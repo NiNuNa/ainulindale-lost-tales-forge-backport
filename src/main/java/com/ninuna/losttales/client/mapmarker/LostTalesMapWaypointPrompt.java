@@ -588,7 +588,7 @@ final class LostTalesMapWaypointPrompt {
 
         // Editing has four actions, which is more than one row can carry
         // legibly: what the waypoint can do sits above what happens to it.
-        // Dropping the party marker on it is not offered here — travelling to
+        // Dropping the fellowship marker on it is not offered here — travelling to
         // it opens the popup that already carries that action.
         int lowerY = Math.max(y,
                 y + height - BUTTON_BOTTOM_MARGIN - BUTTON_HEIGHT);

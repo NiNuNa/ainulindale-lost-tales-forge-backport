@@ -20,7 +20,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * of each channel, and the server's kept history reaches further back.
  *
  * <p>It names the channel, the conversation for a channel that has more
- * than one (a normalized faction id, a party id; for a whisper the id
+ * than one (a normalized faction id, a fellowship id; for a whisper the id
  * its tab carries; empty otherwise), and
  * the oldest message the client already holds, so the answer carries
  * only what comes before it. The server answers with the lines newest

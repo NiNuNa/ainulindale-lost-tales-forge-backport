@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
@@ -32,7 +33,7 @@ public final class LostTalesChatTypingPacket implements IMessage {
     private static final int MAX_TARGET_BYTES = 64;
 
     private String channelId = "";
-    /** Account name a whisper is for; empty for every other channel. */
+    /** The account a whisper is for, or the fellowship a fellowship line is for; empty otherwise. */
     private String target = "";
     private String targetIdentity = "";
     private UUID targetCharacterId;
@@ -131,10 +132,7 @@ public final class LostTalesChatTypingPacket implements IMessage {
                         this.channelId, MAX_CHANNEL_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.target, MAX_TARGET_BYTES)
-                || (channel == ChatChannel.WHISPER
-                        && this.target.length() == 0)
-                || (channel != ChatChannel.WHISPER
-                        && this.target.length() > 0)
+                || !ChatChannel.targetFits(channel, this.target)
                 || this.identityKind
                         < LostTalesChatSendPacket.IDENTITY_DEFAULT
                 || this.identityKind
@@ -149,8 +147,12 @@ public final class LostTalesChatTypingPacket implements IMessage {
     public ChatChannel getChannel() {
         return ChatChannel.fromId(this.channelId);
     }
-    /** The whisper's account name; empty otherwise. */
+    /** The whisper's account name, or a fellowship line's fellowship id; empty otherwise. */
     public String getTarget() { return this.target; }
+    /** The fellowship a fellowship line is typed for; null for every other line. */
+    public UUID getFellowshipId() {
+        return getChannel() == ChatChannel.FELLOWSHIP ? ChatFellowship.idOf(this.target) : null;
+    }
     public String getTargetIdentity() { return this.targetIdentity; }
     public UUID getTargetCharacterId() { return this.targetCharacterId; }
     public boolean isTyping() { return this.typing; }

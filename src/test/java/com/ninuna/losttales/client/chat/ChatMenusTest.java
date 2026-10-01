@@ -1,5 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatFellowship;
+import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
+import java.util.Collections;
+import java.util.UUID;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.client.window.MenuWindow;
@@ -38,24 +42,34 @@ public final class ChatMenusTest {
     }
 
     @Test
-    public void restorableChannelsAreTheClosedOnesThePlayerCouldSee() {
-        List<ChatChannel> expected = new ArrayList<ChatChannel>();
-        for (ChatChannel channel : ChatLayout.closedChannels()) {
-            if (ClientChatChannelState.isAvailable(channel)) {
-                expected.add(channel);
-            }
+    public void restorableTabsAreTheClosedOnesThePlayerCouldSee() {
+        for (ChatTab tab : ChatMenus.restorableTabs()) {
+            assertTrue(ClientChatChannelState.isAvailable(tab));
+            assertFalse(ChatLayout.isOpen(tab));
         }
-        assertEquals(expected, ChatMenus.restorableChannels());
-        for (ChatChannel channel : ChatMenus.restorableChannels()) {
-            assertFalse(ChatLayout.isOpen(ChatTab.of(channel)));
+    }
+
+    /** The Fellowship channel is offered as one tab for each fellowship, never as its own. */
+    @Test
+    public void eachFellowshipIsOfferedByItsOwnTab() {
+        UUID grey = new UUID(7L, 7L);
+        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(null,
+                Collections.singletonList(new ChatFellowship(grey, "Grey Company", 0x123456)),
+                false));
+        try {
+            List<ChatTab> offered = ChatMenus.restorableTabs();
+            assertTrue(offered.contains(ChatTab.of(ChatChannel.FELLOWSHIP, grey.toString())));
+            assertFalse(offered.contains(ChatTab.of(ChatChannel.FELLOWSHIP)));
+        } finally {
+            ClientChatIdentitySelection.clear();
         }
     }
 
     @Test
     public void closedUnreadCountIsCappedJustPastTheCounterLimit() {
         int total = 0;
-        for (ChatChannel channel : ChatMenus.restorableChannels()) {
-            total += ClientChatChannelViews.unreadCount(channel);
+        for (ChatTab tab : ChatMenus.restorableTabs()) {
+            total += ClientChatChannelViews.unreadCount(tab);
         }
         assertEquals(Math.min(ClientChatChannelViews.MAX_UNREAD + 1, total),
                 ChatMenus.closedUnreadCount());
@@ -102,7 +116,7 @@ public final class ChatMenusTest {
             assertTrue(tab != null);
             assertFalse(ChatLayout.isOpen(tab));
         }
-        assertEquals(ChatMenus.restorableChannels().size(), rows);
+        assertEquals(ChatMenus.restorableTabs().size(), rows);
         List<MenuWindow.Entry> none = new ArrayList<MenuWindow.Entry>();
         ChatMenus.addOpenable(null, none, "zzzz-nothing", true);
         assertTrue(none.isEmpty());

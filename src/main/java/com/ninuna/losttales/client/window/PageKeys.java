@@ -235,7 +235,7 @@ public final class PageKeys {
                         window("pages.mark", shift, PLUS, CLICK),
                         window("pages.clear_marks", CLICK),
                         window("pages.options", CLICK, OR, RIGHT_CLICK),
-                        window("pages.option_buttons", CLICK, OR, RIGHT_CLICK),
+                        window("pages.option_buttons", CLICK),
                         window("pages.settings", CLICK),
                         window("pages.help", Keyboard.KEY_F1, OR, CLICK),
                         window("pages.search", COMMAND, PLUS, Keyboard.KEY_F),

@@ -4,7 +4,7 @@ import com.ninuna.losttales.chat.share.ChatShareKind;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.event.HoverEvent;
 import net.minecraft.util.IChatComponent;
-import com.ninuna.losttales.party.sync.PartyInvitationNotice;
+import com.ninuna.losttales.fellowship.sync.FellowshipInvitationNotice;
 
 /**
  * What a left-click on a run of a chat line does. One answer for the
@@ -46,10 +46,10 @@ final class ChatInteractions {
         ACHIEVEMENT,
         /** A shared map marker flies the map to it. */
         MARKER_SHARE,
-        /** A shared quest opens its preview and may request a party join. */
+        /** A shared quest opens its preview and may request a fellowship join. */
         QUEST_SHARE,
-        /** Accept or Decline on a party invitation answers it. */
-        PARTY_INVITATION,
+        /** Accept or Decline on a fellowship invitation answers it. */
+        FELLOWSHIP_INVITATION,
         /** A web address opens. */
         LINK,
         /** A suggestion is put into the input field. */
@@ -58,11 +58,11 @@ final class ChatInteractions {
         COMMAND
     }
 
-    /** The party invitation answer the run carries, or null. */
-    static PartyInvitationNotice.Answer invitationAnswer(IChatComponent part) {
+    /** The fellowship invitation answer the run carries, or null. */
+    static FellowshipInvitationNotice.Answer invitationAnswer(IChatComponent part) {
         ClickEvent click = part == null || part.getChatStyle() == null ? null
                 : part.getChatStyle().getChatClickEvent();
-        return click == null ? null : PartyInvitationNotice.parse(click.getValue());
+        return click == null ? null : FellowshipInvitationNotice.parse(click.getValue());
     }
 
     /** LOTR's own hover action for one of its achievements, by the name it serializes under. */
@@ -94,7 +94,7 @@ final class ChatInteractions {
             return Action.CHANNEL_LINK;
         }
         if (invitationAnswer(part) != null) {
-            return Action.PARTY_INVITATION;
+            return Action.FELLOWSHIP_INVITATION;
         }
         // A person is not a link either: the head, the name, its
         // brackets and title, or a mention.

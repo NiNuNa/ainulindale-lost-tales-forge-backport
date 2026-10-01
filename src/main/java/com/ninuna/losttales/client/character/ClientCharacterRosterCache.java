@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * Client-only synchronized view model. It is never authoritative.
  *
- * <p>Each request is answered on its own, as the party's are: the answer
+ * <p>Each request is answered on its own, as the fellowship's are: the answer
  * waits under its request id until whoever sent it reads it, so a second
  * quick request never takes the first one's answer. A roster older than
  * the one held, arriving late, still completes its request but is not

@@ -32,8 +32,9 @@ public final class LostTalesChatPacketTest {
 
     @Test
     public void sendRequestRoundTripsAndRejectsTrailingData() {
-        LostTalesChatSendPacket original =
-                ChatPacketFixtures.send(ChatChannel.PARTY, "Meet at the western gate.").build();
+        java.util.UUID fellowship = java.util.UUID.randomUUID();
+        LostTalesChatSendPacket original = ChatPacketFixtures.send(ChatChannel.FELLOWSHIP,
+                "Meet at the western gate.").to(fellowship.toString()).build();
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatSendPacket decoded =
@@ -41,8 +42,9 @@ public final class LostTalesChatPacketTest {
         decoded.fromBytes(buffer);
 
         assertFalse(decoded.isMalformed());
-        assertEquals(ChatChannel.PARTY, decoded.getChannel());
+        assertEquals(ChatChannel.FELLOWSHIP, decoded.getChannel());
         assertEquals("Meet at the western gate.", decoded.getMessage());
+        assertEquals(fellowship, decoded.getFellowshipId());
         assertTrue(decoded.getReferences().isEmpty());
 
         ByteBuf trailing = Unpooled.buffer();
@@ -464,7 +466,7 @@ public final class LostTalesChatPacketTest {
     /**
      * The message id survives the wire, and a whisper's two copies carry
      * the same one: it is one message, and anything naming it later has
-     * to name it the same to both parties.
+     * to name it the same to both people.
      */
     @Test
     public void theMessageIdRoundTripsAndIsSharedByBothWhisperCopies() {
@@ -1043,7 +1045,7 @@ public final class LostTalesChatPacketTest {
     }
 
     /**
-     * A whisper says which character of each party it is held as and
+     * A whisper says which character of each fellowship it is held as and
      * with, on the wire and through every rebuild; a plain line carries
      * neither, and one claiming them is refused.
      */

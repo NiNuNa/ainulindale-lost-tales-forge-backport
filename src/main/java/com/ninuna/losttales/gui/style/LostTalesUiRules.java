@@ -157,6 +157,39 @@ public final class LostTalesUiRules {
     }
 
     /**
+     * The chat's rule standing on end, as between the two sides of a
+     * split window: opaque at its middle and fading to nothing at its top
+     * and its bottom.
+     */
+    public static void drawStandingRule(float left, float right, float top,
+                                        float bottom, int alpha) {
+        int safeAlpha = Math.max(0, Math.min(255, alpha));
+        if (safeAlpha < LostTalesUiInk.MIN_VISIBLE_ALPHA
+                || right <= left || bottom <= top) {
+            return;
+        }
+        float middle = (top + bottom) / 2.0F;
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        drawStandingRamp(tessellator, left, right, top, middle, 0, safeAlpha);
+        drawStandingRamp(tessellator, left, right, middle, bottom, safeAlpha, 0);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+    }
+
+    /** One half of a standing rule, its alpha {@code topAlpha} at its top and {@code bottomAlpha} at its bottom. */
+    private static void drawStandingRamp(Tessellator tessellator, float left,
+                                         float right, float top, float bottom,
+                                         int topAlpha, int bottomAlpha) {
+        // Same winding as the backdrop: the GUI pass culls back faces.
+        tessellator.setColorRGBA_I(LostTalesUiInk.IVORY, bottomAlpha);
+        tessellator.addVertex(right, bottom, 0.0D);
+        tessellator.setColorRGBA_I(LostTalesUiInk.IVORY, topAlpha);
+        tessellator.addVertex(right, top, 0.0D);
+        tessellator.addVertex(left, top, 0.0D);
+        tessellator.setColorRGBA_I(LostTalesUiInk.IVORY, bottomAlpha);
+        tessellator.addVertex(left, bottom, 0.0D);
+    }
+
+    /**
      * The rule with the stretch from {@code holeLeft} to
      * {@code holeRight} left out — where the selected tab stands on it —
      * hung from the tab: each piece is full where it meets the tab's

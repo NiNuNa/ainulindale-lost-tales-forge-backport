@@ -31,7 +31,7 @@ public final class LostTalesCommandDiscordTest {
 
     @Test
     public void aPrivateOrUnknownChannelIsRefused() {
-        assertNotNull(LostTalesCommandDiscord.linkRefusal("party"));
+        assertNotNull(LostTalesCommandDiscord.linkRefusal("fellowship"));
         assertNotNull(LostTalesCommandDiscord.linkRefusal("nowhere"));
         assertNotNull(LostTalesCommandDiscord.linkRefusal(null));
     }

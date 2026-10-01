@@ -136,7 +136,7 @@ public final class WindowBarTest {
 
     @Test
     public void aFieldAfterTheLeadStandsPastItsOwnDivider() {
-        List<WindowBar.Placed> placed = WindowBar.layOut(withLead("Party",
+        List<WindowBar.Placed> placed = WindowBar.layOut(withLead("Fellowship",
                 BarItem.field("invite", null, "Invite")), 0, 300, SIX);
         WindowBar.Placed identity = of(placed, BarItem.IDENTITY_ID);
         WindowBar.Placed field = of(placed, "invite");

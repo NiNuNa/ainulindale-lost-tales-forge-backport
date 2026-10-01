@@ -8,18 +8,17 @@ import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The chat's own artwork, one sprite sheet: the four picker buttons and
- * the send button, the tab row's controls and their hover states, the
- * window's fullscreen control, the search fields' magnifiers, the tab
- * borders, the framed buttons' corners and a chat window frame's, the
- * window grip, and the hatch
- * laid over empty message rows. Each
- * constant is a cell of {@code textures/gui/chat.png} in
- * texels; the sheet is drawn 1:1 in GUI pixels, so a sprite's width and
- * height are also its size on screen. The padlock's frames are the one
- * thing not held here: they are a regular grid, and
- * {@link LockAnimation} walks it. {@code LostTalesUiSheetTest} locks
- * the constants to the bundled PNG the way the emoji sheet is locked.
+ * The windows' artwork, one sprite sheet: the bar's picker buttons and
+ * the send button, the tab row's and the tool strip's controls with
+ * their lit looks, the options' glyphs, the message toolbar, the
+ * presence marks, the count tile, the tab borders, the framed buttons'
+ * corners, the grip and the hatch laid over empty message rows. Each
+ * constant is a cell of {@code textures/gui/window.png} in texels; the
+ * sheet is drawn 1:1 in GUI pixels, so a sprite's width and height are
+ * also its size on screen. The padlock's frames are the one thing not
+ * held here: they are a regular grid, and {@link LockAnimation} walks
+ * it. {@code LostTalesUiSheetTest} locks the constants to the bundled
+ * PNG the way the emoji sheet is locked.
  */
 public enum LostTalesUiSheet {
     EMOJI(0, 0, 10, 10),
@@ -51,47 +50,28 @@ public enum LostTalesUiSheet {
      * rather than a five-row cell, so it centres on the same row of the
      * strip the {@code +}'s own crossbar stands on.
      */
-    MINUS(12, 13, 5, 1),
-    MINUS_HOVER(18, 13, 5, 1),
-    CLOSE(24, 11, 5, 5),
-    CLOSE_HOVER(30, 11, 5, 5),
-    COG(36, 11, 5, 5),
-    COG_HOVER(42, 11, 5, 5),
+    MINUS(18, 13, 5, 1),
+    MINUS_HOVER(24, 13, 5, 1),
+    CLOSE(36, 11, 5, 5),
+    CLOSE_HOVER(42, 11, 5, 5),
+    COG(48, 11, 5, 5),
+    COG_HOVER(54, 11, 5, 5),
+    /** The favourite heart: plain, and filled in the palette's wine. */
+    HEART(60, 11, 5, 5),
+    HEART_FAVORITE(66, 11, 5, 5),
     /**
-     * The speech bubble, its tail included: the typing line, a reply's
-     * quote and a message link wear it, and the character menu's
-     * Narrator row crosses to its lit artwork.
+     * Two rings of a chain holding each other, with its lit artwork: a
+     * link to a message, on the message toolbar and in the message's
+     * menu.
      */
-    SPEECH_BUBBLE(32, 18, 9, 6),
-    SPEECH_BUBBLE_HOVER(42, 18, 9, 6),
-    GRIP(0, 17, 6, 8),
-    GRIP_HOVER(7, 17, 6, 8),
+    COPY_LINK(72, 11, 7, 5),
+    COPY_LINK_HOVER(80, 11, 7, 5),
     /**
-     * The window's fullscreen control: four corners pointing out while
-     * the window keeps its own size, pointing in while it fills the
-     * screen, each with its lit artwork.
+     * The timestamp area's button: one person, for the heads the area
+     * holds, with its lit cell to the right.
      */
-    FULLSCREEN(75, 26, 5, 5),
-    FULLSCREEN_HOVER(81, 26, 5, 5),
-    FULLSCREEN_EXIT(63, 26, 5, 5),
-    FULLSCREEN_EXIT_HOVER(69, 26, 5, 5),
-    /**
-     * The pen a tab wears while something is written in its input and
-     * not yet sent, resting and lit: the draft mark, beside the
-     * fullscreen controls on the sheet.
-     */
-    DRAFT(87, 26, 4, 5),
-    DRAFT_HOVER(92, 26, 4, 5),
-    /**
-     * A question mark and an exclamation mark, each in the chat's ivory
-     * and in a colour of its own — the question green, the exclamation
-     * crimson. The question heads a question window; the exclamation
-     * marks the message menu's report row and the report menu.
-     */
-    QUESTION(97, 26, 3, 5),
-    QUESTION_LIT(101, 26, 3, 5),
-    EXCLAMATION(102, 11, 1, 5),
-    EXCLAMATION_LIT(104, 11, 1, 5),
+    AREA(88, 11, 4, 5),
+    AREA_HOVER(93, 11, 4, 5),
     /**
      * The mark a head wears for the presence of the identity it shows,
      * at the head's bottom-right corner in a notch cut out of the head
@@ -102,116 +82,140 @@ public enum LostTalesUiSheet {
      * sees of Invisible; the hollows are painted in, shaded plum at two
      * thirds. The ivory sphere is not a presence: it is the lit look a
      * status row's mark crosses to under the pointer in the head
-     * button's menu.
+     * button's menu, and the mark a tab's icon wears for lines not read.
      */
-    PRESENCE_SELECTED(17, 26, 5, 5),
-    PRESENCE_OFFLINE(23, 26, 5, 5),
-    PRESENCE_ONLINE(29, 26, 5, 5),
-    PRESENCE_AWAY(35, 26, 5, 5),
-    PRESENCE_BUSY(41, 26, 5, 5),
+    PRESENCE_SELECTED(0, 17, 5, 5),
+    PRESENCE_OFFLINE(6, 17, 5, 5),
+    PRESENCE_ONLINE(12, 17, 5, 5),
+    PRESENCE_AWAY(18, 17, 5, 5),
+    PRESENCE_BUSY(24, 17, 5, 5),
     /**
      * The member list's button: two people, one standing before the
      * other, with its lit cell to the right.
      */
-    MEMBERS(47, 26, 7, 5),
-    MEMBERS_HOVER(55, 26, 7, 5),
+    MEMBERS(30, 17, 7, 5),
+    MEMBERS_HOVER(38, 17, 7, 5),
+    /**
+     * The window's fullscreen control: four corners pointing out while
+     * the window keeps its own size, pointing in while it fills the
+     * screen, each with its lit artwork.
+     */
+    FULLSCREEN_EXIT(46, 17, 5, 5),
+    FULLSCREEN_EXIT_HOVER(52, 17, 5, 5),
+    FULLSCREEN(58, 17, 5, 5),
+    FULLSCREEN_HOVER(64, 17, 5, 5),
+    /**
+     * The pen a tab wears while something is written in its input and
+     * not yet sent, resting and lit: the draft mark.
+     */
+    DRAFT(70, 17, 4, 5),
+    DRAFT_HOVER(75, 17, 4, 5),
+    /**
+     * A question mark in ivory and in green: it heads a question window,
+     * and stands at the tool strip's end for a page's help.
+     */
+    QUESTION(80, 17, 3, 5),
+    QUESTION_LIT(84, 17, 3, 5),
+    /** A pin, resting and lit: a window's two pins in Window Options. */
+    PIN(88, 17, 3, 5),
+    PIN_LIT(92, 17, 3, 5),
+    /**
+     * Three dots in a row, with its lit artwork beneath it on the sheet:
+     * the message toolbar's menu button, a tab's options and Window
+     * Options.
+     */
+    MORE(96, 17, 8, 2),
+    MORE_HOVER(96, 20, 8, 2),
     /**
      * A hovered message's toolbar controls, each with its lit artwork:
      * copy, a page with its corner turned down, and reply, an arrow
      * curling back to the left.
      */
-    COPY(45, 32, 4, 5),
-    COPY_HOVER(50, 32, 4, 5),
-    REPLY(55, 32, 4, 5),
-    REPLY_HOVER(60, 32, 4, 5),
+    COPY(0, 23, 4, 5),
+    COPY_HOVER(5, 23, 4, 5),
+    REPLY(10, 23, 4, 5),
+    REPLY_HOVER(15, 23, 4, 5),
     /**
      * An arrow curling on to the right, with its lit artwork: forwarding a
      * message to another conversation, on the message toolbar, over the
      * list of conversations, and where a forward's row opens.
      */
-    FORWARD(65, 32, 4, 5),
-    FORWARD_HOVER(70, 32, 4, 5),
+    FORWARD(20, 23, 4, 5),
+    FORWARD_HOVER(25, 23, 4, 5),
     /**
-     * The message toolbar's menu button, three dots in a row, with its
-     * lit artwork beneath it on the sheet: it opens the message's own
-     * menu, the one a right click opens.
+     * An exclamation mark in ivory and in crimson: the message menu's
+     * report row and the report menu, and the journal's Active filter.
      */
-    MORE(36, 32, 8, 2),
-    MORE_HOVER(36, 35, 8, 2),
-    /**
-     * A tab's count of unread mentions, as a messenger's mention badge
-     * is: a crimson tile as tall as the capitals, built from its left
-     * edge and one figure after it — one to nine in ivory, or the plus
-     * past nine ({@link #drawJoinedWithShadow}).
-     */
-    COUNT_LEFT(52, 18, 1, 7),
-    COUNT_MORE(54, 18, 4, 7),
-    COUNT_1(59, 18, 4, 7),
-    COUNT_2(64, 18, 4, 7),
-    COUNT_3(69, 18, 4, 7),
-    COUNT_4(74, 18, 4, 7),
-    COUNT_5(79, 18, 4, 7),
-    COUNT_6(84, 18, 4, 7),
-    COUNT_7(89, 18, 4, 7),
-    COUNT_8(94, 18, 4, 7),
-    COUNT_9(99, 18, 4, 7),
-    /**
-     * The magnifier every search field opens with, and its lit artwork,
-     * which the search bar and the pickers cross to while their field
-     * takes the keys or the pointer is on it.
-     */
-    SEARCH(14, 17, 8, 8),
-    SEARCH_HOVER(23, 17, 8, 8),
-    /**
-     * A framed button's four corners, resting and lit: six-texel cells
-     * whose innermost column and row are the frame's edges, stretched
-     * between the corners to any size ({@link LostTalesUiFramedButton}). Like
-     * the tab pieces they bring ink alone; their backdrop texels preview
-     * the surface the button paints itself.
-     */
-    FRAME_TOP_LEFT(0, 79, 6, 6),
-    FRAME_TOP_RIGHT(7, 79, 6, 6),
-    FRAME_BOTTOM_LEFT(0, 86, 6, 6),
-    FRAME_BOTTOM_RIGHT(7, 86, 6, 6),
-    FRAME_LIT_TOP_LEFT(14, 79, 6, 6),
-    FRAME_LIT_TOP_RIGHT(21, 79, 6, 6),
-    FRAME_LIT_BOTTOM_LEFT(14, 86, 6, 6),
-    FRAME_LIT_BOTTOM_RIGHT(21, 86, 6, 6),
-    /**
-     * A chat window's frame, its corners and, stretched as a framed
-     * button's are, its edges: the lit framed button's ink texel for
-     * texel, previewing the window's plum black behind it where a
-     * button's cells preview their plum grey.
-     */
-    WINDOW_FRAME_TOP_LEFT(28, 79, 6, 6),
-    WINDOW_FRAME_TOP_RIGHT(35, 79, 6, 6),
-    WINDOW_FRAME_BOTTOM_LEFT(28, 86, 6, 6),
-    WINDOW_FRAME_BOTTOM_RIGHT(35, 86, 6, 6),
-    /** The favourite heart: plain, and filled in the palette's wine. */
-    HEART(48, 11, 5, 5),
-    HEART_FAVORITE(54, 11, 5, 5),
+    EXCLAMATION(30, 23, 1, 5),
+    EXCLAMATION_LIT(32, 23, 1, 5),
     /**
      * The insert-toolbar chevron's animation, five frames from pointing
      * right (the inserts are out and fold back toward it) to pointing
      * left (they are away and open leftward), each cell exactly its own
      * artwork so a frame centres on the control however wide it is.
      */
-    TOGGLE_1(60, 11, 3, 5),
-    TOGGLE_2(64, 11, 2, 5),
-    TOGGLE_3(67, 11, 1, 5),
-    TOGGLE_4(69, 11, 2, 5),
-    TOGGLE_5(72, 11, 3, 5),
-    TOGGLE_1_HOVER(76, 11, 3, 5),
-    TOGGLE_2_HOVER(80, 11, 2, 5),
-    TOGGLE_3_HOVER(83, 11, 1, 5),
-    TOGGLE_4_HOVER(85, 11, 2, 5),
-    TOGGLE_5_HOVER(88, 11, 3, 5),
+    TOGGLE_1(36, 23, 3, 5),
+    TOGGLE_2(40, 23, 2, 5),
+    TOGGLE_3(43, 23, 1, 5),
+    TOGGLE_4(45, 23, 2, 5),
+    TOGGLE_5(48, 23, 3, 5),
+    TOGGLE_1_HOVER(52, 23, 3, 5),
+    TOGGLE_2_HOVER(56, 23, 2, 5),
+    TOGGLE_3_HOVER(59, 23, 1, 5),
+    TOGGLE_4_HOVER(61, 23, 2, 5),
+    TOGGLE_5_HOVER(64, 23, 3, 5),
     /**
-     * The timestamp area's button: one person, for the heads the area
-     * holds, with its lit cell to the right.
+     * A conversation's Notifications: the bell in the colour of what it
+     * is set to (ivory for Only Mentions, green for Everything, crimson
+     * for Nothing), and its lit artwork in honey.
      */
-    AREA(92, 11, 4, 5),
-    AREA_HOVER(97, 11, 4, 5),
+    BELL(68, 23, 5, 5),
+    BELL_EVERYTHING(74, 23, 5, 5),
+    BELL_NOTHING(80, 23, 5, 5),
+    BELL_LIT(86, 23, 5, 5),
+    /**
+     * A conversation's Show in Feed: a small speech bubble in the colours
+     * the bell wears for the same three words, and in honey lit.
+     */
+    FEED(0, 29, 6, 5),
+    FEED_EVERYTHING(7, 29, 6, 5),
+    FEED_NOTHING(14, 29, 6, 5),
+    FEED_LIT(21, 29, 6, 5),
+    GRIP(0, 35, 6, 8),
+    GRIP_HOVER(7, 35, 6, 8),
+    /**
+     * The magnifier every search field opens with, and its lit artwork,
+     * which the search bar and the pickers cross to while their field
+     * takes the keys or the pointer is on it.
+     */
+    SEARCH(14, 35, 8, 8),
+    SEARCH_HOVER(23, 35, 8, 8),
+    /**
+     * The speech bubble, its tail included: the typing line, a reply's
+     * quote and a message link wear it, and the character menu's
+     * Narrator row crosses to its lit artwork.
+     */
+    SPEECH_BUBBLE(32, 36, 9, 6),
+    SPEECH_BUBBLE_HOVER(42, 36, 9, 6),
+    /**
+     * A tab's count of unread mentions, as a messenger's mention badge
+     * is: a crimson tile as tall as the capitals with rounded corners,
+     * built from its left edge, a row shorter at each end, and its
+     * figures after it: one to nine in ivory, and the plus. Each figure
+     * carries the tile's right edge in its last column
+     * ({@link #drawCountTile}).
+     */
+    COUNT_LEFT(52, 36, 1, 5),
+    COUNT_MORE(54, 35, 4, 7),
+    COUNT_1(59, 35, 4, 7),
+    COUNT_2(64, 35, 4, 7),
+    COUNT_3(69, 35, 4, 7),
+    COUNT_4(74, 35, 4, 7),
+    COUNT_5(79, 35, 4, 7),
+    COUNT_6(84, 35, 4, 7),
+    COUNT_7(89, 35, 4, 7),
+    COUNT_8(94, 35, 4, 7),
+    COUNT_9(99, 35, 4, 7),
     /**
      * A tab's two border pieces. Each carries the corner it turns at the
      * top, the line that runs down the tab's side, and the tab's own
@@ -221,12 +225,12 @@ public enum LostTalesUiSheet {
      * wider: each piece ends in a foot on its last row, which stands on
      * the strip's rule, reaching one texel out past the tab's side.
      */
-    TAB_LEFT(0, 59, 4, 19),
-    TAB_RIGHT(5, 59, 4, 19),
-    TAB_HOVER_LEFT(10, 59, 4, 19),
-    TAB_HOVER_RIGHT(15, 59, 4, 19),
-    TAB_SELECTED_LEFT(20, 58, 5, 20),
-    TAB_SELECTED_RIGHT(26, 58, 5, 20),
+    TAB_LEFT(0, 75, 4, 19),
+    TAB_RIGHT(5, 75, 4, 19),
+    TAB_HOVER_LEFT(10, 75, 4, 19),
+    TAB_HOVER_RIGHT(15, 75, 4, 19),
+    TAB_SELECTED_LEFT(20, 74, 5, 20),
+    TAB_SELECTED_RIGHT(26, 74, 5, 20),
     /**
      * The selected pair as the hand lifts it off the row: a row taller
      * at the top, its feet on the same row, its contours warmed through
@@ -235,15 +239,32 @@ public enum LostTalesUiSheet {
      * stretches along that run from the one shape to the other and its
      * feet never leave the rule.
      */
-    TAB_LIFTED_LEFT(32, 57, 5, 21),
-    TAB_LIFTED_RIGHT(38, 57, 5, 21),
+    TAB_LIFTED_LEFT(32, 73, 5, 21),
+    TAB_LIFTED_RIGHT(38, 73, 5, 21),
+    /**
+     * A framed button's four corners, resting and lit: six-texel cells
+     * whose innermost column and row are the frame's edges, stretched
+     * between the corners to any size ({@link LostTalesUiFramedButton}).
+     * The window frame is drawn from the lit corners
+     * ({@link LostTalesUiWindowFrame}). Like the tab pieces they bring ink
+     * alone; their backdrop texels preview the surface the button paints
+     * itself.
+     */
+    FRAME_TOP_LEFT(0, 95, 6, 6),
+    FRAME_TOP_RIGHT(7, 95, 6, 6),
+    FRAME_BOTTOM_LEFT(0, 102, 6, 6),
+    FRAME_BOTTOM_RIGHT(7, 102, 6, 6),
+    FRAME_LIT_TOP_LEFT(14, 95, 6, 6),
+    FRAME_LIT_TOP_RIGHT(21, 95, 6, 6),
+    FRAME_LIT_BOTTOM_LEFT(14, 102, 6, 6),
+    FRAME_LIT_BOTTOM_RIGHT(21, 102, 6, 6),
     /**
      * The hatch laid over message rows the history does not reach: a
      * 45° line every eight texels. The pattern's period divides the
      * cell in both directions, so whole cells meet seamlessly wherever
      * the region is tiled with them.
      */
-    EMPTY_HATCH(0, 26, 16, 16),
+    EMPTY_HATCH(18, 44, 16, 16),
     /**
      * The chevron a control opens a list below itself with, animated:
      * five frames from pointing down (the list is away and opens
@@ -258,21 +279,21 @@ public enum LostTalesUiSheet {
      * button rest in ivory and light to the lit run; the tab search
      * button rests in the muted run and lights to ivory.</p>
      */
-    CHEVRON_1(0, 43, 5, 3),
-    CHEVRON_2(0, 47, 5, 2),
-    CHEVRON_3(0, 50, 5, 1),
-    CHEVRON_4(0, 52, 5, 2),
-    CHEVRON_5(0, 55, 5, 3),
-    CHEVRON_1_HOVER(6, 43, 5, 3),
-    CHEVRON_2_HOVER(6, 47, 5, 2),
-    CHEVRON_3_HOVER(6, 50, 5, 1),
-    CHEVRON_4_HOVER(6, 52, 5, 2),
-    CHEVRON_5_HOVER(6, 55, 5, 3),
-    CHEVRON_1_MUTED(12, 43, 5, 3),
-    CHEVRON_2_MUTED(12, 47, 5, 2),
-    CHEVRON_3_MUTED(12, 50, 5, 1),
-    CHEVRON_4_MUTED(12, 52, 5, 2),
-    CHEVRON_5_MUTED(12, 55, 5, 3);
+    CHEVRON_1(0, 44, 5, 3),
+    CHEVRON_2(0, 48, 5, 2),
+    CHEVRON_3(0, 51, 5, 1),
+    CHEVRON_4(0, 53, 5, 2),
+    CHEVRON_5(0, 56, 5, 3),
+    CHEVRON_1_HOVER(6, 44, 5, 3),
+    CHEVRON_2_HOVER(6, 48, 5, 2),
+    CHEVRON_3_HOVER(6, 51, 5, 1),
+    CHEVRON_4_HOVER(6, 53, 5, 2),
+    CHEVRON_5_HOVER(6, 56, 5, 3),
+    CHEVRON_1_MUTED(12, 44, 5, 3),
+    CHEVRON_2_MUTED(12, 48, 5, 2),
+    CHEVRON_3_MUTED(12, 51, 5, 1),
+    CHEVRON_4_MUTED(12, 53, 5, 2),
+    CHEVRON_5_MUTED(12, 56, 5, 3);
 
     /**
      * What a frame or tab piece must clear to be drawn: the artwork
@@ -281,9 +302,9 @@ public enum LostTalesUiSheet {
      * from it cuts at the same place.
      */
     public static final float INK_THRESHOLD = 0.8F;
-    public static final String TEXTURE_PATH = "textures/gui/chat.png";
+    public static final String TEXTURE_PATH = "textures/gui/window.png";
     public static final int SHEET_WIDTH = 108;
-    public static final int SHEET_HEIGHT = 92;
+    public static final int SHEET_HEIGHT = 108;
     private static final ResourceLocation TEXTURE =
             new ResourceLocation("losttales", TEXTURE_PATH);
 
@@ -447,25 +468,70 @@ public enum LostTalesUiSheet {
                 1.0F - (1.0F - whole) / (1.0F - laid)));
     }
 
+    /** The highest count a tile shows as a number; past it, {@code 99+}. */
+    public static final int COUNT_MOST = 99;
+
+    /** What a count tile reads for {@code count}: the number up to 99, then {@code 99+}. */
+    public static String countText(int count) {
+        return count > COUNT_MOST ? COUNT_MOST + "+"
+                : String.valueOf(Math.max(1, count));
+    }
+
+    /** How wide the tile for {@code count} stands: its left edge and a cell per figure. */
+    public static int countTileWidth(int count) {
+        return COUNT_LEFT.width + countText(count).length() * COUNT_1.width;
+    }
+
     /**
-     * Two cells side by side, {@code first} from ({@code x}, {@code y})
-     * and {@code second} straight after it, their tops level, over one
-     * shadow for both as a single sprite casts it: how a count tile is
-     * drawn, its left edge and then its figure.
+     * A count tile with its top left at ({@code x}, {@code y}), over one
+     * shadow as a single sprite casts it: the left edge a row in from the
+     * top and the bottom, then a figure per digit and the plus past 99.
+     * Each figure's last column is the tile's right edge, its corners
+     * rounded; between two figures those corners are filled from the
+     * figure's own top and bottom rows, so the tile runs on unbroken. The
+     * sheet has no nought yet: it is drawn from the eight with its waist
+     * taken out, until it is painted.
      */
-    public static void drawJoinedWithShadow(LostTalesUiSheet first,
-                                            LostTalesUiSheet second, float x,
-                                            float y, int alpha) {
-        float secondX = x + first.width;
-        drawShadow(first.u, first.v, first.width, first.height, x, y, alpha);
-        drawShadow(second.u, second.v, second.width, second.height, secondX,
-                y, alpha);
+    public static void drawCountTile(int count, float x, float y, int alpha) {
+        String text = countText(count);
+        int[][] pieces = new int[4 + text.length() * 6][];
+        int laid = 0;
+        pieces[laid++] = new int[] {COUNT_LEFT.u, COUNT_LEFT.v, 1, 5, 0, 1};
+        int left = COUNT_LEFT.width;
+        for (int index = 0; index < text.length(); index++) {
+            char figure = text.charAt(index);
+            // COUNT_1 to COUNT_9 stand in order, so a digit is an offset.
+            LostTalesUiSheet cell = figure == '+' ? COUNT_MORE
+                    : figure == '0' ? COUNT_8
+                    : values()[COUNT_1.ordinal() + figure - '1'];
+            if (figure == '0') {
+                pieces[laid++] = new int[] {cell.u, cell.v, 4, 3, left, 0};
+                pieces[laid++] = new int[] {cell.u, cell.v + 4, 4, 1, left, 3};
+                pieces[laid++] = new int[] {cell.u, cell.v + 4, 4, 3, left, 4};
+            } else {
+                pieces[laid++] = new int[] {cell.u, cell.v, 4, 7, left, 0};
+            }
+            if (index < text.length() - 1) {
+                pieces[laid++] = new int[] {cell.u + 2, cell.v, 1, 1,
+                        left + 3, 0};
+                pieces[laid++] = new int[] {cell.u + 2, cell.v + 6, 1, 1,
+                        left + 3, 6};
+            }
+            left += COUNT_1.width;
+        }
+        for (int index = 0; index < laid; index++) {
+            int[] piece = pieces[index];
+            drawShadow(piece[0], piece[1], piece[2], piece[3], x + piece[4],
+                    y + piece[5], alpha);
+        }
         // The cells stand over their shadow, so a translucent picture
         // does not show the one through the other.
         LostTalesUiFlatLayers.nextLayer();
-        draw(first.u, first.v, first.width, first.height, x, y, alpha);
-        draw(second.u, second.v, second.width, second.height, secondX, y,
-                alpha);
+        for (int index = 0; index < laid; index++) {
+            int[] piece = pieces[index];
+            draw(piece[0], piece[1], piece[2], piece[3], x + piece[4],
+                    y + piece[5], alpha);
+        }
     }
 
     /** The shared drop shadow: the same cell, offset, in the shadow tone. */
@@ -565,14 +631,6 @@ public enum LostTalesUiSheet {
         }
         float ramp = 1.0F - Math.abs(y - middle) / half;
         return Math.round(alpha * Math.max(0.0F, Math.min(1.0F, ramp)));
-    }
-
-    /** The figure a count tile shows for {@code count}: one to nine, the plus past nine. */
-    public static LostTalesUiSheet countFigure(int count) {
-        LostTalesUiSheet[] figures = {COUNT_1, COUNT_2, COUNT_3, COUNT_4,
-                COUNT_5, COUNT_6, COUNT_7, COUNT_8, COUNT_9};
-        return count > figures.length ? COUNT_MORE
-                : figures[Math.max(1, count) - 1];
     }
 
     /** The sprite at its own size, 1:1, at the given opacity. */

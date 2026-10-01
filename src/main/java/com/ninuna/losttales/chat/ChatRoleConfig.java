@@ -368,7 +368,7 @@ public final class ChatRoleConfig {
      * channel by it. {@code rule} is how the server routes it —
      * {@code everyone}, {@code proximity} or
      * {@code operators}; the rules that need something the config cannot
-     * describe (a party, a faction, a whisper, a private console) are
+     * describe (a fellowship, a faction, a whisper, a private console) are
      * refused. {@code ooc} makes it an out-of-character channel: its
      * lines are said as the account, the name in the colour of the
      * account's highest role ({@link ChatPresentationMode}).
@@ -449,8 +449,8 @@ public final class ChatRoleConfig {
 
     /**
      * The routing a config may ask for. The rules left out each need
-     * something only the game can supply — a party, a faction, the two
-     * parties of a whisper, one player's own console — so a channel
+     * something only the game can supply — a fellowship, a faction, the two
+     * people of a whisper, one player's own console — so a channel
      * defined by data cannot name them.
      */
     private static ChatRecipientRule definedRule(String rule) {

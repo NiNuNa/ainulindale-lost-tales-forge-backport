@@ -4,25 +4,24 @@ import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentityPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
-import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 
 /**
  * Synchronizes the shared chat selection with the server and holds what
- * the server says of the party of the character played: its id, the
- * colour worn in it, its leader's name and its own, which name the Party
- * tab. An answer for another identity than the one selected now is a
- * late one and is ignored.
+ * the server says of the fellowships of the character played, the one
+ * it travels with first: each one's id, name and the colour worn in it,
+ * which name and colour its conversation. An answer for another identity
+ * than the one selected now is a late one and is ignored.
  */
 public final class ClientChatIdentitySelection {
     private static String requestedKey;
     private static boolean requestedNarrating;
     private static String confirmedKey;
-    private static String partyKey = "";
-    private static int partyColor;
-    private static String partyLeader = "";
-    private static String partyName = "";
+    private static List<ChatFellowship> fellowships = Collections.emptyList();
     private static long requestedAt;
 
     private ClientChatIdentitySelection() {}
@@ -52,40 +51,37 @@ public final class ClientChatIdentitySelection {
         String key = ChatTab.ownerKeyOf(packet.getCharacterId());
         if (!key.equals(ClientChatIdentities.viewIdentityKey())) { return; }
         confirmedKey = key;
-        partyKey = ChatTab.ownerKeyOf(packet.getPartyId());
-        partyColor = packet.getPartyColor();
-        partyLeader = packet.getPartyLeader();
-        partyName = packet.getPartyName();
+        fellowships = packet.getFellowships();
         ClientChatIdentities.confirmNarrating(packet.isNarrating());
     }
 
-    /** The party of the character played, as the server confirmed it; empty for none. */
-    static String partyKey() {
-        return ClientChatIdentities.viewIdentityKey().equals(confirmedKey) ? partyKey : "";
+    /** The fellowships of the character played, the one travelled with first, as the server confirmed them. */
+    static List<ChatFellowship> fellowships() {
+        return ClientChatIdentities.viewIdentityKey().equals(confirmedKey)
+                ? fellowships : Collections.<ChatFellowship>emptyList();
     }
 
-    static int partyColor() {
-        return partyKey().length() == 0 ? ChatChannel.PARTY.getDisplayColor() : partyColor;
+    /** The fellowship a conversation's key names, of the character played; null for none. */
+    static ChatFellowship fellowship(String key) {
+        for (ChatFellowship fellowship : fellowships()) {
+            if (ChatTab.ownerKeyOf(fellowship.getId()).equals(key)) {
+                return fellowship;
+            }
+        }
+        return null;
     }
 
-    /** The leader's character name of that party; empty without one. */
-    static String partyLeader() {
-        return partyKey().length() == 0 ? "" : partyLeader;
-    }
-
-    /** The name the leader gave that party; empty when it has none, or without one. */
-    static String partyName() {
-        return partyKey().length() == 0 ? "" : partyName;
+    /** The key of the fellowship travelled with; empty for none. */
+    static String travellingKey() {
+        List<ChatFellowship> all = fellowships();
+        return all.isEmpty() ? "" : ChatTab.ownerKeyOf(all.get(0).getId());
     }
 
     public static void clear() {
         requestedKey = null;
         requestedNarrating = false;
         confirmedKey = null;
-        partyKey = "";
-        partyColor = 0;
-        partyLeader = "";
-        partyName = "";
+        fellowships = Collections.emptyList();
         requestedAt = 0L;
     }
 }

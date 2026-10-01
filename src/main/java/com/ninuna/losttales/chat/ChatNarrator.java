@@ -6,7 +6,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
  * The Narrator: the voice a storyteller speaks with in the roleplaying
  * channels, whispers included, while it is chosen. It rides on the
  * chat identity underneath — a line is still routed by that identity's
- * faction and party and recorded under the account — and changes only
+ * faction and fellowship and recorded under the account — and changes only
  * how the line is signed: the name Narrator, the parchment colour, a
  * mark where a head would stand, the words in italics, and no speech
  * bubble. Choosing it needs the {@code chat.narrate} capability, which

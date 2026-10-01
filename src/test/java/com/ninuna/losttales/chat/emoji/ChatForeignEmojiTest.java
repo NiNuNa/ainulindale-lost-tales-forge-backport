@@ -58,9 +58,9 @@ public final class ChatForeignEmojiTest {
         assertNull("thirty-three characters",
                 ChatForeignEmoji.customKey(repeat("p", 33), "556"));
         assertNotNull(ChatForeignEmoji.customKey(repeat("p", 32), "556"));
-        assertNull(ChatForeignEmoji.customKey("party-parrot", "556"));
-        assertNull(ChatForeignEmoji.customKey("party parrot", "556"));
-        assertNull(ChatForeignEmoji.customKey("party:parrot", "556"));
+        assertNull(ChatForeignEmoji.customKey("fellowship-parrot", "556"));
+        assertNull(ChatForeignEmoji.customKey("fellowship parrot", "556"));
+        assertNull(ChatForeignEmoji.customKey("fellowship:parrot", "556"));
         assertNull(ChatForeignEmoji.customKey("partyparrot", ""));
         assertNull(ChatForeignEmoji.customKey("partyparrot", "12a"));
         assertNull("a leading zero would be a second spelling of one id",

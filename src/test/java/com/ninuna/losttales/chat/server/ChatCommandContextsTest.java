@@ -60,8 +60,8 @@ public final class ChatCommandContextsTest {
         assertEquals("", ChatCommandContexts.answerLine(STEVE,
                 2000L + ChatCommandContexts.VALID_MILLIS + 1L));
         // No note: no context, and a stale context is dropped with it.
-        ChatCommandContexts.note(ALEX, "party", 3000L);
-        assertEquals("party", ChatCommandContexts.beginCommand(ALEX, 3000L));
+        ChatCommandContexts.note(ALEX, "fellowship", 3000L);
+        assertEquals("fellowship", ChatCommandContexts.beginCommand(ALEX, 3000L));
         assertEquals("", ChatCommandContexts.beginCommand(ALEX, 3100L));
         assertEquals("", ChatCommandContexts.answerLine(ALEX, 3100L));
         assertEquals("", ChatCommandContexts.beginCommand(null, 3100L));

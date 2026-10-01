@@ -115,6 +115,8 @@ public final class WindowScreen extends GuiChat
     private final SnapLayouts.Flyout snapFlyout = new SnapLayouts.Flyout();
     /** The pickers' windows, the menus and cards: whatever opens on a click and stays. */
     private final SubWindows subWindows = new SubWindows();
+    /** How strongly each window shows under the windows in front of it. */
+    private final StackFade stackFade = new StackFade();
     /** The pages' input bars. */
     private final WindowBar bar = new WindowBar(new BarLead.Voice() {
         @Override
@@ -173,6 +175,10 @@ public final class WindowScreen extends GuiChat
     private int edgePressX;
     private int edgePressY;
     private int edgePressNumber;
+    /** The same for the last press on a split's divider. */
+    private String dividerPressWindowId;
+    private long dividerPressNanos;
+    private int dividerPressNumber;
     /** The screen's presses, counted: a double click is two in a row. */
     private int pressCount;
     private boolean openAnimationStarted;
@@ -691,6 +697,14 @@ public final class WindowScreen extends GuiChat
                     : WindowPages.contentOf(front);
             if (content != null) {
                 content.tick();
+            }
+            // The other page of a split shown keeps time beside it.
+            WindowSplit split = shown.isEmpty() ? null : window.splitOf(front);
+            WindowTab other = split == null ? null : split.other(front);
+            PageContent beside = other == null || !shown.contains(other) ? null
+                    : WindowPages.contentOf(other);
+            if (content != null && beside != null) {
+                beside.tick();
             }
         }
         for (ScreenPart part : this.parts) {
@@ -1217,29 +1231,35 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * A right-click on a control of the tool strip: on an option's button
-     * it steps the option back, as on its row; on any other control it
-     * opens the window's Window Options, as on the bare strip.
+     * A right-click anywhere on the tool strip opens the options of the
+     * page in front at the pointer, as a right-click on its tab does: the
+     * strip and everything on it belong to the page, not to the window.
      */
     private void rightClickToolStrip(WindowHover press, double x) {
         selectWindow(press.window);
-        if (press.stripPart == ToolStrip.Part.OPTION) {
-            takeStripOption(press, true);
-            return;
-        }
-        this.tabMenus.showWindowMenu(press.window,
+        this.tabMenus.showTabMenu(press.window.getActiveTab(),
                 SubWindowAnchor.onToolStrip(press.frame, press.row,
                         (int)Math.floor(x), this.width, this.height), false);
     }
 
-    /** An option's button taken, with {@code back} by a right-click; one greyed takes nothing. */
-    private void takeStripOption(WindowHover press, boolean back) {
+    /**
+     * An option's button taken: a pick opens its words hung from the
+     * button, anything else is done at once; one greyed takes nothing.
+     */
+    private void takeStripOption(WindowHover press, double x) {
         WindowTab front = press.window == null ? null
                 : press.window.getActiveTab();
-        if (front != null && press.stripOption != null
-                && press.stripOption.isAvailable()) {
-            front.takeOption(press.stripOption.id, back);
+        PageOption option = press.stripOption;
+        if (front == null || option == null || !option.isAvailable()) {
+            return;
         }
+        if (option.kind == PageOption.Kind.PICK) {
+            this.tabMenus.togglePick(front, option, WindowMenus.hangingFrom(
+                    SubWindowAnchor.onToolStrip(press.frame, press.row,
+                            (int)Math.floor(x), this.width, this.height)));
+            return;
+        }
+        front.takeOption(option.id);
     }
 
     /**
@@ -1274,7 +1294,7 @@ public final class WindowScreen extends GuiChat
                 }
                 return;
             case OPTION:
-                takeStripOption(press, false);
+                takeStripOption(press, x);
                 return;
             case SETTINGS:
                 this.tabMenus.toggleSettings(press.window.getActiveTab(),
@@ -1488,11 +1508,18 @@ public final class WindowScreen extends GuiChat
             return;
         }
         if (under.is(WindowHover.Kind.PAGE)) {
-            PageContent content = WindowPages.contentOf(under.frame.page);
-            if (content != null) {
-                LostTalesUiHitBox exact = WindowDrawing.pageBox(under.frame);
-                LostTalesUiHitBox whole = WindowDrawing.wholePageBox(
-                        under.frame);
+            PageTab page = under.otherSide ? under.frame.splitPage : under.frame.page;
+            if (under.otherSide && page == null) {
+                // A conversation on the other side scrolls where it is.
+                for (ScreenPart part : this.parts) {
+                    part.scrollBeside(under.frame, lines);
+                }
+                return;
+            }
+            PageContent content = WindowPages.contentOf(page);
+            LostTalesUiHitBox exact = WindowDrawing.boxOfPage(under.frame, page);
+            if (content != null && exact != null) {
+                LostTalesUiHitBox whole = WindowDrawing.wholeBox(exact);
                 content.scroll(whole, mouseX - (exact.left - whole.left),
                         mouseY - (exact.top - whole.top), -lines);
             }
@@ -1844,6 +1871,7 @@ public final class WindowScreen extends GuiChat
         String typed = !isEmpty() && hasField() ? typedWindowId() : null;
         List<PageTab> drawnPages = new ArrayList<PageTab>();
         ContentView.follow();
+        stackWindows(windows);
         for (int index = 0; index < windows.size(); index++) {
             Window window = windows.get(index);
             WindowFrame frame = WindowFrame.of(window);
@@ -1853,6 +1881,9 @@ public final class WindowScreen extends GuiChat
             // A window just made from carried tabs fades in on its own,
             // inside the screen's own motion. One pinned to the HUD was
             // on screen before the screen opened and does not come in.
+            // A window others lie over fades as one picture, from where
+            // it stands on the world to the end of its bar.
+            frame.stackShare = this.stackFade.shareOf(window.getId());
             LostTalesGuiAnimationSample shown = PinnedWindows.entrance(
                     window, opening).withOpacity(frame.appearShare());
             // A window its page fills is cut to what it shows, its row,
@@ -1862,25 +1893,40 @@ public final class WindowScreen extends GuiChat
             frame.fillWithPage(WindowPlacement.filledBox(window, this.mc,
                     this.width, this.height));
             boolean cut = false;
+            boolean drawn = false;
             try {
-                layOutWindow(window, frame, shown);
-                LostTalesUiHitBox filled = WindowDrawing.filledCut(frame);
-                cut = filled != null && frame.drawn
-                        && LostTalesUiClip.beginOuter(this.mc, filled);
-                if (!drawWindow(window, frame, shown, mouseX, mouseY,
-                        pointerX, pointerY, partialTicks, drawnPages)) {
-                    continue;
+                try {
+                    layOutWindow(window, frame, shown);
+                    LostTalesUiHitBox filled = WindowDrawing.filledCut(frame);
+                    cut = filled != null && frame.drawn
+                            && LostTalesUiClip.beginOuter(this.mc, filled);
+                    drawn = drawWindow(window, frame, shown, mouseX, mouseY,
+                            pointerX, pointerY, partialTicks, drawnPages);
+                } finally {
+                    LostTalesUiClip.endOuter(cut);
+                }
+                if (drawn) {
+                    WindowDrawing.drawFilledRing(this.mc, frame, shown);
+                    // The bar being typed in is its window's own, and so
+                    // are its sub-windows: the windows in front of it
+                    // cover them all.
+                    if (window.getId().equals(typed)) {
+                        for (ScreenPart part : this.parts) {
+                            part.drawLiveBar(pointerX, pointerY);
+                        }
+                    }
                 }
             } finally {
-                LostTalesUiClip.endOuter(cut);
+                WindowDrawing.endStackFade(this.mc, frame);
             }
-            WindowDrawing.drawFilledRing(this.mc, frame, shown);
-            // The bar being typed in is its window's own, and so are its
-            // sub-windows: the windows in front of it cover them all.
-            if (window.getId().equals(typed)) {
-                for (ScreenPart part : this.parts) {
-                    part.drawLiveBar(pointerX, pointerY);
-                }
+            if (!drawn) {
+                continue;
+            }
+            // A carried tab over its content's edge shows the half it
+            // would take in a split.
+            SnapPreview.Pane split = this.gestures.splitPane(window.getId());
+            if (split != null) {
+                SnapPreview.draw(this.mc, split, opening.getOpacity());
             }
             this.subWindows.draw(this.mc, this.fontRendererObj,
                     this.regions, this.hover, pointerX, pointerY, false,
@@ -1895,6 +1941,23 @@ public final class WindowScreen extends GuiChat
         }
         this.shownPages.clear();
         this.shownPages.addAll(drawnPages);
+    }
+
+    /**
+     * How strongly each window shows under the windows in front of it
+     * ({@link StackFade}), from where each stood when last drawn: a
+     * window off screen this view neither fades nor is faded.
+     */
+    private void stackWindows(List<Window> windows) {
+        List<String> keys = new ArrayList<String>(windows.size());
+        List<LostTalesUiHitBox> boxes =
+                new ArrayList<LostTalesUiHitBox>(windows.size());
+        for (Window window : windows) {
+            WindowFrame frame = WindowFrame.find(window.getId());
+            keys.add(window.getId());
+            boxes.add(frame != null && frame.drawn ? frame.drawnBox() : null);
+        }
+        this.stackFade.advance(keys, boxes, System.nanoTime());
     }
 
     /**
@@ -1921,6 +1984,12 @@ public final class WindowScreen extends GuiChat
         if (pageContent != null) {
             pageContent.search(WindowSearch.isOpenOn(window.getId())
                     ? WindowSearch.query() : "");
+        }
+        // The well searches the page in front; the other page of a split
+        // shows all it holds.
+        PageContent besideContent = WindowPages.contentOf(frame.splitPage);
+        if (besideContent != null) {
+            besideContent.search("");
         }
         // The row is laid out in whole pixels and shifted by the
         // window's fractional remainder, so it sits exactly where what
@@ -1958,7 +2027,8 @@ public final class WindowScreen extends GuiChat
                                 ? this.hover.stripOption : null,
                         new ToolStrip.Out(
                                 this.tabMenus.settingsOut(window.getActiveTab()),
-                                this.tabMenus.helpOut(window.getActiveTab())));
+                                this.tabMenus.helpOut(window.getActiveTab()),
+                                this.tabMenus.pickOut(window.getActiveTab())));
             } finally {
                 GL11.glPopMatrix();
             }
@@ -1969,7 +2039,19 @@ public final class WindowScreen extends GuiChat
             if (!this.shownPages.contains(frame.page)) {
                 frame.page.content().shown();
             }
+            if (frame.splitPage != null) {
+                drawnPages.add(frame.splitPage);
+                if (!this.shownPages.contains(frame.splitPage)) {
+                    frame.splitPage.content().shown();
+                }
+            }
             drawPage(frame, shown, pointerX, pointerY, partialTicks);
+            if (frame.splitOther != null && frame.splitPage == null) {
+                for (ScreenPart part : this.parts) {
+                    part.drawBeside(window, frame, frame.splitOther,
+                            WindowDrawing.otherSideBox(frame), shown);
+                }
+            }
             if (furniture) {
                 WindowDrawing.drawBottomRule(this.mc, frame, shown);
                 WindowDrawing.drawFrameEdges(this.mc, frame, shown);
@@ -1982,6 +2064,19 @@ public final class WindowScreen extends GuiChat
             }
             drawAnswer(frame, frame.page.content(), shown);
         } else {
+            if (frame.splitPage != null) {
+                drawnPages.add(frame.splitPage);
+                if (!this.shownPages.contains(frame.splitPage)) {
+                    frame.splitPage.content().shown();
+                }
+            }
+            boolean onOther = this.hover.is(WindowHover.Kind.PAGE)
+                    && this.hover.frame == frame && this.hover.otherSide
+                    || frame.splitPage != null && frame.splitPage.equals(this.pressedPage);
+            WindowDrawing.drawSplitPage(this.mc, frame, shown,
+                    onOther ? pointerX : WindowHover.AWAY,
+                    onOther ? pointerY : WindowHover.AWAY, partialTicks,
+                    this.depthTestAtStart);
             for (ScreenPart part : this.parts) {
                 part.drawWindowFoot(window, frame, shown, mouseX, mouseY);
             }
@@ -2155,29 +2250,51 @@ public final class WindowScreen extends GuiChat
         // The page a held button went down on keeps the pointer wherever
         // it goes, as a screen of its own would.
         boolean onPage = this.hover.is(WindowHover.Kind.PAGE)
-                && this.hover.frame == frame
+                && this.hover.frame == frame && !this.hover.otherSide
                 || frame.page.equals(this.pressedPage);
+        boolean onOther = frame.splitPage != null
+                && (this.hover.is(WindowHover.Kind.PAGE)
+                        && this.hover.frame == frame && this.hover.otherSide
+                        || frame.splitPage.equals(this.pressedPage));
         WindowDrawing.drawPage(this.mc, frame, shown,
                 onPage ? pointerX : WindowHover.AWAY,
-                onPage ? pointerY : WindowHover.AWAY, partialTicks,
+                onPage ? pointerY : WindowHover.AWAY,
+                onOther ? pointerX : WindowHover.AWAY,
+                onOther ? pointerY : WindowHover.AWAY, partialTicks,
                 this.depthTestAtStart);
     }
 
     /**
      * A press on a page: its window comes to the front, the page takes the
-     * keys and the press, in the page's own whole pixels.
+     * keys and the press, in the page's own whole pixels. A press on a
+     * split's other page brings that page in front first: the tool strip
+     * and the bar serve it from then on.
      */
     private void pressPage(WindowHover press, double x, double y,
                            int button) {
-        PageTab page = press.frame == null ? null : press.frame.page;
+        if (press.frame == null) {
+            return;
+        }
+        if (press.otherSide && press.frame.splitPage == null) {
+            // A conversation on the other side comes in front, and takes
+            // the input.
+            if (press.frame.splitOther != null) {
+                selectTab(press.frame.splitOther);
+            }
+            return;
+        }
+        PageTab page = press.otherSide ? press.frame.splitPage : press.frame.page;
         PageContent content = WindowPages.contentOf(page);
-        if (content == null) {
+        LostTalesUiHitBox exact = WindowDrawing.boxOfPage(press.frame, page);
+        if (content == null || exact == null) {
             return;
         }
         WindowLayout.raise(press.frame.windowId);
+        if (press.otherSide) {
+            selectTab(page);
+        }
         focusPage(page);
-        LostTalesUiHitBox exact = WindowDrawing.pageBox(press.frame);
-        LostTalesUiHitBox whole = WindowDrawing.wholePageBox(press.frame);
+        LostTalesUiHitBox whole = WindowDrawing.wholeBox(exact);
         this.pressedPage = page;
         this.pressedPageButton = button;
         content.mousePressed(this.mc, whole, x - (exact.left - whole.left),
@@ -2194,12 +2311,12 @@ public final class WindowScreen extends GuiChat
         Window window = WindowLayout.windowOf(this.pressedPage);
         WindowFrame frame = window == null ? null
                 : WindowFrame.find(window.getId());
-        if (frame == null || !frame.drawn
-                || !this.pressedPage.equals(frame.page)) {
+        LostTalesUiHitBox exact = frame == null || !frame.drawn ? null
+                : WindowDrawing.boxOfPage(frame, this.pressedPage);
+        if (exact == null) {
             return null;
         }
-        LostTalesUiHitBox exact = WindowDrawing.pageBox(frame);
-        LostTalesUiHitBox whole = WindowDrawing.wholePageBox(frame);
+        LostTalesUiHitBox whole = WindowDrawing.wholeBox(exact);
         return new double[] {x - (exact.left - whole.left),
                 y - (exact.top - whole.top), whole.left, whole.top,
                 whole.width, whole.height};
@@ -2215,18 +2332,40 @@ public final class WindowScreen extends GuiChat
      */
     private static WindowHover pageHoverAt(double x, double y) {
         WindowFrame front = WindowFrame.drawnAt(x, y);
-        if (front == null || front.page == null) {
+        if (front == null || front.page == null && front.split == null) {
             return null;
         }
-        LostTalesUiHitBox exact = WindowDrawing.pageBox(front);
-        if (!exact.contains(x, y)) {
-            return null;
+        LostTalesUiHitBox divider = WindowDrawing.dividerBox(front);
+        if (divider != null && divider.contains(x, y)) {
+            WindowHover hover = new WindowHover(WindowHover.Kind.DIVIDER);
+            hover.frame = front;
+            hover.window = WindowLayout.window(front.windowId);
+            return hover;
+        }
+        boolean otherSide = false;
+        LostTalesUiHitBox exact = front.page == null ? null
+                : WindowDrawing.pageBox(front);
+        if (exact == null || !exact.contains(x, y)) {
+            // The other side, a page or a conversation; a conversation in
+            // front answers through its own part.
+            exact = WindowDrawing.otherSideBox(front);
+            if (exact == null || !exact.contains(x, y)) {
+                return null;
+            }
+            otherSide = true;
         }
         WindowHover hover = new WindowHover(WindowHover.Kind.PAGE);
         hover.frame = front;
         hover.window = WindowLayout.window(front.windowId);
-        PageContent content = WindowPages.contentOf(front.page);
-        LostTalesUiHitBox whole = WindowDrawing.wholePageBox(front);
+        hover.otherSide = otherSide;
+        PageContent content = WindowPages.contentOf(
+                otherSide ? front.splitPage : front.page);
+        LostTalesUiHitBox whole = WindowDrawing.wholeBox(exact);
+        if (content == null) {
+            // A conversation on the other side: a press brings it in front.
+            hover.acts = true;
+            return hover;
+        }
         hover.acts = content != null && content.acts(whole,
                 x - (exact.left - whole.left), y - (exact.top - whole.top));
         return hover;
@@ -2639,13 +2778,13 @@ public final class WindowScreen extends GuiChat
                 return hover.stripOption != null ? hover.stripOption.tip()
                         : ToolStrip.tipFor(hover.stripPart, hover.window);
             case PAGE: {
-                PageContent content = WindowPages.contentOf(hover.frame.page);
-                if (content == null) {
+                PageTab page = hover.otherSide ? hover.frame.splitPage : hover.frame.page;
+                PageContent content = WindowPages.contentOf(page);
+                LostTalesUiHitBox exact = WindowDrawing.boxOfPage(hover.frame, page);
+                if (content == null || exact == null) {
                     return "";
                 }
-                LostTalesUiHitBox exact = WindowDrawing.pageBox(hover.frame);
-                LostTalesUiHitBox whole = WindowDrawing.wholePageBox(
-                        hover.frame);
+                LostTalesUiHitBox whole = WindowDrawing.wholeBox(exact);
                 return content.tipAt(whole,
                         pointerX() - (exact.left - whole.left),
                         pointerY() - (exact.top - whole.top));
@@ -2680,16 +2819,16 @@ public final class WindowScreen extends GuiChat
      * The label a hovered row control offers. A tab names itself whole
      * whether or not the row cut its name short — the marquee in the tab
      * shows the rest of a cut name too, and the tip says it plainly. A
-     * control a locked window holds back says why. The grip has no tip.
+     * control a locked window holds back stands greyed with no tip: the
+     * padlock lights to say why when it is tried. The grip has no tip.
      */
     private String tipFor(TabRow.Hit hit, Window window) {
         switch (hit.kind) {
             case TAB:
                 return hit.tab.title();
             case CLOSE:
-                return StatCollector.translateToLocal(window.isLocked()
-                        ? "gui.losttales.window.locked.close"
-                        : "gui.losttales.window.tab.close");
+                return window.isLocked() ? "" : StatCollector.translateToLocal(
+                        "gui.losttales.window.tab.close");
             case DRAFT:
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.tab.draft");
@@ -2709,15 +2848,13 @@ public final class WindowScreen extends GuiChat
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.menu");
             case WINDOW_FULLSCREEN:
-                return StatCollector.translateToLocal(window.isLocked()
-                        ? "gui.losttales.window.locked.fullscreen"
-                        : window.isFullscreen()
-                        ? "gui.losttales.window.exit_fullscreen"
-                        : "gui.losttales.window.fullscreen");
+                return window.isLocked() ? "" : StatCollector.translateToLocal(
+                        window.isFullscreen()
+                                ? "gui.losttales.window.exit_fullscreen"
+                                : "gui.losttales.window.fullscreen");
             case WINDOW_CLOSE:
-                return StatCollector.translateToLocal(window.isLocked()
-                        ? "gui.losttales.window.locked.close_window"
-                        : "gui.losttales.window.close");
+                return window.isLocked() ? "" : StatCollector.translateToLocal(
+                        "gui.losttales.window.close");
             case RESTORE:
                 for (ScreenPart part : this.parts) {
                     String tip = part.restoreTip();
@@ -2848,6 +2985,11 @@ public final class WindowScreen extends GuiChat
             case PAGE:
                 pressPage(press, x, y, button);
                 return;
+            case DIVIDER:
+                if (button == 0) {
+                    pressDivider(press, mouseX, mouseY);
+                }
+                return;
             case BAR:
                 pressBar(press, button);
                 return;
@@ -2875,6 +3017,10 @@ public final class WindowScreen extends GuiChat
         if (onRow != null) {
             if (button == 0) {
                 handleRowClick(onRow, mouseX, mouseY);
+            } else if (button == 1 && onRow.tabHit == null
+                    && !TabRow.inRowBand(onRow.row, y)) {
+                // The tool strip is the page's, bare or not.
+                rightClickToolStrip(onRow, x);
             } else if (button == 1) {
                 handleRowRightClick(onRow, mouseX);
             } else if (button == 2) {
@@ -3024,11 +3170,11 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * A right press on one of the rows: on a tab — its name or its cross
-     * — it opens the tab's options at the pointer; anywhere else on the
-     * strip — the bare stretch, the grip, the end controls — it opens the
-     * window's Window Options where the window's dots would. The press belongs
-     * to that window like any other, and is spent on the strip either way.
+     * A right press on a tab row: on a tab — its name or its cross — it
+     * opens the tab's options at the pointer; anywhere else on the row —
+     * the bare stretch, the grip, the end controls — it opens the window's
+     * Window Options where the window's dots would. The press belongs to
+     * that window like any other, and is spent on the row either way.
      */
     private void handleRowRightClick(WindowHover press, int mouseX) {
         Window window = press.window;
@@ -3229,6 +3375,35 @@ public final class WindowScreen extends GuiChat
         this.edgePressX = mouseX;
         this.edgePressY = mouseY;
         return false;
+    }
+
+    /**
+     * A press on a split's divider takes hold of it to share the room; a
+     * second press on it at once, as a double click, shares the room
+     * evenly again.
+     */
+    private void pressDivider(WindowHover press, int mouseX, int mouseY) {
+        WindowSplit split = press.frame.split;
+        LostTalesUiHitBox divider = WindowDrawing.dividerBox(press.frame);
+        if (split == null || divider == null) {
+            return;
+        }
+        long now = System.nanoTime();
+        boolean second = press.frame.windowId.equals(this.dividerPressWindowId)
+                && this.dividerPressNumber == this.pressCount - 1
+                && now - this.dividerPressNanos <= DOUBLE_CLICK_NANOS;
+        if (second) {
+            this.dividerPressWindowId = null;
+            WindowLayout.shareSplit(split.first(), 0.5D, true);
+            return;
+        }
+        this.dividerPressWindowId = press.frame.windowId;
+        this.dividerPressNumber = this.pressCount;
+        this.dividerPressNanos = now;
+        double x = pointerX();
+        double y = pointerY();
+        this.gestures.startContentDrag(new SplitDividerDrag(press.frame.windowId,
+                split, split.isStacked() ? y - divider.top : x - divider.left));
     }
 
     /**

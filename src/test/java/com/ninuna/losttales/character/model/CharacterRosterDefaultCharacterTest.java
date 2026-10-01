@@ -33,7 +33,7 @@ public final class CharacterRosterDefaultCharacterTest {
     /**
      * The default character carries the account's own id. That is what
      * lets a world that already existed gain one without moving anything:
-     * party membership, markers and saved player state are all filed
+     * fellowship membership, markers and saved player state are all filed
      * under the gameplay id, which for the account was this same value.
      */
     @Test

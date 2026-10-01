@@ -27,8 +27,8 @@ public final class LostTalesRequestRateLimiter {
         // on a board's page, one per notice; a dozen in five seconds covers
         // a player clearing a whole board and pinning some back.
         MISSIVE_BOARD(12, 5000L),
-        PARTY_SNAPSHOT(20, 5000L),
-        PARTY_MUTATION(12, 5000L),
+        FELLOWSHIP_SNAPSHOT(20, 5000L),
+        FELLOWSHIP_MUTATION(12, 5000L),
         // Allows ordinary high-rate clicking while bounding custom-packet floods.
         THIRD_PERSON_ENTITY_ACTION(120, 5000L),
         THIRD_PERSON_BLOCK_ACTION(120, 5000L),

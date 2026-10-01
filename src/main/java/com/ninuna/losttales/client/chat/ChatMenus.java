@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatMessageIds;
@@ -269,13 +270,12 @@ final class ChatMenus {
     static void addOpenable(Minecraft mc, List<MenuWindow.Entry> entries,
                             String filter, boolean search) {
         List<MenuWindow.Entry> closed = new ArrayList<MenuWindow.Entry>();
-        for (ChatChannel channel : restorableChannels()) {
-            String name = ClientChatChannelState.displayName(channel);
+        for (ChatTab tab : restorableTabs()) {
+            String name = ClientChatChannelState.displayName(tab);
             if (WindowMenus.matchesFilter(name, filter)) {
-                ChatTab tab = ChatTab.of(channel);
                 closed.add(new MenuWindow.Entry(tab.id(), name,
-                        ChatLayout.isMuted(channel),
-                        ClientChatChannelState.displayColor(channel), tab));
+                        ChatLayout.isMuted(tab),
+                        ClientChatChannelState.displayColor(tab), tab));
             }
         }
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
@@ -301,13 +301,23 @@ final class ChatMenus {
                 "gui.losttales.chat.open.players"), players);
     }
 
-    /** Closed channels the player could see if they were open. */
-    static List<ChatChannel> restorableChannels() {
-        List<ChatChannel> closed = ChatLayout.closedChannels();
-        List<ChatChannel> result = new ArrayList<ChatChannel>(closed.size());
-        for (ChatChannel channel : closed) {
-            if (ClientChatChannelState.isAvailable(channel)) {
-                result.add(channel);
+    /**
+     * The closed channels the player could see if they were open, each
+     * its tab; the Fellowship channel as a tab for each fellowship of the
+     * character played whose conversation is closed.
+     */
+    static List<ChatTab> restorableTabs() {
+        List<ChatTab> result = new ArrayList<ChatTab>();
+        for (ChatChannel channel : ChatLayout.closedChannels()) {
+            if (channel == ChatChannel.FELLOWSHIP) {
+                for (ChatFellowship fellowship : ClientChatIdentitySelection.fellowships()) {
+                    ChatTab tab = ChatTab.of(channel, ChatTab.ownerKeyOf(fellowship.getId()));
+                    if (ClientChatChannelState.isAvailable(tab) && !ChatLayout.isOpen(tab)) {
+                        result.add(tab);
+                    }
+                }
+            } else if (ClientChatChannelState.isAvailable(channel)) {
+                result.add(ChatTab.of(channel));
             }
         }
         return result;
@@ -400,10 +410,7 @@ final class ChatMenus {
 
     /** The closed channels the player could see, then the session's closed NPC conversations. */
     private static List<ChatTab> closedConversations() {
-        List<ChatTab> closed = new ArrayList<ChatTab>();
-        for (ChatChannel channel : restorableChannels()) {
-            closed.add(ChatTab.of(channel));
-        }
+        List<ChatTab> closed = new ArrayList<ChatTab>(restorableTabs());
         closed.addAll(ChatLayout.closedNpcConversations());
         return closed;
     }
@@ -724,13 +731,12 @@ final class ChatMenus {
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
                 "gui.losttales.window.search.open"), open);
         List<MenuWindow.Entry> channels = new ArrayList<MenuWindow.Entry>();
-        for (ChatChannel channel : restorableChannels()) {
-            ChatTab tab = ChatTab.of(channel);
-            String name = ClientChatChannelState.displayName(channel);
+        for (ChatTab tab : restorableTabs()) {
+            String name = ClientChatChannelState.displayName(tab);
             if (forwardsInto(tab) && WindowMenus.matchesFilter(name, filter)) {
                 channels.add(new MenuWindow.Entry(tab.id(), name,
-                        ChatLayout.isMuted(channel),
-                        ClientChatChannelState.displayColor(channel), tab));
+                        ChatLayout.isMuted(tab),
+                        ClientChatChannelState.displayColor(tab), tab));
             }
         }
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
@@ -1026,7 +1032,7 @@ final class ChatMenus {
      * it is typed into. Opened from the chat's bar ({@code page} null) it
      * follows the conversation typed in; opened from a page's bar it is
      * about that page. Where nothing chooses an identity — an account
-     * channel, Proximity, Party, a page — it is the status rows alone, for
+     * channel, Proximity, Fellowship, a page — it is the status rows alone, for
      * the identity the tab shows, with no roster and no search field.
      */
     void toggleCharacterMenu(WindowTab page, SubWindowAnchor anchor) {

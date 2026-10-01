@@ -115,11 +115,11 @@ public abstract class PageContent {
     }
 
     /**
-     * One of its {@link #options} taken, by a click or, with {@code back},
-     * a right-click; answers whether the menu stays open. Options are
-     * settings of the page's view, so it does by default.
+     * One of its {@link #options} taken, or one of a pick's words; answers
+     * whether the menu stays open. Options are settings of the page's view,
+     * so it does by default.
      */
-    public boolean takeOption(String id, boolean back) {
+    public boolean takeOption(String id) {
         return true;
     }
 

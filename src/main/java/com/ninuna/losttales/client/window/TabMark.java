@@ -10,7 +10,8 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
  * for anything else not yet read, or nothing. Each kind of tab says what
  * its own mark is ({@link WindowTab#mark}); a conversation with one
  * person counts every line not yet read as a ping, as a messenger's
- * direct messages are. The tile goes to nine; past nine it shows a plus.
+ * direct messages are. The tile counts to 99 and then reads {@code 99+},
+ * as Discord's does, growing to the left as its figures grow.
  *
  * <p>It stands where a head's status sphere stands, two pixels past the
  * icon's right edge and one below its bottom, and the icon gives it its
@@ -20,11 +21,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
  * while anything is unread.</p>
  */
 public final class TabMark {
-    /** The tile's outline, row by row from its top: a plain rectangle. */
-    public static final int[] TILE_INK_LEFT = {0, 0, 0, 0, 0, 0, 0};
-    /** The tile's width, its left edge and a figure; the white sphere is as wide. */
-    public static final int TILE_WIDTH = LostTalesUiSheet.COUNT_LEFT.getWidth()
-            + LostTalesUiSheet.COUNT_1.getWidth();
+    /** The tile's outline, row by row from its top: its left corners rounded. */
+    public static final int[] TILE_INK_LEFT = {1, 0, 0, 0, 0, 0, 1};
+    /** The tile's height, as tall as the capitals. */
+    private static final int TILE_HEIGHT = LostTalesUiSheet.COUNT_1.getHeight();
     /** Nothing waiting. */
     public static final TabMark NONE = new TabMark(0, false);
     /** Something unread that pinged nobody. */
@@ -64,24 +64,16 @@ public final class TabMark {
         return !this.unread;
     }
 
-    /**
-     * What the mark shows: the tile's figure for its count — one to nine,
-     * or the plus past nine — or the white sphere.
-     */
-    public LostTalesUiSheet figure() {
-        return this.pings > 0 ? LostTalesUiSheet.countFigure(this.pings)
-                : LostTalesUiSheet.PRESENCE_SELECTED;
-    }
-
-    /** How wide the mark stands: the tile, or the sphere. */
+    /** How wide the mark stands: the tile with its figures, or the sphere. */
     public int width() {
-        return this.pings > 0 ? TILE_WIDTH
+        return this.pings > 0 ? LostTalesUiSheet.countTileWidth(this.pings)
                 : LostTalesUiSheet.PRESENCE_SELECTED.getWidth();
     }
 
     /** How tall the mark stands: the tile, or the sphere. */
     public int height() {
-        return figure().getHeight();
+        return this.pings > 0 ? TILE_HEIGHT
+                : LostTalesUiSheet.PRESENCE_SELECTED.getHeight();
     }
 
     /** The mark's outline, row by row, as {@link LostTalesUiCornerCut#around} reads one. */
@@ -127,17 +119,16 @@ public final class TabMark {
 
     /**
      * The mark with its top-left at ({@code x}, {@code y}), over the one
-     * shadow: the tile's left edge and its figure, or the sphere.
+     * shadow: the tile with its figures, or the sphere.
      */
     public void drawAt(float x, float y, int alpha) {
         if (isNone()) {
             return;
         }
         if (this.pings > 0) {
-            LostTalesUiSheet.drawJoinedWithShadow(LostTalesUiSheet.COUNT_LEFT,
-                    figure(), x, y, alpha);
+            LostTalesUiSheet.drawCountTile(this.pings, x, y, alpha);
         } else {
-            figure().drawWithShadow(x, y, alpha);
+            LostTalesUiSheet.PRESENCE_SELECTED.drawWithShadow(x, y, alpha);
         }
     }
 }

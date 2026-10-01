@@ -7,7 +7,7 @@ import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
-import com.ninuna.losttales.party.server.PartySyncManager;
+import com.ninuna.losttales.fellowship.server.FellowshipSyncManager;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSyncManager;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
 import cpw.mods.fml.common.FMLLog;
@@ -79,8 +79,8 @@ public final class CharacterNetworkRequestHandler {
     public static void handleDeleteRequest(final EntityPlayerMP player, final int requestId,
                                            final long expectedRosterRevision,
                                            final UUID characterId) {
-        PartySyncManager.AudienceSnapshot affectedAudience =
-                PartySyncManager.captureCharacterRelationsAudience(
+        FellowshipSyncManager.AudienceSnapshot affectedAudience =
+                FellowshipSyncManager.captureCharacterRelationsAudience(
                         player == null ? null : player.worldObj, characterId);
         execute(player, requestId, CharacterOperationType.DELETE, new Operation() {
             @Override
@@ -210,7 +210,7 @@ public final class CharacterNetworkRequestHandler {
                                 int requestId,
                                 CharacterOperationType operationType,
                                 Operation operation,
-                                PartySyncManager.AudienceSnapshot affectedAudience) {
+                                FellowshipSyncManager.AudienceSnapshot affectedAudience) {
         CharacterOperationResult result;
         try {
             result = operation.run();
@@ -250,10 +250,11 @@ public final class CharacterNetworkRequestHandler {
                             result.getCharacter().getCharacterId());
                 }
                 if (touchesGameplay(operationType)) {
-                    PartySyncManager.sendState(
-                            player, PartySyncManager.UNSOLICITED_REQUEST_ID);
-                    PartySyncManager.sendStateToAudience(
+                    FellowshipSyncManager.sendState(
+                            player, FellowshipSyncManager.UNSOLICITED_REQUEST_ID);
+                    FellowshipSyncManager.sendStateToAudience(
                             affectedAudience, player.getUniqueID());
+                    FellowshipSyncManager.presenceChanged(player.getUniqueID());
                 }
                 if (operationType == CharacterOperationType.SELECT) {
                     // The roles a line is signed with and the channels the
@@ -286,7 +287,7 @@ public final class CharacterNetworkRequestHandler {
     }
 
     /**
-     * Whether the race's gameplay and the party state are brought up to
+     * Whether the race's gameplay and the fellowship state are brought up to
      * date after an operation. A cape, a profile, a look and a restored
      * character that is not played touch neither.
      */

@@ -9,6 +9,7 @@ import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowOpening;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowScreen;
+import com.ninuna.losttales.client.window.WindowSplit;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
@@ -314,6 +315,11 @@ public final class LostTalesChatOverlayRenderer {
             return;
         }
         frame.page = null;
+        frame.showSplit(null, null, null);
+        // A split shows its other side beside the conversation, which
+        // keeps its own side of the window.
+        WindowSplit split = window.splitOf(front);
+        boolean besideOther = WindowDrawing.shows(split, front);
         ChatTab view = ChatTab.from(front);
         ChatLineFilter filter = ChatLineFilter.of(view);
         // An open window lays its own lines out: at its own width when
@@ -327,6 +333,13 @@ public final class LostTalesChatOverlayRenderer {
         frame.advanceFill(ContentView.fillOf(window));
         int chatWidth = WindowPlacement.drawnChatWidth(window, minecraft,
                 screenWidth);
+        if (besideOther) {
+            double boxWidth = WindowPlacement.windowBounds(window, minecraft,
+                    screenWidth, screenHeight).width;
+            double[] side = split.box(front.equals(split.first()), 0.0D, 0.0D,
+                    boxWidth, 1.0D);
+            chatWidth = WindowPlacement.chatWidthForBox(side[2] - side[0], minecraft);
+        }
         // The timestamp area and the member list glide in and out before
         // anything reads their width: the lines are laid out against it.
         // The list takes the width its edge was dragged to, within a third
@@ -346,7 +359,7 @@ public final class LostTalesChatOverlayRenderer {
         Integer unread = view == null ? null
                 : ClientChatChannelViews.unreadDividerLine(view);
         List<ChatLine> own = ChatWindowLines.forWindow(minecraft, chat,
-                window, filter, chatWidth,
+                frame, filter, chatWidth,
                 unread == null ? 0 : unread.intValue());
         List<ChatLine> lines = own != null ? own
                 : ClientChatChannelViews.visibleLines(drawn, filter);
@@ -370,6 +383,8 @@ public final class LostTalesChatOverlayRenderer {
         float scale = chat.func_146244_h();
         frame.begin(box, scale, opening.getTranslationX(),
                 opening.getTranslationY());
+        frame.showSplit(besideOther ? split : null, front,
+                besideOther ? split.other(front) : null);
         // The frame's message room says how much of the stack the window
         // shows: the box's, laid on whole display pixels against the
         // drawn baseline. The room is the height the player dragged the
@@ -434,6 +449,9 @@ public final class LostTalesChatOverlayRenderer {
                 blurTop, blurBottom, BACKDROP_FADE_WEIGHTS, blurOpacity);
         blur.drawFramedBand(blurLeft, historyBottom, blurRight, blurBottom,
                 blurTop, blurBottom, null, blurOpacity);
+        // From here on the window draws on the world it stands on; one
+        // others lie over fades as one picture.
+        WindowDrawing.beginStackFade(minecraft, frame, shownBox);
         // The newest line sits on the baseline; the whole window rides
         // the opening motion, tabs and bar included. The origin is the
         // frame's, not the placement box's: the box is where the window
@@ -446,10 +464,72 @@ public final class LostTalesChatOverlayRenderer {
         ChatTimestampColumn columns =
                 ChatTimestampColumn.of(frame, minecraft.fontRenderer);
         float originX = (float)LostTalesDisplayPixels.snap(
-                frame.drawnLeft() + columns.messageX() * scale);
+                frame.contentLeft() + columns.messageX() * scale);
         float originY = (float)frame.drawnBaseline();
         drawWindow(minecraft, chat, frame, filter, lines, scroll, room,
-                originX, originY, true, opening, chatWidth, columns);
+                originX, originY, true, opening, chatWidth, columns,
+                frame.contentLeft());
+        if (besideOther && frame.splitPage == null) {
+            // A conversation on the other side, read only.
+            drawBeside(minecraft, window, ChatTab.from(split.other(front)),
+                    WindowDrawing.otherSideBox(frame), opening);
+        }
+    }
+
+    /**
+     * A conversation on the other side of a split window from the tab in
+     * front: its history in its own side, read only. Nothing on it
+     * answers the pointer until a press brings it in front.
+     */
+    static void drawBeside(Minecraft minecraft, Window window, ChatTab view,
+                           LostTalesUiHitBox box,
+                           LostTalesGuiAnimationSample opening) {
+        if (minecraft == null || minecraft.ingameGUI == null || window == null
+                || view == null || box == null) {
+            return;
+        }
+        GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
+        ChatFrame front = ChatFrame.of(window);
+        ChatFrame frame = front.besideFrame();
+        if (frame != front) {
+            frame.beginAs(front);
+            frame.advancePanels(window);
+        }
+        ChatLineFilter filter = ChatLineFilter.of(view);
+        float scale = chat.func_146244_h();
+        int chatWidth = WindowPlacement.chatWidthForBox(box.width, minecraft);
+        // The member list is held to its side before the lines are laid
+        // out against it.
+        ChatMemberList.measure(frame.members,
+                ChatLayout.getMembersWidth(window), chatWidth / scale + 6.0F,
+                ChatTimestampColumn.of(frame, minecraft.fontRenderer)
+                        .messageX());
+        Integer unread = ClientChatChannelViews.unreadDividerLine(view);
+        List<ChatLine> lines = ChatWindowLines.forWindow(minecraft, chat,
+                frame, filter, chatWidth, unread == null ? 0 : unread.intValue());
+        if (lines == null) {
+            return;
+        }
+        frame.lines = lines;
+        frame.view = view;
+        frame.resolveDividerRow(lines, unread);
+        frame.resolveRows();
+        ClientChatChannelViews.holdPosition(view, frame);
+        double scroll = ClientChatChannelViews.renderedScroll(view,
+                ClientChatChannelViews.getScroll(view, frame.contentRows(),
+                        frame.roomLines()));
+        frame.renderedScrollLines = scroll;
+        ChatTimestampColumn columns =
+                ChatTimestampColumn.of(frame, minecraft.fontRenderer);
+        float originX = (float)LostTalesDisplayPixels.snap(
+                box.left + columns.messageX() * scale);
+        drawWindow(minecraft, chat, frame, filter, lines, scroll,
+                (float)frame.room, originX, (float)frame.drawnBaseline(), true,
+                opening, chatWidth, columns, box.left);
+        // Read only: what the draw recorded for the pointer is let go.
+        frame.clearMarks();
+        frame.clearAvatars();
+        frame.members.clearDrawn();
     }
 
     /**
@@ -515,7 +595,8 @@ public final class LostTalesChatOverlayRenderer {
         int chatWidth = WindowPlacement.chatWidth(minecraft);
         drawWindow(minecraft, chat, frame, filter, lines, 0.0D,
                 (float)frame.room, originX, baseline - lift, false,
-                LostTalesGuiAnimationSample.SETTLED, chatWidth, columns);
+                LostTalesGuiAnimationSample.SETTLED, chatWidth, columns,
+                frame.drawnLeft());
         if (typingShare > 0.0F) {
             drawFeedTyping(minecraft, ChatFeedTyping.shown(), originX,
                     baseline, lift, scale, chatWidth, columns);
@@ -864,7 +945,7 @@ public final class LostTalesChatOverlayRenderer {
             double scrollLines, float room, float restingX,
             float restingY, boolean open,
             LostTalesGuiAnimationSample opening, int chatWidth,
-            ChatTimestampColumn columns) {
+            ChatTimestampColumn columns, double sideLeft) {
         // The offset is in rows and fractions of one: whole rows pick
         // where the stack starts, the fraction slides it by that much of
         // the row it is inside, and one more row is drawn so the gap the
@@ -1018,7 +1099,7 @@ public final class LostTalesChatOverlayRenderer {
         float windowRight = areaLeft + unscaledWidth + 6.0F;
         float panelRight = windowRight;
         if (open) {
-            double screenLeft = frame.drawnLeft();
+            double screenLeft = sideLeft;
             double screenRight = LostTalesDisplayPixels.snap(
                     screenLeft + (unscaledWidth + 6.0F) * scale);
             panelLeft = (float)((screenLeft - originX) / scale);
@@ -1043,7 +1124,7 @@ public final class LostTalesChatOverlayRenderer {
                 : panelLeft;
         // Where the area's contents are cut: the window's own left edge,
         // past which they slide as the area is driven out.
-        double areaClipLeft = open ? frame.drawnLeft()
+        double areaClipLeft = open ? sideLeft
                 : originX + panelLeft * scale;
         // The panel's opacity, shared by every stretch of it a line
         // recolours, so the stretch and the panel beside it are one.
@@ -2611,16 +2692,6 @@ public final class LostTalesChatOverlayRenderer {
      */
     public static final int[] TOOLBAR_KINDS = {TOOLBAR_REACT, TOOLBAR_REPLY,
             TOOLBAR_FORWARD, TOOLBAR_COPY, TOOLBAR_LINK, TOOLBAR_MORE};
-    /**
-     * The link glyph's pixels: two rings of a chain holding each other,
-     * standing in until the link's own artwork is drawn.
-     */
-    private static final String[] LINK_GLYPH = {
-            ".##..##.",
-            "#..##..#",
-            "#..##..#",
-            ".##..##."};
-
     /** Where the hovered message's toolbar stands, in the stack's units, and whose it is. */
     private static final class ToolbarPlace {
         final float top;
@@ -2887,7 +2958,7 @@ public final class LostTalesChatOverlayRenderer {
                 if (!open) {
                     // A control that cannot be taken stands still, muted.
                     drawToolbarGlyph(TOOLBAR_KINDS[index], cellLeft, edge,
-                            0.0F, false, Math.round(alpha
+                            0.0F, Math.round(alpha
                                     * WindowStyle.UNAVAILABLE_OPACITY));
                     continue;
                 }
@@ -2895,7 +2966,7 @@ public final class LostTalesChatOverlayRenderer {
                         TOOLBAR_CELL, TOOLBAR_CELL);
                 try {
                     drawToolbarGlyph(TOOLBAR_KINDS[index], cellLeft, edge,
-                            lit[index], true, alpha);
+                            lit[index], alpha);
                 } finally {
                     LostTalesUiButton.endPose();
                 }
@@ -2920,23 +2991,12 @@ public final class LostTalesChatOverlayRenderer {
     /**
      * One control's glyph centred in its square at {@code (left, top)},
      * crossing to its lit artwork as far as {@code lit}: the input bar's
-     * own emoji button for React, the sheet's reply arrow, copy page and
-     * menu dots, and the link glyph in ivory; muted where the control
+     * own emoji button for React, the sheet's reply and forward arrows,
+     * copy page, chain links and menu dots; muted where the control
      * cannot be taken.
      */
     private static void drawToolbarGlyph(int kind, float left, float top,
-                                         float lit, boolean open, int alpha) {
-        if (kind == TOOLBAR_LINK) {
-            drawPixelGlyph(LINK_GLYPH,
-                    left + LostTalesUiInk.centredStart(TOOLBAR_CELL,
-                            LINK_GLYPH[0].length()),
-                    top + LostTalesUiInk.centredStart(TOOLBAR_CELL,
-                            LINK_GLYPH.length),
-                    open ? LostTalesUiInk.IVORY
-                            : LostTalesChatVisualStyle.asideRgb(),
-                    alpha);
-            return;
-        }
+                                         float lit, int alpha) {
         LostTalesUiSheet resting;
         LostTalesUiSheet hovered;
         switch (kind) {
@@ -2956,6 +3016,10 @@ public final class LostTalesChatOverlayRenderer {
                 resting = LostTalesUiSheet.COPY;
                 hovered = LostTalesUiSheet.COPY_HOVER;
                 break;
+            case TOOLBAR_LINK:
+                resting = LostTalesUiSheet.COPY_LINK;
+                hovered = LostTalesUiSheet.COPY_LINK_HOVER;
+                break;
             default:
                 resting = LostTalesUiSheet.MORE;
                 hovered = LostTalesUiSheet.MORE_HOVER;
@@ -2967,50 +3031,6 @@ public final class LostTalesChatOverlayRenderer {
                 top + LostTalesUiInk.centredStart(TOOLBAR_CELL,
                         resting.getHeight()),
                 alpha);
-    }
-
-    /**
-     * A glyph drawn from its own pixels — {@link #LINK_GLYPH} — its ink
-     * from {@code (x, y)} in {@code rgb}, over the chat's one shadow: the
-     * same pixels a pixel down and right in the shadow tone, at the
-     * shadow's share of {@code alpha}.
-     */
-    private static void drawPixelGlyph(String[] rows, float x, float y,
-                                       int rgb, int alpha) {
-        int shadow = LostTalesUiInk.shadowAlpha(alpha);
-        if (shadow > 0) {
-            drawGlyphPixels(rows, x + LostTalesUiInk.SHADOW_OFFSET,
-                    y + LostTalesUiInk.SHADOW_OFFSET,
-                    LostTalesUiInk.argb(
-                            LostTalesUiInk.SHADOW, shadow));
-        }
-        drawGlyphPixels(rows, x, y, LostTalesUiInk.argb(rgb, alpha));
-    }
-
-    /**
-     * A glyph's pixels in one colour, each run of a row as one quad, so
-     * no pixel is laid down twice and a translucent pass — the shadow, a
-     * fading toolbar — stays one even tone.
-     */
-    private static void drawGlyphPixels(String[] rows, float x, float y,
-                                        int argb) {
-        for (int row = 0; row < rows.length; row++) {
-            String pixels = rows[row];
-            int column = 0;
-            while (column < pixels.length()) {
-                if (pixels.charAt(column) != '#') {
-                    column++;
-                    continue;
-                }
-                int start = column;
-                while (column < pixels.length()
-                        && pixels.charAt(column) == '#') {
-                    column++;
-                }
-                LostTalesUiInk.fillRect(x + start, y + row, x + column, y + row + 1.0F,
-                        argb);
-            }
-        }
     }
 
     /**

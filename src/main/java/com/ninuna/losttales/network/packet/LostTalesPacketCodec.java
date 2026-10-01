@@ -13,7 +13,7 @@ import java.util.UUID;
  * varint byte length of at most two bytes, so no string is longer than
  * 16383 bytes, followed by the UTF-8 payload.
  *
- * <p>Internal to the mod's packets. The character and party families sit
+ * <p>Internal to the mod's packets. The character and fellowship families sit
  * in packages of their own and read and write through these too; the
  * size limits those families bound their fields by live in their own
  * small classes.</p>

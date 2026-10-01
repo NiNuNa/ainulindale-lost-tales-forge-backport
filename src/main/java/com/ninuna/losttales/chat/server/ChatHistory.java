@@ -43,22 +43,22 @@ import java.util.UUID;
  *
  * <p>The audience is decided when the message is sent and checked again
  * when it is replayed, and both have to agree: a whisper reaches its two
- * parties, a party line the members the party had, a faction line every
+ * people, a fellowship line the members the fellowship had, a faction line every
  * account whose chat identity was in the faction then, a gated line
  * (Operator Chat, the consoles, a read gate) whoever may read the channel
  * when they ask.
- * Gaining a role, a party or a faction afterwards never opens what was
+ * Gaining a role, a fellowship or a faction afterwards never opens what was
  * said before. Proximity lines reach only those who were near, since
  * where a player stood then cannot be asked again.</p>
  *
- * <p>Bounded per channel — per faction and per party on the channels
+ * <p>Bounded per channel — per faction and per fellowship on the channels
  * that hold several, and per conversation for whispers, so one busy
- * faction, party or pair cannot push another's lines out —
+ * faction, fellowship or pair cannot push another's lines out —
  * ({@link #perChannelCapacity}, the server's {@code historyPerChannel})
  * and in all
  * ({@link #MAX_TOTAL}), the oldest
  * going first; a replay hands a player at most
- * {@link #MAX_REPLAY_PER_CHANNEL} of a channel and
+ * {@link #MAX_REPLAY_PER_CONVERSATION} of a conversation and
  * {@link #MAX_REPLAY_TOTAL} in all. The live store is this class; the
  * world save keeps a copy through {@link ChatHistoryWorldData}, written
  * with the world and read back as the server starts, so a restart hands
@@ -70,8 +70,8 @@ public final class ChatHistory {
     public static final int MAX_TOTAL = 2000;
     /** The most one request for older lines of a channel is answered with. */
     public static final int MAX_OLDER_PER_REQUEST = 50;
-    /** The most of one channel a joining player is shown. */
-    public static final int MAX_REPLAY_PER_CHANNEL = 100;
+    /** The most of one conversation a joining player is shown: a channel, or one faction's or fellowship's talk. */
+    public static final int MAX_REPLAY_PER_CONVERSATION = 100;
     /** The most a joining player is shown in all. */
     public static final int MAX_REPLAY_TOTAL = 400;
 
@@ -214,7 +214,7 @@ public final class ChatHistory {
      * the message it names to everyone the reply reaches, so it may only
      * be shown back into the conversation it was said in: the same
      * channel, and for a channel that has conversations of its own — a
-     * party, a faction, a whisper — the same one. Otherwise naming an id
+     * fellowship, a faction, a whisper — the same one. Otherwise naming an id
      * would quote a private line into a channel of the replier's
      * choosing, which is the one thing this check exists to stop.</p>
      */
@@ -261,7 +261,7 @@ public final class ChatHistory {
      * to the readers of {@code channel}'s conversation {@code scopeValue};
      * {@code partner} is the other person of a whisper, else null. A line
      * said for everyone may go anywhere. Any other goes back only into its
-     * own conversation (the same channel, the same party or faction), or
+     * own conversation (the same channel, the same fellowship or faction), or
      * into a whisper whose two people could both read it. A Proximity line
      * and a whisper were said to exactly those who heard them, so they go
      * only into such a whisper.
@@ -421,7 +421,7 @@ public final class ChatHistory {
     /** A message as a report names it: where it was said, by whom, and how it began. */
     public static final class Reportable {
         public final ChatChannel channel;
-        /** The faction or party it was said in; empty for a channel of one conversation. */
+        /** The faction or fellowship it was said in; empty for a channel of one conversation. */
         public final String scope;
         public final String author;
         public final int authorColor;
@@ -724,6 +724,17 @@ public final class ChatHistory {
     }
 
     /**
+     * The conversation a kept line was said in, on a channel that has more
+     * than one: its faction, or its fellowship's id. Empty for any other
+     * line, and for none kept.
+     */
+    public static synchronized String scopeOf(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        String scope = entry == null ? null : entry.forOthers.getScopeValue();
+        return scope == null ? "" : scope;
+    }
+
+    /**
      * The faction a kept line of a faction-scoped channel was spoken to;
      * empty for a line of any other channel, and for none kept.
      */
@@ -803,8 +814,8 @@ public final class ChatHistory {
     /**
      * The recent messages {@code requester} may be shown, oldest first:
      * every kept message newer than {@code sinceMessageId} whose audience
-     * admits them, at most {@link #MAX_REPLAY_PER_CHANNEL} of any channel
-     * and {@link #MAX_REPLAY_TOTAL} in all — the newest of each channel
+     * admits them, at most {@link #MAX_REPLAY_PER_CONVERSATION} of any
+     * conversation and {@link #MAX_REPLAY_TOTAL} in all — the newest of each
      * when there are more. The requester is handed their own copy of a
      * line they sent and everyone else's copy of every other, exactly as
      * they would have been sent it at the time.
@@ -814,7 +825,7 @@ public final class ChatHistory {
         if (requester == null) {
             return Collections.emptyList();
         }
-        // Newest first, so the per-channel cap keeps the latest.
+        // Newest first, so the cap of each conversation keeps the latest.
         List<Entry> admitted = new ArrayList<Entry>();
         List<Entry> all = new ArrayList<Entry>(ENTRIES.values());
         Map<String, Integer> taken = new HashMap<String, Integer>();
@@ -825,12 +836,14 @@ public final class ChatHistory {
                     || !entry.audience.admits(requester, entry)) {
                 continue;
             }
-            Integer count = taken.get(entry.channelId);
+            String conversation = entry.channelId + ChatTabIds.SEPARATOR
+                    + entry.forOthers.getScopeValue();
+            Integer count = taken.get(conversation);
             int soFar = count == null ? 0 : count.intValue();
-            if (soFar >= MAX_REPLAY_PER_CHANNEL) {
+            if (soFar >= MAX_REPLAY_PER_CONVERSATION) {
                 continue;
             }
-            taken.put(entry.channelId, Integer.valueOf(soFar + 1));
+            taken.put(conversation, Integer.valueOf(soFar + 1));
             admitted.add(entry);
         }
         List<LostTalesChatMessagePacket> lines =
@@ -846,7 +859,7 @@ public final class ChatHistory {
      * The recent messages of one conversation the requester may be shown,
      * oldest first: every kept message newer than {@code sinceMessageId}
      * that was said in {@code scopeValue} on {@code channel} and whose
-     * audience admits them, at most {@link #MAX_REPLAY_PER_CHANNEL}. The
+     * audience admits them, at most {@link #MAX_REPLAY_PER_CONVERSATION}. The
      * requester's own entitlement decides, exactly as it does for a
      * whole replay, so asking about a conversation the account has no
      * character in answers with nothing.
@@ -862,7 +875,7 @@ public final class ChatHistory {
         List<Entry> admitted = new ArrayList<Entry>();
         List<Entry> all = new ArrayList<Entry>(ENTRIES.values());
         for (int index = all.size() - 1; index >= 0
-                && admitted.size() < MAX_REPLAY_PER_CHANNEL; index--) {
+                && admitted.size() < MAX_REPLAY_PER_CONVERSATION; index--) {
             Entry entry = all.get(index);
             if (entry.forOthers.getMessageId() <= sinceMessageId
                     || !channelId.equals(entry.channelId)
@@ -937,22 +950,22 @@ public final class ChatHistory {
     /**
      * Who may be shown a message after the fact. Every part named must
      * agree, and a part left out asks nothing: the accounts it was for,
-     * the party it was said in, the faction it was said to, and whether
+     * the fellowship it was said in, the faction it was said to, and whether
      * the channel must still be readable by the asker.
      */
     public static final class Audience {
         /** The accounts, or null for anyone the other parts admit. */
         private final Set<UUID> accounts;
-        private final UUID partyId;
+        private final UUID fellowshipId;
         private final String factionId;
         /** Whether the channel's read gate is asked again on replay. */
         private final boolean gated;
 
-        private Audience(Collection<UUID> accounts, UUID partyId,
+        private Audience(Collection<UUID> accounts, UUID fellowshipId,
                          String factionId, boolean gated) {
             this.accounts = accounts == null ? null
                     : Collections.unmodifiableSet(new HashSet<UUID>(accounts));
-            this.partyId = partyId;
+            this.fellowshipId = fellowshipId;
             this.factionId = factionId == null || factionId.length() == 0
                     ? null : factionId;
             this.gated = gated;
@@ -974,15 +987,15 @@ public final class ChatHistory {
             return new Audience(null, null, null, true);
         }
 
-        /** Whether the audience is everyone: no accounts, party, faction or gate. */
+        /** Whether the audience is everyone: no accounts, fellowship, faction or gate. */
         boolean isOpen() {
-            return this.accounts == null && this.partyId == null
+            return this.accounts == null && this.fellowshipId == null
                     && this.factionId == null && !this.gated;
         }
 
         /**
          * The accounts the line was sent to, and nobody else: a whisper's
-         * two parties, the players who were near a proximity line, the
+         * two people, the players who were near a proximity line, the
          * readers a staff line reached. {@code gated} asks besides that
          * the channel still be readable by whoever is shown it.
          */
@@ -992,12 +1005,12 @@ public final class ChatHistory {
         }
 
         /**
-         * The accounts that owned the party's members when the line was
-         * said, while they are still in that party.
+         * The accounts that owned the fellowship's members when the line was
+         * said, while they are still in that fellowship.
          */
-        public static Audience party(UUID partyId, Collection<UUID> memberOwners) {
+        public static Audience fellowship(UUID fellowshipId, Collection<UUID> memberOwners) {
             return new Audience(memberOwners == null
-                    ? Collections.<UUID>emptySet() : memberOwners, partyId, null,
+                    ? Collections.<UUID>emptySet() : memberOwners, fellowshipId, null,
                     false);
         }
 
@@ -1018,12 +1031,12 @@ public final class ChatHistory {
 
         /**
          * An audience exactly as it was written to the save: the
-         * accounts (null for anyone), the party, the faction and whether
+         * accounts (null for anyone), the fellowship, the faction and whether
          * the gate is asked again. Only the codec builds one this way.
          */
-        static Audience restore(Collection<UUID> accounts, UUID partyId,
+        static Audience restore(Collection<UUID> accounts, UUID fellowshipId,
                                 String factionId, boolean gated) {
-            return new Audience(accounts, partyId, factionId, gated);
+            return new Audience(accounts, fellowshipId, factionId, gated);
         }
 
         /** The accounts, or null for anyone the other parts admit. */
@@ -1031,8 +1044,8 @@ public final class ChatHistory {
             return this.accounts;
         }
 
-        UUID partyId() {
-            return this.partyId;
+        UUID fellowshipId() {
+            return this.fellowshipId;
         }
 
         String factionId() {
@@ -1058,7 +1071,7 @@ public final class ChatHistory {
                     || !this.accounts.contains(requester.accountId))) {
                 return false;
             }
-            if (this.partyId != null && !this.partyId.equals(requester.partyId)) {
+            if (this.fellowshipId != null && !requester.fellowshipIds.contains(this.fellowshipId)) {
                 return false;
             }
             if (this.factionId != null) {
@@ -1084,19 +1097,21 @@ public final class ChatHistory {
          * was in that faction when it was said.
          */
         final Map<String, Long> ownedFactions;
-        /** The party the played identity is in; null for none. */
-        final UUID partyId;
+        /** The fellowships the played identity is in. */
+        final Set<UUID> fellowshipIds;
         /** The ids of the channels the player may read right now. */
         final Set<String> readableChannels;
 
         public Requester(UUID accountId, Map<String, Long> ownedFactions,
-                         UUID partyId, Collection<ChatChannel> readable) {
+                         Collection<UUID> fellowshipIds, Collection<ChatChannel> readable) {
             this.accountId = accountId;
             this.ownedFactions = ownedFactions == null
                     ? Collections.<String, Long>emptyMap()
                     : Collections.unmodifiableMap(
                             new HashMap<String, Long>(ownedFactions));
-            this.partyId = partyId;
+            this.fellowshipIds = fellowshipIds == null
+                    ? Collections.<UUID>emptySet()
+                    : Collections.unmodifiableSet(new HashSet<UUID>(fellowshipIds));
             Set<String> ids = new HashSet<String>();
             if (readable != null) {
                 for (ChatChannel channel : readable) {
@@ -1141,8 +1156,8 @@ public final class ChatHistory {
 
     /**
      * The budget a line is charged to: its channel; on a channel that
-     * holds several conversations, the one faction or party it was said
-     * in; for a whisper the pair of identities. So a busy faction, party
+     * holds several conversations, the one faction or fellowship it was said
+     * in; for a whisper the pair of identities. So a busy faction, fellowship
      * or pair only ever pushes out its own lines.
      */
     private static String budgetKeyOf(Entry entry) {

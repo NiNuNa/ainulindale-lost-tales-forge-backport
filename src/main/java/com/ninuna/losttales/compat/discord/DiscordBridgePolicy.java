@@ -12,7 +12,7 @@ import com.ninuna.losttales.chat.ChatMessageOrigin;
  * carries it on to the other Discord channels of its game channel itself,
  * never back into the one it came from, and never reads a post of its
  * own webhooks, so a message can never go round. A private channel
- * (a party, a whisper, a console) is refused here before any binding is
+ * (a fellowship, a whisper, a console) is refused here before any binding is
  * asked, so no configuration can carry it. A channel only some players may
  * read, Operator Chat among them, may be linked:
  * on Discord the channel's own permissions then decide who reads it, and

@@ -9,7 +9,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 
 /**
- * The pages a window can hold, by code name: the journal, the party, the
+ * The pages a window can hold, by code name: the journal, the fellowship, the
  * map, the Characters page, the Motion Lab, and the pages of things in
  * the world. A system with a page registers it once as the client
  * starts, with the words its tab reads, the item its tab wears, its key

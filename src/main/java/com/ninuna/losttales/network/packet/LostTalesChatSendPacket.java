@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatAction;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
@@ -70,7 +71,11 @@ public final class LostTalesChatSendPacket implements IMessage {
      */
     private boolean action;
     private List<ChatShareReference> references = Collections.emptyList();
-    /** Account name a whisper is for; empty for every other channel. */
+    /**
+     * The other end of the conversation: the account a whisper is for, or
+     * the id of the fellowship a fellowship line is for; empty for every
+     * other channel. The server checks the fellowship is the sender's.
+     */
     private String target = "";
     /**
      * The identity of that account the whisper is addressed to — a
@@ -390,8 +395,8 @@ public final class LostTalesChatSendPacket implements IMessage {
                 || (this.targetIdentity.length() > 0
                         && ChatChannel.fromId(this.channelId)
                                 != ChatChannel.WHISPER)
-                || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
-                        && this.target.length() == 0)
+                || !ChatChannel.targetFits(ChatChannel.fromId(this.channelId),
+                        this.target)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.channelId, MAX_CHANNEL_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
@@ -433,8 +438,12 @@ public final class LostTalesChatSendPacket implements IMessage {
     public boolean isAction() { return this.action; }
     /** References in token order; may be shorter than the token list. */
     public List<ChatShareReference> getReferences() { return this.references; }
-    /** The whisper's account name; empty otherwise. */
+    /** The whisper's account name, or a fellowship line's fellowship id; empty otherwise. */
     public String getTarget() { return this.target; }
+    /** The fellowship a fellowship line is for; null for every other line. */
+    public UUID getFellowshipId() {
+        return getChannel() == ChatChannel.FELLOWSHIP ? ChatFellowship.idOf(this.target) : null;
+    }
     /** The identity of that account addressed; empty for its own. */
     public String getTargetIdentity() { return this.targetIdentity; }
     /** The character a whisper is addressed to by id; null for by name or account. */

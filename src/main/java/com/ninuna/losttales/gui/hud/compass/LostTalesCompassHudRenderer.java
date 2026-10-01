@@ -13,7 +13,7 @@ import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerProvide
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerRenderItem;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesDirectionCompassMarkerProvider;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesHostileCompassMarkerProvider;
-import com.ninuna.losttales.gui.hud.compass.marker.LostTalesPartyCompassMarkerProvider;
+import com.ninuna.losttales.gui.hud.compass.marker.LostTalesFellowshipCompassMarkerProvider;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesStaticCompassMarkerProvider;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -406,7 +406,7 @@ public class LostTalesCompassHudRenderer {
         List<LostTalesCompassMarkerProvider> providers = new ArrayList<LostTalesCompassMarkerProvider>();
         providers.add(new LostTalesDirectionCompassMarkerProvider());
         providers.add(new LostTalesStaticCompassMarkerProvider());
-        providers.add(new LostTalesPartyCompassMarkerProvider());
+        providers.add(new LostTalesFellowshipCompassMarkerProvider());
         providers.add(new LostTalesHostileCompassMarkerProvider());
         return Collections.unmodifiableList(providers);
     }

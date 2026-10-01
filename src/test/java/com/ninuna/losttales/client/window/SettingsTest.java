@@ -34,11 +34,11 @@ public final class SettingsTest {
         MenuWindow.Entry global = MenuWindow.Entry.group("Global", null, 0);
         MenuWindow.Entry globalMute = new MenuWindow.Entry("a", "Mute");
         MenuWindow.Entry globalHide = new MenuWindow.Entry("b", "Hide");
-        MenuWindow.Entry party = MenuWindow.Entry.group("Party", null, 0);
-        MenuWindow.Entry partyMute = new MenuWindow.Entry("c", "Mute");
-        MenuWindow.Entry partyHide = new MenuWindow.Entry("d", "Hide");
+        MenuWindow.Entry fellowship = MenuWindow.Entry.group("Fellowship", null, 0);
+        MenuWindow.Entry fellowshipMute = new MenuWindow.Entry("c", "Mute");
+        MenuWindow.Entry fellowshipHide = new MenuWindow.Entry("d", "Hide");
         List<MenuWindow.Entry> members = Arrays.asList(global, globalMute,
-                globalHide, party, partyMute, partyHide);
+                globalHide, fellowship, fellowshipMute, fellowshipHide);
 
         List<MenuWindow.Entry> all = new ArrayList<MenuWindow.Entry>();
         Settings.section(all, "Channels", members, "");
@@ -47,15 +47,15 @@ public final class SettingsTest {
         assertTrue(all.get(0).header);
 
         List<MenuWindow.Entry> byGroup = new ArrayList<MenuWindow.Entry>();
-        Settings.section(byGroup, "Channels", members, "party");
+        Settings.section(byGroup, "Channels", members, "fellowship");
         assertEquals("a group whose name holds the words is kept whole",
-                Arrays.asList(party, partyMute, partyHide),
+                Arrays.asList(fellowship, fellowshipMute, fellowshipHide),
                 byGroup.subList(1, byGroup.size()));
 
         List<MenuWindow.Entry> byRow = new ArrayList<MenuWindow.Entry>();
         Settings.section(byRow, "Channels", members, "hide");
         assertEquals("a row is kept under its group's name",
-                Arrays.asList(global, globalHide, party, partyHide),
+                Arrays.asList(global, globalHide, fellowship, fellowshipHide),
                 byRow.subList(1, byRow.size()));
 
         List<MenuWindow.Entry> bySection = new ArrayList<MenuWindow.Entry>();

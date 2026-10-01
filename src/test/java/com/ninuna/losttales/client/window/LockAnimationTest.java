@@ -115,10 +115,10 @@ public final class LockAnimationTest {
     private static BufferedImage readSheet() throws Exception {
         InputStream stream = LockAnimationTest.class.getResourceAsStream(
                 "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
-        assertNotNull("Chat icon sheet is missing", stream);
+        assertNotNull("The window sheet is missing", stream);
         try {
             BufferedImage sheet = ImageIO.read(stream);
-            assertNotNull("Chat icon sheet is not a readable PNG", sheet);
+            assertNotNull("The window sheet is not a readable PNG", sheet);
             return sheet;
         } finally {
             stream.close();

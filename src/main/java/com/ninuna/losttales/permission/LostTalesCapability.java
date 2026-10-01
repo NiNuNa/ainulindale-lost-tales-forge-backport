@@ -47,15 +47,15 @@ public final class LostTalesCapability {
     /** Read and change every server-side config category, in game and by command. */
     public static final LostTalesCapability SERVER_CONFIG = register("server.config", OPERATOR);
 
-    /* ---- Administration of characters, quests, parties, markers and the HUD ---- */
+    /* ---- Administration of characters, quests, fellowships, markers and the HUD ---- */
 
     /** Inspect, restore and purge the roleplay characters of any account. */
     public static final LostTalesCapability CHARACTER_ADMIN =
             register("character.admin", OPERATOR);
     /** Grant, revoke and inspect quest progress. */
     public static final LostTalesCapability QUEST_ADMIN = register("quest.admin", OPERATOR);
-    /** Check and repair the party stores, and clear the combat markers (/losttales party). */
-    public static final LostTalesCapability PARTY_ADMIN = register("party.admin", OPERATOR);
+    /** Check and repair the fellowship stores, and clear the combat markers (/losttales fellowship). */
+    public static final LostTalesCapability FELLOWSHIP_ADMIN = register("fellowship.admin", OPERATOR);
     /** Place, move and remove the shared map markers. */
     public static final LostTalesCapability MAPMARKER_MANAGE =
             register("mapmarker.manage", OPERATOR);

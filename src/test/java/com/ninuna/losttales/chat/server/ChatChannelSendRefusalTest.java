@@ -5,9 +5,10 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatRoleConfig;
-import com.ninuna.losttales.party.model.Party;
-import com.ninuna.losttales.party.model.PartyColor;
-import com.ninuna.losttales.party.model.PartyMember;
+import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.model.FellowshipFixtures;
+import com.ninuna.losttales.fellowship.model.FellowshipColor;
+import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import java.util.ArrayList;
 import java.util.UUID;
 import org.junit.After;
@@ -18,8 +19,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Why a channel refuses a send. Membership is asked first — a party line
- * needs a party, a faction line a faction — and then the role gate the
+ * Why a channel refuses a send. Membership is asked first — a fellowship line
+ * needs a fellowship, a faction line a faction — and then the role gate the
  * config put on the channel. Every answer is the notice the sender is
  * told, so the reason is never guessed at the other end.
  */
@@ -31,7 +32,7 @@ public final class ChatChannelSendRefusalTest {
             UUID.fromString("00000000-0000-0000-0000-0000000000c2");
     private static final String GONDOR = "lotr:gondor";
 
-    private static final String PARTY_REFUSAL = "chat.losttales.channel.party_unavailable";
+    private static final String FELLOWSHIP_REFUSAL = "chat.losttales.channel.fellowship_unavailable";
     private static final String FACTION_REFUSAL = "chat.losttales.channel.faction_unavailable";
     private static final String GATE_REFUSAL = "chat.losttales.channel.role_unavailable";
 
@@ -41,12 +42,11 @@ public final class ChatChannelSendRefusalTest {
         ChatRoleCatalog.resetToBuiltIn();
     }
 
-    private static Party partyOf(UUID leader) {
-        ArrayList<PartyMember> members = new ArrayList<PartyMember>();
-        members.add(new PartyMember(leader, UUID.randomUUID(), "Aldric", 1L,
-                PartyColor.GREEN));
-        return new Party(UUID.randomUUID(), leader, members, 1L, 0L,
-                Party.CURRENT_DATA_VERSION);
+    private static Fellowship fellowshipOf(UUID leader) {
+        ArrayList<FellowshipMember> members = new ArrayList<FellowshipMember>();
+        members.add(new FellowshipMember(leader, UUID.randomUUID(), "Aldric", 1L,
+                FellowshipColor.GREEN));
+        return FellowshipFixtures.of(UUID.randomUUID(), leader, members);
     }
 
     /** An open channel refuses nobody, whatever they are or are not in. */
@@ -64,19 +64,19 @@ public final class ChatChannelSendRefusalTest {
                 ChatChannelPolicy.sendRefusal(null, null, ALDRIC, GONDOR, 0, false, false));
     }
 
-    /** A party line needs a party, and the sender's own place in it. */
+    /** A fellowship line needs a fellowship, and the sender's own place in it. */
     @Test
-    public void aPartyLineNeedsThatPartysMembership() {
-        assertEquals(PARTY_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, null, ALDRIC, "", 0, false, false));
-        Party party = partyOf(ALDRIC);
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, party, ALDRIC, "", 0, false, false));
-        assertEquals("someone else's party is not the sender's",
-                PARTY_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, party, BEREN, "", 0, false, false));
-        assertEquals("an identity with no gameplay id is in no party",
-                PARTY_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, party, null, "", 0, false, false));
+    public void aFellowshipLineNeedsThatFellowshipsMembership() {
+        assertEquals(FELLOWSHIP_REFUSAL,
+                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, null, ALDRIC, "", 0, false, false));
+        Fellowship fellowship = fellowshipOf(ALDRIC);
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, fellowship, ALDRIC, "", 0, false, false));
+        assertEquals("someone else's fellowship is not the sender's",
+                FELLOWSHIP_REFUSAL,
+                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, fellowship, BEREN, "", 0, false, false));
+        assertEquals("an identity with no gameplay id is in no fellowship",
+                FELLOWSHIP_REFUSAL,
+                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, fellowship, null, "", 0, false, false));
     }
 
     /** A faction line needs a faction: the account, which has none, is refused. */

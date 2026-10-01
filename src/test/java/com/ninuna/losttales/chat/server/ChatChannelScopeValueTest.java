@@ -2,9 +2,10 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelScope;
-import com.ninuna.losttales.party.model.Party;
-import com.ninuna.losttales.party.model.PartyColor;
-import com.ninuna.losttales.party.model.PartyMember;
+import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.model.FellowshipFixtures;
+import com.ninuna.losttales.fellowship.model.FellowshipColor;
+import com.ninuna.losttales.fellowship.model.FellowshipMember;
 
 import org.junit.Test;
 
@@ -31,9 +32,9 @@ public final class ChatChannelScopeValueTest {
     @Test
     public void onlyTheScopedChannelsAreMoreThanOneConversation() {
         assertTrue(ChatChannel.FACTION.isScoped());
-        assertTrue(ChatChannel.PARTY.isScoped());
+        assertTrue(ChatChannel.FELLOWSHIP.isScoped());
         assertEquals(ChatChannelScope.FACTION, ChatChannel.FACTION.getScope());
-        assertEquals(ChatChannelScope.PARTY, ChatChannel.PARTY.getScope());
+        assertEquals(ChatChannelScope.FELLOWSHIP, ChatChannel.FELLOWSHIP.getScope());
 
         assertFalse(ChatChannel.GLOBAL.isScoped());
         assertFalse(ChatChannel.PROXIMITY.isScoped());
@@ -51,22 +52,22 @@ public final class ChatChannelScopeValueTest {
     }
 
     /**
-     * A party line is stamped with the party it was said in, so two
-     * parties an account is in through two characters are two
+     * A fellowship line is stamped with the fellowship it was said in, so two
+     * fellowships an account is in through two characters are two
      * conversations rather than one tab holding both.
      */
     @Test
-    public void aPartyLineNamesItsParty() {
-        Party first = party();
-        Party second = party();
+    public void aFellowshipLineNamesItsFellowship() {
+        Fellowship first = fellowship();
+        Fellowship second = fellowship();
 
         String firstScope = ChatChannelPolicy.scopeValueOf(
-                ChatChannel.PARTY, first, GONDOR);
+                ChatChannel.FELLOWSHIP, first, GONDOR);
         String secondScope = ChatChannelPolicy.scopeValueOf(
-                ChatChannel.PARTY, second, GONDOR);
+                ChatChannel.FELLOWSHIP, second, GONDOR);
 
-        assertEquals(first.getPartyId().toString(), firstScope);
-        assertFalse("two parties are two conversations",
+        assertEquals(first.getFellowshipId().toString(), firstScope);
+        assertFalse("two fellowships are two conversations",
                 firstScope.equals(secondScope));
     }
 
@@ -75,28 +76,27 @@ public final class ChatChannelScopeValueTest {
     @Test
     public void anUnscopedChannelNamesNoConversation() {
         assertEquals("", ChatChannelPolicy.scopeValueOf(
-                ChatChannel.GLOBAL, party(), GONDOR));
+                ChatChannel.GLOBAL, fellowship(), GONDOR));
         assertEquals("", ChatChannelPolicy.scopeValueOf(
-                ChatChannel.OOC, party(), GONDOR));
-        assertEquals("", ChatChannelPolicy.scopeValueOf(null, party(), GONDOR));
+                ChatChannel.OOC, fellowship(), GONDOR));
+        assertEquals("", ChatChannelPolicy.scopeValueOf(null, fellowship(), GONDOR));
     }
 
     /** With nothing to name the conversation, nothing is named. */
     @Test
     public void aScopedChannelWithNothingToNameNamesNothing() {
         assertEquals("", ChatChannelPolicy.scopeValueOf(
-                ChatChannel.PARTY, null, GONDOR));
+                ChatChannel.FELLOWSHIP, null, GONDOR));
         assertEquals("", ChatChannelPolicy.scopeValueOf(
-                ChatChannel.FACTION, party(), ""));
+                ChatChannel.FACTION, fellowship(), ""));
         assertEquals("", ChatChannelPolicy.scopeValueOf(
-                ChatChannel.FACTION, party(), null));
+                ChatChannel.FACTION, fellowship(), null));
     }
 
-    private static Party party() {
-        ArrayList<PartyMember> members = new ArrayList<PartyMember>();
-        members.add(new PartyMember(ALDRIC, UUID.randomUUID(), "Aldric", 1L,
-                PartyColor.GREEN));
-        return new Party(UUID.randomUUID(), ALDRIC, members, 1L, 0L,
-                Party.CURRENT_DATA_VERSION);
+    private static Fellowship fellowship() {
+        ArrayList<FellowshipMember> members = new ArrayList<FellowshipMember>();
+        members.add(new FellowshipMember(ALDRIC, UUID.randomUUID(), "Aldric", 1L,
+                FellowshipColor.GREEN));
+        return FellowshipFixtures.of(UUID.randomUUID(), ALDRIC, members);
     }
 }

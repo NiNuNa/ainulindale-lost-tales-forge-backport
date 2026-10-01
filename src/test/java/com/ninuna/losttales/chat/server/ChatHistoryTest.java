@@ -39,7 +39,7 @@ public final class ChatHistoryTest {
     private static final UUID ALICE = UUID.randomUUID();
     private static final UUID BOB = UUID.randomUUID();
     private static final UUID CAROL = UUID.randomUUID();
-    private static final UUID PARTY = UUID.randomUUID();
+    private static final UUID FELLOWSHIP = UUID.randomUUID();
     private static final String GONDOR = "GONDOR";
     private static final long SENT_AT = 1000000L;
     private static final List<ChatChannel> EVERY_CHANNEL =
@@ -377,7 +377,7 @@ public final class ChatHistoryTest {
     public void aReplayIsCappedPerChannelAndComesOldestFirst() {
         long first = record(ChatChannel.GLOBAL, ALICE, "one",
                 Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
-        for (int index = 0; index < ChatHistory.MAX_REPLAY_PER_CHANNEL; index++) {
+        for (int index = 0; index < ChatHistory.MAX_REPLAY_PER_CONVERSATION; index++) {
             record(ChatChannel.GLOBAL, ALICE, "more",
                     Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
         }
@@ -385,7 +385,7 @@ public final class ChatHistoryTest {
                 Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
         List<LostTalesChatMessagePacket> replay = ChatHistory.replayFor(
                 requester(CAROL), ChatMessageIds.NONE);
-        assertEquals(ChatHistory.MAX_REPLAY_PER_CHANNEL + 1, replay.size());
+        assertEquals(ChatHistory.MAX_REPLAY_PER_CONVERSATION + 1, replay.size());
         assertTrue(replay.get(0).getMessageId() > first);
         for (int index = 1; index < replay.size(); index++) {
             assertTrue(replay.get(index - 1).getMessageId()
@@ -414,9 +414,9 @@ public final class ChatHistoryTest {
                 .get(0).getEchoNonce());
     }
 
-    /** A whisper is its two parties' and nobody else's, however long after. */
+    /** A whisper is its two people's and nobody else's, however long after. */
     @Test
-    public void aWhisperReplaysToItsTwoPartiesOnly() {
+    public void aWhisperReplaysToItsTwoFellowshipsOnly() {
         record(ChatChannel.WHISPER, ALICE, "between us", Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
         assertEquals(1, ChatHistory.replayFor(requester(ALICE), ChatMessageIds.NONE).size());
@@ -424,21 +424,21 @@ public final class ChatHistoryTest {
         assertTrue(ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE).isEmpty());
     }
 
-    /** A party line reaches the members it had, while they are still in that party. */
+    /** A fellowship line reaches the members it had, while they are still in that fellowship. */
     @Test
-    public void aPartyLineReplaysToThenMembersStillInTheParty() {
-        record(ChatChannel.PARTY, ALICE, "form up", Arrays.asList(ALICE, BOB),
-                ChatHistory.Audience.party(PARTY, Arrays.asList(ALICE, BOB)));
+    public void aFellowshipLineReplaysToThenMembersStillInTheFellowship() {
+        record(ChatChannel.FELLOWSHIP, ALICE, "form up", Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.fellowship(FELLOWSHIP, Arrays.asList(ALICE, BOB)));
         assertEquals(1, ChatHistory.replayFor(
-                ChatHistoryRequesters.oneFaction(BOB, "", 0L, PARTY, EVERY_CHANNEL),
+                ChatHistoryRequesters.oneFaction(BOB, "", 0L, FELLOWSHIP, EVERY_CHANNEL),
                 ChatMessageIds.NONE).size());
-        // Bob has since left the party.
+        // Bob has since left the fellowship.
         assertTrue(ChatHistory.replayFor(
                 ChatHistoryRequesters.oneFaction(BOB, "", 0L, null, EVERY_CHANNEL),
                 ChatMessageIds.NONE).isEmpty());
         // Carol joined it afterwards.
         assertTrue(ChatHistory.replayFor(
-                ChatHistoryRequesters.oneFaction(CAROL, "", 0L, PARTY, EVERY_CHANNEL),
+                ChatHistoryRequesters.oneFaction(CAROL, "", 0L, FELLOWSHIP, EVERY_CHANNEL),
                 ChatMessageIds.NONE).isEmpty());
     }
 
@@ -611,7 +611,7 @@ public final class ChatHistoryTest {
         assertEquals(Collections.singleton(ALICE), voices);
         assertEquals(Collections.singleton(BOB),
                 ChatHistory.authorsIn(ChatChannel.OOC));
-        assertTrue(ChatHistory.authorsIn(ChatChannel.PARTY).isEmpty());
+        assertTrue(ChatHistory.authorsIn(ChatChannel.FELLOWSHIP).isEmpty());
         assertTrue(ChatHistory.authorsIn(null).isEmpty());
     }
 
@@ -816,12 +816,12 @@ public final class ChatHistoryTest {
     }
 
     /**
-     * The Faction and Party channels hold several conversations, and each
-     * faction and each party is charged its own budget: a busy faction
+     * The Faction and Fellowship channels hold several conversations, and each
+     * faction and each fellowship is charged its own budget: a busy faction
      * only ever pushes out its own lines.
      */
     @Test
-    public void factionAndPartyRetentionIsPerFactionAndPerParty() {
+    public void factionAndFellowshipRetentionIsPerFactionAndPerFellowship() {
         int kept = LostTalesConfig.chatHistoryPerChannel;
         LostTalesConfig.chatHistoryPerChannel = 2;
         try {
@@ -841,20 +841,20 @@ public final class ChatHistoryTest {
             assertTrue("the other faction's line stays",
                     ChatHistory.quoteFor(rohan, ChatHistoryRequesters.reader(BOB), ChatChannel.FACTION, "rohan").exists());
 
-            UUID otherParty = UUID.randomUUID();
-            ChatHistory.Audience ours = ChatHistory.Audience.party(PARTY, Arrays.asList(ALICE, BOB));
-            String ourScope = PARTY.toString();
-            long formUp = record(ChatChannel.PARTY, ALICE, "form up",
+            UUID otherFellowship = UUID.randomUUID();
+            ChatHistory.Audience ours = ChatHistory.Audience.fellowship(FELLOWSHIP, Arrays.asList(ALICE, BOB));
+            String ourScope = FELLOWSHIP.toString();
+            long formUp = record(ChatChannel.FELLOWSHIP, ALICE, "form up",
                     Arrays.asList(ALICE, BOB), ours, ourScope);
-            long theirs = record(ChatChannel.PARTY, CAROL, "we march",
-                    Arrays.asList(CAROL), ChatHistory.Audience.party(otherParty, Arrays.asList(CAROL)),
-                    otherParty.toString());
-            record(ChatChannel.PARTY, ALICE, "hold", Arrays.asList(ALICE, BOB), ours, ourScope);
-            record(ChatChannel.PARTY, ALICE, "charge", Arrays.asList(ALICE, BOB), ours, ourScope);
-            assertFalse("the party's oldest line went",
-                    ChatHistory.quoteFor(formUp, ChatHistoryRequesters.reader(BOB), ChatChannel.PARTY, ourScope).exists());
+            long theirs = record(ChatChannel.FELLOWSHIP, CAROL, "we march",
+                    Arrays.asList(CAROL), ChatHistory.Audience.fellowship(otherFellowship, Arrays.asList(CAROL)),
+                    otherFellowship.toString());
+            record(ChatChannel.FELLOWSHIP, ALICE, "hold", Arrays.asList(ALICE, BOB), ours, ourScope);
+            record(ChatChannel.FELLOWSHIP, ALICE, "charge", Arrays.asList(ALICE, BOB), ours, ourScope);
+            assertFalse("the fellowship's oldest line went",
+                    ChatHistory.quoteFor(formUp, ChatHistoryRequesters.reader(BOB), ChatChannel.FELLOWSHIP, ourScope).exists());
             assertTrue("the other party's line stays",
-                    ChatHistory.quoteFor(theirs, ChatHistoryRequesters.reader(CAROL), ChatChannel.PARTY, otherParty.toString()).exists());
+                    ChatHistory.quoteFor(theirs, ChatHistoryRequesters.reader(CAROL), ChatChannel.FELLOWSHIP, otherFellowship.toString()).exists());
         } finally {
             LostTalesConfig.chatHistoryPerChannel = kept;
         }
@@ -863,10 +863,10 @@ public final class ChatHistoryTest {
     /**
      * A whisper tab reaches back into the kept history like any other: the
      * page before a line, of the conversation the tab names, for one of
-     * its two parties and nobody else.
+     * its two people and nobody else.
      */
     @Test
-    public void aWhisperConversationPagesItsOlderLinesForItsParties() {
+    public void aWhisperConversationPagesItsOlderLinesForItsFellowships() {
         long older = record(ChatChannel.WHISPER, ALICE, "first", Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
         long newer = record(ChatChannel.WHISPER, ALICE, "second", Arrays.asList(ALICE, BOB),
@@ -1018,15 +1018,15 @@ public final class ChatHistoryTest {
         assertFalse("never to somebody else", ChatHistory.mayShowTo(whisper,
                 ChatChannel.WHISPER, "", reader(BOB), reader(CAROL)));
 
-        long party = record(ChatChannel.PARTY, ALICE, "form up",
+        long fellowship = record(ChatChannel.FELLOWSHIP, ALICE, "form up",
                 Arrays.asList(ALICE, BOB),
-                ChatHistory.Audience.party(PARTY, Arrays.asList(ALICE, BOB)),
-                PARTY.toString());
-        assertTrue("its own party", ChatHistory.mayShowTo(party,
-                ChatChannel.PARTY, PARTY.toString(), reader(BOB), null));
-        assertFalse("another party", ChatHistory.mayShowTo(party,
-                ChatChannel.PARTY, UUID.randomUUID().toString(), reader(BOB), null));
-        assertFalse("OOC", ChatHistory.mayShowTo(party,
+                ChatHistory.Audience.fellowship(FELLOWSHIP, Arrays.asList(ALICE, BOB)),
+                FELLOWSHIP.toString());
+        assertTrue("its own fellowship", ChatHistory.mayShowTo(fellowship,
+                ChatChannel.FELLOWSHIP, FELLOWSHIP.toString(), reader(BOB), null));
+        assertFalse("another party", ChatHistory.mayShowTo(fellowship,
+                ChatChannel.FELLOWSHIP, UUID.randomUUID().toString(), reader(BOB), null));
+        assertFalse("OOC", ChatHistory.mayShowTo(fellowship,
                 ChatChannel.OOC, "", reader(BOB), null));
 
         long near = record(ChatChannel.PROXIMITY, ALICE, "psst",

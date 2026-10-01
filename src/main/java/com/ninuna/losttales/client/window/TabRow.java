@@ -211,10 +211,12 @@ public final class TabRow {
     private static final int DRAFT_WIDTH =
             LostTalesUiSheet.DRAFT.getWidth();
     /**
-     * The mark after the {@code +} for what waits in the channels it
-     * would open: the ping tile or the white sphere, both this wide.
+     * The room kept after the {@code +} for the mark of what waits in the
+     * channels it would open: the widest the ping tile stands, at
+     * {@code 99+}.
      */
-    private static final int RESTORE_MARK_WIDTH = TabMark.TILE_WIDTH;
+    private static final int RESTORE_MARK_WIDTH = LostTalesUiSheet
+            .countTileWidth(LostTalesUiSheet.COUNT_MOST + 1);
     /** Hit square of a control inside the selected tab. */
     static final int CONTROL_SIZE = 7;
     static final int CONTROL_GAP = 2;
@@ -562,6 +564,12 @@ public final class TabRow {
     public static final class Row {
         public List<WindowTab> tabs = Collections.emptyList();
         public WindowTab selected;
+        /**
+         * The other page of the split shown, beside the one in front: it
+         * stands forward with it, the two as one tab, while only the one
+         * in front wears its colour. Null while the window shows one page.
+         */
+        public WindowTab splitPartner;
         /** Tabs marked in this row; the selected one need not be among them. */
         public List<WindowTab> marked = Collections.emptyList();
         /** Resting left edge of the first tab, screen space. */
@@ -802,7 +810,7 @@ public final class TabRow {
             if (localX < tab.x || localX >= tab.x + tab.width) {
                 continue;
             }
-            int tabTop = tabTop(bottom, tab.tab.equals(row.selected));
+            int tabTop = tabTop(bottom, isForward(row, tab.tab));
             if (tab.closeX >= 0 && tabControlBox(tab.closeX, tabTop)
                     .contains(localX, localY)) {
                 return new Hit(HitKind.CLOSE, tab.tab);
@@ -993,6 +1001,7 @@ public final class TabRow {
         this.rowClipBottom = row.rowBottomExact - 1.0D;
         this.clipFractionX = row.fractionX;
         Tab selectedTab = null;
+        Tab partnerTab = null;
         boolean masked = false;
         boolean clipped = LostTalesUiClip.beginRows(
                 Minecraft.getMinecraft(), Double.NaN,
@@ -1044,6 +1053,10 @@ public final class TabRow {
                 Tab tab = tabs.get(index);
                 if (tab.tab.equals(row.selected)) {
                     selectedTab = tab;
+                    continue;
+                }
+                if (tab.tab.equals(row.splitPartner)) {
+                    partnerTab = tab;
                     continue;
                 }
                 if (isCarried(row, tab.tab)) {
@@ -1155,11 +1168,20 @@ public final class TabRow {
         float selectedRight = 0.0F;
         if (selectedTab != null) {
             // The hole reaches to the ends of the selected pieces' feet:
-            // the rule begins right where they do.
+            // the rule begins right where they do. A split's two halves
+            // stand forward as one tab, the hole under both.
             selectedLeft = row.offsetX + drawnX(row, selectedTab)
                     - SELECTED_FOOT;
             selectedRight = selectedLeft + drawnWidth(row, selectedTab)
                     + 2 * SELECTED_FOOT;
+            if (partnerTab != null) {
+                float partnerLeft = row.offsetX + drawnX(row, partnerTab)
+                        - SELECTED_FOOT;
+                float partnerRight = partnerLeft + drawnWidth(row, partnerTab)
+                        + 2 * SELECTED_FOOT;
+                selectedLeft = Math.min(selectedLeft, partnerLeft);
+                selectedRight = Math.max(selectedRight, partnerRight);
+            }
         }
         float ruleLeft = row.offsetX + row.left - STRIP_INSET;
         int ruleRowArgb = toolSurfaceArgb();
@@ -1188,6 +1210,9 @@ public final class TabRow {
                 resumeCarriedMask();
             }
             this.rowClipBottom = row.rowBottomExact;
+            if (partnerTab != null && !isCarried(row, partnerTab.tab)) {
+                drawTab(font, partnerTab, row, bottom, hovered, true, false);
+            }
             drawTab(font, selectedTab, row, bottom, hovered, true);
         }
         if (masked) {
@@ -1330,7 +1355,7 @@ public final class TabRow {
             lefts[index] = row.offsetX + drawnX(row, tab);
             rights[index] = lefts[index] + drawnWidth(row, tab);
             tops[index] = tabTop(row.rowBottom,
-                    tab.tab.equals(row.selected)) - raisedBy(tab);
+                    isForward(row, tab.tab)) - raisedBy(tab);
             float[] tabEdges = {lefts[index], lefts[index] + 1.0F,
                     rights[index] - 1.0F, rights[index]};
             for (float edge : tabEdges) {
@@ -1389,6 +1414,17 @@ public final class TabRow {
 
     private void drawTab(FontRenderer font, Tab tab, Row row,
                          int rowBottom, Hit hovered, boolean selected) {
+        drawTab(font, tab, row, rowBottom, hovered, selected, selected);
+    }
+
+    /**
+     * A tab, standing forward when {@code selected}, wearing its colour
+     * and its cross as the tab in front when {@code focused}: the other
+     * half of a split stands forward without them.
+     */
+    private void drawTab(FontRenderer font, Tab tab, Row row,
+                         int rowBottom, Hit hovered, boolean selected,
+                         boolean focused) {
         float left = row.offsetX + drawnX(row, tab);
         float width = drawnWidth(row, tab);
         if (width <= 0.0F) {
@@ -1453,14 +1489,14 @@ public final class TabRow {
             int textAlpha = Math.round(scaled(0xFF) * contentShare);
             int labelRgb = LostTalesUiInk.blend(
                     LostTalesUiInk.IVORY, channelRgb,
-                    selected ? 1.0F : lit);
+                    focused ? 1.0F : lit);
             // Which buttons stand, and how much of the name shows beside
             // them, is read off the width the tab is laid out at and the
             // row's fades: every tab gives a button up together. A button
             // going gives up its ink first and its room after, and one
             // coming takes its room first and shows after, so the name
             // never runs under a button.
-            float closeFade = closeShare(row, selected);
+            float closeFade = closeShare(row, focused);
             float optionsFade = row.bare ? 0.0F : this.optionsShown.clamped();
             float draftFade = tab.draft ? this.draftShown.clamped() : 0.0F;
             TabRoom room = roomFor(laidWidth, iconWidth(tab.tab),
@@ -2345,6 +2381,11 @@ public final class TabRow {
      */
     static boolean closeStands(double width) {
         return width >= DEFAULT_TAB_WIDTH * CLOSE_SHARE - 1.0E-6D;
+    }
+
+    /** Whether a tab stands forward: the one in front, and the other half of the split it shows. */
+    static boolean isForward(Row row, WindowTab tab) {
+        return tab.equals(row.selected) || tab.equals(row.splitPartner);
     }
 
     /** How far a tab of this row shows its cross right now. */
@@ -3318,7 +3359,7 @@ public final class TabRow {
         this.showRestore = row.showRestore;
         this.restoreMark = restoreMark;
         this.restoreWidth = !row.showRestore ? 0 : PLUS_WIDTH
-                + (restoreMark.isNone() ? 0 : COUNTER_GAP + RESTORE_MARK_WIDTH);
+                + (restoreMark.isNone() ? 0 : COUNTER_GAP + restoreMark.width());
         placeLeftRun();
         // The window's own controls hang from the row's right edge, past
         // the room the tabs and the restore run were given; the tabs'

@@ -216,7 +216,7 @@ public final class ChatReactionsTest {
         assertFalse(reactions.clearDiscord("pepe:557", "557", CHANNEL));
         assertEquals(4, reactions.total());
 
-        assertTrue(reactions.clearDiscord("parrot_party:556", "556", CHANNEL));
+        assertTrue(reactions.clearDiscord("parrot_fellowship:556", "556", CHANNEL));
         assertNull(reactions.summaryFor(ALICE).find(PARROT));
         assertEquals("the player's stays", 1,
                 reactions.summaryFor(ALICE).find(RENAMED).count);

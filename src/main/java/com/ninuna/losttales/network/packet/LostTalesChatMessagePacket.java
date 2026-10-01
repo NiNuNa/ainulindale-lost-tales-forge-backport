@@ -232,7 +232,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
      */
     private String tabId = "";
     /**
-     * For a whisper, the character of the receiving party this copy is
+     * For a whisper, the character of the receiving side this copy is
      * held as — the sender's worn character on the sender's copy, the
      * addressed character on the partner's — or null for the account.
      * What the client files the conversation under, so one player's
@@ -846,7 +846,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /**
      * The same whisper as the other party is sent it: filed under the
-     * partner and identity that party sees the conversation as.
+     * partner and identity that fellowship sees the conversation as.
      */
     public LostTalesChatMessagePacket withPartner(String partner,
                                                   String partnerIdentity) {
@@ -856,7 +856,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /**
      * The same whisper held as, and addressed to, the given characters:
-     * the receiving party's own, and the other party's; null for an
+     * the receiving side's own, and the other party's; null for an
      * account on either side.
      */
     public LostTalesChatMessagePacket withConversation(UUID ownCharacterId,
@@ -1083,7 +1083,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
      */
     public UUID getIdentityCharacterId() { return this.identityCharacterId; }
     /**
-     * For a whisper, the receiving party's own character this copy is
+     * For a whisper, the receiving side's own character this copy is
      * held as; null for the account.
      */
     public UUID getOwnCharacterId() { return this.ownCharacterId; }

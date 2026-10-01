@@ -29,10 +29,20 @@ public abstract class OptionGlyph {
      */
     public abstract void draw(float x, float y, float lit, int alpha);
 
+    /** The sheet sprite the glyph rests as, for a sub-window's strip; null for a chip or a pattern. */
+    public LostTalesUiSheet sprite() {
+        return null;
+    }
+
     /** A sprite of the UI sheet and its lit artwork. */
     public static OptionGlyph sprite(final LostTalesUiSheet resting,
                                      final LostTalesUiSheet litSprite) {
         return new OptionGlyph() {
+            @Override
+            public LostTalesUiSheet sprite() {
+                return resting;
+            }
+
             @Override
             public int width() {
                 return resting.getWidth();
@@ -52,7 +62,7 @@ public abstract class OptionGlyph {
     }
 
     /**
-     * A square of a colour, {@link Pattern#SIZE} wide: a party colour. Lit,
+     * A square of a colour, {@link Pattern#SIZE} wide: a fellowship colour. Lit,
      * its edge takes the chat's ivory.
      */
     public static OptionGlyph chip(final int rgb) {

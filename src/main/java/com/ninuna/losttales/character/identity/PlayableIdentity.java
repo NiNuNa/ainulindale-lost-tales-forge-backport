@@ -10,7 +10,7 @@ import java.util.UUID;
  * of the account's roleplay characters. The account is a full identity with
  * saved state of its own, not a gap between characters.
  *
- * <p>The gameplay id is what gameplay systems key on — party membership,
+ * <p>The gameplay id is what gameplay systems key on — fellowship membership,
  * saved player state, LOTR bounty records: the character's UUID for a
  * character, the account's own UUID for the account. Character UUIDs are
  * random, so the two never collide.</p>
@@ -56,7 +56,7 @@ public final class PlayableIdentity {
 
     /**
      * The one rule for the gameplay id, shared by the roster, the identity
-     * hook and party markers: the character when there is one, else the
+     * hook and fellowship markers: the character when there is one, else the
      * owner. Null in, null out, so callers with nothing known get nothing.
      */
     public static UUID gameplayId(UUID characterIdOrNull, UUID ownerIdOrNull) {
@@ -66,7 +66,7 @@ public final class PlayableIdentity {
     /**
      * How an identity is named: the character's own name when it has one
      * worth showing, else the account's. The one statement of the rule,
-     * so the chat, the nameplates, the party and the LOTR records that
+     * so the chat, the nameplates, the fellowship and the LOTR records that
      * ask it all answer the same.
      *
      * <p>An account name that is itself empty comes back empty: a caller

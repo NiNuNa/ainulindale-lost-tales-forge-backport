@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
@@ -91,10 +92,12 @@ public final class ClientChatChannelStateTest {
 
     @Test
     public void closedChannelsAreNeverSelected() {
-        joinParty(acceptRoster("lotr:gondor"));
+        joinFellowship(acceptRoster("lotr:gondor"));
         Tearing.off(ChatTab.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
+        // The Fellowship channel has no plain tab: each fellowship's
+        // conversation is a tab of its own.
         assertEquals(java.util.Arrays.asList(ChatChannel.CLIENT_CONSOLE,
-                ChatChannel.GLOBAL, ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
+                ChatChannel.GLOBAL, ChatChannel.FACTION, ChatChannel.OOC,
                 ChatChannel.PROXIMITY),
                 openChannels());
         // A closed channel stays available (readable) but not selectable.
@@ -116,7 +119,7 @@ public final class ClientChatChannelStateTest {
 
     @Test
     public void accountOnlyPlayersTalkAnywhereWithTheAccount() {
-        // The Party tab is not there until the identity is in a party;
+        // The Fellowship tab is not there until the identity is in a fellowship;
         // Faction is open to the account, which speaks in Unaligned.
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.GLOBAL));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.GLOBAL));
@@ -124,8 +127,8 @@ public final class ClientChatChannelStateTest {
                 ChatChannel.PROXIMITY));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.PROXIMITY));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FACTION));
-        assertFalse(ClientChatChannelState.isAvailable(ChatChannel.PARTY));
-        assertFalse(ClientChatChannelState.canSend(ChatChannel.PARTY));
+        assertFalse(ClientChatChannelState.isAvailable(ChatChannel.FELLOWSHIP));
+        assertFalse(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.OOC));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.OOC));
         // The console is always there; Admin only once the server says so.
@@ -133,17 +136,17 @@ public final class ClientChatChannelStateTest {
                 ChatChannel.PROXIMITY, ChatChannel.FACTION, ChatChannel.OOC,
                 ChatChannel.CLIENT_CONSOLE),
                 availableChannels());
-        // The Party tab is there once the character played joins one.
-        joinParty(null);
-        assertTrue(ClientChatChannelState.isAvailable(ChatChannel.PARTY));
-        assertTrue(ClientChatChannelState.canSend(ChatChannel.PARTY));
+        // The Fellowship tab is there once the character played joins one.
+        joinFellowship(null);
+        assertTrue(ClientChatChannelState.isAvailable(ChatChannel.FELLOWSHIP));
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
         assertFalse(ClientChatChannelState.canSend(ChatChannel.OPERATOR));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.CLIENT_CONSOLE));
         // The server's word arrives as channel ids: every channel open here.
         ClientChatChannelState.setChannelGates(allChannelIds(), allChannelIds());
         assertEquals(java.util.Arrays.asList(ChatChannel.GLOBAL,
                 ChatChannel.PROXIMITY, ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.PARTY, ChatChannel.OPERATOR,
+                ChatChannel.FELLOWSHIP, ChatChannel.OPERATOR,
                 ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
                 availableChannels());
         ClientChatChannelState.select(ChatTab.of(ChatChannel.OPERATOR));
@@ -333,10 +336,11 @@ public final class ClientChatChannelStateTest {
         assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asAccount));
     }
 
-    /** The server's word that the selected identity is in a party. */
-    private static void joinParty(UUID characterId) {
+    /** The server's word that the selected identity is in a fellowship. */
+    private static void joinFellowship(UUID characterId) {
         ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
-                characterId, new UUID(9L, 9L), 0x123456, "Aldric", "", false));
+                characterId, Collections.singletonList(new ChatFellowship(
+                        new UUID(9L, 9L), "Grey Company", 0x123456)), false));
     }
 
     private static UUID acceptRoster(String factionId) {

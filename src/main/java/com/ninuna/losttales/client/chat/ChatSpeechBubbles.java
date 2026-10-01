@@ -19,9 +19,9 @@ import java.util.UUID;
  *
  * <p>Only lines spoken <em>in character</em> are kept: the channel says
  * which those are ({@link ChatRolePresentation#isInCharacter}) — Global,
- * Proximity, Party, Faction and whispers — so a channel added later needs
+ * Proximity, Fellowship, Faction and whispers — so a channel added later needs
  * nothing here, and the out-of-character ones (OOC, the operator channel,
- * the console, the Discord bridge) never reach the world. Party, Faction,
+ * the console, the Discord bridge) never reach the world. Fellowship, Faction,
  * whispers and Global carry no distance of their
  * own, but a speaker has to be rendered in front of you for the words to
  * be drawn at all, so what shows over a head is always someone present.</p>

@@ -23,8 +23,29 @@ public final class ChatTabIds {
      * character's id, which no name can be mistaken for.
      */
     public static final String OWNER_MARK = "own:";
+    /**
+     * The last segment of a scoped plain channel's id, after a separator:
+     * the conversation the tab is, a faction or a fellowship.
+     */
+    public static final String SCOPE_MARK = "in:";
 
     private ChatTabIds() {}
+
+    /**
+     * The conversation a plain channel's tab id names after its
+     * {@link #SCOPE_MARK}: a faction, or a fellowship's id. Empty for any
+     * other id.
+     */
+    public static String scopeOf(String tabId) {
+        String trimmed = tabId == null ? "" : tabId.trim();
+        if (channelOf(trimmed) == null) {
+            return "";
+        }
+        int separator = trimmed.indexOf(SEPARATOR);
+        String rest = separator < 0 ? "" : trimmed.substring(separator + 1);
+        return rest.toLowerCase(Locale.ROOT).startsWith(SCOPE_MARK)
+                ? rest.substring(SCOPE_MARK.length()) : "";
+    }
 
     /**
      * The id of one whisper conversation, as the client's tab writes it:

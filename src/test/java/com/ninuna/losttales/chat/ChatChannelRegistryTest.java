@@ -32,7 +32,7 @@ public final class ChatChannelRegistryTest {
     @Test
     public void theBuiltInChannelsAreInForceBeforeAnythingIsRegistered() {
         List<ChatChannel> built = Arrays.asList(ChatChannel.GLOBAL,
-                ChatChannel.PROXIMITY, ChatChannel.PARTY, ChatChannel.FACTION,
+                ChatChannel.PROXIMITY, ChatChannel.FELLOWSHIP, ChatChannel.FACTION,
                 ChatChannel.OOC, ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE,
                 ChatChannel.SERVER_CONSOLE, ChatChannel.WHISPER);
         List<ChatChannel> inForce = Arrays.asList(ChatChannel.values());

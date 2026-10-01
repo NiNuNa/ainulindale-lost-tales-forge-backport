@@ -61,18 +61,28 @@ public final class ChatTab extends WindowTab {
             "...#.",
             "#.#..",
             ".#...");
-    /** A bell: Notifications. A pattern until its artwork is painted. */
-    private static final OptionGlyph BELL_GLYPH = OptionGlyph.pattern(
-            "..#..",
-            ".###.",
-            ".###.",
-            "#####",
-            "..#..");
     private static final OptionGlyph JUMP_GLYPH = OptionGlyph.sprite(
             LostTalesUiSheet.CHEVRON_5, LostTalesUiSheet.CHEVRON_5_HOVER);
-    private static final OptionGlyph FEED_GLYPH = OptionGlyph.sprite(
-            LostTalesUiSheet.SPEECH_BUBBLE,
-            LostTalesUiSheet.SPEECH_BUBBLE_HOVER);
+    /**
+     * The bell of Notifications and the bubble of Show in Feed, one for
+     * each word in {@link ChatLineChoice}'s order: green for Everything,
+     * ivory for Only Mentions, crimson for Nothing, each lighting to
+     * honey.
+     */
+    private static final OptionGlyph[] BELL_GLYPHS = {
+            OptionGlyph.sprite(LostTalesUiSheet.BELL_EVERYTHING,
+                    LostTalesUiSheet.BELL_LIT),
+            OptionGlyph.sprite(LostTalesUiSheet.BELL, LostTalesUiSheet.BELL_LIT),
+            OptionGlyph.sprite(LostTalesUiSheet.BELL_NOTHING,
+                    LostTalesUiSheet.BELL_LIT)};
+    private static final OptionGlyph[] FEED_GLYPHS = {
+            OptionGlyph.sprite(LostTalesUiSheet.FEED_EVERYTHING,
+                    LostTalesUiSheet.FEED_LIT),
+            OptionGlyph.sprite(LostTalesUiSheet.FEED, LostTalesUiSheet.FEED_LIT),
+            OptionGlyph.sprite(LostTalesUiSheet.FEED_NOTHING,
+                    LostTalesUiSheet.FEED_LIT)};
+    /** Between a pick's id and one of its words in a choice's id: {@code notify:mentions}. */
+    private static final String WORD_SEPARATOR = ":";
     /** The timestamp area's button: the person, for the heads the area holds. */
     private static final ToolStrip.Panel AREA_PANEL = new ToolStrip.Panel(
             LostTalesUiSheet.AREA, LostTalesUiSheet.AREA_HOVER,
@@ -91,12 +101,11 @@ public final class ChatTab extends WindowTab {
     private static final String OWNER_MARK = ChatTabIds.OWNER_MARK;
     /**
      * The last segment of a scoped plain channel's id, after a
-     * separator: the conversation the tab is, which for the Faction
-     * channel is the faction. A conversation and not a character —
-     * two characters in one faction are in the same conversation, and
-     * it outlives either of them.
+     * separator: the conversation the tab is, a faction or a fellowship.
+     * A conversation and not a character — two characters in one faction
+     * are in the same conversation, and it outlives either of them.
      */
-    private static final String SCOPE_MARK = "in:";
+    private static final String SCOPE_MARK = ChatTabIds.SCOPE_MARK;
     /**
      * One interned tab per channel, by the channel itself. A map rather
      * than a position: the set of channels is open, so there is no fixed
@@ -191,14 +200,16 @@ public final class ChatTab extends WindowTab {
 
     /**
      * The row entry a tab belongs to: the plain channel tab for a
-     * conversation of a scoped channel, the person's tab for a whisper
-     * conversation held as one identity, and the tab itself for
-     * everything else. The row holds one entry per channel and per
-     * person, so a line's own tab is not a tab a window can hold;
-     * anything asking the layout about a line asks about this.
+     * faction's conversation, the person's tab for a whisper conversation
+     * held as one identity, and the tab itself for everything else, a
+     * fellowship's conversation among them. The row holds one entry per
+     * channel, per person and per fellowship, so a line's own tab is not
+     * always a tab a window can hold; anything asking the layout about a
+     * line asks about this.
      */
     public static ChatTab row(ChatTab tab) {
-        if (tab == null || tab.npc || tab.ownerKey.length() == 0) {
+        if (tab == null || tab.npc || tab.ownerKey.length() == 0
+                || tab.isFellowship()) {
             return tab;
         }
         return tab.isWhisper() ? whisper(tab.partner, tab.identity)
@@ -277,6 +288,26 @@ public final class ChatTab extends WindowTab {
      */
     public String getOwnerKey() { return this.ownerKey; }
     public boolean isWhisper() { return this.channel == ChatChannel.WHISPER; }
+    /** Whether the tab is one fellowship's conversation, named by the fellowship's id. */
+    public boolean isFellowship() {
+        return this.channel == ChatChannel.FELLOWSHIP && this.ownerKey.length() > 0;
+    }
+    /**
+     * Whether the tab is a conversation the server it is held on keeps
+     * apart: a whisper with a player, or a fellowship's. Its tab is
+     * remembered for that server, not in the layout, and goes when the
+     * session ends.
+     */
+    public boolean isPlaceConversation() {
+        return (isWhisper() && !this.npc) || isFellowship();
+    }
+    /**
+     * The other end a line typed here is sent to: a whisper's partner, a
+     * fellowship's id; empty for every other tab.
+     */
+    public String target() {
+        return isWhisper() ? this.partner : isFellowship() ? this.ownerKey : "";
+    }
     /** Whether the partner is an NPC rather than a player. */
     public boolean isNpc() { return this.npc; }
 
@@ -515,8 +546,8 @@ public final class ChatTab extends WindowTab {
         if (isWhisper()) {
             return prefix + (this.npc ? "npc" : "whisper");
         }
-        if (this.channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP) {
-            return prefix + "party";
+        if (this.channel.getAccess() == ChatChannelAccess.FELLOWSHIP_MEMBERSHIP) {
+            return prefix + "fellowship";
         }
         switch (this.channel.getRecipientRule()) {
             case PROXIMITY:
@@ -557,9 +588,9 @@ public final class ChatTab extends WindowTab {
      * forward and its history taken to where the unread run begins; each
      * greyed while nothing waits unread. Then Notifications and Show in
      * Feed (Everything, Only Mentions or Nothing: which lines chime, and
-     * which reach the closed feed), each stepped on with a click and back
-     * with a right-click: the channel's own settings. Their glyphs rest
-     * lit at Everything and are struck through at Nothing.
+     * which reach the closed feed), each opening its three words in a
+     * sub-window of its own: the channel's own settings. Their glyphs wear
+     * the colour of the word chosen.
      */
     @Override
     public List<PageOption> options() {
@@ -574,20 +605,37 @@ public final class ChatTab extends WindowTab {
                 word("gui.losttales.chat.tab.jump_unread"), JUMP_GLYPH)
                 .unavailable(divided ? "" : word("gui.losttales.chat.tab.nothing_unread"))
                 .inGroup(GROUP_READING, ""));
-        options.add(cycle(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
-                ChatLayout.notification(this), BELL_GLYPH));
-        options.add(cycle(MENU_FEED, "gui.losttales.chat.tab.feed",
-                ChatLayout.feedChoice(this), FEED_GLYPH));
+        options.add(pick(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
+                ChatLayout.notification(this), BELL_GLYPHS));
+        options.add(pick(MENU_FEED, "gui.losttales.chat.tab.feed",
+                ChatLayout.feedChoice(this), FEED_GLYPHS));
         return options;
     }
 
-    /** One of the conversation's two settings, its glyph saying where it stands. */
-    private static PageOption cycle(String id, String labelKey,
-                                    ChatLineChoice choice, OptionGlyph glyph) {
-        return PageOption.cycle(id, word(labelKey), word(choice.labelKey()),
-                choice == ChatLineChoice.EVERYTHING,
-                choice == ChatLineChoice.NOTHING ? glyph.struck() : glyph)
-                .inGroup(GROUP_SETTINGS, "");
+    /**
+     * One of the conversation's two settings: its three words, each with
+     * its glyph and what it does under the pointer, the one {@code chosen}
+     * marked; the option wears the chosen word's glyph.
+     */
+    private static PageOption pick(String id, String labelKey,
+                                   ChatLineChoice chosen,
+                                   OptionGlyph[] glyphs) {
+        List<PageOption> words = new ArrayList<PageOption>(3);
+        for (ChatLineChoice choice : ChatLineChoice.values()) {
+            words.add(PageOption.choice(id + WORD_SEPARATOR + choice.id(),
+                    word(choice.labelKey()), choice == chosen,
+                    glyphs[choice.ordinal()]).explained(word(
+                    "gui.losttales.chat.choice." + id + "." + choice.id())));
+        }
+        return PageOption.pick(id, word(labelKey), word(chosen.labelKey()),
+                glyphs[chosen.ordinal()], words).inGroup(GROUP_SETTINGS, "");
+    }
+
+    /** The word a choice's id picks of {@code pick}'s three, or null for an id of another option. */
+    private static ChatLineChoice wordOf(String pick, String id) {
+        String prefix = pick + WORD_SEPARATOR;
+        return id.startsWith(prefix)
+                ? ChatLineChoice.fromId(id.substring(prefix.length())) : null;
     }
 
     private static String word(String key) {
@@ -595,18 +643,19 @@ public final class ChatTab extends WindowTab {
     }
 
     /**
-     * The settings stay; reading and jumping are done with the menu. A
-     * setting steps on with a click and back with a right-click; reading
-     * and jumping take either press alike.
+     * A word picked for one of the settings stays, and so does its
+     * sub-window; reading and jumping are done with the menu.
      */
     @Override
-    public boolean takeOption(String id, boolean back) {
-        if (MENU_NOTIFY.equals(id)) {
-            ChatLayout.stepNotification(this, back);
+    public boolean takeOption(String id) {
+        ChatLineChoice notify = wordOf(MENU_NOTIFY, id);
+        if (notify != null) {
+            ChatLayout.setNotification(this, notify);
             return true;
         }
-        if (MENU_FEED.equals(id)) {
-            ChatLayout.stepFeedChoice(this, back);
+        ChatLineChoice feed = wordOf(MENU_FEED, id);
+        if (feed != null) {
+            ChatLayout.setFeedChoice(this, feed);
             return true;
         }
         if (MENU_MARK_READ.equals(id)) {

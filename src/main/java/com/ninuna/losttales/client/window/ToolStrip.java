@@ -28,7 +28,7 @@ import org.lwjgl.input.Mouse;
  * back in; over a page the page's own panel, the journal's quest list.
  * After it the page's options, each a button of its own
  * ({@link PageOption}): Mark as Read, Notifications, the journal's
- * filters, the map's kinds of marker, a party colour; a gap between two
+ * filters, the map's kinds of marker, a fellowship colour; a gap between two
  * groups, and those the strip has no room for left to the tab's options.
  * At its right end the help button, a question mark, which opens the
  * page's help: what the page is for and its keys. Before it the search,
@@ -415,7 +415,8 @@ public final class ToolStrip {
                     state.panelMotion, laid.panelX,
                     glyphTop(laid, laid.panelHeight), ink);
         }
-        drawOptions(state, laid, underOption, now, ink);
+        drawOptions(state, laid, underOption, out == null ? "" : out.pick,
+                now, ink);
         drawButton(state.settingsMotion, front.settingsPlace() != null,
                 out != null && out.settings, under, Part.SETTINGS,
                 LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER,
@@ -562,11 +563,13 @@ public final class ToolStrip {
     }
 
     /**
-     * The page's option buttons: each resting lit while it is on, lifting
-     * under the pointer; one that cannot be taken greyed and still.
+     * The page's option buttons: each resting lit while it is on or its
+     * words are out ({@code pickOut}), lifting under the pointer; one that
+     * cannot be taken greyed and still.
      */
     private static void drawOptions(State state, Layout laid,
-                                    PageOption under, long now, int ink) {
+                                    PageOption under, String pickOut,
+                                    long now, int ink) {
         for (int index = 0; index < laid.options.length; index++) {
             PageOption option = laid.options[index];
             OptionGlyph glyph = option.glyph;
@@ -584,7 +587,8 @@ public final class ToolStrip {
                 state.optionMotions.put(option.id, motion);
             }
             boolean hovered = under != null && under.id.equals(option.id);
-            motion.advance(now, option.on || hovered, hovered,
+            boolean lit = option.on || hovered || option.id.equals(pickOut);
+            motion.advance(now, lit, hovered,
                     hovered && Mouse.isButtonDown(0));
             LostTalesUiButton.beginPose(motion, x, y, glyph.width(),
                     glyph.height());
@@ -596,14 +600,19 @@ public final class ToolStrip {
         }
     }
 
-    /** Which of what the tab in front opens is out: its settings, its help. */
+    /**
+     * Which of what the tab in front opens is out: its settings, its help,
+     * and the option whose words are out ({@code pick}, empty for none).
+     */
     public static final class Out {
         final boolean settings;
         final boolean help;
+        final String pick;
 
-        public Out(boolean settings, boolean help) {
+        public Out(boolean settings, boolean help, String pick) {
             this.settings = settings;
             this.help = help;
+            this.pick = pick == null ? "" : pick;
         }
     }
 

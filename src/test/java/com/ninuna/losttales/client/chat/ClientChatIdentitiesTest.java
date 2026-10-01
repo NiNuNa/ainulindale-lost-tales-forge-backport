@@ -51,8 +51,8 @@ public final class ClientChatIdentitiesTest {
             assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(tab).characterId);
             assertEquals(LEGOLAS, ClientChatIdentities.wireCharacterId(tab));
         }
-        // The world around the player and the party hear the character played.
-        for (ChatChannel channel : new ChatChannel[] {ChatChannel.PROXIMITY, ChatChannel.PARTY}) {
+        // The world around the player and the fellowship hear the character played.
+        for (ChatChannel channel : new ChatChannel[] {ChatChannel.PROXIMITY, ChatChannel.FELLOWSHIP}) {
             ChatTab tab = ChatTab.of(channel);
             assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(tab).characterId);
             assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT,

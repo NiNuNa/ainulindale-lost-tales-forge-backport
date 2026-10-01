@@ -19,7 +19,7 @@ import org.lwjgl.input.Keyboard;
  *
  * <p>Typing narrows one list of everything the player is allowed to be told
  * about: the locations they have found, their own and shared waypoints, and
- * their party's markers. A location that has not been discovered is not in the
+ * their fellowship's markers. A location that has not been discovered is not in the
  * list at all — offering to fly the camera to a name the map itself refuses to
  * print would give away exactly what discovery withholds.</p>
  *

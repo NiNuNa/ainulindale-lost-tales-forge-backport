@@ -54,12 +54,12 @@ public final class ChatTabTest {
     /**
      * A conversation's options, with nothing unread: Mark as Read and Jump
      * to First Unread greyed with their reason, then its own settings,
-     * Notifications and Show in Feed, in a group of their own; each setting
-     * steps on with a click and back with a right-click round the same
-     * three words, reads the choice it stands on, and keeps the menu open.
+     * Notifications and Show in Feed, in a group of their own; each a pick
+     * of the same three words, reading the one it stands on, each word
+     * taken by its own id with the menu kept open.
      */
     @Test
-    public void aConversationsOptionsStepBothChoices() {
+    public void aConversationsOptionsPickBothChoices() {
         ClientChatChannelViews.clear();
         TwoWindowLayout.reset();
         ChatTab ooc = ChatTab.of(ChatChannel.OOC);
@@ -77,15 +77,21 @@ public final class ChatTabTest {
                 ooc.options().get(2).value);
         assertEquals(ChatLineChoice.EVERYTHING.labelKey(),
                 ooc.options().get(3).value);
-        // Show in Feed at Everything rests lit.
-        assertTrue(ooc.options().get(3).on);
-        assertTrue(ooc.takeOption("feed", false));
+        PageOption notify = ooc.options().get(2);
+        assertEquals(PageOption.Kind.PICK, notify.kind);
+        List<String> words = new java.util.ArrayList<String>();
+        for (PageOption word : notify.choices()) {
+            words.add(word.id);
+            assertEquals(word.id.equals("notify:mentions"), word.on);
+        }
+        assertEquals(Arrays.asList("notify:everything", "notify:mentions",
+                "notify:nothing"), words);
+        assertTrue(ooc.takeOption("feed:mentions"));
         assertEquals(ChatLineChoice.ONLY_MENTIONS, ChatLayout.feedChoice(ooc));
-        assertTrue(ooc.takeOption("notify", true));
+        assertTrue(ooc.takeOption("notify:everything"));
         assertEquals(ChatLineChoice.EVERYTHING, ChatLayout.notification(ooc));
         assertEquals(ChatLineChoice.ONLY_MENTIONS, ChatLayout.feedChoice(ooc));
-        assertTrue(ooc.takeOption("notify", false));
-        assertTrue(ooc.takeOption("notify", false));
+        assertTrue(ooc.takeOption("notify:nothing"));
         assertTrue(ooc.isMuted());
     }
 
@@ -204,7 +210,7 @@ public final class ChatTabTest {
         ChatLayout.setNotification(alex, ChatLineChoice.EVERYTHING);
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.PARTY), ChatLayoutViews.channelsOf(WindowLayout.window("w2")));
+                ChatChannel.FELLOWSHIP), ChatLayoutViews.channelsOf(WindowLayout.window("w2")));
         // They also end with the session: closed along with the history.
         ChatTab wanderer = ChatLayout.openTab(
                 ChatTab.npc("Grey Wanderer"), "w2");
@@ -215,7 +221,7 @@ public final class ChatTabTest {
         assertFalse(ChatLayout.isOpen(wanderer));
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.PARTY), ChatLayoutViews.channelsOf(WindowLayout.window("w2")));
+                ChatChannel.FELLOWSHIP), ChatLayoutViews.channelsOf(WindowLayout.window("w2")));
     }
 
     private static int countWhispers() {

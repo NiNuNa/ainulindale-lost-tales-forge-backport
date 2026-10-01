@@ -94,8 +94,8 @@ public final class PageTab extends WindowTab {
     }
 
     @Override
-    public boolean takeOption(String id, boolean back) {
-        return content().takeOption(id, back);
+    public boolean takeOption(String id) {
+        return content().takeOption(id);
     }
 
     @Override

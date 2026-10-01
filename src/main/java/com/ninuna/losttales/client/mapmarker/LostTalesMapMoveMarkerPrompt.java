@@ -10,7 +10,7 @@ import org.lwjgl.input.Keyboard;
 /**
  * Asked before an existing "go here" marker is disturbed.
  *
- * <p>The marker is shared with the party and is often the only thing telling
+ * <p>The marker is shared with the fellowship and is often the only thing telling
  * everyone where they are headed, so moving it is a decision rather than a
  * side effect of clicking the map. The first placement asks nothing; every
  * later click on empty map comes through here.</p>

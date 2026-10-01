@@ -6,8 +6,9 @@ import java.util.Locale;
  * Which of a conversation's new lines a choice lets through: every line,
  * only a line that mentions the player or replies to them, or none. Each
  * conversation (a channel, a whisper, an NPC or a server's own channel)
- * has two of them, stepped through in its options: Notifications, which
- * lines chime, and Show in Feed, which lines reach the closed feed. A
+ * has two of them, each picked in a sub-window its option opens:
+ * Notifications, which lines chime, and Show in Feed, which lines reach
+ * the closed feed. A
  * conversation starts at its defaults ({@link ChatLayout#defaultNotification},
  * Everything for the feed). The player's own lines and replayed history
  * never chime, and Do Not Disturb holds every chime whatever the choice.
@@ -51,13 +52,6 @@ public enum ChatLineChoice {
      */
     public boolean lets(boolean addressed) {
         return this == EVERYTHING || (this == ONLY_MENTIONS && addressed);
-    }
-
-    /** The next choice, or the one before it {@code back}, round the three. */
-    public ChatLineChoice step(boolean back) {
-        ChatLineChoice[] all = values();
-        int next = (ordinal() + (back ? all.length - 1 : 1)) % all.length;
-        return all[next];
     }
 
     /** The key of the words the choice reads as, the same for both choices. */

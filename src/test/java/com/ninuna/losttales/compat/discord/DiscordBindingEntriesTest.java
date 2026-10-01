@@ -57,7 +57,7 @@ public final class DiscordBindingEntriesTest {
                 DiscordBindingEntries.webhooksRemoved(ENTRIES, byChannel));
         assertTrue(DiscordBindingEntries.webhooksRemoved(ENTRIES, byKey).isEmpty());
         assertEquals("a key no entry names leaves the list whole", Arrays.asList(ENTRIES),
-                DiscordBindingEntries.removeKey(ENTRIES, "party"));
+                DiscordBindingEntries.removeKey(ENTRIES, "fellowship"));
     }
 
     @Test

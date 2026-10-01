@@ -101,7 +101,7 @@ public final class ClientChatTypingState {
 
     /**
      * Whether a name is typing into a roleplaying conversation this
-     * client reads — Global, Proximity, Faction, Party or a whisper —
+     * client reads — Global, Proximity, Faction, Fellowship or a whisper —
      * which is what the typing bubble over a head answers for. An NPC
      * conversation is local and never has a typist on the other end.
      */

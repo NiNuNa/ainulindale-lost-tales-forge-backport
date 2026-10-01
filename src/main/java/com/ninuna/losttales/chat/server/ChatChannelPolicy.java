@@ -15,8 +15,8 @@ import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.party.model.Party;
-import com.ninuna.losttales.party.model.PartyMember;
+import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissions;
 import java.util.ArrayList;
@@ -79,11 +79,11 @@ public final class ChatChannelPolicy {
 
     /**
      * Why the channel refuses a send, as the notice the sender is told,
-     * or null when it may be sent into. Membership first — a party line
-     * needs a party, a faction line a faction — then the role gate,
+     * or null when it may be sent into. Membership first — a fellowship line
+     * needs a fellowship, a faction line a faction — then the role gate,
      * which a channel may ask besides.
      *
-     * @param playedId the identity the sender plays, whose party a party line
+     * @param playedId the identity the sender plays, whose fellowship a fellowship line
      *                 needs
      * @param roles    the sender's roles as the selected chat identity
      * @param operator whether the sender holds the server's operator level,
@@ -93,15 +93,15 @@ public final class ChatChannelPolicy {
      *                 {@code chat.server_console.read}, which is what reaches
      *                 the server's console; see {@link #readsConsole}
      */
-    public static String sendRefusal(ChatChannel channel, Party party, UUID playedId,
+    public static String sendRefusal(ChatChannel channel, Fellowship fellowship, UUID playedId,
                                      String factionId, int roles, boolean operator,
                                      boolean consoleReader) {
         if (channel == null) {
             return "chat.losttales.channel.role_unavailable";
         }
-        if (channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP
-                && (party == null || playedId == null || !party.containsMember(playedId))) {
-            return "chat.losttales.channel.party_unavailable";
+        if (channel.getAccess() == ChatChannelAccess.FELLOWSHIP_MEMBERSHIP
+                && (fellowship == null || playedId == null || !fellowship.containsMember(playedId))) {
+            return "chat.losttales.channel.fellowship_unavailable";
         }
         if (channel.getAccess() == ChatChannelAccess.CHARACTER_FACTION
                 && (factionId == null || factionId.length() == 0)) {
@@ -208,12 +208,12 @@ public final class ChatChannelPolicy {
      * is recorded with. A sender of null is a line with nobody behind it
      * on this server, a Discord member's: it has no place to be near and
      * no console of its own. Whispers are not routed here; they are
-     * delivered to their two parties before any rule is asked.
+     * delivered to their two people before any rule is asked.
      *
-     * @param party     the sender's party, for a party line
+     * @param fellowship     the sender's fellowship, for a fellowship line
      * @param factionId the faction the line is spoken to, normalized
      */
-    public static Routing route(EntityPlayerMP sender, ChatChannel channel, Party party,
+    public static Routing route(EntityPlayerMP sender, ChatChannel channel, Fellowship fellowship,
                                 String factionId) {
         List<EntityPlayerMP> recipients = new ArrayList<EntityPlayerMP>();
         List<EntityPlayerMP> online = onlinePlayers();
@@ -249,8 +249,8 @@ public final class ChatChannelPolicy {
                     reached = sender != null && candidate.dimension == sender.dimension
                             && candidate.getDistanceSqToEntity(sender) <= proximity;
                     break;
-                case PARTY:
-                    reached = isCurrentOnlinePartyMember(candidate, party);
+                case FELLOWSHIP:
+                    reached = isCurrentOnlineFellowshipMember(candidate, fellowship);
                     break;
                 case FACTION:
                     reached = factionId != null && factionId.length() > 0
@@ -266,7 +266,7 @@ public final class ChatChannelPolicy {
         }
         Routing routing = new Routing(recipients, null);
         return new Routing(recipients,
-                audienceFor(channel, party, factionId, routing.recipientIds()));
+                audienceFor(channel, fellowship, factionId, routing.recipientIds()));
     }
 
     /**
@@ -276,14 +276,14 @@ public final class ChatChannelPolicy {
      * channel, an open channel the config gates — reaches whoever may
      * read it at the moment of asking, so a role granted afterwards
      * opens everything said before, as a Discord channel shows its past
-     * to whoever is let in. A party line reaches the accounts of the
-     * party's members then, while they are still in it; a faction line
+     * to whoever is let in. A fellowship line reaches the accounts of the
+     * fellowship's members then, while they are still in it; a faction line
      * the characters of the faction then and now; everything else —
      * proximity, whispers, a private channel's line — exactly who was
      * sent it, since where a player stood cannot be asked again and a
      * note to oneself is nobody else's.
      */
-    public static ChatHistory.Audience audienceFor(ChatChannel channel, Party party,
+    public static ChatHistory.Audience audienceFor(ChatChannel channel, Fellowship fellowship,
                                                    String factionId,
                                                    List<UUID> recipientIds) {
         ChatChannelGates.Gate gate = ChatChannelGates.current().gateOf(channel);
@@ -299,17 +299,17 @@ public final class ChatChannelPolicy {
             // stream's past as a Discord channel shows its own.
             case CONSOLE_READERS:
                 return ChatHistory.Audience.readers();
-            case PARTY:
+            case FELLOWSHIP:
                 List<UUID> owners = new ArrayList<UUID>();
-                if (party != null) {
-                    for (PartyMember member : party.getMembers()) {
+                if (fellowship != null) {
+                    for (FellowshipMember member : fellowship.getMembers()) {
                         if (member != null && member.getOwnerId() != null) {
                             owners.add(member.getOwnerId());
                         }
                     }
                 }
-                return ChatHistory.Audience.party(
-                        party == null ? null : party.getPartyId(), owners);
+                return ChatHistory.Audience.fellowship(
+                        fellowship == null ? null : fellowship.getFellowshipId(), owners);
             case FACTION:
                 return ChatHistory.Audience.faction(factionId, readGated);
             case SELF:
@@ -339,12 +339,12 @@ public final class ChatChannelPolicy {
 
     /**
      * Which conversation of the channel a line belongs to: the faction it
-     * is spoken to, the party it is spoken in, or nothing at all for a
+     * is spoken to, the fellowship it is spoken in, or nothing at all for a
      * channel that is only ever one conversation. The one place the scope
      * of a line is decided, so the sender's copy, the recipients' and the
      * history all name the same conversation.
      */
-    public static String scopeValueOf(ChatChannel channel, Party party,
+    public static String scopeValueOf(ChatChannel channel, Fellowship fellowship,
                                       String factionId) {
         if (channel == null) {
             return "";
@@ -352,9 +352,9 @@ public final class ChatChannelPolicy {
         if (channel.getScope() == ChatChannelScope.FACTION) {
             return factionId == null ? "" : factionId;
         }
-        if (channel.getScope() == ChatChannelScope.PARTY) {
-            return party == null || party.getPartyId() == null
-                    ? "" : party.getPartyId().toString();
+        if (channel.getScope() == ChatChannelScope.FELLOWSHIP) {
+            return fellowship == null || fellowship.getFellowshipId() == null
+                    ? "" : fellowship.getFellowshipId().toString();
         }
         return "";
     }
@@ -370,11 +370,11 @@ public final class ChatChannelPolicy {
                 character == null ? "" : character.getFactionId());
     }
 
-    private static boolean isCurrentOnlinePartyMember(EntityPlayerMP player, Party party) {
-        if (party == null || player == null) {
+    private static boolean isCurrentOnlineFellowshipMember(EntityPlayerMP player, Fellowship fellowship) {
+        if (fellowship == null || player == null) {
             return false;
         }
-        PartyMember member = party.getMember(
+        FellowshipMember member = fellowship.getMember(
                 ChatIdentitySelection.playedId(player));
         return member != null && player.getUniqueID().equals(member.getOwnerId());
     }

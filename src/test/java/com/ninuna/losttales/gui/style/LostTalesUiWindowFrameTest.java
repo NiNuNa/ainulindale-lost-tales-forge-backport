@@ -9,30 +9,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 /**
- * A window's frame is a lit framed button's frame, faded: its own cells
- * carry the lit button's ink texel for texel, every corner drawn from them
- * texel by texel on the frame's ramps, and every edge from the texel a
- * framed button stretches along that edge.
+ * A window's frame is a lit framed button's frame, faded: every corner
+ * drawn from the lit button's corner cells texel by texel on the frame's
+ * ramps, and every edge from the texel a framed button stretches along
+ * that edge.
  */
 public final class LostTalesUiWindowFrameTest {
-
-    /**
-     * The window frame's cells hold the lit framed button's ink exactly:
-     * the same texels opaque, in the same colours. Only what they preview
-     * behind the ink may differ.
-     */
-    @Test
-    public void theWindowFrameWearsTheLitFramedButtonsInk() throws Exception {
-        BufferedImage sheet = readSheet();
-        assertSameInk(sheet, LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
-                LostTalesUiSheet.FRAME_LIT_TOP_LEFT);
-        assertSameInk(sheet, LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT,
-                LostTalesUiSheet.FRAME_LIT_TOP_RIGHT);
-        assertSameInk(sheet, LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT,
-                LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT);
-        assertSameInk(sheet, LostTalesUiSheet.WINDOW_FRAME_BOTTOM_RIGHT,
-                LostTalesUiSheet.FRAME_LIT_BOTTOM_RIGHT);
-    }
 
     /**
      * Each edge comes from the corner cell a framed button stretches it
@@ -41,13 +23,13 @@ public final class LostTalesUiWindowFrameTest {
      */
     @Test
     public void everyEdgeIsStretchedAsAFramedButtonsIs() throws Exception {
-        assertEquals(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
+        assertEquals(LostTalesUiSheet.FRAME_LIT_TOP_LEFT,
                 LostTalesUiWindowFrame.edgeCorner(false, false));
-        assertEquals(LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT,
+        assertEquals(LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT,
                 LostTalesUiWindowFrame.edgeCorner(false, true));
-        assertEquals(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
+        assertEquals(LostTalesUiSheet.FRAME_LIT_TOP_LEFT,
                 LostTalesUiWindowFrame.edgeCorner(true, false));
-        assertEquals(LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT,
+        assertEquals(LostTalesUiSheet.FRAME_LIT_TOP_RIGHT,
                 LostTalesUiWindowFrame.edgeCorner(true, true));
         BufferedImage sheet = readSheet();
         int innermost = LostTalesUiFramedButton.CORNER - 1;
@@ -79,10 +61,10 @@ public final class LostTalesUiWindowFrameTest {
     @Test
     public void everyCornerHoldsTwoArmsAndARoundingPixel() throws Exception {
         BufferedImage sheet = readSheet();
-        assertInk(sheet, LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT, false, false);
-        assertInk(sheet, LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT, true, false);
-        assertInk(sheet, LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT, false, true);
-        assertInk(sheet, LostTalesUiSheet.WINDOW_FRAME_BOTTOM_RIGHT, true, true);
+        assertInk(sheet, LostTalesUiSheet.FRAME_LIT_TOP_LEFT, false, false);
+        assertInk(sheet, LostTalesUiSheet.FRAME_LIT_TOP_RIGHT, true, false);
+        assertInk(sheet, LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT, false, true);
+        assertInk(sheet, LostTalesUiSheet.FRAME_LIT_BOTTOM_RIGHT, true, true);
     }
 
     /**
@@ -150,24 +132,6 @@ public final class LostTalesUiWindowFrameTest {
                         corner.getTextureV() + v) >>> 24;
                 assertEquals(corner + " texel " + u + "," + v, ink[v][u],
                         alpha == 0xFF);
-            }
-        }
-    }
-
-    private static void assertSameInk(BufferedImage sheet, LostTalesUiSheet cell,
-                                      LostTalesUiSheet lit) {
-        for (int v = 0; v < cell.getHeight(); v++) {
-            for (int u = 0; u < cell.getWidth(); u++) {
-                int own = sheet.getRGB(cell.getTextureU() + u,
-                        cell.getTextureV() + v);
-                int button = sheet.getRGB(lit.getTextureU() + u,
-                        lit.getTextureV() + v);
-                boolean ink = own >>> 24 == 0xFF;
-                assertEquals(cell + " texel " + u + "," + v, button >>> 24 == 0xFF,
-                        ink);
-                if (ink) {
-                    assertEquals(cell + " texel " + u + "," + v, button, own);
-                }
             }
         }
     }

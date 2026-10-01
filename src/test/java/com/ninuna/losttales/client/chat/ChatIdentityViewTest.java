@@ -4,10 +4,12 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.After;
@@ -50,56 +52,59 @@ public final class ChatIdentityViewTest {
     }
 
     @Test
-    public void partyMembershipFollowsTheChatIdentityAndIgnoresLateReplies() {
+    public void fellowshipMembershipFollowsTheChatIdentityAndIgnoresLateReplies() {
         roster();
-        UUID firstParty = new UUID(1L, 1L);
-        UUID secondParty = new UUID(2L, 2L);
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, firstParty, 0x123456, "Aldric", "", false));
-        assertEquals(firstParty.toString(), ClientChatChannelState.scopeKeyRead(ChatChannel.PARTY));
+        UUID firstFellowship = new UUID(1L, 1L);
+        UUID secondFellowship = new UUID(2L, 2L);
+        ClientChatIdentitySelection.accept(sync(ALDRIC, firstFellowship, 0x123456));
+        assertEquals(firstFellowship.toString(), ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP));
         ClientChatIdentities.select(identityOf(BEREN));
-        assertEquals("", ClientChatChannelState.scopeKeyRead(ChatChannel.PARTY));
-        assertFalse(ClientChatChannelState.canSend(ChatChannel.PARTY));
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, firstParty, 0x123456, "Aldric", "", false));
-        assertEquals("", ClientChatChannelState.scopeKeyRead(ChatChannel.PARTY));
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(BEREN, secondParty, 0xABCDEF, "Beren", "", false));
-        assertEquals(secondParty.toString(), ClientChatChannelState.scopeKeyRead(ChatChannel.PARTY));
-        assertEquals(0xABCDEF, ClientChatIdentitySelection.partyColor());
-        assertTrue(ClientChatChannelState.canSend(ChatChannel.PARTY));
-        assertFalse(ClientChatChannelState.isAvailable(ChatTab.of(ChatChannel.PARTY, firstParty.toString())));
-        assertFalse(ClientChatChannelState.canSend(ChatTab.of(ChatChannel.PARTY, firstParty.toString())));
-        assertTrue(ClientChatChannelState.isAvailable(ChatTab.of(ChatChannel.PARTY, secondParty.toString())));
+        assertEquals("", ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP));
+        assertFalse(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
+        ClientChatIdentitySelection.accept(sync(ALDRIC, firstFellowship, 0x123456));
+        assertEquals("", ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP));
+        ClientChatIdentitySelection.accept(sync(BEREN, secondFellowship, 0xABCDEF));
+        assertEquals(secondFellowship.toString(), ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP));
+        assertEquals(0xABCDEF, ClientChatChannelState.displayColor(
+                ChatTab.of(ChatChannel.FELLOWSHIP, secondFellowship.toString())));
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
+        assertFalse(ClientChatChannelState.isAvailable(ChatTab.of(ChatChannel.FELLOWSHIP, firstFellowship.toString())));
+        assertFalse(ClientChatChannelState.canSend(ChatTab.of(ChatChannel.FELLOWSHIP, firstFellowship.toString())));
+        assertTrue(ClientChatChannelState.isAvailable(ChatTab.of(ChatChannel.FELLOWSHIP, secondFellowship.toString())));
         assertEquals(ALDRIC, ClientCharacterRosterCache.getSnapshot().getActiveCharacterId());
     }
 
-    /** With no character held the chat falls back to the account, whose party is its own. */
+    /** With no character held the chat falls back to the account, whose fellowship is its own. */
     @Test
-    public void accountPartyIsSeparateAndDisconnectDropsMembership() {
-        UUID party = new UUID(3L, 3L);
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(null, party, 0x123456, "Steve", "", false));
-        assertEquals(party.toString(), ClientChatChannelState.scopeOfIdentity(ChatChannel.PARTY, ""));
-        assertTrue(ClientChatChannelState.canSend(ChatChannel.PARTY));
+    public void accountFellowshipIsSeparateAndDisconnectDropsMembership() {
+        UUID fellowship = new UUID(3L, 3L);
+        ClientChatIdentitySelection.accept(sync(null, fellowship, 0x123456));
+        assertEquals(fellowship.toString(), ClientChatChannelState.scopeOfIdentity(ChatChannel.FELLOWSHIP, ""));
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
         ClientChatIdentitySelection.clear();
-        assertFalse(ClientChatChannelState.canSend(ChatChannel.PARTY));
+        assertFalse(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
     }
 
     /**
-     * A party has no name of its own, so its tab wears its leader's:
-     * "Aldric's Party" while the selected identity is in Aldric's party,
-     * the plain channel name otherwise, and the name goes with the
-     * membership when another identity is selected.
+     * Each fellowship's conversation is named after the fellowship ("The
+     * Grey Company Chat") and shown while its character is read; the
+     * channel itself keeps its plain name.
      */
     @Test
-    public void thePartyTabIsNamedAfterItsLeader() {
+    public void eachFellowshipsConversationIsNamedAfterIt() {
         roster();
-        String plain = ChatChannel.PARTY.getDisplayName();
-        assertEquals(plain, ClientChatChannelState.displayName(ChatChannel.PARTY));
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
-                ALDRIC, new UUID(4L, 4L), 0x123456, "Aldric", "", false));
-        assertEquals("Aldric", ClientChatIdentitySelection.partyLeader());
-        assertNotEquals(plain, ClientChatChannelState.displayName(ChatChannel.PARTY));
+        String plain = ChatChannel.FELLOWSHIP.getDisplayName();
+        UUID grey = new UUID(4L, 4L);
+        ChatTab tab = ChatTab.of(ChatChannel.FELLOWSHIP, grey.toString());
+        ClientChatIdentitySelection.accept(sync(ALDRIC, grey, 0x123456));
+        assertEquals(plain, ClientChatChannelState.displayName(ChatChannel.FELLOWSHIP));
+        assertNotEquals(plain, ClientChatChannelState.displayName(tab));
+        assertTrue(ClientChatChannelState.isAvailable(tab));
+        assertFalse("the channel has no plain tab",
+                ClientChatChannelState.isAvailable(ChatTab.of(ChatChannel.FELLOWSHIP)));
         ClientChatIdentities.select(identityOf(BEREN));
-        assertEquals("", ClientChatIdentitySelection.partyLeader());
-        assertEquals(plain, ClientChatChannelState.displayName(ChatChannel.PARTY));
+        assertFalse(ClientChatChannelState.isAvailable(tab));
+        assertEquals(plain, ClientChatChannelState.displayName(tab));
     }
 
     @Test
@@ -162,7 +167,7 @@ public final class ChatIdentityViewTest {
     /**
      * The last channel stays selected across an identity switch: Faction
      * follows the new identity's faction rather than moving, while the
-     * Party tab, gone when the new identity is in no party, hands the
+     * Fellowship tab, gone when the new identity is in no fellowship, hands the
      * selection on as a closed tab does.
      */
     @Test
@@ -179,13 +184,15 @@ public final class ChatIdentityViewTest {
             assertEquals(channel, ClientChatChannelState.getSelected().getChannel());
             ClientChatIdentities.select(identityOf(ALDRIC));
         }
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
-                ALDRIC, new UUID(5L, 5L), 0x123456, "Aldric", "", false));
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.PARTY));
-        assertEquals(ChatChannel.PARTY, ClientChatChannelState.getSelected().getChannel());
+        UUID fellowship = new UUID(5L, 5L);
+        ClientChatIdentitySelection.accept(sync(ALDRIC, fellowship, 0x123456));
+        ChatTab conversation = ChatTab.of(ChatChannel.FELLOWSHIP, fellowship.toString());
+        ChatLayout.openTab(conversation, null);
+        ClientChatChannelState.select(conversation);
+        assertEquals(ChatChannel.FELLOWSHIP, ClientChatChannelState.getSelected().getChannel());
         ClientChatIdentities.select(identityOf(BEREN));
         ClientChatChannelState.ensureAvailable();
-        assertNotEquals(ChatChannel.PARTY, ClientChatChannelState.getSelected().getChannel());
+        assertNotEquals(ChatChannel.FELLOWSHIP, ClientChatChannelState.getSelected().getChannel());
     }
 
     @Test
@@ -212,16 +219,16 @@ public final class ChatIdentityViewTest {
     @Test
     public void everyRoleplayingChannelProducesBubblesForItsRecipient() {
         roster();
-        UUID party = new UUID(1L, 2L);
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, party, 0, "Aldric", "", false));
+        UUID fellowship = new UUID(1L, 2L);
+        ClientChatIdentitySelection.accept(sync(ALDRIC, fellowship, 0));
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.PARTY, ChatChannel.WHISPER}) {
+                ChatChannel.FACTION, ChatChannel.FELLOWSHIP, ChatChannel.WHISPER}) {
             ChatSpeechBubbles.clear();
             LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
                     channel, "Friend", "Steve", "Hello").sender(new UUID(10L, 20L)).colors(0, 0)
                     .partner(channel == ChatChannel.WHISPER ? "Steve" : "").build()
                     .withScope(channel == ChatChannel.FACTION ? GONDOR
-                            : channel == ChatChannel.PARTY ? party.toString() : "")
+                            : channel == ChatChannel.FELLOWSHIP ? fellowship.toString() : "")
                     .withConversation(ALDRIC, null);
             ChatSpeechBubbles.receive(packet);
             assertFalse(channel.getId(), ChatSpeechBubbles.isEmpty());
@@ -539,5 +546,12 @@ public final class ChatIdentityViewTest {
     private static void scroll(ChatTab tab, int lines, int totalLines, double roomLines) {
         double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
         ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
+    }
+
+    /** The server's answer: the identity, in one fellowship whose name follows its id. */
+    private static LostTalesChatIdentitySyncPacket sync(UUID identity, UUID fellowship, int color) {
+        return new LostTalesChatIdentitySyncPacket(identity, Collections.singletonList(
+                new ChatFellowship(fellowship, "Company " + fellowship.getLeastSignificantBits(),
+                        color)), false);
     }
 }

@@ -83,6 +83,10 @@
     "about": "A row or control crossing to its lit shade and back.",
     "follow": 0.05
   },
+  "window.stack.fade": {
+    "about": "A window or a sub-window fading an eighth for each window that comes to lie over it, down to half, and back as they go: most of the way in this many seconds.",
+    "follow": 0.12
+  },
   "window.marquee.return": {
     "about": "A name cut short gliding home once the pointer leaves it.",
     "follow": 0.1

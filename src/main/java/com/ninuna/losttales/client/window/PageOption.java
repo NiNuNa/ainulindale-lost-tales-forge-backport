@@ -1,22 +1,26 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import net.minecraft.util.StatCollector;
 
 /**
  * One of a page's options, as both places show it: a row of the page's
- * options (the three dots on its tab, a right-click on it) and a button
- * on its window's tool strip. One option, one record, so the two never
- * disagree. Four kinds:
+ * options (the three dots on its tab, a right-click on it or on its tool
+ * strip) and a button on its window's tool strip. One option, one record,
+ * so the two never disagree. Four kinds:
  *
  * <ul>
  * <li>an <em>action</em>, done at once: Mark as Read;</li>
  * <li>a <em>switch</em>, on or off: a kind of marker the map shows; off,
  * its button is struck through;</li>
- * <li>a <em>choice</em>, one of a group: the journal's filter, a party
+ * <li>a <em>choice</em>, one of a group: the journal's filter, a fellowship
  * colour; the one chosen rests lit;</li>
- * <li>a <em>cycle</em> of a few words, a click on and a right-click back:
- * a conversation's Notifications; its glyph says where it stands.</li>
+ * <li>a <em>pick</em> of a few words, each a choice of its own, in a
+ * sub-window the option opens: a conversation's Notifications; its glyph
+ * says which word stands.</li>
  * </ul>
  *
  * <p>An option that cannot be taken stays in both places, greyed, and
@@ -26,16 +30,20 @@ import net.minecraft.util.StatCollector;
  */
 public final class PageOption {
     /** What a press on the option does. */
-    public enum Kind { ACTION, SWITCH, CHOICE, CYCLE }
+    public enum Kind { ACTION, SWITCH, CHOICE, PICK }
 
     public final String id;
     public final String label;
     public final Kind kind;
-    /** A switch's state, a choice chosen, or a cycle that rests lit. */
+    /** A switch's state, or a choice chosen. */
     public final boolean on;
-    /** What a cycle reads now; empty for every other kind. */
+    /** The word a pick reads now; empty for every other kind. */
     public final String value;
     public final OptionGlyph glyph;
+    /** A pick's words, each a choice taken by its own id; empty for every other kind. */
+    private List<PageOption> choices = Collections.emptyList();
+    /** What a choice says it does under the pointer, in its pick's sub-window; empty for nothing. */
+    private String tip = "";
     /** Why the option cannot be taken now; empty while it can. */
     private String unavailable = "";
     /** The group it stands in; options of one group stand together. */
@@ -72,12 +80,28 @@ public final class PageOption {
     }
 
     /**
-     * A few words, stepped on by a click and back by a right-click;
-     * {@code glyph} says where it stands, resting lit where {@code lit}.
+     * A few words to pick from, in a sub-window the option opens; its
+     * {@code glyph} says which word stands, {@code value}. Each of
+     * {@code choices} is a word, taken by its own id.
      */
-    public static PageOption cycle(String id, String label, String value,
-                                   boolean lit, OptionGlyph glyph) {
-        return new PageOption(id, label, Kind.CYCLE, lit, value, glyph);
+    public static PageOption pick(String id, String label, String value,
+                                  OptionGlyph glyph, List<PageOption> choices) {
+        PageOption option = new PageOption(id, label, Kind.PICK, false, value,
+                glyph);
+        option.choices = Collections.unmodifiableList(
+                new ArrayList<PageOption>(choices));
+        return option;
+    }
+
+    /** The same choice saying {@code words} under the pointer in its pick's sub-window. */
+    public PageOption explained(String words) {
+        this.tip = words == null ? "" : words;
+        return this;
+    }
+
+    /** A pick's words; empty for every other kind. */
+    public List<PageOption> choices() {
+        return this.choices;
     }
 
     /** The same option, greyed, saying {@code reason}; an empty reason leaves it as it is. */
@@ -111,7 +135,7 @@ public final class PageOption {
 
     /**
      * What its button says under the pointer: why it cannot be taken, or
-     * its name; a switch with On or Off, a cycle with the word it reads.
+     * its name; a switch with On or Off, a pick with the word it reads.
      */
     public String tip() {
         if (!isAvailable()) {
@@ -124,7 +148,7 @@ public final class PageOption {
                         StatCollector.translateToLocal(this.on
                                 ? "gui.losttales.window.settings.on"
                                 : "gui.losttales.window.settings.off"));
-            case CYCLE:
+            case PICK:
                 return StatCollector.translateToLocalFormatted(
                         "gui.losttales.window.option.state", this.label,
                         this.value);
@@ -134,9 +158,10 @@ public final class PageOption {
     }
 
     /**
-     * Its row in the page's options: its glyph before its name, a switch
-     * or a choice marked in honey while it is on, a cycle's word at the
-     * row's end.
+     * Its row in the page's options, or in its pick's sub-window: its
+     * glyph before its name, a switch or a choice marked in honey while it
+     * is on, a pick's word at the row's end, a choice's tip under the
+     * pointer.
      */
     MenuWindow.Entry row() {
         boolean marked = (this.kind == Kind.SWITCH || this.kind == Kind.CHOICE)
@@ -144,9 +169,9 @@ public final class PageOption {
         MenuWindow.Entry entry = new MenuWindow.Entry(this.id, this.label,
                 false, marked ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1,
                 null).withPicture(this.glyph.asPicture());
-        if (this.kind == Kind.CYCLE) {
+        if (this.kind == Kind.PICK) {
             entry.withValue(this.value);
         }
-        return entry.unavailable(this.unavailable);
+        return entry.withTip(this.tip).unavailable(this.unavailable);
     }
 }

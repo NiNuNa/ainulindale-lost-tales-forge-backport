@@ -8,8 +8,8 @@ import com.ninuna.losttales.compat.lotr.LotrQuestReference;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
-import com.ninuna.losttales.party.model.Party;
-import com.ninuna.losttales.party.server.PartyService;
+import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.server.FellowshipService;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestStartSource;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -19,7 +19,9 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.ChatComponentTranslation;
 
-/** Requests the independent copy advertised by one recorded party quest card. */
+import java.util.UUID;
+
+/** Requests the independent copy advertised by one recorded fellowship quest card. */
 public final class LostTalesQuestShareJoinPacket implements IMessage {
     private long messageId;
     private int tokenIndex;
@@ -66,10 +68,8 @@ public final class LostTalesQuestShareJoinPacket implements IMessage {
         ChatHistory.QuestShareClaim claim = ChatHistory.questShareFor(
                 messageId, tokenIndex,
                 LostTalesChatService.requesterFor(player));
-        Party party = PartyService.getInstance()
-                .getPartyForActiveIdentity(player);
-        if (claim == null || claim.authorId == null || party == null
-                || !party.hasMemberOwnedBy(claim.authorId)
+        if (claim == null || claim.authorId == null
+                || !sharesFellowshipWith(player, claim.authorId)
                 || LotrQuestReference.isLotrQuest(
                         claim.showcase.getQuestReference())) {
             player.addChatMessage(new ChatComponentTranslation(
@@ -79,6 +79,17 @@ public final class LostTalesQuestShareJoinPacket implements IMessage {
         LostTalesQuestManager.startQuest(player,
                 claim.showcase.getQuestReference(),
                 LostTalesQuestStartSource.SHARED);
+    }
+
+    /** Whether the character the player plays is in a fellowship with one of the account's. */
+    private static boolean sharesFellowshipWith(EntityPlayerMP player, UUID ownerId) {
+        for (Fellowship fellowship : FellowshipService.getInstance()
+                .getFellowshipsForActiveIdentity(player)) {
+            if (fellowship.hasMemberOwnedBy(ownerId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static final class Handler implements IMessageHandler<

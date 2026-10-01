@@ -99,7 +99,7 @@ public final class CharacterService {
      * plays as it when nothing else is being played.
      *
      * <p>The record carries the account's own UUID as its character id.
-     * Party membership, LOTR bounty records, personal map markers and the
+     * Fellowship membership, LOTR bounty records, personal map markers and the
      * account's saved player state are all filed under the gameplay id,
      * which for the account is its own UUID and for this character is the
      * same value, so everything the account has in the world is the
@@ -130,7 +130,7 @@ public final class CharacterService {
         if (data.containsCharacter(ownerId)) {
             // Some other roster already holds a character under this id.
             // Minting a second would make the id ambiguous and cost both
-            // of them their party membership and their markers.
+            // of them their fellowship membership and their markers.
             FMLLog.warning("[%s] Not making an account character for %s: "
                             + "a character already exists under that id",
                     LostTalesMetaData.MOD_ID, ownerId);
@@ -326,7 +326,7 @@ public final class CharacterService {
      * content exactly as a character somebody is making is checked. The
      * character's id, slot, faction and creation time are not the look's
      * to say and are left as they were — which is what keeps the account's
-     * items, statistics, alignment and party membership where they are,
+     * items, statistics, alignment and fellowship membership where they are,
      * all of them filed under the id this record already has.</p>
      */
     public synchronized CharacterOperationResult adoptTemplate(
@@ -703,7 +703,7 @@ public final class CharacterService {
         RoleplayCharacter character = roster.getCharacter(characterId);
         // The account character is always there. Deleting it would leave
         // the account with nothing to fall back to, and the state filed
-        // under its id — its party membership, its markers, its saved
+        // under its id — its fellowship membership, its markers, its saved
         // player state — with nothing to belong to.
         if (character != null && character.isDefault()) {
             return CharacterOperationResult.failure(

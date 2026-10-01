@@ -63,6 +63,13 @@ public final class ChatWindowLinesPruneTest {
         assertFalse(cache.containsKey("w404"));
     }
 
-
-
+    @Test
+    public void theConversationBesideGoesWithItsWindow() {
+        String live = WindowLayout.windows().get(0).getId();
+        Map<String, Object> cache = views(live + ChatWindowLines.BESIDE,
+                "w404" + ChatWindowLines.BESIDE);
+        ChatWindowLines.pruneViews(cache, WindowLayout.windows());
+        assertTrue(cache.containsKey(live + ChatWindowLines.BESIDE));
+        assertFalse(cache.containsKey("w404" + ChatWindowLines.BESIDE));
+    }
 }

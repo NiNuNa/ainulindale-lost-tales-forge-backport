@@ -60,7 +60,7 @@ public final class ChatChannelSuggester {
         for (ChatChannel channel : channels) {
             String word = channel == null ? null
                     : ChatCodeNames.of(channel, scopeFor(channel, factionScope));
-            if (word == null || channel == ChatChannel.WHISPER) {
+            if (word == null || isPerConversation(channel)) {
                 continue;
             }
             if (word.startsWith(query) || shownKey(channel).startsWith(query)) {
@@ -104,10 +104,10 @@ public final class ChatChannelSuggester {
     /**
      * The channel link whose {@code #} stands at {@code hash}: the
      * conversation its word names and, where a slash and digits follow,
-     * the message they name. A whisper is named only by a link to one of
-     * its messages, {@code #whisper/1234}: whispers are one conversation
-     * per person, so the word alone names none of them. Null where the
-     * word names no channel.
+     * the message they name. A whisper or a fellowship's line is named
+     * only by a link to one of its messages, {@code #whisper/1234}: there
+     * is one conversation per person and per fellowship, so the word alone
+     * names none of them. Null where the word names no channel.
      */
     public static Link linkAt(String text, int hash) {
         if (text == null || hash < 0 || hash >= text.length()
@@ -121,13 +121,17 @@ public final class ChatChannelSuggester {
         ChatCodeNames.Named named = ChatCodeNames.parse(
                 text.substring(hash + 1, end));
         int linkEnd = messageIdEnd(text, end);
-        if (named == null
-                || (named.channel == ChatChannel.WHISPER && linkEnd == end)) {
+        if (named == null || (isPerConversation(named.channel) && linkEnd == end)) {
             return null;
         }
         return new Link(named.channel, named.scope, linkEnd,
                 linkEnd > end ? Long.parseLong(text.substring(end + 1, linkEnd))
                         : ChatMessageIds.NONE);
+    }
+
+    /** Whether a channel is one conversation per person or per fellowship, which its word alone names none of. */
+    private static boolean isPerConversation(ChatChannel channel) {
+        return channel == ChatChannel.WHISPER || channel == ChatChannel.FELLOWSHIP;
     }
 
     /**

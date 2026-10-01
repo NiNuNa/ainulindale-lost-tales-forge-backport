@@ -409,22 +409,21 @@ public final class ChatWindowLines {
      */
     static synchronized List<ChatLine> forWindow(Minecraft minecraft,
                                                  GuiNewChat chat,
-                                                 Window window,
+                                                 ChatFrame frame,
                                                  ChatLineFilter filter,
                                                  int chatWidth,
                                                  int unreadLineId) {
         if (minecraft == null || minecraft.fontRenderer == null
-                || chat == null || window == null || chatWidth <= 0) {
+                || chat == null || frame == null || chatWidth <= 0) {
             return null;
         }
         // The timestamp area at the window's left edge and the member
         // list at its right come out of the room the messages may wrap
         // to, as far as each stands in the window, so a line never runs
         // out under the window's edge to pay for them.
-        ChatFrame frame = ChatFrame.of(window);
         ChatTimestampColumn columns =
                 ChatTimestampColumn.of(frame, minecraft.fontRenderer);
-        return forView(minecraft, chat, window.getId(), filter,
+        return forView(minecraft, chat, viewIdOf(frame), filter,
                 WindowPlacement.wrapWidth(chatWidth,
                         chat.func_146244_h())
                         - (int)Math.ceil(columns.messageX() - 2.0F
@@ -505,6 +504,14 @@ public final class ChatWindowLines {
         return cached.lines;
     }
 
+    /** Marks the lines of a conversation beside the one in front of a split, laid out apart from them. */
+    static final String BESIDE = "|beside";
+
+    /** What a frame's lines are kept under: its window's id, and apart for the conversation beside. */
+    private static String viewIdOf(ChatFrame frame) {
+        return frame.beside ? frame.windowId + BESIDE : frame.windowId;
+    }
+
     /** Forgotten with the rest of the client's chat state. */
     static synchronized void clear() {
         CACHE.clear();
@@ -528,10 +535,11 @@ public final class ChatWindowLines {
      */
     static synchronized void prune(List<Window> windows) {
         // Nothing to sweep while the cache holds no more than the feed
-        // and one entry per window. A window drawn before its first
-        // layout makes this miss by one, which only puts the sweep off
-        // to the next frame; it can never drop a view still in use.
-        if (windows != null && CACHE.size() > windows.size() + 1) {
+        // and two entries per window, its own and the conversation beside
+        // it. A window drawn before its first layout makes this miss by
+        // one, which only puts the sweep off to the next frame; it can
+        // never drop a view still in use.
+        if (windows != null && CACHE.size() > windows.size() * 2 + 1) {
             pruneViews(CACHE, windows);
         }
     }
@@ -552,7 +560,9 @@ public final class ChatWindowLines {
             boolean alive = false;
             for (int index = 0; windows != null && index < windows.size();
                  index++) {
-                if (windows.get(index).getId().equals(viewId)) {
+                String windowId = windows.get(index).getId();
+                if (windowId.equals(viewId)
+                        || (windowId + BESIDE).equals(viewId)) {
                     alive = true;
                     break;
                 }

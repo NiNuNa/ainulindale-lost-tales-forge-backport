@@ -28,12 +28,12 @@ final class ChatMentionTargets {
     private ChatMentionTargets() {}
 
     /**
-     * Whom {@code message}, said by {@code sender} in {@code channel},
-     * mentions: a whisper reaches its two people, any other conversation
-     * its members.
+     * Whom {@code message}, said by {@code sender} in {@code channel}'s
+     * conversation {@code scope}, mentions: a whisper reaches its two
+     * people, any other conversation its members.
      */
     static List<ChatNamedPlayer> of(EntityPlayerMP sender, ChatChannel channel,
-                                    EntityPlayerMP whisperTarget,
+                                    String scope, EntityPlayerMP whisperTarget,
                                     String message) {
         if (sender == null || channel == null || message == null
                 || message.indexOf('@') < 0) {
@@ -48,7 +48,7 @@ final class ChatMentionTargets {
             }
         } else {
             candidates = candidatesOf(
-                    ChatMemberDirectory.answerFor(sender, channel).members);
+                    ChatMemberDirectory.answerFor(sender, channel, scope).members);
         }
         return ChatMentions.reached(message, candidates,
                 ChatNamedPlayer.MAX_PER_LINE);

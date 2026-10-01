@@ -38,7 +38,7 @@ public final class ChatChannelIconsTest {
         assertEquals(ChatEmoji.JOY,
                 ChatChannelIcons.iconOf(ChatTab.of(ChatChannel.OPERATOR)));
         // Every other channel keeps its own.
-        assertEquals(ChatEmoji.JOY, ChatChannelIcons.iconOf(ChatChannel.PARTY));
+        assertEquals(ChatEmoji.JOY, ChatChannelIcons.iconOf(ChatChannel.FELLOWSHIP));
         assertEquals(ChatEmoji.SLIGHT_SMILE,
                 ChatChannelIcons.iconOf(ChatChannel.GLOBAL));
 

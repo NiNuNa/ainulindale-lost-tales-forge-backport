@@ -32,21 +32,6 @@ public final class ChatLineChoiceTest {
         assertFalse(ChatLineChoice.NOTHING.lets(false));
     }
 
-    /** A few-word option: a click steps on, a right-click back, round the three. */
-    @Test
-    public void theChoicesCycleBothWays() {
-        assertEquals(ChatLineChoice.ONLY_MENTIONS,
-                ChatLineChoice.EVERYTHING.step(false));
-        assertEquals(ChatLineChoice.NOTHING,
-                ChatLineChoice.ONLY_MENTIONS.step(false));
-        assertEquals(ChatLineChoice.EVERYTHING,
-                ChatLineChoice.NOTHING.step(false));
-        assertEquals(ChatLineChoice.NOTHING,
-                ChatLineChoice.EVERYTHING.step(true));
-        assertEquals(ChatLineChoice.ONLY_MENTIONS,
-                ChatLineChoice.NOTHING.step(true));
-    }
-
     /** The words the layout file keeps each choice under read back as it. */
     @Test
     public void eachChoiceReadsBackFromItsWord() {

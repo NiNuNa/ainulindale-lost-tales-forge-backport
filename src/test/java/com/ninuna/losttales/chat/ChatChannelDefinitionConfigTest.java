@@ -12,8 +12,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The channels a server defines for itself. The config says which and
- * how they route; everything a config cannot answer for — a party, a
- * faction, the two parties of a whisper, one player's own console — it
+ * how they route; everything a config cannot answer for — a fellowship, a
+ * faction, the two people of a whisper, one player's own console — it
  * is not allowed to name, and the code's own channels are not its to
  * redefine.
  */
@@ -76,12 +76,12 @@ public final class ChatChannelDefinitionConfigTest {
 
     /**
      * A rule that needs something the config cannot supply is refused
-     * rather than quietly becoming a global channel: a party channel with
-     * no party would reach everyone.
+     * rather than quietly becoming a global channel: a fellowship channel with
+     * no fellowship would reach everyone.
      */
     @Test
     public void aRoutingAConfigCannotDescribeIsRefused() {
-        assertTrue(parse("mine=rule:party").isEmpty());
+        assertTrue(parse("mine=rule:fellowship").isEmpty());
         assertTrue(parse("kin=rule:faction").isEmpty());
         assertTrue(parse("quiet=rule:whisper").isEmpty());
         assertTrue(parse("notes=rule:self").isEmpty());

@@ -351,7 +351,7 @@ public final class QuestJournalPage extends PageContent {
     }
 
     @Override
-    public boolean takeOption(String id, boolean back) {
+    public boolean takeOption(String id) {
         for (QuestFilter each : FILTERS) {
             if (each.name().equals(id)) {
                 setFilter(each);

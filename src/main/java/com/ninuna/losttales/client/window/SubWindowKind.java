@@ -18,9 +18,12 @@ public final class SubWindowKind {
     private static final Map<String, SubWindowKind> KINDS =
             new LinkedHashMap<String, SubWindowKind>();
 
-    /** A tab's options, behind the three dots on the tool strip. */
+    /** A tab's options, behind the three dots on the tab. */
     public static final SubWindowKind TAB = register("tab",
             "gui.losttales.window.sub.tab");
+    /** The few words one of a tab's options picks from: a conversation's Notifications. */
+    public static final SubWindowKind PICK = register("pick",
+            "gui.losttales.window.sub.pick");
     /** A window's own menu, behind the three dots at the end of its row. */
     public static final SubWindowKind WINDOW = register("window",
             "gui.losttales.window.sub.window");

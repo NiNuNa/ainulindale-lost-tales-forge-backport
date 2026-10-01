@@ -33,7 +33,7 @@ import static org.junit.Assert.assertTrue;
 public final class ChatHistoryNbtCodecTest {
     private static final UUID ALICE = UUID.fromString("00000000-0000-0000-0000-00000000000a");
     private static final UUID BOB = UUID.fromString("00000000-0000-0000-0000-00000000000b");
-    private static final UUID PARTY = UUID.fromString("00000000-0000-0000-0000-0000000000cc");
+    private static final UUID FELLOWSHIP = UUID.fromString("00000000-0000-0000-0000-0000000000cc");
     private static final List<ChatChannel> EVERY_CHANNEL =
             Arrays.asList(ChatChannel.values());
 
@@ -208,11 +208,11 @@ public final class ChatHistoryNbtCodecTest {
                 own.withPartner("alice", "Aldric"),
                 Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
-        long party = ChatMessageIdAllocator.next();
-        ChatHistory.record(party, BOB, "Beren", null,
-                line(party, ChatChannel.PARTY, BOB, "form up", ""),
+        long fellowship = ChatMessageIdAllocator.next();
+        ChatHistory.record(fellowship, BOB, "Beren", null,
+                line(fellowship, ChatChannel.FELLOWSHIP, BOB, "form up", ""),
                 Arrays.asList(ALICE, BOB),
-                ChatHistory.Audience.party(PARTY, Arrays.asList(ALICE, BOB)));
+                ChatHistory.Audience.fellowship(FELLOWSHIP, Arrays.asList(ALICE, BOB)));
         long faction = ChatMessageIdAllocator.next();
         ChatHistory.record(faction, ALICE, "Aldric", null,
                 line(faction, ChatChannel.FACTION, ALICE, "the gate holds", "")
@@ -241,14 +241,14 @@ public final class ChatHistoryNbtCodecTest {
         assertTrue(ChatMessageIdAllocator.next() > faction);
 
         List<LostTalesChatMessagePacket> bobSees = ChatHistory.replayFor(
-                ChatHistoryRequesters.oneFaction(BOB, "", 0L, PARTY, EVERY_CHANNEL), 0L);
+                ChatHistoryRequesters.oneFaction(BOB, "", 0L, FELLOWSHIP, EVERY_CHANNEL), 0L);
         assertEquals(3, bobSees.size());
         assertEquals("hail", bobSees.get(0).getMessage());
         // Bob is handed the partner's copy of the whisper, not Alice's own.
         assertEquals("the vault code is 4417", bobSees.get(1).getMessage());
         assertEquals("alice", bobSees.get(1).getPartner());
         assertEquals("form up", bobSees.get(2).getMessage());
-        // Alice, out of the party and its faction line's gate, is handed her
+        // Alice, out of the fellowship and its faction line's gate, is handed her
         // own copies: the faction line is hers by a character made in time.
         List<LostTalesChatMessagePacket> aliceSees = ChatHistory.replayFor(
                 ChatHistoryRequesters.oneFaction(ALICE, "gondor", 0L, null, EVERY_CHANNEL), 0L);

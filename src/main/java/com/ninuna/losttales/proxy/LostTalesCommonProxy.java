@@ -2,8 +2,8 @@ package com.ninuna.losttales.proxy;
 
 import com.ninuna.losttales.chat.server.ChatIdentitySelection;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
-import com.ninuna.losttales.party.quest.PartyQuestProgressCoordinator;
-import com.ninuna.losttales.party.server.PartyDeclines;
+import com.ninuna.losttales.fellowship.quest.FellowshipQuestProgressCoordinator;
+import com.ninuna.losttales.fellowship.server.FellowshipDeclines;
 import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
@@ -87,14 +87,15 @@ import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyn
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
-import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
-import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
-import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
-import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
-import com.ninuna.losttales.party.server.PartyMemberStatusSyncManager;
-import com.ninuna.losttales.party.server.PartyTrackingSyncManager;
-import com.ninuna.losttales.party.server.PartyPlayerEventHandler;
-import com.ninuna.losttales.party.server.PartySyncManager;
+import com.ninuna.losttales.network.packet.fellowship.FellowshipMemberStatusSyncPacket;
+import com.ninuna.losttales.network.packet.fellowship.FellowshipOperationResultPacket;
+import com.ninuna.losttales.network.packet.fellowship.FellowshipStateSyncPacket;
+import com.ninuna.losttales.network.packet.fellowship.FellowshipTrackingSyncPacket;
+import com.ninuna.losttales.fellowship.server.FellowshipMemberStatusSyncManager;
+import com.ninuna.losttales.fellowship.server.FellowshipTrackingSyncManager;
+import com.ninuna.losttales.fellowship.server.FellowshipPlayerEventHandler;
+import com.ninuna.losttales.fellowship.server.FellowshipMirrors;
+import com.ninuna.losttales.fellowship.server.FellowshipSyncManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.quest.missive.MissiveBoardWatches;
 import com.ninuna.losttales.world.biome.ELostTalesBiome;
@@ -123,6 +124,7 @@ import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.ChatConsoleCommandHandler;
 import com.ninuna.losttales.chat.server.ChatSpeechGate;
+import com.ninuna.losttales.chat.server.FellowshipMessageCommand;
 import com.ninuna.losttales.chat.server.ChatArrivals;
 import com.ninuna.losttales.chat.server.ChatWelcome;
 import com.ninuna.losttales.chat.ChatChannel;
@@ -183,7 +185,7 @@ public class LostTalesCommonProxy {
         CharacterSpawnOriginHandler characterSpawnOriginHandler = new CharacterSpawnOriginHandler();
         CharacterStateCheckpointHandler characterStateCheckpointHandler =
                 new CharacterStateCheckpointHandler();
-        PartyPlayerEventHandler partyPlayerEventHandler = new PartyPlayerEventHandler();
+        FellowshipPlayerEventHandler fellowshipPlayerEventHandler = new FellowshipPlayerEventHandler();
         LostTalesServerTaskQueue serverTaskQueue = new LostTalesServerTaskQueue();
         LostTalesNetworkPlayerEventHandler networkPlayerEventHandler = new LostTalesNetworkPlayerEventHandler();
         LostTalesThirdPersonProjectileAimHandler projectileAimHandler =
@@ -214,6 +216,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(new CharacterRoomWorldHandler());
         MinecraftForge.EVENT_BUS.register(new ChatConsoleCommandHandler());
         MinecraftForge.EVENT_BUS.register(new ChatSpeechGate());
+        MinecraftForge.EVENT_BUS.register(new FellowshipMessageCommand());
         MinecraftForge.EVENT_BUS.register(new ChatArrivals());
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatWelcome());
         MinecraftForge.TERRAIN_GEN_BUS.register(waystoneGenerationHandler);
@@ -227,7 +230,7 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(characterPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(characterRaceGameplayHandler);
         FMLCommonHandler.instance().bus().register(characterStateCheckpointHandler);
-        FMLCommonHandler.instance().bus().register(partyPlayerEventHandler);
+        FMLCommonHandler.instance().bus().register(fellowshipPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(serverTaskQueue);
         FMLCommonHandler.instance().bus().register(networkPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(chargeService);
@@ -348,13 +351,13 @@ public class LostTalesCommonProxy {
 
     public void handleLoreCharacterSync(LoreCharacterSyncPacket packet) {}
 
-    public void handlePartyStateSync(PartyStateSyncPacket packet) {}
+    public void handleFellowshipStateSync(FellowshipStateSyncPacket packet) {}
 
-    public void handlePartyOperationResult(PartyOperationResultPacket packet) {}
+    public void handleFellowshipOperationResult(FellowshipOperationResultPacket packet) {}
 
-    public void handlePartyMemberStatusSync(PartyMemberStatusSyncPacket packet) {}
+    public void handleFellowshipMemberStatusSync(FellowshipMemberStatusSyncPacket packet) {}
 
-    public void handlePartyTrackingSync(PartyTrackingSyncPacket packet) {}
+    public void handleFellowshipTrackingSync(FellowshipTrackingSyncPacket packet) {}
 
     public void handleChatIdentity(LostTalesChatIdentitySyncPacket packet) {}
 
@@ -411,11 +414,12 @@ public class LostTalesCommonProxy {
         LostTalesRequestRateLimiter.clear();
         LostTalesThirdPersonAimService.clear();
         LostTalesChargeService.clear();
-        PartySyncManager.clear();
-        PartyMemberStatusSyncManager.clear();
-        PartyTrackingSyncManager.clear();
-        PartyDeclines.clear();
-        PartyQuestProgressCoordinator.getInstance().clear();
+        FellowshipSyncManager.clear();
+        FellowshipMirrors.clear();
+        FellowshipMemberStatusSyncManager.clear();
+        FellowshipTrackingSyncManager.clear();
+        FellowshipDeclines.clear();
+        FellowshipQuestProgressCoordinator.getInstance().clear();
         MissiveBoardWatches.clear();
         LostTalesMapMarkerSyncManager.clear();
         LostTalesLotrWaystoneTravelAdapter.clear();
@@ -543,11 +547,12 @@ public class LostTalesCommonProxy {
         LostTalesRequestRateLimiter.clear();
         LostTalesThirdPersonAimService.clear();
         LostTalesChargeService.clear();
-        PartySyncManager.clear();
-        PartyMemberStatusSyncManager.clear();
-        PartyTrackingSyncManager.clear();
-        PartyDeclines.clear();
-        PartyQuestProgressCoordinator.getInstance().clear();
+        FellowshipSyncManager.clear();
+        FellowshipMirrors.clear();
+        FellowshipMemberStatusSyncManager.clear();
+        FellowshipTrackingSyncManager.clear();
+        FellowshipDeclines.clear();
+        FellowshipQuestProgressCoordinator.getInstance().clear();
         MissiveBoardWatches.clear();
         LostTalesQuestRegistry.clearServerQuests();
         ServerQuestSync.clear();

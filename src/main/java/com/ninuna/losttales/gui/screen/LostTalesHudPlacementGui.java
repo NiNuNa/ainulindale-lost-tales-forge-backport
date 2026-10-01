@@ -13,8 +13,8 @@ import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
-import com.ninuna.losttales.gui.hud.party.LostTalesPartyHudRenderer;
-import com.ninuna.losttales.gui.hud.party.PartyHudLayout;
+import com.ninuna.losttales.gui.hud.fellowship.LostTalesFellowshipHudRenderer;
+import com.ninuna.losttales.gui.hud.fellowship.FellowshipHudLayout;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import java.util.ArrayList;
 import java.util.List;
@@ -537,7 +537,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
 
     private enum HudElement implements Placeable {
         COMPASS("Compass", "compass"),
-        PARTY("Party", "party"),
+        FELLOWSHIP("Fellowship", "fellowship"),
         QUICK_LOOT("Quick Loot", "quickloot"),
         QUEST_TRACKER("Quest Tracker", "quest"),
         /** Quest banners, location discoveries and area names, one slot. */
@@ -561,8 +561,8 @@ public class LostTalesHudPlacementGui extends GuiScreen
             if (this == COMPASS) {
                 return LostTalesCompassHudRenderer.getPlacementWidth();
             }
-            if (this == PARTY) {
-                return PartyHudLayout.PANEL_WIDTH;
+            if (this == FELLOWSHIP) {
+                return FellowshipHudLayout.PANEL_WIDTH;
             }
             if (this == QUICK_LOOT) {
                 return LostTalesQuickLootHudRenderer.getPlacementWidth();
@@ -578,9 +578,9 @@ public class LostTalesHudPlacementGui extends GuiScreen
             if (this == COMPASS) {
                 return LostTalesCompassHudRenderer.getPlacementHeight();
             }
-            if (this == PARTY) {
-                return PartyHudLayout.height(
-                        LostTalesPartyHudRenderer.placementRows());
+            if (this == FELLOWSHIP) {
+                return FellowshipHudLayout.height(
+                        LostTalesFellowshipHudRenderer.placementRows());
             }
             if (this == QUICK_LOOT) {
                 return LostTalesQuickLootHudRenderer.getPlacementHeight();
@@ -596,8 +596,8 @@ public class LostTalesHudPlacementGui extends GuiScreen
             if (this == COMPASS) {
                 return LostTalesConfig.compassHudOffsetX;
             }
-            if (this == PARTY) {
-                return LostTalesConfig.partyHudOffsetX;
+            if (this == FELLOWSHIP) {
+                return LostTalesConfig.fellowshipHudOffsetX;
             }
             if (this == QUICK_LOOT) {
                 return LostTalesConfig.quickLootHudOffsetX;
@@ -613,8 +613,8 @@ public class LostTalesHudPlacementGui extends GuiScreen
             if (this == COMPASS) {
                 return LostTalesConfig.compassHudOffsetY;
             }
-            if (this == PARTY) {
-                return LostTalesConfig.partyHudOffsetY;
+            if (this == FELLOWSHIP) {
+                return LostTalesConfig.fellowshipHudOffsetY;
             }
             if (this == QUICK_LOOT) {
                 return LostTalesConfig.quickLootHudOffsetY;
@@ -627,7 +627,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
 
         @Override
         public HudPlacementLayout.CoordinateMode horizontalMode() {
-            if (this == PARTY || this == QUICK_LOOT
+            if (this == FELLOWSHIP || this == QUICK_LOOT
                     || this == QUEST_TRACKER) {
                 return HudPlacementLayout.CoordinateMode.SCREEN_PERCENT;
             }
@@ -637,7 +637,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
 
         @Override
         public HudPlacementLayout.CoordinateMode verticalMode() {
-            if (this == COMPASS || this == PARTY || this == QUICK_LOOT
+            if (this == COMPASS || this == FELLOWSHIP || this == QUICK_LOOT
                     || this == QUEST_TRACKER) {
                 return HudPlacementLayout.CoordinateMode.SCREEN_PERCENT;
             }

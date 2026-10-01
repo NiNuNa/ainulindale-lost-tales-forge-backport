@@ -28,8 +28,8 @@ public final class LostTalesHudPlacementConfigTest {
     public void everyPlacementScreenElementHasAStableConfigKey() {
         assertEquals("compass",
                 LostTalesConfig.normalizeHudElement("compass"));
-        assertEquals("party",
-                LostTalesConfig.normalizeHudElement("partyHud"));
+        assertEquals("fellowship",
+                LostTalesConfig.normalizeHudElement("fellowshipHud"));
         assertEquals("quickloot",
                 LostTalesConfig.normalizeHudElement("quick-loot"));
         assertEquals("quest",

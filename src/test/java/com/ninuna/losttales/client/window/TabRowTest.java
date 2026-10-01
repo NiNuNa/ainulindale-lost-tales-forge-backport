@@ -421,15 +421,14 @@ public final class TabRowTest {
         assertEquals(0.0F, relaid.leg.clamped(), 0.0F);
     }
 
-    /** A tab's pings are the count tile; past nine it shows the plus. */
+    /** A tab's pings are the count tile, a figure wider for each digit. */
     @Test
     public void aTabsPingsAreItsCountTile() {
-        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_3,
-                TabMark.pings(3).figure());
-        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_MORE,
-                TabMark.pings(42).figure());
-        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_1,
-                TabMark.pings(1).figure());
+        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet
+                .countTileWidth(3), TabMark.pings(3).width());
+        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet
+                .countTileWidth(42), TabMark.pings(42).width());
+        assertTrue(TabMark.pings(42).width() > TabMark.pings(1).width());
     }
 
     /** A tab standing at {@code fromLeft}, bound for {@code toLeft}. */
@@ -532,7 +531,7 @@ public final class TabRowTest {
     private static BufferedImage readSheet() throws Exception {
         InputStream stream = TabRowTest.class.getResourceAsStream(
                 "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
-        assertNotNull("Chat icon sheet is missing", stream);
+        assertNotNull("The window sheet is missing", stream);
         try {
             return ImageIO.read(stream);
         } finally {

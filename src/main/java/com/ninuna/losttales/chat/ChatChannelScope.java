@@ -20,12 +20,12 @@ public enum ChatChannelScope {
      */
     FACTION,
     /**
-     * One conversation per party. Which one a player is in follows the
+     * One conversation per fellowship. Which one a player is in follows the
      * identity they are <em>playing</em>: membership is that identity's,
-     * so a party is not something another of the account's characters
+     * so a fellowship is not something another of the account's characters
      * can read while it is not in it.
      */
-    PARTY;
+    FELLOWSHIP;
 
     /**
      * Whether a channel of this scope is more than one conversation. The

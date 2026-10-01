@@ -11,7 +11,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
  * name takes the colour of the sender's primary role, the one of highest
  * display priority; a sender with no role reads in the chat's plain
  * ivory, the colour of the unassigned. On an in-character channel —
- * Global, Proximity, Faction, Party and whispers — the name takes the
+ * Global, Proximity, Faction, Fellowship and whispers — the name takes the
  * worn character's faction colour; a line spoken as the account, which
  * has no faction, is unassigned and reads in ivory too. No line wears a
  * role beside its name: roles gate channels, answer mentions and stand
@@ -35,14 +35,14 @@ public final class ChatRolePresentation {
     /**
      * Whether the channel's lines speak as the character each player plays
      * rather than the chat identity: speech in the world around them (a
-     * channel reaching those nearby) and the party they travel with. So
+     * channel reaching those nearby) and the fellowship they travel with. So
      * words float only over the body that
-     * says them, and a party speaks as the characters in it.
+     * says them, and a fellowship speaks as the characters in it.
      */
     public static boolean speaksAsPlayedCharacter(ChatChannel channel) {
         return isInCharacter(channel)
                 && (channel.getRecipientRule() == ChatRecipientRule.PROXIMITY
-                        || channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP);
+                        || channel.getAccess() == ChatChannelAccess.FELLOWSHIP_MEMBERSHIP);
     }
 
     /** Whether the channel's lines colour their sender by the primary role: out of character. */

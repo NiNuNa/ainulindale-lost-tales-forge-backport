@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiLayerFade;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +55,10 @@ public final class SubWindows {
 
     /** Back to front. */
     private final List<SubWindow> stack = new ArrayList<SubWindow>();
+    /** How strongly each sub-window shows under the sub-windows in front of it. */
+    private final StackFade stackFade = new StackFade();
+    /** What a sub-window others lie over is drawn into, laid back over the world at its strength. */
+    private final LostTalesUiLayerFade fade = new LostTalesUiLayerFade();
     private SubWindow focused;
     private Gesture gesture;
     private int screenWidth;
@@ -473,6 +478,7 @@ public final class SubWindows {
      * undrawn until its window draws it.
      */
     public void beginFrame() {
+        stackSubWindows();
         for (int index = this.stack.size() - 1; index >= 0; index--) {
             SubWindow window = this.stack.get(index);
             if (window.parentId != null
@@ -487,6 +493,37 @@ public final class SubWindows {
             }
             window.hidden = true;
         }
+    }
+
+    /**
+     * How strongly each sub-window shows under the sub-windows drawn in
+     * front of it ({@link StackFade}), from where each stood when last
+     * drawn: back to front as the screen draws them, a window's own with
+     * it in the windows' order and those on the bare screen last. Windows
+     * take no part: a sub-window fades only under other sub-windows.
+     */
+    private void stackSubWindows() {
+        List<SubWindow> order = new ArrayList<SubWindow>(this.stack.size());
+        for (Window window : WindowLayout.stacked()) {
+            for (SubWindow sub : this.stack) {
+                if (sub.belongsTo(window.getId())) {
+                    order.add(sub);
+                }
+            }
+        }
+        for (SubWindow sub : this.stack) {
+            if (sub.parentId == null) {
+                order.add(sub);
+            }
+        }
+        List<LostTalesUiHitBox> boxes =
+                new ArrayList<LostTalesUiHitBox>(order.size());
+        for (SubWindow sub : order) {
+            boxes.add(sub.hidden || !sub.isOpen() || sub.strip == null ? null
+                    : new LostTalesUiHitBox(sub.drawnLeft, sub.drawnTop,
+                            sub.width, sub.height));
+        }
+        this.stackFade.advance(order, boxes, System.nanoTime());
     }
 
     /**
@@ -590,6 +627,13 @@ public final class SubWindows {
                 window.width, window.height);
         WindowDrawing.cutBehind(stands, share);
         WindowDrawing.softenBehind(stands, share);
+        // One the sub-windows in front of it lie over fades as one
+        // picture over the world it now stands on.
+        float strength = this.stackFade.shareOf(window);
+        int ring = WindowPlacement.FRAME_WIDTH + LostTalesUiInk.SHADOW_OFFSET;
+        boolean fading = strength < 1.0F && this.fade.begin(minecraft,
+                exactLeft - ring, exactTop - ring, window.width + 2 * ring,
+                window.height + 2 * ring);
         GL11.glPushMatrix();
         GL11.glTranslatef(window.fractionX, window.fractionY, 0.0F);
         try {
@@ -612,6 +656,9 @@ public final class SubWindows {
             LostTalesUiWindowFrame.drawEdges(left, top, right, bottom, alpha);
         } finally {
             GL11.glPopMatrix();
+            if (fading) {
+                this.fade.end(minecraft, strength);
+            }
         }
         if (window.isOpen()) {
             int border = WindowGestures.RESIZE_BORDER;

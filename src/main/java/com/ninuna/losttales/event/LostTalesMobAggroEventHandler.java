@@ -6,10 +6,10 @@ import com.ninuna.losttales.entity.LostTalesHostilityHelper;
 import com.ninuna.losttales.entity.combat.LostTalesCombatEngagement;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
-import com.ninuna.losttales.party.model.Party;
-import com.ninuna.losttales.party.model.PartyMember;
-import com.ninuna.losttales.party.storage.PartyStorage;
-import com.ninuna.losttales.party.storage.PartyWorldData;
+import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.model.FellowshipMember;
+import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
+import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -35,7 +35,7 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 
 /**
  * Server-authoritative combat tracker used by compass and map enemy markers.
- * Direct evidence remains player-scoped; authorized online party members in the same world receive a filtered union.
+ * Direct evidence remains player-scoped; authorized online fellowship members in the same world receive a filtered union.
  */
 public class LostTalesMobAggroEventHandler {
     private static final int SNAPSHOT_HEARTBEAT_TICKS = 100;
@@ -202,7 +202,7 @@ public class LostTalesMobAggroEventHandler {
 
         state.currentSnapshot.clear();
         state.currentSnapshot.putAll(snapshot);
-        mergeAuthorizedPartySnapshots(player, snapshot);
+        mergeAuthorizedFellowshipSnapshots(player, snapshot);
         List<LostTalesMobAggroSyncPacket.Entry> packetEntries =
                 buildPacketEntries(player, snapshot, state.currentSnapshot);
 
@@ -233,24 +233,24 @@ public class LostTalesMobAggroEventHandler {
         }
     }
 
-    private static void mergeAuthorizedPartySnapshots(
+    private static void mergeAuthorizedFellowshipSnapshots(
             EntityPlayerMP recipient,
             TreeMap<Integer, LostTalesCombatEngagement> snapshot) {
-        if (!LostTalesConfig.partySharedAggroTracking || recipient == null
+        if (!LostTalesConfig.fellowshipSharedAggroTracking || recipient == null
                 || recipient.worldObj == null || snapshot == null
                 || snapshot.size() >= LostTalesMobAggroSyncPacket.MAX_ENTITY_IDS) {
             return;
         }
 
-        Party party;
+        Fellowship fellowship;
         try {
-            PartyWorldData data = PartyStorage.get(recipient.worldObj);
-            party = data.getPartyForIdentity(
+            FellowshipWorldData data = FellowshipStorage.get(recipient.worldObj);
+            fellowship = data.getTravellingFellowship(
                     RoleplayCharacterIdentityHook.resolveGameplayId(recipient));
         } catch (RuntimeException ignored) {
             return;
         }
-        if (party == null || party.getMemberCount() <= 1) {
+        if (fellowship == null || fellowship.getMemberCount() <= 1) {
             return;
         }
 
@@ -259,7 +259,7 @@ public class LostTalesMobAggroEventHandler {
             return;
         }
         List<?> onlinePlayers = server.getConfigurationManager().playerEntityList;
-        for (PartyMember member : party.getMembers()) {
+        for (FellowshipMember member : fellowship.getMembers()) {
             if (member == null || member.getOwnerId().equals(recipient.getUniqueID())) {
                 continue;
             }

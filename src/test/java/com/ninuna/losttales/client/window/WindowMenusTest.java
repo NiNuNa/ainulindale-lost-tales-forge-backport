@@ -21,7 +21,7 @@ public final class WindowMenusTest {
         assertTrue(WindowMenus.matchesFilter("Global", ""));
         assertTrue(WindowMenus.matchesFilter("Global", "lob"));
         assertTrue(WindowMenus.matchesFilter("Global", "GLO"));
-        assertFalse(WindowMenus.matchesFilter("Global", "party"));
+        assertFalse(WindowMenus.matchesFilter("Global", "fellowship"));
     }
 
     @Test

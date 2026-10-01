@@ -25,8 +25,8 @@ import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
-import com.ninuna.losttales.party.server.PartyOperationResult;
-import com.ninuna.losttales.party.server.PartyService;
+import com.ninuna.losttales.fellowship.server.FellowshipOperationResult;
+import com.ninuna.losttales.fellowship.server.FellowshipService;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
@@ -431,10 +431,10 @@ public final class LoreCharacterTransferCoordinator {
                         roster.getActiveCharacterId())) {
                     return CharacterErrorId.LORE_CHARACTER_ACTIVE;
                 }
-                PartyOperationResult cleanup = PartyService.getInstance()
+                FellowshipOperationResult cleanup = FellowshipService.getInstance()
                         .removeCharacterForDeletion(world, character);
                 if (!cleanup.isSuccessful()) {
-                    return CharacterErrorId.PARTY_CLEANUP_FAILED;
+                    return CharacterErrorId.FELLOWSHIP_CLEANUP_FAILED;
                 }
                 roster.removeCharacter(transaction.getCharacterId());
                 roster.incrementRevision();

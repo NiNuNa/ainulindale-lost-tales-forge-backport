@@ -122,7 +122,7 @@ public final class ChatPresenceMarkTest {
     private static BufferedImage readSheet() throws Exception {
         InputStream stream = ChatPresenceMarkTest.class.getResourceAsStream(
                 "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
-        assertTrue("chat sheet is missing", stream != null);
+        assertTrue("The window sheet is missing", stream != null);
         try {
             return ImageIO.read(stream);
         } finally {

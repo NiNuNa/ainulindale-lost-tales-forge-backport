@@ -3,6 +3,8 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipIcons;
 import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
@@ -234,12 +236,15 @@ public final class ChatChannelIcons {
         if (!tab.isNpc() && !tab.isWhisper()) {
             boolean linked = ClientChatChannelState.isLinkedToDiscord(tab);
             // The server's own choice of item stands before everything
-            // else, then the faction's banner, each drawn as an item's
-            // icon in a line is.
+            // else, then the faction's banner or the fellowship's icon,
+            // each drawn as an item's icon in a line is.
             ItemStack item = itemIconOf(tab.getChannel());
             if (item == null && tab.getChannel() == ChatChannel.FACTION) {
                 item = LotrFactionBannerResolver.bannerFor(
                         ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
+            }
+            if (item == null && tab.isFellowship()) {
+                item = ClientFellowshipIcons.stackOf(ChatFellowship.idOf(tab.getOwnerKey()));
             }
             if (item != null) {
                 drawItemIcon(minecraft, item, x, y, alpha, linked, mark);
@@ -645,7 +650,7 @@ public final class ChatChannelIcons {
         if (channel == ChatChannel.OOC) {
             return ChatEmoji.BLUE_HEART;
         }
-        if (channel == ChatChannel.PARTY) {
+        if (channel == ChatChannel.FELLOWSHIP) {
             return ChatEmoji.JOY;
         }
         if (channel == ChatChannel.OPERATOR) {

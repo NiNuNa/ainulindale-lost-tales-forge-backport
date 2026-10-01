@@ -5,7 +5,7 @@ public enum ChatRecipientRule {
     /** Everyone online: Global and OOC. */
     EVERYONE,
     PROXIMITY,
-    PARTY,
+    FELLOWSHIP,
     FACTION,
     /** Only the sender: a private console that echoes back to its author. */
     SELF,

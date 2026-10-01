@@ -48,6 +48,32 @@ public final class WindowLayoutStoreTest {
     }
 
     /**
+     * A split is kept on its window's line: its two pages, its way and
+     * its share. One naming a page the window does not hold, or written
+     * wrong, is left out, and one holding a conversation stands side by
+     * side.
+     */
+    @Test
+    public void aSplitRoundTripsOnItsWindowsLine() {
+        WindowLayoutStore.load(Arrays.asList(
+                "window w1 locked=false x=0.00 y=0.00 split=ooc,global,down,0.6000 split=global,operator,across,0.5000 active=global tabs=global,ooc,client_console",
+                "window w2 locked=false x=0.00 y=100.00 split=client_console,nowhere,across,0.5000 active=operator tabs=operator"));
+        Window first = WindowLayout.window("w1");
+        WindowSplit split = first.splitOf(ChatTab.of(ChatChannel.GLOBAL));
+        assertNotNull(split);
+        assertEquals(ChatTab.of(ChatChannel.OOC), split.first());
+        assertFalse("a conversation stands only side by side", split.isStacked());
+        assertEquals(0.6D, split.share(), 1.0E-9D);
+        assertEquals("the second split shares a page with the first", 1,
+                first.getSplits().size());
+        assertTrue(WindowLayout.window("w2").getSplits().isEmpty());
+        List<String> described = WindowLayoutStore.describe();
+        WindowLayoutStore.load(described);
+        assertEquals(described, WindowLayoutStore.describe());
+        assertTrue(described.get(1).contains(" split=ooc,global,across,0.6000 "));
+    }
+
+    /**
      * A place's whisper tabs, open or closed by hand, are lines of their
      * own that survive the round trip and come back for that place only.
      */
@@ -87,7 +113,7 @@ public final class WindowLayoutStoreTest {
                 "window w3 locked=false x=0.00 y=50.00 fill=top_right"
                         + " active=ooc tabs=ooc",
                 "window w4 locked=false x=0.00 y=60.00 fill=sideways"
-                        + " active=party tabs=party",
+                        + " active=fellowship tabs=fellowship",
                 "window w5 locked=false x=0.00 y=70.00"
                         + " fill=free:0.25000,0.00000,0.75000,1.00000"
                         + " active=faction tabs=faction"));
@@ -334,12 +360,12 @@ public final class WindowLayoutStoreTest {
 
     @Test
     public void describeRoundTripsThroughLoad() {
-        Tearing.off(ChatTab.of(ChatChannel.PARTY), 62.5D, 8.0D);
+        Tearing.off(ChatTab.of(ChatChannel.FELLOWSHIP), 62.5D, 8.0D);
         WindowLayout.moveTab(ChatTab.of(ChatChannel.FACTION), "w3", 1);
         WindowLayout.setLocked("w3", true);
         ChatLayout.close(ChatTab.of(ChatChannel.OPERATOR));
         ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
-        ChatLayout.setNotification(ChatTab.of(ChatChannel.PARTY),
+        ChatLayout.setNotification(ChatTab.of(ChatChannel.FELLOWSHIP),
                 ChatLineChoice.EVERYTHING);
         ChatLayout.setFeedChoice(ChatTab.of(ChatChannel.GLOBAL),
                 ChatLineChoice.NOTHING);
@@ -357,10 +383,10 @@ public final class WindowLayoutStoreTest {
                 + " x=3.00 y=97.50 active=ooc tabs=global,proximity,ooc"));
         assertTrue(lines.toString(), lines.contains("window w3 locked=true"
                 + " x=62.50 y=8.00 height=200.00 width=300 active=faction"
-                + " tabs=party,faction"));
+                + " tabs=fellowship,faction"));
         assertTrue(lines.contains("closed operator"));
         assertTrue(lines.contains("notify\tnothing\tooc"));
-        assertTrue(lines.contains("notify\teverything\tparty"));
+        assertTrue(lines.contains("notify\teverything\tfellowship"));
         assertTrue(lines.contains("feedchoice\tnothing\tglobal"));
         for (String line : lines) {
             assertFalse(line.startsWith("muted ")
@@ -382,7 +408,7 @@ public final class WindowLayoutStoreTest {
         assertTrue(ChatLayout.isToolbarCollapsed());
         Window w3 = WindowLayout.window("w3");
         assertNotNull(w3);
-        assertEquals(Arrays.asList(ChatChannel.PARTY, ChatChannel.FACTION),
+        assertEquals(Arrays.asList(ChatChannel.FELLOWSHIP, ChatChannel.FACTION),
                 ChatLayoutViews.channelsOf(w3));
         assertEquals(ChatChannel.FACTION, ChatLayoutViews.frontChannelOf(w3));
         assertTrue(w3.isLocked());
@@ -393,7 +419,7 @@ public final class WindowLayoutStoreTest {
         assertEquals(ChatLineChoice.NOTHING,
                 ChatLayout.notification(ChatTab.of(ChatChannel.OOC)));
         assertEquals(ChatLineChoice.EVERYTHING,
-                ChatLayout.notification(ChatTab.of(ChatChannel.PARTY)));
+                ChatLayout.notification(ChatTab.of(ChatChannel.FELLOWSHIP)));
         assertEquals(ChatLineChoice.ONLY_MENTIONS,
                 ChatLayout.notification(ChatTab.of(ChatChannel.GLOBAL)));
         assertEquals(ChatLineChoice.NOTHING,
@@ -411,7 +437,7 @@ public final class WindowLayoutStoreTest {
                 "# comment",
                 "",
                 "window w1 locked=maybe active=nope tabs=global,,unknown,ooc",
-                "window w2 x=abc y=12 tabs=party,party",
+                "window w2 x=abc y=12 tabs=fellowship,fellowship",
                 "window  badid tabs=faction",
                 "window w9",
                 "closed",
@@ -446,7 +472,7 @@ public final class WindowLayoutStoreTest {
         assertEquals(2, WindowLayout.windows().size());
         Window w2 = WindowLayout.window("w2");
         assertNotNull(w2);
-        assertEquals(Collections.singletonList(ChatChannel.PARTY),
+        assertEquals(Collections.singletonList(ChatChannel.FELLOWSHIP),
                 ChatLayoutViews.channelsOf(w2));
         assertEquals(0.0D, w2.getOffsetX(), 0.0D);
         assertEquals(12.0D, w2.getOffsetY(), 0.0D);

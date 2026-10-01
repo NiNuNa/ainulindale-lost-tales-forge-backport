@@ -65,9 +65,10 @@ import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainCache;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapViewMemory;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
-import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
-import com.ninuna.losttales.client.party.ClientPartyStateCache;
-import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipIcons;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipMemberStatusCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientWorldQuests;
 import com.ninuna.losttales.client.quest.LostTalesQuestDialogueHooks;
@@ -84,7 +85,7 @@ import com.ninuna.losttales.client.render.renderer.item.LostTalesRendererLargeIt
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
-import com.ninuna.losttales.gui.hud.party.LostTalesPartyHudRenderer;
+import com.ninuna.losttales.gui.hud.fellowship.LostTalesFellowshipHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesWorldQuestMarkerRenderer;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
@@ -115,6 +116,8 @@ import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
 import net.minecraftforge.client.MinecraftForgeClient;
+import com.ninuna.losttales.gui.screen.fellowship.FellowshipPage;
+import lotr.client.gui.LOTRGuiFellowships;
 import lotr.client.gui.LOTRGuiMap;
 import lotr.client.gui.LOTRGuiMiniquestOffer;
 import lotr.client.gui.LOTRGuiRedBook;
@@ -131,7 +134,7 @@ import net.minecraftforge.client.event.sound.PlaySoundEvent17;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.world.WorldEvent;
-import com.ninuna.losttales.client.chat.ChatPartyInvitationAnswers;
+import com.ninuna.losttales.client.chat.ChatFellowshipInvitationAnswers;
 
 public class LostTalesClientEventHandler implements IResourceManagerReloadListener {
 
@@ -198,10 +201,11 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ChestPhysicsStates.clear();
         ClientCharacterCreationCatalogCache.clear();
         ClientLoreCharacterCache.clear();
-        ClientPartyStateCache.clear();
-        ChatPartyInvitationAnswers.clear();
-        ClientPartyMemberStatusCache.clear();
-        ClientPartyTrackingCache.clear();
+        ClientFellowshipStateCache.clear();
+        ClientFellowshipIcons.clear();
+        ChatFellowshipInvitationAnswers.clear();
+        ClientFellowshipMemberStatusCache.clear();
+        ClientFellowshipTrackingCache.clear();
         // Words over a head belong to the world they were spoken in.
         ChatSpeechBubbles.clear();
         ClientServerConfigCache.clear();
@@ -290,7 +294,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             LostTalesMapTerrainCache.clear();
             LostTalesMapTerrainRenderer.clear();
             LostTalesClientMobAggroCache.clear();
-            ClientPartyTrackingCache.clear();
+            ClientFellowshipTrackingCache.clear();
             ThirdPersonCameraRuntime.resetSession();
             WraithWorldVisualEffect.reset();
         }
@@ -534,8 +538,12 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         }
     }
 
+    /**
+     * LOTR's screens that ours stand in for: the quest offer, the quest
+     * book, the ordinary map, the fellowships, and the inventory.
+     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void replaceLotrMapGui(GuiOpenEvent event) {
+    public void replaceLotrScreens(GuiOpenEvent event) {
         if (event.gui != null
                 && event.gui.getClass() == LOTRGuiMiniquestOffer.class) {
             // A quest offered in Middle-earth is talked about in the Lost
@@ -552,6 +560,13 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                     QuestJournalPage.PAGE_ID);
             if (journal != null) {
                 event.gui = journal;
+            }
+        } else if (event.gui != null
+                && event.gui.getClass() == LOTRGuiFellowships.class) {
+            // LOTR's fellowships are ours, kept on the Fellowships page.
+            GuiScreen fellowships = WindowScreen.screenForPage(FellowshipPage.PAGE_ID);
+            if (fellowships != null) {
+                event.gui = fellowships;
             }
         } else if (event.gui != null
                 && event.gui.getClass() == LOTRGuiMap.class) {
@@ -676,7 +691,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 LostTalesQuickLootHudRenderer.render(minecraft);
                 LostTalesCompassHudRenderer.render(minecraft, event.partialTicks);
                 LostTalesMapMarkerHudRenderer.render(minecraft, event.partialTicks);
-                LostTalesPartyHudRenderer.render(minecraft, event.partialTicks);
+                LostTalesFellowshipHudRenderer.render(minecraft, event.partialTicks);
                 LostTalesQuestHudRenderer.render(minecraft, event.partialTicks);
                 CharacterRoomJourneyPrompt.render(minecraft);
             } finally {

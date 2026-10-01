@@ -214,7 +214,7 @@ public final class LostTalesChatAccessPacketTest {
         icons.put(ChatChannel.OPERATOR.getId(),
                 com.ninuna.losttales.chat.ChatChannelIconSpec.parse(
                         "item:minecraft:iron_sword"));
-        icons.put(ChatChannel.PARTY.getId(),
+        icons.put(ChatChannel.FELLOWSHIP.getId(),
                 com.ninuna.losttales.chat.ChatChannelIconSpec.parse("emoji:joy"));
         LostTalesChatAccessPacket packet = new LostTalesChatAccessPacket(0,
                 Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList(),

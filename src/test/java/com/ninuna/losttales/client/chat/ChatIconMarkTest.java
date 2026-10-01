@@ -46,11 +46,11 @@ public final class ChatIconMarkTest {
         assertTrue(TabMark.of(global).isNone());
         ClientChatChannelViews.record(-1, global, selected, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertSame(TabMark.UNREAD, TabMark.of(global));
-        assertSame(LostTalesUiSheet.PRESENCE_SELECTED,
-                TabMark.of(global).figure());
+        assertEquals(LostTalesUiSheet.PRESENCE_SELECTED.getWidth(),
+                TabMark.of(global).width());
         ClientChatChannelViews.record(-2, global, selected, true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         ClientChatChannelViews.record(-3, global, selected, true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-        assertSame(LostTalesUiSheet.COUNT_2, TabMark.of(global).figure());
+        assertEquals(TabMark.pings(2), TabMark.of(global));
     }
 
     @Test
@@ -63,20 +63,26 @@ public final class ChatIconMarkTest {
                 TabMark.combined(Arrays.asList(global, proximity)));
         ClientChatChannelViews.record(-2, global, selected, true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         ClientChatChannelViews.record(-3, proximity, selected, true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-        assertSame(LostTalesUiSheet.COUNT_2, TabMark.combined(
-                Arrays.asList(global, proximity)).figure());
+        assertEquals(TabMark.pings(2), TabMark.combined(
+                Arrays.asList(global, proximity)));
     }
 
-    /** Past nine the tile shows the plus, and keeps its width. */
+    /** The tile counts to 99, then reads 99+, as Discord's does; it grows a figure at a time. */
     @Test
-    public void pastNineTheTileShowsThePlus() {
-        assertSame(LostTalesUiSheet.COUNT_MORE, TabMark.pings(42).figure());
-        assertSame(LostTalesUiSheet.COUNT_MORE, TabMark.pings(10).figure());
-        assertSame(LostTalesUiSheet.COUNT_9, TabMark.pings(9).figure());
-        assertSame(LostTalesUiSheet.COUNT_1, TabMark.pings(1).figure());
-        assertEquals(TabMark.TILE_WIDTH, TabMark.pings(42).width());
+    public void theTileCountsToNinetyNineThenShowsThePlus() {
+        assertEquals("1", LostTalesUiSheet.countText(1));
+        assertEquals("9", LostTalesUiSheet.countText(9));
+        assertEquals("10", LostTalesUiSheet.countText(10));
+        assertEquals("99", LostTalesUiSheet.countText(99));
+        assertEquals("99+", LostTalesUiSheet.countText(100));
+        assertEquals("99+", LostTalesUiSheet.countText(4242));
+        int edge = LostTalesUiSheet.COUNT_LEFT.getWidth();
+        int figure = LostTalesUiSheet.COUNT_1.getWidth();
+        assertEquals(edge + figure, TabMark.pings(9).width());
+        assertEquals(edge + 2 * figure, TabMark.pings(42).width());
+        assertEquals(edge + 3 * figure, TabMark.pings(100).width());
         assertEquals(LostTalesUiSheet.PRESENCE_SELECTED.getWidth(),
-                TabMark.TILE_WIDTH);
+                TabMark.pings(5).width());
         assertTrue(TabMark.pings(0).isNone());
     }
 
@@ -108,56 +114,76 @@ public final class ChatIconMarkTest {
         assertEquals(6.0F, CornerCuts.cutFrom(cut, 9), 0.0F);
     }
 
-    /** The mock-up of the "2" tile: the row over it cut from its left edge, the rows beside it a pixel further left. */
+    /**
+     * The mock-up of the "2" tile, its corners rounded: the row over it
+     * cut from its first figure, its top row from its left edge, the
+     * rows beside it a pixel further left.
+     */
     @Test
-    public void theTilesCutIsItsBoxGrownByAPixel() {
+    public void theTilesCutIsItsShapeGrownByAPixel() {
         LostTalesUiCornerCut cut = TabMark.pings(2).cut(0.0F, 0.0F, ICON);
         for (int row = 0; row < 3; row++) {
             assertFalse("row " + row, CornerCuts.cuts(cut, ICON - 1, row));
         }
-        assertEquals(7.0F, CornerCuts.cutFrom(cut, 3), 0.0F);
-        assertEquals(6.0F, CornerCuts.cutFrom(cut, 4), 0.0F);
+        assertEquals(8.0F, CornerCuts.cutFrom(cut, 3), 0.0F);
+        assertEquals(7.0F, CornerCuts.cutFrom(cut, 4), 0.0F);
+        assertEquals(6.0F, CornerCuts.cutFrom(cut, 5), 0.0F);
         assertEquals(6.0F, CornerCuts.cutFrom(cut, 9), 0.0F);
     }
 
     /**
-     * The outline the tile's cut is built from is the sheet's: the tile's
-     * left edge and every figure after it are as tall as the outline, and
-     * each starts on its first column in every row, so a tile is one
-     * solid rectangle whatever it counts.
+     * The outline the tile's cut is built from is the sheet's: every
+     * figure is as tall as the outline and starts on its first column in
+     * every row; the left edge is a row shorter at each end, inked in
+     * every row it has. So a tile's left side is its edge between two
+     * rounded corners, whatever it counts.
      */
     @Test
     public void theTilesOutlineIsTheSheets() throws Exception {
         BufferedImage sheet = readSheet();
-        LostTalesUiSheet[] tiles = {LostTalesUiSheet.COUNT_LEFT,
-                LostTalesUiSheet.COUNT_1, LostTalesUiSheet.COUNT_2,
-                LostTalesUiSheet.COUNT_3, LostTalesUiSheet.COUNT_4,
-                LostTalesUiSheet.COUNT_5, LostTalesUiSheet.COUNT_6,
-                LostTalesUiSheet.COUNT_7, LostTalesUiSheet.COUNT_8,
-                LostTalesUiSheet.COUNT_9, LostTalesUiSheet.COUNT_MORE};
-        for (LostTalesUiSheet tile : tiles) {
-            assertEquals(tile.toString(), TabMark.TILE_INK_LEFT.length,
-                    tile.getHeight());
-            for (int row = 0; row < tile.getHeight(); row++) {
-                int first = tile.getWidth();
-                for (int x = 0; x < tile.getWidth(); x++) {
-                    int argb = sheet.getRGB(tile.getTextureU() + x,
-                            tile.getTextureV() + row);
-                    if ((argb >>> 24) > 0) {
-                        first = x;
-                        break;
-                    }
-                }
-                assertEquals(tile + " row " + row,
-                        TabMark.TILE_INK_LEFT[row], first);
+        LostTalesUiSheet[] figures = {LostTalesUiSheet.COUNT_1,
+                LostTalesUiSheet.COUNT_2, LostTalesUiSheet.COUNT_3,
+                LostTalesUiSheet.COUNT_4, LostTalesUiSheet.COUNT_5,
+                LostTalesUiSheet.COUNT_6, LostTalesUiSheet.COUNT_7,
+                LostTalesUiSheet.COUNT_8, LostTalesUiSheet.COUNT_9,
+                LostTalesUiSheet.COUNT_MORE};
+        int rows = TabMark.TILE_INK_LEFT.length;
+        for (LostTalesUiSheet figure : figures) {
+            assertEquals(figure.toString(), rows, figure.getHeight());
+            for (int row = 0; row < rows; row++) {
+                assertEquals(figure + " row " + row, 0,
+                        firstInk(sheet, figure, row));
             }
         }
+        LostTalesUiSheet edge = LostTalesUiSheet.COUNT_LEFT;
+        assertEquals(rows - 2, edge.getHeight());
+        for (int row = 0; row < edge.getHeight(); row++) {
+            assertEquals("edge row " + row, 0, firstInk(sheet, edge, row));
+        }
+        for (int row = 0; row < rows; row++) {
+            boolean besideEdge = row >= 1 && row < rows - 1;
+            assertEquals("outline row " + row, besideEdge ? 0 : edge.getWidth(),
+                    TabMark.TILE_INK_LEFT[row]);
+        }
+    }
+
+    /** The first column of a cell's row that holds ink, or the cell's width for none. */
+    private static int firstInk(BufferedImage sheet, LostTalesUiSheet cell,
+                                int row) {
+        for (int x = 0; x < cell.getWidth(); x++) {
+            int argb = sheet.getRGB(cell.getTextureU() + x,
+                    cell.getTextureV() + row);
+            if ((argb >>> 24) > 0) {
+                return x;
+            }
+        }
+        return cell.getWidth();
     }
 
     private static BufferedImage readSheet() throws Exception {
         InputStream stream = ChatIconMarkTest.class.getResourceAsStream(
                 "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
-        assertTrue("chat sheet is missing", stream != null);
+        assertTrue("The window sheet is missing", stream != null);
         try {
             return ImageIO.read(stream);
         } finally {

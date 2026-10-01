@@ -48,7 +48,10 @@ public final class ChatChannelSuggesterTest {
     @Test
     public void matchesGoByCodeNameOrShownName() {
         List<ChatChannel> all = ChatChannel.presentationOrder();
-        assertEquals(all, ChatChannelSuggester.matches("", all, "lotr:gondor", 20));
+        List<ChatChannel> named = new java.util.ArrayList<ChatChannel>(all);
+        named.remove(ChatChannel.FELLOWSHIP);
+        assertEquals("a fellowship is one conversation each, which the word alone names none of",
+                named, ChatChannelSuggester.matches("", all, "lotr:gondor", 20));
         assertEquals(Arrays.asList(ChatChannel.GLOBAL),
                 ChatChannelSuggester.matches("glo", all, "lotr:gondor", 20));
         assertEquals(Arrays.asList(ChatChannel.OOC),
@@ -82,6 +85,9 @@ public final class ChatChannelSuggesterTest {
                 ChatChannelSuggester.linkAt("#whisper/12", 0).channel);
         assertEquals(12L, ChatChannelSuggester.linkAt("see #Whisper/12 now", 4).messageId);
         assertNull(ChatChannelSuggester.linkAt("#whisper", 0));
+        assertSame(ChatChannel.FELLOWSHIP,
+                ChatChannelSuggester.linkAt("#fellowship/12", 0).channel);
+        assertNull(ChatChannelSuggester.linkAt("#fellowship", 0));
         assertNull(ChatChannelSuggester.messageLink(ChatChannel.GLOBAL, "", 0L));
         assertNull(ChatChannelSuggester.messageLink(ChatChannel.GLOBAL, "", -4L));
         assertNull(ChatChannelSuggester.messageLink(null, "", 12L));
@@ -91,14 +97,14 @@ public final class ChatChannelSuggesterTest {
 
     @Test
     public void theIdAfterAChannelWordIsASlashAndDigits() {
-        String text = "see #global/1234 and #ooc/ and #party/x #gondor/12345678901234567890";
+        String text = "see #global/1234 and #ooc/ and #fellowship/x #gondor/12345678901234567890";
         int global = ChatChannelSuggester.wordEnd(text, text.indexOf("global"));
         assertEquals(text.indexOf(" and"), ChatChannelSuggester.messageIdEnd(text, global));
         int ooc = ChatChannelSuggester.wordEnd(text, text.indexOf("ooc"));
         assertEquals("a slash with no digits is no id", ooc,
                 ChatChannelSuggester.messageIdEnd(text, ooc));
-        int party = ChatChannelSuggester.wordEnd(text, text.indexOf("party/"));
-        assertEquals(party, ChatChannelSuggester.messageIdEnd(text, party));
+        int fellowship = ChatChannelSuggester.wordEnd(text, text.indexOf("fellowship/"));
+        assertEquals(fellowship, ChatChannelSuggester.messageIdEnd(text, fellowship));
         int gondor = ChatChannelSuggester.wordEnd(text, text.indexOf("gondor"));
         // Eighteen digits at most: what a long can hold.
         assertEquals(gondor + 1 + 18,

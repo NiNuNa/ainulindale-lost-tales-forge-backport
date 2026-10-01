@@ -31,7 +31,7 @@ public final class LostTalesMapLegendRegistryTest {
         assertTrue(ids.contains(
                 LostTalesMapLegendRegistry.PLAYER_WAYSTONES));
         assertTrue(ids.contains(LostTalesMapLegendRegistry.QUESTS));
-        assertTrue(ids.contains(LostTalesMapLegendRegistry.PARTY));
+        assertTrue(ids.contains(LostTalesMapLegendRegistry.FELLOWSHIP));
         assertTrue(ids.contains(LostTalesMapLegendRegistry.LABELS));
         for (String id : ids) {
             assertFalse(id.contains("hostile"));
@@ -42,7 +42,7 @@ public final class LostTalesMapLegendRegistryTest {
     }
 
     @Test
-    public void markerClassificationUsesStableSourceWithPartyPrecedence() {
+    public void markerClassificationUsesStableSourceWithFellowshipPrecedence() {
         assertEquals(LostTalesMapLegendRegistry.LOCATIONS,
                 LostTalesMapLegendRegistry.categoryFor(marker(
                         "location", "Point of Interest",
@@ -58,9 +58,9 @@ public final class LostTalesMapLegendRegistryTest {
                         "quest", "Quest",
                         LostTalesMapMarkerSource.QUEST_DYNAMIC,
                         false, false)));
-        assertEquals(LostTalesMapLegendRegistry.PARTY,
+        assertEquals(LostTalesMapLegendRegistry.FELLOWSHIP,
                 LostTalesMapLegendRegistry.categoryFor(marker(
-                        "party_go_here:character", "Go Here",
+                        "fellowship_go_here:character", "Go Here",
                         LostTalesMapMarkerSource.PLAYER_CREATED,
                         false, false)));
     }

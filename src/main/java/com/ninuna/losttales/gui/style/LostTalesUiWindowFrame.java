@@ -3,10 +3,9 @@ package com.ninuna.losttales.gui.style;
 /**
  * The frame every window wears, and every panel that stands like one: a
  * lit framed button's frame just outside the window's box, differing only
- * in that it is no button, it fades and it is always lit. Its edges
- * and corners come from the sheet's
- * {@code WINDOW_FRAME_*} cells, which carry the lit button's ink texel for
- * texel. The left and bottom edges are strongest at the bottom-left corner
+ * in that it is no button, it fades and it is always lit. Its edges and
+ * corners come from the lit framed button's own cells
+ * ({@code FRAME_LIT_*}). The left and bottom edges are strongest at the bottom-left corner
  * and the top and right ones at the top-right, each fading to nothing at
  * the far corner, and the corners fade with them. The ring the frame lies
  * on is the surface of whatever it runs beside, which the window paints.
@@ -95,13 +94,13 @@ public final class LostTalesUiWindowFrame {
         drawEdge(true, true, right, top + arm, split - top - arm,
                 rampDownAlpha(alpha, edgeTop, span, top + arm),
                 rampDownAlpha(alpha, edgeTop, span, split));
-        drawCorner(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT, left - ring,
+        drawCorner(LostTalesUiSheet.FRAME_LIT_TOP_LEFT, left - ring,
                 top - ring, false, false,
                 rampAlpha(alpha, bottom, span, top),
                 rampAlpha(alpha, bottom, span, top + arm),
                 edgeAlphaAt(alpha, right, left, left),
                 edgeAlphaAt(alpha, right, left, left + arm));
-        drawCorner(LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT,
+        drawCorner(LostTalesUiSheet.FRAME_LIT_TOP_RIGHT,
                 right + ring - cell, top - ring, true, false,
                 rampDownAlpha(alpha, edgeTop, span, top),
                 rampDownAlpha(alpha, edgeTop, span, top + arm),
@@ -135,13 +134,13 @@ public final class LostTalesUiWindowFrame {
         drawEdge(false, true, left + arm, bottom, right - left - 2 * arm,
                 edgeAlphaAt(alpha, left, right, left + arm),
                 edgeAlphaAt(alpha, left, right, right - arm));
-        drawCorner(LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT, left - ring,
+        drawCorner(LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT, left - ring,
                 bottom + ring - cell, false, true,
                 rampAlpha(alpha, bottom, span, bottom),
                 rampAlpha(alpha, bottom, span, bottom - arm),
                 edgeAlphaAt(alpha, left, right, left),
                 edgeAlphaAt(alpha, left, right, left + arm));
-        drawCorner(LostTalesUiSheet.WINDOW_FRAME_BOTTOM_RIGHT,
+        drawCorner(LostTalesUiSheet.FRAME_LIT_BOTTOM_RIGHT,
                 right + ring - cell, bottom + ring - cell, true, true,
                 rampDownAlpha(alpha, edgeTop, span, bottom),
                 rampDownAlpha(alpha, edgeTop, span, bottom - arm),
@@ -219,11 +218,11 @@ public final class LostTalesUiWindowFrame {
      */
     static LostTalesUiSheet edgeCorner(boolean side, boolean far) {
         if (side) {
-            return far ? LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT
-                    : LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT;
+            return far ? LostTalesUiSheet.FRAME_LIT_TOP_RIGHT
+                    : LostTalesUiSheet.FRAME_LIT_TOP_LEFT;
         }
-        return far ? LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT
-                : LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT;
+        return far ? LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT
+                : LostTalesUiSheet.FRAME_LIT_TOP_LEFT;
     }
 
     /**

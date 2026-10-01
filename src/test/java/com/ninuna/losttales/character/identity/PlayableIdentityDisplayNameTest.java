@@ -14,7 +14,7 @@ import static org.junit.Assert.assertEquals;
 
 /**
  * How an identity is named. One rule, so the chat, the nameplates, the
- * party and the LOTR records cannot answer the same question three
+ * fellowship and the LOTR records cannot answer the same question three
  * different ways for the same player.
  */
 public final class PlayableIdentityDisplayNameTest {

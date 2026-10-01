@@ -68,7 +68,7 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_AUDIENCE = "Audience";
     private static final String TAG_AUDIENCE_HAS_ACCOUNTS = "HasAccounts";
     private static final String TAG_AUDIENCE_ACCOUNTS = "Accounts";
-    private static final String TAG_AUDIENCE_PARTY = "Party";
+    private static final String TAG_AUDIENCE_FELLOWSHIP = "Fellowship";
     private static final String TAG_AUDIENCE_FACTION = "Faction";
     private static final String TAG_AUDIENCE_GATED = "Gated";
     private static final String TAG_REACTIONS = "Reactions";
@@ -440,8 +440,8 @@ public final class ChatHistoryNbtCodec {
         if (accounts != null) {
             audience.setTag(TAG_AUDIENCE_ACCOUNTS, writeUuids(accounts));
         }
-        if (entry.audience.partyId() != null) {
-            NbtTags.writeUuid(audience, TAG_AUDIENCE_PARTY, entry.audience.partyId());
+        if (entry.audience.fellowshipId() != null) {
+            NbtTags.writeUuid(audience, TAG_AUDIENCE_FELLOWSHIP, entry.audience.fellowshipId());
         }
         audience.setString(TAG_AUDIENCE_FACTION, entry.audience.factionId() == null
                 ? "" : entry.audience.factionId());
@@ -607,15 +607,15 @@ public final class ChatHistoryNbtCodec {
                 return EntryReadResult.failure("invalid_audience");
             }
         }
-        UUID partyId = null;
-        if (audienceTag.hasKey(TAG_AUDIENCE_PARTY + TAG_UUID_MOST)) {
-            partyId = NbtTags.readUuid(audienceTag, TAG_AUDIENCE_PARTY);
-            if (partyId == null) {
+        UUID fellowshipId = null;
+        if (audienceTag.hasKey(TAG_AUDIENCE_FELLOWSHIP + TAG_UUID_MOST)) {
+            fellowshipId = NbtTags.readUuid(audienceTag, TAG_AUDIENCE_FELLOWSHIP);
+            if (fellowshipId == null) {
                 return EntryReadResult.failure("invalid_audience");
             }
         }
         ChatHistory.Audience audience = ChatHistory.Audience.restore(accounts,
-                partyId, audienceTag.getString(TAG_AUDIENCE_FACTION),
+                fellowshipId, audienceTag.getString(TAG_AUDIENCE_FACTION),
                 audienceTag.getBoolean(TAG_AUDIENCE_GATED));
         UUID authorId = raw.hasKey(TAG_AUTHOR_UUID + TAG_UUID_MOST)
                 ? NbtTags.readUuid(raw, TAG_AUTHOR_UUID) : null;

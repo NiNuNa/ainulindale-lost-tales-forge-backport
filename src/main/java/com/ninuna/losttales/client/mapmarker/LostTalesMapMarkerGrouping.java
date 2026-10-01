@@ -75,7 +75,7 @@ final class LostTalesMapMarkerGrouping {
     enum GroupingCategory {
         LOCATION("locations", true),
         PLAYER_WAYSTONE("player_waystones", true),
-        PARTY("party", true),
+        FELLOWSHIP("fellowship", true),
         /**
          * A player places their own waypoints deliberately, often several
          * close together and each meaning something different, so they stay

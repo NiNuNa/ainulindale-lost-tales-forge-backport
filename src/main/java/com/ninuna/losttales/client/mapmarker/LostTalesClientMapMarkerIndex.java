@@ -12,7 +12,7 @@ import lotr.common.LOTRDimension;
 
 /**
  * Atomic client index for persistent and map-only marker projections.
- * Quest markers replace world records with the same logical identity. Party
+ * Quest markers replace world records with the same logical identity. Fellowship
  * markers are map-only and never replace either persistent authority.
  */
 final class LostTalesClientMapMarkerIndex {
@@ -22,7 +22,7 @@ final class LostTalesClientMapMarkerIndex {
             Collections.emptyList();
     private volatile Snapshot persistentSnapshot = Snapshot.empty();
     private volatile Snapshot mapSnapshot = Snapshot.empty();
-    private Collection<LostTalesMapMarkerData> indexedPartyMarkers;
+    private Collection<LostTalesMapMarkerData> indexedFellowshipMarkers;
 
     public synchronized void replaceWorldMarkers(
             Collection<LostTalesMapMarkerData> markers) {
@@ -49,15 +49,15 @@ final class LostTalesClientMapMarkerIndex {
     }
 
     public synchronized Snapshot getMapSnapshot(
-            Collection<LostTalesMapMarkerData> partyMarkers) {
-        Collection<LostTalesMapMarkerData> safeParty = partyMarkers == null
+            Collection<LostTalesMapMarkerData> fellowshipMarkers) {
+        Collection<LostTalesMapMarkerData> safeFellowship = fellowshipMarkers == null
                 ? Collections.<LostTalesMapMarkerData>emptyList()
-                : partyMarkers;
-        if (this.indexedPartyMarkers != safeParty) {
-            this.indexedPartyMarkers = safeParty;
+                : fellowshipMarkers;
+        if (this.indexedFellowshipMarkers != safeFellowship) {
+            this.indexedFellowshipMarkers = safeFellowship;
             this.mapSnapshot = Snapshot.createMap(
                     this.persistentSnapshot,
-                    immutableCopy(safeParty));
+                    immutableCopy(safeFellowship));
         }
         return this.mapSnapshot;
     }
@@ -72,7 +72,7 @@ final class LostTalesClientMapMarkerIndex {
     private void rebuildPersistentSnapshot() {
         this.persistentSnapshot = Snapshot.createPersistent(
                 this.worldMarkers, this.questMarkers);
-        this.indexedPartyMarkers = null;
+        this.indexedFellowshipMarkers = null;
         this.mapSnapshot = this.persistentSnapshot;
     }
 
@@ -134,7 +134,7 @@ final class LostTalesClientMapMarkerIndex {
 
         static Snapshot createMap(
                 Snapshot persistent,
-                List<LostTalesMapMarkerData> party) {
+                List<LostTalesMapMarkerData> fellowship) {
             LinkedHashMap<String, LostTalesMapMarkerData> merged =
                     new LinkedHashMap<String, LostTalesMapMarkerData>();
             if (persistent != null) {
@@ -146,7 +146,7 @@ final class LostTalesClientMapMarkerIndex {
                     }
                 }
             }
-            addMissing(merged, party);
+            addMissing(merged, fellowship);
             return createFromMerged(merged);
         }
 

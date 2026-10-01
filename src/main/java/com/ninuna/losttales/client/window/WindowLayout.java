@@ -440,6 +440,7 @@ public final class WindowLayout {
                 window.setActiveTab(successor(window.tabs(),
                         activeIndex - before));
             }
+            settleSplits(window);
         }
         return removed;
     }
@@ -657,6 +658,7 @@ public final class WindowLayout {
             list.clear();
             list.addAll(reordered);
             source.setActiveTab(active);
+            settleSplits(source);
             if (persist) {
                 changed();
             }
@@ -670,19 +672,151 @@ public final class WindowLayout {
         }
         int activeIndex = list.indexOf(active);
         int before = countBefore(moved, source, activeIndex);
+        List<WindowSplit> carried = splitsWhollyIn(source, moved);
         list.removeAll(moved);
         if (list.isEmpty()) {
             dropWindow(source);
         } else if (active != null && moved.contains(active)) {
             source.setActiveTab(successor(list, activeIndex - before));
         }
+        settleSplits(source);
         int to = Math.max(0, Math.min(target.tabs().size(), index));
         target.tabs().addAll(to, moved);
+        target.splits().addAll(carried);
         target.setActiveTab(moved.get(moved.size() - 1));
+        settleSplits(target);
         if (persist) {
             changed();
         }
         return true;
+    }
+
+    /** The splits of {@code window} both of whose pages are among {@code tabs}: they go where the tabs go. */
+    private static List<WindowSplit> splitsWhollyIn(Window window, List<WindowTab> tabs) {
+        List<WindowSplit> whole = new ArrayList<WindowSplit>();
+        for (WindowSplit split : window.splits()) {
+            if (tabs.contains(split.first()) && tabs.contains(split.second())) {
+                whole.add(split);
+            }
+        }
+        return whole;
+    }
+
+    /**
+     * Keeps a window's splits whole: a split one of whose pages left the
+     * window goes, a page stands in one split at most, and each split's
+     * second page stands right after its first in the row.
+     */
+    private static void settleSplits(Window window) {
+        Set<WindowTab> taken = new HashSet<WindowTab>();
+        Iterator<WindowSplit> splits = window.splits().iterator();
+        while (splits.hasNext()) {
+            WindowSplit split = splits.next();
+            if (!window.contains(split.first()) || !window.contains(split.second())
+                    || taken.contains(split.first()) || taken.contains(split.second())) {
+                splits.remove();
+                continue;
+            }
+            taken.add(split.first());
+            taken.add(split.second());
+            List<WindowTab> tabs = window.tabs();
+            tabs.remove(split.second());
+            tabs.add(tabs.indexOf(split.first()) + 1, split.second());
+        }
+    }
+
+    /* ---- Split view ---- */
+
+    /**
+     * Shows {@code second} beside {@code first} in first's window: the
+     * second page moves right after the first, from wherever it stood, and
+     * comes to the front, side by side and sharing the room evenly.
+     * Refused while either window is locked, for a page already in a
+     * split, and where first's window has no room for the second.
+     */
+    public static synchronized boolean split(WindowTab first, WindowTab second) {
+        Window window = windowOf(first);
+        Window from = windowOf(second);
+        if (window == null || from == null || first.equals(second)
+                || window.isLocked() || from.isLocked()
+                || window.splitOf(first) != null || from.splitOf(second) != null) {
+            return false;
+        }
+        if (from != window && !moveTabs(Collections.singletonList(second),
+                window.getId(), window.tabs().indexOf(first) + 1, false)) {
+            return false;
+        }
+        window.splits().add(new WindowSplit(first, second, false, 0.5D));
+        settleSplits(window);
+        window.setActiveTab(second);
+        changed();
+        return true;
+    }
+
+    /** The split {@code tab} stands in, and its window; refused while it is locked. */
+    private static Window splitWindow(WindowTab tab, boolean evenLocked) {
+        Window window = windowOf(tab);
+        return window == null || window.splitOf(tab) == null
+                || (window.isLocked() && !evenLocked) ? null : window;
+    }
+
+    /** The two pages of {@code tab}'s split become two tabs again, side by side in the row. */
+    public static synchronized boolean separate(WindowTab tab) {
+        Window window = splitWindow(tab, false);
+        if (window == null) {
+            return false;
+        }
+        window.splits().remove(window.splitOf(tab));
+        changed();
+        return true;
+    }
+
+    /** Changes the two sides of {@code tab}'s split round. */
+    public static synchronized boolean swapSides(WindowTab tab) {
+        Window window = splitWindow(tab, false);
+        if (window == null) {
+            return false;
+        }
+        replaceSplit(window, window.splitOf(tab), window.splitOf(tab).swapped());
+        changed();
+        return true;
+    }
+
+    /** Turns {@code tab}'s split side by side, or one over the other. */
+    public static synchronized boolean turnSplit(WindowTab tab, boolean stacked) {
+        Window window = splitWindow(tab, false);
+        if (window == null || window.splitOf(tab).isStacked() == stacked
+                || stacked && !(window.splitOf(tab).first() instanceof PageTab
+                        && window.splitOf(tab).second() instanceof PageTab)) {
+            return false;
+        }
+        replaceSplit(window, window.splitOf(tab), window.splitOf(tab).turned(stacked));
+        changed();
+        return true;
+    }
+
+    /**
+     * Shares the room of {@code tab}'s split at {@code share}, a locked
+     * window's too, as the member list's edge moves in one.
+     * {@code persist} is false while the divider is being dragged.
+     */
+    public static synchronized boolean shareSplit(WindowTab tab, double share,
+                                                  boolean persist) {
+        Window window = splitWindow(tab, true);
+        if (window == null) {
+            return false;
+        }
+        replaceSplit(window, window.splitOf(tab), window.splitOf(tab).sharedAt(share));
+        if (persist) {
+            changed();
+        }
+        return true;
+    }
+
+    private static void replaceSplit(Window window, WindowSplit before, WindowSplit after) {
+        int index = window.splits().indexOf(before);
+        window.splits().set(index, after);
+        settleSplits(window);
     }
 
     /**
@@ -759,9 +893,13 @@ public final class WindowLayout {
             source.setActiveTab(successor(source.tabs(),
                     activeIndex - before));
         }
+        List<WindowSplit> carried = splitsWhollyIn(source, moved);
+        settleSplits(source);
         Window window = newWindow();
         window.tabs().addAll(moved);
+        window.splits().addAll(carried);
         window.setActiveTab(moved.get(moved.size() - 1));
+        settleSplits(window);
         WINDOWS.add(window);
         return window;
     }
@@ -793,6 +931,7 @@ public final class WindowLayout {
         if (tab.equals(window.getActiveTab())) {
             window.setActiveTab(successor(window.tabs(), index));
         }
+        settleSplits(window);
     }
 
     /**
@@ -864,6 +1003,14 @@ public final class WindowLayout {
                 window.setOwnHeight(clampWindowHeight(spec.height));
                 window.setOwnWidth(clampWindowWidth(spec.width));
                 window.setActiveTab(spec.activeTab);
+                for (WindowSplit split : spec.splits) {
+                    // A conversation stands only side by side.
+                    window.splits().add(split.isStacked()
+                            && !(split.first() instanceof PageTab
+                                    && split.second() instanceof PageTab)
+                            ? split.turned(false) : split);
+                }
+                settleSplits(window);
                 WINDOWS.add(window);
             }
         }
@@ -887,12 +1034,18 @@ public final class WindowLayout {
                 continue;
             }
             WindowTab active = window.getActiveTab();
+            List<WindowSplit> splits = new ArrayList<WindowSplit>();
+            for (WindowSplit split : window.splits()) {
+                if (tabs.contains(split.first()) && tabs.contains(split.second())) {
+                    splits.add(split);
+                }
+            }
             result.add(new WindowSpec(window.getId(), tabs,
                     active != null && active.isKeptInLayout() ? active : null,
                     window.isLocked(), window.isPinnedToHud(),
                     window.isPinnedToGui(), window.getOffsetX(),
                     window.getOffsetY(), window.getOwnHeight(),
-                    window.getOwnWidth(), window.getFill()));
+                    window.getOwnWidth(), window.getFill(), splits));
         }
         return result;
     }
@@ -913,12 +1066,15 @@ public final class WindowLayout {
         final int width;
         /** The part of the screen the window fills; none in its own box. */
         final Window.ScreenFill fill;
+        /** The splits that show two of its pages together. */
+        final List<WindowSplit> splits;
 
         public WindowSpec(String id, List<? extends WindowTab> tabs,
                           WindowTab activeTab, boolean locked,
                           boolean pinnedToHud, boolean pinnedToGui,
                           double offsetX, double offsetY,
-                          double height, int width, Window.ScreenFill fill) {
+                          double height, int width, Window.ScreenFill fill,
+                          List<WindowSplit> splits) {
             this.id = id;
             List<WindowTab> kept = new ArrayList<WindowTab>();
             if (tabs != null) {
@@ -938,6 +1094,8 @@ public final class WindowLayout {
             this.height = clampWindowHeight(height);
             this.width = clampWindowWidth(width);
             this.fill = fill == null ? Window.ScreenFill.NONE : fill;
+            this.splits = splits == null ? new ArrayList<WindowSplit>()
+                    : new ArrayList<WindowSplit>(splits);
         }
     }
 
@@ -953,6 +1111,7 @@ public final class WindowLayout {
         }
         window.tabs().add(tab);
         window.setActiveTab(tab);
+        settleSplits(window);
         changed();
         return true;
     }

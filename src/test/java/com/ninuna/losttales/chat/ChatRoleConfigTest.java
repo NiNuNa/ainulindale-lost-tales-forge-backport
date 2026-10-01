@@ -269,7 +269,7 @@ public final class ChatRoleConfigTest {
                 "operator=read:moderator,operator;send:operator",
                 "nowhere=read:operator",
                 "ooc=read:ghost",
-                "party=send:none",
+                "fellowship=send:none",
         }, catalog, collect);
         int moderator = catalog.byId("moderator").bit();
         int operator = catalog.byId("operator").bit();
@@ -286,8 +286,8 @@ public final class ChatRoleConfigTest {
         assertFalse(gates.canRead(moderator | operator, ChatChannel.OOC));
         assertTrue(gates.canSend(0, ChatChannel.OOC));
         assertTrue(gates.isGated(ChatChannel.OOC));
-        assertFalse(gates.canSend(operator, ChatChannel.PARTY));
-        assertTrue(gates.canRead(0, ChatChannel.PARTY));
+        assertFalse(gates.canSend(operator, ChatChannel.FELLOWSHIP));
+        assertTrue(gates.canRead(0, ChatChannel.FELLOWSHIP));
         assertEquals(2, warnings.size());
         assertTrue(warnings.get(1).contains("closed"));
         // Nothing is gated before the file says so; the seeded entry is

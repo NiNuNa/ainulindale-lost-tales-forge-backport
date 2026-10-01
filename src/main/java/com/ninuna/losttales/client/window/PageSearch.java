@@ -8,7 +8,7 @@ import java.util.Locale;
 /**
  * What a page's search is looking for — the words typed in the well of
  * a page window's tool strip — and whether an entry answers it: a quest
- * in the journal, a member or an invitation in the party.
+ * in the journal, a member or an invitation in the fellowship.
  *
  * <p>Every word typed has to appear somewhere in what the entry says,
  * so a half-remembered objective finds its quest and the order the words

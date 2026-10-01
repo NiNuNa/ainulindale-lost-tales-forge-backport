@@ -6,14 +6,17 @@ import java.util.List;
 
 /**
  * One window in the client layout: an ordered row of tabs, the tab
- * currently in front, a lock, its two pins, a position, its own size, and
- * whether it fills a part of the screen. Instances are owned and mutated
- * only by {@link WindowLayout}; everyone else reads them.
+ * currently in front, the splits that show two of its pages together, a
+ * lock, its two pins, a position, its own size, and whether it fills a
+ * part of the screen. Instances are owned and mutated only by
+ * {@link WindowLayout}; everyone else reads them.
  */
 public final class Window {
     private final String id;
     private final List<WindowTab> tabs = new ArrayList<WindowTab>();
     private WindowTab activeTab;
+    /** Two of its pages each, shown together while one of them is in front. */
+    private final List<WindowSplit> splits = new ArrayList<WindowSplit>();
     private boolean locked;
     /** Whether the window stays on screen while playing, as part of the HUD. */
     private boolean pinnedToHud;
@@ -339,7 +342,29 @@ public final class Window {
         return tab != null && this.tabs.contains(tab);
     }
 
+    /** The splits the window holds, in the order they were made. */
+    public List<WindowSplit> getSplits() {
+        return Collections.unmodifiableList(this.splits);
+    }
+
+    /** The split a tab stands in; null for none. */
+    public WindowSplit splitOf(WindowTab tab) {
+        for (WindowSplit split : this.splits) {
+            if (split.holds(tab)) {
+                return split;
+            }
+        }
+        return null;
+    }
+
+    /** The split shown now: the one the tab in front stands in; null for none. */
+    public WindowSplit shownSplit() {
+        return splitOf(this.activeTab);
+    }
+
     List<WindowTab> tabs() { return this.tabs; }
+
+    List<WindowSplit> splits() { return this.splits; }
 
     void setActiveTab(WindowTab tab) {
         this.activeTab = tab != null && this.tabs.contains(tab)

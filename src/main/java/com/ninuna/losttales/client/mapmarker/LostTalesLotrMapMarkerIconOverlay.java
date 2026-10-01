@@ -5,18 +5,19 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache.TrackedEnemy;
 import com.ninuna.losttales.client.character.ClientRoleplayCharacterIdentityHook;
-import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
-import com.ninuna.losttales.client.party.ClientPartyStateCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
-import com.ninuna.losttales.party.sync.PartyMemberSnapshot;
-import com.ninuna.losttales.party.sync.PartyStateSnapshot;
-import com.ninuna.losttales.party.sync.PartyTrackedMemberSnapshot;
+import com.ninuna.losttales.fellowship.sync.FellowshipMemberSnapshot;
+import com.ninuna.losttales.fellowship.sync.FellowshipSnapshot;
+import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
+import com.ninuna.losttales.fellowship.sync.FellowshipTrackedMemberSnapshot;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
-import com.ninuna.losttales.party.sync.PartyTrackingSnapshot;
+import com.ninuna.losttales.fellowship.sync.FellowshipTrackingSnapshot;
 import cpw.mods.fml.common.FMLLog;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.lang.reflect.Field;
@@ -1552,7 +1553,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             Set<UUID> renderedOwners = new HashSet<UUID>();
             // LOTR renders the local player outside playerLocations. Cover
             // that separate path first so solo players receive the same
-            // roleplaying portrait as remote party members.
+            // roleplaying portrait as remote fellowship members.
             EntityPlayer localPlayer = context.minecraft.thePlayer;
             UUID localOwnerId = localPlayer == null
                     ? null : localPlayer.getUniqueID();
@@ -1567,23 +1568,23 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 renderedOwners.add(localOwnerId);
             }
 
-            // Lost Tales parties are independent of LOTR fellowships, so
-            // their synchronized members may not exist in LOTR's native
-            // playerLocations map. Render those authorized positions here.
-            PartyStateSnapshot partyState =
-                    ClientPartyStateCache.getSnapshot();
-            PartyTrackingSnapshot tracking =
-                    ClientPartyTrackingCache.getMatching(partyState);
-            if (tracking != null && partyState != null
-                    && partyState.getParty() != null) {
-                for (PartyTrackedMemberSnapshot tracked
+            // The travelling fellowship's members, from our own tracking:
+            // LOTR's playerLocations map holds only the players LOTR shows.
+            FellowshipStateSnapshot fellowshipState =
+                    ClientFellowshipStateCache.getSnapshot();
+            FellowshipTrackingSnapshot tracking =
+                    ClientFellowshipTrackingCache.getMatching(fellowshipState);
+            FellowshipSnapshot travelling = fellowshipState == null
+                    ? null : fellowshipState.getTravellingFellowship();
+            if (tracking != null && travelling != null) {
+                for (FellowshipTrackedMemberSnapshot tracked
                         : tracking.getTrackedMembers()) {
                     if (tracked.getDimensionId()
                             != LOTRDimension.MIDDLE_EARTH.dimensionID) {
                         continue;
                     }
-                    PartyMemberSnapshot member = partyState.getParty()
-                            .getMember(tracked.getIdentityId());
+                    FellowshipMemberSnapshot member =
+                            travelling.getMember(tracked.getIdentityId());
                     if (member == null
                             || !renderedOwners.add(member.getOwnerId())) {
                         continue;
@@ -2652,9 +2653,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     private static List<LostTalesMapMarkerData> getVisibleStandaloneMarkers() {
-        List<LostTalesMapMarkerData> party =
-                ClientPartyTrackingCache.getMapMarkers();
-        return LostTalesClientMapMarkerStore.getMapMarkers(party);
+        List<LostTalesMapMarkerData> fellowship =
+                ClientFellowshipTrackingCache.getMapMarkers();
+        return LostTalesClientMapMarkerStore.getMapMarkers(fellowship);
     }
 
     private static LostTalesMapMarkerData getReplacementMarker(LOTRAbstractWaypoint waypoint) {
@@ -3075,7 +3076,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             name = living.getCommandSenderName();
         }
 
-        if (!trackedEnemy.isSharedFromParty()) {
+        if (!trackedEnemy.isSharedFromFellowship()) {
             double dx = x - context.minecraft.thePlayer.posX;
             double dy = y - context.minecraft.thePlayer.posY;
             double dz = z - context.minecraft.thePlayer.posZ;

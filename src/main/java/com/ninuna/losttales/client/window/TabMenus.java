@@ -30,6 +30,13 @@ final class TabMenus {
     private static final String ENTRY_FIND_PREFIX = "find:";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
     /** Marks a row that opens settings beside its menu: this and the place's name. */
+    /** The rows of a split's menu, and the page a split is made with after this. */
+    private static final String SPLIT_WITH_PREFIX = "split_with:";
+    private static final String SPLIT_SWAP = "split:swap";
+    private static final String SPLIT_TURN = "split:turn";
+    private static final String SPLIT_CLOSE_FIRST = "split:close_first";
+    private static final String SPLIT_CLOSE_SECOND = "split:close_second";
+    private static final String SPLIT_SEPARATE = "split:separate";
     private static final String SETTINGS_PREFIX = "settings:";
 
     private final WindowScreen screen;
@@ -39,6 +46,7 @@ final class TabMenus {
         this.screen = screen;
         this.menus = menus;
         menus.register(SubWindowKind.TAB, new TabSource());
+        menus.register(SubWindowKind.PICK, new PickSource());
         menus.register(SubWindowKind.WINDOW, new WindowSource());
         menus.register(SubWindowKind.OPEN, new OpenSource());
         menus.register(SubWindowKind.TAB_SEARCH, new SearchSource(
@@ -71,7 +79,125 @@ final class TabMenus {
      * greyed, and no menu opens for it.
      */
     static boolean hasRows(WindowTab tab) {
-        return tab.hasOptions() || tab.settingsPlace() != null;
+        return tab.hasOptions() || tab.settingsPlace() != null
+                || hasSplitRows(tab);
+    }
+
+    /** Whether a tab has split rows: it stands in a split, or another tab of its window could join it in one. */
+    private static boolean hasSplitRows(WindowTab tab) {
+        Window window = WindowLayout.windowOf(tab);
+        if (window == null) {
+            return false;
+        }
+        if (window.splitOf(tab) != null) {
+            return true;
+        }
+        for (WindowTab other : window.getTabs()) {
+            if (canSplitWith(window, tab, other)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether {@code other} can be shown beside {@code tab} in a new split. */
+    private static boolean canSplitWith(Window window, WindowTab tab, WindowTab other) {
+        return !other.equals(tab) && window.splitOf(other) == null
+                && other.isAvailable() && WindowView.isShown(other);
+    }
+
+    /**
+     * The split's rows of a tab's menu: for a tab in a split, Swap Sides,
+     * the other way, closing either side and separating them; for a tab
+     * in none, the window's other tabs it can be split with. Greyed while
+     * the window is locked.
+     */
+    static List<MenuWindow.Entry> splitRows(WindowTab tab) {
+        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
+        Window window = WindowLayout.windowOf(tab);
+        if (window == null) {
+            return rows;
+        }
+        WindowSplit split = window.splitOf(tab);
+        if (split != null) {
+            boolean stacked = split.isStacked();
+            rows.add(splitRow(SPLIT_SWAP, "gui.losttales.window.split.swap", window));
+            MenuWindow.Entry turn = splitRow(SPLIT_TURN, stacked
+                    ? "gui.losttales.window.split.side_by_side"
+                    : "gui.losttales.window.split.one_over_other", window);
+            rows.add(!stacked && !(split.first() instanceof PageTab
+                    && split.second() instanceof PageTab)
+                    ? turn.unavailable(StatCollector.translateToLocal(
+                            "gui.losttales.window.split.conversation_beside"))
+                    : turn);
+            rows.add(splitRow(SPLIT_CLOSE_FIRST, stacked ? "gui.losttales.window.split.close_top"
+                    : "gui.losttales.window.split.close_left", window));
+            rows.add(splitRow(SPLIT_CLOSE_SECOND, stacked ? "gui.losttales.window.split.close_bottom"
+                    : "gui.losttales.window.split.close_right", window));
+            rows.add(splitRow(SPLIT_SEPARATE, "gui.losttales.window.split.separate", window));
+            return rows;
+        }
+        List<MenuWindow.Entry> pages = new ArrayList<MenuWindow.Entry>();
+        for (WindowTab other : window.getTabs()) {
+            if (canSplitWith(window, tab, other)) {
+                pages.add(heldWhileLocked(new MenuWindow.Entry(SPLIT_WITH_PREFIX
+                        + other.id(), other.title(), false, other.tone(), other), window));
+            }
+        }
+        if (!pages.isEmpty()) {
+            rows.add(MenuWindow.Entry.header(StatCollector.translateToLocal(
+                    "gui.losttales.window.split.with")));
+            rows.addAll(pages);
+        }
+        return rows;
+    }
+
+    private static MenuWindow.Entry splitRow(String id, String labelKey, Window window) {
+        return heldWhileLocked(new MenuWindow.Entry(id,
+                StatCollector.translateToLocal(labelKey)), window);
+    }
+
+    /**
+     * Does what a split's row of {@code tab}'s menu says; false for a row
+     * that is no split's. The layout refuses what the padlock holds.
+     */
+    private static boolean actOnSplit(WindowTab tab, String id) {
+        Window window = WindowLayout.windowOf(tab);
+        WindowSplit split = window == null ? null : window.splitOf(tab);
+        if (id.startsWith(SPLIT_WITH_PREFIX)) {
+            WindowTab other = window == null ? null : findTab(window,
+                    id.substring(SPLIT_WITH_PREFIX.length()));
+            if (other != null) {
+                WindowLayout.split(tab, other);
+            }
+            return true;
+        }
+        if (split == null) {
+            return false;
+        }
+        if (SPLIT_SWAP.equals(id)) {
+            WindowLayout.swapSides(tab);
+        } else if (SPLIT_TURN.equals(id)) {
+            WindowLayout.turnSplit(tab, !split.isStacked());
+        } else if (SPLIT_CLOSE_FIRST.equals(id)) {
+            WindowLayout.close(split.first());
+        } else if (SPLIT_CLOSE_SECOND.equals(id)) {
+            WindowLayout.close(split.second());
+        } else if (SPLIT_SEPARATE.equals(id)) {
+            WindowLayout.separate(tab);
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    private static WindowTab findTab(Window window, String id) {
+        for (WindowTab each : window.getTabs()) {
+            if (each.id().equals(id)) {
+                return each;
+            }
+        }
+        return null;
     }
 
     /**
@@ -110,6 +236,38 @@ final class TabMenus {
     /** Whether the tab's options are out, which lights the three dots on the tab. */
     boolean optionsOut(WindowTab tab) {
         return tab != null && this.menus.isOpenFor(SubWindowKind.TAB, tab);
+    }
+
+    /**
+     * The words one of the tab's options picks from, in a sub-window of
+     * their own at {@code place}: a switch, as the option's button is.
+     */
+    void togglePick(WindowTab tab, PageOption option,
+                    WindowMenus.FirstPlace place) {
+        if (tab != null && option != null && option.kind == PageOption.Kind.PICK) {
+            this.menus.show(SubWindowKind.PICK, new Picking(tab, option.id),
+                    place, true);
+        }
+    }
+
+    /** The option of the tab whose words are out, which lights its button; empty for none. */
+    String pickOut(WindowTab tab) {
+        if (tab == null || !this.menus.isOpen(SubWindowKind.PICK)) {
+            return "";
+        }
+        Object about = this.menus.menu(SubWindowKind.PICK).about();
+        return about instanceof Picking && ((Picking)about).tab.equals(tab)
+                ? ((Picking)about).optionId : "";
+    }
+
+    /** The option of the tab with {@code id}, or null for one it no longer has. */
+    private static PageOption optionOf(WindowTab tab, String id) {
+        for (PageOption option : tab.options()) {
+            if (option.id.equals(id)) {
+                return option;
+            }
+        }
+        return null;
     }
 
     /** Whether the settings of the tab's kind are out, which lights its cog. */
@@ -157,30 +315,31 @@ final class TabMenus {
                 WindowMenus.besideWindow(menuWindow));
     }
 
-    /** A switch row named by {@code labelKey}, reading On or Off. */
-    private static MenuWindow.Entry switchRow(String id, String labelKey,
-                                              boolean on) {
+    /** One of a window's two pins, named by {@code labelKey}, reading On or Off, its pin lit while on. */
+    private static MenuWindow.Entry pinRow(String id, String labelKey,
+                                           boolean on) {
         return new MenuWindow.Entry(id,
                 StatCollector.translateToLocal(labelKey)).withValue(
                 StatCollector.translateToLocal(on
                         ? "gui.losttales.window.settings.on"
-                        : "gui.losttales.window.settings.off"));
+                        : "gui.losttales.window.settings.off"))
+                .withSprite(LostTalesUiSheet.PIN, LostTalesUiSheet.PIN_LIT, on);
     }
 
-    /** A row that changes a window's place or its tabs: greyed while the window is locked, {@code whyKey} saying why. */
+    /**
+     * A row that changes a window's place or its tabs: greyed while the
+     * window is locked, with nothing said, since the lit padlock says it.
+     */
     private static MenuWindow.Entry heldWhileLocked(MenuWindow.Entry row,
-                                                    Window window,
-                                                    String whyKey) {
-        return window != null && window.isLocked()
-                ? row.unavailable(StatCollector.translateToLocal(whyKey))
-                : row;
+                                                    Window window) {
+        return window != null && window.isLocked() ? row.held() : row;
     }
 
     /**
      * The window's own menu, Window Options, behind the three dots at the
      * end of its row — a switch, as the dots are — or under a right-click
-     * on the row or the tool strip anywhere but a tab or the tool strip's
-     * dots: what a window has that nothing else on the row offers. Locking
+     * on the row anywhere but a tab: what a window has that nothing else
+     * on the row offers. Locking
      * and closing are not among them, since the padlock and the cross
      * stand beside the dots. Its two pins come first, then Reset Window
      * Layout, and last Window Settings, which opens beside it.
@@ -413,29 +572,103 @@ final class TabMenus {
                 }
                 rows.add(settingsRow(tab.settingsPlace()));
             }
+            List<MenuWindow.Entry> split = splitRows(tab);
+            if (!split.isEmpty()) {
+                if (!rows.isEmpty()) {
+                    rows.add(MenuWindow.Entry.separator());
+                }
+                rows.addAll(split);
+            }
             menu.setRows(rows);
         }
 
         /**
-         * The settings row opens its settings beside the menu, which
-         * stays; the rest are the tab's: its switches stay, its actions
-         * are done with it.
+         * The settings row opens its settings beside the menu, and a
+         * pick's row its words, the menu staying; the rest are the tab's:
+         * its switches stay, its actions are done with it.
          */
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
                            SubWindow window, boolean back) {
             if (entry.id.startsWith(SETTINGS_PREFIX)) {
-                if (!back) {
-                    toggleSettingsBeside(entry, window);
-                }
+                toggleSettingsBeside(entry, window);
                 return true;
             }
-            return ((WindowTab)menu.about()).takeOption(entry.id, back);
+            WindowTab tab = (WindowTab)menu.about();
+            if (actOnSplit(tab, entry.id)) {
+                return false;
+            }
+            PageOption option = optionOf(tab, entry.id);
+            if (option != null && option.kind == PageOption.Kind.PICK) {
+                togglePick(tab, option, WindowMenus.besideWindow(window));
+                return true;
+            }
+            return tab.takeOption(entry.id);
+        }
+    }
+
+    /** One of a tab's options whose words a sub-window shows. */
+    private static final class Picking {
+        final WindowTab tab;
+        final String optionId;
+
+        Picking(WindowTab tab, String optionId) {
+            this.tab = tab;
+            this.optionId = optionId;
         }
 
         @Override
-        public boolean takesBack() {
-            return true;
+        public boolean equals(Object other) {
+            if (!(other instanceof Picking)) {
+                return false;
+            }
+            Picking picking = (Picking)other;
+            return this.tab.equals(picking.tab)
+                    && this.optionId.equals(picking.optionId);
+        }
+
+        @Override
+        public int hashCode() {
+            return this.tab.hashCode() * 31 + this.optionId.hashCode();
+        }
+    }
+
+    /**
+     * The words one of a tab's options picks from, named as the option
+     * is: each a row with its glyph and what it does under the pointer,
+     * the one chosen marked. A pick stays, so another word can be tried.
+     */
+    private final class PickSource extends WindowMenus.Source {
+        @Override
+        public boolean stillStands(MenuWindow menu) {
+            if (!(menu.about() instanceof Picking)) {
+                return false;
+            }
+            Picking picking = (Picking)menu.about();
+            return WindowLayout.isOpen(picking.tab)
+                    && optionOf(picking.tab, picking.optionId) != null;
+        }
+
+        @Override
+        public void rebuild(MenuWindow menu) {
+            Picking picking = (Picking)menu.about();
+            PageOption option = optionOf(picking.tab, picking.optionId);
+            List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
+            if (option != null) {
+                menu.setTitle(option.label, option.glyph.sprite());
+                for (PageOption word : option.choices()) {
+                    rows.add(word.row());
+                }
+            }
+            menu.setRows(rows);
+        }
+
+        @Override
+        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
+                           SubWindow window, boolean back) {
+            boolean stays = ((Picking)menu.about()).tab.takeOption(entry.id);
+            TabMenus.this.menus.rebuildIfOpen(SubWindowKind.TAB);
+            return stays;
         }
     }
 
@@ -523,17 +756,16 @@ final class TabMenus {
                     "gui.losttales.window.menu"), LostTalesUiSheet.MORE);
             List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>(6);
             if (window != null) {
-                entries.add(switchRow(ENTRY_PIN_HUD,
+                entries.add(pinRow(ENTRY_PIN_HUD,
                         "gui.losttales.window.menu.pin_hud",
                         window.isPinnedToHud()));
-                entries.add(switchRow(ENTRY_PIN_GUI,
+                entries.add(pinRow(ENTRY_PIN_GUI,
                         "gui.losttales.window.menu.pin_gui",
                         window.isPinnedToGui()));
                 entries.add(MenuWindow.Entry.separator());
                 entries.add(heldWhileLocked(new MenuWindow.Entry(
                         ENTRY_WINDOW_RESET, StatCollector.translateToLocal(
-                                "gui.losttales.window.menu.reset")), window,
-                        "gui.losttales.window.locked.reset"));
+                                "gui.losttales.window.menu.reset")), window));
                 entries.add(MenuWindow.Entry.separator());
                 entries.add(settingsRow(Settings.Place.WINDOWS));
             }

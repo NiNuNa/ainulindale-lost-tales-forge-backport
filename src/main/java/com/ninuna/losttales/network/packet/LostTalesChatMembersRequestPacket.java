@@ -27,9 +27,9 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * does, whose NPC the client adds itself.
  *
  * <p>Which of a channel's conversations is meant — the faction, the
- * party — is the server's to say from the identity the player speaks as;
+ * fellowship — is the server's to say from the identity the player speaks as;
  * whether they may read the channel at all is asked again, and a named
- * party is looked up in the server's own records, never taken on trust.
+ * fellowship is looked up in the server's own records, never taken on trust.
  * The answer is {@link LostTalesChatMembersPacket}: empty for a channel
  * the player may not read, and only a word that nothing changed where the
  * fingerprint still matches.</p>
@@ -130,7 +130,7 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
 
     /**
      * A request names a channel this build has, within its bounds; a
-     * party is named only for a whisper.
+     * fellowship is named only for a whisper.
      */
     private void validate() {
         if (ChatChannel.fromId(this.channelId) == null

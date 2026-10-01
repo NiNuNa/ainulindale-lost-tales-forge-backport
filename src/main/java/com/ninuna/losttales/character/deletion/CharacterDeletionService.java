@@ -23,9 +23,9 @@ import com.ninuna.losttales.character.validation.CharacterNames;
 import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.party.server.PartyErrorId;
-import com.ninuna.losttales.party.server.PartyOperationResult;
-import com.ninuna.losttales.party.server.PartyService;
+import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
+import com.ninuna.losttales.fellowship.server.FellowshipOperationResult;
+import com.ninuna.losttales.fellowship.server.FellowshipService;
 import com.ninuna.losttales.util.LostTalesMath;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -134,7 +134,7 @@ public final class CharacterDeletionService {
                         Math.max(1L, System.currentTimeMillis()));
         try {
             deletionData.savePrepared(tombstone);
-            // Persist the recovery record before touching party membership or
+            // Persist the recovery record before touching fellowship membership or
             // the roster. A crash after this point always leaves a restorable
             // character identity and an exact state-generation reference.
             CharacterDeletionStorage.flush(player.worldObj);
@@ -145,11 +145,11 @@ public final class CharacterDeletionService {
                     CharacterErrorId.DELETE_RECOVERY_STORAGE_READ_ONLY, roster);
         }
 
-        PartyOperationResult partyCleanup = PartyService.getInstance()
+        FellowshipOperationResult fellowshipCleanup = FellowshipService.getInstance()
                 .removeCharacterForDeletion(player.worldObj, character);
-        if (!partyCleanup.isSuccessful()) {
+        if (!fellowshipCleanup.isSuccessful()) {
             return CharacterOperationResult.failure(
-                    mapPartyCleanupError(partyCleanup.getErrorId()), roster);
+                    mapFellowshipCleanupError(fellowshipCleanup.getErrorId()), roster);
         }
 
         RoleplayCharacter removed = roster.removeCharacter(
@@ -169,7 +169,7 @@ public final class CharacterDeletionService {
         tombstone.commit(deletedAt, purgeAfter);
         deletionData.saveTombstone(tombstone);
         try {
-            // MapStorage saves the roster, party cleanup, snapshot manifest,
+            // MapStorage saves the roster, fellowship cleanup, snapshot manifest,
             // and tombstone in the same authoritative server save pass.
             CharacterDeletionStorage.flush(player.worldObj);
         } catch (RuntimeException exception) {
@@ -717,15 +717,15 @@ public final class CharacterDeletionService {
                 && !target.worldObj.isRemote && characterId != null;
     }
 
-    private static CharacterErrorId mapPartyCleanupError(
-            PartyErrorId errorId) {
-        if (errorId == PartyErrorId.PARTY_STORAGE_READ_ONLY) {
-            return CharacterErrorId.PARTY_STORAGE_READ_ONLY;
+    private static CharacterErrorId mapFellowshipCleanupError(
+            FellowshipErrorId errorId) {
+        if (errorId == FellowshipErrorId.FELLOWSHIP_STORAGE_READ_ONLY) {
+            return CharacterErrorId.FELLOWSHIP_STORAGE_READ_ONLY;
         }
-        if (errorId == PartyErrorId.INVITATION_STORAGE_READ_ONLY) {
-            return CharacterErrorId.PARTY_INVITATION_STORAGE_READ_ONLY;
+        if (errorId == FellowshipErrorId.INVITATION_STORAGE_READ_ONLY) {
+            return CharacterErrorId.FELLOWSHIP_INVITATION_STORAGE_READ_ONLY;
         }
-        return CharacterErrorId.PARTY_CLEANUP_FAILED;
+        return CharacterErrorId.FELLOWSHIP_CLEANUP_FAILED;
     }
 
     private static void flushCommitted(

@@ -35,6 +35,8 @@ public class WindowHover {
         SNAP_ASSIST,
         /** A page in a window: the journal, the map, a waystone, any tab that is not a conversation. */
         PAGE,
+        /** The divider between the two sides of a split window, which shares the room between them. */
+        DIVIDER,
         /** A page's input bar: one of its items, a row of its field's list, or the bare bar. */
         BAR,
         /** The band just outside a sub-window, which resizes it. */
@@ -78,6 +80,8 @@ public class WindowHover {
     public PageOption stripOption;
     /** On a sub-window, the sub-window; null anywhere else. */
     public SubWindow subWindow;
+    /** On a page, whether it is the split's other page rather than the one in front. */
+    public boolean otherSide;
     /** On a sub-window's resize band, the edge. */
     public WindowGestures.ResizeEdge subEdge;
     /** On the snap layouts, which zone of the panel; -1 on the panel round them. */
@@ -150,6 +154,8 @@ public class WindowHover {
             case CONTENT:
             case SUB_WINDOW:
                 return this.acts;
+            case DIVIDER:
+                return true;
             case BAR:
                 return this.listRow >= 0 || this.barItem != null
                         && this.barItem.isAvailable()
@@ -189,6 +195,10 @@ public class WindowHover {
         }
         if (this.kind == Kind.SUB_WINDOW_RESIZE && this.subEdge != null) {
             return WindowGestures.cursorPose(this.subEdge);
+        }
+        if (this.kind == Kind.DIVIDER && this.frame != null && this.frame.split != null) {
+            return this.frame.split.isStacked() ? LostTalesMapCursor.Pose.RESIZE_VERTICAL
+                    : LostTalesMapCursor.Pose.RESIZE_HORIZONTAL;
         }
         return acts() ? LostTalesMapCursor.Pose.HAND
                 : LostTalesMapCursor.Pose.ARROW;

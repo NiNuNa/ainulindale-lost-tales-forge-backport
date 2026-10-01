@@ -12,7 +12,7 @@ import net.minecraft.util.StatCollector;
 
 /**
  * A question before an action that cannot be undone — abandoning a
- * quest, leaving a party — asked in a sub-window inside the window that
+ * quest, leaving a fellowship — asked in a sub-window inside the window that
  * wants the answer: what will happen, then Cancel and the action itself,
  * in red, at the foot. The cross, Escape and Cancel all say no. Closing
  * the screen says no too: a question never comes back with it.

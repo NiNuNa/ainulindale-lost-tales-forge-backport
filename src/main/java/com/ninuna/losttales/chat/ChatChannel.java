@@ -13,7 +13,7 @@ import java.util.Map;
  * The chat's channels, shared by packet validation and the client. Each
  * constant is one built-in {@link ChatChannelDescriptor}: the id, how its
  * lines present their sender, the routing rule, the access a player needs,
- * the colour, and whether the Discord bridge may carry it (Party, the
+ * the colour, and whether the Discord bridge may carry it (Fellowship, the
  * consoles and whispers are private and never leave the game). The id is
  * the channel's code name ({@link ChatCodeNames}): packets, saves, the
  * layout file, {@code #} links and Discord links all name it by that.
@@ -39,12 +39,12 @@ public final class ChatChannel {
     public static final ChatChannel PROXIMITY = register("proximity", "Proximity Chat", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.PROXIMITY, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.ORCHID), true);
-    // Presentation shows the member's own party colour; this seafoam is
-    // only the fallback outside a party.
-    public static final ChatChannel PARTY = register("party", "Party Chat", ChatPresentationMode.IN_CHARACTER,
-            ChatRecipientRule.PARTY, ChatChannelAccess.PARTY_MEMBERSHIP,
+    // Presentation shows the member's own fellowship colour; this seafoam is
+    // only the fallback outside a fellowship.
+    public static final ChatChannel FELLOWSHIP = register("fellowship", "Fellowship Chat", ChatPresentationMode.IN_CHARACTER,
+            ChatRecipientRule.FELLOWSHIP, ChatChannelAccess.FELLOWSHIP_MEMBERSHIP,
             LostTalesColors.rgb(LostTalesColors.SEAFOAM), false,
-            ChatChannelScope.PARTY);
+            ChatChannelScope.FELLOWSHIP);
     // Presentation shows the sender's LOTR faction colour; this palette
     // honey is only the indicator/selector fallback.
     public static final ChatChannel FACTION = register("faction", "Faction Chat", ChatPresentationMode.IN_CHARACTER,
@@ -96,14 +96,14 @@ public final class ChatChannel {
             LostTalesColors.rgb(LostTalesColors.HUD_LABEL), false);
 
     /** Tab, indicator, and cycle order for the built-in channels: Global
-     *  and OOC bracket the role-play ones, then Party,
+     *  and OOC bracket the role-play ones, then Fellowship,
      *  Operator, and the two consoles, this player's before the server's.
      *  Whispers are not listed: their tabs exist per conversation.
      *  Anything registered besides these follows them, in the order it
      *  was registered. */
     private static final List<ChatChannel> BUILT_IN_ORDER =
             Collections.unmodifiableList(Arrays.asList(
-                    GLOBAL, PROXIMITY, FACTION, OOC, PARTY, OPERATOR, CLIENT_CONSOLE,
+                    GLOBAL, PROXIMITY, FACTION, OOC, FELLOWSHIP, OPERATOR, CLIENT_CONSOLE,
                     SERVER_CONSOLE));
 
     /** The ids that are the code's own and are never taken out of force. */
@@ -276,6 +276,22 @@ public final class ChatChannel {
             }
         }
         return Collections.unmodifiableList(order);
+    }
+
+    /**
+     * Whether a request's target suits the channel: a whisper names its
+     * account, a fellowship line its fellowship ({@link ChatFellowship#idOf}),
+     * every other line nothing.
+     */
+    public static boolean targetFits(ChatChannel channel, String target) {
+        String named = target == null ? "" : target;
+        if (channel == WHISPER) {
+            return named.length() > 0;
+        }
+        if (channel == FELLOWSHIP) {
+            return ChatFellowship.idOf(named) != null;
+        }
+        return named.length() == 0;
     }
 
     /** The channel an id names; null for anything unknown. */

@@ -21,8 +21,33 @@ import net.minecraft.client.gui.ChatLine;
  * and the jump-to-present button. The closed feed has one of its own.
  */
 public final class ChatFrame extends WindowFrame {
+    /** Whether this frame draws the conversation beside the one in front of a split. */
+    final boolean beside;
+    /** The frame of the conversation beside the one in front; made when first asked for. */
+    private ChatFrame besideFrame;
+
     ChatFrame(String windowId) {
+        this(windowId, false);
+    }
+
+    private ChatFrame(String windowId, boolean beside) {
         super(windowId);
+        this.beside = beside;
+    }
+
+    /**
+     * The frame a conversation on the other side of this window's split
+     * draws on, read only: the window's own while a page is in front, else
+     * one of its own, so the one in front keeps its lines and marks.
+     */
+    ChatFrame besideFrame() {
+        if (this.page != null) {
+            return this;
+        }
+        if (this.besideFrame == null) {
+            this.besideFrame = new ChatFrame(this.windowId, true);
+        }
+        return this.besideFrame;
     }
 
     /** Makes every window's frame a chat frame; before any frame is asked for. */

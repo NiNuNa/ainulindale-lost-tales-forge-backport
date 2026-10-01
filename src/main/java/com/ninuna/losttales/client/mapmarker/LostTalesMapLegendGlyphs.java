@@ -77,7 +77,7 @@ final class LostTalesMapLegendGlyphs {
         if (LostTalesMapLegendRegistry.QUESTS.equals(categoryId)) {
             return MARK;
         }
-        if (LostTalesMapLegendRegistry.PARTY.equals(categoryId)) {
+        if (LostTalesMapLegendRegistry.FELLOWSHIP.equals(categoryId)) {
             return PEOPLE;
         }
         if (LostTalesMapLegendRegistry.LABELS.equals(categoryId)) {

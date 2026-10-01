@@ -10,7 +10,7 @@ public final class LostTalesLogTest {
 
     @Test
     public void aWarningOutsideAGameIsDroppedQuietly() {
-        LostTalesLog.warning("Party data uses unsupported version %d; data will "
+        LostTalesLog.warning("Fellowship data uses unsupported version %d; data will "
                 + "remain read-only", Integer.valueOf(3));
         LostTalesLog.warning("No arguments at all");
         LostTalesLog.warning("A null argument: %s", (Object) null);

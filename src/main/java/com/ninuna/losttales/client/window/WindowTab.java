@@ -129,12 +129,11 @@ public abstract class WindowTab {
     }
 
     /**
-     * One of its options taken, on its row or its button; with
-     * {@code back}, by a right-click, which steps a cycle back and takes
-     * every other kind as a click does. Answers whether the menu stays
-     * open.
+     * One of its options taken, on its row or its button, or one of a
+     * pick's words in the pick's sub-window. Answers whether the menu
+     * stays open.
      */
-    public boolean takeOption(String id, boolean back) {
+    public boolean takeOption(String id) {
         return false;
     }
 

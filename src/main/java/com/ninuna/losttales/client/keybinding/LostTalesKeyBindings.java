@@ -11,7 +11,7 @@ import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
 import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
-import com.ninuna.losttales.gui.screen.party.PartyPage;
+import com.ninuna.losttales.gui.screen.fellowship.FellowshipPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import cpw.mods.fml.client.registry.ClientRegistry;
@@ -31,8 +31,8 @@ public class LostTalesKeyBindings {
     private static final KeyBinding CHARACTER_MENU = new KeyBinding("key.losttales.characterMenu", Keyboard.KEY_CAPITAL, CATEGORY);
     private static final KeyBinding QUEST_JOURNAL = new KeyBinding("key.losttales.questJournal", Keyboard.KEY_J, CATEGORY);
     /** Unbound until the player gives it a key. */
-    private static final KeyBinding PARTY = new KeyBinding("key.losttales.party", Keyboard.KEY_NONE, CATEGORY);
-    /** Unbound until the player gives it a key, as the Party key is. */
+    private static final KeyBinding FELLOWSHIP = new KeyBinding("key.losttales.fellowship", Keyboard.KEY_NONE, CATEGORY);
+    /** Unbound until the player gives it a key, as the Fellowship key is. */
     private static final KeyBinding CHARACTERS = new KeyBinding("key.losttales.characters", Keyboard.KEY_NONE, CATEGORY);
     private static final KeyBinding MAP = new KeyBinding(
             "key.losttales.map", Keyboard.KEY_M, CATEGORY);
@@ -47,7 +47,7 @@ public class LostTalesKeyBindings {
     public void register() {
         ClientRegistry.registerKeyBinding(CHARACTER_MENU);
         ClientRegistry.registerKeyBinding(QUEST_JOURNAL);
-        ClientRegistry.registerKeyBinding(PARTY);
+        ClientRegistry.registerKeyBinding(FELLOWSHIP);
         ClientRegistry.registerKeyBinding(CHARACTERS);
         ClientRegistry.registerKeyBinding(MAP);
         ClientRegistry.registerKeyBinding(TOGGLE_HUD);
@@ -110,8 +110,8 @@ public class LostTalesKeyBindings {
         if (QUEST_JOURNAL.isPressed()) {
             WindowScreen.openPage(QuestJournalPage.PAGE_ID);
         }
-        if (PARTY.isPressed()) {
-            WindowScreen.openPage(PartyPage.PAGE_ID);
+        if (FELLOWSHIP.isPressed()) {
+            WindowScreen.openPage(FellowshipPage.PAGE_ID);
         }
         if (CHARACTERS.isPressed()) {
             WindowScreen.openPage(CharactersPage.PAGE_ID);
@@ -199,8 +199,8 @@ public class LostTalesKeyBindings {
         return MAP;
     }
 
-    public static KeyBinding getPartyKeyBinding() {
-        return PARTY;
+    public static KeyBinding getFellowshipKeyBinding() {
+        return FELLOWSHIP;
     }
 
     public static KeyBinding getCharactersKeyBinding() {

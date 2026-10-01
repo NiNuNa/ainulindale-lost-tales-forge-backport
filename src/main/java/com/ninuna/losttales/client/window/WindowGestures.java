@@ -1573,6 +1573,10 @@ public final class WindowGestures {
         /** Window row the tab would dock into at the current pointer. */
         String targetWindowId;
         int targetIndex = -1;
+        /** The window whose content edge the carried tab would split, or null. */
+        String splitWindowId;
+        /** Which edge of it: {@link SplitDrop#LEFT} and the others. */
+        int splitEdge = -1;
         /** Where the window the tabs were torn off into lands, as any carried window does. */
         final Landing landing = new Landing();
 
@@ -1615,6 +1619,7 @@ public final class WindowGestures {
                     List<WindowTab> group, int mouseX, int mouseY,
                     boolean collapsesOnRelease, boolean alreadyTornOff) {
         WindowLayout.raise(window.getId());
+        group = withSplitPartners(window, group);
         int grabX = 0;
         int pressedX = Integer.MIN_VALUE;
         int firstOfGroupX = Integer.MIN_VALUE;
@@ -1644,6 +1649,22 @@ public final class WindowGestures {
             drag.detachedWindowId = window.getId();
         }
         this.tabDrag = drag;
+    }
+
+    /**
+     * A carried group with the other page of every split one of it stands
+     * in, in row order: a split is carried whole, and lands still split.
+     */
+    static List<WindowTab> withSplitPartners(Window window, List<WindowTab> group) {
+        List<WindowTab> whole = new ArrayList<WindowTab>();
+        for (WindowTab tab : window.getTabs()) {
+            WindowSplit split = window.splitOf(tab);
+            if (group.contains(tab)
+                    || split != null && group.contains(split.other(tab))) {
+                whole.add(tab);
+            }
+        }
+        return whole;
     }
 
     /**
@@ -1810,6 +1831,7 @@ public final class WindowGestures {
         Window detached = WindowLayout.window(drag.detachedWindowId);
         if (detached != null) {
             carryWindow(drag, detached);
+            updateSplitTarget(drag, detached);
             return;
         }
         if (hasLeftItsRow(drag, mouseX, mouseY)) {
@@ -1874,7 +1896,7 @@ public final class WindowGestures {
     /**
      * Where in a window's own tab list a place counted among its visible
      * tabs falls. The list also holds open tabs the player cannot
-     * currently see (Party outside a party, Faction without one),
+     * currently see (Fellowship outside a fellowship, Faction without one),
      * sitting between them, so a place counted in visible tabs has to be
      * translated or the move lands beside the wrong neighbour. Tabs in
      * {@code moving} are left out of both counts: they are on their way
@@ -2039,9 +2061,85 @@ public final class WindowGestures {
      * plainly see they had just pulled out.</p>
      */
     private void dropTab(TabDrag drag) {
+        if (drag.splitWindowId != null && splitInto(drag)) {
+            this.snapPreview.reset();
+            this.snapBar.hide();
+            WindowLayout.persist();
+            return;
+        }
         if (drag.detachedWindowId != null) {
             land(drag.detachedWindowId, drag.landing);
         }
         WindowLayout.persist();
+    }
+
+    /**
+     * Where a carried tab would split another window: the window under
+     * the pointer, not the one carrying it, whose content the pointer is
+     * in within a quarter of an edge. Only one tab is carried into a
+     * split, into an unlocked window whose front tab is in none, and a
+     * conversation goes only beside the other side.
+     */
+    private void updateSplitTarget(TabDrag drag, Window carried) {
+        drag.splitWindowId = null;
+        drag.splitEdge = -1;
+        if (drag.group.size() != 1) {
+            return;
+        }
+        double x = WindowPlacement.preciseMouseX(this.mc, this.screenWidth);
+        double y = WindowPlacement.preciseMouseY(this.mc, this.screenHeight);
+        List<Window> windows = WindowLayout.stacked();
+        for (int index = windows.size() - 1; index >= 0; index--) {
+            Window window = windows.get(index);
+            WindowFrame frame = WindowFrame.find(window.getId());
+            if (window == carried || frame == null || !frame.drawn
+                    || !frame.contains(x, y)) {
+                continue;
+            }
+            WindowTab front = WindowFrame.activeTab(window,
+                    WindowFrame.visibleTabs(window));
+            int edge = SplitDrop.edgeAt(WindowDrawing.contentBox(frame), x, y);
+            if (edge >= 0 && !window.isLocked() && front != null
+                    && window.splitOf(front) == null
+                    && SplitDrop.takes(front, drag.tab, edge)) {
+                drag.splitWindowId = window.getId();
+                drag.splitEdge = edge;
+            }
+            return;
+        }
+    }
+
+    /** Splits the window the carried tab was let go over, on the edge it was at; false where it would not. */
+    private boolean splitInto(TabDrag drag) {
+        Window target = WindowLayout.window(drag.splitWindowId);
+        WindowTab front = target == null ? null
+                : WindowFrame.activeTab(target, WindowFrame.visibleTabs(target));
+        if (front == null || !WindowLayout.split(front, drag.tab)) {
+            return false;
+        }
+        if (drag.splitEdge == SplitDrop.LEFT || drag.splitEdge == SplitDrop.TOP) {
+            WindowLayout.swapSides(front);
+        }
+        if (drag.splitEdge == SplitDrop.TOP || drag.splitEdge == SplitDrop.BOTTOM) {
+            WindowLayout.turnSplit(front, true);
+        }
+        WindowLayout.raise(target.getId());
+        this.host.selectTab(drag.tab);
+        return true;
+    }
+
+    /**
+     * The half a carried tab would take in the window it would split, for
+     * the frosted pane that shows it; null while it would split none.
+     */
+    public SnapPreview.Pane splitPane(String windowId) {
+        TabDrag drag = activeTabDrag();
+        WindowFrame frame = WindowFrame.find(windowId);
+        if (drag == null || frame == null || !windowId.equals(drag.splitWindowId)) {
+            return null;
+        }
+        LostTalesUiHitBox room = WindowDrawing.contentBox(frame);
+        double[] half = SplitDrop.half(room, drag.splitEdge);
+        return new SnapPreview.Pane(half[0], half[1], half[2], half[3]);
     }
 }

@@ -18,7 +18,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 /**
- * The roster answers each request on its own, as the party does: a second
+ * The roster answers each request on its own, as the fellowship does: a second
  * quick request no longer takes the first one's answer, and an older
  * roster arriving late completes its request without being shown.
  */

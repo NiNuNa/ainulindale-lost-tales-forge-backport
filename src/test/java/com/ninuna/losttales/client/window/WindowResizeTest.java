@@ -79,7 +79,7 @@ public final class WindowResizeTest {
 
     @Test
     public void heightIsWrittenAndReadBack() {
-        Tearing.off(ChatTab.of(ChatChannel.PARTY), 40.0D, 20.0D);
+        Tearing.off(ChatTab.of(ChatChannel.FELLOWSHIP), 40.0D, 20.0D);
         WindowLayout.setWindowHeight("w3", 214.25D, true);
         List<String> lines = WindowLayoutStore.describe();
         boolean found = false;
@@ -109,8 +109,8 @@ public final class WindowResizeTest {
                         + "active=global tabs=global",
                 "window w2 locked=false x=0.00 y=50.00 height=99999 "
                         + "active=ooc tabs=ooc",
-                "window w3 locked=false x=0.00 y=90.00 active=party "
-                        + "tabs=party"));
+                "window w3 locked=false x=0.00 y=90.00 active=fellowship "
+                        + "tabs=fellowship"));
         assertEquals(0.0D, WindowLayout.window("w1").getOwnHeight(), 0.0D);
         assertEquals(WindowLayout.MAX_WINDOW_SIZE,
                 WindowLayout.window("w2").getOwnHeight(), 0.0D);
@@ -132,7 +132,7 @@ public final class WindowResizeTest {
                 WindowLayout.clampWindowWidth(99999));
         assertEquals(320, WindowLayout.clampWindowWidth(320));
 
-        Tearing.off(ChatTab.of(ChatChannel.PARTY), 40.0D, 20.0D);
+        Tearing.off(ChatTab.of(ChatChannel.FELLOWSHIP), 40.0D, 20.0D);
         assertTrue(WindowLayout.setWindowWidth("w3", 420, true));
         assertEquals(420, WindowLayout.window("w3").getOwnWidth());
         // Its neighbours are untouched: widths are not shared.

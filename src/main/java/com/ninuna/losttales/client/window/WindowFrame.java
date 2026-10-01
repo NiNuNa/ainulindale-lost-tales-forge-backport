@@ -39,6 +39,14 @@ public class WindowFrame {
     final ToolStrip.State toolStrip = new ToolStrip.State();
     /** The page shown while open instead of a conversation; null for none. */
     public PageTab page;
+    /** The split the window shows; null while it shows one tab. */
+    public WindowSplit split;
+    /** The split's side in front, the one the tool strip and the bar serve; null while the window shows one tab. */
+    public WindowTab splitFront;
+    /** The split's other side, a page or a conversation; null while the window shows one tab. */
+    public WindowTab splitOther;
+    /** The other side while it is a page, which the screen draws; null otherwise. */
+    public PageTab splitPage;
     public boolean drawn;
     public double boxLeft;
     public double boxTop;
@@ -92,6 +100,12 @@ public class WindowFrame {
     private boolean appearing;
     /** How much of its opacity the window showed when last drawn. */
     private float shown = 1.0F;
+    /**
+     * How strongly the windows lying over it let the window show
+     * ({@link StackFade}): whole for the window in front. Set by the
+     * screen every frame; a window drawn anywhere else stands whole.
+     */
+    float stackShare = 1.0F;
     /**
      * The box the window shows while its page fills it, or glides to or
      * from that ({@link ContentView}): its row, strip and bar lie past
@@ -162,7 +176,30 @@ public class WindowFrame {
     /** Shows a page in the window: what the window held before is let go. */
     public void showPage(PageTab shown) {
         this.page = shown;
+        showSplit(null, null, null);
         pageShown();
+    }
+
+    /**
+     * Shows {@code other} beside {@code front}, as {@code shown} splits
+     * them; with no split, the window shows its front tab alone.
+     */
+    public void showSplit(WindowSplit shown, WindowTab front, WindowTab other) {
+        this.split = shown;
+        this.splitFront = shown == null ? null : front;
+        this.splitOther = shown == null ? null : other;
+        this.splitPage = shown != null && other instanceof PageTab ? (PageTab)other : null;
+    }
+
+    /** Where what the window holds in front begins: the window's left edge, or its side's in a split. */
+    public double contentLeft() {
+        return this.split == null ? drawnLeft() : WindowDrawing.pageBox(this).left;
+    }
+
+    /** How wide what the window holds in front is: the window's width, or its side's in a split. */
+    public double contentWidth() {
+        return this.split == null ? this.boxRight - this.boxLeft
+                : WindowDrawing.pageBox(this).width;
     }
 
     /** What a kind of frame lets go of when its window shows a page. */
@@ -289,6 +326,29 @@ public class WindowFrame {
      * pixels they crawl. A display pixel is the finest step the screen
      * has, so the motion loses nothing by landing on one.
      */
+    /**
+     * Lays this frame on {@code front}'s box as {@code front} was laid
+     * this frame: what stands beside it in a split reads the same room on
+     * the same baseline.
+     */
+    public void beginAs(WindowFrame front) {
+        this.placed = front.placed;
+        this.filledBox = front.filledBox;
+        this.boxLeft = front.boxLeft;
+        this.boxTop = front.boxTop;
+        this.boxRight = front.boxRight;
+        this.boxBottom = front.boxBottom;
+        this.restingBarTop = front.restingBarTop;
+        this.barGrowthLimit = front.barGrowthLimit;
+        this.drawnBarGrowth = front.drawnBarGrowth;
+        this.baseline = front.baseline;
+        this.scale = front.scale;
+        this.motionX = front.motionX;
+        this.motionY = front.motionY;
+        this.room = front.room;
+        this.stackTop = front.stackTop;
+    }
+
     public void begin(WindowPlacement.Box box, float chatScale,
                float openingMotionX, float openingMotionY) {
         this.placed = box;

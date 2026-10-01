@@ -23,7 +23,7 @@ public final class LostTalesMapLegendRegistry {
     public static final String SHARED_WAYPOINTS = "shared_waypoints";
     public static final String PLAYER_WAYSTONES = "player_waystones";
     public static final String QUESTS = "quests";
-    public static final String PARTY = "party";
+    public static final String FELLOWSHIP = "fellowship";
     public static final String LABELS = "labels";
 
     private static final Map<String, LostTalesMapLegendCategory> CATEGORIES =
@@ -49,7 +49,7 @@ public final class LostTalesMapLegendRegistry {
                 QUESTS, "gui.losttales.map.legend.quests",
                 LostTalesCompassMarkerIcon.QUEST, "yellow"));
         register(new LostTalesMapLegendCategory(
-                PARTY, "gui.losttales.map.legend.party",
+                FELLOWSHIP, "gui.losttales.map.legend.fellowship",
                 LostTalesCompassMarkerIcon.QUEST, "blue"));
         register(new LostTalesMapLegendCategory(
                 LABELS, "gui.losttales.map.legend.labels",
@@ -110,9 +110,9 @@ public final class LostTalesMapLegendRegistry {
             return null;
         }
         String id = marker.getId() == null ? "" : marker.getId();
-        if (id.startsWith("party_go_here:")
+        if (id.startsWith("fellowship_go_here:")
                 || "Go Here".equalsIgnoreCase(marker.getCategoryName())) {
-            return PARTY;
+            return FELLOWSHIP;
         }
         // A custom waypoint is drawn as a Lost Tales marker but filtered as
         // the waypoint it stands for, so one toggle covers both views of it.

@@ -23,12 +23,14 @@ final class ChatHistoryRequesters {
      */
     static ChatHistory.Requester oneFaction(UUID accountId, String factionId,
                                             long characterCreatedAt,
-                                            UUID partyId,
+                                            UUID fellowshipId,
                                             Collection<ChatChannel> readable) {
         Map<String, Long> owned = factionId == null || factionId.length() == 0
                 ? Collections.<String, Long>emptyMap()
                 : Collections.singletonMap(factionId,
                         Long.valueOf(characterCreatedAt));
-        return new ChatHistory.Requester(accountId, owned, partyId, readable);
+        return new ChatHistory.Requester(accountId, owned, fellowshipId == null
+                ? Collections.<UUID>emptySet() : Collections.singleton(fellowshipId),
+                readable);
     }
 }

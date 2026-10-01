@@ -77,6 +77,8 @@ public final class MotionIds {
     public static final String WINDOW_SCROLL = "window.scroll";
     /** A row or control crossing to its lit shade. */
     public static final String WINDOW_HOVER_FADE = "window.hover.fade";
+    /** A window or a sub-window fading as others come to lie over it, and back. */
+    public static final String WINDOW_STACK_FADE = "window.stack.fade";
     /** A name cut short gliding home once the pointer leaves it. */
     public static final String WINDOW_MARQUEE_RETURN = "window.marquee.return";
     /** A short notice over a window's bar coming up, standing a moment and fading. */

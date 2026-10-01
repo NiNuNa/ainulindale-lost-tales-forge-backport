@@ -280,6 +280,9 @@ public final class PinnedWindows {
             return;
         }
         WindowFrame frame = WindowFrame.of(window);
+        // While playing a pinned window stands at its own strength; the
+        // screen's stack fades nothing here.
+        frame.stackShare = 1.0F;
         LostTalesGuiAnimationSample shown =
                 LostTalesGuiAnimationSample.SETTLED.withOpacity(strength);
         WindowTab front = WindowFrame.activeTab(window, tabs);
@@ -328,9 +331,15 @@ public final class PinnedWindows {
                     content.shown();
                 }
                 DRAWN.add(frame.page);
+                if (frame.splitPage != null) {
+                    if (!SHOWN.contains(frame.splitPage)) {
+                        frame.splitPage.content().shown();
+                    }
+                    DRAWN.add(frame.splitPage);
+                }
                 WindowDrawing.drawPage(minecraft, frame, shown,
-                        WindowHover.AWAY, WindowHover.AWAY, partialTicks,
-                        depthTest);
+                        WindowHover.AWAY, WindowHover.AWAY, WindowHover.AWAY,
+                        WindowHover.AWAY, partialTicks, depthTest);
             }
             if (furniture) {
                 WindowDrawing.drawBottomRule(minecraft, frame, shown);
@@ -360,18 +369,29 @@ public final class PinnedWindows {
 
     /* ---- Time ---- */
 
-    /** Once a game tick while playing: the page in front of each pinned window keeps time. */
+    /**
+     * Once a game tick while playing: the page in front of each pinned
+     * window keeps time, and the other page of a split it shows.
+     */
     public static void tick(Minecraft minecraft) {
         if (!standing(minecraft)) {
             return;
         }
         for (Window window : WindowLayout.hudWindows()) {
             List<WindowTab> tabs = hudTabs(window);
-            PageContent content = tabs.isEmpty() ? null
-                    : WindowPages.contentOf(WindowFrame.activeTab(window,
-                            tabs));
-            if (content != null) {
-                content.tick();
+            WindowTab front = tabs.isEmpty() ? null
+                    : WindowFrame.activeTab(window, tabs);
+            PageContent content = WindowPages.contentOf(front);
+            if (content == null) {
+                continue;
+            }
+            content.tick();
+            WindowSplit split = window.splitOf(front);
+            WindowTab other = split == null ? null : split.other(front);
+            PageContent beside = other == null || !tabs.contains(other) ? null
+                    : WindowPages.contentOf(other);
+            if (beside != null) {
+                beside.tick();
             }
         }
     }

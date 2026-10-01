@@ -34,13 +34,13 @@ final class ChatTrailingStrip {
     static ChatTrailingStrip of(ChatFrame frame, FontRenderer font) {
         ChatTimestampColumn columns = ChatTimestampColumn.of(frame, font);
         double originX = LostTalesDisplayPixels.snap(
-                frame.drawnLeft() + columns.messageX() * frame.scale);
+                frame.contentLeft() + columns.messageX() * frame.scale);
         double originY = frame.drawnBaseline();
         int wholeX = (int)Math.floor(originX);
         int wholeY = (int)Math.floor(originY);
-        int room = (int)Math.round(frame.boxRight - frame.boxLeft
+        int room = (int)Math.round(frame.contentWidth()
                 - ChatMemberList.drawnWidth(frame) * frame.scale
-                - (originX - frame.drawnLeft())) - 6;
+                - (originX - frame.contentLeft())) - 6;
         return new ChatTrailingStrip(wholeX,
                 wholeY + LostTalesChatOverlayRenderer.LINE_HEIGHT
                         - LostTalesChatOverlayRenderer.TEXT_OFFSET,

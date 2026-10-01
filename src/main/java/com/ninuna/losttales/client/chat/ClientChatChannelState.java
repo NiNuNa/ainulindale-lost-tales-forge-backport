@@ -7,6 +7,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.HashMap;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatRoleConfig;
@@ -305,11 +306,16 @@ public final class ClientChatChannelState {
      * filed and counted, and it shows again the moment that identity is
      * read as again. An NPC conversation belongs to nobody in particular
      * and is always shown; so is every plain channel, a scoped one
-     * included — one row entry, showing the conversation being read.
+     * included — one row entry, showing the conversation being read. A
+     * fellowship's conversation is its own row entry, shown while the
+     * character played is in it; the Fellowship channel has no plain tab.
      */
     public static synchronized boolean isAvailable(ChatTab tab) {
         if (tab == null || !isAvailable(tab.getChannel())) {
             return false;
+        }
+        if (tab.getChannel() == ChatChannel.FELLOWSHIP) {
+            return ClientChatIdentitySelection.fellowship(tab.getOwnerKey()) != null;
         }
         if (tab.isNpc() || tab.getOwnerKey().length() == 0) {
             // A row entry stands for whichever conversation is read.
@@ -326,14 +332,14 @@ public final class ClientChatChannelState {
     /**
      * Whether the channel's tab is shown and its history readable: every
      * open channel always, a gated one while its access is held, and
-     * Party only while the selected identity is in a party.
+     * Fellowship only while the character played is in a fellowship.
      */
     public static synchronized boolean isAvailable(ChatChannel channel) {
         if (channel == null || !isGateOpen(readableChannels, channel)) {
             return false;
         }
-        return channel.getAccess() != ChatChannelAccess.PARTY_MEMBERSHIP
-                || ClientChatIdentitySelection.partyKey().length() > 0;
+        return channel.getAccess() != ChatChannelAccess.FELLOWSHIP_MEMBERSHIP
+                || !ClientChatIdentitySelection.fellowships().isEmpty();
     }
 
     /** Whether the server's gate for this player lets the channel be used. */
@@ -438,7 +444,9 @@ public final class ClientChatChannelState {
     /**
      * The colour of one conversation: for a faction's chat that faction's
      * own, whichever faction is read now, so a link or a line names the
-     * faction it was said in; the channel's colour for every other.
+     * faction it was said in; for a fellowship's the colour the player
+     * wears in it, the one its HUD and page show them in; the channel's
+     * colour for every other.
      */
     public static synchronized int displayColor(ChatChannel channel,
                                                 String scope) {
@@ -446,7 +454,14 @@ public final class ClientChatChannelState {
             return LotrFactionColors.forFactionId(scope,
                     channel.getDisplayColor());
         }
-        return displayColor(channel);
+        ChatFellowship fellowship = fellowshipOf(channel, scope);
+        return fellowship != null ? fellowship.getColor() : displayColor(channel);
+    }
+
+    /** The fellowship a channel and scope name; null for anything else, and for one the character played is not in. */
+    private static ChatFellowship fellowshipOf(ChatChannel channel, String scope) {
+        return channel == ChatChannel.FELLOWSHIP
+                ? ClientChatIdentitySelection.fellowship(scope) : null;
     }
 
     /** Whether a channel and scope name one faction's chat rather than the Faction tab. */
@@ -560,11 +575,6 @@ public final class ClientChatChannelState {
                     : LotrFactionColors.forFactionId(factionId,
                             channel.getDisplayColor());
         }
-        if (channel == ChatChannel.PARTY) {
-            // The party speaks in the colour the player wears in it —
-            // the one the party HUD and management screen show them in.
-            return ClientChatIdentitySelection.partyColor();
-        }
         return channel.getDisplayColor();
     }
 
@@ -589,13 +599,18 @@ public final class ClientChatChannelState {
 
     /**
      * The name of one conversation: for a faction's chat that faction's
-     * chat ("Gondor Chat"), whichever faction is read now; the channel's
-     * name ({@link #displayName(ChatChannel)}) for every other.
+     * chat ("Gondor Chat"), whichever faction is read now; for a
+     * fellowship's its name ("The Grey Company Chat"); the channel's name
+     * ({@link #displayName(ChatChannel)}) for every other.
      */
     public static synchronized String displayName(ChatChannel channel,
                                                   String scope) {
-        return isFaction(channel, scope)
-                ? factionChatName(scope, channel.getDisplayName())
+        if (isFaction(channel, scope)) {
+            return factionChatName(scope, channel.getDisplayName());
+        }
+        ChatFellowship fellowship = fellowshipOf(channel, scope);
+        return fellowship != null ? StatCollector.translateToLocalFormatted(
+                "gui.losttales.chat.fellowship.titled", fellowship.getName())
                 : displayName(channel);
     }
 
@@ -603,24 +618,12 @@ public final class ClientChatChannelState {
      * Visible label for a channel. Faction shows the chat of the LOTR
      * faction ("Gondor Chat") the identity its tab speaks as belongs to,
      * so the tab, indicator and message prefix all agree and follow the
-     * chat identity. Party shows the name its leader gave it ("The Grey
-     * Company Chat"), else its leader's ("Aldric's Party Chat"), while the
-     * character played is in one.
+     * chat identity. A fellowship's conversation is named by its own
+     * name ({@link #displayName(ChatChannel, String)}).
      */
     public static synchronized String displayName(ChatChannel channel) {
         if (channel == null) {
             return "";
-        }
-        if (channel == ChatChannel.PARTY) {
-            String named = ClientChatIdentitySelection.partyName();
-            if (named.length() > 0) {
-                return StatCollector.translateToLocalFormatted(
-                        "gui.losttales.chat.party.titled", named);
-            }
-            String leader = ClientChatIdentitySelection.partyLeader();
-            return leader.length() == 0 ? channel.getDisplayName()
-                    : StatCollector.translateToLocalFormatted(
-                            "gui.losttales.chat.party.named", leader);
         }
         if (channel != ChatChannel.FACTION) {
             return channel.getDisplayName();
@@ -1018,13 +1021,13 @@ public final class ClientChatChannelState {
         DISCORD_LINKS.clear();
     }
 
-    /** The shared chat identity's faction or server-confirmed party. */
+    /** The shared chat identity's faction, or the fellowship the character played travels with. */
     public static synchronized String scopeKeyRead(ChatChannel channel) {
         if (channel == null || !channel.isScoped()) {
             return "";
         }
-        if (channel.getScope() == ChatChannelScope.PARTY) {
-            return ClientChatIdentitySelection.partyKey();
+        if (channel.getScope() == ChatChannelScope.FELLOWSHIP) {
+            return ClientChatIdentitySelection.travellingKey();
         }
         return scopeOfIdentity(channel, ClientChatIdentities.viewIdentityKey());
     }
@@ -1066,9 +1069,9 @@ public final class ClientChatChannelState {
                 || ownerKey == null) {
             return "";
         }
-        if (channel.getScope() == ChatChannelScope.PARTY) {
+        if (channel.getScope() == ChatChannelScope.FELLOWSHIP) {
             return ownerKey.equals(ClientChatIdentities.viewIdentityKey())
-                    ? ClientChatIdentitySelection.partyKey() : "";
+                    ? ClientChatIdentitySelection.travellingKey() : "";
         }
         if (ownerKey.length() == 0) {
             return LotrCharacterAdapter.UNALIGNED_FACTION_ID;

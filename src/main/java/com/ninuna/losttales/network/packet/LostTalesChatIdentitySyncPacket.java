@@ -1,48 +1,46 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
+import com.ninuna.losttales.chat.ChatFellowship;
+import com.ninuna.losttales.fellowship.model.Fellowship;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * The server's answer to a chat identity selection: the identity it now
- * holds for the player, and the party of the character they play as the
- * chat sees it,
- * independent of the gameplay party snapshot: the party's id, the colour
- * the identity wears in it, its leader's character name and its own name
- * if the leader gave it one: what names the Party tab.
+ * holds for the player, and the fellowships of the character they play as
+ * the chat sees them, the one they travel with first: each one's id, name
+ * and the colour worn in it, which name and colour its conversation.
  */
 public final class LostTalesChatIdentitySyncPacket implements IMessage {
-    /** A character name is at most 32 characters; room for them in UTF-8. */
-    static final int MAX_PARTY_LEADER_BYTES = 96;
-    /** A party's name is at most 24 characters; room for them in UTF-8. */
-    static final int MAX_PARTY_NAME_BYTES = 96;
-    /** Two optional ids, the colour, the two names behind their lengths, the voice's flag. */
-    private static final int MAX_PACKET_BYTES = 2 * 17 + 4 + 2 + MAX_PARTY_LEADER_BYTES
-            + 2 + MAX_PARTY_NAME_BYTES + 1;
+    /** A fellowship's name in UTF-8: its most characters, at four bytes each at most. */
+    static final int MAX_FELLOWSHIP_NAME_BYTES = Fellowship.MAX_NAME_LENGTH * 4;
+    /** The optional id, the count, each fellowship's id, colour and name, the voice's flag. */
+    private static final int MAX_PACKET_BYTES = 17 + 1
+            + Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY * (16 + 4 + 2 + MAX_FELLOWSHIP_NAME_BYTES)
+            + 1;
 
     private UUID characterId;
-    private UUID partyId;
-    private int partyColor;
-    private String partyLeader = "";
-    private String partyName = "";
+    private List<ChatFellowship> fellowships = Collections.emptyList();
     /** Whether the Narrator's voice is taken up over the identity. */
     private boolean narrating;
     private boolean malformed;
 
     public LostTalesChatIdentitySyncPacket() {}
 
-    public LostTalesChatIdentitySyncPacket(UUID characterId, UUID partyId, int partyColor,
-                                           String partyLeader, String partyName,
+    public LostTalesChatIdentitySyncPacket(UUID characterId, List<ChatFellowship> fellowships,
                                            boolean narrating) {
         this.characterId = characterId;
-        this.partyId = partyId;
-        this.partyColor = partyColor;
-        this.partyLeader = partyLeader == null ? "" : partyLeader;
-        this.partyName = partyName == null ? "" : partyName;
+        this.fellowships = fellowships == null ? Collections.<ChatFellowship>emptyList()
+                : Collections.unmodifiableList(new ArrayList<ChatFellowship>(fellowships));
         this.narrating = narrating;
         validate();
     }
@@ -55,12 +53,22 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
                 throw new LostTalesPacketCodec.DecodeException("invalid chat identity sync size");
             }
             this.characterId = readId(buffer);
-            this.partyId = readId(buffer);
-            this.partyColor = buffer.readInt();
-            this.partyLeader = LostTalesPacketCodec.readUtf8String(buffer,
-                    MAX_PARTY_LEADER_BYTES);
-            this.partyName = LostTalesPacketCodec.readUtf8String(buffer,
-                    MAX_PARTY_NAME_BYTES);
+            int count = buffer.readUnsignedByte();
+            if (count > Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY) {
+                throw new LostTalesPacketCodec.DecodeException("too many fellowships");
+            }
+            List<ChatFellowship> read = new ArrayList<ChatFellowship>(count);
+            for (int index = 0; index < count; index++) {
+                UUID id = new UUID(buffer.readLong(), buffer.readLong());
+                int color = buffer.readInt();
+                String name = LostTalesPacketCodec.readUtf8String(buffer,
+                        MAX_FELLOWSHIP_NAME_BYTES);
+                if (color < 0 || color > 0xFFFFFF || !Fellowship.isWellFormedName(name)) {
+                    throw new LostTalesPacketCodec.DecodeException("invalid chat fellowship");
+                }
+                read.add(new ChatFellowship(id, name, color));
+            }
+            this.fellowships = Collections.unmodifiableList(read);
             int voice = buffer.readUnsignedByte();
             if (voice > 1) {
                 throw new LostTalesPacketCodec.DecodeException("invalid narrator flag");
@@ -71,10 +79,7 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
         } catch (RuntimeException failure) {
             this.malformed = true;
             this.characterId = null;
-            this.partyId = null;
-            this.partyColor = 0;
-            this.partyLeader = "";
-            this.partyName = "";
+            this.fellowships = Collections.emptyList();
             this.narrating = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
@@ -84,10 +89,14 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
     public void toBytes(ByteBuf buffer) {
         validate();
         writeId(buffer, this.characterId);
-        writeId(buffer, this.partyId);
-        buffer.writeInt(this.partyColor);
-        LostTalesPacketCodec.writeUtf8String(buffer, this.partyLeader, MAX_PARTY_LEADER_BYTES);
-        LostTalesPacketCodec.writeUtf8String(buffer, this.partyName, MAX_PARTY_NAME_BYTES);
+        buffer.writeByte(this.fellowships.size());
+        for (ChatFellowship fellowship : this.fellowships) {
+            buffer.writeLong(fellowship.getId().getMostSignificantBits());
+            buffer.writeLong(fellowship.getId().getLeastSignificantBits());
+            buffer.writeInt(fellowship.getColor());
+            LostTalesPacketCodec.writeUtf8String(buffer, fellowship.getName(),
+                    MAX_FELLOWSHIP_NAME_BYTES);
+        }
         buffer.writeBoolean(this.narrating);
     }
 
@@ -109,14 +118,16 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
     }
 
     private void validate() {
-        if (this.partyColor < 0 || this.partyColor > 0xFFFFFF) {
-            throw new IllegalArgumentException("invalid party color");
+        if (this.fellowships.size() > Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY) {
+            throw new IllegalArgumentException("too many fellowships");
         }
-        if (!LostTalesPacketCodec.isUtf8WithinLimit(this.partyLeader, MAX_PARTY_LEADER_BYTES)) {
-            throw new IllegalArgumentException("party leader name exceeds packet limit");
-        }
-        if (!LostTalesPacketCodec.isUtf8WithinLimit(this.partyName, MAX_PARTY_NAME_BYTES)) {
-            throw new IllegalArgumentException("party name exceeds packet limit");
+        Set<UUID> ids = new HashSet<UUID>();
+        for (ChatFellowship fellowship : this.fellowships) {
+            if (fellowship == null || !ids.add(fellowship.getId())
+                    || !LostTalesPacketCodec.isUtf8WithinLimit(fellowship.getName(),
+                            MAX_FELLOWSHIP_NAME_BYTES)) {
+                throw new IllegalArgumentException("fellowships must be distinct and bounded");
+            }
         }
     }
 
@@ -124,22 +135,9 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
         return this.characterId;
     }
 
-    public UUID getPartyId() {
-        return this.partyId;
-    }
-
-    public int getPartyColor() {
-        return this.partyColor;
-    }
-
-    /** The party leader's character name; empty without a party. */
-    public String getPartyLeader() {
-        return this.partyLeader;
-    }
-
-    /** The name the leader gave the party; empty when it has none, or without a party. */
-    public String getPartyName() {
-        return this.partyName;
+    /** The fellowships of the character played, the one travelled with first. */
+    public List<ChatFellowship> getFellowships() {
+        return this.fellowships;
     }
 
     /** Whether the Narrator's voice is taken up over the identity. */

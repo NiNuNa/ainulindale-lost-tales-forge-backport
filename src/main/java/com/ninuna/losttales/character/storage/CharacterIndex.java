@@ -15,7 +15,7 @@ import java.util.UUID;
  * Every character in the world by id, built once from the rosters and
  * kept by {@link CharacterWorldData} until a roster is written again. A
  * character id found in more than one roster is ambiguous and answers to
- * nobody, since the id is what parties, markers and bounties key on.
+ * nobody, since the id is what fellowships, markers and bounties key on.
  */
 public final class CharacterIndex {
 

@@ -196,7 +196,7 @@ public final class LostTalesChatMembersPacketTest {
     }
 
     @Test
-    public void aWhisperRequestNamesItsOtherPartyAndOnlyAWhisperDoes() {
+    public void aWhisperRequestNamesItsOtherFellowshipAndOnlyAWhisperDoes() {
         UUID beren = UUID.randomUUID();
         UUID aldric = UUID.randomUUID();
         LostTalesChatMembersRequestPacket sent =
@@ -216,7 +216,7 @@ public final class LostTalesChatMembersPacketTest {
         try {
             new LostTalesChatMembersRequestPacket(ChatChannel.OOC, "ooc",
                     "Steve", "", null, null, 0L);
-            throw new AssertionError("only a whisper names a party");
+            throw new AssertionError("only a whisper names a fellowship");
         } catch (IllegalArgumentException refused) {
             // expected
         }

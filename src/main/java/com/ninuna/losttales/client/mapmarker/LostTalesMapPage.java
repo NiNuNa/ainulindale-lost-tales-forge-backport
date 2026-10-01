@@ -185,7 +185,7 @@ public final class LostTalesMapPage extends PageContent {
     }
 
     @Override
-    public boolean takeOption(String id, boolean back) {
+    public boolean takeOption(String id) {
         LostTalesMapLegendRegistry.toggleCategory(id);
         if (this.map != null) {
             this.map.onMapLegendFiltersChanged();

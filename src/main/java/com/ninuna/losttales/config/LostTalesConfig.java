@@ -18,7 +18,6 @@ import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
@@ -38,7 +37,7 @@ public final class LostTalesConfig {
     public static final String CATEGORY_MISSIVES = "missives";
     public static final String CATEGORY_CHARACTERS = "characters";
     public static final String CATEGORY_COMBAT_MARKERS = "combat_markers";
-    public static final String CATEGORY_PARTY = "party";
+    public static final String CATEGORY_FELLOWSHIP = "fellowship";
     public static final String CATEGORY_CHAT = "chat";
     public static final String CATEGORY_RANGED_COMBAT = "ranged_combat";
     public static final String CATEGORY_WAYSTONES = "waystones";
@@ -106,21 +105,20 @@ public final class LostTalesConfig {
     public static int combatMarkerUpdateIntervalTicks = 10;
     public static int combatMarkerDisengagementGraceTicks = 20;
     public static boolean combatMarkerDebugLogging = false;
-    public static boolean partySharedAggroTracking = true;
+    public static boolean fellowshipSharedAggroTracking = true;
 
-    public static boolean showPartyHud = true;
-    public static boolean linkShowPartyHud = false;
-    public static double partyHudOffsetX = 2.0D;
-    public static double partyHudOffsetY = 18.0D;
-    public static int partyCompassMarkerFadeRadius = 100;
+    public static boolean showFellowshipHud = true;
+    public static boolean linkShowFellowshipHud = false;
+    public static double fellowshipHudOffsetX = 2.0D;
+    public static double fellowshipHudOffsetY = 18.0D;
+    public static int fellowshipCompassMarkerFadeRadius = 100;
 
-    public static int partyStatusUpdateIntervalTicks = 10;
-    public static int partyStatusHeartbeatTicks = 100;
-    public static int partyTrackingUpdateIntervalTicks = 10;
-    public static int partyTrackingHeartbeatTicks = 100;
+    public static int fellowshipStatusUpdateIntervalTicks = 10;
+    public static int fellowshipStatusHeartbeatTicks = 100;
+    public static int fellowshipTrackingUpdateIntervalTicks = 10;
+    public static int fellowshipTrackingHeartbeatTicks = 100;
     public static boolean enableSharedQuestProgress = true;
-    public static int partySharedQuestRadius = 32;
-    public static int partyMaxMembers = 4;
+    public static int fellowshipSharedQuestRadius = 32;
 
     public static boolean showQuickLootHud = true;
     public static boolean linkShowQuickLootHud = false;
@@ -772,96 +770,88 @@ public final class LostTalesConfig {
                     combatMarkerDebugLogging,
                     "Log changed combat marker snapshots. Disabled by default to avoid log spam."
             );
-            partySharedAggroTracking = config.getBoolean(
-                    "shareWithParty",
+            fellowshipSharedAggroTracking = config.getBoolean(
+                    "shareWithFellowship",
                     CATEGORY_COMBAT_MARKERS,
-                    partySharedAggroTracking,
-                    "Share server-approved active-combat enemy markers with authorized nearby members of the same role-playing party."
+                    fellowshipSharedAggroTracking,
+                    "Share server-approved active-combat enemy markers with authorized nearby members of the same role-playing fellowship."
             );
 
-            showPartyHud = config.getBoolean(
-                    "showPartyHud",
+            showFellowshipHud = config.getBoolean(
+                    "showFellowshipHud",
                     CATEGORY_CLIENT,
-                    showPartyHud,
-                    "Render the compact party member HUD while the active role-playing character belongs to a party."
+                    showFellowshipHud,
+                    "Render the compact fellowship member HUD while the active role-playing character belongs to a fellowship."
             );
-            linkShowPartyHud = config.getBoolean(
-                    "linkShowPartyHud",
+            linkShowFellowshipHud = config.getBoolean(
+                    "linkShowFellowshipHud",
                     CATEGORY_CLIENT,
-                    linkShowPartyHud,
-                    "When true, changing showLostTalesHud also changes showPartyHud."
+                    linkShowFellowshipHud,
+                    "When true, changing showLostTalesHud also changes showFellowshipHud."
             );
-            partyHudOffsetX = getHudPercent(
-                    config, "partyHudOffsetX",
-                    partyHudOffsetX, 0.0D, 100.0D,
-                    "Horizontal party HUD position as a percentage of the scaled screen width."
+            fellowshipHudOffsetX = getHudPercent(
+                    config, "fellowshipHudOffsetX",
+                    fellowshipHudOffsetX, 0.0D, 100.0D,
+                    "Horizontal fellowship HUD position as a percentage of the scaled screen width."
             );
-            partyHudOffsetY = getHudPercent(
-                    config, "partyHudOffsetY",
-                    partyHudOffsetY, 0.0D, 100.0D,
-                    "Vertical party HUD position as a percentage of the scaled screen height."
+            fellowshipHudOffsetY = getHudPercent(
+                    config, "fellowshipHudOffsetY",
+                    fellowshipHudOffsetY, 0.0D, 100.0D,
+                    "Vertical fellowship HUD position as a percentage of the scaled screen height."
             );
-            partyCompassMarkerFadeRadius = config.getInt(
-                    "partyCompassMarkerFadeRadius",
+            fellowshipCompassMarkerFadeRadius = config.getInt(
+                    "fellowshipCompassMarkerFadeRadius",
                     CATEGORY_CLIENT,
-                    partyCompassMarkerFadeRadius,
+                    fellowshipCompassMarkerFadeRadius,
                     16,
                     2048,
-                    "Distance in blocks over which party-member compass markers fade to their minimum opacity. Beyond this distance they remain visible at the opacity floor."
+                    "Distance in blocks over which fellowship-member compass markers fade to their minimum opacity. Beyond this distance they remain visible at the opacity floor."
             );
-            partyStatusUpdateIntervalTicks = config.getInt(
+            fellowshipStatusUpdateIntervalTicks = config.getInt(
                     "statusUpdateIntervalTicks",
-                    CATEGORY_PARTY,
-                    partyStatusUpdateIntervalTicks,
+                    CATEGORY_FELLOWSHIP,
+                    fellowshipStatusUpdateIntervalTicks,
                     2,
                     40,
-                    "Server ticks between party health and availability checks. Packets are sent only when state changes or a heartbeat is due."
+                    "Server ticks between fellowship health and availability checks. Packets are sent only when state changes or a heartbeat is due."
             );
-            partyStatusHeartbeatTicks = config.getInt(
+            fellowshipStatusHeartbeatTicks = config.getInt(
                     "statusHeartbeatTicks",
-                    CATEGORY_PARTY,
-                    partyStatusHeartbeatTicks,
+                    CATEGORY_FELLOWSHIP,
+                    fellowshipStatusHeartbeatTicks,
                     20,
                     400,
-                    "Maximum server ticks between unchanged party status snapshots for online party members."
+                    "Maximum server ticks between unchanged fellowship status snapshots for online fellowship members."
             );
-            partyTrackingUpdateIntervalTicks = config.getInt(
+            fellowshipTrackingUpdateIntervalTicks = config.getInt(
                     "trackingUpdateIntervalTicks",
-                    CATEGORY_PARTY,
-                    partyTrackingUpdateIntervalTicks,
+                    CATEGORY_FELLOWSHIP,
+                    fellowshipTrackingUpdateIntervalTicks,
                     2,
                     40,
-                    "Server ticks between authorized party position checks. Coordinates are quantized and packets are sent only when state changes or a heartbeat is due."
+                    "Server ticks between authorized fellowship position checks. Coordinates are quantized and packets are sent only when state changes or a heartbeat is due."
             );
-            partyTrackingHeartbeatTicks = config.getInt(
+            fellowshipTrackingHeartbeatTicks = config.getInt(
                     "trackingHeartbeatTicks",
-                    CATEGORY_PARTY,
-                    partyTrackingHeartbeatTicks,
+                    CATEGORY_FELLOWSHIP,
+                    fellowshipTrackingHeartbeatTicks,
                     20,
                     400,
-                    "Maximum server ticks between unchanged party tracking snapshots for online party members."
+                    "Maximum server ticks between unchanged fellowship tracking snapshots for online fellowship members."
             );
             enableSharedQuestProgress = config.getBoolean(
                     "enableSharedQuestProgress",
-                    CATEGORY_PARTY,
+                    CATEGORY_FELLOWSHIP,
                     enableSharedQuestProgress,
-                    "Allow authoritative kill and destination-arrival events to advance matching Lost Tales objectives for eligible nearby party members. Gathering, crafting, hand-ins, completion, and rewards remain individual."
+                    "Allow authoritative kill and destination-arrival events to advance matching Lost Tales objectives for eligible nearby fellowship members. Gathering, crafting, hand-ins, completion, and rewards remain individual."
             );
-            partySharedQuestRadius = config.getInt(
+            fellowshipSharedQuestRadius = config.getInt(
                     "sharedQuestRadius",
-                    CATEGORY_PARTY,
-                    partySharedQuestRadius,
+                    CATEGORY_FELLOWSHIP,
+                    fellowshipSharedQuestRadius,
                     1,
                     128,
-                    "Maximum block distance for conservative party-shared kill and travel objective progress. Members must be online, alive, in the same dimension, using the party character, and independently possess the matching quest."
-            );
-            partyMaxMembers = config.getInt(
-                    "maxMembers",
-                    CATEGORY_PARTY,
-                    partyMaxMembers,
-                    Party.MIN_MEMBER_LIMIT,
-                    Party.MAX_MEMBERS,
-                    "The most members a party may have. A party with more members than a lowered limit keeps them all, and can invite again once it is below the limit."
+                    "Maximum block distance for conservative fellowship-shared kill and travel objective progress. Members must be online, alive, in the same dimension, using the fellowship character, and independently possess the matching quest."
             );
 
             showQuickLootHud = config.getBoolean(
@@ -1046,7 +1036,7 @@ public final class LostTalesConfig {
                     "permissions",
                     CATEGORY_ROLES,
                     chatPermissions,
-                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.server_console.read (the Server Console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
+                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.server_console.read (the Server Console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, fellowship.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
             );
             chatRoles = config.getStringList(
                     "definitions",
@@ -1064,7 +1054,7 @@ public final class LostTalesConfig {
                     "definitions",
                     CATEGORY_CHANNELS,
                     new String[0],
-                    "Channels this server has of its own, one per line as <id>=name:<shown name>;rule:<everyone|proximity|operators>;colour:<RRGGBB>;ooc:<true|false>;bridge:<true|false>. The id is the channel's code name: packets, the layout file, the gates, # links and Discord links all name a channel by it. The routing rules a config cannot describe - a party, a faction, a whisper, a private console - are refused, and so is an entry naming a channel this build already has or a faction's code name (gondor, high_elf)."
+                    "Channels this server has of its own, one per line as <id>=name:<shown name>;rule:<everyone|proximity|operators>;colour:<RRGGBB>;ooc:<true|false>;bridge:<true|false>. The id is the channel's code name: packets, the layout file, the gates, # links and Discord links all name a channel by it. The routing rules a config cannot describe - a fellowship, a faction, a whisper, a private console - are refused, and so is an entry naming a channel this build already has or a faction's code name (gondor, high_elf)."
             );
             chatChannelRoles = config.getStringList(
                     "gates",
@@ -1103,7 +1093,7 @@ public final class LostTalesConfig {
                     CATEGORY_DISCORD,
                     "channelBindings",
                     new String[0],
-                    "Server only, secrets: the links between game channels and Discord channels. Make one with /losttales discord link <channel> in the game, which gives a code, and /link code:<code> in the Discord channel, where the bot makes the channel's webhook itself; take one away with /losttales discord unlink or /unlink. Each entry is <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook address>: a game channel may be linked to several Discord channels, in any Discord server the bot is in, while a Discord channel holds one game channel only. The channel is its code name: global, proximity, ooc, operator, a server's own, or a faction's code name for that faction's chat (gondor, high_elf); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. Party, the consoles and whispers are private and refused. Kept off the Server Settings screen and /losttales config, since a webhook address lets whoever holds it post into its channel."
+                    "Server only, secrets: the links between game channels and Discord channels. Make one with /losttales discord link <channel> in the game, which gives a code, and /link code:<code> in the Discord channel, where the bot makes the channel's webhook itself; take one away with /losttales discord unlink or /unlink. Each entry is <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook address>: a game channel may be linked to several Discord channels, in any Discord server the bot is in, while a Discord channel holds one game channel only. The channel is its code name: global, proximity, ooc, operator, a server's own, or a faction's code name for that faction's chat (gondor, high_elf); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. Fellowship, the consoles and whispers are private and refused. Kept off the Server Settings screen and /losttales config, since a webhook address lets whoever holds it post into its channel."
             );
             discordChannelBindings = bindingsProperty.getStringList();
             discordAvatarUrlTemplate = config.getString(
@@ -1382,7 +1372,7 @@ public final class LostTalesConfig {
                     "showChatSpeechBubbles",
                     CATEGORY_CLIENT,
                     showChatSpeechBubbles,
-                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech, as far as the server's Proximity radius. In-character channels only (Global, Proximity, Party, Faction and whispers); never OOC, the operator channel or the consoles."
+                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech, as far as the server's Proximity radius. In-character channels only (Global, Proximity, Fellowship, Faction and whispers); never OOC, the operator channel or the consoles."
             );
             animations = config.getBoolean(
                     "animations", CATEGORY_CLIENT, animations,
@@ -1734,8 +1724,8 @@ public final class LostTalesConfig {
         if (linkShowCompassHud) {
             showCompassHud = showLostTalesHud;
         }
-        if (linkShowPartyHud) {
-            showPartyHud = showLostTalesHud;
+        if (linkShowFellowshipHud) {
+            showFellowshipHud = showLostTalesHud;
         }
         if (linkShowQuickLootHud) {
             showQuickLootHud = showLostTalesHud;
@@ -1772,8 +1762,8 @@ public final class LostTalesConfig {
         if (HUD_PRESET_DEFAULT.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 2;
-            partyHudOffsetX = 2;
-            partyHudOffsetY = 18;
+            fellowshipHudOffsetX = 2;
+            fellowshipHudOffsetY = 18;
             quickLootHudOffsetX = 62;
             quickLootHudOffsetY = 32;
             questHudOffsetX = 2;
@@ -1782,8 +1772,8 @@ public final class LostTalesConfig {
         } else if (HUD_PRESET_LOTR_SAFE.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 12;
-            partyHudOffsetX = 2;
-            partyHudOffsetY = 28;
+            fellowshipHudOffsetX = 2;
+            fellowshipHudOffsetY = 28;
             quickLootHudOffsetX = 61;
             quickLootHudOffsetY = 34;
             questHudOffsetX = 2;
@@ -1792,8 +1782,8 @@ public final class LostTalesConfig {
         } else if (HUD_PRESET_COMPACT.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 7;
-            partyHudOffsetX = 1;
-            partyHudOffsetY = 26;
+            fellowshipHudOffsetX = 1;
+            fellowshipHudOffsetY = 26;
             quickLootHudOffsetX = 67;
             quickLootHudOffsetY = 37;
             questHudOffsetX = 1;
@@ -1802,8 +1792,8 @@ public final class LostTalesConfig {
         } else if (HUD_PRESET_MINIMAL.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 4;
-            partyHudOffsetX = 1;
-            partyHudOffsetY = 18;
+            fellowshipHudOffsetX = 1;
+            fellowshipHudOffsetY = 18;
             quickLootHudOffsetX = 71;
             quickLootHudOffsetY = 42;
             questHudOffsetX = 1;
@@ -1879,9 +1869,9 @@ public final class LostTalesConfig {
         if ("compass".equals(key)) {
             compassHudOffsetX = x;
             compassHudOffsetY = y;
-        } else if ("party".equals(key)) {
-            partyHudOffsetX = x;
-            partyHudOffsetY = y;
+        } else if ("fellowship".equals(key)) {
+            fellowshipHudOffsetX = x;
+            fellowshipHudOffsetY = y;
         } else if ("quickloot".equals(key)) {
             quickLootHudOffsetX = x;
             quickLootHudOffsetY = y;
@@ -1902,8 +1892,8 @@ public final class LostTalesConfig {
         if ("compass".equals(key)) {
             return setHudOffset(key, compassHudOffsetX + dx, compassHudOffsetY + dy);
         }
-        if ("party".equals(key)) {
-            return setHudOffset(key, partyHudOffsetX + dx, partyHudOffsetY + dy);
+        if ("fellowship".equals(key)) {
+            return setHudOffset(key, fellowshipHudOffsetX + dx, fellowshipHudOffsetY + dy);
         }
         if ("quickloot".equals(key)) {
             return setHudOffset(key, quickLootHudOffsetX + dx, quickLootHudOffsetY + dy);
@@ -1929,8 +1919,8 @@ public final class LostTalesConfig {
         if ("compass".equals(key)) {
             return "compass";
         }
-        if ("party".equals(key) || "partyhud".equals(key)) {
-            return "party";
+        if ("fellowship".equals(key) || "fellowshiphud".equals(key)) {
+            return "fellowship";
         }
         if ("quickloot".equals(key) || "loot".equals(key) || "quickloothud".equals(key)) {
             return "quickloot";
@@ -1961,8 +1951,8 @@ public final class LostTalesConfig {
     public static void clampHudOffsets() {
         compassHudOffsetX = clampPercent(compassHudOffsetX);
         compassHudOffsetY = clampPercent(compassHudOffsetY);
-        partyHudOffsetX = clampPercent(partyHudOffsetX);
-        partyHudOffsetY = clampPercent(partyHudOffsetY);
+        fellowshipHudOffsetX = clampPercent(fellowshipHudOffsetX);
+        fellowshipHudOffsetY = clampPercent(fellowshipHudOffsetY);
         quickLootHudOffsetX = clampPercent(quickLootHudOffsetX);
         quickLootHudOffsetY = clampPercent(quickLootHudOffsetY);
         questHudOffsetX = clampPercent(questHudOffsetX);
@@ -2039,7 +2029,7 @@ public final class LostTalesConfig {
         config.getCategory(CATEGORY_MISSIVES).setLanguageKey("losttales.config.category.missives");
         config.getCategory(CATEGORY_CHARACTERS).setLanguageKey("losttales.config.category.characters");
         config.getCategory(CATEGORY_COMBAT_MARKERS).setLanguageKey("losttales.config.category.combatMarkers");
-        config.getCategory(CATEGORY_PARTY).setLanguageKey("losttales.config.category.party");
+        config.getCategory(CATEGORY_FELLOWSHIP).setLanguageKey("losttales.config.category.fellowship");
         config.getCategory(CATEGORY_CHAT).setLanguageKey(
                 "losttales.config.category.chat");
         config.getCategory(CATEGORY_RANGED_COMBAT).setLanguageKey(
@@ -2280,18 +2270,17 @@ public final class LostTalesConfig {
         config.get(CATEGORY_COMBAT_MARKERS, "updateIntervalTicks", combatMarkerUpdateIntervalTicks).set(combatMarkerUpdateIntervalTicks);
         config.get(CATEGORY_COMBAT_MARKERS, "disengagementGraceTicks", combatMarkerDisengagementGraceTicks).set(combatMarkerDisengagementGraceTicks);
         config.get(CATEGORY_COMBAT_MARKERS, "debugLogging", combatMarkerDebugLogging).set(combatMarkerDebugLogging);
-        config.get(CATEGORY_COMBAT_MARKERS, "shareWithParty", partySharedAggroTracking).set(partySharedAggroTracking);
-        config.get(CATEGORY_CLIENT, "showPartyHud", showPartyHud).set(showPartyHud);
-        config.get(CATEGORY_CLIENT, "linkShowPartyHud", linkShowPartyHud).set(linkShowPartyHud);
-        config.get(CATEGORY_CLIENT, "partyHudOffsetX", partyHudOffsetX).set(partyHudOffsetX);
-        config.get(CATEGORY_CLIENT, "partyHudOffsetY", partyHudOffsetY).set(partyHudOffsetY);
-        config.get(CATEGORY_PARTY, "statusUpdateIntervalTicks", partyStatusUpdateIntervalTicks).set(partyStatusUpdateIntervalTicks);
-        config.get(CATEGORY_PARTY, "statusHeartbeatTicks", partyStatusHeartbeatTicks).set(partyStatusHeartbeatTicks);
-        config.get(CATEGORY_PARTY, "trackingUpdateIntervalTicks", partyTrackingUpdateIntervalTicks).set(partyTrackingUpdateIntervalTicks);
-        config.get(CATEGORY_PARTY, "trackingHeartbeatTicks", partyTrackingHeartbeatTicks).set(partyTrackingHeartbeatTicks);
-        config.get(CATEGORY_PARTY, "enableSharedQuestProgress", enableSharedQuestProgress).set(enableSharedQuestProgress);
-        config.get(CATEGORY_PARTY, "sharedQuestRadius", partySharedQuestRadius).set(partySharedQuestRadius);
-        config.get(CATEGORY_PARTY, "maxMembers", partyMaxMembers).set(partyMaxMembers);
+        config.get(CATEGORY_COMBAT_MARKERS, "shareWithFellowship", fellowshipSharedAggroTracking).set(fellowshipSharedAggroTracking);
+        config.get(CATEGORY_CLIENT, "showFellowshipHud", showFellowshipHud).set(showFellowshipHud);
+        config.get(CATEGORY_CLIENT, "linkShowFellowshipHud", linkShowFellowshipHud).set(linkShowFellowshipHud);
+        config.get(CATEGORY_CLIENT, "fellowshipHudOffsetX", fellowshipHudOffsetX).set(fellowshipHudOffsetX);
+        config.get(CATEGORY_CLIENT, "fellowshipHudOffsetY", fellowshipHudOffsetY).set(fellowshipHudOffsetY);
+        config.get(CATEGORY_FELLOWSHIP, "statusUpdateIntervalTicks", fellowshipStatusUpdateIntervalTicks).set(fellowshipStatusUpdateIntervalTicks);
+        config.get(CATEGORY_FELLOWSHIP, "statusHeartbeatTicks", fellowshipStatusHeartbeatTicks).set(fellowshipStatusHeartbeatTicks);
+        config.get(CATEGORY_FELLOWSHIP, "trackingUpdateIntervalTicks", fellowshipTrackingUpdateIntervalTicks).set(fellowshipTrackingUpdateIntervalTicks);
+        config.get(CATEGORY_FELLOWSHIP, "trackingHeartbeatTicks", fellowshipTrackingHeartbeatTicks).set(fellowshipTrackingHeartbeatTicks);
+        config.get(CATEGORY_FELLOWSHIP, "enableSharedQuestProgress", enableSharedQuestProgress).set(enableSharedQuestProgress);
+        config.get(CATEGORY_FELLOWSHIP, "sharedQuestRadius", fellowshipSharedQuestRadius).set(fellowshipSharedQuestRadius);
         config.get(CATEGORY_CLIENT, "showQuickLootHud", showQuickLootHud).set(showQuickLootHud);
         config.get(CATEGORY_CLIENT, "linkShowQuickLootHud", linkShowQuickLootHud).set(linkShowQuickLootHud);
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetX", quickLootHudOffsetX).set(quickLootHudOffsetX);
@@ -2315,8 +2304,8 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "showQuestChatFeedback", showQuestChatFeedback).set(showQuestChatFeedback);
         config.get(CATEGORY_CLIENT, "playQuestSounds", playQuestSounds).set(playQuestSounds);
         config.get(CATEGORY_CLIENT, "enableQuestDialogue", enableQuestDialogue).set(enableQuestDialogue);
-        config.get(CATEGORY_CLIENT, "partyCompassMarkerFadeRadius",
-                partyCompassMarkerFadeRadius).set(partyCompassMarkerFadeRadius);
+        config.get(CATEGORY_CLIENT, "fellowshipCompassMarkerFadeRadius",
+                fellowshipCompassMarkerFadeRadius).set(fellowshipCompassMarkerFadeRadius);
         config.get(CATEGORY_CLIENT, "chatHistoryLines", chatHistoryLines).set(chatHistoryLines);
         config.get(CATEGORY_CLIENT, "showSkinOverlays", showSkinOverlays).set(showSkinOverlays);
         config.get(CATEGORY_CLIENT, "chestPhysics", chestPhysics).set(chestPhysics);

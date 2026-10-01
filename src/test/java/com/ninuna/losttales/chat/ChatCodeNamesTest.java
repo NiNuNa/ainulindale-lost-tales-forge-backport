@@ -19,7 +19,7 @@ public final class ChatCodeNamesTest {
     public void factions() {
         ChatCodeNames.installFactions(Arrays.asList(
                 "lotr:gondor", "LOTR:High_Elf", "lotr:unaligned",
-                "lotr:party", "lotr:bree-land", "lotr:"));
+                "lotr:fellowship", "lotr:bree-land", "lotr:"));
     }
 
     @After
@@ -32,7 +32,7 @@ public final class ChatCodeNamesTest {
         assertEquals("global", ChatCodeNames.of(ChatChannel.GLOBAL, ""));
         assertEquals("proximity", ChatCodeNames.of(ChatChannel.PROXIMITY, ""));
         assertEquals("ooc", ChatCodeNames.of(ChatChannel.OOC, ""));
-        assertEquals("party", ChatCodeNames.of(ChatChannel.PARTY, "some-party"));
+        assertEquals("fellowship", ChatCodeNames.of(ChatChannel.FELLOWSHIP, "some-fellowship"));
         assertEquals("operator", ChatCodeNames.of(ChatChannel.OPERATOR, ""));
         assertEquals("whisper", ChatCodeNames.of(ChatChannel.WHISPER, ""));
         assertEquals("client_console", ChatCodeNames.of(ChatChannel.CLIENT_CONSOLE, ""));
@@ -69,8 +69,8 @@ public final class ChatCodeNamesTest {
     @Test
     public void aFactionNameThatCouldNotBeTypedOrIsAChannelIsLeftOut() {
         assertTrue(ChatCodeNames.isFaction("Gondor"));
-        assertFalse("a channel keeps its own name", ChatCodeNames.isFaction("party"));
-        assertSame(ChatChannel.PARTY, ChatCodeNames.parse("party").channel);
+        assertFalse("a channel keeps its own name", ChatCodeNames.isFaction("fellowship"));
+        assertSame(ChatChannel.FELLOWSHIP, ChatCodeNames.parse("fellowship").channel);
         assertFalse(ChatCodeNames.isFaction("bree-land"));
         assertEquals(Arrays.asList("gondor", "high_elf", "unaligned"),
                 ChatCodeNames.factionCodes());

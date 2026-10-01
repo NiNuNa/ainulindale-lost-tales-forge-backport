@@ -1,7 +1,7 @@
 package com.ninuna.losttales.character.identity;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
-import com.ninuna.losttales.party.model.PartyPersonalMarkerOwner;
+import com.ninuna.losttales.fellowship.model.FellowshipPersonalMarkerOwner;
 import org.junit.Test;
 
 import java.util.UUID;
@@ -43,9 +43,9 @@ public final class PlayableIdentityTest {
         assertEquals(OWNER, PlayableIdentity.gameplayId(null, OWNER));
         assertNull(PlayableIdentity.gameplayId(null, null));
         assertEquals(PlayableIdentity.gameplayId(null, OWNER),
-                PartyPersonalMarkerOwner.resolve(null, OWNER));
+                FellowshipPersonalMarkerOwner.resolve(null, OWNER));
         assertEquals(PlayableIdentity.gameplayId(CHARACTER, OWNER),
-                PartyPersonalMarkerOwner.resolve(CHARACTER, OWNER));
+                FellowshipPersonalMarkerOwner.resolve(CHARACTER, OWNER));
     }
 
     @Test

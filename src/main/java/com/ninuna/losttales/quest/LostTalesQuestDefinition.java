@@ -158,7 +158,7 @@ public final class LostTalesQuestDefinition {
     }
 
     /**
-     * Whether a party member may join this quest from a card shared in
+     * Whether a fellowship member may join this quest from a card shared in
      * the chat: only a quest a player may start by item or interaction. A
      * locked quest starts only on its own server path, a missive board's
      * for one, so its card is never joined.

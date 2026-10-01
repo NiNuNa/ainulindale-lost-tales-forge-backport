@@ -34,7 +34,7 @@ import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.gui.screen.character.CharacterSubWindows;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
-import com.ninuna.losttales.gui.screen.party.PartyPage;
+import com.ninuna.losttales.gui.screen.fellowship.FellowshipPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.gui.screen.missive.MissiveBoardPage;
 import com.ninuna.losttales.gui.screen.missive.MissiveLetterPage;
@@ -57,9 +57,9 @@ import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerUsageStore;
-import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
-import com.ninuna.losttales.client.party.ClientPartyStateCache;
-import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipMemberStatusCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -121,10 +121,10 @@ import com.ninuna.losttales.network.packet.character.CharacterOperationResultPac
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
-import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
-import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
-import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
-import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
+import com.ninuna.losttales.network.packet.fellowship.FellowshipMemberStatusSyncPacket;
+import com.ninuna.losttales.network.packet.fellowship.FellowshipOperationResultPacket;
+import com.ninuna.losttales.network.packet.fellowship.FellowshipStateSyncPacket;
+import com.ninuna.losttales.network.packet.fellowship.FellowshipTrackingSyncPacket;
 import com.ninuna.losttales.client.chat.ClientChatProfanity;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
@@ -146,7 +146,7 @@ import net.minecraft.client.resources.IReloadableResourceManager;
 import lotr.client.render.entity.LOTRRenderBreeMan;
 import net.minecraftforge.common.MinecraftForge;
 import software.bernie.geckolib3.renderers.geo.GeoArmorRenderer;
-import com.ninuna.losttales.client.chat.ChatPartyInvitationAnswers;
+import com.ninuna.losttales.client.chat.ChatFellowshipInvitationAnswers;
 
 public class LostTalesClientProxy extends LostTalesCommonProxy {
 
@@ -206,7 +206,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     /**
-     * The quest journal, the party, the map and the characters, each a
+     * The quest journal, the fellowship, the map and the characters, each a
      * page a window can hold, with the key that opens it from another
      * page; the Characters tab's own kinds of sub-window; the Motion Lab
      * and the Server Settings, pages with no key, which need no world;
@@ -223,13 +223,13 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                         return new QuestJournalPage();
                     }
                 });
-        WindowPages.register(PartyPage.PAGE_ID, "gui.losttales.page.party",
+        WindowPages.register(FellowshipPage.PAGE_ID, "gui.losttales.page.fellowship",
                 new ItemStack(Items.iron_helmet),
-                LostTalesKeyBindings.getPartyKeyBinding(),
+                LostTalesKeyBindings.getFellowshipKeyBinding(),
                 new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
-                        return new PartyPage();
+                        return new FellowshipPage();
                     }
                 });
         WindowPages.register(LostTalesMapPage.PAGE_ID, "gui.losttales.page.map",
@@ -568,56 +568,53 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     @Override
-    public void handlePartyStateSync(PartyStateSyncPacket packet) {
+    public void handleFellowshipStateSync(FellowshipStateSyncPacket packet) {
         if (packet == null || packet.isMalformed() || packet.getSnapshot() == null) {
-            ClientPartyStateCache.markProtocolError(
+            ClientFellowshipStateCache.markProtocolError(
                     packet == null ? 0 : packet.getRequestId());
             return;
         }
         EntityPlayer player = Minecraft.getMinecraft().thePlayer;
         if (player == null || !player.getUniqueID().equals(
                 packet.getSnapshot().getOwnerId())) {
-            ClientPartyStateCache.markProtocolError(packet.getRequestId());
+            ClientFellowshipStateCache.markProtocolError(packet.getRequestId());
             return;
         }
-        ClientPartyStateCache.acceptState(
+        ClientFellowshipStateCache.acceptState(
                 packet.getRequestId(), packet.getSnapshot());
-        ClientPartyMemberStatusCache.validatePartyState(packet.getSnapshot());
-        ClientPartyTrackingCache.validatePartyState(packet.getSnapshot());
+        ClientFellowshipTrackingCache.validateFellowshipState(packet.getSnapshot());
     }
 
     @Override
-    public void handlePartyMemberStatusSync(PartyMemberStatusSyncPacket packet) {
+    public void handleFellowshipMemberStatusSync(FellowshipMemberStatusSyncPacket packet) {
         if (packet == null || packet.isMalformed() || packet.getSnapshot() == null) {
-            ClientPartyMemberStatusCache.clear();
+            ClientFellowshipMemberStatusCache.clear();
             return;
         }
         EntityPlayer player = Minecraft.getMinecraft().thePlayer;
         if (player == null || !player.getUniqueID().equals(
                 packet.getSnapshot().getOwnerId())) {
-            ClientPartyMemberStatusCache.clear();
+            ClientFellowshipMemberStatusCache.clear();
             return;
         }
-        ClientPartyMemberStatusCache.accept(packet.getSnapshot());
-        ClientPartyMemberStatusCache.validatePartyState(
-                ClientPartyStateCache.getSnapshot());
+        ClientFellowshipMemberStatusCache.accept(packet.getSnapshot());
     }
 
     @Override
-    public void handlePartyTrackingSync(PartyTrackingSyncPacket packet) {
+    public void handleFellowshipTrackingSync(FellowshipTrackingSyncPacket packet) {
         if (packet == null || packet.isMalformed() || packet.getSnapshot() == null) {
-            ClientPartyTrackingCache.clear();
+            ClientFellowshipTrackingCache.clear();
             return;
         }
         EntityPlayer player = Minecraft.getMinecraft().thePlayer;
         if (player == null || !player.getUniqueID().equals(
                 packet.getSnapshot().getOwnerId())) {
-            ClientPartyTrackingCache.clear();
+            ClientFellowshipTrackingCache.clear();
             return;
         }
-        ClientPartyTrackingCache.accept(packet.getSnapshot());
-        ClientPartyTrackingCache.validatePartyState(
-                ClientPartyStateCache.getSnapshot());
+        ClientFellowshipTrackingCache.accept(packet.getSnapshot());
+        ClientFellowshipTrackingCache.validateFellowshipState(
+                ClientFellowshipStateCache.getSnapshot());
     }
 
     @Override
@@ -859,14 +856,14 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     @Override
-    public void handlePartyOperationResult(PartyOperationResultPacket packet) {
+    public void handleFellowshipOperationResult(FellowshipOperationResultPacket packet) {
         if (packet == null || packet.isMalformed()) {
-            ClientPartyStateCache.markProtocolError(
+            ClientFellowshipStateCache.markProtocolError(
                     packet == null ? 0 : packet.getRequestId());
             return;
         }
-        ClientPartyStateCache.acceptOperation(packet.toFeedback());
-        ChatPartyInvitationAnswers.onResult(packet.toFeedback());
+        ClientFellowshipStateCache.acceptOperation(packet.toFeedback());
+        ChatFellowshipInvitationAnswers.onResult(packet.toFeedback());
     }
 
 }

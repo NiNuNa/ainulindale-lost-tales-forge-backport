@@ -14,7 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Server-to-client replacement snapshot of entities engaged with this party. */
+/** Server-to-client replacement snapshot of entities engaged with this fellowship. */
 public class LostTalesMobAggroSyncPacket implements IMessage {
     public static final int MAX_ENTITY_IDS = 512;
     public static final int MIN_TRACKING_RADIUS = 8;
@@ -80,14 +80,14 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
                 LostTalesCombatEngagement engagement =
                         LostTalesCombatEngagement.fromNetworkId(
                         buffer.readUnsignedByte());
-                boolean sharedFromParty = buffer.readBoolean();
+                boolean sharedFromFellowship = buffer.readBoolean();
                 double x = buffer.readDouble();
                 double y = buffer.readDouble();
                 double z = buffer.readDouble();
                 String name = LostTalesPacketCodec.readUtf8String(
                         buffer, MAX_ENTITY_NAME_BYTES);
                 Entry entry = new Entry(entityId, engagement,
-                        sharedFromParty, name, x, y, z);
+                        sharedFromFellowship, name, x, y, z);
                 if (!entry.isValid()
                         || !seenEntityIds.add(Integer.valueOf(entityId))) {
                     throw new LostTalesPacketCodec.DecodeException(
@@ -112,7 +112,7 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
             Entry entry = this.entries.get(index);
             buffer.writeInt(entry.getEntityId());
             buffer.writeByte(entry.getEngagement().getNetworkId());
-            buffer.writeBoolean(entry.isSharedFromParty());
+            buffer.writeBoolean(entry.isSharedFromFellowship());
             buffer.writeDouble(entry.getX());
             buffer.writeDouble(entry.getY());
             buffer.writeDouble(entry.getZ());
@@ -158,19 +158,19 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
     public static final class Entry {
         private final int entityId;
         private final LostTalesCombatEngagement engagement;
-        private final boolean sharedFromParty;
+        private final boolean sharedFromFellowship;
         private final String name;
         private final double x;
         private final double y;
         private final double z;
 
         public Entry(int entityId, LostTalesCombatEngagement engagement,
-                     boolean sharedFromParty, String name,
+                     boolean sharedFromFellowship, String name,
                      double x, double y, double z) {
             this.entityId = entityId;
             this.engagement = engagement == null
                     ? LostTalesCombatEngagement.NONE : engagement;
-            this.sharedFromParty = sharedFromParty;
+            this.sharedFromFellowship = sharedFromFellowship;
             String safeName = name == null ? "Enemy" : name.trim();
             this.name = safeName.length() == 0 ? "Enemy" : safeName;
             this.x = x;
@@ -186,8 +186,8 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
             return this.engagement;
         }
 
-        public boolean isSharedFromParty() {
-            return this.sharedFromParty;
+        public boolean isSharedFromFellowship() {
+            return this.sharedFromFellowship;
         }
 
         public String getName() {
@@ -228,7 +228,7 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
             Entry other = (Entry) value;
             return this.entityId == other.entityId
                     && this.engagement == other.engagement
-                    && this.sharedFromParty == other.sharedFromParty
+                    && this.sharedFromFellowship == other.sharedFromFellowship
                     && this.name.equals(other.name)
                     && Double.doubleToLongBits(this.x)
                     == Double.doubleToLongBits(other.x)
@@ -242,7 +242,7 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
         public int hashCode() {
             int result = this.entityId;
             result = 31 * result + this.engagement.hashCode();
-            result = 31 * result + (this.sharedFromParty ? 1 : 0);
+            result = 31 * result + (this.sharedFromFellowship ? 1 : 0);
             result = 31 * result + this.name.hashCode();
             long bits = Double.doubleToLongBits(this.x);
             result = 31 * result + (int) (bits ^ bits >>> 32);

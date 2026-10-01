@@ -147,7 +147,7 @@ public final class ClientSettingsSections {
                     }
                 });
                 panel("compass", "compass", "Compass", true);
-                panel("party", "party", "Party", true);
+                panel("fellowship", "fellowship", "Fellowship", true);
                 panel("quick_loot", "quickloot", "QuickLoot", true);
                 add(number(OptionFile.CLIENT, "quickLootHudMaxRows",
                         "hud.quick_loot_rows", 1.0D, 0));
@@ -226,8 +226,8 @@ public final class ClientSettingsSections {
                         "compass.enemies"));
                 add(number(OptionFile.CLIENT, "hostileCompassMarkerScanRadius",
                         "compass.enemy_range", 1.0D, 0));
-                add(number(OptionFile.CLIENT, "partyCompassMarkerFadeRadius",
-                        "compass.party_fade", 10.0D, 0));
+                add(number(OptionFile.CLIENT, "fellowshipCompassMarkerFadeRadius",
+                        "compass.fellowship_fade", 10.0D, 0));
             }
         };
     }

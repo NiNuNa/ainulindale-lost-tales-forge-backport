@@ -138,7 +138,7 @@ public final class LostTalesClientMobAggroCache {
 
     public static final class TrackedEnemy {
         private final int entityId;
-        private final boolean sharedFromParty;
+        private final boolean sharedFromFellowship;
         private final String name;
         private final double x;
         private final double y;
@@ -146,7 +146,7 @@ public final class LostTalesClientMobAggroCache {
 
         private TrackedEnemy(LostTalesMobAggroSyncPacket.Entry entry) {
             this.entityId = entry.getEntityId();
-            this.sharedFromParty = entry.isSharedFromParty();
+            this.sharedFromFellowship = entry.isSharedFromFellowship();
             this.name = entry.getName();
             this.x = entry.getX();
             this.y = entry.getY();
@@ -157,8 +157,8 @@ public final class LostTalesClientMobAggroCache {
             return this.entityId;
         }
 
-        public boolean isSharedFromParty() {
-            return this.sharedFromParty;
+        public boolean isSharedFromFellowship() {
+            return this.sharedFromFellowship;
         }
 
         public String getName() {

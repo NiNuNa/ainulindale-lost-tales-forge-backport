@@ -15,13 +15,13 @@ public final class LostTalesChatTypingPacketTest {
 
     @Test
     public void requestRoundTripsAndRejectsTrailingData() {
-        LostTalesChatTypingPacket original = ChatPacketFixtures.typing(ChatChannel.PARTY, "", true);
+        LostTalesChatTypingPacket original = ChatPacketFixtures.typing(ChatChannel.GLOBAL, "", true);
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatTypingPacket decoded = new LostTalesChatTypingPacket();
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
-        assertEquals(ChatChannel.PARTY, decoded.getChannel());
+        assertEquals(ChatChannel.GLOBAL, decoded.getChannel());
         assertEquals("", decoded.getTarget());
         assertTrue(decoded.isTyping());
 

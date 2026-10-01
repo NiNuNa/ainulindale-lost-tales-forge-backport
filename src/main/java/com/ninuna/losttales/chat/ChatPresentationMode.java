@@ -12,7 +12,7 @@ package com.ninuna.losttales.chat;
  * mode.
  */
 public enum ChatPresentationMode {
-    /** Global, Proximity, Party, Faction and whispers: roleplay conversation. */
+    /** Global, Proximity, Fellowship, Faction and whispers: roleplay conversation. */
     IN_CHARACTER,
     /** OOC, Operator and the two consoles: talk about the game. */
     OUT_OF_CHARACTER

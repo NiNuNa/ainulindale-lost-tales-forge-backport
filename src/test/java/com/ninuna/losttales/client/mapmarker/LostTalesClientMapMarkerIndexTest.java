@@ -55,22 +55,22 @@ public final class LostTalesClientMapMarkerIndexTest {
     }
 
     @Test
-    public void partyMarkersAreMapOnlyAndCannotReplacePersistentMarkers() {
+    public void fellowshipMarkersAreMapOnlyAndCannotReplacePersistentMarkers() {
         LostTalesClientMapMarkerIndex index =
                 new LostTalesClientMapMarkerIndex();
         LostTalesMapMarkerData world = marker(
-                "party_go_here:shared", "World", 10.0D,
+                "fellowship_go_here:shared", "World", 10.0D,
                 LostTalesMapMarkerSource.CUSTOM_PRESET);
-        LostTalesMapMarkerData collidingParty = marker(
-                "party_go_here:shared", "Party Collision", 20.0D,
+        LostTalesMapMarkerData collidingFellowship = marker(
+                "fellowship_go_here:shared", "Fellowship Collision", 20.0D,
                 LostTalesMapMarkerSource.QUEST_DYNAMIC);
-        LostTalesMapMarkerData party = marker(
-                "party_go_here:member", "Party", 30.0D,
+        LostTalesMapMarkerData fellowship = marker(
+                "fellowship_go_here:member", "Fellowship", 30.0D,
                 LostTalesMapMarkerSource.QUEST_DYNAMIC);
 
         index.replaceWorldMarkers(Collections.singleton(world));
         LostTalesClientMapMarkerIndex.Snapshot map = index.getMapSnapshot(
-                Arrays.asList(collidingParty, party));
+                Arrays.asList(collidingFellowship, fellowship));
 
         assertEquals(1,
                 index.getPersistentSnapshot().getAllMarkers().size());
@@ -78,7 +78,7 @@ public final class LostTalesClientMapMarkerIndexTest {
                 index.getPersistentSnapshot().findById(world.getId()));
         assertEquals(2, map.getAllMarkers().size());
         assertSame(world, map.findById(world.getId()));
-        assertSame(party, map.findById(party.getId()));
+        assertSame(fellowship, map.findById(fellowship.getId()));
     }
 
     @Test
@@ -91,20 +91,20 @@ public final class LostTalesClientMapMarkerIndexTest {
         LostTalesMapMarkerData second = marker(
                 "losttales:second", "Second", 20.0D,
                 LostTalesMapMarkerSource.CUSTOM_PRESET);
-        LostTalesMapMarkerData party = marker(
-                "party_go_here:member", "Party", 30.0D,
+        LostTalesMapMarkerData fellowship = marker(
+                "fellowship_go_here:member", "Fellowship", 30.0D,
                 LostTalesMapMarkerSource.QUEST_DYNAMIC);
 
         index.replaceWorldMarkers(Collections.singleton(first));
         assertEquals(2, index.getMapSnapshot(
-                Collections.singleton(party)).getAllMarkers().size());
+                Collections.singleton(fellowship)).getAllMarkers().size());
         index.replaceWorldMarkers(Collections.singleton(second));
         LostTalesClientMapMarkerIndex.Snapshot rebuilt =
-                index.getMapSnapshot(Collections.singleton(party));
+                index.getMapSnapshot(Collections.singleton(fellowship));
 
         assertEquals(2, rebuilt.getAllMarkers().size());
         assertSame(second, rebuilt.findById(second.getId()));
-        assertSame(party, rebuilt.findById(party.getId()));
+        assertSame(fellowship, rebuilt.findById(fellowship.getId()));
     }
 
     private static LostTalesMapMarkerData marker(

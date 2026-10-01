@@ -275,6 +275,18 @@ public abstract class ScreenPart {
     public void searchWindow(Window window, WindowFrame frame) {}
 
     /** Over a window of the part's, after its row: whatever stands at its foot. */
+    /**
+     * Draws {@code tab}, one of this part's, beside the page in front of
+     * a split window, in {@code box}, read only. Nothing for a tab that is
+     * not this part's.
+     */
+    public void drawBeside(Window window, WindowFrame frame, WindowTab tab,
+                           LostTalesUiHitBox box,
+                           LostTalesGuiAnimationSample shown) {}
+
+    /** Scrolls this part's tab on the other side of {@code frame}'s split by {@code lines} turns of the wheel. */
+    public void scrollBeside(WindowFrame frame, int lines) {}
+
     public void drawWindowFoot(Window window, WindowFrame frame,
                                LostTalesGuiAnimationSample shown,
                                int mouseX, int mouseY) {}

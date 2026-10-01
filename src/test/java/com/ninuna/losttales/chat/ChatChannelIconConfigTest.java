@@ -38,14 +38,14 @@ public final class ChatChannelIconConfigTest {
     public void anEntryPutsAnIconOnAChannel() {
         Map<String, ChatChannelIconSpec> icons = parse(
                 "operator=item:minecraft:iron_sword",
-                "Party = emoji:joy",
+                "Fellowship = emoji:joy",
                 "ooc=slight_smile");
 
         assertEquals(3, icons.size());
         assertEquals(ChatChannelIconSpec.parse("item:minecraft:iron_sword"),
                 icons.get(ChatChannel.OPERATOR.getId()));
         assertEquals(ChatChannelIconSpec.parse("emoji:joy"),
-                icons.get(ChatChannel.PARTY.getId()));
+                icons.get(ChatChannel.FELLOWSHIP.getId()));
         assertEquals(ChatChannelIconSpec.parse("emoji:slight_smile"),
                 icons.get(ChatChannel.OOC.getId()));
         assertTrue(this.warnings.isEmpty());

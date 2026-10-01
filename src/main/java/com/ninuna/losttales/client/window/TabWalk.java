@@ -6,18 +6,36 @@ import java.util.List;
 /**
  * The order the tab keys walk, as a browser's: every tab a window shows,
  * window by window in the layout's order and each window's in its row's
- * order, pages and conversations alike.
+ * order, pages and conversations alike, a split as one.
  */
 final class TabWalk {
     private TabWalk() {}
 
-    /** Every tab the windows show, in the order Ctrl+Tab walks them. */
+    /**
+     * Every tab the windows show, in the order Ctrl+Tab walks them. A
+     * split shown is one stop, at its side in front.
+     */
     static List<WindowTab> everyTab(List<Window> windows) {
         List<WindowTab> order = new ArrayList<WindowTab>();
         for (Window window : windows) {
-            order.addAll(WindowFrame.visibleTabs(window));
+            List<WindowTab> shown = WindowFrame.visibleTabs(window);
+            WindowTab front = WindowFrame.activeTab(window, shown);
+            for (WindowTab tab : shown) {
+                if (isStop(window, tab, front)) {
+                    order.add(tab);
+                }
+            }
         }
         return order;
+    }
+
+    /** Whether Ctrl+Tab stops at {@code tab}: every tab but the side of a split behind the other. */
+    private static boolean isStop(Window window, WindowTab tab, WindowTab front) {
+        WindowSplit split = window.splitOf(tab);
+        if (split == null || !WindowDrawing.shows(split, tab)) {
+            return true;
+        }
+        return split.holds(front) ? tab.equals(front) : tab.equals(split.first());
     }
 
     /**

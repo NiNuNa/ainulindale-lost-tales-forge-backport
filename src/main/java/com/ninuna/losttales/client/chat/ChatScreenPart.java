@@ -484,7 +484,7 @@ public final class ChatScreenPart extends ScreenPart {
      */
     @Override
     public boolean hasRestorable() {
-        return !ChatMenus.restorableChannels().isEmpty()
+        return !ChatMenus.restorableTabs().isEmpty()
                 || ChatMenus.hasWhisperCandidates(this.mc)
                 || ChatLayout.hasClosedNpcConversation();
     }
@@ -1247,6 +1247,27 @@ public final class ChatScreenPart extends ScreenPart {
         LostTalesChatOverlayRenderer.drawWindowForScreen(this.mc, window,
                 this.screen.width, this.screen.height, shown);
         return true;
+    }
+
+    /** A conversation beside the page in front of a split window, read only. */
+    @Override
+    public void drawBeside(Window window, WindowFrame frame, WindowTab tab,
+                           LostTalesUiHitBox box,
+                           LostTalesGuiAnimationSample shown) {
+        ChatTab view = ChatTab.from(tab);
+        if (view != null) {
+            LostTalesChatOverlayRenderer.drawBeside(this.mc, window, view, box, shown);
+        }
+    }
+
+    /** A conversation on the other side of a split scrolls where it stands. */
+    @Override
+    public void scrollBeside(WindowFrame frame, int lines) {
+        ChatFrame chat = frame == null ? null : ChatFrame.find(frame.windowId);
+        if (chat != null) {
+            scrollHistory(chat.besideFrame(), WheelStep.pixels(lines,
+                    LostTalesChatOverlayRenderer.LINE_HEIGHT));
+        }
     }
 
     /** A search over the window reads its lines, and lands on a new match. */
@@ -2480,8 +2501,8 @@ public final class ChatScreenPart extends ScreenPart {
                 }
                 return true;
             }
-            case PARTY_INVITATION:
-                ChatPartyInvitationAnswers.answer(
+            case FELLOWSHIP_INVITATION:
+                ChatFellowshipInvitationAnswers.answer(
                         ChatInteractions.invitationAnswer(part));
                 return true;
             case CONSUMED:

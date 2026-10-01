@@ -192,6 +192,11 @@ public final class MenuWindow extends SubWindowContent {
          * keeps the same rows.
          */
         public String unavailable = "";
+        /**
+         * Whether the row stands muted with nothing said: a row a locked
+         * window holds back, which the padlock explains by itself.
+         */
+        boolean held;
         /** What the row's setting reads now, at its right end; empty for none. */
         public String value = "";
         /** A colour chip before the value, a colour setting's; -1 for none. */
@@ -276,6 +281,12 @@ public final class MenuWindow extends SubWindowContent {
         /** The same entry, muted and closed for {@code reason}. */
         public Entry unavailable(String reason) {
             this.unavailable = reason == null ? "" : reason;
+            return this;
+        }
+
+        /** The same entry, muted and closed with nothing said under the pointer: held by a padlock. */
+        public Entry held() {
+            this.held = true;
             return this;
         }
 
@@ -403,6 +414,7 @@ public final class MenuWindow extends SubWindowContent {
             copy.labelStyle = this.labelStyle;
             copy.labelColor = this.labelColor;
             copy.unavailable = this.unavailable;
+            copy.held = this.held;
             copy.value = this.value;
             copy.valueChip = this.valueChip;
             copy.valuePicture = this.valuePicture;
@@ -423,7 +435,7 @@ public final class MenuWindow extends SubWindowContent {
 
         /** Whether a press on the row does something. */
         public boolean isTakeable() {
-            return !this.header && !this.passive
+            return !this.header && !this.passive && !this.held
                     && this.unavailable.length() == 0;
         }
     }
@@ -1304,7 +1316,7 @@ public final class MenuWindow extends SubWindowContent {
                     LostTalesUiInk.argb(entry.color, alpha));
         }
         drawRowIcon(minecraft, at, entry, labelTop, hovered, elapsed, alpha);
-        int labelRgb = entry.unavailable.length() > 0
+        int labelRgb = entry.unavailable.length() > 0 || entry.held
                 ? WindowStyle.asideRgb()
                 : entry.labelColor >= 0 ? entry.labelColor
                 : LostTalesUiInk.IVORY;

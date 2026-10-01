@@ -58,7 +58,7 @@ public final class WindowStackTest {
     @Test
     public void loweringSendsAWindowBehindEveryOther() {
         detach(ChatChannel.OOC);
-        detach(ChatChannel.PARTY);
+        detach(ChatChannel.FELLOWSHIP);
         List<Window> before = WindowLayout.stacked();
         assertTrue("the layout needs a stack to test", before.size() >= 2);
         Window wasInFront = before.get(before.size() - 1);
@@ -78,7 +78,7 @@ public final class WindowStackTest {
     @Test
     public void loweringTheFrontWindowWalksTheWholeStack() {
         detach(ChatChannel.OOC);
-        detach(ChatChannel.PARTY);
+        detach(ChatChannel.FELLOWSHIP);
         String start = order();
         int count = WindowLayout.stacked().size();
         assertTrue(count >= 2);

@@ -81,7 +81,7 @@ import net.minecraft.util.ChatComponentText;
  * {@link DiscordChannelBindings}: a Discord channel holds one game
  * channel, and a game channel may be linked to any number of Discord
  * channels, in any guild the bot is in, every line posted as plain text
- * under the sender's name to each of them, while the Party channel, the
+ * under the sender's name to each of them, while the Fellowship channel, the
  * consoles and whispers never leave the game. A link is made with a
  * pairing code the game hands out and the bot's {@code /link} takes
  * ({@link DiscordLinkCodes}), so with its slash commands on the bridge

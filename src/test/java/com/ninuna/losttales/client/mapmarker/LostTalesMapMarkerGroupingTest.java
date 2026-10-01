@@ -12,7 +12,7 @@ import org.junit.Test;
 import static com.ninuna.losttales.client.mapmarker
         .LostTalesMapMarkerGrouping.GroupingCategory.LOCATION;
 import static com.ninuna.losttales.client.mapmarker
-        .LostTalesMapMarkerGrouping.GroupingCategory.PARTY;
+        .LostTalesMapMarkerGrouping.GroupingCategory.FELLOWSHIP;
 import static com.ninuna.losttales.client.mapmarker
         .LostTalesMapMarkerGrouping.GroupingCategory.QUEST;
 import static com.ninuna.losttales.client.mapmarker
@@ -934,10 +934,10 @@ public final class LostTalesMapMarkerGroupingTest {
                 LostTalesMapMarkerGrouping.GroupingCategory
                         .forLegendCategory(
                                 LostTalesMapLegendRegistry.QUESTS));
-        assertEquals(PARTY,
+        assertEquals(FELLOWSHIP,
                 LostTalesMapMarkerGrouping.GroupingCategory
                         .forLegendCategory(
-                                LostTalesMapLegendRegistry.PARTY));
+                                LostTalesMapLegendRegistry.FELLOWSHIP));
         assertEquals(UNKNOWN,
                 LostTalesMapMarkerGrouping.GroupingCategory
                         .forLegendCategory(null));
@@ -1255,9 +1255,9 @@ public final class LostTalesMapMarkerGroupingTest {
                         3.0F * s),
                 icon("losttales:quest", "Quest", 60, QUEST, 4.0F * s,
                         1.0F * s),
-                icon("losttales:gohere", "Go Here", 30, PARTY,
+                icon("losttales:gohere", "Go Here", 30, FELLOWSHIP,
                         6.0F * s, 1.0F * s),
-                icon("losttales:party2", "Rally", 25, PARTY, 8.0F * s,
+                icon("losttales:fellowship2", "Rally", 25, FELLOWSHIP, 8.0F * s,
                         2.0F * s),
                 icon("losttales:far", "Far", 20, LOCATION, 90.0F * s,
                         90.0F * s));

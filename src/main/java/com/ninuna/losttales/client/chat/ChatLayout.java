@@ -102,16 +102,16 @@ public final class ChatLayout {
      */
     private static final Set<ChatTab> CLOSED_BY_HAND = new HashSet<ChatTab>();
     /**
-     * Whisper tabs remembered per place, by the session's server key:
-     * where each was open, in order, and which were closed by hand. A
-     * conversation belongs to the server it was held on, so arriving
-     * elsewhere leaves it in the file for the next visit.
+     * Whisper and fellowship tabs remembered per place, by the session's
+     * server key: where each was open, in order, and which were closed by
+     * hand. A conversation belongs to the server it was held on, so
+     * arriving elsewhere leaves it in the file for the next visit.
      */
     private static final Map<String, List<String[]>> CONVERSATIONS =
             new LinkedHashMap<String, List<String[]>>();
     private static final Map<String, Set<String>> CLOSED_CONVERSATIONS =
             new LinkedHashMap<String, Set<String>>();
-    /** The place whose whisper tabs are on screen; empty before a join. */
+    /** The place whose whisper and fellowship tabs are on screen; empty before a join. */
     private static String conversationsPlace = "";
     /** Each window's timestamp area and member list, by window id. */
     private static final Map<String, View> VIEWS = new HashMap<String, View>();
@@ -203,7 +203,7 @@ public final class ChatLayout {
      * A new player's window: Global and OOC, Global in front, in the
      * middle of the screen at two thirds of it and locked, the one window
      * that opens locked. Every other channel starts closed; Proximity, Faction
-     * and Party open with their first line, and Operator and the consoles
+     * and Fellowship open with their first line, and Operator and the consoles
      * wait in the {@code +} until opened by hand. From then on the layout
      * is whatever the player makes of it.
      */
@@ -326,17 +326,6 @@ public final class ChatLayout {
         WindowLayout.persist();
     }
 
-    /**
-     * Steps the conversation's Notifications on, or {@code back}, as a
-     * few-word option is stepped: round the three.
-     */
-    public static synchronized ChatLineChoice stepNotification(
-            ChatTab tab, boolean back) {
-        ChatLineChoice next = notification(tab).step(back);
-        setNotification(tab, next);
-        return next;
-    }
-
     /** The conversation's Show in Feed choice: All Messages unless the player chose another. */
     public static synchronized ChatLineChoice feedChoice(ChatTab tab) {
         ChatTab row = ChatTab.row(tab);
@@ -361,14 +350,6 @@ public final class ChatLayout {
             FEED_CHOICES.put(row, choice);
         }
         WindowLayout.persist();
-    }
-
-    /** Steps the conversation's Show in Feed on, or {@code back}, round the three. */
-    public static synchronized ChatLineChoice stepFeedChoice(ChatTab tab,
-                                                             boolean back) {
-        ChatLineChoice next = feedChoice(tab).step(back);
-        setFeedChoice(tab, next);
-        return next;
     }
 
     /**
@@ -479,7 +460,7 @@ public final class ChatLayout {
             // feed as well as off the row: hiding the tab and still
             // showing its lines would say two things at once.
             ChatTab tab = ChatTab.from(each);
-            if (tab != null && tab.isWhisper()
+            if (tab != null && (tab.isWhisper() || tab.isFellowship())
                     && ClientChatChannelState.isAvailable(tab)
                     && feedChoice(tab) == choice
                     && !PinnedWindows.shows(tab)) {
@@ -593,15 +574,15 @@ public final class ChatLayout {
         return first == null ? null : openTab(tab, first.getId());
     }
 
-    /* ---- Whisper tabs per place ---- */
+    /* ---- Whisper and fellowship tabs per place ---- */
 
-    /** Whether a tab is a whisper the layout remembers per place; an NPC's is not. */
+    /** Whether a tab is a conversation the layout remembers per place: a player's whisper or a fellowship's. */
     private static boolean isRemembered(ChatTab tab) {
-        return tab != null && tab.isWhisper() && !tab.isNpc();
+        return tab != null && tab.isPlaceConversation();
     }
 
     /**
-     * Writes a place's whisper tabs into the remembered set: the open
+     * Writes a place's whisper and fellowship tabs into the remembered set: the open
      * ones with their windows, in order, and the ones closed by hand.
      */
     static synchronized void rememberConversations(String serverKey) {
@@ -626,7 +607,7 @@ public final class ChatLayout {
     }
 
     /**
-     * Opens the place's remembered whisper tabs where they were, and
+     * Opens the place's remembered whisper and fellowship tabs where they were, and
      * marks the ones closed by hand so a replay does not bring them
      * back. Called as the client connects, before anything is replayed;
      * a tab already open is left as it is.
@@ -658,7 +639,7 @@ public final class ChatLayout {
     }
 
     /**
-     * Puts a remembered whisper back in the window it stood in, locked or
+     * Puts a remembered conversation back in the window it stood in, locked or
      * not: that is the layout as the player left it, not a tab arriving.
      * With that window gone it opens as any conversation does.
      */
@@ -672,13 +653,13 @@ public final class ChatLayout {
     }
 
     /**
-     * A live line reopens a whisper tab closed by hand, a player's or an
-     * NPC's: it was closed only until somebody spoke in it again. Null
-     * for anything else.
+     * A live line reopens a conversation closed by hand, a whisper (a
+     * player's or an NPC's) or a fellowship's: it was closed only until
+     * somebody spoke in it again. Null for anything else.
      */
     public static synchronized ChatTab reopenConversation(ChatTab row,
                                                           String preferredWindowId) {
-        if (row == null || !row.isWhisper()) {
+        if (row == null || !(row.isWhisper() || row.isFellowship())) {
             return null;
         }
         CLOSED_BY_HAND.remove(ChatTab.row(row));
@@ -686,10 +667,10 @@ public final class ChatLayout {
     }
 
     /**
-     * Closes every whisper and NPC tab: a conversation ends with the
-     * session it was held in, and so does its tab — the place's whisper
-     * tabs are remembered first, open and closed by hand alike, and come
-     * back on the next visit, each with its choices. The NPC
+     * Closes every whisper, NPC and fellowship tab: a conversation ends
+     * with the session it was held in, and so does its tab — the place's
+     * whisper and fellowship tabs are remembered first, open and closed by
+     * hand alike, and come back on the next visit, each with its choices. The NPC
      * conversations of the session go, with their choices. A window left
      * empty goes, the last one included.
      */
@@ -705,7 +686,8 @@ public final class ChatLayout {
                     public boolean matches(WindowTab tab) {
                         ChatTab conversation = ChatTab.from(tab);
                         return conversation != null
-                                && conversation.isWhisper();
+                                && (conversation.isWhisper()
+                                        || conversation.isFellowship());
                     }
                 });
         if (!removed.isEmpty()) {
@@ -1035,9 +1017,9 @@ public final class ChatLayout {
      * ({@code everything}, {@code mentions} or {@code nothing}) and the
      * tab id. Its Show in Feed, where it is not {@code everything}, stands on a
      * {@code feedchoice} line the same way ({@code mentions} or
-     * {@code nothing}). Both name whispers too, never an NPC
-     * conversation, whose choices end with the session. A whisper tab is
-     * remembered per place on a line of its own: {@code conversation}, the place, the
+     * {@code nothing}). Both name whispers and fellowships too, never an
+     * NPC conversation, whose choices end with the session. A whisper or
+     * fellowship tab is remembered per place on a line of its own: {@code conversation}, the place, the
      * window and the tab id for one that was open;
      * {@code closedconversation}, the place and the tab id for one closed
      * by hand. These lines are tab-separated, since a name or a place may

@@ -9,9 +9,9 @@ import static org.junit.Assert.assertEquals;
 public final class ChatChannelTest {
 
     @Test
-    public void presentationOrderIsGlobalProximityFactionOocParty() {
+    public void presentationOrderIsGlobalProximityFactionOocFellowship() {
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
+                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.FELLOWSHIP,
                 ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE,
                 ChatChannel.SERVER_CONSOLE),
                 ChatChannel.presentationOrder());
@@ -42,7 +42,7 @@ public final class ChatChannelTest {
         assertEquals("Gondor Chat", ChatChannel.factionChatName("Gondor"));
         assertEquals("global", ChatChannel.GLOBAL.getId());
         assertEquals("proximity", ChatChannel.PROXIMITY.getId());
-        assertEquals("party", ChatChannel.PARTY.getId());
+        assertEquals("fellowship", ChatChannel.FELLOWSHIP.getId());
         assertEquals("faction", ChatChannel.FACTION.getId());
         assertEquals("ooc", ChatChannel.OOC.getId());
         assertEquals("operator", ChatChannel.OPERATOR.getId());
@@ -51,7 +51,7 @@ public final class ChatChannelTest {
         assertEquals(null, ChatChannel.fromId("all"));
         assertEquals(null, ChatChannel.fromId("admin"));
         assertEquals(null, ChatChannel.fromId("console"));
-        assertEquals(ChatChannel.PARTY, ChatChannel.fromId(" Party "));
+        assertEquals(ChatChannel.FELLOWSHIP, ChatChannel.fromId(" Fellowship "));
         // Every id resolves back to its own channel, so no two collide.
         for (ChatChannel channel : ChatChannel.values()) {
             assertEquals(channel, ChatChannel.fromId(channel.getId()));
@@ -95,8 +95,8 @@ public final class ChatChannelTest {
                 ChatChannel.WHISPER.getAccess());
         assertEquals(ChatChannelAccess.CHARACTER_FACTION,
                 ChatChannel.FACTION.getAccess());
-        assertEquals(ChatChannelAccess.PARTY_MEMBERSHIP,
-                ChatChannel.PARTY.getAccess());
+        assertEquals(ChatChannelAccess.FELLOWSHIP_MEMBERSHIP,
+                ChatChannel.FELLOWSHIP.getAccess());
         assertEquals(ChatChannelAccess.NONE,
                 ChatChannel.OPERATOR.getAccess());
         // OOC is a room everyone is in, bridged or not; the
@@ -115,7 +115,7 @@ public final class ChatChannelTest {
         assertEquals(true, ChatChannel.FACTION.isBridgeable());
         assertEquals(true, ChatChannel.OOC.isBridgeable());
         assertEquals(true, ChatChannel.OPERATOR.isBridgeable());
-        assertEquals(false, ChatChannel.PARTY.isBridgeable());
+        assertEquals(false, ChatChannel.FELLOWSHIP.isBridgeable());
         assertEquals(false, ChatChannel.CLIENT_CONSOLE.isBridgeable());
         assertEquals(false, ChatChannel.WHISPER.isBridgeable());
     }

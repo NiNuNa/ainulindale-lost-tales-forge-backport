@@ -325,7 +325,7 @@ public final class DiscordChannelBindingsTest {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "whisper=BIDIRECTIONAL;channel=123;webhook=" + WEBHOOK,
-                "party=GAME_TO_DISCORD;webhook=" + WEBHOOK,
+                "fellowship=GAME_TO_DISCORD;webhook=" + WEBHOOK,
                 "client_console=DISCORD_TO_GAME;channel=123",
         }, true, warnings);
         assertTrue(bindings.all().isEmpty());

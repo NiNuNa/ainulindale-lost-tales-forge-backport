@@ -176,7 +176,7 @@ final class ChatOutbox {
         ClientChatIdentitySelection.update();
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 LostTalesChatSendPacket.forward(tab.getChannel(),
-                        tab.getPartner(), ClientChatIdentities.wireKind(tab),
+                        tab.target(), ClientChatIdentities.wireKind(tab),
                         ClientChatIdentities.wireCharacterId(tab),
                         tab.isWhisper() ? tab.getPartnerIdentity() : "",
                         tab.isWhisper()
@@ -206,7 +206,7 @@ final class ChatOutbox {
         boolean named = ChatMessageIds.isServerId(reply.getMessageId());
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatSendPacket(tab.getChannel(), outgoing,
-                        resolveShareReferences(outgoing), tab.getPartner(),
+                        resolveShareReferences(outgoing), tab.target(),
                         ClientChatIdentities.wireKind(tab),
                         ClientChatIdentities.wireCharacterId(tab),
                         named ? reply.getMessageId() : ChatMessageIds.NONE,
@@ -438,7 +438,7 @@ final class ChatOutbox {
         // the send states it, so presence goes where the message will.
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatTypingPacket(tab.getChannel(),
-                        tab.isWhisper() ? tab.getPartner() : "", typing,
+                        tab.target(), typing,
                         ClientChatIdentities.wireKind(tab),
                         ClientChatIdentities.wireCharacterId(tab),
                         tab.isWhisper() ? tab.getPartnerIdentity() : "",

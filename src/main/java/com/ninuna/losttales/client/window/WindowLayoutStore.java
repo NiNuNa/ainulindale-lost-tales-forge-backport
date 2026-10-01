@@ -27,10 +27,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
- * window w2 locked=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full active=global tabs=global,ooc,page:journal
+ * window w2 locked=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
  * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00
- * place page:party locked=false hud=true x=40.00 y=60.00 height=292.00 width=366 fill=full
+ * place page:fellowship locked=false hud=true x=40.00 y=60.00 height=292.00 width=366 fill=full
  * tips seen=3
  * </pre>
  */
@@ -320,6 +320,7 @@ public final class WindowLayoutStore {
         double height = 0.0D;
         int width = 0;
         Window.ScreenFill fill = Window.ScreenFill.NONE;
+        List<WindowSplit> splits = new ArrayList<WindowSplit>();
         for (int index = 2; index < parts.length; index++) {
             String part = parts[index];
             int equals = part.indexOf('=');
@@ -353,6 +354,11 @@ public final class WindowLayoutStore {
                 width = parseWidth(value);
             } else if ("fill".equals(key)) {
                 fill = Window.ScreenFill.fromId(value);
+            } else if ("split".equals(key)) {
+                WindowSplit split = parseSplit(value);
+                if (split != null) {
+                    splits.add(split);
+                }
             } else {
                 for (Part owner : PARTS) {
                     if (owner.readWindow(id, key, value)) {
@@ -362,7 +368,26 @@ public final class WindowLayoutStore {
             }
         }
         return new WindowLayout.WindowSpec(id, tabs, active, locked, hud, gui,
-                offsetX, offsetY, height, width, fill);
+                offsetX, offsetY, height, width, fill, splits);
+    }
+
+    /**
+     * A split as a window's line writes it: its first page, its second,
+     * {@code across} or {@code down}, and the first's share of the room.
+     * Null for anything unreadable.
+     */
+    private static WindowSplit parseSplit(String value) {
+        String[] fields = value.split(",");
+        if (fields.length != 4) {
+            return null;
+        }
+        WindowTab first = WindowTab.fromId(fields[0]);
+        WindowTab second = WindowTab.fromId(fields[1]);
+        if (first == null || second == null || first.equals(second)) {
+            return null;
+        }
+        return new WindowSplit(first, second, WindowSplit.isStackedWay(fields[2]),
+                parseDouble(fields[3]));
     }
 
     /** A number written in the file; zero for anything unreadable. */
@@ -414,6 +439,11 @@ public final class WindowLayoutStore {
             }
             if (spec.fill != Window.ScreenFill.NONE) {
                 line.append(" fill=").append(spec.fill.id());
+            }
+            for (WindowSplit split : spec.splits) {
+                line.append(" split=").append(split.first().id()).append(',')
+                        .append(split.second().id()).append(',').append(split.wayId())
+                        .append(',').append(String.format(Locale.ROOT, "%.4f", split.share()));
             }
             Window window = WindowLayout.window(spec.id);
             for (Part part : PARTS) {

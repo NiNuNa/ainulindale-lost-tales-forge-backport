@@ -184,15 +184,15 @@ public final class WindowGesturesTest {
     public void aVisibleSlotIsTranslatedPastHiddenTabsAndTheMovingOnes() {
         Window window = WindowLayout.windows().get(1);
         List<WindowTab> tabs = window.getTabs();
-        // A server gate hides Party while its layout slot stays intact.
+        // A server gate hides Fellowship while its layout slot stays intact.
         java.util.List<String> allowed = new java.util.ArrayList<String>();
         for (ChatChannel channel : ChatChannel.values()) {
-            if (channel != ChatChannel.PARTY) { allowed.add(channel.getId()); }
+            if (channel != ChatChannel.FELLOWSHIP) { allowed.add(channel.getId()); }
         }
         ClientChatChannelState.setChannelGates(allowed, allowed);
-        assertTrue(tabs.contains(ChatTab.of(ChatChannel.PARTY)));
+        assertTrue(tabs.contains(ChatTab.of(ChatChannel.FELLOWSHIP)));
         assertFalse(ClientChatChannelState.isAvailable(
-                ChatTab.of(ChatChannel.PARTY)));
+                ChatTab.of(ChatChannel.FELLOWSHIP)));
         // The k-th visible slot lands on the list index of the k-th
         // available tab, hidden ones between counted past.
         int visible = 0;

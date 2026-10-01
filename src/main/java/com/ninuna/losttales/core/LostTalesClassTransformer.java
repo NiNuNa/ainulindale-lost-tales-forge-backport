@@ -137,6 +137,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.deathMessageTransformer.active";
     public static final String LOTR_HIRED_UNIT_ACTIVE_PROPERTY =
             "losttales.lotrHiredUnitTransformer.active";
+    public static final String LOTR_FELLOWSHIP_REQUESTS_ACTIVE_PROPERTY =
+            "losttales.lotrFellowshipRequestsTransformer.active";
+    public static final String LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY =
+            "losttales.lotrFellowshipCreateTransformer.active";
     public static final String LOTR_TRADER_NOTICE_ACTIVE_PROPERTY =
             "losttales.lotrTraderNoticeTransformer.active";
     public static final String LOTR_ACHIEVEMENT_HOVER_ACTIVE_PROPERTY =
@@ -375,6 +379,18 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "lotr.common.LOTRPlayerData";
     private static final String LOTR_HIRED_NPC_INFO =
             "lotr.common.entity.npc.LOTRHiredNPCInfo";
+    private static final String LOTR_FELLOWSHIP_DO =
+            "lotr.common.network.LOTRPacketFellowshipDo";
+    private static final String LOTR_FELLOWSHIP_CREATE_HANDLER =
+            "lotr.common.network.LOTRPacketFellowshipCreate$Handler";
+    private static final String LOTR_FELLOWSHIP_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LostTalesLotrFellowshipRequestHook";
+    private static final String LOTR_FELLOWSHIP_DESC =
+            "Llotr/common/fellowship/LOTRFellowship;";
+    private static final String LOTR_FELLOWSHIP_CREATE_DESC =
+            "(Llotr/common/network/LOTRPacketFellowshipCreate;"
+                    + "Lcpw/mods/fml/common/network/simpleimpl/MessageContext;)"
+                    + "Lcpw/mods/fml/common/network/simpleimpl/IMessage;";
     private static final String LOTR_TRAVELLING_TRADER_INFO =
             "lotr.common.entity.npc.LOTRTravellingTraderInfo";
     private static final String LOTR_TRADER_NOTICE_HOOK_OWNER =
@@ -433,6 +449,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_HIRED_NPC_INFO.equals(transformedName)) {
             return transformLotrHiredUnit(basicClass);
+        }
+        if (LOTR_FELLOWSHIP_DO.equals(transformedName)) {
+            return transformLotrFellowshipRequests(basicClass);
+        }
+        if (LOTR_FELLOWSHIP_CREATE_HANDLER.equals(transformedName)) {
+            return transformLotrFellowshipCreate(basicClass);
         }
         if (GUI_CONTAINER.equals(transformedName)) {
             return transformGuiContainer(basicClass);
@@ -3540,6 +3562,105 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch LOTR unit hiring: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Refuses LOTR's own requests about a fellowship.
+     *
+     * <p>Every request of LOTR's fellowship screen but the one that makes a
+     * fellowship finds its fellowship through
+     * {@code LOTRPacketFellowshipDo.getActiveFellowship} or
+     * {@code getActiveOrDisbandedFellowship}, and does nothing when that
+     * finds none. Each value either returns is handed to
+     * {@code LostTalesLotrFellowshipRequestHook.refuse}, which finds none:
+     * the fellowships are the mod's, managed on its own page. Without the
+     * patch a changed client could still rename, invite or hand on the lead
+     * in LOTR's fellowship behind one of ours, until the mod next sets it
+     * right.</p>
+     */
+    private static byte[] transformLotrFellowshipRequests(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            int methods = 0;
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("getActiveFellowship".equals(method.name)
+                        || "getActiveOrDisbandedFellowship".equals(method.name))
+                        || !("()" + LOTR_FELLOWSHIP_DESC).equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, LOTR_FELLOWSHIP_HOOK_OWNER, "refuse")) {
+                    methods++;
+                    continue;
+                }
+                int patched = 0;
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() != Opcodes.ARETURN) {
+                        continue;
+                    }
+                    method.instructions.insertBefore(instruction, new MethodInsnNode(
+                            Opcodes.INVOKESTATIC, LOTR_FELLOWSHIP_HOOK_OWNER, "refuse",
+                            "(" + LOTR_FELLOWSHIP_DESC + ")" + LOTR_FELLOWSHIP_DESC));
+                    patched++;
+                }
+                if (patched > 0) {
+                    methods++;
+                }
+            }
+            if (methods != 2) {
+                warn("Could not locate both fellowship lookups of LOTRPacketFellowshipDo; "
+                        + "LOTR's own fellowship requests are not refused");
+                return basicClass;
+            }
+            System.setProperty(LOTR_FELLOWSHIP_REQUESTS_ACTIVE_PROPERTY, "true");
+            info("Patched LOTR's fellowship requests to be refused");
+            return write(owner);
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR's fellowship requests: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Refuses LOTR's own request to make a fellowship: before its handler
+     * does anything, {@code LostTalesLotrFellowshipRequestHook.refusesCreation}
+     * is asked, and a yes returns at once. Fellowships are made on the
+     * mod's page; LOTR's operator command still makes LOTR's own.
+     */
+    private static byte[] transformLotrFellowshipCreate(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"onMessage".equals(method.name)
+                        || !LOTR_FELLOWSHIP_CREATE_DESC.equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, LOTR_FELLOWSHIP_HOOK_OWNER, "refusesCreation")) {
+                    System.setProperty(LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                LabelNode go = new LabelNode();
+                InsnList refusal = new InsnList();
+                refusal.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                        LOTR_FELLOWSHIP_HOOK_OWNER, "refusesCreation", "()Z"));
+                refusal.add(new JumpInsnNode(Opcodes.IFEQ, go));
+                refusal.add(new InsnNode(Opcodes.ACONST_NULL));
+                refusal.add(new InsnNode(Opcodes.ARETURN));
+                refusal.add(go);
+                method.instructions.insert(refusal);
+                System.setProperty(LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY, "true");
+                info("Patched LOTR's request to make a fellowship to be refused");
+                return write(owner);
+            }
+            warn("Could not locate LOTRPacketFellowshipCreate.Handler#onMessage; "
+                    + "LOTR's own requests to make a fellowship are not refused");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR's request to make a fellowship: " + throwable);
             return basicClass;
         }
     }

@@ -27,9 +27,9 @@ public final class ChatRolePresentationTest {
     }
 
     @Test
-    public void theWorldAroundAndThePartyHearTheCharacterPlayed() {
+    public void theWorldAroundAndTheFellowshipHearTheCharacterPlayed() {
         assertTrue(ChatRolePresentation.speaksAsPlayedCharacter(ChatChannel.PROXIMITY));
-        assertTrue(ChatRolePresentation.speaksAsPlayedCharacter(ChatChannel.PARTY));
+        assertTrue(ChatRolePresentation.speaksAsPlayedCharacter(ChatChannel.FELLOWSHIP));
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL,
                 ChatChannel.FACTION, ChatChannel.WHISPER, ChatChannel.OOC,
                 ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE}) {
@@ -88,7 +88,7 @@ public final class ChatRolePresentationTest {
         assertEquals(GONDOR,
                 ChatRolePresentation.nameColor(ChatChannel.GLOBAL, held, false, GONDOR));
         assertEquals(GONDOR,
-                ChatRolePresentation.nameColor(ChatChannel.PARTY, 0, false, GONDOR));
+                ChatRolePresentation.nameColor(ChatChannel.FELLOWSHIP, 0, false, GONDOR));
         assertEquals(ChatRolePresentation.unassignedColor(),
                 ChatRolePresentation.nameColor(ChatChannel.GLOBAL, held, true, GONDOR));
         assertEquals(ChatRolePresentation.unassignedColor(),

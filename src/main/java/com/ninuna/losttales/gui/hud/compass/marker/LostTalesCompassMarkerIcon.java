@@ -36,10 +36,10 @@ public enum LostTalesCompassMarkerIcon {
     TAVERN(0, 36, 2, 15, 3, 15),
     /** Retired from the palette; its cell now holds the mountains glyph. */
     FOUNTAIN(54, 36, 1, 16, 2, 16),
-    PARTY_PURPLE(72, 0, 4, 13, 2, 15),
-    PARTY_YELLOW(72, 0, 4, 13, 2, 15),
-    PARTY_BLUE(72, 0, 4, 13, 2, 15),
-    PARTY_GREEN(72, 0, 4, 13, 2, 15);
+    FELLOWSHIP_PURPLE(72, 0, 4, 13, 2, 15),
+    FELLOWSHIP_YELLOW(72, 0, 4, 13, 2, 15),
+    FELLOWSHIP_BLUE(72, 0, 4, 13, 2, 15),
+    FELLOWSHIP_GREEN(72, 0, 4, 13, 2, 15);
 
     public static final ResourceLocation TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/map_markers.png");
     public static final int TEXTURE_WIDTH = 197;

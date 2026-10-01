@@ -5,16 +5,20 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
-import com.ninuna.losttales.party.model.Party;
-import com.ninuna.losttales.party.model.PartyMember;
-import com.ninuna.losttales.party.storage.PartyStorage;
+import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.model.FellowshipMember;
+import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
+import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissions;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
 import cpw.mods.fml.common.FMLLog;
@@ -66,10 +70,9 @@ public final class ChatIdentitySelection {
         RoleplayCharacter character = character(player);
         LostTalesChatService.sendContextHistory(player, ChatChannel.FACTION,
                 ChatChannelPolicy.factionOf(character), ChatMessageIds.NONE);
-        Party party = party(player);
-        if (party != null) {
-            LostTalesChatService.sendContextHistory(player, ChatChannel.PARTY,
-                    party.getPartyId().toString(), ChatMessageIds.NONE);
+        for (Fellowship fellowship : fellowships(player)) {
+            LostTalesChatService.sendContextHistory(player, ChatChannel.FELLOWSHIP,
+                    fellowship.getFellowshipId().toString(), ChatMessageIds.NONE);
         }
         // The character spoken as is one the player uses, so it shows a
         // presence, and the one given up may not any more.
@@ -146,18 +149,59 @@ public final class ChatIdentitySelection {
                 ? played(player) : character(player);
     }
 
-    /** The party the player travels with: the played character's. */
-    public static Party party(EntityPlayerMP player) { return partyFor(player, playedId(player)); }
-
-    private static Party partyFor(EntityPlayerMP player, UUID identityId) {
+    /**
+     * The fellowships of the character the player plays, the one it
+     * travels with first, then the others in the order it joined them.
+     */
+    public static List<Fellowship> fellowships(EntityPlayerMP player) {
+        UUID identityId = playedId(player);
+        List<Fellowship> result = new ArrayList<Fellowship>();
         try {
-            Party party = PartyStorage.get(player.worldObj).getPartyForIdentity(identityId);
-            PartyMember member = party == null ? null : party.getMember(identityId);
-            return member != null && player.getUniqueID().equals(member.getOwnerId()) ? party : null;
+            FellowshipWorldData data = FellowshipStorage.get(player.worldObj);
+            Fellowship travelling = data.getTravellingFellowship(identityId);
+            if (travelling != null) {
+                result.add(travelling);
+            }
+            for (Fellowship fellowship : data.getFellowshipsForIdentity(identityId)) {
+                if (travelling == null || !fellowship.getFellowshipId()
+                        .equals(travelling.getFellowshipId())) {
+                    result.add(fellowship);
+                }
+            }
         } catch (RuntimeException failure) {
             warn(failure);
+            return result;
+        }
+        List<Fellowship> owned = new ArrayList<Fellowship>(result.size());
+        for (Fellowship fellowship : result) {
+            FellowshipMember member = fellowship.getMember(identityId);
+            if (member != null && player.getUniqueID().equals(member.getOwnerId())) {
+                owned.add(fellowship);
+            }
+        }
+        return owned;
+    }
+
+    /** One of the played character's fellowships; null for any other id. */
+    public static Fellowship fellowship(EntityPlayerMP player, UUID fellowshipId) {
+        if (fellowshipId == null) {
             return null;
         }
+        for (Fellowship fellowship : fellowships(player)) {
+            if (fellowship.getFellowshipId().equals(fellowshipId)) {
+                return fellowship;
+            }
+        }
+        return null;
+    }
+
+    /** The ids of the played character's fellowships. */
+    public static Set<UUID> fellowshipIds(EntityPlayerMP player) {
+        Set<UUID> ids = new HashSet<UUID>();
+        for (Fellowship fellowship : fellowships(player)) {
+            ids.add(fellowship.getFellowshipId());
+        }
+        return ids;
     }
 
     private static void warn(RuntimeException failure) {
@@ -174,33 +218,40 @@ public final class ChatIdentitySelection {
 
     public static void sendState(EntityPlayerMP player) {
         RoleplayCharacter character = character(player);
-        Party party = party(player);
-        PartyMember member = party == null ? null : party.getMember(playedId(player));
-        int color = member == null ? ChatChannel.PARTY.getDisplayColor() : member.getColor().getRgb();
         UUID id = character == null ? null : character.getCharacterId();
-        UUID partyId = party == null ? null : party.getPartyId();
-        String leader = leaderName(party);
-        String name = party == null ? "" : party.getName();
-        LAST_STATE.put(player.getUniqueID(), signature(player, id, partyId, color, leader, name));
+        List<ChatFellowship> fellowships = chatFellowships(player);
+        LAST_STATE.put(player.getUniqueID(), signature(player, id, fellowships));
         LostTalesNetworkHandler.CHANNEL.sendTo(
-                new LostTalesChatIdentitySyncPacket(id, partyId, color, leader, name,
-                        isNarrating(player)), player);
+                new LostTalesChatIdentitySyncPacket(id, fellowships, isNarrating(player)),
+                player);
     }
 
-    /** The leader's character name, which names an unnamed party's tab; empty without a party. */
-    static String leaderName(Party party) {
-        PartyMember leader = party == null ? null : party.getLeader();
-        return leader == null || leader.getCharacterName() == null ? "" : leader.getCharacterName();
+    /** The played character's fellowships as the chat names and colours them. */
+    static List<ChatFellowship> chatFellowships(EntityPlayerMP player) {
+        UUID played = playedId(player);
+        List<ChatFellowship> result = new ArrayList<ChatFellowship>();
+        for (Fellowship fellowship : fellowships(player)) {
+            FellowshipMember member = fellowship.getMember(played);
+            result.add(new ChatFellowship(fellowship.getFellowshipId(), fellowship.getName(),
+                    member.getColor().getRgb()));
+        }
+        return result;
     }
 
-    private static String signature(EntityPlayerMP player, UUID id, UUID partyId, int color,
-                                    String leader, String name) {
-        return id + ":" + partyId + ":" + color + ":" + leader + ":" + name + ":" + isNarrating(player)
-                + ":" + roles(player) + ":"
-                + ChatChannelPolicy.factionOf(character(player));
+    private static String signature(EntityPlayerMP player, UUID id,
+                                    List<ChatFellowship> fellowships) {
+        StringBuilder state = new StringBuilder();
+        state.append(id).append(':');
+        for (ChatFellowship fellowship : fellowships) {
+            state.append(fellowship.getId()).append('/').append(fellowship.getColor())
+                    .append('/').append(fellowship.getName()).append(';');
+        }
+        return state.append(':').append(isNarrating(player)).append(':')
+                .append(roles(player)).append(':')
+                .append(ChatChannelPolicy.factionOf(character(player))).toString();
     }
 
-    /** Membership and role changes refresh the chat without replacing gameplay party data. */
+    /** Membership and role changes refresh the chat without replacing gameplay fellowship data. */
     @SubscribeEvent
     public void onTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END || ++ticks < 20) { return; }
@@ -211,12 +262,8 @@ public final class ChatIdentitySelection {
             if (!(value instanceof EntityPlayerMP)) { continue; }
             EntityPlayerMP player = (EntityPlayerMP)value;
             RoleplayCharacter character = character(player);
-            Party party = party(player);
-            PartyMember member = party == null ? null : party.getMember(playedId(player));
             String state = signature(player, character == null ? null : character.getCharacterId(),
-                    party == null ? null : party.getPartyId(), member == null
-                            ? ChatChannel.PARTY.getDisplayColor() : member.getColor().getRgb(),
-                    leaderName(party), party == null ? "" : party.getName());
+                    chatFellowships(player));
             if (!state.equals(LAST_STATE.get(player.getUniqueID()))) {
                 LostTalesChatService.sendAccess(player);
             }

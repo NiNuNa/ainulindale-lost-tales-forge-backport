@@ -14,7 +14,7 @@ import net.minecraft.client.Minecraft;
  * What the server last said of who is in each conversation, for the
  * member lists of the windows showing it, and when to ask again. A
  * conversation is the one a tab shows ({@link ChatTab#viewed}), known by
- * its id: a channel's, a faction's or a party's as the chat is read, a
+ * its id: a channel's, a faction's or a fellowship's as the chat is read, a
  * whisper held as one identity, an NPC's.
  *
  * <p>A window whose list stands asks for its front tab's conversation

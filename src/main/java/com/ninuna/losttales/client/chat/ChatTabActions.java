@@ -3,7 +3,9 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.TabSelection;
 import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowDrawing;
 import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowSplit;
 import com.ninuna.losttales.client.window.WindowTab;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -118,10 +120,19 @@ public final class ChatTabActions {
         List<Window> windows = WindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
             Window window = windows.get(index);
-            ChatTab front = ChatTab.from(ChatFrame.activeTab(window,
-                    ChatFrame.visibleTabs(window)));
+            WindowTab shown = ChatFrame.activeTab(window,
+                    ChatFrame.visibleTabs(window));
+            ChatTab front = ChatTab.from(shown);
             if (front != null) {
                 ClientChatChannelViews.markViewed(front);
+            }
+            // A conversation on the other side of a split is read where
+            // it stands too.
+            WindowSplit split = shown == null ? null : window.splitOf(shown);
+            ChatTab beside = WindowDrawing.shows(split, shown)
+                    ? ChatTab.from(split.other(shown)) : null;
+            if (beside != null) {
+                ClientChatChannelViews.markViewed(beside);
             }
         }
     }

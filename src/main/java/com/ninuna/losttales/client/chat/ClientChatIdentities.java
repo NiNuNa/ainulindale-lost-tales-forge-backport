@@ -133,7 +133,7 @@ final class ClientChatIdentities {
 
     /**
      * Whether the tab speaks as the character played, whatever the head
-     * button chose: Proximity and Party
+     * button chose: Proximity and Fellowship
      * ({@link ChatRolePresentation#speaksAsPlayedCharacter}).
      */
     static boolean speaksAsPlayed(ChatTab tab) {

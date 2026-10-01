@@ -60,10 +60,10 @@ import net.minecraft.util.IChatComponent;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StatCollector;
-import com.ninuna.losttales.party.sync.PartyInvitationNotice;
-import com.ninuna.losttales.party.sync.PartyInvitationSnapshot;
-import com.ninuna.losttales.party.sync.PartyStateSnapshot;
-import com.ninuna.losttales.client.party.ClientPartyStateCache;
+import com.ninuna.losttales.fellowship.sync.FellowshipInvitationNotice;
+import com.ninuna.losttales.fellowship.sync.FellowshipInvitationSnapshot;
+import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 
 /**
  * Turns every line that arrives into the chat's own line: a player's or a
@@ -238,7 +238,7 @@ public final class LostTalesChatPresentation {
         if (row != null && !ChatLayout.isOpen(row)) {
             if (ChatLayout.opensByItself(row)) {
                 ChatLayout.openTab(row, windowIdOfSelection());
-            } else if (!replayed && row.isWhisper() && !row.isNpc()) {
+            } else if (!replayed && row.isPlaceConversation()) {
                 ChatLayout.reopenConversation(row, windowIdOfSelection());
             }
         }
@@ -2463,16 +2463,16 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * Whether the invitation, as the party state already shows it, comes
+     * Whether the invitation, as the fellowship state already shows it, comes
      * from an account or an identity this player ignores.
      */
     private static boolean isFromIgnored(UUID invitationId) {
-        PartyStateSnapshot party = invitationId == null ? null
-                : ClientPartyStateCache.getSnapshot();
-        if (party == null) {
+        FellowshipStateSnapshot fellowship = invitationId == null ? null
+                : ClientFellowshipStateCache.getSnapshot();
+        if (fellowship == null) {
             return false;
         }
-        for (PartyInvitationSnapshot invitation : party.getIncomingInvitations()) {
+        for (FellowshipInvitationSnapshot invitation : fellowship.getIncomingInvitations()) {
             if (invitationId.equals(invitation.getInvitationId())) {
                 return ClientChatIgnores.isIgnored(invitation.getInvitingOwnerId())
                         || ClientChatIgnores.isIgnoredIdentity(
@@ -2500,8 +2500,8 @@ public final class LostTalesChatPresentation {
             return false;
         }
         // An invitation from someone this player ignores is dropped without
-        // a word; the Party page still lists it until it runs out.
-        if (isFromIgnored(PartyInvitationNotice.invitationIdOf(message))) {
+        // a word; the Fellowship page still lists it until it runs out.
+        if (isFromIgnored(FellowshipInvitationNotice.invitationIdOf(message))) {
             return true;
         }
         // A system line reopens its closed channel exactly as a player
@@ -2515,11 +2515,11 @@ public final class LostTalesChatPresentation {
         boolean adminNotice = ChatSystemLineClassifier.isAdminNotice(message);
         ChatTab asked = channel == ChatChannel.CLIENT_CONSOLE && !adminNotice
                 ? commandOutputTab() : null;
-        // A line addressed to this player, a party invitation, stands in
+        // A line addressed to this player, a fellowship invitation, stands in
         // the conversation they are looking at, where it is read and
         // answered, rather than in a console that may be closed.
         ChatTab addressed = asked == null
-                && PartyInvitationNotice.isNotice(message)
+                && FellowshipInvitationNotice.isNotice(message)
                 ? ClientChatChannelState.getSelected() : null;
         if (asked == null && addressed == null && !ChatLayout.isOpen(tab)
                 && ChatLayout.opensByItself(tab)) {
@@ -2538,10 +2538,10 @@ public final class LostTalesChatPresentation {
         IChatComponent shown = rewriteServerLine(adminNotice
                         ? plainAdminNotice(message) : message, channel,
                 localMentionNames(minecraft), localMentioned, named);
-        // An invitation to a party is addressed to its reader.
+        // An invitation to a fellowship is addressed to its reader.
         boolean mentioned = localMentioned[0]
                 || (LostTalesConfig.enableChatPings
-                        && PartyInvitationNotice.isNotice(message));
+                        && FellowshipInvitationNotice.isNotice(message));
         // A join, a leave, a death or an achievement is a sentence the
         // server says, and ends as one.
         shown = asAnnouncement(shown,

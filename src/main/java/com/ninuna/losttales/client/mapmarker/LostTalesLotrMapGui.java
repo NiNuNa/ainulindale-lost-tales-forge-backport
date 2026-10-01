@@ -5,14 +5,14 @@ import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
-import com.ninuna.losttales.client.party.ClientPartyStateCache;
-import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
-import com.ninuna.losttales.client.party.PartyClientRequestManager;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
+import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
-import com.ninuna.losttales.party.model.PartyPersonalMarkerOwner;
-import com.ninuna.losttales.party.sync.PartyStateSnapshot;
+import com.ninuna.losttales.fellowship.model.FellowshipPersonalMarkerOwner;
+import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import java.util.UUID;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
@@ -403,7 +403,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         if (this.places == null) {
             this.places = LostTalesMapSearchPrompt.places(
                     LostTalesClientMapMarkerStore.getMapMarkers(
-                            ClientPartyTrackingCache.getMapMarkers()));
+                            ClientFellowshipTrackingCache.getMapMarkers()));
         }
         this.placesFound = LostTalesMapSearchPrompt.filter(this.places,
                 typed);
@@ -1568,7 +1568,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         this.searchPrompt = LostTalesMapSearchPrompt.open(
                 this.mc.fontRenderer, this.width, this.height,
                 LostTalesClientMapMarkerStore.getMapMarkers(
-                        ClientPartyTrackingCache.getMapMarkers()));
+                        ClientFellowshipTrackingCache.getMapMarkers()));
         this.mapLegendOpen = false;
         LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
     }
@@ -1912,7 +1912,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
 
         this.goHerePressPending = false;
         this.mapInput.press(mouseX, mouseY);
-        PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
+        FellowshipStateSnapshot state = ClientFellowshipStateCache.getSnapshot();
         if (handleMarkerClick(mouseX, mouseY, state)) {
             return;
         }
@@ -1978,7 +1978,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      *         "go here" marker being dropped underneath it
      */
     private boolean handleMarkerClick(
-            int mouseX, int mouseY, PartyStateSnapshot state) {
+            int mouseX, int mouseY, FellowshipStateSnapshot state) {
         if (this.mc == null || this.mc.thePlayer == null) {
             return false;
         }
@@ -2093,12 +2093,12 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      * Acts on a click that landed on empty map.
      *
      * <p>The first marker is dropped where the player clicked, with nothing to
-     * ask about. Once one exists it is shared with the party and is what
+     * ask about. Once one exists it is shared with the fellowship and is what
      * everyone is walking towards, so moving it is asked for rather than
      * assumed.</p>
      */
     private void placeGoHereMarkerAtPointer(int mouseX, int mouseY) {
-        PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
+        FellowshipStateSnapshot state = ClientFellowshipStateCache.getSnapshot();
         UUID ownerId = personalMarkerOwnerId(state);
         if (this.mc == null || this.mc.thePlayer == null
                 || ownerId == null) {
@@ -2113,7 +2113,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                 this.mc.thePlayer.dimension,
                 worldPosition[0], worldPosition[1]
         };
-        if (ClientPartyTrackingCache.hasLocalGoHereMarker(state)) {
+        if (ClientFellowshipTrackingCache.hasLocalGoHereMarker(state)) {
             openMoveMarkerPrompt(destination);
             return;
         }
@@ -2127,7 +2127,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                 || destination.length < 3) {
             return;
         }
-        PartyClientRequestManager.setGoHereMarker(
+        FellowshipClientRequestManager.setGoHereMarker(
                 ownerId, destination[0], destination[1], destination[2]);
     }
 
@@ -2155,7 +2155,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         }
         int[] destination = this.pendingGoHereDestination;
         UUID ownerId = personalMarkerOwnerId(
-                ClientPartyStateCache.getSnapshot());
+                ClientFellowshipStateCache.getSnapshot());
         clearMoveMarkerPrompt();
         // Every answer is a request the server re-derives ownership for; the
         // popup itself owns nothing.
@@ -2163,7 +2163,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             sendGoHereMarker(ownerId, destination);
         } else if (action
                 == LostTalesMapMoveMarkerPrompt.Action.REMOVE) {
-            PartyClientRequestManager.removeGoHereMarker(ownerId);
+            FellowshipClientRequestManager.removeGoHereMarker(ownerId);
         }
     }
 
@@ -2182,17 +2182,17 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      * <p>The server resolves the same thing independently for every request;
      * this only decides what to ask for and where to look for the answer.</p>
      */
-    private UUID personalMarkerOwnerId(PartyStateSnapshot state) {
+    private UUID personalMarkerOwnerId(FellowshipStateSnapshot state) {
         UUID characterId = state != null && state.isAvailable()
                 ? state.getActiveIdentityId() : null;
         UUID playerId = this.mc == null || this.mc.thePlayer == null
                 ? null : this.mc.thePlayer.getUniqueID();
-        return PartyPersonalMarkerOwner.resolve(characterId, playerId);
+        return FellowshipPersonalMarkerOwner.resolve(characterId, playerId);
     }
 
-    private String getLocalGoHereMarkerId(PartyStateSnapshot state) {
+    private String getLocalGoHereMarkerId(FellowshipStateSnapshot state) {
         UUID ownerId = personalMarkerOwnerId(state);
-        return ownerId == null ? null : "party_go_here:" + ownerId;
+        return ownerId == null ? null : "fellowship_go_here:" + ownerId;
     }
 
     /**
@@ -2275,7 +2275,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                                 this.lastRenderedWaypoints,
                                 this.lastRenderedIncludeHidden,
                                 getLocalGoHereMarkerId(
-                                        ClientPartyStateCache
+                                        ClientFellowshipStateCache
                                                 .getSnapshot())),
                 anchorX, anchorZ,
                 anchor == null ? null : anchor.getKey());
@@ -2367,7 +2367,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                 && (this.promptCustomMarker != null
                         || this.promptNativeWaypoint != null)
                 && personalMarkerOwnerId(
-                        ClientPartyStateCache.getSnapshot()) != null;
+                        ClientFellowshipStateCache.getSnapshot()) != null;
     }
 
     private void handleFastTravelPromptAction(
@@ -2417,7 +2417,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             LostTalesMapMarkerData customMarker,
             LOTRAbstractWaypoint nativeWaypoint) {
         UUID ownerId = personalMarkerOwnerId(
-                ClientPartyStateCache.getSnapshot());
+                ClientFellowshipStateCache.getSnapshot());
         if (ownerId == null) {
             return;
         }
@@ -2435,7 +2435,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         } else {
             return;
         }
-        PartyClientRequestManager.setGoHereMarker(
+        FellowshipClientRequestManager.setGoHereMarker(
                 ownerId, dimensionId, x, z);
     }
 

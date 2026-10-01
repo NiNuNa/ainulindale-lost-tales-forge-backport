@@ -9,6 +9,8 @@ import com.ninuna.losttales.character.state.CharacterLastSeen;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
+import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
@@ -23,8 +25,8 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
-import com.ninuna.losttales.party.model.Party;
-import com.ninuna.losttales.party.model.PartyMember;
+import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -58,7 +60,7 @@ import net.minecraft.world.storage.IPlayerFileData;
  * absent stand together after everyone here, by name. On an
  * in-character channel that is every other character of the world's
  * rosters that may read it — every character of the faction for Faction,
- * the party's members for Party — including a player's characters other
+ * the fellowship's members for Fellowship — including a player's characters other
  * than the one they speak as; on an out-of-character one, every other
  * account the world has made a roster for. An account the server would
  * not let in, banned or off an enforced whitelist, is nobody's member. A
@@ -154,21 +156,23 @@ public final class ChatMemberDirectory {
                         request.getPartnerIdentity(),
                         request.getPartnerCharacterId(),
                         request.getHeldCharacterId())
-                : answerFor(viewer, channel);
+                : answerFor(viewer, channel,
+                        ChatTabIds.scopeOf(request.getConversationKey()));
         return new LostTalesChatMembersPacket(channel,
                 request.getConversationKey(), answer.members, answer.unlisted);
     }
 
     /**
-     * The members of {@code channel}'s conversation as {@code viewer}
-     * reads it, grouped and ordered as the list stands them, at most
+     * The members of {@code channel}'s conversation {@code scope} (a
+     * fellowship's id for a fellowship's) as {@code viewer} reads it, grouped and ordered as the list stands them, at most
      * {@link LostTalesChatMembersPacket#MAX_MEMBERS}: the viewer alone in
      * a private console, the Server in every conversation, and none for a
      * channel the viewer may not read, or for the whisper channel, whose
      * conversations are asked for by their two people
      * ({@link #answerForWhisper}).
      */
-    public static Answer answerFor(EntityPlayerMP viewer, ChatChannel channel) {
+    public static Answer answerFor(EntityPlayerMP viewer, ChatChannel channel,
+                                   String scope) {
         if (viewer == null || channel == null || channel == ChatChannel.WHISPER
                 || !ChatChannelPolicy.canRead(viewer, channel,
                         ChatIdentitySelection.roles(viewer))) {
@@ -187,10 +191,10 @@ public final class ChatMemberDirectory {
             Collections.sort(alone, LostTalesChatMembersPacket.ORDER);
             return new Answer(alone, 0);
         }
-        Party party = channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP
-                ? ChatIdentitySelection.party(viewer) : null;
-        if (channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP
-                && party == null) {
+        Fellowship fellowship = channel.getAccess() == ChatChannelAccess.FELLOWSHIP_MEMBERSHIP
+                ? ChatIdentitySelection.fellowship(viewer, ChatFellowship.idOf(scope)) : null;
+        if (channel.getAccess() == ChatChannelAccess.FELLOWSHIP_MEMBERSHIP
+                && fellowship == null) {
             return Answer.NONE;
         }
         String factionId = ChatChannelPolicy.factionOf(
@@ -199,7 +203,7 @@ public final class ChatMemberDirectory {
                 new ArrayList<LostTalesChatMembersPacket.Member>();
         Set<String> presentKeys = new HashSet<String>();
         List<EntityPlayerMP> reached = new ArrayList<EntityPlayerMP>(
-                ChatChannelPolicy.route(viewer, channel, party, factionId)
+                ChatChannelPolicy.route(viewer, channel, fellowship, factionId)
                         .recipients);
         if (!reached.contains(viewer)) {
             reached.add(viewer);
@@ -219,7 +223,7 @@ public final class ChatMemberDirectory {
         // The server speaks in every conversation as a voice of its own,
         // and is online for as long as anybody can read it.
         present.add(serverMember(inCharacter));
-        List<Absentee> absent = absenteesOf(viewer, channel, party, factionId,
+        List<Absentee> absent = absenteesOf(viewer, channel, fellowship, factionId,
                 inCharacter);
         RoleplayCharacter viewerAs = inCharacter
                 ? ChatIdentitySelection.speakerFor(viewer, channel) : null;
@@ -404,19 +408,19 @@ public final class ChatMemberDirectory {
 
     /**
      * The identities that may be absent from the conversation, by name: a
-     * party's members, read afresh; nobody for Proximity; for every other
+     * fellowship's members, read afresh; nobody for Proximity; for every other
      * channel the rosters' identities that may read it, kept for a while.
      */
     private static List<Absentee> absenteesOf(EntityPlayerMP viewer,
-                                              ChatChannel channel, Party party,
+                                              ChatChannel channel, Fellowship fellowship,
                                               String factionId,
                                               boolean inCharacter) {
         MinecraftServer server = MinecraftServer.getServer();
         if (server == null || viewer.worldObj == null) {
             return Collections.emptyList();
         }
-        if (channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP) {
-            return partyAbsentees(server, viewer, party);
+        if (channel.getAccess() == ChatChannelAccess.FELLOWSHIP_MEMBERSHIP) {
+            return fellowshipAbsentees(server, viewer, fellowship);
         }
         if (channel.getRecipientRule() == ChatRecipientRule.PROXIMITY) {
             return Collections.emptyList();
@@ -542,17 +546,17 @@ public final class ChatMemberDirectory {
     }
 
     /**
-     * A party's members as absentees, read from their rosters: a member
-     * whose roster cannot be read keeps the name the party knows them by.
+     * A fellowship's members as absentees, read from their rosters: a member
+     * whose roster cannot be read keeps the name the fellowship knows them by.
      */
-    private static List<Absentee> partyAbsentees(MinecraftServer server,
+    private static List<Absentee> fellowshipAbsentees(MinecraftServer server,
                                                  EntityPlayerMP viewer,
-                                                 Party party) {
+                                                 Fellowship fellowship) {
         List<Absentee> absent = new ArrayList<Absentee>();
-        if (party == null) {
+        if (fellowship == null) {
             return absent;
         }
-        for (PartyMember member : party.getMembers()) {
+        for (FellowshipMember member : fellowship.getMembers()) {
             UUID owner = member == null ? null : member.getOwnerId();
             UUID characterId = member == null ? null : member.getIdentityId();
             if (owner == null || characterId == null) {

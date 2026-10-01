@@ -718,7 +718,7 @@ public final class LostTalesQuestManager {
                 if (!LostTalesQuestObjectiveType.KILL.is(objective)) {
                     continue;
                 }
-                if (shared && !allowsPartySharing(objective)) {
+                if (shared && !allowsFellowshipSharing(objective)) {
                     continue;
                 }
                 if (!LostTalesQuestObjectiveMatcher.matchesEntity(victim, objective)) {
@@ -968,7 +968,7 @@ public final class LostTalesQuestManager {
                     : LostTalesQuestObjectiveSelection
                     .getProgressibleObjectives(quest, progress)) {
                 if (!isGotoObjective(objective)
-                        || shared && !allowsPartySharing(objective)) {
+                        || shared && !allowsFellowshipSharing(objective)) {
                     continue;
                 }
                 if (isAtObjectiveLocation(player, source, objective)) {
@@ -1479,14 +1479,14 @@ public final class LostTalesQuestManager {
         return dx * dx + dy * dy + dz * dz <= radius * radius;
     }
 
-    /** Whether a party member's kill or arrival counts for this objective: yes, unless its {@code partyShared} says false. */
-    private static boolean allowsPartySharing(
+    /** Whether a fellowship member's kill or arrival counts for this objective: yes, unless its {@code fellowshipShared} says false. */
+    private static boolean allowsFellowshipSharing(
             LostTalesQuestObjectiveDefinition objective) {
         if (objective == null) {
             return false;
         }
         String value = LostTalesQuestParams.value(objective.getParams(),
-                "partyShared");
+                "fellowshipShared");
         return value.length() == 0 || Boolean.parseBoolean(value);
     }
 

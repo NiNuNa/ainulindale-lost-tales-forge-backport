@@ -21,10 +21,10 @@ public final class LostTalesUiSheetTest {
     public void sheetMetadataMatchesBundledSprite() throws Exception {
         InputStream stream = LostTalesUiSheetTest.class.getResourceAsStream(
                 "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
-        assertNotNull("Chat icon sheet is missing", stream);
+        assertNotNull("The window sheet is missing", stream);
         try {
             BufferedImage sheet = ImageIO.read(stream);
-            assertNotNull("Chat icon sheet is not a readable PNG", sheet);
+            assertNotNull("The window sheet is not a readable PNG", sheet);
             assertEquals(LostTalesUiSheet.SHEET_WIDTH, sheet.getWidth());
             assertEquals(LostTalesUiSheet.SHEET_HEIGHT, sheet.getHeight());
             LostTalesUiSheet[] icons = LostTalesUiSheet.values();
@@ -99,10 +99,10 @@ public final class LostTalesUiSheetTest {
     private static BufferedImage readSheet() throws Exception {
         InputStream stream = LostTalesUiSheetTest.class.getResourceAsStream(
                 "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
-        assertNotNull("Chat icon sheet is missing", stream);
+        assertNotNull("The window sheet is missing", stream);
         try {
             BufferedImage sheet = ImageIO.read(stream);
-            assertNotNull("Chat icon sheet is not a readable PNG", sheet);
+            assertNotNull("The window sheet is not a readable PNG", sheet);
             return sheet;
         } finally {
             stream.close();
@@ -123,7 +123,7 @@ public final class LostTalesUiSheetTest {
     public void tabPiecesSeparateInkFromSurfacePreview() throws Exception {
         InputStream stream = LostTalesUiSheetTest.class.getResourceAsStream(
                 "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
-        assertNotNull("Chat icon sheet is missing", stream);
+        assertNotNull("The window sheet is missing", stream);
         try {
             BufferedImage sheet = ImageIO.read(stream);
             assertInkOrPreview(sheet, LostTalesUiSheet.TAB_LEFT);
@@ -143,11 +143,6 @@ public final class LostTalesUiSheetTest {
             assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_TOP_RIGHT);
             assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT);
             assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_BOTTOM_RIGHT);
-            // So are a chat window frame's.
-            assertInkOrPreview(sheet, LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT);
-            assertInkOrPreview(sheet, LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT);
-            assertInkOrPreview(sheet, LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT);
-            assertInkOrPreview(sheet, LostTalesUiSheet.WINDOW_FRAME_BOTTOM_RIGHT);
         } finally {
             stream.close();
         }
@@ -265,14 +260,28 @@ public final class LostTalesUiSheetTest {
                 LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT);
         assertSameSize(LostTalesUiSheet.FRAME_LIT_TOP_LEFT,
                 LostTalesUiSheet.FRAME_LIT_BOTTOM_RIGHT);
-        assertSameSize(LostTalesUiSheet.FRAME_LIT_TOP_LEFT,
-                LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT);
-        assertSameSize(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
-                LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT);
-        assertSameSize(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
-                LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT);
-        assertSameSize(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
-                LostTalesUiSheet.WINDOW_FRAME_BOTTOM_RIGHT);
+        // An option's states and its lit look are one shape, so a button
+        // crosses from any of them to its lit artwork in place.
+        LostTalesUiSheet[][] states = {
+                {LostTalesUiSheet.BELL, LostTalesUiSheet.BELL_EVERYTHING,
+                        LostTalesUiSheet.BELL_NOTHING, LostTalesUiSheet.BELL_LIT},
+                {LostTalesUiSheet.FEED, LostTalesUiSheet.FEED_EVERYTHING,
+                        LostTalesUiSheet.FEED_NOTHING, LostTalesUiSheet.FEED_LIT}};
+        for (LostTalesUiSheet[] option : states) {
+            for (LostTalesUiSheet state : option) {
+                assertSameSize(option[0], state);
+            }
+        }
+        assertSameSize(LostTalesUiSheet.PIN, LostTalesUiSheet.PIN_LIT);
+        assertSameSize(LostTalesUiSheet.COPY_LINK,
+                LostTalesUiSheet.COPY_LINK_HOVER);
+        assertSameSize(LostTalesUiSheet.QUESTION, LostTalesUiSheet.QUESTION_LIT);
+        assertSameSize(LostTalesUiSheet.DRAFT, LostTalesUiSheet.DRAFT_HOVER);
+        // A count tile's figures are one size, the plus among them.
+        for (int figure = 1; figure <= 9; figure++) {
+            assertSameSize(LostTalesUiSheet.COUNT_MORE,
+                    LostTalesUiSheet.valueOf("COUNT_" + figure));
+        }
         // The tab controls share one square.
         assertEquals(LostTalesUiSheet.CLOSE.getWidth(),
                 LostTalesUiSheet.COG.getWidth());

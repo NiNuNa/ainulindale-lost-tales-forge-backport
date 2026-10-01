@@ -42,10 +42,10 @@ public final class LostTalesClientMapMarkerStore {
         return INDEX.getPersistentSnapshot().getAllMarkers();
     }
 
-    /** Map-only merge; party markers never enter compass or world-HUD lists. */
+    /** Map-only merge; fellowship markers never enter compass or world-HUD lists. */
     public static List<LostTalesMapMarkerData> getMapMarkers(
-            Collection<LostTalesMapMarkerData> partyMarkers) {
-        return INDEX.getMapSnapshot(partyMarkers).getAllMarkers();
+            Collection<LostTalesMapMarkerData> fellowshipMarkers) {
+        return INDEX.getMapSnapshot(fellowshipMarkers).getAllMarkers();
     }
 
     public static List<LostTalesMapMarkerData> getDecorativeMarkers() {

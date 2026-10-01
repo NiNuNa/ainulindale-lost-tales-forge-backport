@@ -10,7 +10,7 @@ import com.ninuna.losttales.accessory.player.AccessoryPlayerData;
 import com.ninuna.losttales.compat.lotr.LotrAccessoryMapHooks;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
-import com.ninuna.losttales.party.server.PartyTrackingSyncManager;
+import com.ninuna.losttales.fellowship.server.FellowshipTrackingSyncManager;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -267,7 +267,7 @@ public final class AccessoryEffectService {
     }
 
     private static void refreshTracking(EntityPlayerMP player) {
-        PartyTrackingSyncManager.refreshAll();
+        FellowshipTrackingSyncManager.refreshAll();
         LotrAccessoryMapHooks.refreshPlayerLocations(player.worldObj);
     }
 

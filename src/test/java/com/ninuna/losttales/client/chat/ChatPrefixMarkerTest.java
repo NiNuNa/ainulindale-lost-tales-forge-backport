@@ -26,7 +26,7 @@ public final class ChatPrefixMarkerTest {
     @Test
     public void thePrefixKeepsItsExactColour() {
         ChatComponentText channel = ChatPrefixMarker.channel(
-                new ChatComponentText("Party: "), 0x123456);
+                new ChatComponentText("Fellowship: "), 0x123456);
         assertEquals(Integer.valueOf(0x123456),
                 ChatPrefixMarker.decode(channel));
         assertTrue(ChatPrefixMarker.isMarker(channel));

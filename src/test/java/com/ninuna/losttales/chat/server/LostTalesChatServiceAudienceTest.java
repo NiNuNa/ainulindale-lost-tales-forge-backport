@@ -7,9 +7,10 @@ import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
-import com.ninuna.losttales.party.model.Party;
-import com.ninuna.losttales.party.model.PartyColor;
-import com.ninuna.losttales.party.model.PartyMember;
+import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.model.FellowshipFixtures;
+import com.ninuna.losttales.fellowship.model.FellowshipColor;
+import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,12 +33,12 @@ public final class LostTalesChatServiceAudienceTest {
     private static final UUID ALICE = UUID.randomUUID();
     private static final UUID BOB = UUID.randomUUID();
     private static final UUID CAROL = UUID.randomUUID();
-    private static final UUID PARTY_ID = UUID.randomUUID();
+    private static final UUID FELLOWSHIP_ID = UUID.randomUUID();
     private static final List<ChatChannel> EVERY_CHANNEL =
             Arrays.asList(ChatChannel.values());
     private static final List<ChatChannel> OPEN_CHANNELS = Arrays.asList(
             ChatChannel.GLOBAL, ChatChannel.PROXIMITY, ChatChannel.FACTION,
-            ChatChannel.OOC, ChatChannel.PARTY, ChatChannel.WHISPER);
+            ChatChannel.OOC, ChatChannel.FELLOWSHIP, ChatChannel.WHISPER);
 
     @Before
     public void setUp() {
@@ -91,20 +92,20 @@ public final class LostTalesChatServiceAudienceTest {
     }
 
     @Test
-    public void aPartyLineReachesItsMembersThenWhileTheyAreStillMembers() {
-        PartyMember aldric = new PartyMember(UUID.randomUUID(), ALICE,
-                "Aldric", 1L, PartyColor.values()[0]);
-        Party party = new Party(PARTY_ID, aldric.getIdentityId(), Arrays.asList(aldric,
-                new PartyMember(UUID.randomUUID(), BOB, "Beren", 2L,
-                        PartyColor.values()[1])), 1L, 0L, Party.CURRENT_DATA_VERSION);
-        record(ChatChannel.PARTY, party, "", Collections.singletonList(ALICE));
+    public void aFellowshipLineReachesItsMembersThenWhileTheyAreStillMembers() {
+        FellowshipMember aldric = new FellowshipMember(UUID.randomUUID(), ALICE,
+                "Aldric", 1L, FellowshipColor.values()[0]);
+        Fellowship fellowship = FellowshipFixtures.of(FELLOWSHIP_ID, aldric.getIdentityId(), Arrays.asList(aldric,
+                new FellowshipMember(UUID.randomUUID(), BOB, "Beren", 2L,
+                        FellowshipColor.values()[1])));
+        record(ChatChannel.FELLOWSHIP, fellowship, "", Collections.singletonList(ALICE));
         // Bob was a member but offline when it was said.
-        assertEquals(1, replay(BOB, "", 0L, PARTY_ID, EVERY_CHANNEL).size());
+        assertEquals(1, replay(BOB, "", 0L, FELLOWSHIP_ID, EVERY_CHANNEL).size());
         assertTrue(replay(BOB, "", 0L, null, EVERY_CHANNEL).isEmpty());
-        assertTrue(replay(CAROL, "", 0L, PARTY_ID, EVERY_CHANNEL).isEmpty());
-        // A party line with no party behind it reaches nobody later.
-        record(ChatChannel.PARTY, null, "", Collections.singletonList(ALICE));
-        assertEquals(1, replay(ALICE, "", 0L, PARTY_ID, EVERY_CHANNEL).size());
+        assertTrue(replay(CAROL, "", 0L, FELLOWSHIP_ID, EVERY_CHANNEL).isEmpty());
+        // A fellowship line with no fellowship behind it reaches nobody later.
+        record(ChatChannel.FELLOWSHIP, null, "", Collections.singletonList(ALICE));
+        assertEquals(1, replay(ALICE, "", 0L, FELLOWSHIP_ID, EVERY_CHANNEL).size());
     }
 
     @Test
@@ -128,7 +129,7 @@ public final class LostTalesChatServiceAudienceTest {
         assertEquals(3, replay(BOB, "", 0L, null, OPEN_CHANNELS).size());
     }
 
-    private static void record(ChatChannel channel, Party party, String factionId,
+    private static void record(ChatChannel channel, Fellowship fellowship, String factionId,
                                List<UUID> sentTo) {
         long id = ChatMessageIdAllocator.next();
         LostTalesChatMessagePacket line = new LostTalesChatMessagePacket(channel, ALICE,
@@ -136,13 +137,13 @@ public final class LostTalesChatServiceAudienceTest {
                 channel == ChatChannel.WHISPER ? "bob" : "", 0, false, id,
                 ChatReplyReference.NONE, "");
         ChatHistory.record(id, ALICE, "Aldric", null, line, sentTo,
-                ChatChannelPolicy.audienceFor(channel, party, factionId, sentTo));
+                ChatChannelPolicy.audienceFor(channel, fellowship, factionId, sentTo));
     }
 
     private static List<LostTalesChatMessagePacket> replay(
-            UUID account, String factionId, long createdAt, UUID partyId,
+            UUID account, String factionId, long createdAt, UUID fellowshipId,
             List<ChatChannel> readable) {
         return ChatHistory.replayFor(ChatHistoryRequesters.oneFaction(account, factionId,
-                createdAt, partyId, readable), ChatMessageIds.NONE);
+                createdAt, fellowshipId, readable), ChatMessageIds.NONE);
     }
 }

@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiLayerFade;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import java.util.List;
@@ -47,11 +48,48 @@ public final class WindowDrawing {
                 + WindowPlacement.TOOL_STRIP_HEIGHT
                 + WindowPlacement.HISTORY_TOP_MARGIN);
         frame.drawn = true;
+        // A split shows its other side beside the page in front.
+        WindowSplit split = window.shownSplit();
+        if (shows(split, page)) {
+            frame.showSplit(split, page, split.other(page));
+        }
         // What lies behind the window is cut away, then the world under
         // it softened, over the box it shows and its frame's ring.
         LostTalesUiHitBox shown = frame.drawnBox();
         cutBehind(shown, opening.getOpacity());
         softenBehind(shown, opening.getOpacity());
+        beginStackFade(minecraft, frame, shown);
+    }
+
+    /** What a window others lie over is drawn into, laid back over the world at its strength. */
+    private static final LostTalesUiLayerFade STACK_FADE = new LostTalesUiLayerFade();
+    /** Whether a window's fade is open, waiting for {@link #endStackFade}. */
+    private static boolean stackFading;
+
+    /**
+     * Starts fading a window others lie over as one picture, once it
+     * stands on the world it cut itself onto in {@code box}: everything it
+     * draws from here on, its frame's ring and its bar included, shows at
+     * its strength over that world when {@link #endStackFade} lays the
+     * world back. Nothing for a window in front.
+     */
+    public static void beginStackFade(Minecraft minecraft, WindowFrame frame,
+                                      LostTalesUiHitBox box) {
+        if (stackFading || frame == null || box == null
+                || frame.stackShare >= 1.0F) {
+            return;
+        }
+        int ring = WindowPlacement.FRAME_WIDTH + LostTalesUiInk.SHADOW_OFFSET;
+        stackFading = STACK_FADE.begin(minecraft, box.left - ring,
+                box.top - ring, box.width + 2 * ring, box.height + 2 * ring);
+    }
+
+    /** Ends a window's fade, if one is open: the world is laid back at what the window does not show. */
+    static void endStackFade(Minecraft minecraft, WindowFrame frame) {
+        if (stackFading) {
+            stackFading = false;
+            STACK_FADE.end(minecraft, frame == null ? 1.0F : frame.stackShare);
+        }
     }
 
     /**
@@ -93,6 +131,10 @@ public final class WindowDrawing {
         TabRow.Row row = new TabRow.Row();
         row.tabs = tabs;
         row.selected = WindowFrame.activeTab(window, tabs);
+        // The split the window draws, its other page standing forward
+        // with the one in front.
+        row.splitPartner = frame.splitOther != null && tabs.contains(frame.splitOther)
+                ? frame.splitOther : null;
         row.rowBottom = (int)Math.floor(frame.tabRowBottom());
         row.rowBottomExact = frame.tabRowBottom();
         row.fractionX = (float)(frame.drawnLeft()
@@ -113,21 +155,63 @@ public final class WindowDrawing {
     /**
      * A page window's page: its surface under the row, then the page drawn
      * on whole pixels in a matrix moved by the fraction the window stands
-     * on. The pointer is the screen's, or away where the page is not
-     * under it; {@code depthTest} is whether depth testing was on as the
-     * frame began, for a page drawn as a screen of its own.
+     * on, and in a split the other page beside it with the divider
+     * between. The pointer is the screen's, or away where the page is
+     * not under it, for each page; {@code depthTest} is whether depth
+     * testing was on as the frame began, for a page drawn as a screen of
+     * its own.
      */
     static void drawPage(Minecraft minecraft, WindowFrame frame,
                          LostTalesGuiAnimationSample shown, double pointerX,
-                         double pointerY, float partialTicks,
+                         double pointerY, double splitPointerX,
+                         double splitPointerY, float partialTicks,
                          boolean depthTest) {
         drawPageSurface(minecraft, frame, shown);
-        PageContent content = WindowPages.contentOf(frame.page);
-        if (content == null) {
+        drawPageIn(minecraft, WindowPages.contentOf(frame.page), pageBox(frame),
+                shown, pointerX, pointerY, partialTicks, depthTest);
+        drawSplitPage(minecraft, frame, shown, splitPointerX, splitPointerY,
+                partialTicks, depthTest);
+    }
+
+    /**
+     * The split's other page, beside what is in front, with the divider
+     * between; the divider alone while the other side is a conversation,
+     * which its own part draws. Nothing while there is no split.
+     */
+    public static void drawSplitPage(Minecraft minecraft, WindowFrame frame,
+                                     LostTalesGuiAnimationSample shown,
+                                     double pointerX, double pointerY,
+                                     float partialTicks, boolean depthTest) {
+        if (frame.split == null) {
             return;
         }
-        LostTalesUiHitBox exact = pageBox(frame);
-        LostTalesUiHitBox whole = wholePageBox(frame);
+        if (frame.splitPage != null) {
+            if (frame.page == null) {
+                // Beside a conversation the page lies on a surface of its
+                // own; beside a page it shares the window's.
+                LostTalesUiHitBox box = splitPageBox(frame);
+                LostTalesUiInk.fillRect((float)box.left, (float)box.top,
+                        (float)(box.left + box.width), (float)(box.top + box.height),
+                        WindowStyle.insetArgb(shown.getOpacity()
+                                * WindowStyle.opacity(minecraft)));
+            }
+            drawPageIn(minecraft, WindowPages.contentOf(frame.splitPage),
+                    splitPageBox(frame), shown, pointerX, pointerY,
+                    partialTicks, depthTest);
+        }
+        drawDivider(minecraft, frame, shown);
+    }
+
+    /** One page in its box, on whole pixels moved by the fraction the box stands on. */
+    private static void drawPageIn(Minecraft minecraft, PageContent content,
+                                   LostTalesUiHitBox exact,
+                                   LostTalesGuiAnimationSample shown,
+                                   double pointerX, double pointerY,
+                                   float partialTicks, boolean depthTest) {
+        if (content == null || exact == null) {
+            return;
+        }
+        LostTalesUiHitBox whole = wholeBox(exact);
         float fractionX = (float)(exact.left - whole.left);
         float fractionY = (float)(exact.top - whole.top);
         boolean depth = depthTest && content.wantsDepthTest();
@@ -150,11 +234,11 @@ public final class WindowDrawing {
     }
 
     /**
-     * The page's box in a page window as drawn this frame: the window's
-     * width from under its tool strip down to its foot's rule, laid on
-     * the display's grid.
+     * The room pages take in a page window as drawn this frame: the
+     * window's width from under its tool strip down to its foot's rule,
+     * laid on the display's grid.
      */
-    public static LostTalesUiHitBox pageBox(WindowFrame frame) {
+    public static LostTalesUiHitBox contentBox(WindowFrame frame) {
         double left = frame.drawnLeft();
         double top = LostTalesDisplayPixels.snap(frame.historyTop());
         double bottom = frame.footTop();
@@ -162,11 +246,95 @@ public final class WindowDrawing {
                 Math.max(0.0D, bottom - top));
     }
 
+    /** The box of what is in front: the whole room, or its side of the split shown. */
+    public static LostTalesUiHitBox pageBox(WindowFrame frame) {
+        return frame.split == null ? contentBox(frame) : sideBox(frame, frame.splitFront);
+    }
+
+    /** The box of the split's other page; null while the other side is no page, or there is no split. */
+    public static LostTalesUiHitBox splitPageBox(WindowFrame frame) {
+        return frame.splitPage == null ? null : sideBox(frame, frame.splitPage);
+    }
+
+    /** The box of the split's other side, a page or a conversation; null while there is no split. */
+    public static LostTalesUiHitBox otherSideBox(WindowFrame frame) {
+        return frame.splitOther == null ? null : sideBox(frame, frame.splitOther);
+    }
+
+    /**
+     * Whether a window shows {@code split} with {@code front} in front:
+     * its other side can be seen, and a conversation stands only side by
+     * side.
+     */
+    public static boolean shows(WindowSplit split, WindowTab front) {
+        WindowTab other = split == null ? null : split.other(front);
+        if (other == null || !other.isAvailable() || !WindowView.isShown(other)) {
+            return false;
+        }
+        return !split.isStacked()
+                || other instanceof PageTab && front instanceof PageTab;
+    }
+
+    /** The box of whichever side shows {@code page}; null for a page the window does not show. */
+    public static LostTalesUiHitBox boxOfPage(WindowFrame frame, PageTab page) {
+        if (page == null) {
+            return null;
+        }
+        if (page.equals(frame.page)) {
+            return pageBox(frame);
+        }
+        return page.equals(frame.splitPage) ? splitPageBox(frame) : null;
+    }
+
+    /** The divider between a split's sides, the band it is dragged by; null while the window shows one page. */
+    public static LostTalesUiHitBox dividerBox(WindowFrame frame) {
+        if (frame.split == null) {
+            return null;
+        }
+        LostTalesUiHitBox room = contentBox(frame);
+        if (frame.split.isStacked()) {
+            double at = frame.split.dividerAt(room.top, room.top + room.height);
+            return new LostTalesUiHitBox(room.left, at, room.width, WindowSplit.DIVIDER);
+        }
+        double at = frame.split.dividerAt(room.left, room.left + room.width);
+        return new LostTalesUiHitBox(at, room.top, WindowSplit.DIVIDER, room.height);
+    }
+
+    private static LostTalesUiHitBox sideBox(WindowFrame frame, WindowTab side) {
+        LostTalesUiHitBox room = contentBox(frame);
+        double[] box = frame.split.box(side.equals(frame.split.first()), room.left,
+                room.top, room.left + room.width, room.top + room.height);
+        return new LostTalesUiHitBox(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+    }
+
     /** The page box in whole pixels; the page is drawn off them by the fraction the window stands on. */
     public static LostTalesUiHitBox wholePageBox(WindowFrame frame) {
-        LostTalesUiHitBox exact = pageBox(frame);
+        return wholeBox(pageBox(frame));
+    }
+
+    /** A box on whole pixels; what stands in it is drawn off them by the fraction the box stands on. */
+    public static LostTalesUiHitBox wholeBox(LostTalesUiHitBox exact) {
         return new LostTalesUiHitBox(Math.floor(exact.left),
                 Math.floor(exact.top), exact.width, exact.height);
+    }
+
+    /** The divider between a split's sides: one rule along its middle, in the colour of the window's rules. */
+    private static void drawDivider(Minecraft minecraft, WindowFrame frame,
+                                    LostTalesGuiAnimationSample shown) {
+        LostTalesUiHitBox divider = dividerBox(frame);
+        if (divider == null) {
+            return;
+        }
+        int alpha = Math.round(255.0F * shown.getOpacity());
+        if (frame.split.isStacked()) {
+            float y = (float)(divider.top + WindowSplit.DIVIDER / 2);
+            LostTalesUiRules.drawRule((float)divider.left,
+                    (float)(divider.left + divider.width), y, y + 1.0F, alpha);
+        } else {
+            float x = (float)(divider.left + WindowSplit.DIVIDER / 2);
+            LostTalesUiRules.drawStandingRule(x, x + 1.0F, (float)divider.top,
+                    (float)(divider.top + divider.height), alpha);
+        }
     }
 
     /**
@@ -181,7 +349,7 @@ public final class WindowDrawing {
                 || opening == null) {
             return;
         }
-        LostTalesUiHitBox page = pageBox(frame);
+        LostTalesUiHitBox page = contentBox(frame);
         float left = (float)page.left;
         float right = (float)(page.left + page.width);
         float top = (float)page.top;

@@ -220,6 +220,8 @@ public final class LostTalesClassTransformerTest {
                     + "LostTalesMenuFramerateHook";
     private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/LostTalesLotrFastTravelArrivalHook";
+    private static final String FELLOWSHIP_REQUEST_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LostTalesLotrFellowshipRequestHook";
     private static final String HIRED_UNIT_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/hired/LostTalesLotrHiredUnitHook";
     private static final String TRADER_NOTICE_HOOK_OWNER =
@@ -707,6 +709,23 @@ public final class LostTalesClassTransformerTest {
         assertTrue(beforeReturn);
         assertEquals("true", System.getProperty(
                 LostTalesClassTransformer.LOTR_HIRED_UNIT_ACTIVE_PROPERTY));
+    }
+
+    @Test
+    public void lotrsOwnFellowshipRequestsAreRefused() throws Exception {
+        ClassNode request = transform("lotr.common.network.LOTRPacketFellowshipDo");
+        assertTrue(containsStaticHook(request, "getActiveFellowship",
+                FELLOWSHIP_REQUEST_HOOK_OWNER, "refuse"));
+        assertTrue(containsStaticHook(request, "getActiveOrDisbandedFellowship",
+                FELLOWSHIP_REQUEST_HOOK_OWNER, "refuse"));
+        assertEquals("true", System.getProperty(
+                LostTalesClassTransformer.LOTR_FELLOWSHIP_REQUESTS_ACTIVE_PROPERTY));
+
+        ClassNode create = transform("lotr.common.network.LOTRPacketFellowshipCreate$Handler");
+        assertTrue(containsStaticHook(create, "onMessage",
+                FELLOWSHIP_REQUEST_HOOK_OWNER, "refusesCreation"));
+        assertEquals("true", System.getProperty(
+                LostTalesClassTransformer.LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY));
     }
 
     @Test

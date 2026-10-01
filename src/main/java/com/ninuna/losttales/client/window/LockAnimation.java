@@ -50,9 +50,9 @@ final class LockAnimation {
      * bottom on the control's baseline.
      */
     private static final int[][] FRAMES = {
-            {0, 43, 9, 7}, {0, 51, 9, 6}, {0, 58, 8, 7}, {0, 66, 7, 8},
-            {0, 75, 6, 8}, {0, 84, 5, 8}, {10, 84, 5, 8}, {10, 75, 5, 8},
-            {10, 66, 5, 8}, {10, 58, 5, 7}, {10, 51, 5, 6}, {10, 43, 5, 7}};
+            {0, 59, 9, 7}, {0, 67, 9, 6}, {0, 74, 8, 7}, {0, 82, 7, 8},
+            {0, 91, 6, 8}, {0, 100, 5, 8}, {10, 100, 5, 8}, {10, 91, 5, 8},
+            {10, 82, 5, 8}, {10, 74, 5, 7}, {10, 67, 5, 6}, {10, 59, 5, 7}};
 
     /** How far the lock has crossed to its hovered colourway, and when. */
     private float hoverFade;
