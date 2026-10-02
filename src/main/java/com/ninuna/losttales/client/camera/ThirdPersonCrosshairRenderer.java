@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.camera;
 
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -92,7 +93,7 @@ public final class ThirdPersonCrosshairRenderer extends Gui {
     }
 
     private void drawLockIndicator(int centerX, int centerY) {
-        int color = 0xD9E7C76A;
+        int color = LostTalesColors.withAlpha(LostTalesColors.APRICOT, 0xD9);
         int inner = 9;
         int outer = 13;
         int length = 5;
@@ -112,7 +113,8 @@ public final class ThirdPersonCrosshairRenderer extends Gui {
         int y = centerY + 17;
         for (int index = 0; index < 3; index++) {
             int color = index < chargeTier
-                    ? 0xE6E7C76A : 0x80403B31;
+                    ? LostTalesColors.withAlpha(LostTalesColors.APRICOT, 0xE6)
+                    : LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x80);
             drawRect(startX + index * 6, y,
                     startX + index * 6 + 4, y + 2, color);
         }

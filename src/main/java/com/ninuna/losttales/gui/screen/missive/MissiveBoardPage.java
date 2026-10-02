@@ -8,7 +8,7 @@ import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowBar;
@@ -190,7 +190,7 @@ public final class MissiveBoardPage extends PageContent
      * from its first notice.
      */
     private void open(LostTalesMissiveBoardStatePacket packet) {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         boolean same = tab != null && WindowLayout.isOpen(tab)
                 && isShown(packet);
         if (!same) {
@@ -342,7 +342,7 @@ public final class MissiveBoardPage extends PageContent
     /** Closes the tab where the player no longer stands at the board. */
     @Override
     public void watch() {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (tab == null || !WindowLayout.isOpen(tab)) {
             return;
         }
@@ -377,7 +377,7 @@ public final class MissiveBoardPage extends PageContent
     /** The tab closed, by hand or by itself: the board goes with it. */
     @Override
     public void hidden() {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (tab == null || !WindowLayout.isOpen(tab)) {
             forget();
         }
@@ -481,7 +481,7 @@ public final class MissiveBoardPage extends PageContent
 
     /** The window the page's tab stands in; null while none holds it. */
     private static String windowId() {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         Window window = tab == null ? null : WindowLayout.windowOf(tab);
         return window == null ? null : window.getId();
     }
@@ -767,6 +767,11 @@ public final class MissiveBoardPage extends PageContent
     @Override
     public void togglePanel() {
         this.listOut = !this.listOut;
+    }
+
+    @Override
+    public void resetPanel() {
+        this.listOut = true;
     }
 
     @Override

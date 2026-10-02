@@ -66,13 +66,13 @@ public final class ClientChatDrafts {
     }
 
     /** The conversation's unsent text on that server; empty when it has none. */
-    static synchronized String get(String serverKey, ChatTab tab) {
+    static synchronized String get(String serverKey, ConversationPage tab) {
         String value = tab == null ? null : DRAFTS.get(key(serverKey, tab));
         return value == null ? "" : value;
     }
 
     /** Remembers the conversation's unsent text on that server; empty text forgets it. */
-    static synchronized void set(String serverKey, ChatTab tab, String text) {
+    static synchronized void set(String serverKey, ConversationPage tab, String text) {
         if (tab == null) {
             return;
         }
@@ -173,7 +173,7 @@ public final class ClientChatDrafts {
     }
 
     /** A server key that holds the separator names no place. */
-    private static String key(String serverKey, ChatTab tab) {
+    private static String key(String serverKey, ConversationPage tab) {
         String server = serverKey == null
                 || serverKey.indexOf(SEPARATOR) >= 0 ? "" : serverKey;
         return server + SEPARATOR + tab.id().toLowerCase(Locale.ROOT)

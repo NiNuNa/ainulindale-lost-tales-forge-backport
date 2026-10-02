@@ -16,6 +16,7 @@ import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.gui.hud.fellowship.LostTalesFellowshipHudRenderer;
 import com.ninuna.losttales.gui.hud.fellowship.FellowshipHudLayout;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.GuiScreen;
@@ -234,7 +235,8 @@ public class LostTalesHudPlacementGui extends GuiScreen
         for (int dx = 0; centreX - dx >= 0 || centreX + dx <= this.width;
                 dx += GRID_MINOR_SPACING) {
             int color = dx % GRID_MAJOR_SPACING == 0
-                    ? 0x305E6875 : 0x183C4652;
+                    ? LostTalesColors.withAlpha(LostTalesColors.SLATE_BLUE, 0x30)
+                    : LostTalesColors.withAlpha(LostTalesColors.INDIGO, 0x18);
             if (centreX - dx >= 0) {
                 drawRect(centreX - dx, 0,
                         centreX - dx + 1, this.height, color);
@@ -247,7 +249,8 @@ public class LostTalesHudPlacementGui extends GuiScreen
         for (int dy = 0; centreY - dy >= 0 || centreY + dy <= this.height;
                 dy += GRID_MINOR_SPACING) {
             int color = dy % GRID_MAJOR_SPACING == 0
-                    ? 0x305E6875 : 0x183C4652;
+                    ? LostTalesColors.withAlpha(LostTalesColors.SLATE_BLUE, 0x30)
+                    : LostTalesColors.withAlpha(LostTalesColors.INDIGO, 0x18);
             if (centreY - dy >= 0) {
                 drawRect(0, centreY - dy,
                         this.width, centreY - dy + 1, color);
@@ -258,9 +261,11 @@ public class LostTalesHudPlacementGui extends GuiScreen
             }
         }
         drawRect(this.width / 2, 0,
-                this.width / 2 + 1, this.height, 0x667F8790);
+                this.width / 2 + 1, this.height,
+                LostTalesColors.withAlpha(LostTalesColors.ROSE_GRAY, 0x66));
         drawRect(0, this.height / 2,
-                this.width, this.height / 2 + 1, 0x667F8790);
+                this.width, this.height / 2 + 1,
+                LostTalesColors.withAlpha(LostTalesColors.ROSE_GRAY, 0x66));
     }
 
     private void drawSnapGuides() {
@@ -269,11 +274,13 @@ public class LostTalesHudPlacementGui extends GuiScreen
         }
         if (this.snappedToCenterX) {
             drawRect(this.width / 2 - 1, 0,
-                    this.width / 2 + 1, this.height, 0xCCFFD37A);
+                    this.width / 2 + 1, this.height,
+                    LostTalesColors.withAlpha(LostTalesColors.HONEY, 0xCC));
         }
         if (this.snappedToCenterY) {
             drawRect(0, this.height / 2 - 1,
-                    this.width, this.height / 2 + 1, 0xCCFFD37A);
+                    this.width, this.height / 2 + 1,
+                    LostTalesColors.withAlpha(LostTalesColors.HONEY, 0xCC));
         }
     }
 
@@ -282,18 +289,23 @@ public class LostTalesHudPlacementGui extends GuiScreen
         int titleWidth = this.fontRendererObj.getStringWidth(title);
         int left = (this.width - titleWidth) / 2 - 7;
         int right = (this.width + titleWidth) / 2 + 7;
-        drawRect(left, 5, right, 21, 0xB0000000);
+        drawRect(left, 5, right, 21,
+                LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xB0));
         drawCenteredString(this.fontRendererObj, title,
-                this.width / 2, 9, 0xFFD37A);
+                this.width / 2, 9, LostTalesColors.HONEY);
     }
 
     private void drawPreviewBox(Placeable element, boolean hovered) {
         HudPlacementLayout.Bounds bounds = getBounds(element);
         boolean isSelected = element == this.selected;
         int fill = isSelected
-                ? 0x99553818 : hovered ? 0x66333B44 : 0x40000000;
+                ? LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x99)
+                : hovered ? LostTalesColors.withAlpha(LostTalesColors.DUSK_VIOLET, 0x66)
+                : LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x40);
         int border = isSelected
-                ? 0xFFFFD37A : hovered ? 0xDDFFFFFF : 0x99B8BEC6;
+                ? LostTalesColors.HONEY
+                : hovered ? LostTalesColors.withAlpha(LostTalesColors.IVORY, 0xDD)
+                : LostTalesColors.withAlpha(LostTalesColors.SAND, 0x99);
         drawRect(bounds.x, bounds.y,
                 bounds.x + bounds.width, bounds.y + bounds.height, fill);
         drawBorder(bounds, border, isSelected ? 2 : 1);
@@ -306,7 +318,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
                 label,
                 bounds.x + 5,
                 textY,
-                isSelected ? 0xFFD37A : 0xFFFFFF);
+                isSelected ? LostTalesColors.HONEY : LostTalesColors.IVORY);
     }
 
     private void drawBorder(HudPlacementLayout.Bounds bounds,

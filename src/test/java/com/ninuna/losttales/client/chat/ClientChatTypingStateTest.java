@@ -26,9 +26,9 @@ public final class ClientChatTypingStateTest {
     /** A typist in a roleplaying tab shows over their head; one in OOC or an NPC tab does not. */
     @Test
     public void typingInARoleplayingTabShowsOverTheHead() {
-        ClientChatTypingState.apply(ChatTab.of(ChatChannel.FELLOWSHIP), "Aragorn", true, 0L);
-        ClientChatTypingState.apply(ChatTab.of(ChatChannel.OOC), "Steve", true, 0L);
-        ClientChatTypingState.apply(ChatTab.npc("Bard"), "Bard", true, 0L);
+        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.FELLOWSHIP), "Aragorn", true, 0L);
+        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.OOC), "Steve", true, 0L);
+        ClientChatTypingState.apply(ConversationPage.npc("Bard"), "Bard", true, 0L);
         long soon = ClientChatTypingState.TTL_NANOS - 1L;
         assertTrue(ClientChatTypingState.isTypingInCharacter("Aragorn", soon));
         assertTrue(ClientChatTypingState.anyTypingInCharacter(soon));
@@ -39,14 +39,14 @@ public final class ClientChatTypingStateTest {
         assertFalse(ClientChatTypingState.isTypingInCharacter("Aragorn",
                 ClientChatTypingState.TTL_NANOS));
         assertFalse(ClientChatTypingState.isTypingInCharacter("", soon));
-        ClientChatTypingState.apply(ChatTab.of(ChatChannel.FELLOWSHIP), "Aragorn", false, 1L);
+        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.FELLOWSHIP), "Aragorn", false, 1L);
         assertFalse(ClientChatTypingState.anyTypingInCharacter(soon));
     }
 
     @Test
     public void typistsAreListedInOrderUntilTheyStopOrExpire() {
-        ChatTab fellowship = ChatTab.of(ChatChannel.FELLOWSHIP);
-        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        ConversationPage fellowship = ConversationPage.of(ChatChannel.FELLOWSHIP);
+        ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         ClientChatTypingState.apply(fellowship, "Aragorn", true, 0L);
         ClientChatTypingState.apply(fellowship, "Gimli", true, 1L);
         ClientChatTypingState.apply(ooc, "Steve", true, 1L);
@@ -70,10 +70,10 @@ public final class ClientChatTypingStateTest {
                 3L + ClientChatTypingState.TTL_NANOS).isEmpty());
         // Whisper typists are filed under the partner's tab, by name,
         // case-insensitively like the tab itself.
-        ClientChatTypingState.apply(ChatTab.whisper("bilbo", ""), "Bilbo",
+        ClientChatTypingState.apply(ConversationPage.whisper("bilbo", ""), "Bilbo",
                 true, 0L);
         assertEquals(Collections.singletonList("Bilbo"),
-                ClientChatTypingState.namesTyping(ChatTab.whisper("Bilbo", ""),
+                ClientChatTypingState.namesTyping(ConversationPage.whisper("Bilbo", ""),
                         1L));
         ClientChatTypingState.clear();
         assertTrue(ClientChatTypingState.namesTyping(fellowship, 1L).isEmpty());
@@ -81,7 +81,7 @@ public final class ClientChatTypingStateTest {
 
     @Test
     public void aTabKeepsABoundedNumberOfTypists() {
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         for (int index = 0; index < ClientChatTypingState.MAX_NAMES_PER_TAB + 5;
              index++) {
             ClientChatTypingState.apply(global, "Player" + index, true,

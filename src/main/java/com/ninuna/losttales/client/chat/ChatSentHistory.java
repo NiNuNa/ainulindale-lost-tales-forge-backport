@@ -24,16 +24,16 @@ final class ChatSentHistory {
     /** Tabs remembered, oldest first; the bound the drafts have. */
     static final int MAX_TABS = 64;
 
-    private final LinkedHashMap<ChatTab, ArrayList<String>> entries =
-            new LinkedHashMap<ChatTab, ArrayList<String>>();
+    private final LinkedHashMap<ConversationPage, ArrayList<String>> entries =
+            new LinkedHashMap<ConversationPage, ArrayList<String>>();
     /** The tab being walked, or null while no walk is under way. */
-    private ChatTab browsing;
+    private ConversationPage browsing;
     /** Index into the browsed tab's lines; its size means the pending text. */
     private int cursor;
     private String pending = "";
 
     /** Remembers a sent line under its tab; empty text is nothing to recall. */
-    void record(ChatTab tab, String text) {
+    void record(ConversationPage tab, String text) {
         endBrowse();
         String line = text == null ? "" : text.trim();
         if (tab == null || line.length() == 0) {
@@ -43,7 +43,7 @@ final class ChatSentHistory {
         if (lines == null) {
             lines = new ArrayList<String>();
             while (this.entries.size() >= MAX_TABS) {
-                Iterator<ChatTab> oldest = this.entries.keySet().iterator();
+                Iterator<ConversationPage> oldest = this.entries.keySet().iterator();
                 oldest.next();
                 oldest.remove();
             }
@@ -63,7 +63,7 @@ final class ChatSentHistory {
      * text as the pending line; stepping down past the newest entry
      * gives it back and ends the walk.
      */
-    String step(ChatTab tab, int direction, String fieldText) {
+    String step(ConversationPage tab, int direction, String fieldText) {
         if (tab == null || direction == 0) {
             return null;
         }
@@ -98,7 +98,7 @@ final class ChatSentHistory {
 
     /** Drops every conversation tab's history: what leaving a server does. */
     void forgetConversations() {
-        Iterator<ChatTab> tabs = this.entries.keySet().iterator();
+        Iterator<ConversationPage> tabs = this.entries.keySet().iterator();
         while (tabs.hasNext()) {
             if (tabs.next().isWhisper()) {
                 tabs.remove();
@@ -115,7 +115,7 @@ final class ChatSentHistory {
     }
 
     /** A tab's lines, oldest first. */
-    List<String> entries(ChatTab tab) {
+    List<String> entries(ConversationPage tab) {
         ArrayList<String> lines = tab == null ? null : this.entries.get(tab);
         return lines == null ? Collections.<String>emptyList()
                 : Collections.unmodifiableList(lines);

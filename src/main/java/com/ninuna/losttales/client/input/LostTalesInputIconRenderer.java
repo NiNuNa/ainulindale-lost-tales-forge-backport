@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.input;
 import com.ninuna.losttales.client.input.LostTalesInputBinding.Type;
 import com.ninuna.losttales.client.input.LostTalesInputIconAnimation.Pose;
 import com.ninuna.losttales.client.input.LostTalesInputIconAtlas.Sprite;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.io.IOException;
@@ -296,7 +297,8 @@ public final class LostTalesInputIconRenderer {
                     int shadowAlpha = Math.max(0, Math.min(255,
                             Math.round(pose.getShadowAlpha() * alpha * 255.0F)));
                     drawRect(0, 0, width, BASE_ICON_HEIGHT,
-                            shadowAlpha << 24);
+                            LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK,
+                                    shadowAlpha));
                 } finally {
                     GL11.glPopMatrix();
                 }
@@ -304,18 +306,21 @@ public final class LostTalesInputIconRenderer {
             GL11.glPushMatrix();
             try {
                 applyPoseTransform(pose, width, BASE_ICON_HEIGHT, false);
-                drawRect(0, 0, width, BASE_ICON_HEIGHT, faded(0xCC080808, alpha));
-                drawRect(0, 0, width, 1, faded(0xDDB8B8B8, alpha));
-                drawRect(0, BASE_ICON_HEIGHT - 1, width,
-                        BASE_ICON_HEIGHT, faded(0xDD303030, alpha));
-                drawRect(0, 0, 1, BASE_ICON_HEIGHT, faded(0xDD909090, alpha));
-                drawRect(width - 1, 0, width,
-                        BASE_ICON_HEIGHT, faded(0xDD303030, alpha));
+                drawRect(0, 0, width, BASE_ICON_HEIGHT, faded(
+                        LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xCC), alpha));
+                drawRect(0, 0, width, 1, faded(
+                        LostTalesColors.withAlpha(LostTalesColors.ROSE_BEIGE, 0xDD), alpha));
+                drawRect(0, BASE_ICON_HEIGHT - 1, width, BASE_ICON_HEIGHT, faded(
+                        LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xDD), alpha));
+                drawRect(0, 0, 1, BASE_ICON_HEIGHT, faded(
+                        LostTalesColors.withAlpha(LostTalesColors.ROSE_GRAY, 0xDD), alpha));
+                drawRect(width - 1, 0, width, BASE_ICON_HEIGHT, faded(
+                        LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xDD), alpha));
                 GL11.glEnable(GL11.GL_TEXTURE_2D);
                 GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
                 font.drawStringWithShadow(label, FALLBACK_HORIZONTAL_PADDING,
                         (BASE_ICON_HEIGHT - font.FONT_HEIGHT) / 2,
-                        faded(0xFFFFFFFF, alpha));
+                        faded(LostTalesColors.IVORY, alpha));
             } finally {
                 GL11.glPopMatrix();
             }

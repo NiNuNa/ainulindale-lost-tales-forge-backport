@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -258,7 +259,8 @@ final class LostTalesLotrMapLegend {
             Gui.drawRect(x + 2, y + 2, x + 4, y + 4,
                     LostTalesSkyrimUiStyle.GOLD);
         } else {
-            Gui.drawRect(x, y, x + width, y + height, 0x48000000);
+            Gui.drawRect(x, y, x + width, y + height,
+                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x48));
             font.drawStringWithShadow(
                     "x", x + width - 7, y + 2,
                     LostTalesSkyrimUiStyle.RED);

@@ -23,7 +23,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * The account travels on the wire as an identity of its own: the appearance
  * sync names its kind, the private roster carries its cape, and a cape
- * request names it with a flag.
+ * request names it by naming no character.
  */
 public final class CharacterAccountCapePacketTest {
 
@@ -95,7 +95,7 @@ public final class CharacterAccountCapePacketTest {
     }
 
     @Test
-    public void aCapeRequestNamesTheAccountWithItsFlag() {
+    public void aCapeRequestNamesTheAccountByNamingNoCharacter() {
         ByteBuf buffer = Unpooled.buffer();
         new CharacterCapeUpdateRequestPacket(5, 2L, null, true,
                 CharacterCapeCatalog.PELARGIR).toBytes(buffer);
@@ -113,15 +113,15 @@ public final class CharacterAccountCapePacketTest {
         assertFalse(forCharacter.isMalformed());
         assertEquals(character, forCharacter.getCharacterId());
 
-        // A request without the flag is malformed, whatever id it names.
-        CharacterCapeUpdateRequestPacket unflagged = new CharacterCapeUpdateRequestPacket();
-        unflagged.fromBytes(named.slice(0, named.readableBytes() - 1));
-        assertTrue(unflagged.isMalformed());
+        // A request cut short is malformed.
+        CharacterCapeUpdateRequestPacket cut = new CharacterCapeUpdateRequestPacket();
+        cut.fromBytes(named.slice(0, named.readableBytes() - 1));
+        assertTrue(cut.isMalformed());
 
         // The nil id names no character.
         ByteBuf nil = Unpooled.buffer();
-        new CharacterCapeUpdateRequestPacket(7, 2L, null, true, 0).toBytes(nil);
-        nil.setBoolean(nil.writerIndex() - 1, false);
+        new CharacterCapeUpdateRequestPacket(7, 2L, new UUID(0L, 0L), true, 0)
+                .toBytes(nil);
         CharacterCapeUpdateRequestPacket refused = new CharacterCapeUpdateRequestPacket();
         refused.fromBytes(nil);
         assertTrue(refused.isMalformed());

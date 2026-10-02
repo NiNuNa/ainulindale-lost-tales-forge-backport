@@ -99,11 +99,11 @@ public final class WindowLayout {
      * These are the only windows that open locked. Null with no tabs; a
      * tab already open elsewhere stays where it is.
      */
-    public static synchronized Window addWindow(List<? extends WindowTab> tabs,
-                                                WindowTab active) {
-        List<WindowTab> fresh = new ArrayList<WindowTab>();
+    public static synchronized Window addWindow(List<? extends WindowPage> tabs,
+                                                WindowPage active) {
+        List<WindowPage> fresh = new ArrayList<WindowPage>();
         if (tabs != null) {
-            for (WindowTab tab : tabs) {
+            for (WindowPage tab : tabs) {
                 if (tab != null && !isOpen(tab) && !fresh.contains(tab)) {
                     fresh.add(tab);
                 }
@@ -134,19 +134,17 @@ public final class WindowLayout {
         final int width;
         /** The part of the screen the window filled; its own box for none. */
         final Window.ScreenFill fill;
-        final boolean locked;
         final boolean pinnedToHud;
         final boolean pinnedToGui;
 
         Place(double x, double y, double height, int width,
-              Window.ScreenFill fill, boolean locked, boolean pinnedToHud,
+              Window.ScreenFill fill, boolean pinnedToHud,
               boolean pinnedToGui) {
             this.x = x;
             this.y = y;
             this.height = height;
             this.width = width;
             this.fill = fill == null ? Window.ScreenFill.NONE : fill;
-            this.locked = locked;
             this.pinnedToHud = pinnedToHud;
             this.pinnedToGui = pinnedToGui;
         }
@@ -155,10 +153,11 @@ public final class WindowLayout {
     /**
      * Brings a page forward: in the window holding its tab, the tab put in
      * front there and the window raised; else in a window of its own, in
-     * front, where the page's window last stood, padlock and pins and all,
-     * or a step on from the window in front, unlocked. Null for no page.
+     * front and unlocked, where the page's window last stood with its pins,
+     * or a step on from the window in front. Only a first window opens
+     * locked. Null for no page.
      */
-    public static synchronized Window showPage(PageTab page) {
+    public static synchronized Window showPage(OtherPage page) {
         if (page == null) {
             return null;
         }
@@ -176,7 +175,6 @@ public final class WindowLayout {
             created.setOwnHeight(clampWindowHeight(place.height));
             created.setOwnWidth(clampWindowWidth(place.width));
             created.setFill(place.fill);
-            created.setLocked(place.locked);
             created.setPinnedToHud(place.pinnedToHud);
             created.setPinnedToGui(place.pinnedToGui);
         } else {
@@ -192,18 +190,18 @@ public final class WindowLayout {
 
     /** Whether the window has a page in front. */
     public static synchronized boolean showsPage(Window window) {
-        return window != null && window.getActiveTab() instanceof PageTab;
+        return window != null && window.getActiveTab() instanceof OtherPage;
     }
 
     /** Notes where the window stands for every page tab in {@code tabs} that is leaving it. */
     private static void rememberPlaces(Window window,
-                                       List<? extends WindowTab> tabs) {
-        for (WindowTab tab : tabs) {
-            if (tab instanceof PageTab) {
+                                       List<? extends WindowPage> tabs) {
+        for (WindowPage tab : tabs) {
+            if (tab instanceof OtherPage) {
                 PLACES.put(tab.id(), new Place(
                         window.getOffsetX(), window.getOffsetY(),
                         window.getOwnHeight(), window.getOwnWidth(),
-                        window.getFill(), window.isLocked(),
+                        window.getFill(),
                         window.isPinnedToHud(), window.isPinnedToGui()));
             }
         }
@@ -271,7 +269,7 @@ public final class WindowLayout {
      * Whether the tab shows while playing: it stands in a window pinned to
      * the HUD and is no world page.
      */
-    public static synchronized boolean isOnHud(WindowTab tab) {
+    public static synchronized boolean isOnHud(WindowPage tab) {
         Window window = windowOf(tab);
         return window != null && window.isPinnedToHud() && staysPut(tab);
     }
@@ -280,7 +278,7 @@ public final class WindowLayout {
      * Whether every view shows the tab: it stands in a window pinned to
      * the GUI and is no world page.
      */
-    public static synchronized boolean isOnGui(WindowTab tab) {
+    public static synchronized boolean isOnGui(WindowPage tab) {
         Window window = windowOf(tab);
         return window != null && window.isPinnedToGui() && staysPut(tab);
     }
@@ -290,15 +288,15 @@ public final class WindowLayout {
      * stands for a thing in the world, which closes as the player walks
      * away from it.
      */
-    static boolean staysPut(WindowTab tab) {
-        return tab != null && !(tab instanceof PageTab
-                && ((PageTab)tab).page().opensFromWorld());
+    static boolean staysPut(WindowPage tab) {
+        return tab != null && !(tab instanceof OtherPage
+                && ((OtherPage)tab).page().opensFromWorld());
     }
 
     /* ---- Tabs ---- */
 
     /** The window holding the tab, or null when it is closed. */
-    public static synchronized Window windowOf(WindowTab tab) {
+    public static synchronized Window windowOf(WindowPage tab) {
         if (tab == null) {
             return null;
         }
@@ -310,13 +308,13 @@ public final class WindowLayout {
         return null;
     }
 
-    public static synchronized boolean isOpen(WindowTab tab) {
+    public static synchronized boolean isOpen(WindowPage tab) {
         return windowOf(tab) != null;
     }
 
     /** Every open tab in window order, each window's tabs in row order. */
-    public static synchronized List<WindowTab> order() {
-        List<WindowTab> result = new ArrayList<WindowTab>();
+    public static synchronized List<WindowPage> order() {
+        List<WindowPage> result = new ArrayList<WindowPage>();
         for (int index = 0; index < WINDOWS.size(); index++) {
             result.addAll(WINDOWS.get(index).tabs());
         }
@@ -328,7 +326,7 @@ public final class WindowLayout {
      * window is not locked. A locked window keeps the tabs it holds. The
      * last tab of the last window closes like any other.
      */
-    public static synchronized boolean isClosable(WindowTab tab) {
+    public static synchronized boolean isClosable(WindowPage tab) {
         Window window = windowOf(tab);
         return window != null && !window.isLocked();
     }
@@ -340,7 +338,7 @@ public final class WindowLayout {
      * walked away from, a whisper as the session ends) leaves through
      * {@link #removeTabs}, locked window or not.
      */
-    public static synchronized boolean close(WindowTab tab) {
+    public static synchronized boolean close(WindowPage tab) {
         if (!isClosable(tab)) {
             return false;
         }
@@ -360,17 +358,17 @@ public final class WindowLayout {
         if (window == null || window.isLocked()) {
             return false;
         }
-        List<WindowTab> leaving = new ArrayList<WindowTab>();
-        for (WindowTab tab : window.tabs()) {
+        List<WindowPage> leaving = new ArrayList<WindowPage>();
+        for (WindowPage tab : window.tabs()) {
             if (WindowView.shows(tab)) {
                 leaving.add(tab);
             }
         }
         if (leaving.size() < window.tabs().size()) {
-            final List<WindowTab> taken = leaving;
+            final List<WindowPage> taken = leaving;
             removeTabs(new TabFilter() {
                 @Override
-                public boolean matches(WindowTab tab) {
+                public boolean matches(WindowPage tab) {
                     return taken.contains(tab) && window.contains(tab);
                 }
             });
@@ -388,7 +386,7 @@ public final class WindowLayout {
     /** Whether a window holds a tab the view hides now, which the {@code +} offers. */
     public static synchronized boolean hasHidden() {
         for (Window window : WINDOWS) {
-            for (WindowTab tab : window.tabs()) {
+            for (WindowPage tab : window.tabs()) {
                 if (tab.isAvailable() && !WindowView.shows(tab)) {
                     return true;
                 }
@@ -399,7 +397,7 @@ public final class WindowLayout {
 
     /** Picks tabs out of the layout; see {@link #removeTabs}. */
     public interface TabFilter {
-        boolean matches(WindowTab tab);
+        boolean matches(WindowPage tab);
     }
 
     /**
@@ -410,17 +408,17 @@ public final class WindowLayout {
      * ({@link #successor}). The listener is not told; the caller writes
      * the change when it is done.
      */
-    public static synchronized List<WindowTab> removeTabs(TabFilter filter) {
-        List<WindowTab> removed = new ArrayList<WindowTab>();
+    public static synchronized List<WindowPage> removeTabs(TabFilter filter) {
+        List<WindowPage> removed = new ArrayList<WindowPage>();
         Iterator<Window> iterator = WINDOWS.iterator();
         while (iterator.hasNext()) {
             Window window = iterator.next();
-            WindowTab active = window.getActiveTab();
+            WindowPage active = window.getActiveTab();
             int activeIndex = window.tabs().indexOf(active);
             int before = 0;
-            List<WindowTab> taken = new ArrayList<WindowTab>();
+            List<WindowPage> taken = new ArrayList<WindowPage>();
             for (int index = 0; index < window.tabs().size(); index++) {
-                WindowTab tab = window.tabs().get(index);
+                WindowPage tab = window.tabs().get(index);
                 if (filter.matches(tab)) {
                     taken.add(tab);
                     if (index < activeIndex) {
@@ -452,7 +450,7 @@ public final class WindowLayout {
      * left, a tab not on screen now passed over while one that is stands
      * further along. Null for an empty row.
      */
-    static WindowTab successor(List<WindowTab> tabs, int index) {
+    static WindowPage successor(List<WindowPage> tabs, int index) {
         if (tabs.isEmpty()) {
             return null;
         }
@@ -487,10 +485,10 @@ public final class WindowLayout {
      * kind: a tab never opens a window of its own by itself, and waits in
      * the {@code +} until the player opens one.</p>
      */
-    private static Window receivingWindow(Window preferred, WindowTab tab) {
+    private static Window receivingWindow(Window preferred, WindowPage tab) {
         // A window whose row cannot hold one more tab at its least — the
         // widest tab whole, every other down to its icon — is full.
-        List<WindowTab> candidate = Collections.singletonList(tab);
+        List<WindowPage> candidate = Collections.singletonList(tab);
         boolean asked = preferred != null && WINDOWS.contains(preferred);
         if (asked && takes(preferred, candidate)) {
             return preferred;
@@ -516,13 +514,13 @@ public final class WindowLayout {
 
     /** Whether the window takes the tabs: it is unlocked, and its row has room. */
     private static boolean takes(Window window,
-                                 List<? extends WindowTab> tabs) {
+                                 List<? extends WindowPage> tabs) {
         return !window.isLocked() && hasRoomFor(window, tabs);
     }
 
     /** Whether the window holds a tab of the same kind as {@code tab}: a conversation, or a page. */
-    private static boolean holdsKindOf(Window window, WindowTab tab) {
-        for (WindowTab held : window.tabs()) {
+    private static boolean holdsKindOf(Window window, WindowPage tab) {
+        for (WindowPage held : window.tabs()) {
             if (held.getClass() == tab.getClass()) {
                 return true;
             }
@@ -536,7 +534,7 @@ public final class WindowLayout {
      * measure with — headless tests, a broken frame — the answer is yes.
      */
     private static boolean hasRoomFor(Window window,
-                                      List<? extends WindowTab> tabs) {
+                                      List<? extends WindowPage> tabs) {
         try {
             return TabRow.rowHasRoomFor(
                     net.minecraft.client.Minecraft.getMinecraft(), window,
@@ -554,7 +552,7 @@ public final class WindowLayout {
      * tab as the layout holds it: the one already open, if it is. Null
      * when there is no window to open it in.
      */
-    public static synchronized WindowTab openTab(WindowTab tab,
+    public static synchronized WindowPage openTab(WindowPage tab,
                                                  String preferredWindowId) {
         if (tab == null) {
             return null;
@@ -581,7 +579,7 @@ public final class WindowLayout {
      * front, unlocked and in front of it: how a tab comes back when no
      * window is left to put it in. Refused for a tab that is already open.
      */
-    public static synchronized WindowTab openInNewWindow(WindowTab tab) {
+    public static synchronized WindowPage openInNewWindow(WindowPage tab) {
         if (tab == null || isOpen(tab)) {
             return null;
         }
@@ -602,7 +600,7 @@ public final class WindowLayout {
      * window refuses, as source and as target. A source emptied by the
      * move disappears.
      */
-    public static synchronized boolean moveTab(WindowTab tab,
+    public static synchronized boolean moveTab(WindowPage tab,
                                                String targetWindowId,
                                                int index) {
         return moveTabs(Collections.singletonList(tab), targetWindowId,
@@ -620,7 +618,7 @@ public final class WindowLayout {
      * reorder included, as does a target whose row has no room for the
      * tabs at their least. A source emptied by the move disappears.
      */
-    public static synchronized boolean moveTabs(List<? extends WindowTab> tabs,
+    public static synchronized boolean moveTabs(List<? extends WindowPage> tabs,
                                                 String targetWindowId,
                                                 int index) {
         return moveTabs(tabs, targetWindowId, index, true);
@@ -631,10 +629,10 @@ public final class WindowLayout {
      * a tab sliding along its row writes the file once, on release,
      * rather than every time it passes a neighbour.
      */
-    public static synchronized boolean moveTabs(List<? extends WindowTab> tabs,
+    public static synchronized boolean moveTabs(List<? extends WindowPage> tabs,
                                                 String targetWindowId,
                                                 int index, boolean persist) {
-        List<WindowTab> moved = sameWindowTabs(tabs);
+        List<WindowPage> moved = sameWindowTabs(tabs);
         Window target = window(targetWindowId);
         if (moved.isEmpty() || target == null || target.isLocked()) {
             return false;
@@ -643,10 +641,10 @@ public final class WindowLayout {
         if (source.isLocked()) {
             return false;
         }
-        WindowTab active = source.getActiveTab();
-        List<WindowTab> list = source.tabs();
+        WindowPage active = source.getActiveTab();
+        List<WindowPage> list = source.tabs();
         if (source == target) {
-            List<WindowTab> reordered = new ArrayList<WindowTab>(list);
+            List<WindowPage> reordered = new ArrayList<WindowPage>(list);
             reordered.removeAll(moved);
             reordered.addAll(Math.max(0,
                     Math.min(reordered.size(), index)), moved);
@@ -692,7 +690,7 @@ public final class WindowLayout {
     }
 
     /** The splits of {@code window} both of whose pages are among {@code tabs}: they go where the tabs go. */
-    private static List<WindowSplit> splitsWhollyIn(Window window, List<WindowTab> tabs) {
+    private static List<WindowSplit> splitsWhollyIn(Window window, List<WindowPage> tabs) {
         List<WindowSplit> whole = new ArrayList<WindowSplit>();
         for (WindowSplit split : window.splits()) {
             if (tabs.contains(split.first()) && tabs.contains(split.second())) {
@@ -708,7 +706,7 @@ public final class WindowLayout {
      * second page stands right after its first in the row.
      */
     private static void settleSplits(Window window) {
-        Set<WindowTab> taken = new HashSet<WindowTab>();
+        Set<WindowPage> taken = new HashSet<WindowPage>();
         Iterator<WindowSplit> splits = window.splits().iterator();
         while (splits.hasNext()) {
             WindowSplit split = splits.next();
@@ -719,7 +717,7 @@ public final class WindowLayout {
             }
             taken.add(split.first());
             taken.add(split.second());
-            List<WindowTab> tabs = window.tabs();
+            List<WindowPage> tabs = window.tabs();
             tabs.remove(split.second());
             tabs.add(tabs.indexOf(split.first()) + 1, split.second());
         }
@@ -734,7 +732,7 @@ public final class WindowLayout {
      * Refused while either window is locked, for a page already in a
      * split, and where first's window has no room for the second.
      */
-    public static synchronized boolean split(WindowTab first, WindowTab second) {
+    public static synchronized boolean split(WindowPage first, WindowPage second) {
         Window window = windowOf(first);
         Window from = windowOf(second);
         if (window == null || from == null || first.equals(second)
@@ -754,14 +752,14 @@ public final class WindowLayout {
     }
 
     /** The split {@code tab} stands in, and its window; refused while it is locked. */
-    private static Window splitWindow(WindowTab tab, boolean evenLocked) {
+    private static Window splitWindow(WindowPage tab, boolean evenLocked) {
         Window window = windowOf(tab);
         return window == null || window.splitOf(tab) == null
                 || (window.isLocked() && !evenLocked) ? null : window;
     }
 
     /** The two pages of {@code tab}'s split become two tabs again, side by side in the row. */
-    public static synchronized boolean separate(WindowTab tab) {
+    public static synchronized boolean separate(WindowPage tab) {
         Window window = splitWindow(tab, false);
         if (window == null) {
             return false;
@@ -772,7 +770,7 @@ public final class WindowLayout {
     }
 
     /** Changes the two sides of {@code tab}'s split round. */
-    public static synchronized boolean swapSides(WindowTab tab) {
+    public static synchronized boolean swapSides(WindowPage tab) {
         Window window = splitWindow(tab, false);
         if (window == null) {
             return false;
@@ -783,11 +781,11 @@ public final class WindowLayout {
     }
 
     /** Turns {@code tab}'s split side by side, or one over the other. */
-    public static synchronized boolean turnSplit(WindowTab tab, boolean stacked) {
+    public static synchronized boolean turnSplit(WindowPage tab, boolean stacked) {
         Window window = splitWindow(tab, false);
         if (window == null || window.splitOf(tab).isStacked() == stacked
-                || stacked && !(window.splitOf(tab).first() instanceof PageTab
-                        && window.splitOf(tab).second() instanceof PageTab)) {
+                || stacked && !(window.splitOf(tab).first() instanceof OtherPage
+                        && window.splitOf(tab).second() instanceof OtherPage)) {
             return false;
         }
         replaceSplit(window, window.splitOf(tab), window.splitOf(tab).turned(stacked));
@@ -800,7 +798,7 @@ public final class WindowLayout {
      * window's too, as the member list's edge moves in one.
      * {@code persist} is false while the divider is being dragged.
      */
-    public static synchronized boolean shareSplit(WindowTab tab, double share,
+    public static synchronized boolean shareSplit(WindowPage tab, double share,
                                                   boolean persist) {
         Window window = splitWindow(tab, true);
         if (window == null) {
@@ -825,9 +823,9 @@ public final class WindowLayout {
      * is the window's, never the caller's, so a group keeps the order it
      * was shown in however it came to be selected.
      */
-    private static List<WindowTab> sameWindowTabs(
-            List<? extends WindowTab> tabs) {
-        List<WindowTab> result = new ArrayList<WindowTab>();
+    private static List<WindowPage> sameWindowTabs(
+            List<? extends WindowPage> tabs) {
+        List<WindowPage> result = new ArrayList<WindowPage>();
         if (tabs == null || tabs.isEmpty()) {
             return result;
         }
@@ -835,13 +833,13 @@ public final class WindowLayout {
         if (window == null) {
             return result;
         }
-        for (WindowTab tab : window.tabs()) {
+        for (WindowPage tab : window.tabs()) {
             if (tabs.contains(tab)) {
                 result.add(tab);
             }
         }
-        return result.size() == new HashSet<WindowTab>(tabs).size()
-                ? result : new ArrayList<WindowTab>();
+        return result.size() == new HashSet<WindowPage>(tabs).size()
+                ? result : new ArrayList<WindowPage>();
     }
 
     /**
@@ -851,10 +849,10 @@ public final class WindowLayout {
      * The tabs keep their relative order. A window's only tabs dragged out
      * just move that window. A locked window lets nothing go.
      */
-    public static synchronized Window tearOff(List<? extends WindowTab> tabs,
+    public static synchronized Window tearOff(List<? extends WindowPage> tabs,
                                               double offsetX, double offsetY,
                                               int width, double height) {
-        List<WindowTab> moved = sameWindowTabs(tabs);
+        List<WindowPage> moved = sameWindowTabs(tabs);
         if (moved.isEmpty()) {
             return null;
         }
@@ -884,8 +882,8 @@ public final class WindowLayout {
      * last of them in front there, and hands the source's front to a
      * neighbour where one of them held it. Not written.
      */
-    private static Window takeOut(Window source, List<WindowTab> moved) {
-        WindowTab active = source.getActiveTab();
+    private static Window takeOut(Window source, List<WindowPage> moved) {
+        WindowPage active = source.getActiveTab();
         int activeIndex = source.tabs().indexOf(active);
         int before = countBefore(moved, source, activeIndex);
         source.tabs().removeAll(moved);
@@ -905,7 +903,7 @@ public final class WindowLayout {
     }
 
     /** Brings a tab to the front of its own window; not a layout change. */
-    public static synchronized boolean setActiveTab(WindowTab tab) {
+    public static synchronized boolean setActiveTab(WindowPage tab) {
         Window window = windowOf(tab);
         if (window == null || tab.equals(window.getActiveTab())) {
             return false;
@@ -920,7 +918,7 @@ public final class WindowLayout {
      * tab that was in front hands the front to its neighbour
      * ({@link #successor}).
      */
-    private static void removeTab(Window window, WindowTab tab) {
+    private static void removeTab(Window window, WindowPage tab) {
         rememberPlaces(window, Collections.singletonList(tab));
         int index = window.tabs().indexOf(tab);
         window.tabs().remove(tab);
@@ -938,7 +936,7 @@ public final class WindowLayout {
      * How many of {@code moved} stand before {@code index} in the
      * window's row, read before they leave it.
      */
-    private static int countBefore(List<WindowTab> moved, Window window,
+    private static int countBefore(List<WindowPage> moved, Window window,
                                    int index) {
         int count = 0;
         for (int at = 0; at < index && at < window.tabs().size(); at++) {
@@ -964,7 +962,7 @@ public final class WindowLayout {
     static synchronized void load(List<WindowSpec> specs) {
         WINDOWS.clear();
         STACK.clear();
-        Set<WindowTab> placed = new HashSet<WindowTab>();
+        Set<WindowPage> placed = new HashSet<WindowPage>();
         int highestNumber = 0;
         if (specs != null) {
             for (WindowSpec spec : specs) {
@@ -985,7 +983,7 @@ public final class WindowLayout {
                     continue;
                 }
                 Window window = new Window(id);
-                for (WindowTab tab : spec.tabs) {
+                for (WindowPage tab : spec.tabs) {
                     if (tab != null && tab.isKeptInLayout()
                             && placed.add(tab)) {
                         window.tabs().add(tab);
@@ -1006,8 +1004,8 @@ public final class WindowLayout {
                 for (WindowSplit split : spec.splits) {
                     // A conversation stands only side by side.
                     window.splits().add(split.isStacked()
-                            && !(split.first() instanceof PageTab
-                                    && split.second() instanceof PageTab)
+                            && !(split.first() instanceof OtherPage
+                                    && split.second() instanceof OtherPage)
                             ? split.turned(false) : split);
                 }
                 settleSplits(window);
@@ -1024,8 +1022,8 @@ public final class WindowLayout {
     static synchronized List<WindowSpec> describe() {
         List<WindowSpec> result = new ArrayList<WindowSpec>(WINDOWS.size());
         for (Window window : WINDOWS) {
-            List<WindowTab> tabs = new ArrayList<WindowTab>();
-            for (WindowTab tab : window.tabs()) {
+            List<WindowPage> tabs = new ArrayList<WindowPage>();
+            for (WindowPage tab : window.tabs()) {
                 if (tab.isKeptInLayout()) {
                     tabs.add(tab);
                 }
@@ -1033,7 +1031,7 @@ public final class WindowLayout {
             if (tabs.isEmpty()) {
                 continue;
             }
-            WindowTab active = window.getActiveTab();
+            WindowPage active = window.getActiveTab();
             List<WindowSplit> splits = new ArrayList<WindowSplit>();
             for (WindowSplit split : window.splits()) {
                 if (tabs.contains(split.first()) && tabs.contains(split.second())) {
@@ -1053,8 +1051,8 @@ public final class WindowLayout {
     /** Plain description of one window, used by load and describe. */
     public static final class WindowSpec {
         final String id;
-        final List<WindowTab> tabs;
-        final WindowTab activeTab;
+        final List<WindowPage> tabs;
+        final WindowPage activeTab;
         final boolean locked;
         final boolean pinnedToHud;
         final boolean pinnedToGui;
@@ -1069,16 +1067,16 @@ public final class WindowLayout {
         /** The splits that show two of its pages together. */
         final List<WindowSplit> splits;
 
-        public WindowSpec(String id, List<? extends WindowTab> tabs,
-                          WindowTab activeTab, boolean locked,
+        public WindowSpec(String id, List<? extends WindowPage> tabs,
+                          WindowPage activeTab, boolean locked,
                           boolean pinnedToHud, boolean pinnedToGui,
                           double offsetX, double offsetY,
                           double height, int width, Window.ScreenFill fill,
                           List<WindowSplit> splits) {
             this.id = id;
-            List<WindowTab> kept = new ArrayList<WindowTab>();
+            List<WindowPage> kept = new ArrayList<WindowPage>();
             if (tabs != null) {
-                for (WindowTab tab : tabs) {
+                for (WindowPage tab : tabs) {
                     if (tab != null) {
                         kept.add(tab);
                     }
@@ -1103,7 +1101,7 @@ public final class WindowLayout {
      * Adds a closed tab as a window's last and puts it in front. Refused
      * for a missing or locked window and a tab already open.
      */
-    public static synchronized boolean addTab(String windowId, WindowTab tab) {
+    public static synchronized boolean addTab(String windowId, WindowPage tab) {
         Window window = window(windowId);
         if (tab == null || window == null || window.isLocked()
                 || isOpen(tab)) {
@@ -1123,11 +1121,11 @@ public final class WindowLayout {
      * server. Not written; the caller decides.
      */
     public static synchronized void appendTabs(Window window,
-                                               List<? extends WindowTab> tabs) {
+                                               List<? extends WindowPage> tabs) {
         if (window == null || tabs == null || !WINDOWS.contains(window)) {
             return;
         }
-        for (WindowTab tab : tabs) {
+        for (WindowPage tab : tabs) {
             if (tab != null && !isOpen(tab)) {
                 window.tabs().add(tab);
             }
@@ -1244,10 +1242,22 @@ public final class WindowLayout {
         return null;
     }
 
-    /** The window drawn in front of the others; null with none. */
+    /**
+     * The window drawn in front of the others that the view shows: a new
+     * window steps on from it. A window the view hides is not seen, so
+     * one that would step on from it opens at the default place instead.
+     * Null with none.
+     */
     private static Window frontWindow() {
         List<Window> order = stacked();
-        return order.isEmpty() ? null : order.get(order.size() - 1);
+        for (int index = order.size() - 1; index >= 0; index--) {
+            for (WindowPage tab : order.get(index).tabs()) {
+                if (WindowView.shows(tab)) {
+                    return order.get(index);
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -1285,8 +1295,10 @@ public final class WindowLayout {
     /**
      * Puts a window's layout back as it first was: at the default place,
      * in the middle of the screen at two thirds of it, filling no part of
-     * the screen, and locked again. Its pages and its pins stay. A locked
-     * window stays where it is, so only an unlocked one resets.
+     * the screen, pinned nowhere, its splits parted, and locked again. Its
+     * pages stay; what each lays out in it is put back by the tab
+     * ({@link WindowPage#resetIn}), and the settings keep their own reset.
+     * A locked window stays where it is, so only an unlocked one resets.
      */
     public static synchronized boolean resetWindow(String windowId) {
         Window window = window(windowId);
@@ -1296,6 +1308,9 @@ public final class WindowLayout {
         window.setOwnWidth(0);
         window.setOwnHeight(0.0D);
         window.setFill(Window.ScreenFill.NONE);
+        window.setPinnedToHud(false);
+        window.setPinnedToGui(false);
+        window.splits().clear();
         window.setLocked(true);
         changed();
         return true;

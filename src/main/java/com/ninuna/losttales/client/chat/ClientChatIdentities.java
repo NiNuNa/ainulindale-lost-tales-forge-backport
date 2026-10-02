@@ -5,7 +5,7 @@ import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,7 +94,7 @@ final class ClientChatIdentities {
 
     public static synchronized String viewIdentityKey() {
         if (viewing != null && isHeld(viewing)) {
-            return ChatTab.ownerKeyOf(viewing.characterId);
+            return ConversationPage.ownerKeyOf(viewing.characterId);
         }
         viewing = null;
         return activeIdentityKey();
@@ -102,18 +102,18 @@ final class ClientChatIdentities {
 
     public static String activeIdentityKey() {
         CharacterSummary active = activeCharacter();
-        return ChatTab.ownerKeyOf(active == null ? null : active.getCharacterId());
+        return ConversationPage.ownerKeyOf(active == null ? null : active.getCharacterId());
     }
 
     /**
      * Who the player is on a tab: on a conversation, who it speaks as; on
      * a page, the character played, whom every page is about.
      */
-    static synchronized Identity effectiveFor(WindowTab tab) {
-        if (tab != null && !(tab instanceof ChatTab)) {
+    static synchronized Identity effectiveFor(WindowPage tab) {
+        if (tab != null && !(tab instanceof ConversationPage)) {
             return played();
         }
-        ChatTab chat = (ChatTab)tab;
+        ConversationPage chat = (ConversationPage)tab;
         if (!speaksInCharacter(chat)) {
             return accountIdentity();
         }
@@ -121,14 +121,14 @@ final class ClientChatIdentities {
     }
 
     /** Whether a tab's identity button shows the Narrator's mark: its voice is taken up and the tab speaks in character. */
-    static boolean narratesOn(WindowTab tab) {
-        return isNarrating() && tab instanceof ChatTab
-                && speaksInCharacter((ChatTab)tab);
+    static boolean narratesOn(WindowPage tab) {
+        return isNarrating() && tab instanceof ConversationPage
+                && speaksInCharacter((ConversationPage)tab);
     }
 
     /** Whether the identity button's menu chooses who the tab speaks as: Global, Faction, whispers. */
-    static boolean picksIdentity(WindowTab tab) {
-        return tab instanceof ChatTab && picksIdentity((ChatTab)tab);
+    static boolean picksIdentity(WindowPage tab) {
+        return tab instanceof ConversationPage && picksIdentity((ConversationPage)tab);
     }
 
     /**
@@ -136,12 +136,12 @@ final class ClientChatIdentities {
      * button chose: Proximity and Fellowship
      * ({@link ChatRolePresentation#speaksAsPlayedCharacter}).
      */
-    static boolean speaksAsPlayed(ChatTab tab) {
+    static boolean speaksAsPlayed(ConversationPage tab) {
         return tab != null && ChatRolePresentation.speaksAsPlayedCharacter(tab.getChannel());
     }
 
     /** Whether the head button chooses who the tab speaks as: Global, Faction, whispers. */
-    static boolean picksIdentity(ChatTab tab) {
+    static boolean picksIdentity(ConversationPage tab) {
         return speaksInCharacter(tab) && !speaksAsPlayed(tab);
     }
 
@@ -156,11 +156,11 @@ final class ClientChatIdentities {
      * the account: where the head button chooses, and where a choice
      * shows.
      */
-    static boolean speaksInCharacter(ChatTab tab) {
+    static boolean speaksInCharacter(ConversationPage tab) {
         return tab != null && ChatRolePresentation.isInCharacter(tab.getChannel());
     }
 
-    static synchronized int wireKind(ChatTab tab) {
+    static synchronized int wireKind(ConversationPage tab) {
         if (!speaksInCharacter(tab)) {
             return LostTalesChatSendPacket.IDENTITY_ACCOUNT;
         }
@@ -169,13 +169,13 @@ final class ClientChatIdentities {
                 : LostTalesChatSendPacket.IDENTITY_CHARACTER;
     }
 
-    static synchronized UUID wireCharacterId(ChatTab tab) {
+    static synchronized UUID wireCharacterId(ConversationPage tab) {
         return wireKind(tab) == LostTalesChatSendPacket.IDENTITY_CHARACTER
                 ? viewing.characterId : null;
     }
 
     static synchronized boolean isSelected(Identity identity) {
-        return identity != null && ChatTab.ownerKeyOf(identity.characterId)
+        return identity != null && ConversationPage.ownerKeyOf(identity.characterId)
                 .equals(viewIdentityKey());
     }
 

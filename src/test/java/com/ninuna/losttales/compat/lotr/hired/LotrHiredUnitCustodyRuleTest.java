@@ -19,8 +19,9 @@ public final class LotrHiredUnitCustodyRuleTest {
     private static final UUID CHARACTER = UUID.fromString(
             "f4000000-0000-0000-0000-00000000004f");
     private static final UUID PARKED = LotrHiredUnitCustodyRule.parkedUuid(OWNER);
-    private static final String CHARACTER_KEY = LotrHiredUnitTag.identityKey(CHARACTER);
-    private static final String ACCOUNT_KEY = LotrHiredUnitTag.ACCOUNT_KEY;
+    private static final String CHARACTER_KEY = CHARACTER.toString();
+    /** The account character's key: its id is the account's own. */
+    private static final String ACCOUNT_KEY = OWNER.toString();
 
 
     @Test

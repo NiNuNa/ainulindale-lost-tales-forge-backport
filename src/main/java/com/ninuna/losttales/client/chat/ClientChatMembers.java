@@ -13,7 +13,7 @@ import net.minecraft.client.Minecraft;
 /**
  * What the server last said of who is in each conversation, for the
  * member lists of the windows showing it, and when to ask again. A
- * conversation is the one a tab shows ({@link ChatTab#viewed}), known by
+ * conversation is the one a tab shows ({@link ConversationPage#viewed}), known by
  * its id: a channel's, a faction's or a fellowship's as the chat is read, a
  * whisper held as one identity, an NPC's.
  *
@@ -96,7 +96,7 @@ public final class ClientChatMembers {
     }
 
     /** The answer last told for the conversation the tab shows, or null while none has been. */
-    static synchronized Answer of(ChatTab tab) {
+    static synchronized Answer of(ConversationPage tab) {
         return tab == null ? null : BY_CONVERSATION.get(keyOf(tab));
     }
 
@@ -104,8 +104,8 @@ public final class ClientChatMembers {
      * Asks for the members of the conversation the tab shows when its
      * list is due an answer; nothing when one was asked for too recently.
      */
-    static void requestIfDue(ChatTab tab) {
-        ChatTab viewed = ChatTab.viewed(tab);
+    static void requestIfDue(ConversationPage tab) {
+        ConversationPage viewed = ConversationPage.viewed(tab);
         if (viewed == null || viewed.getChannel() == null) {
             return;
         }
@@ -126,18 +126,18 @@ public final class ClientChatMembers {
      * in front first, as the chat opens: at most {@link #MAX_PREFETCH},
      * and none already answered or asked for this session.
      */
-    static void prefetch(List<ChatTab> tabs) {
+    static void prefetch(List<ConversationPage> tabs) {
         if (tabs == null) {
             return;
         }
         long now = System.currentTimeMillis();
         String asAs = ClientChatIdentities.viewIdentityKey();
         int asked = 0;
-        for (ChatTab tab : tabs) {
+        for (ConversationPage tab : tabs) {
             if (asked >= MAX_PREFETCH) {
                 return;
             }
-            ChatTab viewed = ChatTab.viewed(tab);
+            ConversationPage viewed = ConversationPage.viewed(tab);
             if (viewed == null || viewed.getChannel() == null) {
                 continue;
             }
@@ -160,7 +160,7 @@ public final class ClientChatMembers {
         ASKED_AT.clear();
     }
 
-    private static void ask(ChatTab viewed, long now, String asAs) {
+    private static void ask(ConversationPage viewed, long now, String asAs) {
         String key = viewed.id();
         long held;
         synchronized (ClientChatMembers.class) {
@@ -185,7 +185,7 @@ public final class ClientChatMembers {
      * conversation names, else — for an NPC's, which names none — the one
      * the chat is read as; null for the account.
      */
-    private static UUID heldCharacterOf(ChatTab conversation, String readAs) {
+    private static UUID heldCharacterOf(ConversationPage conversation, String readAs) {
         String owner = conversation.getOwnerKey().length() > 0
                 ? conversation.getOwnerKey() : readAs;
         if (owner == null || owner.length() == 0) {
@@ -199,8 +199,8 @@ public final class ClientChatMembers {
     }
 
     /** The key a tab's conversation is known by. */
-    private static String keyOf(ChatTab tab) {
-        ChatTab viewed = ChatTab.viewed(tab);
+    private static String keyOf(ConversationPage tab) {
+        ConversationPage viewed = ConversationPage.viewed(tab);
         return viewed == null ? "" : viewed.id();
     }
 

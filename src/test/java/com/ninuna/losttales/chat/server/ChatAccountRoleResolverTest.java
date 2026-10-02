@@ -3,6 +3,9 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatRoleSource;
+import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
+import com.ninuna.losttales.permission.LostTalesPermissions;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -14,6 +17,8 @@ import org.junit.After;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Two questions, two answers. The account's roles are what a capability
@@ -150,6 +155,75 @@ public final class ChatAccountRoleResolverTest {
         ChatRoleCatalog catalog = ChatRoleCatalog.of(
                 Collections.<ChatAccountRole>emptyList(), members, null);
         assertEquals(0, ChatAccountRoleResolver.assignedMask(catalog, ACCOUNT, ALDRIC));
+    }
+
+    /**
+     * Capabilities come only from roles the account holds: assigned to
+     * the account, or given by an operator level. A role earned by a LOTR
+     * faction rank, or assigned to a character, keeps its bit for its look
+     * and the gates it opens, and grants nothing, whatever it names.
+     */
+    @Test
+    public void aRoleEarnedByRankOrHeldByACharacterGrantsNothing() {
+        Set<String> moderate = Collections.singleton(
+                LostTalesCapability.CHAT_MODERATE.getId());
+        ChatAccountRole knight = ChatAccountRole.custom("knight", "Knight", "",
+                0x112233, true, 30, Arrays.asList(
+                        ChatRoleSource.factionRank("gondor", "gondor.knight")),
+                moderate, null);
+        ChatAccountRole herald = ChatAccountRole.custom("herald", "Herald", "",
+                0x223344, true, 31, null, moderate, null);
+        ChatAccountRole warden = ChatAccountRole.custom("warden", "Warden", "",
+                0x334455, true, 32, null, moderate, null);
+        ChatAccountRole staff = ChatAccountRole.custom("staff", "Staff", "",
+                0x445566, true, 33, Arrays.asList(ChatRoleSource.opLevel(2)),
+                moderate, null);
+        Map<String, Set<UUID>> accounts = new LinkedHashMap<String, Set<UUID>>();
+        accounts.put("warden", setOf(ACCOUNT));
+        Map<String, Set<UUID>> characters = new LinkedHashMap<String, Set<UUID>>();
+        characters.put("herald", setOf(ALDRIC));
+        ChatRoleCatalog catalog = ChatRoleCatalog.of(
+                Arrays.asList(knight, herald, warden, staff), accounts, characters);
+        int knightBit = catalog.byId("knight").bit();
+        int heraldBit = catalog.byId("herald").bit();
+        int wardenBit = catalog.byId("warden").bit();
+        int staffBit = catalog.byId("staff").bit();
+
+        ChatAccountRoleResolver.OperatorLevel operator =
+                new ChatAccountRoleResolver.OperatorLevel() {
+                    @Override
+                    public boolean reaches(int level, String roleId) {
+                        return level <= 2;
+                    }
+                };
+        ChatAccountRoleResolver.OperatorLevel player =
+                new ChatAccountRoleResolver.OperatorLevel() {
+                    @Override
+                    public boolean reaches(int level, String roleId) {
+                        return false;
+                    }
+                };
+        assertEquals(wardenBit | staffBit,
+                ChatAccountRoleResolver.grantingMask(catalog, ACCOUNT, operator));
+        assertEquals(wardenBit,
+                ChatAccountRoleResolver.grantingMask(catalog, ACCOUNT, player));
+        assertEquals(0, ChatAccountRoleResolver.grantingMask(catalog, OTHER_ACCOUNT,
+                player));
+
+        // Aldric still wears the herald's role for its look and its gates.
+        assertEquals(wardenBit | heraldBit,
+                ChatAccountRoleResolver.assignedMask(catalog, ACCOUNT, ALDRIC));
+        // A rank or a character's role names a grant the catalogue keeps,
+        // but the mask capabilities are asked through never holds it.
+        assertTrue(LostTalesPermissions.isGranted(knightBit | heraldBit,
+                LostTalesCapability.CHAT_MODERATE, catalog,
+                LostTalesPermissionCatalog.empty()));
+        int granting = ChatAccountRoleResolver.grantingMask(catalog, OTHER_ACCOUNT,
+                player);
+        assertEquals(0, granting & (knightBit | heraldBit));
+        assertFalse(LostTalesPermissions.decide(false, granting,
+                LostTalesCapability.CHAT_MODERATE, catalog,
+                LostTalesPermissionCatalog.empty()));
     }
 
     /** Nothing at all is asked of a missing catalogue or a nameless account. */

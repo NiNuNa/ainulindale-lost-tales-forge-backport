@@ -331,6 +331,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String LOTR_MAP_LABEL_STYLE_HOOK_OWNER =
             "com/ninuna/losttales/client/mapmarker/"
                     + "LostTalesLotrMapLabelStyle";
+    /**
+     * LOTR's white, as the literal its map strip hands the font:
+     * recognised to route it through the label style, never drawn here.
+     */
+    private static final int LOTR_MAP_TEXT_WHITE = 0x00FFFFFF;
     private static final String MAP_LABEL_DRAW_HOOK_DESC =
             "(Lnet/minecraft/client/gui/FontRenderer;"
                     + "Ljava/lang/String;III)I";
@@ -1846,7 +1851,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         for (AbstractInsnNode instruction = method.instructions.getFirst();
              instruction != null; instruction = instruction.getNext()) {
             if (!(instruction instanceof LdcInsnNode)
-                    || !Integer.valueOf(0x00FFFFFF).equals(
+                    || !Integer.valueOf(LOTR_MAP_TEXT_WHITE).equals(
                             ((LdcInsnNode)instruction).cst)) {
                 continue;
             }

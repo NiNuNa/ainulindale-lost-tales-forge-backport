@@ -287,7 +287,7 @@ final class FellowshipInvitationCoordinator {
                     fellowship,
                     invitation);
         }
-        FellowshipDeclines.declined(invitation.getInvitingOwnerId(),
+        FellowshipDeclines.startWait(invitation.getInvitingOwnerId(),
                 invitation.getTargetOwnerId(), now);
         return FellowshipInvitationOperationResult.success(
                 true, fellowship, invitation, null);
@@ -309,13 +309,19 @@ final class FellowshipInvitationCoordinator {
                     FellowshipErrorId.INVITATION_NOT_FOUND, fellowship, null);
         }
         invitationData.removeInvitation(invitationId);
-        if (invitation.isExpired(System.currentTimeMillis())) {
+        long now = System.currentTimeMillis();
+        if (invitation.isExpired(now)) {
             return FellowshipInvitationOperationResult.failure(
                     FellowshipErrorId.INVITATION_EXPIRED,
                     true,
                     fellowship,
                     invitation);
         }
+        // As after a decline, the one who sent it waits before inviting the
+        // same player again, so inviting and taking back cannot chime at
+        // them over and over.
+        FellowshipDeclines.startWait(invitation.getInvitingOwnerId(),
+                invitation.getTargetOwnerId(), now);
         return FellowshipInvitationOperationResult.success(
                 true, fellowship, invitation, null);
     }

@@ -20,7 +20,7 @@ import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 
 /**
- * The Glances tab, editing one glance at a time as Total RP 3 does: the
+ * The profile editor's Glances section, editing one glance at a time as Total RP 3 does: the
  * five places a glance can stand, as framed buttons wearing each glance's
  * emoji and a {@code +} in the first empty one; under them the chosen
  * glance's title and line, every one of the chat's emoji to give it, and
@@ -237,7 +237,7 @@ final class GlanceEditor extends CreatorControl {
             ChatEmojiIcon.draw(this.context.getMinecraft(), emoji,
                     (int)left + inset, (int)top + inset, 255);
         } else {
-            LostTalesUiSheet plus = lit ? LostTalesUiSheet.PLUS_HOVER
+            LostTalesUiSheet plus = lit ? LostTalesUiSheet.PLUS_ADD
                     : LostTalesUiSheet.PLUS;
             plus.drawWithShadow(left + LostTalesUiInk.centredStart(SLOT,
                     plus.getWidth()), top + LostTalesUiInk.centredStart(SLOT,

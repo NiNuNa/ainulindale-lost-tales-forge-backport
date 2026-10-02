@@ -5,7 +5,7 @@ import java.util.UUID;
 
 /**
  * The grammar of a tab id, the part of it both sides read: the client's
- * {@code ChatTab} writes and parses ids in full, and the server reads
+ * {@code ConversationPage} writes and parses ids in full, and the server reads
  * only which channel an id names, for the command answers it keeps
  * under the tab they were typed in. A plain channel's id is the channel
  * id, followed by {@code |} and a conversation or an identity; a whisper

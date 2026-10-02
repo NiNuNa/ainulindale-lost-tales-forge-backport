@@ -64,8 +64,7 @@ public final class CharacterTemplateOffer {
         }
         offeredFor = ownerId;
         pendingRequestId = ClientCharacterNetwork.adoptTemplate(
-                adoption(snapshot.getRevision(),
-                        CharacterTemplateStore.load(account)));
+                adoption(CharacterTemplateStore.load(account)));
     }
 
     /**
@@ -101,17 +100,16 @@ public final class CharacterTemplateOffer {
     }
 
     /** What the template asks for, or an empty offer when there is none. */
-    static CharacterTemplateAdoption adoption(long rosterRevision,
-                                              CharacterTemplate template) {
+    static CharacterTemplateAdoption adoption(CharacterTemplate template) {
         if (template == null || template.isEmpty() || !template.hasUsableName()
                 || !template.hasSelectableRace()) {
             // A template no server would accept is not offered: a name
             // too short, or a race the registry does not let anyone choose.
             // Refusing it here spends the reading cleanly, and the template
             // editor names the missing choice the next time it is opened.
-            return CharacterTemplateAdoption.none(rosterRevision);
+            return CharacterTemplateAdoption.none();
         }
-        return new CharacterTemplateAdoption(rosterRevision, true,
+        return new CharacterTemplateAdoption(true,
                 template.getName(), template.getRaceId(),
                 template.getGenderId(), template.getSkinId(),
                 template.getBodyTypeId(), template.getChestTypeId(),

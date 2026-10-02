@@ -49,10 +49,20 @@ public abstract class SubWindowContent {
                        double pointerY, int alpha, int surfaceAlpha);
 
     /**
-     * Draws the tip of what the pointer rests on, beside
-     * {@code tipX}/{@code tipY}, once every window is drawn.
+     * What the pointer rests on, for the tip's timing: the same words for
+     * the same thing, empty where there is no tip.
      */
-    public void drawTip(Minecraft minecraft, int tipX, int tipY, int screenWidth) {}
+    public String tipKey() {
+        return "";
+    }
+
+    /**
+     * Draws the tip of what the pointer rests on, beside
+     * {@code tipX}/{@code tipY}, once every window is drawn, at
+     * {@code share} of its strength as it fades in.
+     */
+    public void drawTip(Minecraft minecraft, int tipX, int tipY, int screenWidth,
+                        float share) {}
 
     /**
      * What a point on the content is, as a hover of its own kind; null

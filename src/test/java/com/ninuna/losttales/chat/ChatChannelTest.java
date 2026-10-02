@@ -29,11 +29,17 @@ public final class ChatChannelTest {
 
     /**
      * Each id is the channel's name in lower case, its spaces underscores,
-     * without the word a conversation channel's name ends on.
+     * without the word a conversation channel's name ends on. The two
+     * consoles are the exception: the player reads them as the Console
+     * and the Server Log, and their code names stay.
      */
     @Test
     public void idsAreTheChannelsNames() {
         for (ChatChannel channel : ChatChannel.values()) {
+            if (channel == ChatChannel.CLIENT_CONSOLE
+                    || channel == ChatChannel.SERVER_CONSOLE) {
+                continue;
+            }
             assertEquals(channel.getDisplayName().replaceFirst(" Chat$", "")
                     .toLowerCase(java.util.Locale.ROOT).replace(' ', '_'),
                     channel.getId());
@@ -71,9 +77,13 @@ public final class ChatChannelTest {
                 ChatChannel.CLIENT_CONSOLE.getRecipientRule());
         assertEquals(ChatRecipientRule.CONSOLE_READERS,
                 ChatChannel.SERVER_CONSOLE.getRecipientRule());
-        assertEquals("Client Console", ChatChannel.CLIENT_CONSOLE.getDisplayName());
-        assertEquals("Server Console",
+        // The player reads the consoles as the Console and the Server Log;
+        // their code names stay client_console and server_console.
+        assertEquals("Console", ChatChannel.CLIENT_CONSOLE.getDisplayName());
+        assertEquals("Server Log",
                 ChatChannel.SERVER_CONSOLE.getDisplayName());
+        assertEquals("client_console", ChatChannel.CLIENT_CONSOLE.getId());
+        assertEquals("server_console", ChatChannel.SERVER_CONSOLE.getId());
         // Neither console ever leaves the game.
         assertEquals(false, ChatChannel.CLIENT_CONSOLE.isBridgeable());
         assertEquals(false, ChatChannel.SERVER_CONSOLE.isBridgeable());

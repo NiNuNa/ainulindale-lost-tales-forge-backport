@@ -89,7 +89,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
     /** Set between sending a completion request and its answer. */
     private boolean completionWaiting;
     /** The tab whose input the pending or walked completion belongs to. */
-    private ChatTab completionTab;
+    private ConversationPage completionTab;
     /** The candidates as a popup over the input, never a chat line. */
     private final ChatCommandSuggestionBox commandSuggestions =
             new ChatCommandSuggestionBox();
@@ -98,7 +98,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
             Collections.emptyList();
     private int mentionRevision;
     private long mentionBuiltNanos;
-    private ChatTab mentionTab;
+    private ConversationPage mentionTab;
 
     ChatInputCompletion(ChatNoticeSink notices) {
         this.notices = notices;
@@ -373,7 +373,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
         this.completionCandidates.clear();
         this.completionCycleIndex = -1;
         this.commandSuggestions.clear();
-        ChatTab owner = this.completionTab;
+        ConversationPage owner = this.completionTab;
         if (owner == null
                 || !owner.equals(ClientChatChannelState.getSelected())) {
             return;
@@ -728,7 +728,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
      * keystroke or frame.
      */
     private List<ChatMentionCandidate> mentionCandidates() {
-        ChatTab tab = ClientChatChannelState.getSelected();
+        ConversationPage tab = ClientChatChannelState.getSelected();
         long now = System.nanoTime();
         if (tab != null && tab.equals(this.mentionTab)
                 && this.mentionBuiltNanos != 0L
@@ -750,7 +750,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
      * appearance cache, handed to the pure builder. A list not asked for
      * yet is asked for here, so the names come in while the player types.
      */
-    private List<ChatMentionCandidate> buildMentionCandidates(ChatTab tab) {
+    private List<ChatMentionCandidate> buildMentionCandidates(ConversationPage tab) {
         if (this.mc.thePlayer == null) {
             return new ArrayList<ChatMentionCandidate>();
         }

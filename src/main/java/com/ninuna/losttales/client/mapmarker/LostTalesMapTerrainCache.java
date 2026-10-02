@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -239,7 +240,7 @@ public final class LostTalesMapTerrainCache {
 
     private static int renderColor(Block block, int metadata) {
         if (block == null) {
-            return 0x00FFFFFF;
+            return LostTalesUiInk.UNTINTED;
         }
         try {
             return block.getRenderColor(metadata) & 0x00FFFFFF;
@@ -247,7 +248,7 @@ public final class LostTalesMapTerrainCache {
             // Some custom blocks only implement their world-aware colour
             // path. White preserves their authored texture without letting
             // one compatibility failure discard an otherwise valid tile.
-            return 0x00FFFFFF;
+            return LostTalesUiInk.UNTINTED;
         }
     }
 

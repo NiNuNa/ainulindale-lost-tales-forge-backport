@@ -65,13 +65,13 @@ public final class FellowshipInvitationNbtCodec {
         NBTTagCompound safeSource = source == null ? new NBTTagCompound() : source;
         int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
+        if (version != CURRENT_ROOT_DATA_VERSION) {
             LostTalesLog.warning("Fellowship invitation data uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
 
-        boolean repaired = version != CURRENT_ROOT_DATA_VERSION;
+        boolean repaired = false;
         NbtQuarantine.Read quarantineResult = NbtQuarantine.read(safeSource);
         if (!quarantineResult.isSupported()) {
             LostTalesLog.warning("Fellowship invitation quarantine is malformed or unsupported; data will remain read-only");
@@ -81,13 +81,9 @@ public final class FellowshipInvitationNbtCodec {
         ArrayList<NBTTagCompound> quarantine =
                 new ArrayList<NBTTagCompound>(quarantineResult.getEntries());
 
-        if (safeSource.hasKey(TAG_INVITATIONS)
-                && !safeSource.hasKey(TAG_INVITATIONS, Constants.NBT.TAG_LIST)) {
-            LostTalesLog.warning("Fellowship invitation root has a malformed invitation list; preserving data read-only");
-            return ReadResult.unsupported(safeSource, -1);
-        }
         if (!safeSource.hasKey(TAG_INVITATIONS, Constants.NBT.TAG_LIST)) {
-            repaired = true;
+            LostTalesLog.warning("Fellowship invitation root has no invitation list; preserving data read-only");
+            return ReadResult.unsupported(safeSource, -1);
         }
 
         LinkedHashMap<UUID, FellowshipInvitation> invitations =
@@ -163,7 +159,7 @@ public final class FellowshipInvitationNbtCodec {
         }
         int version = source.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? source.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > FellowshipInvitation.CURRENT_DATA_VERSION || version < 0) {
+        if (version != FellowshipInvitation.CURRENT_DATA_VERSION) {
             return InvitationReadResult.unsupported(version);
         }
 
@@ -186,14 +182,14 @@ public final class FellowshipInvitationNbtCodec {
             return InvitationReadResult.failed("missing_timestamps");
         }
 
+        if (!source.hasKey(TAG_INVITING_CHARACTER_NAME, Constants.NBT.TAG_STRING)
+                || !source.hasKey(TAG_TARGET_CHARACTER_NAME, Constants.NBT.TAG_STRING)) {
+            return InvitationReadResult.failed("missing_names");
+        }
         long createdAt = source.getLong(TAG_CREATED_AT);
         long expiresAt = source.getLong(TAG_EXPIRES_AT);
-        String invitingName = source.hasKey(
-                TAG_INVITING_CHARACTER_NAME, Constants.NBT.TAG_STRING)
-                ? source.getString(TAG_INVITING_CHARACTER_NAME) : "Unknown";
-        String targetName = source.hasKey(
-                TAG_TARGET_CHARACTER_NAME, Constants.NBT.TAG_STRING)
-                ? source.getString(TAG_TARGET_CHARACTER_NAME) : "Unknown";
+        String invitingName = source.getString(TAG_INVITING_CHARACTER_NAME);
+        String targetName = source.getString(TAG_TARGET_CHARACTER_NAME);
         try {
             FellowshipInvitation invitation = new FellowshipInvitation(
                     invitationId,
@@ -206,12 +202,7 @@ public final class FellowshipInvitationNbtCodec {
                     targetName,
                     createdAt,
                     expiresAt);
-            boolean repaired = version != FellowshipInvitation.CURRENT_DATA_VERSION
-                    || !source.hasKey(TAG_INVITING_CHARACTER_NAME,
-                    Constants.NBT.TAG_STRING)
-                    || !source.hasKey(TAG_TARGET_CHARACTER_NAME,
-                    Constants.NBT.TAG_STRING);
-            return InvitationReadResult.success(invitation, repaired);
+            return InvitationReadResult.success(invitation, false);
         } catch (IllegalArgumentException exception) {
             return InvitationReadResult.failed("invalid_invitation_fields");
         }

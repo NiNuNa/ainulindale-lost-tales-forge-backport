@@ -39,7 +39,7 @@ public final class WindowGestures {
         void selectWindow(Window window);
 
         /** A tab was dropped or picked: it comes in front and takes the keys. */
-        void selectTab(WindowTab tab);
+        void selectTab(WindowPage tab);
 
         /** A window moved or changed its size: whatever follows it follows. */
         void windowsMoved();
@@ -1523,8 +1523,8 @@ public final class WindowGestures {
      * onto another window's row docks the tab there like any other.</p>
      */
     public static final class TabDrag {
-        public final WindowTab tab;
-        public final List<WindowTab> group;
+        public final WindowPage tab;
+        public final List<WindowPage> group;
         final String sourceWindowId;
         final int pressX;
         final int pressY;
@@ -1580,7 +1580,7 @@ public final class WindowGestures {
         /** Where the window the tabs were torn off into lands, as any carried window does. */
         final Landing landing = new Landing();
 
-        TabDrag(WindowTab tab, List<WindowTab> group, String sourceWindowId,
+        TabDrag(WindowPage tab, List<WindowPage> group, String sourceWindowId,
                 int pressX, int pressY, int grabOffsetX,
                 int grabOffsetInWindowX, int grabOffsetY,
                 boolean collapsesOnRelease) {
@@ -1602,8 +1602,8 @@ public final class WindowGestures {
      * otherwise — which is also what an unmarked press has just left
      * marked.
      */
-    public static List<WindowTab> draggedGroup(Window window, WindowTab tab) {
-        List<WindowTab> marked = TabSelection.selectedIn(window);
+    public static List<WindowPage> draggedGroup(Window window, WindowPage tab) {
+        List<WindowPage> marked = TabSelection.selectedIn(window);
         return marked.size() > 1 && marked.contains(tab) ? marked
                 : Collections.singletonList(tab);
     }
@@ -1615,8 +1615,8 @@ public final class WindowGestures {
      * already torn off names the window it is in as the one carrying it.
      */
     public void armTabDrag(Window window, WindowFrame frame,
-                    TabRow.Row row, WindowTab pressed,
-                    List<WindowTab> group, int mouseX, int mouseY,
+                    TabRow.Row row, WindowPage pressed,
+                    List<WindowPage> group, int mouseX, int mouseY,
                     boolean collapsesOnRelease, boolean alreadyTornOff) {
         WindowLayout.raise(window.getId());
         group = withSplitPartners(window, group);
@@ -1655,9 +1655,9 @@ public final class WindowGestures {
      * A carried group with the other page of every split one of it stands
      * in, in row order: a split is carried whole, and lands still split.
      */
-    static List<WindowTab> withSplitPartners(Window window, List<WindowTab> group) {
-        List<WindowTab> whole = new ArrayList<WindowTab>();
-        for (WindowTab tab : window.getTabs()) {
+    static List<WindowPage> withSplitPartners(Window window, List<WindowPage> group) {
+        List<WindowPage> whole = new ArrayList<WindowPage>();
+        for (WindowPage tab : window.getTabs()) {
             WindowSplit split = window.splitOf(tab);
             if (group.contains(tab)
                     || split != null && group.contains(split.other(tab))) {
@@ -1857,7 +1857,7 @@ public final class WindowGestures {
         Window target = WindowLayout.window(targetWindowId);
         if (target == null || !WindowLayout.moveTabs(drag.group,
                 targetWindowId,
-                listPosition(target, Collections.<WindowTab>emptyList(),
+                listPosition(target, Collections.<WindowPage>emptyList(),
                         drag.targetIndex), false)) {
             return false;
         }
@@ -1904,13 +1904,13 @@ public final class WindowGestures {
      * makes the answer the position the run ends up at once they have
      * been lifted out.
      */
-    static int listPosition(Window window, List<WindowTab> moving,
+    static int listPosition(Window window, List<WindowPage> moving,
                             int visibleSlot) {
-        List<WindowTab> all = window.getTabs();
+        List<WindowPage> all = window.getTabs();
         int position = 0;
         int seen = 0;
         for (int index = 0; index < all.size(); index++) {
-            WindowTab tab = all.get(index);
+            WindowPage tab = all.get(index);
             if (moving.contains(tab)) {
                 continue;
             }
@@ -2096,7 +2096,7 @@ public final class WindowGestures {
                     || !frame.contains(x, y)) {
                 continue;
             }
-            WindowTab front = WindowFrame.activeTab(window,
+            WindowPage front = WindowFrame.activeTab(window,
                     WindowFrame.visibleTabs(window));
             int edge = SplitDrop.edgeAt(WindowDrawing.contentBox(frame), x, y);
             if (edge >= 0 && !window.isLocked() && front != null
@@ -2112,7 +2112,7 @@ public final class WindowGestures {
     /** Splits the window the carried tab was let go over, on the edge it was at; false where it would not. */
     private boolean splitInto(TabDrag drag) {
         Window target = WindowLayout.window(drag.splitWindowId);
-        WindowTab front = target == null ? null
+        WindowPage front = target == null ? null
                 : WindowFrame.activeTab(target, WindowFrame.visibleTabs(target));
         if (front == null || !WindowLayout.split(front, drag.tab)) {
             return false;

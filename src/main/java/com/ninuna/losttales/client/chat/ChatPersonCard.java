@@ -158,10 +158,16 @@ final class ChatPersonCard extends SubWindowContent {
         return hover.part != null && hover.part.startsWith(GLANCE_PREFIX);
     }
 
+    @Override
+    public String tipKey() {
+        return this.hoveredGlance == null ? ""
+                : this.hoveredGlance.getTitle() + "|" + this.hoveredGlance.getLine();
+    }
+
     /** A glance's title and line, beside the pointer. */
     @Override
     public void drawTip(Minecraft minecraft, int tipX, int tipY,
-                        int screenWidth) {
+                        int screenWidth, float share) {
         CharacterProfile.Glance glance = this.hoveredGlance;
         if (glance == null) {
             return;
@@ -187,13 +193,14 @@ final class ChatPersonCard extends SubWindowContent {
         // other tip does.
         LostTalesTooltipSmoothing.begin(tipX, tipY);
         try {
-            WindowStyle.drawPopup(x, y, x + boxWidth, y + boxHeight, 1.0F);
+            int alpha = Math.round(255.0F * share);
+            WindowStyle.drawPopup(x, y, x + boxWidth, y + boxHeight, share);
             LostTalesUiInk.drawText(font, title, x + pad, y + pad,
-                    LostTalesColors.rgb(LostTalesColors.HONEY), 255);
+                    LostTalesColors.rgb(LostTalesColors.HONEY), alpha);
             int lineY = y + pad + font.FONT_HEIGHT;
             for (String line : words) {
                 LostTalesUiInk.drawText(font, line, x + pad, lineY,
-                        LostTalesUiInk.IVORY, 255);
+                        LostTalesUiInk.IVORY, alpha);
                 lineY += font.FONT_HEIGHT;
             }
         } finally {

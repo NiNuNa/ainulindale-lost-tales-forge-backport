@@ -33,7 +33,7 @@ final class ClientChatContextHistory {
      * Remembers the newest message a conversation has been shown, so a
      * later request asks only for what came after it.
      */
-    static synchronized void remember(ChatTab tab, long messageId) {
+    static synchronized void remember(ConversationPage tab, long messageId) {
         if (tab == null || !ChatMessageIds.isServerId(messageId)
                 || !isScoped(tab)) {
             return;
@@ -48,7 +48,7 @@ final class ClientChatContextHistory {
      * Asks for the conversation the tab stands for, unless this session
      * already has.
      */
-    static synchronized void request(ChatTab tab, String scopeValue) {
+    static synchronized void request(ConversationPage tab, String scopeValue) {
         if (tab == null || !isScoped(tab) || scopeValue == null
                 || scopeValue.length() == 0 || !ASKED.add(tab.id())) {
             return;
@@ -60,7 +60,7 @@ final class ClientChatContextHistory {
     }
 
     /** Whether the tab names one conversation of a channel that has several. */
-    private static boolean isScoped(ChatTab tab) {
+    private static boolean isScoped(ConversationPage tab) {
         return tab != null && !tab.isWhisper() && tab.getChannel() != null
                 && tab.getChannel().isScoped()
                 && tab.getOwnerKey().length() > 0;
@@ -77,7 +77,7 @@ final class ClientChatContextHistory {
      * none, which is what a request must not be made for. A scoped
      * tab is named by its conversation, so the tab is the answer.
      */
-    static String scopeOf(ChatTab tab) {
+    static String scopeOf(ConversationPage tab) {
         return isScoped(tab) ? tab.getOwnerKey() : "";
     }
 }

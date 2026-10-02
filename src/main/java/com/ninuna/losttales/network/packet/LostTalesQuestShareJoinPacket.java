@@ -11,7 +11,6 @@ import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.server.FellowshipService;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
-import com.ninuna.losttales.quest.LostTalesQuestStartSource;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -63,6 +62,12 @@ public final class LostTalesQuestShareJoinPacket implements IMessage {
         }
     }
 
+    /**
+     * Joins the card where the player may read its line and shares a
+     * fellowship with its author; the quest system then refuses the
+     * author, a quest the author no longer runs, and a quest that could
+     * not start for the player by its own rules now.
+     */
     private static void execute(EntityPlayerMP player, long messageId,
                                 int tokenIndex) {
         ChatHistory.QuestShareClaim claim = ChatHistory.questShareFor(
@@ -76,9 +81,8 @@ public final class LostTalesQuestShareJoinPacket implements IMessage {
                     "chat.losttales.quest.join_unavailable"));
             return;
         }
-        LostTalesQuestManager.startQuest(player,
-                claim.showcase.getQuestReference(),
-                LostTalesQuestStartSource.SHARED);
+        LostTalesQuestManager.joinSharedQuest(player, claim.authorId,
+                claim.showcase.getQuestReference());
     }
 
     /** Whether the character the player plays is in a fellowship with one of the account's. */

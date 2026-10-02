@@ -26,6 +26,11 @@ public final class CharacterAppearanceSyncManager {
 
     private CharacterAppearanceSyncManager() {}
 
+    /**
+     * Everyone's appearance, to one player: the first packet replaces what
+     * the player knew, and a server with more players than one packet
+     * carries sends the rest after it.
+     */
     public static void sendFullSnapshot(EntityPlayerMP recipient) {
         if (recipient == null || recipient.worldObj == null || recipient.worldObj.isRemote) {
             return;
@@ -50,8 +55,14 @@ public final class CharacterAppearanceSyncManager {
                 }
             }
         }
-        LostTalesNetworkHandler.CHANNEL.sendTo(
-                new CharacterAppearanceSyncPacket(true, appearances), recipient);
+        int limit = CharacterAppearanceSyncPacket.MAX_APPEARANCES;
+        int from = 0;
+        do {
+            int to = Math.min(appearances.size(), from + limit);
+            LostTalesNetworkHandler.CHANNEL.sendTo(new CharacterAppearanceSyncPacket(
+                    from == 0, appearances.subList(from, to)), recipient);
+            from = to;
+        } while (from < appearances.size());
     }
 
 

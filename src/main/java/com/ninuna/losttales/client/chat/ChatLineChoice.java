@@ -7,8 +7,8 @@ import java.util.Locale;
  * only a line that mentions the player or replies to them, or none. Each
  * conversation (a channel, a whisper, an NPC or a server's own channel)
  * has two of them, each picked in a sub-window its option opens:
- * Notifications, which lines chime, and Show in Feed, which lines reach
- * the closed feed. A
+ * Notification Settings, which lines chime, and Chat Feed Settings,
+ * which lines reach the closed feed. A
  * conversation starts at its defaults ({@link ChatLayout#defaultNotification},
  * Everything for the feed). The player's own lines and replayed history
  * never chime, and Do Not Disturb holds every chime whatever the choice.
@@ -19,7 +19,7 @@ public enum ChatLineChoice {
     EVERYTHING("everything"),
     /** Only a line that mentions the player or replies to them. */
     ONLY_MENTIONS("mentions"),
-    /** No line; a conversation whose Notifications say so reads as muted. */
+    /** No line; a conversation whose notification choice says so reads as muted. */
     NOTHING("nothing");
 
     /** The word the layout file keeps the choice under. */

@@ -66,4 +66,51 @@ public final class FellowshipGoHereMarkerNbtCodecTest {
         assertTrue(result.getMarkers().isEmpty());
         assertEquals(encoded, result.getOriginalDataCopy());
     }
+
+    /** A root at another version than this build writes, or naming none, holds the store read-only too. */
+    @Test
+    public void anOlderOrUnversionedRootHoldsTheWholeStoreReadOnly() {
+        NBTTagCompound older = encodedMarker();
+        older.setInteger("DataVersion",
+                FellowshipGoHereMarkerNbtCodec.CURRENT_ROOT_DATA_VERSION - 1);
+        FellowshipGoHereMarkerNbtCodec.ReadResult olderResult =
+                FellowshipGoHereMarkerNbtCodec.read(older);
+        assertTrue(olderResult.isReadOnly());
+        assertEquals(older, olderResult.getOriginalDataCopy());
+
+        NBTTagCompound unversioned = encodedMarker();
+        unversioned.removeTag("DataVersion");
+        FellowshipGoHereMarkerNbtCodec.ReadResult unversionedResult =
+                FellowshipGoHereMarkerNbtCodec.read(unversioned);
+        assertTrue(unversionedResult.isReadOnly());
+        assertEquals(0, unversionedResult.getUnsupportedVersion());
+    }
+
+    /** A marker that lacks when it was placed goes to the quarantine; no time is made up for it. */
+    @Test
+    public void aMarkerWithoutItsTimeIsQuarantinedNotFilledIn() {
+        NBTTagCompound encoded = encodedMarker();
+        encoded.getTagList("Markers", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).removeTag("UpdatedAt");
+
+        FellowshipGoHereMarkerNbtCodec.ReadResult result =
+                FellowshipGoHereMarkerNbtCodec.read(encoded);
+
+        assertFalse(result.isReadOnly());
+        assertTrue(result.wasRepaired());
+        assertTrue(result.getMarkers().isEmpty());
+        assertEquals(1, result.getQuarantineEntriesCopy().size());
+        assertEquals("missing_or_invalid_updated_at",
+                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+    }
+
+    private static NBTTagCompound encodedMarker() {
+        NBTTagCompound encoded = new NBTTagCompound();
+        FellowshipGoHereMarkerNbtCodec.write(encoded, Collections.singletonList(
+                new FellowshipGoHereMarker(null,
+                        UUID.fromString("30000000-0000-0000-0000-000000000003"),
+                        0, 10.0D, 65.0D, 20.0D, 99L)),
+                Collections.<NBTTagCompound>emptyList());
+        return encoded;
+    }
 }

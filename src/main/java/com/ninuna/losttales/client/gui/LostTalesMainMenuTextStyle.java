@@ -9,6 +9,8 @@ import java.util.regex.Pattern;
 /** Palette text and translucent shadows for vanilla and LOTR's main menus. */
 public final class LostTalesMainMenuTextStyle {
     private static final Pattern COLOR_CODES = Pattern.compile("(?i)\u00a7[0-9a-fr]");
+    /** Vanilla's splash yellow: recognised to keep its emphasis, never drawn. */
+    private static final int VANILLA_SPLASH_YELLOW = 0xFFFF00;
 
     private LostTalesMainMenuTextStyle() {}
 
@@ -47,7 +49,7 @@ public final class LostTalesMainMenuTextStyle {
 
     private static int textColor(int color) {
         // Vanilla's yellow splash keeps its emphasis in the shared palette.
-        return (color & 0xFFFFFF) == 0xFFFF00
+        return (color & 0xFFFFFF) == VANILLA_SPLASH_YELLOW
                 ? LostTalesColors.HONEY : LostTalesColors.IVORY;
     }
 }

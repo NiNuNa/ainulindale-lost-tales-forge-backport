@@ -20,10 +20,12 @@ import java.util.UUID;
 /**
  * LOTR's fellowship behind one of ours. LOTR's own fellowship carries out
  * the three rules, shows members on its map, and shares waypoints and
- * banners, so each of ours keeps one in step with it. Only the fellowship's
- * own methods are called, never LOTR's player-data ones, so nobody is told
- * anything in LOTR's words. Nothing here fails the game: where LOTR cannot
- * be reached the mirror stands as it was, and that is said once.
+ * banners, so each of ours keeps one in step with it. The fellowship is
+ * changed through its own methods; of a player's LOTR data only the list of
+ * fellowships and the {@code /fmsg} binding are touched, never the methods
+ * that send LOTR's notices, so nobody is told anything in LOTR's words.
+ * Nothing here fails the game: where LOTR cannot be reached the mirror
+ * stands as it was, and that is said once.
  */
 public final class LotrFellowshipMirror {
     private static boolean warned;

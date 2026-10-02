@@ -68,7 +68,7 @@ final class ClientChatPendingEchoes {
     /** Remembers a line that is on screen but not yet confirmed. */
     static synchronized void remember(long nonce, int chatLineId,
                                       LostTalesChatMessagePacket packet,
-                                      ChatTab tab, int[] showcaseIds,
+                                      ConversationPage tab, int[] showcaseIds,
                                       long sentAtMillis) {
         if (nonce == 0L || packet == null || tab == null) {
             return;
@@ -148,12 +148,12 @@ final class ClientChatPendingEchoes {
         final long nonce;
         final int chatLineId;
         final LostTalesChatMessagePacket packet;
-        final ChatTab tab;
+        final ConversationPage tab;
         final int[] showcaseIds;
         final long sentAtMillis;
 
         private Pending(long nonce, int chatLineId,
-                        LostTalesChatMessagePacket packet, ChatTab tab,
+                        LostTalesChatMessagePacket packet, ConversationPage tab,
                         int[] showcaseIds, long sentAtMillis) {
             this.nonce = nonce;
             this.chatLineId = chatLineId;

@@ -24,7 +24,7 @@ import java.util.UUID;
  * parked otherwise (see {@link LotrHiredUnitCustodyRule}); loaded units are
  * settled on every switch and login, and a unit whose chunk loads later is
  * settled as it joins the world. A tag naming a character the roster no
- * longer holds counts as the account's. Every pass is best effort and
+ * longer holds counts as the account character's. Every pass is best effort and
  * never fails the switch that asked for it.
  */
 public final class LotrHiredUnitCustody {

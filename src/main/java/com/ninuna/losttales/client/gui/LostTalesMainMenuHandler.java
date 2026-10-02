@@ -58,7 +58,7 @@ import java.util.UUID;
 public final class LostTalesMainMenuHandler {
 
     /** Past every button vanilla and LOTR give the menu. */
-    private static final int BUTTON_ID = 0x105774;
+    private static final int BUTTON_ID = 1070964;
     /** Vanilla's ids for the two buttons the character button spans. */
     private static final int SINGLEPLAYER_ID = 1;
     private static final int MULTIPLAYER_ID = 2;

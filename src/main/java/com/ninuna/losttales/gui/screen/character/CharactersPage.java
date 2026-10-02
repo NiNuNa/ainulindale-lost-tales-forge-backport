@@ -24,7 +24,7 @@ import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRende
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageContent;
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
@@ -55,7 +55,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The Characters tab: the account character and every slot in a roster
+ * The Characters page: the account character and every slot in a roster
  * the tool strip's left button folds away, the deleted characters still
  * to be restored at its foot, and the picked character's profile beside
  * it in one column, its figure live for the one played and posed from
@@ -65,7 +65,7 @@ import org.lwjgl.opengl.GL11;
  * Create in Play as's place for an empty slot, Restore alone for a deleted
  * character. Edit Profile, Change Look, Capes, the lore characters and the
  * questions before a deletion or a restore open as sub-windows in the
- * tab's window; the creator stays a screen of its own. Another person's
+ * page's window; the creator stays a screen of its own. Another person's
  * profile, opened from their card or their menu, stands in the
  * roster's place, read only, until Back.
  *
@@ -145,7 +145,7 @@ public final class CharactersPage extends PageContent {
     /** The person whose profile stands in the roster's place; null for the player's own. */
     private Visit visit;
 
-    /** The page's content on the tab as registered; null while it is not registered. */
+    /** The page's content as registered; null while it is not registered. */
     static CharactersPage current() {
         WindowPages.Page page = WindowPages.byId(PAGE_ID);
         PageContent content = page == null ? null : page.content();
@@ -210,8 +210,8 @@ public final class CharactersPage extends PageContent {
     }
 
     /**
-     * Opens another person's character in the Characters tab, read only,
-     * in the roster's place, and brings the tab forward; one of this
+     * Opens another person's character on the Characters page, read only,
+     * in the roster's place, and brings the page forward; one of this
      * player's own is picked in the roster instead.
      */
     public static void visit(Visit visit) {
@@ -518,7 +518,7 @@ public final class CharactersPage extends PageContent {
         if (row.kind == CharacterRosterRows.Kind.EMPTY
                 || row.kind == CharacterRosterRows.Kind.LORE) {
             LostTalesUiSheet sprite = row.kind == CharacterRosterRows.Kind.EMPTY
-                    ? (hovered ? LostTalesUiSheet.PLUS_HOVER : LostTalesUiSheet.PLUS)
+                    ? (hovered ? LostTalesUiSheet.PLUS_ADD : LostTalesUiSheet.PLUS)
                     : (hovered ? LostTalesUiSheet.MEMBERS_HOVER
                             : LostTalesUiSheet.MEMBERS);
             LostTalesUiInk.beginContent();
@@ -968,6 +968,11 @@ public final class CharactersPage extends PageContent {
         return this.rosterOut && this.visit == null;
     }
 
+    @Override
+    public void resetPanel() {
+        this.rosterOut = true;
+    }
+
     /** The roster's button brings the roster back from a visit, else folds it away or out. */
     @Override
     public void togglePanel() {
@@ -1105,7 +1110,7 @@ public final class CharactersPage extends PageContent {
         if (picked != null && picked.kind == CharacterRosterRows.Kind.EMPTY) {
             String create = I18n.format("gui.losttales.character.create");
             items.add(orBusy(BarItem.button(CREATE, create,
-                    LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_HOVER)
+                    LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_ADD)
                     .tip(create), busy));
         } else {
             String playAs = I18n.format("gui.losttales.character.play_as");
@@ -1149,7 +1154,7 @@ public final class CharactersPage extends PageContent {
                 ? I18n.format("gui.losttales.character.pick") : busy));
         String delete = I18n.format("gui.losttales.character.delete");
         items.add(orBusy(BarItem.button(DELETE, delete,
-                LostTalesUiSheet.CLOSE, LostTalesUiSheet.CLOSE_HOVER)
+                LostTalesUiSheet.TRASH, LostTalesUiSheet.TRASH_LIT)
                 .tip(delete).ending(), character == null
                 ? I18n.format(picked == null
                         || picked.kind == CharacterRosterRows.Kind.EMPTY
@@ -1223,7 +1228,7 @@ public final class CharactersPage extends PageContent {
 
     private void openEditor(CharacterSummary character) {
         WindowScreen screen = WindowScreen.current();
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (screen == null || tab == null) {
             return;
         }
@@ -1241,7 +1246,7 @@ public final class CharactersPage extends PageContent {
     /** Change Look for the character picked: its skin, arm width and chest. */
     private void openLookEditor(CharacterSummary character) {
         WindowScreen screen = WindowScreen.current();
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (screen == null || tab == null) {
             return;
         }
@@ -1268,7 +1273,7 @@ public final class CharactersPage extends PageContent {
 
     private void openLoreCharacters() {
         WindowScreen screen = WindowScreen.current();
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (screen == null || tab == null) {
             return;
         }

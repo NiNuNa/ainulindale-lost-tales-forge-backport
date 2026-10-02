@@ -206,19 +206,49 @@ public final class DiscordMessageSanitizerTest {
     }
 
 
-    /** An action posts in italics under the speaker's name, and quotes in italics too (C2). */
+    /**
+     * An action posts as the Narrator tells it in the game: the action
+     * mark shown as it is, then the sentence its speaker's name opens, in
+     * italics (C25); a quote of one is in italics too (C2).
+     */
     @Test
-    public void actionsPostInItalics() {
-        assertEquals("*draws his sword.*",
-                DiscordMessageSanitizer.outboundAction("draws his sword."));
-        assertEquals("*waves 😳*", DiscordMessageSanitizer.outboundAction(" waves :flushed: "));
-        assertEquals("", DiscordMessageSanitizer.outboundAction("  "));
+    public void actionsPostAsTheNarratorTellsThem() {
+        assertEquals("\\* *Aldric draws his sword.*",
+                DiscordMessageSanitizer.outboundAction("Aldric", "draws his sword."));
+        assertEquals("\\* *Aldric waves 😳*",
+                DiscordMessageSanitizer.outboundAction("Aldric", " waves :flushed: "));
+        assertEquals("", DiscordMessageSanitizer.outboundAction("Aldric", "  "));
+        assertEquals("no name leaves the words alone in the sentence",
+                "\\* *draws his sword.*",
+                DiscordMessageSanitizer.outboundAction("", "draws his sword."));
         assertEquals("a last backslash cannot open the closing mark",
-                "*leans on the wall\\\\*", DiscordMessageSanitizer.outboundAction(
+                "\\* *Aldric leans on the wall\\\\*",
+                DiscordMessageSanitizer.outboundAction("Aldric",
                         "leans on the wall\\"));
+        assertEquals("the name reads as it is written",
+                "\\* *Bilbo\\_Baggins bows.*",
+                DiscordMessageSanitizer.outboundAction("Bilbo_Baggins", "bows."));
         assertEquals("-# ↩ **Aldric** *draws his sword.*\n",
                 DiscordMessageSanitizer.replyHeader("Aldric", "draws his sword.",
                         true, ""));
+    }
+
+    /**
+     * The escaped mark makes no list item of the post and the bridge's
+     * own breaking leaves it whole, while a code typed in the sentence is
+     * still broken as any line's is.
+     */
+    @Test
+    public void anActionsMarkCrossesAsItIs() {
+        String action = DiscordMessageSanitizer.outboundAction("Aldric",
+                "bows to @everyone.");
+        assertEquals(action, DiscordMessageSanitizer.breakDiscordOnlyMarkup(action));
+        DiscordMentions.Post post = DiscordMentions.rewrite(action,
+                Collections.<com.ninuna.losttales.chat.ChatNamedPlayer>emptyList(),
+                Collections.<String>emptySet());
+        assertEquals("\\* *Aldric bows to @" + DiscordMentions.BREAK
+                + "everyone.*", post.content);
+        assertTrue(post.pinged.isEmpty());
     }
 
     @Test
@@ -290,13 +320,14 @@ public final class DiscordMessageSanitizerTest {
 
     /**
      * Paragraphs cross both ways: a game message's are Discord's lines, an
-     * action's each in italics; a Discord message's lines are paragraphs,
-     * eight at most, a block of code one span.
+     * action's each in italics, the mark and the name on the first; a
+     * Discord message's lines are paragraphs, eight at most, a block of
+     * code one span.
      */
     @Test
     public void paragraphsCrossBothWays() {
-        assertEquals("*Aldric bows.*\n*He waits.*",
-                DiscordMessageSanitizer.outboundAction("Aldric bows.\nHe waits."));
+        assertEquals("\\* *Aldric bows.*\n*He waits.*",
+                DiscordMessageSanitizer.outboundAction("Aldric", "bows.\nHe waits."));
         assertEquals("one\ntwo", DiscordMessageSanitizer.outbound("one\ntwo"));
         assertEquals("a\nb\nc\nd\ne\nf\ng\nh i",
                 DiscordMessageSanitizer.inbound("a\n\nb\nc\nd\ne\nf\ng\nh\ni", null));

@@ -15,11 +15,11 @@ public final class Tearing {
 
     private Tearing() {}
 
-    public static Window off(WindowTab tab, double x, double y) {
+    public static Window off(WindowPage tab, double x, double y) {
         return off(Collections.singletonList(tab), x, y);
     }
 
-    public static Window off(List<? extends WindowTab> tabs, double x,
+    public static Window off(List<? extends WindowPage> tabs, double x,
                              double y) {
         return WindowLayout.tearOff(tabs, x, y, WIDTH, HEIGHT);
     }

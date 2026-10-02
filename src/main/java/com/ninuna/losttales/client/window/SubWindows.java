@@ -63,7 +63,6 @@ public final class SubWindows {
     private Gesture gesture;
     private int screenWidth;
     private int screenHeight;
-    /** The window whose sub-windows are drawn over every window this frame. */
 
     /** Takes the screen's size; called on every layout, which also runs on a resize. */
     public void bind(int screenWidth, int screenHeight) {
@@ -523,7 +522,7 @@ public final class SubWindows {
                     : new LostTalesUiHitBox(sub.drawnLeft, sub.drawnTop,
                             sub.width, sub.height));
         }
-        this.stackFade.advance(order, boxes, System.nanoTime());
+        this.stackFade.advance(order, boxes, null, System.nanoTime());
     }
 
     /**
@@ -669,12 +668,24 @@ public final class SubWindows {
     }
 
     /** The tip of what the pointer rests on in a sub-window, over everything. */
-    public void drawTip(Minecraft minecraft, WindowHover hover, int tipX, int tipY) {
-        if (hover != null && hover.subWindow != null
+    public void drawTip(Minecraft minecraft, WindowHover hover, int tipX, int tipY,
+                        float share) {
+        if (share > 0.0F && hover != null && hover.subWindow != null
                 && hover.subWindow.isOpen()) {
             hover.subWindow.content.drawTip(minecraft, tipX, tipY,
-                    this.screenWidth);
+                    this.screenWidth, share);
         }
+    }
+
+    /** What the pointer rests on in a sub-window, for the tip's timing; empty for no tip. */
+    public static String tipKey(WindowHover hover) {
+        if (hover == null || hover.subWindow == null
+                || !hover.subWindow.isOpen()) {
+            return "";
+        }
+        String key = hover.subWindow.content.tipKey();
+        return key.length() == 0 ? ""
+                : System.identityHashCode(hover.subWindow) + ":" + key;
     }
 
     /* ---- Moving and resizing ---- */

@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatColorMarkers;
 import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatStyle;
@@ -30,7 +31,8 @@ final class ChatShowcaseMarker {
         style.setBold(Boolean.TRUE);
         style.setChatClickEvent(new ClickEvent(
                 ClickEvent.Action.SUGGEST_COMMAND,
-                encode(kind, showcaseId, true, 0xFFFFFF)));
+                encode(kind, showcaseId, true,
+                        LostTalesColors.rgb(LostTalesColors.IVORY))));
         marker.setChatStyle(style);
         return marker;
     }

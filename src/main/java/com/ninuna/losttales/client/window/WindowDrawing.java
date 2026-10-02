@@ -29,7 +29,7 @@ public final class WindowDrawing {
      * itself ({@link #drawPageSurface}).
      */
     public static void layOutPage(Minecraft minecraft, Window window,
-                                  WindowFrame frame, PageTab page,
+                                  WindowFrame frame, OtherPage page,
                                   int screenWidth, int screenHeight,
                                   LostTalesGuiAnimationSample opening) {
         frame.showPage(page);
@@ -127,7 +127,7 @@ public final class WindowDrawing {
      * what a pinned window's row is drawn from while playing.
      */
     static TabRow.Row rowOf(Window window, WindowFrame frame,
-                            List<WindowTab> tabs) {
+                            List<WindowPage> tabs) {
         TabRow.Row row = new TabRow.Row();
         row.tabs = tabs;
         row.selected = WindowFrame.activeTab(window, tabs);
@@ -266,17 +266,17 @@ public final class WindowDrawing {
      * its other side can be seen, and a conversation stands only side by
      * side.
      */
-    public static boolean shows(WindowSplit split, WindowTab front) {
-        WindowTab other = split == null ? null : split.other(front);
+    public static boolean shows(WindowSplit split, WindowPage front) {
+        WindowPage other = split == null ? null : split.other(front);
         if (other == null || !other.isAvailable() || !WindowView.isShown(other)) {
             return false;
         }
         return !split.isStacked()
-                || other instanceof PageTab && front instanceof PageTab;
+                || other instanceof OtherPage && front instanceof OtherPage;
     }
 
     /** The box of whichever side shows {@code page}; null for a page the window does not show. */
-    public static LostTalesUiHitBox boxOfPage(WindowFrame frame, PageTab page) {
+    public static LostTalesUiHitBox boxOfPage(WindowFrame frame, OtherPage page) {
         if (page == null) {
             return null;
         }
@@ -300,16 +300,11 @@ public final class WindowDrawing {
         return new LostTalesUiHitBox(at, room.top, WindowSplit.DIVIDER, room.height);
     }
 
-    private static LostTalesUiHitBox sideBox(WindowFrame frame, WindowTab side) {
+    private static LostTalesUiHitBox sideBox(WindowFrame frame, WindowPage side) {
         LostTalesUiHitBox room = contentBox(frame);
         double[] box = frame.split.box(side.equals(frame.split.first()), room.left,
                 room.top, room.left + room.width, room.top + room.height);
         return new LostTalesUiHitBox(box[0], box[1], box[2] - box[0], box[3] - box[1]);
-    }
-
-    /** The page box in whole pixels; the page is drawn off them by the fraction the window stands on. */
-    public static LostTalesUiHitBox wholePageBox(WindowFrame frame) {
-        return wholeBox(pageBox(frame));
     }
 
     /** A box on whole pixels; what stands in it is drawn off them by the fraction the box stands on. */

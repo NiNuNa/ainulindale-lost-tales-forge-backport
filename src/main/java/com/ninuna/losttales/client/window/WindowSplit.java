@@ -15,14 +15,14 @@ public final class WindowSplit {
     /** The room the divider takes between the two sides, in GUI pixels. */
     public static final int DIVIDER = 3;
 
-    private final WindowTab first;
-    private final WindowTab second;
+    private final WindowPage first;
+    private final WindowPage second;
     /** Whether one stands over the other rather than beside it. */
     private final boolean stacked;
     /** The first side's share of the room. */
     private final double share;
 
-    public WindowSplit(WindowTab first, WindowTab second, boolean stacked,
+    public WindowSplit(WindowPage first, WindowPage second, boolean stacked,
                        double share) {
         if (first == null || second == null || first.equals(second)) {
             throw new IllegalArgumentException("a split is two different pages");
@@ -33,9 +33,9 @@ public final class WindowSplit {
         this.share = clampShare(share);
     }
 
-    public WindowTab first() { return this.first; }
+    public WindowPage first() { return this.first; }
 
-    public WindowTab second() { return this.second; }
+    public WindowPage second() { return this.second; }
 
     /** Whether one side stands over the other. */
     public boolean isStacked() { return this.stacked; }
@@ -43,12 +43,12 @@ public final class WindowSplit {
     /** The first side's share of the room. */
     public double share() { return this.share; }
 
-    public boolean holds(WindowTab tab) {
+    public boolean holds(WindowPage tab) {
         return this.first.equals(tab) || this.second.equals(tab);
     }
 
     /** The other side of {@code tab}; null for a tab not in the split. */
-    public WindowTab other(WindowTab tab) {
+    public WindowPage other(WindowPage tab) {
         return this.first.equals(tab) ? this.second
                 : this.second.equals(tab) ? this.first : null;
     }

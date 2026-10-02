@@ -40,7 +40,7 @@ import org.lwjgl.input.Keyboard;
 
 /**
  * Change Look: a character's skin, arm width and chest, in a
- * sub-window of the Characters tab's window, its player's to change at any
+ * sub-window of the Characters page's window, its player's to change at any
  * time. The skins are the grid of faces the creator shows — every skin the
  * character's race and sex may wear, the account's own among them where
  * the race allows it — scrolled a few rows at a time, the chosen one named

@@ -11,19 +11,19 @@ import java.util.Set;
  * addressed to the player, and whether untracked lines — those Lost
  * Tales did not route, which belong to the console — are included. A tab
  * standing for a channel that is more than one conversation is taken as
- * the conversation being read ({@link ChatTab#viewed}), so one Faction
+ * the conversation being read ({@link ConversationPage#viewed}), so one Faction
  * row shows one faction. One tab is its open view; the closed-chat feed
- * shows what each conversation's Show in Feed choice lets through
+ * shows what each conversation's feed choice lets through
  * ({@link ChatLayout#feedFilter}). Value semantics, so
  * {@link ClientChatChannelViews} can cache per filter.
  */
 final class ChatLineFilter {
-    private final Set<ChatTab> tabs;
+    private final Set<ConversationPage> tabs;
     /** Tabs whose lines pass only when they mention or answer the player. */
-    private final Set<ChatTab> mentionTabs;
+    private final Set<ConversationPage> mentionTabs;
     private final boolean includeUntracked;
 
-    private ChatLineFilter(Set<ChatTab> tabs, Set<ChatTab> mentionTabs,
+    private ChatLineFilter(Set<ConversationPage> tabs, Set<ConversationPage> mentionTabs,
                            boolean includeUntracked) {
         this.tabs = tabs;
         this.mentionTabs = mentionTabs;
@@ -31,13 +31,13 @@ final class ChatLineFilter {
     }
 
     /** A single tab; the console tab also carries untracked lines. */
-    static ChatLineFilter of(ChatTab tab) {
+    static ChatLineFilter of(ConversationPage tab) {
         if (tab == null) {
-            return new ChatLineFilter(Collections.<ChatTab>emptySet(),
-                    Collections.<ChatTab>emptySet(), false);
+            return new ChatLineFilter(Collections.<ConversationPage>emptySet(),
+                    Collections.<ConversationPage>emptySet(), false);
         }
-        return new ChatLineFilter(Collections.singleton(ChatTab.viewed(tab)),
-                Collections.<ChatTab>emptySet(),
+        return new ChatLineFilter(Collections.singleton(ConversationPage.viewed(tab)),
+                Collections.<ConversationPage>emptySet(),
                 tab.getChannel() == ClientChatChannelViews.SYSTEM_LINE_VIEW);
     }
 
@@ -46,24 +46,24 @@ final class ChatLineFilter {
      * lines pass only when they are addressed to the player. Untracked
      * lines ride with the console tab when every line of it passes.
      */
-    static ChatLineFilter of(Collection<ChatTab> tabs,
-                             Collection<ChatTab> mentionTabs) {
-        Set<ChatTab> set = new HashSet<ChatTab>();
+    static ChatLineFilter of(Collection<ConversationPage> tabs,
+                             Collection<ConversationPage> mentionTabs) {
+        Set<ConversationPage> set = new HashSet<ConversationPage>();
         boolean untracked = false;
         if (tabs != null) {
-            for (ChatTab tab : tabs) {
+            for (ConversationPage tab : tabs) {
                 if (tab != null) {
-                    set.add(ChatTab.viewed(tab));
+                    set.add(ConversationPage.viewed(tab));
                     untracked |= tab.getChannel()
                             == ClientChatChannelViews.SYSTEM_LINE_VIEW;
                 }
             }
         }
-        Set<ChatTab> mentions = new HashSet<ChatTab>();
+        Set<ConversationPage> mentions = new HashSet<ConversationPage>();
         if (mentionTabs != null) {
-            for (ChatTab tab : mentionTabs) {
+            for (ConversationPage tab : mentionTabs) {
                 if (tab != null) {
-                    mentions.add(ChatTab.viewed(tab));
+                    mentions.add(ConversationPage.viewed(tab));
                 }
             }
         }
@@ -76,12 +76,12 @@ final class ChatLineFilter {
     }
 
     /** Whether every line of the tab passes. */
-    boolean accepts(ChatTab tab) {
+    boolean accepts(ConversationPage tab) {
         // Asked with a line's own tab, which already names the
         // conversation, or with a channel's row entry, which stands for
         // whichever conversation is being read: both answer the same.
         return tab == null ? this.includeUntracked
-                : this.tabs.contains(ChatTab.viewed(tab));
+                : this.tabs.contains(ConversationPage.viewed(tab));
     }
 
     /**
@@ -89,9 +89,9 @@ final class ChatLineFilter {
      * line does, and one {@code addressed} to the player, a mention of
      * them or a reply to them, of a tab whose mentions alone do.
      */
-    boolean accepts(ChatTab tab, boolean addressed) {
+    boolean accepts(ConversationPage tab, boolean addressed) {
         return accepts(tab) || (addressed && tab != null
-                && this.mentionTabs.contains(ChatTab.viewed(tab)));
+                && this.mentionTabs.contains(ConversationPage.viewed(tab)));
     }
 
     @Override

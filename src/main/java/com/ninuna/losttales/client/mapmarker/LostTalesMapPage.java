@@ -156,6 +156,14 @@ public final class LostTalesMapPage extends PageContent {
         }
     }
 
+    /** The legend starts folded. */
+    @Override
+    public void resetPanel() {
+        if (isPanelOut()) {
+            togglePanel();
+        }
+    }
+
     /** The map's markers and its terrain: Map Settings. */
     @Override
     public Settings.Place settingsPlace() {
@@ -311,13 +319,13 @@ public final class LostTalesMapPage extends PageContent {
         String zoom = StatCollector.translateToLocal(
                 "gui.losttales.map.control.zoom_out");
         items.add(BarItem.glyph(ZOOM_OUT, LostTalesUiSheet.MINUS,
-                LostTalesUiSheet.MINUS_HOVER, zoom + " ("
+                LostTalesUiSheet.MINUS_LIT, zoom + " ("
                 + StatCollector.translateToLocal("gui.losttales.map.control.wheel")
                 + ")"));
         String zoomIn = StatCollector.translateToLocal(
                 "gui.losttales.map.control.zoom_in");
         items.add(BarItem.glyph(ZOOM_IN, LostTalesUiSheet.PLUS,
-                LostTalesUiSheet.PLUS_HOVER, zoomIn + " ("
+                LostTalesUiSheet.PLUS_LIT, zoomIn + " ("
                 + StatCollector.translateToLocal("gui.losttales.map.control.wheel")
                 + ")"));
         return items;

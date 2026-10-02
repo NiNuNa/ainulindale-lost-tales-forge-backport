@@ -13,8 +13,8 @@ import java.util.List;
  */
 public final class Window {
     private final String id;
-    private final List<WindowTab> tabs = new ArrayList<WindowTab>();
-    private WindowTab activeTab;
+    private final List<WindowPage> tabs = new ArrayList<WindowPage>();
+    private WindowPage activeTab;
     /** Two of its pages each, shown together while one of them is in front. */
     private final List<WindowSplit> splits = new ArrayList<WindowSplit>();
     private boolean locked;
@@ -329,26 +329,21 @@ public final class Window {
     public boolean isFullscreen() { return this.fill == ScreenFill.FULL; }
 
     /** Tabs in row order, including those that cannot be shown right now. */
-    public List<WindowTab> getTabs() {
+    public List<WindowPage> getTabs() {
         return Collections.unmodifiableList(this.tabs);
     }
 
     /** The tab in front, always one of {@link #getTabs()} when non-empty. */
-    public WindowTab getActiveTab() {
+    public WindowPage getActiveTab() {
         return this.activeTab;
     }
 
-    public boolean contains(WindowTab tab) {
+    public boolean contains(WindowPage tab) {
         return tab != null && this.tabs.contains(tab);
     }
 
-    /** The splits the window holds, in the order they were made. */
-    public List<WindowSplit> getSplits() {
-        return Collections.unmodifiableList(this.splits);
-    }
-
     /** The split a tab stands in; null for none. */
-    public WindowSplit splitOf(WindowTab tab) {
+    public WindowSplit splitOf(WindowPage tab) {
         for (WindowSplit split : this.splits) {
             if (split.holds(tab)) {
                 return split;
@@ -362,11 +357,11 @@ public final class Window {
         return splitOf(this.activeTab);
     }
 
-    List<WindowTab> tabs() { return this.tabs; }
+    List<WindowPage> tabs() { return this.tabs; }
 
     List<WindowSplit> splits() { return this.splits; }
 
-    void setActiveTab(WindowTab tab) {
+    void setActiveTab(WindowPage tab) {
         this.activeTab = tab != null && this.tabs.contains(tab)
                 ? tab : (this.tabs.isEmpty() ? null : this.tabs.get(0));
     }

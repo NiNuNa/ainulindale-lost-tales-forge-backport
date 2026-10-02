@@ -5,9 +5,9 @@ import lotr.common.fellowship.LOTRFellowship;
 /**
  * Called by the coremod where LOTR's own fellowship requests find their
  * fellowship, and before its request to make one. Every fellowship is the
- * mod's, kept on the Fellowships page and checked there; LOTR's screen no
- * longer opens, and its requests check little, so each is refused. LOTR's
- * operator command still works.
+ * mod's, kept on the Fellowships page and checked there; LOTR's screen
+ * opens that page instead, and its requests check little, so each is
+ * refused. LOTR's operator command works as LOTR made it.
  */
 public final class LostTalesLotrFellowshipRequestHook {
     private LostTalesLotrFellowshipRequestHook() {}

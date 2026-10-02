@@ -66,6 +66,7 @@ public class LostTalesQuestActionPacket implements IMessage {
             }
         } catch (RuntimeException exception) {
             this.malformed = true;
+            LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
 

@@ -38,15 +38,15 @@ public class WindowFrame {
     /** The window's tool strip: where its controls stand, and their motions. */
     final ToolStrip.State toolStrip = new ToolStrip.State();
     /** The page shown while open instead of a conversation; null for none. */
-    public PageTab page;
+    public OtherPage page;
     /** The split the window shows; null while it shows one tab. */
     public WindowSplit split;
     /** The split's side in front, the one the tool strip and the bar serve; null while the window shows one tab. */
-    public WindowTab splitFront;
+    public WindowPage splitFront;
     /** The split's other side, a page or a conversation; null while the window shows one tab. */
-    public WindowTab splitOther;
+    public WindowPage splitOther;
     /** The other side while it is a page, which the screen draws; null otherwise. */
-    public PageTab splitPage;
+    public OtherPage splitPage;
     public boolean drawn;
     public double boxLeft;
     public double boxTop;
@@ -174,7 +174,7 @@ public class WindowFrame {
     }
 
     /** Shows a page in the window: what the window held before is let go. */
-    public void showPage(PageTab shown) {
+    public void showPage(OtherPage shown) {
         this.page = shown;
         showSplit(null, null, null);
         pageShown();
@@ -184,11 +184,11 @@ public class WindowFrame {
      * Shows {@code other} beside {@code front}, as {@code shown} splits
      * them; with no split, the window shows its front tab alone.
      */
-    public void showSplit(WindowSplit shown, WindowTab front, WindowTab other) {
+    public void showSplit(WindowSplit shown, WindowPage front, WindowPage other) {
         this.split = shown;
         this.splitFront = shown == null ? null : front;
         this.splitOther = shown == null ? null : other;
-        this.splitPage = shown != null && other instanceof PageTab ? (PageTab)other : null;
+        this.splitPage = shown != null && other instanceof OtherPage ? (OtherPage)other : null;
     }
 
     /** Where what the window holds in front begins: the window's left edge, or its side's in a split. */
@@ -297,9 +297,9 @@ public class WindowFrame {
      * The window's tabs on screen now: those the view shows that can be
      * shown ({@link WindowView#isShown}). A window with none is not drawn.
      */
-    public static List<WindowTab> visibleTabs(Window window) {
-        List<WindowTab> tabs = window.getTabs();
-        List<WindowTab> result = new ArrayList<WindowTab>(tabs.size());
+    public static List<WindowPage> visibleTabs(Window window) {
+        List<WindowPage> tabs = window.getTabs();
+        List<WindowPage> result = new ArrayList<WindowPage>(tabs.size());
         for (int index = 0; index < tabs.size(); index++) {
             if (WindowView.isShown(tabs.get(index))) {
                 result.add(tabs.get(index));
@@ -309,23 +309,15 @@ public class WindowFrame {
     }
 
     /** The tab in front, or the first visible tab when it is unavailable. */
-    public static WindowTab activeTab(Window window,
-                                      List<WindowTab> visibleTabs) {
-        WindowTab active = window.getActiveTab();
+    public static WindowPage activeTab(Window window,
+                                      List<WindowPage> visibleTabs) {
+        WindowPage active = window.getActiveTab();
         if (active != null && visibleTabs.contains(active)) {
             return active;
         }
         return visibleTabs.isEmpty() ? null : visibleTabs.get(0);
     }
 
-    /**
-     * Starts the window's frame from its placement box. The box is
-     * dragged in fractions of a GUI pixel so it follows the mouse
-     * exactly, and laid on whole display pixels to be drawn: the text,
-     * the heads and the emojis in it are pixel art, and between two
-     * pixels they crawl. A display pixel is the finest step the screen
-     * has, so the motion loses nothing by landing on one.
-     */
     /**
      * Lays this frame on {@code front}'s box as {@code front} was laid
      * this frame: what stands beside it in a split reads the same room on
@@ -349,6 +341,14 @@ public class WindowFrame {
         this.stackTop = front.stackTop;
     }
 
+    /**
+     * Starts the window's frame from its placement box. The box is
+     * dragged in fractions of a GUI pixel so it follows the mouse
+     * exactly, and laid on whole display pixels to be drawn: the text,
+     * the heads and the emojis in it are pixel art, and between two
+     * pixels they crawl. A display pixel is the finest step the screen
+     * has, so the motion loses nothing by landing on one.
+     */
     public void begin(WindowPlacement.Box box, float chatScale,
                float openingMotionX, float openingMotionY) {
         this.placed = box;

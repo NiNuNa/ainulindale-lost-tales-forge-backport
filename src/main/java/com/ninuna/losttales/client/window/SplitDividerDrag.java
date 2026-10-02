@@ -12,7 +12,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 final class SplitDividerDrag implements WindowGestures.ContentDrag {
     private final String windowId;
     /** A page of the split, which names it. */
-    private final WindowTab side;
+    private final WindowPage side;
     private final boolean stacked;
     /** How far into the divider the pointer took hold of it. */
     private final double grabOffset;

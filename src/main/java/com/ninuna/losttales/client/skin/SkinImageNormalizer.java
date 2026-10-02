@@ -21,8 +21,8 @@ public final class SkinImageNormalizer {
     public static final int HEIGHT = 64;
     public static final int LEGACY_HEIGHT = 32;
 
-    private static final int OPAQUE = 0xFF000000;
-    private static final int COLOR_MASK = 0x00FFFFFF;
+    private static final int OPAQUE = 0xFF << 24;
+    private static final int COLOR_MASK = ~OPAQUE;
     private static final int TRANSPARENT_THRESHOLD = 128;
 
     private SkinImageNormalizer() {}

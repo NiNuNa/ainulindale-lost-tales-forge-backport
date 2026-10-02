@@ -19,7 +19,7 @@ public final class LostTalesHudHelper {
         sendHudToggleMessage();
     }
 
-    /** Says in the Client Console whether the HUD is shown now. */
+    /** Says in the Console whether the HUD is shown now. */
     private static void sendHudToggleMessage() {
         Minecraft minecraft = Minecraft.getMinecraft();
         EntityPlayer player = minecraft == null ? null : minecraft.thePlayer;

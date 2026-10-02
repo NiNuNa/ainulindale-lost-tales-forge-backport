@@ -44,15 +44,15 @@ public class LostTalesBlockMissiveBoard extends BlockContainer {
         if (!world.isRemote) {
             TileEntity tileEntity = world.getTileEntity(x, y, z);
             if (tileEntity instanceof LostTalesTileEntityMissiveBoard) {
-                this.dropInventory(world, x, y, z, (LostTalesTileEntityMissiveBoard) tileEntity);
+                this.dropNotices(world, x, y, z, (LostTalesTileEntityMissiveBoard) tileEntity);
             }
         }
         super.breakBlock(world, x, y, z, block, meta);
     }
 
-    private void dropInventory(World world, int x, int y, int z, LostTalesTileEntityMissiveBoard board) {
-        for (int slot = 0; slot < board.getSizeInventory(); slot++) {
-            ItemStack stack = board.getStackInSlot(slot);
+    private void dropNotices(World world, int x, int y, int z, LostTalesTileEntityMissiveBoard board) {
+        for (int slot = 0; slot < board.getSlotCount(); slot++) {
+            ItemStack stack = board.getNotice(slot);
             if (stack != null) {
                 ItemStack dropped = stack.copy();
                 float ox = world.rand.nextFloat() * 0.8F + 0.1F;

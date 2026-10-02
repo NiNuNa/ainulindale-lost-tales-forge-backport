@@ -2,14 +2,14 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.window.PageContent;
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowFrame;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowPlacement;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import java.util.Arrays;
 import java.util.List;
@@ -88,17 +88,17 @@ public final class ChatPagesTest {
 
     @Test
     public void aPageIsATabOfItsOwnAndNoConversation() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         assertNotNull(page);
         assertSame("one tab per page", page, WindowPages.tab(PAGE));
         assertEquals("page:" + PAGE, page.id());
-        assertEquals(page, WindowTab.fromId(page.id()));
-        assertNull("a page is no conversation", ChatTab.from(page));
-        assertNull("no channel goes by a page's id", ChatTab.fromId(page.id()));
-        assertFalse(page.equals(ChatTab.of(ChatChannel.GLOBAL)));
-        assertFalse(ChatTab.of(ChatChannel.GLOBAL).equals(page));
+        assertEquals(page, WindowPage.fromId(page.id()));
+        assertNull("a page is no conversation", ConversationPage.from(page));
+        assertNull("no channel goes by a page's id", ConversationPage.fromId(page.id()));
+        assertFalse(page.equals(ConversationPage.of(ChatChannel.GLOBAL)));
+        assertFalse(ConversationPage.of(ChatChannel.GLOBAL).equals(page));
         assertNull("an unregistered page is no tab", WindowPages.tab("nobody"));
-        assertNull(WindowTab.fromId("page:nobody"));
+        assertNull(WindowPage.fromId("page:nobody"));
     }
 
     /**
@@ -111,7 +111,7 @@ public final class ChatPagesTest {
         Window front = stacked.get(stacked.size() - 1);
         WindowPlacement.Box from = WindowPlacement.restingBounds(front, null,
                 427, 240);
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
         assertNotNull(window);
         assertEquals(Arrays.asList(page), window.getTabs());
@@ -130,7 +130,7 @@ public final class ChatPagesTest {
     /** A page's window comes back where it stood, moved or not, unlocked. */
     @Test
     public void aClosedPageComesBackWhereItsWindowStood() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
         double firstX = window.getOffsetX();
         double firstY = window.getOffsetY();
@@ -153,15 +153,15 @@ public final class ChatPagesTest {
         WindowLayout.close(page);
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.toString(), described.contains("place page:" + PAGE
-                + " locked=false x=20.00 y=30.00 height=250.00 width=320"));
+                + " x=20.00 y=30.00 height=250.00 width=320"));
     }
 
     @Test
     public void aConversationPickedComesInFrontOfAPageInItsWindow() {
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         Window window = WindowLayout.windowOf(global);
         ClientChatChannelState.select(global);
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.setLocked(window.getId(), false);
         WindowLayout.openTab(page, window.getId());
         WindowLayout.showPage(page);
@@ -180,12 +180,12 @@ public final class ChatPagesTest {
 
     @Test
     public void aConversationCoveredByAPageStaysTheLastUsed() {
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatTab friend = ChatTab.whisper("friend", "");
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage friend = ConversationPage.whisper("friend", "");
         WindowLayout.openInNewWindow(friend);
         Window window = WindowLayout.windowOf(global);
         ClientChatChannelState.select(global);
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.setLocked(window.getId(), false);
         WindowLayout.openTab(page, window.getId());
         WindowLayout.showPage(page);
@@ -206,12 +206,12 @@ public final class ChatPagesTest {
 
     @Test
     public void beforeAnyPickTheChatKeyBringsTheTopWindowsConversation() {
-        ChatTab friend = ChatTab.whisper("friend", "");
+        ConversationPage friend = ConversationPage.whisper("friend", "");
         WindowLayout.openInNewWindow(friend);
         ClientChatChannelState.clear();
         assertEquals("the top window's, as the layout left it", friend,
                 ClientChatChannelState.lastUsed());
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         ClientChatChannelState.select(global);
         assertEquals("then the one picked", global,
                 ClientChatChannelState.lastUsed());
@@ -225,7 +225,7 @@ public final class ChatPagesTest {
     @Test
     public void aPageOpensAWindowHoweverManyStand() {
         for (int index = 0; index < 12; index++) {
-            WindowLayout.openInNewWindow(ChatTab.whisper("friend" + index, ""));
+            WindowLayout.openInNewWindow(ConversationPage.whisper("friend" + index, ""));
         }
         assertNotNull(WindowLayout.showPage(WindowPages.tab(PAGE)));
     }
@@ -233,7 +233,7 @@ public final class ChatPagesTest {
     /** The map opens like any page, never filling the screen by itself; a part of the screen it was given comes back with it. */
     @Test
     public void aMapLikePageOpensAsAnyPageAndThenWhereItWasLeft() {
-        PageTab page = WindowPages.tab(FILLING);
+        OtherPage page = WindowPages.tab(FILLING);
         Window window = WindowLayout.showPage(page);
         assertEquals(Window.ScreenFill.NONE, window.getFill());
         String place = String.format(java.util.Locale.ROOT,
@@ -248,12 +248,12 @@ public final class ChatPagesTest {
         WindowLayout.close(page);
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.toString(), described.contains("place page:"
-                + FILLING + " locked=false " + place + " fill=full"));
+                + FILLING + " " + place + " fill=full"));
     }
 
     @Test
     public void aPageOutOfReachWaitsUnseen() {
-        PageTab page = WindowPages.tab(FILLING);
+        OtherPage page = WindowPages.tab(FILLING);
         Window window = WindowLayout.showPage(page);
         assertTrue(WindowFrame.visibleTabs(window).contains(page));
         fillingAvailable = false;
@@ -269,14 +269,14 @@ public final class ChatPagesTest {
      */
     @Test
     public void closingTheConversationTypedInBringsTheTabToItsRightForward() {
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         Window window = WindowLayout.windowOf(global);
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.setLocked(window.getId(), false);
         WindowLayout.openTab(page, window.getId());
         WindowLayout.moveTab(page, window.getId(), 1);
-        assertEquals(Arrays.<WindowTab>asList(global, page, ooc),
+        assertEquals(Arrays.<WindowPage>asList(global, page, ooc),
                 window.getTabs());
         ClientChatChannelState.select(global);
         WindowLayout.setActiveTab(global);
@@ -292,7 +292,7 @@ public final class ChatPagesTest {
      */
     @Test
     public void aPageTakenOutByItselfRemembersWhereItsWindowStood() {
-        final PageTab page = WindowPages.tab(PAGE);
+        final OtherPage page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
         WindowLayout.setWindowWidth(window.getId(), 320, false);
         WindowLayout.setWindowHeight(window.getId(), 250.0D, false);
@@ -300,14 +300,16 @@ public final class ChatPagesTest {
         assertTrue(WindowLayout.setLocked(window.getId(), true));
         WindowLayout.removeTabs(new WindowLayout.TabFilter() {
             @Override
-            public boolean matches(WindowTab tab) {
+            public boolean matches(WindowPage tab) {
                 return page.equals(tab);
             }
         });
         assertNull(WindowLayout.windowOf(page));
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.toString(), described.contains("place page:"
-                + PAGE + " locked=true x=25.00 y=35.00 height=250.00 width=320"));
+                + PAGE + " x=25.00 y=35.00 height=250.00 width=320"));
+        // Brought back, it opens unlocked: only a first window is locked.
+        assertFalse(WindowLayout.showPage(page).isLocked());
     }
 
     /**
@@ -317,12 +319,12 @@ public final class ChatPagesTest {
      */
     @Test
     public void aLineForAPageNotShownStaysInTheChat() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
         assertFalse(page.isShown());
-        assertFalse(WindowPages.claimLine("chat.test.page.saved", "Saved."));
+        assertFalse(WindowPages.answerOnPage("chat.test.page.saved", "Saved."));
         assertEquals("", page.content().lastAnswer().words());
-        assertFalse(WindowPages.claimLine("chat.other.line", "Hello."));
+        assertFalse(WindowPages.answerOnPage("chat.other.line", "Hello."));
     }
 
     @Test

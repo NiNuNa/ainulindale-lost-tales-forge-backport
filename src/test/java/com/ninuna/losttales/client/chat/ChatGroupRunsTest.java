@@ -40,7 +40,7 @@ public final class ChatGroupRunsTest {
     private static void remember(int lineId, ChatChannel channel,
                                  UUID sender, String identity,
                                  long timestamp) {
-        ChatGroupRuns.remember(lineId, ChatTab.of(channel), sender, identity,
+        ChatGroupRuns.remember(lineId, ConversationPage.of(channel), sender, identity,
                 true, timestamp, true, new ChatComponentText("grouped"));
     }
 
@@ -274,7 +274,7 @@ public final class ChatGroupRunsTest {
     @Test
     public void aMessageThatCannotGroupStillOpensARun() {
         remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
-        ChatGroupRuns.remember(2, ChatTab.of(ChatChannel.GLOBAL), ALICE,
+        ChatGroupRuns.remember(2, ConversationPage.of(ChatChannel.GLOBAL), ALICE,
                 "Alice", true, START + 1000L, false,
                 new ChatComponentText("grouped"));
         remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2000L);
@@ -286,7 +286,7 @@ public final class ChatGroupRunsTest {
     /** A message with no grouped form of its own is never grouped. */
     @Test
     public void aMessageWithoutAGroupedFormIsNotRecorded() {
-        ChatGroupRuns.remember(1, ChatTab.of(ChatChannel.GLOBAL), ALICE,
+        ChatGroupRuns.remember(1, ConversationPage.of(ChatChannel.GLOBAL), ALICE,
                 "Alice", true, START, true, null);
         assertNull(ChatGroupRuns.of(1));
         assertFalse(ChatGroupRuns.continuationsOf(new int[] { 1 }, null)[0]);

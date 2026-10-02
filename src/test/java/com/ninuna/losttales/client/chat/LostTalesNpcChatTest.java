@@ -23,7 +23,7 @@ public final class LostTalesNpcChatTest {
             UUID npcId = UUID.randomUUID();
             int factionColor = 0x8A9A5B;
             IChatComponent line = LostTalesChatPresentation.buildNpcSpeech(
-                    ChatTab.whisper("Grey Wanderer", ""), npcId, "Grey Wanderer",
+                    ConversationPage.whisper("Grey Wanderer", ""), npcId, "Grey Wanderer",
                     "lotr:mob/wanderer.png",
                     "Good day to you! :smile:", factionColor, false);
 

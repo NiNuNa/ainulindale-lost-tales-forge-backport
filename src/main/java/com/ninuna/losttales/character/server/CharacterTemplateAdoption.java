@@ -23,7 +23,6 @@ package com.ninuna.losttales.character.server;
  */
 public final class CharacterTemplateAdoption {
 
-    private final long expectedRosterRevision;
     private final boolean offered;
     private final String name;
     private final String raceId;
@@ -37,18 +36,17 @@ public final class CharacterTemplateAdoption {
     private final int cosmeticCapeId;
 
     /** An account with no template: the reading is spent, nothing changes. */
-    public static CharacterTemplateAdoption none(long expectedRosterRevision) {
-        return new CharacterTemplateAdoption(expectedRosterRevision, false,
+    public static CharacterTemplateAdoption none() {
+        return new CharacterTemplateAdoption(false,
                 "", "", "", "", "", "", "", 0, true, 0);
     }
 
-    public CharacterTemplateAdoption(long expectedRosterRevision, boolean offered,
+    public CharacterTemplateAdoption(boolean offered,
                                      String name, String raceId, String genderId,
                                      String skinId, String bodyTypeId,
                                      String chestTypeId, String history,
                                      int age, boolean showMinecraftCape,
                                      int cosmeticCapeId) {
-        this.expectedRosterRevision = expectedRosterRevision;
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = cosmeticCapeId;
         this.offered = offered;
@@ -62,7 +60,6 @@ public final class CharacterTemplateAdoption {
         this.age = age;
     }
 
-    public long getExpectedRosterRevision() { return this.expectedRosterRevision; }
     public boolean isOffered() { return this.offered; }
     public String getName() { return this.name; }
     public String getRaceId() { return this.raceId; }

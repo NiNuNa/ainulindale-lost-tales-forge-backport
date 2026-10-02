@@ -146,7 +146,7 @@ public final class LostTalesConfig {
     public static double notificationHudOffsetY = 35.0D;
     public static boolean showWorldQuestMarkers = true;
     public static boolean showDiscoveredWorldMapMarkers = true;
-    public static int worldQuestMarkerMaxDistance = 128;
+    public static int worldQuestMarkerMaxDistance = 256;
 
     public static boolean showQuestChatFeedback = true;
     public static boolean playQuestSounds = true;
@@ -236,6 +236,10 @@ public final class LostTalesConfig {
     public static boolean hideHudWithWindows = true;
     /** How strong a window pinned to the screen shows while playing, in percent of how it shows on the window screen. */
     public static int pinnedWindowOpacity = 70;
+    /** How long the pointer rests before a tip shows: the words Tip Delay picks from. */
+    static final String[] TIP_DELAYS = {"INSTANT", "SHORT", "MEDIUM", "LONG"};
+    static final String DEFAULT_TIP_DELAY = "SHORT";
+    public static String tipDelay = DEFAULT_TIP_DELAY;
     /**
      * Whether anything of the mod's moves: every screen, HUD panel and
      * chat motion. Off, everything stands where it ends.
@@ -968,15 +972,15 @@ public final class LostTalesConfig {
                     "worldQuestMarkerMaxDistance",
                     CATEGORY_CLIENT,
                     worldQuestMarkerMaxDistance,
-                    24,
-                    512,
-                    "Maximum distance in blocks for world-space quest marker labels."
+                    48,
+                    1024,
+                    "Quest marker labels in the world show out to this many blocks."
             );
             showQuestChatFeedback = config.getBoolean(
                     "showQuestChatFeedback",
                     CATEGORY_CLIENT,
                     showQuestChatFeedback,
-                    "Show the server's quest notes in the Client Console: tracking, markers found and rewards received. Off hides only these notes; a refusal always shows."
+                    "Show the server's quest notes in the Console: tracking, markers found and rewards received. Off hides only these notes; a refusal always shows."
             );
             chatProximityRadius = config.getInt(
                     "proximityRadius",
@@ -1036,7 +1040,7 @@ public final class LostTalesConfig {
                     "permissions",
                     CATEGORY_ROLES,
                     chatPermissions,
-                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.server_console.read (the Server Console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, fellowship.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
+                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.server_console.read (the Server Log), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, fellowship.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
             );
             chatRoles = config.getStringList(
                     "definitions",
@@ -1054,7 +1058,7 @@ public final class LostTalesConfig {
                     "definitions",
                     CATEGORY_CHANNELS,
                     new String[0],
-                    "Channels this server has of its own, one per line as <id>=name:<shown name>;rule:<everyone|proximity|operators>;colour:<RRGGBB>;ooc:<true|false>;bridge:<true|false>. The id is the channel's code name: packets, the layout file, the gates, # links and Discord links all name a channel by it. The routing rules a config cannot describe - a fellowship, a faction, a whisper, a private console - are refused, and so is an entry naming a channel this build already has or a faction's code name (gondor, high_elf)."
+                    "Channels this server has of its own, one per line as <id>=name:<shown name>;rule:<everyone|proximity|operators>;colour:<RRGGBB>;ooc:<true|false>;bridge:<true|false>. The id is the channel's code name: packets, the layout file, the gates, # links and Discord links all name a channel by it. The routing rules a config cannot describe - a fellowship, a faction, a whisper, the Console's or the Server Log's - are refused, and so is an entry naming a channel this build already has or a faction's code name (gondor, high_elf)."
             );
             chatChannelRoles = config.getStringList(
                     "gates",
@@ -1093,7 +1097,7 @@ public final class LostTalesConfig {
                     CATEGORY_DISCORD,
                     "channelBindings",
                     new String[0],
-                    "Server only, secrets: the links between game channels and Discord channels. Make one with /losttales discord link <channel> in the game, which gives a code, and /link code:<code> in the Discord channel, where the bot makes the channel's webhook itself; take one away with /losttales discord unlink or /unlink. Each entry is <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook address>: a game channel may be linked to several Discord channels, in any Discord server the bot is in, while a Discord channel holds one game channel only. The channel is its code name: global, proximity, ooc, operator, a server's own, or a faction's code name for that faction's chat (gondor, high_elf); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. Fellowship, the consoles and whispers are private and refused. Kept off the Server Settings screen and /losttales config, since a webhook address lets whoever holds it post into its channel."
+                    "Server only, secrets: the links between game channels and Discord channels. Make one with /losttales discord link <channel> in the game, which gives a code, and /link code:<code> in the Discord channel, where the bot makes the channel's webhook itself; take one away with /losttales discord unlink or /unlink. Each entry is <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook address>: a game channel may be linked to several Discord channels, in any Discord server the bot is in, while a Discord channel holds one game channel only. The channel is its code name: global, proximity, ooc, operator, a server's own, or a faction's code name for that faction's chat (gondor, high_elf); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. Fellowship, the Console, the Server Log and whispers are private and refused. Kept off the Server Settings screen and /losttales config, since a webhook address lets whoever holds it post into its channel."
             );
             discordChannelBindings = bindingsProperty.getStringList();
             discordAvatarUrlTemplate = config.getString(
@@ -1245,12 +1249,12 @@ public final class LostTalesConfig {
                     "chatServerTextColor",
                     CATEGORY_CLIENT,
                     chatServerTextColor,
-                    "Palette colour of what the Server and the Client say in the chat: joins, command answers, notices, the consoles' lines. Names, links and warnings keep their own colours. Set in Settings.",
+                    "Palette colour of what the Server and the Client say in the chat: joins, command answers, notices, the lines of the Console and the Server Log. Names, links and warnings keep their own colours. Set in Settings.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_SERVER_TEXT_COLOR);
             Property feedAlignmentProperty = config.get(
                     CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment,
-                    "Which edge the closed chat feed's lines stand against: LEFT, CENTRE (the default), or RIGHT. Each line's background thins out away from that edge, from the middle to both sides for CENTRE.");
+                    "Which edge the chat feed's lines stand against: LEFT, CENTRE (the default), or RIGHT. Each line's background thins out away from that edge, from the middle to both sides for CENTRE.");
             feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
             chatFeedAlignment = normalizeFeedAlignment(
                     feedAlignmentProperty.getString());
@@ -1264,7 +1268,7 @@ public final class LostTalesConfig {
                             + "is as tall as the text it is drawn in.");
             chatFeedSpeakerSize = readSize(config, "chatFeedSpeakerSize",
                     chatFeedSpeakerSize,
-                    "The same row in the closed chat feed, against the "
+                    "The same row in the chat feed, against the "
                             + "feed's own words: SMALLER, SAME or LARGER. "
                             + "LARGER, the default, stands it a step over "
                             + "them, which is the size the open window's "
@@ -1272,7 +1276,7 @@ public final class LostTalesConfig {
                             + "first.");
             chatFeedMessageSize = readSize(config, "chatFeedMessageSize",
                     chatFeedMessageSize,
-                    "How big what a message says is in the closed chat feed, "
+                    "How big what a message says is in the chat feed, "
                             + "against the same words in the open window: "
                             + "SMALLER, SAME or LARGER. The open window's "
                             + "words are the size every other row is measured "
@@ -1284,7 +1288,7 @@ public final class LostTalesConfig {
                             + "SMALLER, SAME or LARGER.");
             chatFeedQuoteSize = readSize(config, "chatFeedQuoteSize",
                     chatFeedQuoteSize,
-                    "The same row in the closed chat feed, against the "
+                    "The same row in the chat feed, against the "
                             + "feed's own words: SMALLER, SAME or LARGER. "
                             + "SAME, the default, draws the quote as large "
                             + "as the words it stands over.");
@@ -1302,6 +1306,12 @@ public final class LostTalesConfig {
                     100,
                     "How strong a pinned window shows while you play, in percent of how it shows on the window screen."
             );
+            Property tipDelayProperty = config.get(CATEGORY_CLIENT, "tipDelay",
+                    tipDelay,
+                    "How long the pointer rests on something before its tip shows: INSTANT, SHORT (the default), MEDIUM or LONG. Once a tip has shown, the next one shows at once for a moment. The times are the motion files' (ui.tip.show).");
+            tipDelayProperty.setValidValues(TIP_DELAYS);
+            tipDelay = normalizeWord(tipDelayProperty.getString(), TIP_DELAYS,
+                    DEFAULT_TIP_DELAY);
 
             devSkinOverridePath = config.getString(
                     "devSkinOverridePath",
@@ -1372,7 +1382,7 @@ public final class LostTalesConfig {
                     "showChatSpeechBubbles",
                     CATEGORY_CLIENT,
                     showChatSpeechBubbles,
-                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech, as far as the server's Proximity radius. In-character channels only (Global, Proximity, Fellowship, Faction and whispers); never OOC, the operator channel or the consoles."
+                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech, as far as the server's Proximity radius. In-character channels only (Global, Proximity, Fellowship, Faction and whispers); never OOC, the operator channel, the Console or the Server Log."
             );
             animations = config.getBoolean(
                     "animations", CATEGORY_CLIENT, animations,
@@ -1507,7 +1517,7 @@ public final class LostTalesConfig {
                     missiveBoardMinAvailable,
                     0,
                     9,
-                    "Desired minimum number of notices a board tries to keep available. Existing boards clamp this to their 9-slot inventory."
+                    "Notices a board refills towards: while it holds fewer, each refill posts as many as missiveBoardMaxGeneratedPerCycle allows. A board has room for 9; every board reads this as it stands."
             );
             missiveBoardMaxAvailable = config.getInt(
                     "missiveBoardMaxAvailable",
@@ -1515,7 +1525,7 @@ public final class LostTalesConfig {
                     missiveBoardMaxAvailable,
                     1,
                     9,
-                    "Maximum number of notices a board can keep available. The missive board inventory has 9 notice slots."
+                    "The most notices a board holds, never fewer than missiveBoardMinAvailable. A board has room for 9; every board reads this as it stands."
             );
             missiveBoardGenerationIntervalTicks = config.getInt(
                     "missiveBoardGenerationIntervalTicks",
@@ -2145,6 +2155,10 @@ public final class LostTalesConfig {
                 CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment);
         feedAlignmentProperty.set(chatFeedAlignment);
         feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
+        Property tipDelayProperty = config.get(
+                CATEGORY_CLIENT, "tipDelay", tipDelay);
+        tipDelayProperty.set(tipDelay);
+        tipDelayProperty.setValidValues(TIP_DELAYS);
         writeSize(config, "chatSpeakerSize", chatSpeakerSize);
         writeSize(config, "chatFeedSpeakerSize", chatFeedSpeakerSize);
         writeSize(config, "chatFeedMessageSize", chatFeedMessageSize);
@@ -2435,11 +2449,6 @@ public final class LostTalesConfig {
     }
 
     /**
-     * The feed alignment a config value names, case and surrounding space
-     * aside: {@code LEFT}, {@code CENTRE} — {@code CENTER} is read as it —
-     * or {@code RIGHT}, and the left for anything else.
-     */
-    /**
      * One of the chat's row sizes as the file names it, the shipped
      * value for anything else. The words a screen steps through are
      * named on the option itself, so it is a button rather than a text
@@ -2474,6 +2483,23 @@ public final class LostTalesConfig {
         return shipped;
     }
 
+    /** One of {@code words}, case and surrounding space aside; {@code fallback} for anything else. */
+    static String normalizeWord(String value, String[] words, String fallback) {
+        String normalized = value == null
+                ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+        for (String word : words) {
+            if (word.equals(normalized)) {
+                return word;
+            }
+        }
+        return fallback;
+    }
+
+    /**
+     * The feed alignment a config value names, case and surrounding space
+     * aside: {@code LEFT}, {@code CENTRE} — {@code CENTER} is read as it —
+     * or {@code RIGHT}, and the shipped {@code CENTRE} for anything else.
+     */
     public static String normalizeFeedAlignment(String value) {
         String normalized = value == null
                 ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);

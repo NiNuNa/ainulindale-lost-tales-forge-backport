@@ -68,7 +68,7 @@ public final class WindowScreen extends GuiChat
     private static final String COMMAND_OPENER = "/";
 
     /** A page brought forward from outside, which takes the keys once the screen draws. */
-    private static PageTab pageToFocus;
+    private static OtherPage pageToFocus;
 
     private final List<ScreenPart> parts = new ArrayList<ScreenPart>();
     private final PointerRegions regions = new PointerRegions();
@@ -95,7 +95,7 @@ public final class WindowScreen extends GuiChat
                 }
 
                 @Override
-                public void selectTab(WindowTab tab) {
+                public void selectTab(WindowPage tab) {
                     WindowScreen.this.selectTab(tab);
                 }
 
@@ -120,7 +120,7 @@ public final class WindowScreen extends GuiChat
     /** The pages' input bars. */
     private final WindowBar bar = new WindowBar(new BarLead.Voice() {
         @Override
-        public BarLead.Face faceFor(WindowTab tab) {
+        public BarLead.Face faceFor(WindowPage tab) {
             for (ScreenPart part : WindowScreen.this.parts) {
                 BarLead.Face face = part.identityFace(tab);
                 if (face != null) {
@@ -131,7 +131,7 @@ public final class WindowScreen extends GuiChat
         }
 
         @Override
-        public boolean menuOutFor(WindowTab tab) {
+        public boolean menuOutFor(WindowPage tab) {
             for (ScreenPart part : WindowScreen.this.parts) {
                 if (part.identityMenuOut(tab)) {
                     return true;
@@ -157,6 +157,8 @@ public final class WindowScreen extends GuiChat
      */
     private WindowHover hover = WindowHover.NONE;
     private String hoverTip = "";
+    /** When the pointer's tip shows: after a rest, fading in, at once while tips are warm. */
+    private final TipTiming tipTiming = new TipTiming();
     private int hoverTipX;
     private int hoverTipY;
     /**
@@ -195,14 +197,14 @@ public final class WindowScreen extends GuiChat
      * forward by its key, until a press lands anywhere else. Its window
      * shows it; null while the keys are a part's.
      */
-    private PageTab focusedPage;
+    private OtherPage focusedPage;
     /** The page a held button went down on, which its drag and release go to; null for none. */
-    private PageTab pressedPage;
+    private OtherPage pressedPage;
     private int pressedPageButton;
     /** The sub-window whose content the left button went down on and is still held; null for none. */
     private SubWindow pressedSubWindow;
     /** The pages drawn last frame, which are told when they leave the screen. */
-    private final List<PageTab> shownPages = new ArrayList<PageTab>();
+    private final List<OtherPage> shownPages = new ArrayList<OtherPage>();
     /** Whether depth testing was on as this frame began, for a page drawn as a screen of its own. */
     private boolean depthTestAtStart;
     /** The screen closing goes back to; null for the game. */
@@ -243,7 +245,7 @@ public final class WindowScreen extends GuiChat
      */
     public static void openSettings(GuiScreen parent) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        PageTab page = WindowPages.tab(ClientSettingsPage.PAGE_ID);
+        OtherPage page = WindowPages.tab(ClientSettingsPage.PAGE_ID);
         if (minecraft == null || page == null) {
             return;
         }
@@ -311,7 +313,7 @@ public final class WindowScreen extends GuiChat
      */
     public static GuiScreen screenForPage(String pageId) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        PageTab page = WindowPages.tab(pageId);
+        OtherPage page = WindowPages.tab(pageId);
         if (minecraft == null || page == null
                 || WindowLayout.showPage(page) == null) {
             return null;
@@ -384,7 +386,7 @@ public final class WindowScreen extends GuiChat
     }
 
     /** The page holding the keys; null while a part's field has them. */
-    public PageTab focusedPage() {
+    public OtherPage focusedPage() {
         return this.focusedPage;
     }
 
@@ -422,7 +424,7 @@ public final class WindowScreen extends GuiChat
     /* ---- Focus ---- */
 
     /** Gives a page the keys: the input, the search and any sub-window let them go. */
-    public void focusPage(PageTab page) {
+    public void focusPage(OtherPage page) {
         if (page == null || page.equals(this.focusedPage)) {
             return;
         }
@@ -438,7 +440,7 @@ public final class WindowScreen extends GuiChat
 
     /** The page in front lets the keys go. */
     public void leavePage() {
-        PageTab left = this.focusedPage;
+        OtherPage left = this.focusedPage;
         this.focusedPage = null;
         if (left != null) {
             left.content().focusChanged(false);
@@ -451,7 +453,7 @@ public final class WindowScreen extends GuiChat
      */
     private void syncPageFocus() {
         if (pageToFocus != null) {
-            PageTab page = pageToFocus;
+            OtherPage page = pageToFocus;
             pageToFocus = null;
             focusPage(page);
         }
@@ -542,7 +544,7 @@ public final class WindowScreen extends GuiChat
      */
     public static boolean isEmpty() {
         for (Window window : WindowLayout.windows()) {
-            for (WindowTab tab : window.getTabs()) {
+            for (WindowPage tab : window.getTabs()) {
                 if (WindowView.isShown(tab)) {
                     return false;
                 }
@@ -566,14 +568,14 @@ public final class WindowScreen extends GuiChat
     }
 
     /** A tab picked comes in front of its window and takes the keys. */
-    public void selectTab(WindowTab tab) {
+    public void selectTab(WindowPage tab) {
         for (ScreenPart part : this.parts) {
             if (part.selectTab(tab)) {
                 return;
             }
         }
-        if (tab instanceof PageTab) {
-            WindowLayout.showPage((PageTab)tab);
+        if (tab instanceof OtherPage) {
+            WindowLayout.showPage((OtherPage)tab);
         }
     }
 
@@ -583,7 +585,7 @@ public final class WindowScreen extends GuiChat
      * left, which takes the keys when the tab closed held them. A locked
      * window keeps its tabs, and its padlock answers.
      */
-    public void closeTab(WindowTab tab) {
+    public void closeTab(WindowPage tab) {
         Window window = WindowLayout.windowOf(tab);
         if (heldByLock(window)) {
             return;
@@ -591,14 +593,14 @@ public final class WindowScreen extends GuiChat
         boolean hadKeys = tab != null && window != null
                 && window == keysWindow() && tab.equals(window.getActiveTab());
         closeOnly(tab);
-        WindowTab front = hadKeys && WindowLayout.windows().contains(window)
+        WindowPage front = hadKeys && WindowLayout.windows().contains(window)
                 ? window.getActiveTab() : null;
         if (front != null && !front.equals(tab)) {
             jumpToTab(front);
         }
     }
 
-    private void closeOnly(WindowTab tab) {
+    private void closeOnly(WindowPage tab) {
         for (ScreenPart part : this.parts) {
             if (part.closeTab(tab)) {
                 return;
@@ -630,10 +632,12 @@ public final class WindowScreen extends GuiChat
     public void initGui() {
         if (!this.openAnimationStarted) {
             // What the screen shows is decided as it comes up, after the
-            // screen it replaced has closed: the chat's key the
-            // conversations, a page's key that page; the windows pinned
-            // to the GUI always.
-            if (this.openedForChat || pageToFocus == null) {
+            // screen it replaced has closed: the command key the consoles,
+            // the chat's key the conversations, a page's key that page;
+            // the windows pinned to the GUI always.
+            if (this.openedForCommand) {
+                WindowView.forConsole();
+            } else if (this.openedForChat || pageToFocus == null) {
                 WindowView.forChat();
             } else {
                 WindowView.forPage(pageToFocus);
@@ -658,7 +662,7 @@ public final class WindowScreen extends GuiChat
         if (!this.openAnimationStarted) {
             this.openAnimationStarted = true;
             WindowOpening.start();
-            if (this.openedForChat) {
+            if (this.openedForChat && !this.openedForCommand) {
                 FirstTips.chatOpened();
             }
             for (ScreenPart part : this.parts) {
@@ -691,8 +695,8 @@ public final class WindowScreen extends GuiChat
         // it ticks, and its window with it, so the windows are walked
         // from a copy.
         for (Window window : new ArrayList<Window>(WindowLayout.windows())) {
-            List<WindowTab> shown = WindowFrame.visibleTabs(window);
-            WindowTab front = WindowFrame.activeTab(window, shown);
+            List<WindowPage> shown = WindowFrame.visibleTabs(window);
+            WindowPage front = WindowFrame.activeTab(window, shown);
             PageContent content = shown.isEmpty() ? null
                     : WindowPages.contentOf(front);
             if (content != null) {
@@ -700,7 +704,7 @@ public final class WindowScreen extends GuiChat
             }
             // The other page of a split shown keeps time beside it.
             WindowSplit split = shown.isEmpty() ? null : window.splitOf(front);
-            WindowTab other = split == null ? null : split.other(front);
+            WindowPage other = split == null ? null : split.other(front);
             PageContent beside = other == null || !shown.contains(other) ? null
                     : WindowPages.contentOf(other);
             if (content != null && beside != null) {
@@ -729,7 +733,7 @@ public final class WindowScreen extends GuiChat
         leavePage();
         this.pressedPage = null;
         this.pressedSubWindow = null;
-        for (PageTab page : this.shownPages) {
+        for (OtherPage page : this.shownPages) {
             page.content().hidden();
         }
         this.shownPages.clear();
@@ -959,12 +963,12 @@ public final class WindowScreen extends GuiChat
         boolean fieldHasWords = subWindowKeys || this.toolStrip.isFocused()
                 || page != null && page.holdsKeys();
         int key = press.key;
-        WindowTab from = keysTab();
+        WindowPage from = keysTab();
         Window window = keysWindow();
-        List<WindowTab> row = window == null
-                ? Collections.<WindowTab>emptyList()
+        List<WindowPage> row = window == null
+                ? Collections.<WindowPage>emptyList()
                 : WindowFrame.visibleTabs(window);
-        WindowTab next;
+        WindowPage next;
         if (key == Keyboard.KEY_TAB) {
             if (subWindowKeys
                     && front.content.keyTyped(press.character, key)) {
@@ -1000,9 +1004,9 @@ public final class WindowScreen extends GuiChat
         if (window == null) {
             return;
         }
-        List<WindowTab> row = WindowFrame.visibleTabs(window);
-        WindowTab from = WindowFrame.activeTab(window, row);
-        WindowTab next = TabWalk.step(row, from, step);
+        List<WindowPage> row = WindowFrame.visibleTabs(window);
+        WindowPage from = WindowFrame.activeTab(window, row);
+        WindowPage next = TabWalk.step(row, from, step);
         if (next != null && !next.equals(from)) {
             TabSelection.clear();
             jumpToTab(next);
@@ -1013,7 +1017,7 @@ public final class WindowScreen extends GuiChat
      * The tab the keys are in: the page holding them, else the front tab
      * of the window a part types into; null with neither.
      */
-    private WindowTab keysTab() {
+    private WindowPage keysTab() {
         if (this.focusedPage != null) {
             return this.focusedPage;
         }
@@ -1043,7 +1047,7 @@ public final class WindowScreen extends GuiChat
      * pressed on the page. False for no page, or one that cannot come
      * forward.
      */
-    public boolean turnTo(PageTab page) {
+    public boolean turnTo(OtherPage page) {
         if (page == null || !page.isAvailable()) {
             return false;
         }
@@ -1112,7 +1116,7 @@ public final class WindowScreen extends GuiChat
      */
     private void openSearch() {
         Window typed = keysWindow();
-        WindowTab inFront = typed == null ? null : typed.getActiveTab();
+        WindowPage inFront = typed == null ? null : typed.getActiveTab();
         if (inFront == null || inFront.searchUnavailable().length() > 0) {
             return;
         }
@@ -1168,14 +1172,14 @@ public final class WindowScreen extends GuiChat
      * The page the search is open over, while a page is in front of its
      * window; null for a part's search or none.
      */
-    private static PageTab searchedPage() {
+    private static OtherPage searchedPage() {
         Window searched = WindowLayout.window(WindowSearch.windowId());
-        WindowTab front = searched == null ? null : searched.getActiveTab();
-        return front instanceof PageTab ? (PageTab)front : null;
+        WindowPage front = searched == null ? null : searched.getActiveTab();
+        return front instanceof OtherPage ? (OtherPage)front : null;
     }
 
     private void handleSearchKey(char typedChar, int keyCode) {
-        PageTab page = searchedPage();
+        OtherPage page = searchedPage();
         boolean enter = keyCode == Keyboard.KEY_RETURN
                 || keyCode == Keyboard.KEY_NUMPADENTER;
         if (keyCode == Keyboard.KEY_ESCAPE) {
@@ -1247,7 +1251,7 @@ public final class WindowScreen extends GuiChat
      * button, anything else is done at once; one greyed takes nothing.
      */
     private void takeStripOption(WindowHover press, double x) {
-        WindowTab front = press.window == null ? null
+        WindowPage front = press.window == null ? null
                 : press.window.getActiveTab();
         PageOption option = press.stripOption;
         if (front == null || option == null || !option.isAvailable()) {
@@ -1265,7 +1269,9 @@ public final class WindowScreen extends GuiChat
     /**
      * A press on a window's tool strip: the panel button drives the tab's
      * panel out or back in, an option's button takes that option, the cog
-     * opens the settings of its kind, the full window button lets the page fill
+     * opens the settings of its kind, the split view button the pages that
+     * can stand beside it (a locked window's lights its padlock), the full
+     * window button lets the page fill
      * its window, the member list's button puts the list away or brings it
      * out, the well opens the search over the window and takes the caret,
      * the magnifier does the same and the cross it becomes clears the
@@ -1286,7 +1292,11 @@ public final class WindowScreen extends GuiChat
                         .length() > 0) {
             return;
         }
-        WindowTab front = press.row.selected;
+        if (ToolStrip.heldByPadlock(press.stripPart, press.window)) {
+            heldByLock(press.window);
+            return;
+        }
+        WindowPage front = press.row.selected;
         switch (press.stripPart) {
             case PANEL:
                 if (front != null) {
@@ -1300,6 +1310,12 @@ public final class WindowScreen extends GuiChat
                 this.tabMenus.toggleSettings(press.window.getActiveTab(),
                         SubWindowAnchor.onToolStrip(press.frame, press.row,
                                 (int)Math.floor(x), this.width, this.height));
+                return;
+            case SPLIT:
+                this.tabMenus.toggleSplit(press.window.getActiveTab(),
+                        WindowMenus.hangingFrom(SubWindowAnchor.onToolStrip(
+                                press.frame, press.row, (int)Math.floor(x),
+                                this.width, this.height)));
                 return;
             case HELP:
                 this.tabMenus.toggleHelp(press.window.getActiveTab(),
@@ -1342,7 +1358,7 @@ public final class WindowScreen extends GuiChat
      * Brings an open tab in front of its window, the window over the
      * others, and gives it the keys: a conversation's bar, or a page.
      */
-    public void jumpToTab(WindowTab tab) {
+    public void jumpToTab(WindowPage tab) {
         Window window = tab == null ? null : WindowLayout.windowOf(tab);
         if (window == null) {
             return;
@@ -1351,8 +1367,8 @@ public final class WindowScreen extends GuiChat
         WindowView.show(tab);
         WindowLayout.raise(window.getId());
         selectTab(tab);
-        if (tab instanceof PageTab) {
-            focusPage((PageTab)tab);
+        if (tab instanceof OtherPage) {
+            focusPage((OtherPage)tab);
         } else {
             leavePage();
         }
@@ -1508,7 +1524,7 @@ public final class WindowScreen extends GuiChat
             return;
         }
         if (under.is(WindowHover.Kind.PAGE)) {
-            PageTab page = under.otherSide ? under.frame.splitPage : under.frame.page;
+            OtherPage page = under.otherSide ? under.frame.splitPage : under.frame.page;
             if (under.otherSide && page == null) {
                 // A conversation on the other side scrolls where it is.
                 for (ScreenPart part : this.parts) {
@@ -1650,14 +1666,23 @@ public final class WindowScreen extends GuiChat
                 this.hover.is(WindowHover.Kind.SNAP_LAYOUT)
                         && this.hover.snapZone >= 0 ? this.hover.snapZone
                         : this.snapFlyout.keyZone(), shownOpacity);
-        this.subWindows.drawTip(this.mc, this.hover, mouseX, mouseY);
+        // One tip at a time: the screen's own, else a sub-window's, each
+        // after the pointer has rested on it.
+        String tipKey = this.hoverTip.length() > 0 ? "screen:" + this.hoverTip
+                : SubWindows.tipKey(this.hover);
+        float tipShare = this.tipTiming.share(tipKey, System.nanoTime());
+        if (this.hoverTip.length() == 0) {
+            this.subWindows.drawTip(this.mc, this.hover, mouseX, mouseY,
+                    tipShare);
+        }
         // A new player's tip stands over everything, and quiets the
         // pointer's own; so do the snap layouts, which own their tips.
         if (drawFirstTip()) {
             return;
         }
-        if (this.hoverTip.length() > 0 && !this.snapFlyout.isShown()) {
-            drawHoverTip();
+        if (this.hoverTip.length() > 0 && !this.snapFlyout.isShown()
+                && tipShare > 0.0F) {
+            drawHoverTip(tipShare);
         }
     }
 
@@ -1673,7 +1698,7 @@ public final class WindowScreen extends GuiChat
                 || this.hover.listRow >= 0) {
             return;
         }
-        PageTab page = this.hover.frame.page;
+        OtherPage page = this.hover.frame.page;
         for (ScreenPart part : this.parts) {
             if (part.identityMenuOut(page)) {
                 return;
@@ -1869,7 +1894,7 @@ public final class WindowScreen extends GuiChat
         }
         String previewed = this.gestures.snapPreview().windowId();
         String typed = !isEmpty() && hasField() ? typedWindowId() : null;
-        List<PageTab> drawnPages = new ArrayList<PageTab>();
+        List<OtherPage> drawnPages = new ArrayList<OtherPage>();
         ContentView.follow();
         stackWindows(windows);
         for (int index = 0; index < windows.size(); index++) {
@@ -1934,7 +1959,7 @@ public final class WindowScreen extends GuiChat
         }
         // A page no longer drawn has left the screen: behind another tab,
         // or its window closed.
-        for (PageTab left : this.shownPages) {
+        for (OtherPage left : this.shownPages) {
             if (!drawnPages.contains(left)) {
                 left.content().hidden();
             }
@@ -1957,7 +1982,9 @@ public final class WindowScreen extends GuiChat
             keys.add(window.getId());
             boxes.add(frame != null && frame.drawn ? frame.drawnBox() : null);
         }
-        this.stackFade.advance(keys, boxes, System.nanoTime());
+        // The window the pointer rests on shows whole while it does.
+        this.stackFade.advance(keys, boxes, this.hover.window == null ? null
+                : this.hover.window.getId(), System.nanoTime());
     }
 
     /**
@@ -1970,7 +1997,7 @@ public final class WindowScreen extends GuiChat
     private boolean drawWindow(Window window, WindowFrame frame,
                                LostTalesGuiAnimationSample shown, int mouseX,
                                int mouseY, double pointerX, double pointerY,
-                               float partialTicks, List<PageTab> drawnPages) {
+                               float partialTicks, List<OtherPage> drawnPages) {
         TabRow.Row row = rowFor(window, frame, shown);
         if (row == null) {
             return false;
@@ -2027,6 +2054,7 @@ public final class WindowScreen extends GuiChat
                                 ? this.hover.stripOption : null,
                         new ToolStrip.Out(
                                 this.tabMenus.settingsOut(window.getActiveTab()),
+                                this.tabMenus.splitOut(window.getActiveTab()),
                                 this.tabMenus.helpOut(window.getActiveTab()),
                                 this.tabMenus.pickOut(window.getActiveTab())));
             } finally {
@@ -2091,10 +2119,10 @@ public final class WindowScreen extends GuiChat
      */
     private void layOutWindow(Window window, WindowFrame frame,
                               LostTalesGuiAnimationSample shown) {
-        WindowTab front = WindowFrame.activeTab(window,
+        WindowPage front = WindowFrame.activeTab(window,
                 WindowFrame.visibleTabs(window));
-        if (front instanceof PageTab) {
-            WindowDrawing.layOutPage(this.mc, window, frame, (PageTab)front,
+        if (front instanceof OtherPage) {
+            WindowDrawing.layOutPage(this.mc, window, frame, (OtherPage)front,
                     this.width, this.height, shown);
             return;
         }
@@ -2168,7 +2196,7 @@ public final class WindowScreen extends GuiChat
         if (!frame.drawn) {
             return null;
         }
-        List<WindowTab> tabs = WindowFrame.visibleTabs(window);
+        List<WindowPage> tabs = WindowFrame.visibleTabs(window);
         if (tabs.isEmpty()) {
             return null;
         }
@@ -2189,7 +2217,7 @@ public final class WindowScreen extends GuiChat
         row.restoreOpen = this.menus.isOpenFor(SubWindowKind.OPEN,
                 window.getId());
         row.optionsOpen = null;
-        for (WindowTab tab : window.getTabs()) {
+        for (WindowPage tab : window.getTabs()) {
             if (this.tabMenus.optionsOut(tab)) {
                 row.optionsOpen = tab;
             }
@@ -2283,7 +2311,7 @@ public final class WindowScreen extends GuiChat
             }
             return;
         }
-        PageTab page = press.otherSide ? press.frame.splitPage : press.frame.page;
+        OtherPage page = press.otherSide ? press.frame.splitPage : press.frame.page;
         PageContent content = WindowPages.contentOf(page);
         LostTalesUiHitBox exact = WindowDrawing.boxOfPage(press.frame, page);
         if (content == null || exact == null) {
@@ -2401,7 +2429,7 @@ public final class WindowScreen extends GuiChat
      * its field's list. A greyed item does nothing.
      */
     private void pressBar(WindowHover press, int button) {
-        PageTab page = press.frame == null ? null : press.frame.page;
+        OtherPage page = press.frame == null ? null : press.frame.page;
         PageContent content = WindowPages.contentOf(page);
         if (content == null) {
             return;
@@ -2431,7 +2459,7 @@ public final class WindowScreen extends GuiChat
     }
 
     /** A page bar's identity button pressed: the part that shows who the player is opens its menu there. */
-    private void pressIdentity(WindowFrame frame, PageTab page,
+    private void pressIdentity(WindowFrame frame, OtherPage page,
                                PageContent content) {
         LostTalesUiHitBox box = this.bar.identityBox(this.fontRendererObj,
                 frame, content);
@@ -2456,7 +2484,7 @@ public final class WindowScreen extends GuiChat
      * a new one takes the old one's place. Answers whether it was asked:
      * nothing opens while the page's window is not drawn.
      */
-    public boolean ask(PageTab page, String title, String detail,
+    public boolean ask(OtherPage page, String title, String detail,
                        String confirmLabel, Runnable action) {
         String key = page.id();
         SubWindow asking = this.subWindows.find(SubWindowKind.QUESTION, key);
@@ -2503,7 +2531,7 @@ public final class WindowScreen extends GuiChat
 
     /**
      * Something tried to change a locked window — a drag, a snap key, a
-     * cross, the {@code +}: it stays as it is, its padlock lights a
+     * cross, its split view: it stays as it is, its padlock lights a
      * moment, and a notice over its bar says how to change it.
      */
     void nudgeLock(Window window) {
@@ -2561,7 +2589,7 @@ public final class WindowScreen extends GuiChat
      * that kind and key already out comes forward with the content it
      * holds. Nothing opens while the page's window is not drawn.
      */
-    public SubWindow openOverPage(PageTab page, SubWindowKind kind, String key,
+    public SubWindow openOverPage(OtherPage page, SubWindowKind kind, String key,
                                   SubWindowContent content) {
         Window window = WindowLayout.windowOf(page);
         WindowFrame frame = window == null ? null
@@ -2586,7 +2614,7 @@ public final class WindowScreen extends GuiChat
      * Opens the search well over a page's window and gives it the keys:
      * the map's F, Find Location.
      */
-    public void openSearchFor(PageTab page) {
+    public void openSearchFor(OtherPage page) {
         Window window = WindowLayout.windowOf(page);
         if (window != null) {
             searchIn(window);
@@ -2778,7 +2806,7 @@ public final class WindowScreen extends GuiChat
                 return hover.stripOption != null ? hover.stripOption.tip()
                         : ToolStrip.tipFor(hover.stripPart, hover.window);
             case PAGE: {
-                PageTab page = hover.otherSide ? hover.frame.splitPage : hover.frame.page;
+                OtherPage page = hover.otherSide ? hover.frame.splitPage : hover.frame.page;
                 PageContent content = WindowPages.contentOf(page);
                 LostTalesUiHitBox exact = WindowDrawing.boxOfPage(hover.frame, page);
                 if (content == null || exact == null) {
@@ -2873,9 +2901,9 @@ public final class WindowScreen extends GuiChat
     /**
      * The words beside the pointer for what it rests on: a one-line popup
      * four pixels above the pointer, or below it where the screen's top
-     * is too near.
+     * is too near, at {@code share} of its strength as it fades in.
      */
-    private void drawHoverTip() {
+    private void drawHoverTip(float share) {
         List<String> lines = WindowStyle.tipLines(this.fontRendererObj,
                 this.hoverTip);
         int tipWidth = 0;
@@ -2890,7 +2918,7 @@ public final class WindowScreen extends GuiChat
         if (y < 2) {
             y = this.hoverTipY + 12;
         }
-        WindowStyle.drawPopupLines(this.fontRendererObj, lines, x, y, 1.0F);
+        WindowStyle.drawPopupLines(this.fontRendererObj, lines, x, y, share);
     }
 
     /* ---- Presses ---- */
@@ -2898,6 +2926,7 @@ public final class WindowScreen extends GuiChat
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         this.pressCount++;
+        this.tipTiming.pressed();
         // A new player's tip goes with a click anywhere, and the next
         // comes; the click does nothing else.
         if (firstTipFrame() != null && FirstTips.dismiss()) {
@@ -3237,7 +3266,7 @@ public final class WindowScreen extends GuiChat
                 // A press on a tab already in a group keeps the group:
                 // the drag it may start is the group's, and a press that
                 // never travels collapses it on the release instead.
-                List<WindowTab> group = WindowGestures.draggedGroup(window,
+                List<WindowPage> group = WindowGestures.draggedGroup(window,
                         hit.tab);
                 boolean kept = group.size() > 1;
                 // Everything the window holds — its only tab, or all of
@@ -3253,9 +3282,9 @@ public final class WindowScreen extends GuiChat
                     TabSelection.selectOnly(window.getId(), hit.tab);
                 }
                 selectTab(hit.tab);
-                if (hit.tab instanceof PageTab) {
+                if (hit.tab instanceof OtherPage) {
                     // A page pressed in its row takes the keys.
-                    focusPage((PageTab)hit.tab);
+                    focusPage((OtherPage)hit.tab);
                 }
                 if (window.isLocked()) {
                     // A locked window keeps its tabs where they are: the
@@ -3485,7 +3514,7 @@ public final class WindowScreen extends GuiChat
             released.content.released();
         }
         if (this.pressedPage != null && mouseButton == this.pressedPageButton) {
-            PageTab released = this.pressedPage;
+            OtherPage released = this.pressedPage;
             double[] at = onPressedPage(pointerX(), pointerY());
             this.pressedPage = null;
             if (at != null) {

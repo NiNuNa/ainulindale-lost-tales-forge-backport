@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.client.chat.ChatTab;
+import com.ninuna.losttales.client.chat.ConversationPage;
 import net.minecraft.client.Minecraft;
 import org.junit.Test;
 
@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
  */
 public final class TabMenusTest {
     /** A page with no choices of its own and no settings. */
-    private static final WindowTab BARE = new WindowTab() {
+    private static final WindowPage BARE = new WindowPage() {
         @Override
         public String id() {
             return "bare";
@@ -41,10 +41,10 @@ public final class TabMenusTest {
     @Test
     public void everyConversationOpensTheOneChatSettings() {
         assertEquals(Settings.Place.CHAT,
-                ChatTab.of(ChatChannel.GLOBAL).settingsPlace());
+                ConversationPage.of(ChatChannel.GLOBAL).settingsPlace());
         assertEquals(Settings.Place.CHAT,
-                ChatTab.of(ChatChannel.CLIENT_CONSOLE).settingsPlace());
-        assertTrue(TabMenus.hasRows(ChatTab.of(ChatChannel.GLOBAL)));
+                ConversationPage.of(ChatChannel.CLIENT_CONSOLE).settingsPlace());
+        assertTrue(TabMenus.hasRows(ConversationPage.of(ChatChannel.GLOBAL)));
     }
 
     @Test

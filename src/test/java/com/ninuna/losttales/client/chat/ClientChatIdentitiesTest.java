@@ -24,9 +24,9 @@ public final class ClientChatIdentitiesTest {
     private static final UUID ARAGORN = UUID.fromString("b0000000-0000-0000-0000-00000000000b");
     private static final UUID LEGOLAS = UUID.fromString("c0000000-0000-0000-0000-00000000000c");
 
-    private final ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-    private final ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
-    private final ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+    private final ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+    private final ConversationPage proximity = ConversationPage.of(ChatChannel.PROXIMITY);
+    private final ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
 
     @Before
     public void setUp() {
@@ -46,25 +46,25 @@ public final class ClientChatIdentitiesTest {
         ClientChatIdentities.select(identityOf(LEGOLAS));
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL,
                 ChatChannel.FACTION, ChatChannel.WHISPER}) {
-            ChatTab tab = channel == ChatChannel.WHISPER
-                    ? ChatTab.whisper("Steve", "Steve", LEGOLAS.toString()) : ChatTab.of(channel);
+            ConversationPage tab = channel == ChatChannel.WHISPER
+                    ? ConversationPage.whisper("Steve", "Steve", LEGOLAS.toString()) : ConversationPage.of(channel);
             assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(tab).characterId);
             assertEquals(LEGOLAS, ClientChatIdentities.wireCharacterId(tab));
         }
         // The world around the player and the fellowship hear the character played.
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.PROXIMITY, ChatChannel.FELLOWSHIP}) {
-            ChatTab tab = ChatTab.of(channel);
+            ConversationPage tab = ConversationPage.of(channel);
             assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(tab).characterId);
             assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT,
                     ClientChatIdentities.wireKind(tab));
             assertNull(ClientChatIdentities.wireCharacterId(tab));
         }
-        assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(ChatTab.npc("Guard")).characterId);
+        assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(ConversationPage.npc("Guard")).characterId);
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE}) {
-            assertTrue(ClientChatIdentities.effectiveFor(ChatTab.of(channel)).account);
+            assertTrue(ClientChatIdentities.effectiveFor(ConversationPage.of(channel)).account);
             assertEquals(LostTalesChatSendPacket.IDENTITY_ACCOUNT,
-                    ClientChatIdentities.wireKind(ChatTab.of(channel)));
-            assertNull(ClientChatIdentities.wireCharacterId(ChatTab.of(channel)));
+                    ClientChatIdentities.wireKind(ConversationPage.of(channel)));
+            assertNull(ClientChatIdentities.wireCharacterId(ConversationPage.of(channel)));
         }
         assertEquals(ARAGORN, ClientCharacterRosterCache.getSnapshot().getActiveCharacterId());
     }

@@ -24,6 +24,9 @@ public final class SubWindowKind {
     /** The few words one of a tab's options picks from: a conversation's Notifications. */
     public static final SubWindowKind PICK = register("pick",
             "gui.losttales.window.sub.pick");
+    /** A tab's split view: the pages that can stand beside it, or its split's rows. */
+    public static final SubWindowKind SPLIT = register("split",
+            "gui.losttales.window.sub.split");
     /** A window's own menu, behind the three dots at the end of its row. */
     public static final SubWindowKind WINDOW = register("window",
             "gui.losttales.window.sub.window");
@@ -42,6 +45,9 @@ public final class SubWindowKind {
     /** Every setting, in sections. */
     public static final SubWindowKind SETTINGS = register("settings",
             "gui.losttales.window.sub.settings");
+    /** The words a few-word setting picks from. */
+    public static final SubWindowKind SETTING_WORDS = register(
+            "setting_words", "gui.losttales.window.sub.setting_words");
     /** The field a number or a line of Settings is typed into. */
     public static final SubWindowKind SETTING_VALUE = register(
             "setting_value", "gui.losttales.window.sub.setting_value");

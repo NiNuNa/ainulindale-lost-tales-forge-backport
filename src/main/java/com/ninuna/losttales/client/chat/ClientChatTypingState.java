@@ -24,8 +24,8 @@ public final class ClientChatTypingState {
     static final long TTL_NANOS = 6000L * 1000000L;
     /** Names kept per tab; beyond this the oldest goes. */
     static final int MAX_NAMES_PER_TAB = 32;
-    private static final Map<ChatTab, LinkedHashMap<String, Long>> TYPING =
-            new HashMap<ChatTab, LinkedHashMap<String, Long>>();
+    private static final Map<ConversationPage, LinkedHashMap<String, Long>> TYPING =
+            new HashMap<ConversationPage, LinkedHashMap<String, Long>>();
 
     private ClientChatTypingState() {}
 
@@ -38,15 +38,15 @@ public final class ClientChatTypingState {
                 && !packet.getRecipientIdentity().equals(ClientChatIdentities.viewIdentityKey())) {
             return;
         }
-        ChatTab tab = packet.getChannel() == ChatChannel.WHISPER
-                ? ChatTab.whisper(packet.getPartner(), packet.getIdentityName(), packet.getRecipientIdentity())
-                : ChatTab.of(packet.getChannel(), packet.getScopeValue());
+        ConversationPage tab = packet.getChannel() == ChatChannel.WHISPER
+                ? ConversationPage.whisper(packet.getPartner(), packet.getIdentityName(), packet.getRecipientIdentity())
+                : ConversationPage.of(packet.getChannel(), packet.getScopeValue());
         if (!tab.isWhisper() && !ClientChatChannelState.isAvailable(tab)) { return; }
         apply(tab, packet.getIdentityName(), packet.isTyping(),
                 System.nanoTime());
     }
 
-    static synchronized void apply(ChatTab tab, String name, boolean typing,
+    static synchronized void apply(ConversationPage tab, String name, boolean typing,
                                    long nowNanos) {
         if (tab == null || name == null || name.trim().length() == 0) {
             return;
@@ -76,12 +76,12 @@ public final class ClientChatTypingState {
     }
 
     /** The names typing into the tab now, oldest first; never null. */
-    public static List<String> namesTyping(ChatTab tab) {
+    public static List<String> namesTyping(ConversationPage tab) {
         return namesTyping(tab, System.nanoTime());
     }
 
-    static synchronized List<String> namesTyping(ChatTab tab, long nowNanos) {
-        LinkedHashMap<String, Long> names = tab == null ? null : TYPING.get(ChatTab.viewed(tab));
+    static synchronized List<String> namesTyping(ConversationPage tab, long nowNanos) {
+        LinkedHashMap<String, Long> names = tab == null ? null : TYPING.get(ConversationPage.viewed(tab));
         if (names == null) {
             return Collections.emptyList();
         }
@@ -92,7 +92,7 @@ public final class ClientChatTypingState {
             }
         }
         if (names.isEmpty()) {
-            TYPING.remove(ChatTab.viewed(tab));
+            TYPING.remove(ConversationPage.viewed(tab));
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(
@@ -109,8 +109,8 @@ public final class ClientChatTypingState {
         if (name == null || name.length() == 0) {
             return false;
         }
-        for (Map.Entry<ChatTab, LinkedHashMap<String, Long>> entry : TYPING.entrySet()) {
-            ChatTab tab = entry.getKey();
+        for (Map.Entry<ConversationPage, LinkedHashMap<String, Long>> entry : TYPING.entrySet()) {
+            ConversationPage tab = entry.getKey();
             if (tab.isNpc() || !ChatRolePresentation.isInCharacter(tab.getChannel())) {
                 continue;
             }
@@ -124,8 +124,8 @@ public final class ClientChatTypingState {
 
     /** Whether anyone at all is typing into a roleplaying conversation. */
     public static synchronized boolean anyTypingInCharacter(long nowNanos) {
-        for (Map.Entry<ChatTab, LinkedHashMap<String, Long>> entry : TYPING.entrySet()) {
-            ChatTab tab = entry.getKey();
+        for (Map.Entry<ConversationPage, LinkedHashMap<String, Long>> entry : TYPING.entrySet()) {
+            ConversationPage tab = entry.getKey();
             if (tab.isNpc() || !ChatRolePresentation.isInCharacter(tab.getChannel())) {
                 continue;
             }

@@ -39,11 +39,11 @@ public final class ClientChatChannelViewsTest {
     public void aPlayersOwnLineIsReadOnceTheServerNamesIt() {
         ClientChatSession.resume("server:play.example");
         ClientChatReadMarks.markArrival("server:play.example", 4000L);
-        ChatTab fellowship = ChatTab.of(ChatChannel.FELLOWSHIP);
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ConversationPage fellowship = ConversationPage.of(ChatChannel.FELLOWSHIP);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         ClientChatChannelViews.noteOwnLine(fellowship, -7, 4200L);
         ClientChatChannelViews.record(-8, fellowship, global, false, 4200L, 1000L, true);
-        assertFalse(ClientChatChannelViews.hasUnread(ChatTab.of(ChatChannel.FELLOWSHIP)));
+        assertFalse(ClientChatChannelViews.hasUnread(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         ClientChatChannelViews.record(-9, fellowship, global, false, 4201L, 1000L, true);
         assertEquals(1, ClientChatChannelViews.unreadCount(ChatChannel.FELLOWSHIP));
     }
@@ -59,8 +59,8 @@ public final class ClientChatChannelViewsTest {
         ClientChatSession.resume("server:new.example");
         ClientChatChannelViews.noteArrival(700L);
         assertEquals(700L, ClientChatReadMarks.arrival("server:new.example"));
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
         for (int index = 0; index < 200; index++) {
             ClientChatChannelViews.record(-100 - index, global, console,
                     index % 10 == 0, 500L + index, 1000L, true);
@@ -68,7 +68,7 @@ public final class ClientChatChannelViewsTest {
         // Their own join line.
         ClientChatChannelViews.record(-399, global, console, false, 700L,
                 1000L, true);
-        assertFalse(ClientChatChannelViews.hasUnread(ChatTab.of(ChatChannel.GLOBAL)));
+        assertFalse(ClientChatChannelViews.hasUnread(ConversationPage.of(ChatChannel.GLOBAL)));
         assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.GLOBAL));
         // Said after they arrived, in a tab they are not looking at.
         ClientChatChannelViews.record(-400, global, console, false, 900L,
@@ -85,8 +85,8 @@ public final class ClientChatChannelViewsTest {
     public void aReturnVisitStillCountsWhatWasSaidWhileAway() {
         ClientChatSession.resume("server:known.example");
         ClientChatReadMarks.markArrival("server:known.example", 100L);
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
         ClientChatReadMarks.markRead("server:known.example", global, 500L);
         ClientChatChannelViews.record(-1, global, console, false, 500L,
                 1000L, true);
@@ -111,8 +111,8 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.noteArrival(900L);
         assertEquals(400L,
                 ClientChatReadMarks.arrival("server:return.example"));
-        ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ConversationPage proximity = ConversationPage.of(ChatChannel.PROXIMITY);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         ClientChatChannelViews.record(-1, proximity, global, false, 300L,
                 1000L, true);
         ClientChatChannelViews.record(-2, proximity, global, false, 500L,
@@ -124,7 +124,7 @@ public final class ClientChatChannelViewsTest {
         assertEquals(2,
                 ClientChatChannelViews.unreadCount(ChatChannel.PROXIMITY));
         assertTrue((ClientChatChannelViews.unreadPingCount(
-                ChatTab.of(ChatChannel.PROXIMITY)) > 0));
+                ConversationPage.of(ChatChannel.PROXIMITY)) > 0));
         assertEquals(Integer.valueOf(-2),
                 ClientChatChannelViews.unreadDividerLine(proximity));
     }
@@ -134,8 +134,8 @@ public final class ClientChatChannelViewsTest {
     public void aLiveLineInAnotherTabIsUnread() {
         ClientChatSession.resume("server:live.example");
         ClientChatChannelViews.noteArrival(100L);
-        ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ConversationPage proximity = ConversationPage.of(ChatChannel.PROXIMITY);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         ClientChatChannelViews.record(-1, proximity, global, false, 150L,
                 1000L, false);
         assertEquals(1,
@@ -152,10 +152,10 @@ public final class ClientChatChannelViewsTest {
 
     @Test
     public void viewsFilterByRecordedChannelAndKeepVanillaLines() {
-        ClientChatChannelViews.record(-10, ChatTab.of(ChatChannel.FELLOWSHIP),
-                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-        ClientChatChannelViews.record(-11, ChatTab.of(ChatChannel.GLOBAL),
-                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-10, ConversationPage.of(ChatChannel.FELLOWSHIP),
+                ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-11, ConversationPage.of(ChatChannel.GLOBAL),
+                ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         List<ChatLine> drawn = new ArrayList<ChatLine>();
         drawn.add(line(-11));
         drawn.add(line(0));
@@ -163,32 +163,32 @@ public final class ClientChatChannelViewsTest {
 
         // Vanilla lines (achievements, commands) belong to the console only.
         List<ChatLine> fellowship = ClientChatChannelViews.visibleLines(
-                drawn, ChatLineFilter.of(ChatTab.of(ChatChannel.FELLOWSHIP)));
+                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertEquals(1, fellowship.size());
         assertEquals(-10, fellowship.get(0).getChatLineID());
         List<ChatLine> all = ClientChatChannelViews.visibleLines(
-                drawn, ChatLineFilter.of(ChatTab.of(ChatChannel.GLOBAL)));
+                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.GLOBAL)));
         assertEquals(1, all.size());
         assertEquals(-11, all.get(0).getChatLineID());
         List<ChatLine> console = ClientChatChannelViews.visibleLines(
-                drawn, ChatLineFilter.of(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
         assertEquals(1, console.size());
         assertEquals(0, console.get(0).getChatLineID());
         // Same list, same head, same view: the cached instance is reused.
         assertSame(console, ClientChatChannelViews.visibleLines(
-                drawn, ChatLineFilter.of(ChatTab.of(ChatChannel.CLIENT_CONSOLE))));
+                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.CLIENT_CONSOLE))));
         assertNull(channelOf(0));
         assertEquals(ChatChannel.FELLOWSHIP, channelOf(-10));
     }
 
     @Test
     public void filtersCombineChannelsAndCarryUntrackedLinesWithTheConsole() {
-        ClientChatChannelViews.record(-10, ChatTab.of(ChatChannel.FELLOWSHIP),
-                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-        ClientChatChannelViews.record(-11, ChatTab.of(ChatChannel.GLOBAL),
-                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-        ClientChatChannelViews.record(-12, ChatTab.of(ChatChannel.OOC),
-                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-10, ConversationPage.of(ChatChannel.FELLOWSHIP),
+                ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-11, ConversationPage.of(ChatChannel.GLOBAL),
+                ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-12, ConversationPage.of(ChatChannel.OOC),
+                ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         List<ChatLine> drawn = new ArrayList<ChatLine>();
         drawn.add(line(-12));
         drawn.add(line(-11));
@@ -196,96 +196,96 @@ public final class ClientChatChannelViewsTest {
         drawn.add(line(-10));
 
         ChatLineFilter window = ChatLineFilter.of(java.util.Arrays.asList(
-                ChatTab.of(ChatChannel.GLOBAL), ChatTab.of(ChatChannel.FELLOWSHIP)), java.util.Collections.<ChatTab>emptySet());
+                ConversationPage.of(ChatChannel.GLOBAL), ConversationPage.of(ChatChannel.FELLOWSHIP)), java.util.Collections.<ConversationPage>emptySet());
         List<ChatLine> lines = ClientChatChannelViews.visibleLines(drawn, window);
         assertEquals(2, lines.size());
         assertEquals(-11, lines.get(0).getChatLineID());
         assertEquals(-10, lines.get(1).getChatLineID());
         assertSame(lines, ClientChatChannelViews.visibleLines(drawn,
                 ChatLineFilter.of(java.util.Arrays.asList(
-                        ChatTab.of(ChatChannel.FELLOWSHIP), ChatTab.of(ChatChannel.GLOBAL)), java.util.Collections.<ChatTab>emptySet())));
+                        ConversationPage.of(ChatChannel.FELLOWSHIP), ConversationPage.of(ChatChannel.GLOBAL)), java.util.Collections.<ConversationPage>emptySet())));
         // The console channel brings the untracked line with it.
         List<ChatLine> withConsole = ClientChatChannelViews.visibleLines(
                 drawn, ChatLineFilter.of(java.util.Arrays.asList(
-                        ChatTab.of(ChatChannel.OOC), ChatTab.of(ChatChannel.CLIENT_CONSOLE)), java.util.Collections.<ChatTab>emptySet()));
+                        ConversationPage.of(ChatChannel.OOC), ConversationPage.of(ChatChannel.CLIENT_CONSOLE)), java.util.Collections.<ConversationPage>emptySet()));
         assertEquals(2, withConsole.size());
         assertEquals(-12, withConsole.get(0).getChatLineID());
         assertEquals(0, withConsole.get(1).getChatLineID());
         assertTrue(ClientChatChannelViews.visibleLines(drawn,
-                ChatLineFilter.of(java.util.Collections.<ChatTab>emptyList(),
-                        java.util.Collections.<ChatTab>emptySet()))
+                ChatLineFilter.of(java.util.Collections.<ConversationPage>emptyList(),
+                        java.util.Collections.<ConversationPage>emptySet()))
                 .isEmpty());
-        assertTrue(ChatLineFilter.of(ChatTab.of(ChatChannel.CLIENT_CONSOLE)).accepts(null));
-        assertFalse(ChatLineFilter.of(ChatTab.of(ChatChannel.GLOBAL)).accepts(null));
+        assertTrue(ChatLineFilter.of(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)).accepts(null));
+        assertFalse(ChatLineFilter.of(ConversationPage.of(ChatChannel.GLOBAL)).accepts(null));
         // Separate filters keep separate cached results.
         assertEquals(1, ClientChatChannelViews.visibleLines(drawn,
-                ChatLineFilter.of(ChatTab.of(ChatChannel.OOC))).size());
+                ChatLineFilter.of(ConversationPage.of(ChatChannel.OOC))).size());
         assertEquals(2, ClientChatChannelViews.visibleLines(drawn, window)
                 .size());
     }
 
     @Test
     public void cacheInvalidatesWhenTheHeadOfHistoryChanges() {
-        ClientChatChannelViews.record(-1, ChatTab.of(ChatChannel.OOC),
-                ChatTab.of(ChatChannel.OOC), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-1, ConversationPage.of(ChatChannel.OOC),
+                ConversationPage.of(ChatChannel.OOC), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         List<ChatLine> drawn = new ArrayList<ChatLine>();
         drawn.add(line(-1));
         List<ChatLine> first = ClientChatChannelViews.visibleLines(
-                drawn, ChatLineFilter.of(ChatTab.of(ChatChannel.OOC)));
+                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.OOC)));
         assertEquals(1, first.size());
-        ClientChatChannelViews.record(-2, ChatTab.of(ChatChannel.OOC),
-                ChatTab.of(ChatChannel.OOC), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-2, ConversationPage.of(ChatChannel.OOC),
+                ConversationPage.of(ChatChannel.OOC), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         drawn.add(0, line(-2));
         List<ChatLine> second = ClientChatChannelViews.visibleLines(
-                drawn, ChatLineFilter.of(ChatTab.of(ChatChannel.OOC)));
+                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.OOC)));
         assertEquals(2, second.size());
         assertEquals(-2, second.get(0).getChatLineID());
     }
 
     @Test
     public void unreadCountersFollowTheSelectedChannel() {
-        ClientChatChannelViews.record(-1, ChatTab.of(ChatChannel.FELLOWSHIP),
-                ChatTab.of(ChatChannel.GLOBAL), true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-        ClientChatChannelViews.record(-2, ChatTab.of(ChatChannel.GLOBAL),
-                ChatTab.of(ChatChannel.GLOBAL), true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-        ClientChatChannelViews.record(-3, ChatTab.of(ChatChannel.FELLOWSHIP),
-                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-        assertTrue(ClientChatChannelViews.hasUnread(ChatTab.of(ChatChannel.FELLOWSHIP)));
+        ClientChatChannelViews.record(-1, ConversationPage.of(ChatChannel.FELLOWSHIP),
+                ConversationPage.of(ChatChannel.GLOBAL), true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-2, ConversationPage.of(ChatChannel.GLOBAL),
+                ConversationPage.of(ChatChannel.GLOBAL), true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-3, ConversationPage.of(ChatChannel.FELLOWSHIP),
+                ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        assertTrue(ClientChatChannelViews.hasUnread(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         // A ping is counted once, as a ping, never also as "other".
         assertEquals(1, ClientChatChannelViews.unreadPingCount(
-                ChatTab.of(ChatChannel.FELLOWSHIP)));
+                ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertEquals(1, ClientChatChannelViews.unreadOtherCount(
-                ChatTab.of(ChatChannel.FELLOWSHIP)));
+                ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.FELLOWSHIP));
-        assertTrue((ClientChatChannelViews.unreadPingCount(ChatTab.of(ChatChannel.FELLOWSHIP)) > 0));
+        assertTrue((ClientChatChannelViews.unreadPingCount(ConversationPage.of(ChatChannel.FELLOWSHIP)) > 0));
         // Lines arriving in the selected channel are read on arrival.
-        assertFalse(ClientChatChannelViews.hasUnread(ChatTab.of(ChatChannel.GLOBAL)));
+        assertFalse(ClientChatChannelViews.hasUnread(ConversationPage.of(ChatChannel.GLOBAL)));
         assertEquals(0, ClientChatChannelViews.unreadPingCount(
-                ChatTab.of(ChatChannel.GLOBAL)));
+                ConversationPage.of(ChatChannel.GLOBAL)));
         assertEquals(0, ClientChatChannelViews.unreadOtherCount(
-                ChatTab.of(ChatChannel.GLOBAL)));
-        ClientChatChannelViews.markViewed(ChatTab.of(ChatChannel.FELLOWSHIP));
-        assertFalse(ClientChatChannelViews.hasUnread(ChatTab.of(ChatChannel.FELLOWSHIP)));
+                ConversationPage.of(ChatChannel.GLOBAL)));
+        ClientChatChannelViews.markViewed(ConversationPage.of(ChatChannel.FELLOWSHIP));
+        assertFalse(ClientChatChannelViews.hasUnread(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertEquals(0, ClientChatChannelViews.unreadPingCount(
-                ChatTab.of(ChatChannel.FELLOWSHIP)));
+                ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertEquals(0, ClientChatChannelViews.unreadOtherCount(
-                ChatTab.of(ChatChannel.FELLOWSHIP)));
+                ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertFalse((ClientChatChannelViews.unreadPingCount(
-                ChatTab.of(ChatChannel.FELLOWSHIP)) > 0));
+                ConversationPage.of(ChatChannel.FELLOWSHIP)) > 0));
         for (int index = 0; index < 150; index++) {
-            ClientChatChannelViews.record(-10 - index, ChatTab.of(ChatChannel.OOC),
-                    ChatTab.of(ChatChannel.GLOBAL), index % 2 == 0, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+            ClientChatChannelViews.record(-10 - index, ConversationPage.of(ChatChannel.OOC),
+                    ConversationPage.of(ChatChannel.GLOBAL), index % 2 == 0, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         }
         assertEquals(75, ClientChatChannelViews.unreadPingCount(
-                ChatTab.of(ChatChannel.OOC)));
+                ConversationPage.of(ChatChannel.OOC)));
         assertEquals(75, ClientChatChannelViews.unreadOtherCount(
-                ChatTab.of(ChatChannel.OOC)));
+                ConversationPage.of(ChatChannel.OOC)));
         for (int index = 0; index < 150; index++) {
-            ClientChatChannelViews.record(-200 - index, ChatTab.of(ChatChannel.OOC),
-                    ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+            ClientChatChannelViews.record(-200 - index, ConversationPage.of(ChatChannel.OOC),
+                    ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         }
         assertEquals(ClientChatChannelViews.MAX_UNREAD + 1,
-                ClientChatChannelViews.unreadOtherCount(ChatTab.of(ChatChannel.OOC)));
+                ClientChatChannelViews.unreadOtherCount(ConversationPage.of(ChatChannel.OOC)));
         // The total shares the cap rather than summing past it.
         assertEquals(ClientChatChannelViews.MAX_UNREAD + 1,
                 ClientChatChannelViews.unreadCount(ChatChannel.OOC));
@@ -300,23 +300,23 @@ public final class ClientChatChannelViewsTest {
     public void closedChannelsAccumulateUnreadUntilRestoredAndViewed() {
         TwoWindowLayout.reset();
         try {
-            assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.FELLOWSHIP)));
-            ClientChatChannelViews.record(-1, ChatTab.of(ChatChannel.FELLOWSHIP),
-                    ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-            ClientChatChannelViews.record(-2, ChatTab.of(ChatChannel.FELLOWSHIP),
-                    ChatTab.of(ChatChannel.GLOBAL), true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-            ClientChatChannelViews.record(-3, ChatTab.of(ChatChannel.FELLOWSHIP),
-                    ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+            assertTrue(ChatLayout.close(ConversationPage.of(ChatChannel.FELLOWSHIP)));
+            ClientChatChannelViews.record(-1, ConversationPage.of(ChatChannel.FELLOWSHIP),
+                    ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+            ClientChatChannelViews.record(-2, ConversationPage.of(ChatChannel.FELLOWSHIP),
+                    ConversationPage.of(ChatChannel.GLOBAL), true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+            ClientChatChannelViews.record(-3, ConversationPage.of(ChatChannel.FELLOWSHIP),
+                    ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
             assertEquals(3, ClientChatChannelViews.unreadCount(
                     ChatChannel.FELLOWSHIP));
             // Closing and restoring touch no counter on their own.
             assertTrue(ChatLayoutViews.reopen(ChatChannel.FELLOWSHIP));
             assertEquals(3, ClientChatChannelViews.unreadCount(
                     ChatChannel.FELLOWSHIP));
-            assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.FELLOWSHIP)));
+            assertTrue(ChatLayout.close(ConversationPage.of(ChatChannel.FELLOWSHIP)));
             assertEquals(3, ClientChatChannelViews.unreadCount(
                     ChatChannel.FELLOWSHIP));
-            ClientChatChannelViews.markViewed(ChatTab.of(ChatChannel.FELLOWSHIP));
+            ClientChatChannelViews.markViewed(ConversationPage.of(ChatChannel.FELLOWSHIP));
             assertEquals(0, ClientChatChannelViews.unreadCount(
                     ChatChannel.FELLOWSHIP));
         } finally {
@@ -330,7 +330,7 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void scrollToPlacesTheViewAtALineAndClamps() {
-        ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
+        ConversationPage tab = ConversationPage.of(ChatChannel.GLOBAL);
         ClientChatChannelViews.scrollTo(tab, 12.0D, 30, 10.0D);
         assertEquals(12.0D, ClientChatChannelViews.getScroll(tab, 30, 10.0D),
                 0.0001D);
@@ -347,23 +347,23 @@ public final class ClientChatChannelViewsTest {
 
     @Test
     public void scrollIsPerChannelAndClamped() {
-        scroll(ChatTab.of(ChatChannel.GLOBAL), 7, 30, 10.0D);
+        scroll(ConversationPage.of(ChatChannel.GLOBAL), 7, 30, 10.0D);
         assertEquals(7.0D, ClientChatChannelViews.getScroll(
-                ChatTab.of(ChatChannel.GLOBAL), 30, 10.0D), 0.0D);
+                ConversationPage.of(ChatChannel.GLOBAL), 30, 10.0D), 0.0D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatTab.of(ChatChannel.OOC), 30, 10.0D), 0.0D);
-        scroll(ChatTab.of(ChatChannel.GLOBAL), 100, 30, 10.0D);
+                ConversationPage.of(ChatChannel.OOC), 30, 10.0D), 0.0D);
+        scroll(ConversationPage.of(ChatChannel.GLOBAL), 100, 30, 10.0D);
         assertEquals(20.0D, ClientChatChannelViews.getScroll(
-                ChatTab.of(ChatChannel.GLOBAL), 30, 10.0D), 0.0D);
-        scroll(ChatTab.of(ChatChannel.GLOBAL), -100, 32, 10.0D);
+                ConversationPage.of(ChatChannel.GLOBAL), 30, 10.0D), 0.0D);
+        scroll(ConversationPage.of(ChatChannel.GLOBAL), -100, 32, 10.0D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatTab.of(ChatChannel.GLOBAL), 32, 10.0D), 0.0D);
+                ConversationPage.of(ChatChannel.GLOBAL), 32, 10.0D), 0.0D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                (ChatTab)null, 32, 10.0D), 0.0D);
-        scroll(ChatTab.of(ChatChannel.GLOBAL), 5, 32, 10.0D);
+                (ConversationPage)null, 32, 10.0D), 0.0D);
+        scroll(ConversationPage.of(ChatChannel.GLOBAL), 5, 32, 10.0D);
         ClientChatChannelViews.clear();
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatTab.of(ChatChannel.GLOBAL), 32, 10.0D), 0.0D);
+                ConversationPage.of(ChatChannel.GLOBAL), 32, 10.0D), 0.0D);
     }
 
     /**
@@ -373,9 +373,9 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void theFarEndOfAScrollLeavesTheOldestLineWhole() {
-        scroll(ChatTab.of(ChatChannel.GLOBAL), 100, 30, 12.37D);
+        scroll(ConversationPage.of(ChatChannel.GLOBAL), 100, 30, 12.37D);
         assertEquals(30.0D - 12.37D, ClientChatChannelViews.getScroll(
-                ChatTab.of(ChatChannel.GLOBAL), 30, 12.37D), 1.0E-9D);
+                ConversationPage.of(ChatChannel.GLOBAL), 30, 12.37D), 1.0E-9D);
         ClientChatChannelViews.clear();
     }
 
@@ -385,12 +385,12 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void aViewThatFitsItsWindowDoesNotScroll() {
-        scroll(ChatTab.of(ChatChannel.GLOBAL), 100, 10, 10.0D);
+        scroll(ConversationPage.of(ChatChannel.GLOBAL), 100, 10, 10.0D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatTab.of(ChatChannel.GLOBAL), 10, 10.0D), 0.0D);
-        scroll(ChatTab.of(ChatChannel.GLOBAL), 100, 8, 12.5D);
+                ConversationPage.of(ChatChannel.GLOBAL), 10, 10.0D), 0.0D);
+        scroll(ConversationPage.of(ChatChannel.GLOBAL), 100, 8, 12.5D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatTab.of(ChatChannel.GLOBAL), 8, 12.5D), 0.0D);
+                ConversationPage.of(ChatChannel.GLOBAL), 8, 12.5D), 0.0D);
         ClientChatChannelViews.clear();
     }
 
@@ -401,8 +401,8 @@ public final class ClientChatChannelViewsTest {
         assertTrue(bound >= LostTalesChatHistoryHooks.capacity());
         int recorded = bound + 150;
         for (int index = 0; index < recorded; index++) {
-            ClientChatChannelViews.record(-index - 1, ChatTab.of(ChatChannel.GLOBAL),
-                    ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+            ClientChatChannelViews.record(-index - 1, ConversationPage.of(ChatChannel.GLOBAL),
+                    ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         }
         // The newest `bound` lines keep their tab; every older one is let go.
         assertNull(channelOf(-1));
@@ -413,14 +413,14 @@ public final class ClientChatChannelViewsTest {
     }
 
     /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
-    private static void scroll(ChatTab tab, int lines, int totalLines, double roomLines) {
+    private static void scroll(ConversationPage tab, int lines, int totalLines, double roomLines) {
         double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
         ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
     }
 
     /** The recorded line's channel, or null for vanilla and untracked lines. */
     private static ChatChannel channelOf(int chatLineId) {
-        ChatTab tab = ClientChatChannelViews.tabOf(chatLineId);
+        ConversationPage tab = ClientChatChannelViews.tabOf(chatLineId);
         return tab == null ? null : tab.getChannel();
     }
 }

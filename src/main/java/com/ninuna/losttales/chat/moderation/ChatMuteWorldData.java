@@ -159,13 +159,27 @@ public final class ChatMuteWorldData extends WorldSavedData {
      */
     public synchronized ChatMuteEntry unmuteByName(String accountName) {
         ensureWritable();
+        ChatMuteEntry found = findByName(accountName);
+        return found == null ? null : unmute(found.getAccountId());
+    }
+
+    /** The mute stored for an account, running or not; null for none. Nothing is lifted. */
+    public synchronized ChatMuteEntry find(UUID accountId) {
+        return accountId == null ? null : this.mutesByAccount.get(accountId);
+    }
+
+    /**
+     * The mute of the account last known by this name, case-insensitive;
+     * null when no stored mute carries the name. Nothing is lifted.
+     */
+    public synchronized ChatMuteEntry findByName(String accountName) {
         String wanted = accountName == null ? "" : accountName.trim();
         if (wanted.length() == 0) {
             return null;
         }
         for (ChatMuteEntry mute : this.mutesByAccount.values()) {
             if (wanted.equalsIgnoreCase(mute.getAccountName())) {
-                return unmute(mute.getAccountId());
+                return mute;
             }
         }
         return null;

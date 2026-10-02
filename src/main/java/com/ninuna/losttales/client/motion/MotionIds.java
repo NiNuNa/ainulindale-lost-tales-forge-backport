@@ -17,6 +17,8 @@ public final class MotionIds {
     public static final String UI_BUTTON_SNAP = "ui.button.snap";
     /** A control crossing to its lit artwork and back. */
     public static final String UI_BUTTON_LIT = "ui.button.lit";
+    /** A tip beside the pointer: the rests before it shows, and its fade. */
+    public static final String UI_TIP_SHOW = "ui.tip.show";
 
     /* ---- chat ---- */
 
@@ -109,7 +111,7 @@ public final class MotionIds {
     public static final String SCREEN_JOURNAL_SCROLL = "screen.journal.scroll";
     /** A quest conversation's replies gliding to the chosen one. */
     public static final String SCREEN_DIALOGUE_GLIDE = "screen.dialogue.glide";
-    /** The Characters tab's roster and profile gliding to where they were scrolled, and its figure to its zoom. */
+    /** The Characters page's roster and profile gliding to where they were scrolled, and its figure to its zoom. */
     public static final String SCREEN_CHARACTERS_GLIDE = "screen.characters.glide";
 
     /* ---- map ---- */

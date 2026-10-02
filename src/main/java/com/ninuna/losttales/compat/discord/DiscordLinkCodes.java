@@ -38,7 +38,7 @@ public final class DiscordLinkCodes {
         public final DiscordBridgeDirection direction;
         /** The account that asked; null for the server's own console. */
         public final UUID issuer;
-        /** The name of whoever asked, as the Server Console names them. */
+        /** The name of whoever asked, as the Server Log names them. */
         public final String issuerName;
         final long expiresMillis;
 

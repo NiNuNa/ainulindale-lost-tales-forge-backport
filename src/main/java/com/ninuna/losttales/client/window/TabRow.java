@@ -50,10 +50,9 @@ import org.lwjgl.opengl.GL11;
  * where its room ends — resting the pointer on such a tab slides the
  * name along to show the rest — and its buttons go at fixed shares of
  * the full width, every tab's at once since every tab is one width: the
- * draft mark under two thirds, the cross under a third. A tab's options,
- * settings and help are on the tool strip under the row. A button fades
- * as it goes
- * while the name glides into its room,
+ * draft mark under two thirds, the options' three dots under a half, the
+ * cross under a third. A button fades as it goes while the name glides
+ * into its room,
  * so nothing jumps. The tab in front keeps its cross throughout; its
  * icon and name are cut short before it like any name, so the cross
  * ends where the icon stood. The row's other controls stand at its two ends:
@@ -379,14 +378,14 @@ public final class TabRow {
             LostTalesColors.rgb(LostTalesColors.IVORY);
 
     private List<Tab> cachedTabs = Collections.emptyList();
-    private List<WindowTab> cachedChannels = Collections.emptyList();
-    private WindowTab cachedSelected;
-    private final Map<WindowTab, String> cachedLabels =
-            new HashMap<WindowTab, String>();
-    private final Map<WindowTab, Boolean> cachedDraft =
-            new HashMap<WindowTab, Boolean>();
-    private final Map<WindowTab, Boolean> cachedMuted =
-            new HashMap<WindowTab, Boolean>();
+    private List<WindowPage> cachedChannels = Collections.emptyList();
+    private WindowPage cachedSelected;
+    private final Map<WindowPage, String> cachedLabels =
+            new HashMap<WindowPage, String>();
+    private final Map<WindowPage, Boolean> cachedDraft =
+            new HashMap<WindowPage, Boolean>();
+    private final Map<WindowPage, Boolean> cachedMuted =
+            new HashMap<WindowPage, Boolean>();
     private FontRenderer cachedFont;
     /** The end lock's swing; one row, one lock, one state. */
     private final LockAnimation lockAnimation = new LockAnimation();
@@ -408,7 +407,7 @@ public final class TabRow {
     /** Whether the row being drawn is a locked window's ({@link Row#locked}). */
     private boolean locked;
     /** The tab whose options are out in the row being drawn; its dots rest lit. */
-    private WindowTab optionsOpen;
+    private WindowPage optionsOpen;
     /** What waits in the channels the {@code +} would open, marked after it. */
     private TabMark restoreMark = TabMark.NONE;
     /** Width of the restore control together with its mark. */
@@ -422,18 +421,13 @@ public final class TabRow {
     /** The reorder memory of the drag this row is carrying, and the tab
      *  it belongs to; a new drag starts it afresh. */
     private final ReorderLatch reorderLatch = new ReorderLatch();
-    private WindowTab reorderOwner;
+    private WindowPage reorderOwner;
     /** Limit the tabs may not cross; the end controls begin here. */
     private int tabsLimit = Integer.MAX_VALUE;
 
     /** The search control's chevron: one run, one open/closed state. */
     private final IconFlipbook searchChevron =
             new IconFlipbook(SEARCH_FRAMES, SEARCH_FRAMES_HOVER);
-    /**
-     * How far each of the row's own controls has crossed to its hovered
-     * artwork. A control the pointer leaves crosses back the same way,
-     * so nothing in the strip ever swaps in one frame.
-     */
     /**
      * How each of the strip's buttons answers the pointer: its crossing
      * to the lit artwork and the place it is drawn. One per button, since
@@ -514,7 +508,7 @@ public final class TabRow {
      */
     private double heldWidth = Double.NaN;
     /** The tabs the hand carried last frame, to see them put down. */
-    private List<WindowTab> carriedLastFrame = Collections.emptyList();
+    private List<WindowPage> carriedLastFrame = Collections.emptyList();
     /** When the row was last drawn. */
     private long lastFrameNanos;
     /** Whether the row is showing the restore control at all. */
@@ -552,9 +546,9 @@ public final class TabRow {
 
     public static final class Hit {
         public final HitKind kind;
-        public final WindowTab tab;
+        public final WindowPage tab;
 
-        Hit(HitKind kind, WindowTab tab) {
+        Hit(HitKind kind, WindowPage tab) {
             this.kind = kind;
             this.tab = tab;
         }
@@ -562,16 +556,16 @@ public final class TabRow {
 
     /** The per-frame inputs of one window's row, filled by the screen. */
     public static final class Row {
-        public List<WindowTab> tabs = Collections.emptyList();
-        public WindowTab selected;
+        public List<WindowPage> tabs = Collections.emptyList();
+        public WindowPage selected;
         /**
          * The other page of the split shown, beside the one in front: it
          * stands forward with it, the two as one tab, while only the one
          * in front wears its colour. Null while the window shows one page.
          */
-        public WindowTab splitPartner;
+        public WindowPage splitPartner;
         /** Tabs marked in this row; the selected one need not be among them. */
-        public List<WindowTab> marked = Collections.emptyList();
+        public List<WindowPage> marked = Collections.emptyList();
         /** Resting left edge of the first tab, screen space. */
         public int left;
         /** Right limit the row may not cross, screen space. */
@@ -636,7 +630,7 @@ public final class TabRow {
         /** Whether this row's restore list is open right now. */
         public boolean restoreOpen;
         /** The tab of this row whose options are out right now; null for none. */
-        public WindowTab optionsOpen;
+        public WindowPage optionsOpen;
         /** What waits unread in the closed channels, marked after the +. */
         public TabMark closedMark = TabMark.NONE;
         /** Whether this window is the one being dragged right now. */
@@ -647,7 +641,7 @@ public final class TabRow {
          * leaving the strip: a tab under the hand is still one of the
          * row's tabs until it is carried clear of it altogether.
          */
-        public WindowTab dragging;
+        public WindowPage dragging;
         /**
          * Every tab travelling with it, in row order, {@link #dragging}
          * among them. A marked group is carried as one long tab: the
@@ -655,7 +649,7 @@ public final class TabRow {
          * against it, so the run leans, swaps and stops as a single
          * thing rather than as one tab with strays following it.
          */
-        public List<WindowTab> draggedGroup = Collections.emptyList();
+        public List<WindowPage> draggedGroup = Collections.emptyList();
         /** Where the dragged tab's left edge follows the pointer, in whole pixels. */
         public int draggedLeft = Integer.MIN_VALUE;
         /**
@@ -1092,8 +1086,8 @@ public final class TabRow {
                 drawEndControl(
                         row.restoreOpen ? LostTalesUiSheet.MINUS
                                 : LostTalesUiSheet.PLUS,
-                        row.restoreOpen ? LostTalesUiSheet.MINUS_HOVER
-                                : LostTalesUiSheet.PLUS_HOVER,
+                        row.restoreOpen ? LostTalesUiSheet.MINUS_LIT
+                                : LostTalesUiSheet.PLUS_LIT,
                         step(this.restoreMotion, hovered, HitKind.RESTORE),
                         row.offsetX + this.restoreX, bottom, false);
                 if (!this.restoreMark.isNone()) {
@@ -2226,7 +2220,7 @@ public final class TabRow {
         this.frameElapsed = elapsed;
         this.frameNanos = now;
         measureRun(tabs, row);
-        List<WindowTab> carried = carriedTabs(tabs, row);
+        List<WindowPage> carried = carriedTabs(tabs, row);
         boolean immediate = !Motions.enabled() || row.resizing
                 || row.gliding;
         double step = displayStep();
@@ -2384,7 +2378,7 @@ public final class TabRow {
     }
 
     /** Whether a tab stands forward: the one in front, and the other half of the split it shows. */
-    static boolean isForward(Row row, WindowTab tab) {
+    static boolean isForward(Row row, WindowPage tab) {
         return tab.equals(row.selected) || tab.equals(row.splitPartner);
     }
 
@@ -2402,17 +2396,17 @@ public final class TabRow {
     }
 
     /** The row's tabs the hand is carrying, in row order. */
-    private static List<WindowTab> carriedTabs(List<Tab> tabs, Row row) {
-        List<WindowTab> carried = null;
+    private static List<WindowPage> carriedTabs(List<Tab> tabs, Row row) {
+        List<WindowPage> carried = null;
         for (int index = 0; index < tabs.size(); index++) {
             if (isCarried(row, tabs.get(index).tab)) {
                 if (carried == null) {
-                    carried = new ArrayList<WindowTab>(2);
+                    carried = new ArrayList<WindowPage>(2);
                 }
                 carried.add(tabs.get(index).tab);
             }
         }
-        return carried == null ? Collections.<WindowTab>emptyList() : carried;
+        return carried == null ? Collections.<WindowPage>emptyList() : carried;
     }
 
     /** The row's tabs with the closed ones still shrinking away, those first. */
@@ -2498,7 +2492,7 @@ public final class TabRow {
     }
 
     /** Whether a tab is one of those the hand is carrying. */
-    private static boolean isCarried(Row row, WindowTab tab) {
+    private static boolean isCarried(Row row, WindowPage tab) {
         return tab != null && row.draggedLeft != Integer.MIN_VALUE
                 && (tab.equals(row.dragging)
                         || row.draggedGroup.contains(tab));
@@ -2699,7 +2693,7 @@ public final class TabRow {
      * straight back, live in {@link #reorderSlot}; here the row is only
      * turned into the rest positions that rule reads.</p>
      */
-    int slideIndexAt(FontRenderer font, Row row, List<WindowTab> group) {
+    int slideIndexAt(FontRenderer font, Row row, List<WindowPage> group) {
         List<Tab> tabs = layout(font, row);
         measureRun(tabs, row);
         boolean holdsDragged = false;
@@ -2852,7 +2846,7 @@ public final class TabRow {
     }
 
     /** The place the dragged run holds now: the tabs left before it. */
-    private static int heldBefore(List<Tab> tabs, List<WindowTab> group) {
+    private static int heldBefore(List<Tab> tabs, List<WindowPage> group) {
         int slot = 0;
         for (int index = 0; index < tabs.size(); index++) {
             if (group.contains(tabs.get(index).tab)) {
@@ -3169,7 +3163,7 @@ public final class TabRow {
         if (isLayoutCurrent(font, row, showClose)) {
             return this.cachedTabs;
         }
-        List<WindowTab> channels = row.tabs;
+        List<WindowPage> channels = row.tabs;
         int count = channels.size();
         TabMark restoreMark = row.showRestore ? row.closedMark
                 : TabMark.NONE;
@@ -3244,7 +3238,7 @@ public final class TabRow {
         double cursor = row.left + SEARCH_RUN;
         for (int index = first; index <= last; index++) {
             int x = (int)Math.round(cursor);
-            WindowTab channel = channels.get(index);
+            WindowPage channel = channels.get(index);
             boolean selected = channel.equals(row.selected);
             // The whole name, drawn into the room the row gives it and
             // cut where that room ends: a narrowing tab shows a little
@@ -3382,7 +3376,7 @@ public final class TabRow {
         controlX += DIVIDER_WIDTH + END_CONTROL_GAP;
         this.controlsRight = controlX;
         this.cachedTabs = Collections.unmodifiableList(tabs);
-        this.cachedChannels = new ArrayList<WindowTab>(channels);
+        this.cachedChannels = new ArrayList<WindowPage>(channels);
         this.cachedSelected = row.selected;
         this.cachedFont = font;
         this.cachedLeft = row.left;
@@ -3408,7 +3402,7 @@ public final class TabRow {
     }
 
     /** The widest {@link #minimumTabWidth} among the run's tabs. */
-    private static int narrowestTabWidth(List<WindowTab> channels, int first,
+    private static int narrowestTabWidth(List<WindowPage> channels, int first,
                                          int last) {
         int narrowest = 0;
         for (int index = first; index <= last; index++) {
@@ -3513,7 +3507,7 @@ public final class TabRow {
      * gone. What a row counts each tab at when asked whether one more
      * fits.
      */
-    static int minimumTabWidth(WindowTab tab) {
+    static int minimumTabWidth(WindowPage tab) {
         int icon = tab.hasIcon() ? TabIcons.SLOT : 0;
         return PADDING_X * 2 + Math.max(icon, CONTROL_SIZE);
     }
@@ -3532,7 +3526,7 @@ public final class TabRow {
     }
 
     /** The tab of a list that stands for {@code channel}, or null. */
-    private static Tab find(List<Tab> tabs, WindowTab channel) {
+    private static Tab find(List<Tab> tabs, WindowPage channel) {
         for (int index = 0; index < tabs.size(); index++) {
             if (tabs.get(index).tab.equals(channel)) {
                 return tabs.get(index);
@@ -3542,12 +3536,8 @@ public final class TabRow {
     }
 
     /** Room the tab's icon and its mark take before the label, with its gap. */
-    private static int iconWidth(WindowTab tab) {
+    private static int iconWidth(WindowPage tab) {
         return tab.hasIcon() ? TabIcons.SLOT + TabIcons.GAP : 0;
-    }
-
-    private static int controlsWidth(boolean showClose) {
-        return showClose ? CONTROL_GAP + CONTROL_SIZE : 0;
     }
 
     /**
@@ -3600,7 +3590,7 @@ public final class TabRow {
                 || window == null) {
             return 0;
         }
-        List<WindowTab> tabs = WindowFrame.visibleTabs(window);
+        List<WindowPage> tabs = WindowFrame.visibleTabs(window);
         if (tabs.isEmpty()) {
             return 0;
         }
@@ -3611,7 +3601,7 @@ public final class TabRow {
     }
 
     /** {@link #reservedRowWidth(int[])} over the tabs themselves. */
-    private static int reservedRowWidth(List<WindowTab> tabs) {
+    private static int reservedRowWidth(List<WindowPage> tabs) {
         int[] minimum = new int[tabs.size()];
         for (int index = 0; index < tabs.size(); index++) {
             minimum[index] = minimumTabWidth(tabs.get(index));
@@ -3633,7 +3623,7 @@ public final class TabRow {
                 && row.closedMark.equals(this.restoreMark)
                 && row.tabs.equals(this.cachedChannels);
         for (int index = 0; index < row.tabs.size(); index++) {
-            WindowTab tab = row.tabs.get(index);
+            WindowPage tab = row.tabs.get(index);
             String label = tab.title();
             boolean muted = tab.isMuted();
             boolean draft = tab.hasDraft();
@@ -3672,14 +3662,14 @@ public final class TabRow {
      * usable headlessly.
      */
     static boolean rowHasRoomFor(Minecraft minecraft, Window window,
-                                 List<? extends WindowTab> candidates) {
+                                 List<? extends WindowPage> candidates) {
         if (minecraft == null || minecraft.fontRenderer == null
                 || window == null || candidates == null) {
             return true;
         }
-        List<WindowTab> tabs = new ArrayList<WindowTab>(
+        List<WindowPage> tabs = new ArrayList<WindowPage>(
                 WindowFrame.visibleTabs(window));
-        for (WindowTab candidate : candidates) {
+        for (WindowPage candidate : candidates) {
             if (candidate != null && !tabs.contains(candidate)) {
                 tabs.add(candidate);
             }
@@ -3704,7 +3694,7 @@ public final class TabRow {
     }
 
     static final class Tab {
-        final WindowTab tab;
+        final WindowPage tab;
         /** The tab's index in the row's full list; a trimmed run skips some. */
         final int rowIndex;
         /** Whether the tab shows an icon before the label. */
@@ -3789,7 +3779,7 @@ public final class TabRow {
         /** Whether the tab's lines are kept out of the closed feed. */
         final boolean muted;
 
-        Tab(WindowTab tab, int rowIndex, boolean icon, String label,
+        Tab(WindowPage tab, int rowIndex, boolean icon, String label,
             int labelWidth, boolean draft, int x, int width,
             int closeX, int optionsX, int draftX, boolean muted) {
             this.tab = tab;

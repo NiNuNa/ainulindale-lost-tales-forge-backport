@@ -3,7 +3,7 @@ package com.ninuna.losttales.client.window;
 /**
  * The four tips a new player's first opening of the chat shows, one
  * after another: the padlock, which holds a window as it is until it is
- * unlocked; the {@code +}, where closed channels, direct messages and
+ * unlocked; the {@code +}, where closed channels, whispers and
  * other pages wait; the head button, which picks who speaks; and Ctrl+K,
  * the quick switcher. A click anywhere takes the tip showing away and
  * brings the next; once the last has gone none shows again, which the

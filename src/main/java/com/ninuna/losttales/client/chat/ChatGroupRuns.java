@@ -73,7 +73,7 @@ final class ChatGroupRuns {
      * would not name — but still opens a run the messages after it may
      * join.
      */
-    static synchronized void remember(int chatLineId, ChatTab tab,
+    static synchronized void remember(int chatLineId, ConversationPage tab,
                                       UUID senderId, String identityName,
                                       boolean accountLine,
                                       long timestampMillis,
@@ -88,7 +88,7 @@ final class ChatGroupRuns {
         // place to the reader, and a line filed under one — this
         // player's own echo, a command's echo — must run on with lines
         // filed under the other.
-        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(ChatTab.viewed(tab),
+        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(ConversationPage.viewed(tab),
                 senderId, identityName, accountLine, timestampMillis,
                 groupable, groupedLine));
         while (ENTRIES.size() > ClientChatChannelViews.maxTrackedLines()) {
@@ -211,7 +211,7 @@ final class ChatGroupRuns {
 
     /** One printed message's sender identity and its grouped line. */
     static final class Entry {
-        final ChatTab tab;
+        final ConversationPage tab;
         final UUID senderId;
         final String identityName;
         final boolean accountLine;
@@ -221,7 +221,7 @@ final class ChatGroupRuns {
         /** The line without its repeated header; a view picks between the two. */
         final IChatComponent groupedLine;
 
-        private Entry(ChatTab tab, UUID senderId, String identityName,
+        private Entry(ConversationPage tab, UUID senderId, String identityName,
                       boolean accountLine, long timestampMillis,
                       boolean groupable, IChatComponent groupedLine) {
             this.groupable = groupable;

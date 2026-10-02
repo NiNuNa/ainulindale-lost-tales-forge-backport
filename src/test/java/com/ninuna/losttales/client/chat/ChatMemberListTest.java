@@ -171,7 +171,7 @@ public final class ChatMemberListTest {
 
     @Test
     public void anNpcStandsInItsConversationsListBesideThePlayer() {
-        ChatTab conversation = ChatTab.npc("Barliman");
+        ConversationPage conversation = ConversationPage.npc("Barliman");
         UUID npcId = UUID.randomUUID();
         try {
             ChatChannelIcons.rememberNpc(conversation, npcId, "lotr:barliman");
@@ -191,7 +191,7 @@ public final class ChatMemberListTest {
             // Anywhere else, the answer is the list.
             List<LostTalesChatMembersPacket.Member> answered = Arrays.asList(me);
             assertTrue(answered == ChatMemberList.membersOf(
-                    ChatTab.of(ChatChannel.GLOBAL), answered));
+                    ConversationPage.of(ChatChannel.GLOBAL), answered));
         } finally {
             ChatChannelIcons.forgetPortraits();
         }

@@ -43,15 +43,15 @@ public final class BarLead {
     /** Who the player is on a tab, for its identity button: the screen asks its parts. */
     public interface Voice {
         /** The face the tab's identity button shows; null while there is nobody to show. */
-        Face faceFor(WindowTab tab);
+        Face faceFor(WindowPage tab);
 
         /** Whether the button's menu is out for the tab: the button rests lit. */
-        boolean menuOutFor(WindowTab tab);
+        boolean menuOutFor(WindowPage tab);
     }
 
     /** The pair laid out on one bar: what is drawn, and what answers the pointer. */
     public static final class Fit {
-        public final WindowTab tab;
+        public final WindowPage tab;
         public final String label;
         /** Left edge of the tab's icon; -1 for a tab without one. */
         public final int iconLeft;
@@ -67,7 +67,7 @@ public final class BarLead {
         /** Just past the identity button's frame. */
         public final int right;
 
-        Fit(WindowTab tab, String label, int iconLeft, int labelLeft,
+        Fit(WindowPage tab, String label, int iconLeft, int labelLeft,
             int labelWidth, int labelRoom, int frameLeft, int frameRight) {
             this.tab = tab;
             this.label = label;
@@ -114,13 +114,13 @@ public final class BarLead {
     /* ---- The layout ---- */
 
     /** The widest the pair is: the tab's whole name showing. */
-    public static int wholeWidth(WindowTab tab, WindowBar.Measure measure) {
+    public static int wholeWidth(WindowPage tab, WindowBar.Measure measure) {
         return tabFrameWidth(tab, measure, Integer.MAX_VALUE) + BUTTON_GAP
                 + IDENTITY_SIZE;
     }
 
     /** The narrowest the pair is: the tab's icon alone, or its whole name without an icon. */
-    public static int leastWidth(WindowTab tab, WindowBar.Measure measure) {
+    public static int leastWidth(WindowPage tab, WindowBar.Measure measure) {
         return tabFrameWidth(tab, measure, 0) + BUTTON_GAP + IDENTITY_SIZE;
     }
 
@@ -128,7 +128,7 @@ public final class BarLead {
      * The pair laid from {@code left}, {@code width} wide at most and
      * never under {@link #leastWidth}: the tab's name cut at the room left.
      */
-    public static Fit fit(WindowTab tab, int left, int width,
+    public static Fit fit(WindowPage tab, int left, int width,
                           WindowBar.Measure measure) {
         String label = tab == null ? "" : tab.title();
         boolean icon = tab != null && tab.hasIcon();
@@ -153,7 +153,7 @@ public final class BarLead {
      * round the icon, the gap and the name, whose last column is spacing
      * rather than ink; cut down to the icon alone where the room is short.
      */
-    private static int tabFrameWidth(WindowTab tab, WindowBar.Measure measure,
+    private static int tabFrameWidth(WindowPage tab, WindowBar.Measure measure,
                                      int room) {
         boolean icon = tab != null && tab.hasIcon();
         int labelWidth = tab == null ? 0 : measure.width(tab.title());

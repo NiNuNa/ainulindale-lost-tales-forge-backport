@@ -80,7 +80,7 @@ public final class ClientChatReadMarks {
      * The newest message this account was shown in the view on that
      * server, or {@link ChatMessageIds#NONE} for a view never read there.
      */
-    static synchronized long lastRead(String serverKey, ChatTab view) {
+    static synchronized long lastRead(String serverKey, ConversationPage view) {
         String key = key(serverKey, view);
         if (key == null) {
             return ChatMessageIds.NONE;
@@ -94,7 +94,7 @@ public final class ClientChatReadMarks {
      * a mark never moves back, and an id the server never gave moves
      * nothing.
      */
-    static synchronized void markRead(String serverKey, ChatTab view,
+    static synchronized void markRead(String serverKey, ConversationPage view,
                                       long messageId) {
         String key = key(serverKey, view);
         if (key == null || !ChatMessageIds.isServerId(messageId)) {
@@ -205,11 +205,11 @@ public final class ClientChatReadMarks {
         }
     }
 
-    private static String key(String serverKey, ChatTab view) {
+    private static String key(String serverKey, ConversationPage view) {
         if (serverKey == null || serverKey.length() == 0 || view == null) {
             return null;
         }
-        String viewId = ChatTab.viewed(view).id();
+        String viewId = ConversationPage.viewed(view).id();
         if (viewId.indexOf(SEPARATOR) >= 0
                 || serverKey.indexOf(SEPARATOR) >= 0) {
             return null;

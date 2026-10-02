@@ -110,8 +110,8 @@ public final class WindowSplitTest {
 
     @Test
     public void aConversationGoesOnlySideBySide() {
-        PageTab page = WindowPages.tab(PAGE);
-        PageTab other = WindowPages.tab(OTHER_PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
+        OtherPage other = WindowPages.tab(OTHER_PAGE);
         assertTrue(SplitDrop.takes(page, other, SplitDrop.TOP));
         assertTrue(SplitDrop.takes(this.a, page, SplitDrop.LEFT));
         assertTrue(SplitDrop.takes(page, this.a, SplitDrop.RIGHT));
@@ -126,8 +126,8 @@ public final class WindowSplitTest {
         WindowSplit across = new WindowSplit(this.a, this.b, false, 0.5D);
         assertTrue(WindowDrawing.shows(across, this.a));
         assertFalse(WindowDrawing.shows(across.turned(true), this.a));
-        PageTab page = WindowPages.tab(PAGE);
-        PageTab other = WindowPages.tab(OTHER_PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
+        OtherPage other = WindowPages.tab(OTHER_PAGE);
         assertTrue("two pages either way",
                 WindowDrawing.shows(new WindowSplit(page, other, true, 0.5D), page));
     }
@@ -166,11 +166,11 @@ public final class WindowSplitTest {
     public void bothPagesTornOffCarryTheSplit() {
         Unlocking.of(WindowLayout.addWindow(row(this.a, this.b, this.c), this.a));
         WindowLayout.split(this.a, this.b);
-        Window torn = Tearing.off(Arrays.<WindowTab>asList(this.a, this.b), 20.0D, 20.0D);
+        Window torn = Tearing.off(Arrays.<WindowPage>asList(this.a, this.b), 20.0D, 20.0D);
         assertNotNull(torn);
         assertNotNull(torn.splitOf(this.a));
         Window rest = WindowLayout.windowOf(this.c);
-        assertTrue(rest.getSplits().isEmpty());
+        assertTrue(rest.splits().isEmpty());
     }
 
     @Test
@@ -179,8 +179,8 @@ public final class WindowSplitTest {
         Window other = Unlocking.of(WindowLayout.addWindow(row(this.d), this.d));
         WindowLayout.split(this.a, this.b);
         assertTrue(WindowLayout.moveTab(this.b, other.getId(), 1));
-        assertTrue(window.getSplits().isEmpty());
-        assertTrue(other.getSplits().isEmpty());
+        assertTrue(window.splits().isEmpty());
+        assertTrue(other.splits().isEmpty());
     }
 
     @Test
@@ -203,24 +203,24 @@ public final class WindowSplitTest {
         assertEquals(row(this.b, this.a), window.getTabs());
         assertSame(this.b, window.splitOf(this.a).first());
         assertTrue(WindowLayout.separate(this.a));
-        assertTrue(window.getSplits().isEmpty());
+        assertTrue(window.splits().isEmpty());
         assertEquals("the pages stay side by side", row(this.b, this.a), window.getTabs());
     }
 
     @Test
     public void ctrlTabStepsOverASplitAsOne() {
-        PageTab page = WindowPages.tab(PAGE);
-        PageTab other = WindowPages.tab(OTHER_PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
+        OtherPage other = WindowPages.tab(OTHER_PAGE);
         Window window = Unlocking.of(WindowLayout.addWindow(row(page, this.a, other), page));
         assertTrue(WindowLayout.split(page, other));
-        List<WindowTab> order = TabWalk.everyTab(Collections.singletonList(window));
+        List<WindowPage> order = TabWalk.everyTab(Collections.singletonList(window));
         assertEquals("the split stops at its side in front", row(other, this.a), order);
         assertSame(this.a, TabWalk.step(order, other, 1));
         assertSame(other, TabWalk.step(order, this.a, 1));
     }
 
-    private static List<WindowTab> row(WindowTab... tabs) {
-        return new ArrayList<WindowTab>(Arrays.asList(tabs));
+    private static List<WindowPage> row(WindowPage... tabs) {
+        return new ArrayList<WindowPage>(Arrays.asList(tabs));
     }
 
     private static final class EmptyPage extends PageContent {
@@ -232,7 +232,7 @@ public final class WindowSplitTest {
     }
 
     /** A tab that is always shown and is no page, as a conversation is. */
-    private static final class Tab extends WindowTab {
+    private static final class Tab extends WindowPage {
         private final String name;
 
         Tab(String name) {

@@ -18,7 +18,7 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
 /**
- * The figure in the Characters tab: the character played stands
+ * The figure on the Characters page: the character played stands
  * live, in its armour, with what it holds and its cape; any other is
  * posed from its look, as the creator's stage draws it. Dragging turns
  * it and tilts it a little, the wheel over it zooms. It is clipped to its

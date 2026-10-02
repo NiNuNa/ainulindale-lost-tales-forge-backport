@@ -15,6 +15,7 @@ import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointUnlockHelper;
 import java.util.Collection;
 import java.util.Collections;
@@ -23,6 +24,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
@@ -110,6 +112,40 @@ public final class LostTalesQuestManager {
 
     public static StartResult startQuest(EntityPlayer player, String questId, LostTalesQuestStartSource source) {
         return startQuestInternal(player, questId, source, 0L);
+    }
+
+    /**
+     * Starts the quest a card offers as the joiner's own fresh copy. The
+     * card's author never joins it, and nobody joins once the author's
+     * character no longer runs the quest. The quest's own rules then
+     * apply as to any start: its start mode and the server's settings for
+     * it, the take-again rule and the prerequisites.
+     */
+    public static StartResult joinSharedQuest(EntityPlayerMP joiner,
+                                              UUID authorId, String questId) {
+        if (joiner == null) {
+            return StartResult.START_NOT_ALLOWED;
+        }
+        EntityPlayerMP author = LostTalesServerPlayers.findOnline(authorId);
+        LostTalesQuestPlayerData authorData = author == null ? null
+                : LostTalesQuestPlayerData.get(author);
+        if (!mayJoinShared(joiner.getUniqueID(), authorId,
+                authorData != null && questId != null
+                        && authorData.isQuestActive(questId))) {
+            sendQuestChat(joiner, "chat.losttales.quest.join_unavailable");
+            return StartResult.START_NOT_ALLOWED;
+        }
+        return startQuest(joiner, questId, LostTalesQuestStartSource.SHARED);
+    }
+
+    /**
+     * Whether a card's reader may join it: somebody other than its author,
+     * while the author still runs the quest.
+     */
+    static boolean mayJoinShared(UUID joinerId, UUID authorId,
+                                 boolean authorRunsIt) {
+        return joinerId != null && authorId != null
+                && !authorId.equals(joinerId) && authorRunsIt;
     }
 
     private static StartResult startQuestInternal(EntityPlayer player, String questId, LostTalesQuestStartSource source, long timeLimitTicks) {
@@ -440,7 +476,7 @@ public final class LostTalesQuestManager {
         }
         boolean changed = LotrQuestReference.isLotrQuest(questId)
                 ? LotrQuestJournalAdapter.pin(player, questId, data)
-                : data.setPinnedQuestId(questId);
+                : data.pinQuestId(questId);
         if (changed) {
             sendQuestChat(player, "chat.losttales.quest.note.tracking", questTitle(questId));
             syncToClient(player);
@@ -1301,7 +1337,8 @@ public final class LostTalesQuestManager {
             return LostTalesConfig.allowQuestInteractionStarts && quest.canStartFromInteraction();
         }
         if (source == LostTalesQuestStartSource.SHARED) {
-            return quest.canStartFromShare();
+            return quest.canStartFromShare(LostTalesConfig.allowQuestItemStarts,
+                    LostTalesConfig.allowQuestInteractionStarts);
         }
         return false;
     }

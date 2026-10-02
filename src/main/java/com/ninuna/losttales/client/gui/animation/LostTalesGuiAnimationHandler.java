@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.gui.animation;
 
 import com.ninuna.losttales.client.LostTalesClientThread;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent;
@@ -83,7 +84,8 @@ public final class LostTalesGuiAnimationHandler
                             * sample.getBackdropProgress());
             if (alpha > 0) {
                 Gui.drawRect(0, 0, event.gui.width, event.gui.height,
-                        (Math.min(255, alpha) << 24));
+                        LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK,
+                                Math.min(255, alpha)));
                 GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             }
         }

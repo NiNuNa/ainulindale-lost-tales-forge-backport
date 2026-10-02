@@ -2,6 +2,7 @@ package com.ninuna.losttales.compat.lotr;
 
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
+import com.ninuna.losttales.quest.LostTalesQuestShareResolver;
 import java.util.UUID;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
@@ -45,8 +46,15 @@ public final class LotrQuestShareAdapter {
                         "gui.losttales.quest.reward.payment",
                         safe(quest.getFactionSubtitle(), StatCollector.translateToLocal(
                                 "gui.losttales.quest.reward.faction")));
-        return ChatShowcase.quest(tokenIndex, reference, title,
-                LotrQuestCategory.of(quest), progress, rewards, false);
+        // LOTR's words have no bound of their own; the card has.
+        return ChatShowcase.quest(tokenIndex, reference,
+                LostTalesQuestShareResolver.fitBytes(title,
+                        ChatShowcase.MAX_QUEST_TITLE_BYTES),
+                LotrQuestCategory.of(quest),
+                LostTalesQuestShareResolver.fitBytes(progress,
+                        ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES),
+                LostTalesQuestShareResolver.fitBytes(rewards,
+                        ChatShowcase.MAX_QUEST_REWARD_BYTES), false);
     }
 
     private static String safe(String value, String fallback) {

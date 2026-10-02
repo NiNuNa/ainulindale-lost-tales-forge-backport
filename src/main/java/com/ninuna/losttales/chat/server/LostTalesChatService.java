@@ -8,10 +8,10 @@ import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.chat.ChatChannelScope;
+import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
-import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageOrigin;
 import com.ninuna.losttales.chat.ChatMessageValidator;
@@ -103,10 +103,10 @@ public final class LostTalesChatService {
      * Proximity and Fellowship speak as the character played, and the fellowship
      * is that character's;</li>
      * <li>the reply reference is honoured only while the message it
-     * names is within the log's reach <em>and</em> was sent to this
-     * sender, so naming an id can never quote back a message nobody
-     * showed them; one that fails either test is dropped with a
-     * notice;</li>
+     * names is within the log's reach <em>and</em> this sender may read
+     * it now ({@link ChatHistory#mayRead}), so naming an id can never
+     * quote back a message they may not see; one that fails either test
+     * is dropped with a notice;</li>
      * <li>the echo nonce is the sender's own name for the message,
      * handed back to them alone so the line they showed the moment
      * they typed it is replaced by the delivered copy;</li>
@@ -141,8 +141,7 @@ public final class LostTalesChatService {
                 request.getIdentityCharacterId(),
                 request.getReplyToMessageId(), request.getTargetIdentity(),
                 request.getEchoNonce(), request.getTargetCharacterId(),
-                request.getQuoteAuthor(), request.getQuoteExcerpt(),
-                request.getQuoteSource(), forward,
+                request.quotesUnkept(), forward,
                 forward == null ? request.isAction() : forward.action);
     }
 
@@ -153,8 +152,7 @@ public final class LostTalesChatService {
                              UUID identityCharacterId,
                              long replyToMessageId, String requestedIdentity,
                              long echoNonce, UUID targetCharacterId,
-                             String quoteAuthor, String quoteExcerpt,
-                             int quoteSource,
+                             boolean quotesUnkept,
                              ChatHistory.Forwardable forward,
                              boolean action) {
         String targetIdentity = requestedIdentity == null ? "" : requestedIdentity;
@@ -309,20 +307,14 @@ public final class LostTalesChatService {
                 sender.addChatMessage(new ChatComponentTranslation(
                         "chat.losttales.reply.unavailable"));
             }
+        } else if (quotesUnkept) {
+            // A quote of a line no server named or holds: a line of the
+            // client's own, a command's echo. Who said it and what it said
+            // would be only the sender's word, so nothing of it is taken:
+            // it shows as a message no longer kept, with no author.
+            reply = ChatReplyReference.UNKEPT;
         } else {
-            // A quote of a line nobody named: an announcement, a death
-            // message, a console notice, a command's echo. No record
-            // here can resolve it, so the words travel as the sender
-            // saw them — bounded by the packet, stripped of formatting
-            // codes like every other text off the wire, and never a
-            // quote at all without an author. It wears a head only
-            // where this server can vouch for one.
-            reply = vouchedHead(ChatReplyReference.unanchored(
-                    ChatFormattingCodes.stripSectionCodes(quoteAuthor),
-                    ChatFormattingCodes.stripSectionCodes(quoteExcerpt),
-                    ChatReplyReference.NO_COLOR), quoteSource,
-                    sender.getUniqueID(), identityName, accountLine,
-                    skinId, nameColor);
+            reply = ChatReplyReference.NONE;
         }
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 channel, sender.getUniqueID(), identityName,
@@ -401,9 +393,12 @@ public final class LostTalesChatService {
             // identities and a reply is addressed by id.
             UUID wornId = worn == null ? null : worn.getCharacterId();
             packet = packet.withConversation(wornId, whisperCharacterId);
+            // A Narrator line reaches the other party signed by the
+            // Narrator alone, filed under the conversation all the same.
             LostTalesChatMessagePacket partnerCopy = withPartner(
                     packet.withoutEcho(), accountName, identityName)
-                    .withConversation(whisperCharacterId, wornId);
+                    .withConversation(whisperCharacterId, wornId)
+                    .narratedForOthers();
             LostTalesNetworkHandler.CHANNEL.sendTo(packet, sender);
             LostTalesNetworkHandler.CHANNEL.sendTo(partnerCopy, whisperTarget);
             List<UUID> pair = Arrays.asList(sender.getUniqueID(),
@@ -412,10 +407,19 @@ public final class LostTalesChatService {
                     sender.getUniqueID(), identityName,
                     packet.withoutEcho(), partnerCopy, pair,
                     ChatHistory.Audience.accounts(pair, false));
+            if (narrator) {
+                noteNarration(accountName, channel, replyScope,
+                        packet.getMessageId(), null);
+            }
             return;
         }
         deliver(packet, sender, ChatChannelPolicy.route(sender, channel, fellowship, factionId),
                 sender.getUniqueID(), identityName);
+        if (narrator) {
+            noteNarration(accountName, channel, replyScope,
+                    packet.getMessageId(),
+                    fellowship == null ? null : fellowship.getName());
+        }
         // Out to Discord through the channel's binding, when it has one
         // that posts. Only a player's own line in a channel that may be
         // bridged ever leaves: the policy is asked here, before the
@@ -426,24 +430,34 @@ public final class LostTalesChatService {
         // a character's skin is a resource of the game and not a picture
         // Discord can fetch; emoji shortcodes go as the Unicode emoji
         // Discord renders, share tokens as the text they were typed as.
+        // The Narrator tells its own lines and every action, as in the
+        // game: they go under its name alone, an action as the sentence
+        // its speaker's name opens; a forwarded action stays under its
+        // forwarder's name, opened by its author's.
         // The message's own id and the reply it resolved travel with it,
         // so the post can be linked to its Discord copy and a reply can
         // point at the Discord original; so does the sender's id, since
         // the sender alone is told when the post is slow or will not
         // arrive.
         if (DiscordBridgePolicy.relaysOutbound(ChatMessageOrigin.PLAYER, channel)) {
+            boolean forwarded = reply != null && reply.isForward();
+            boolean told = narrator || (packet.isAction() && !forwarded);
             LostTalesDiscordBridge.getInstance().relayToDiscord(channel,
                     factionId,
-                    accountLine ? identityName : ChatEpithet.titledName(
-                            identityName, presentation.factionName,
-                            presentation.title),
-                    DiscordAvatarUrl.forPlayer(sender),
-                    packet.isAction() ? DiscordMessageSanitizer.outboundAction(message)
+                    told ? ChatNarrator.NAME
+                            : accountLine ? identityName : ChatEpithet.titledName(
+                                    identityName, presentation.factionName,
+                                    presentation.title),
+                    // The Narrator is nobody's account: its post, an action
+                    // among them, wears the webhook's own picture, never
+                    // the narrator's head.
+                    told ? "" : DiscordAvatarUrl.forPlayer(sender),
+                    packet.isAction() ? DiscordMessageSanitizer.outboundAction(
+                            forwarded ? reply.getAuthor() : identityName, message)
                             : DiscordMessageSanitizer.outbound(message),
-                    packet.getMessageId(), reply, sender.getUniqueID(),
+                    packet.getMessageId(), forDiscord(reply), sender.getUniqueID(),
                     // A forward pings nobody on Discord either.
-                    reply != null && reply.isForward()
-                            ? Collections.<ChatNamedPlayer>emptyList()
+                    forwarded ? Collections.<ChatNamedPlayer>emptyList()
                             : packet.getNamedPlayers());
         }
     }
@@ -466,7 +480,10 @@ public final class LostTalesChatService {
      * message answers one — a Discord reply is shown exactly as a
      * player's reply is. The line is recorded like any other, so
      * players can reply to it in turn; its author id is the bridge's
-     * own, which no account holds, so nobody can edit or take it back.
+     * own, which no account holds, so no player edits it or takes it
+     * back as its author. The member's own edit or deletion on Discord
+     * follows it here ({@link #editFromDiscord}, {@link #deleteFromDiscord}),
+     * and a moderator who may read it can remove it ({@link #delete}).
      * Answers with the id the message was distributed under, or
      * {@link ChatMessageIds#NONE} when nothing went out, so the bridge
      * can link the line to the Discord message it came from.
@@ -606,7 +623,7 @@ public final class LostTalesChatService {
                         + "without it until the server restarts");
     }
 
-    /* ---- the Server Console ---- */
+    /* ---- the Server Log ---- */
 
     /**
      * Records one administrative event and shows it at once to every
@@ -697,27 +714,39 @@ public final class LostTalesChatService {
     }
 
     /**
-     * The head an unnamed quote may wear: for a line of the sender's own,
-     * the head and name colour this reply is signed with, but only where
-     * the quote names the identity it is signed as. Anything else, a line
-     * of the Server's included, is quoted as it came, without a head: only
-     * a quote the server finds in its own history wears the Server's mark.
+     * Tells the Server Log who narrated a line, and where: one entry
+     * per Narrator line, its actor the narrating account, its words the
+     * link to the line and, for a fellowship's, the fellowship's name.
+     * Every other copy of the line names nobody, so the console's readers
+     * are the only ones who learn it. A whisper is named by its link
+     * alone, never by the other party.
      */
-    static ChatReplyReference vouchedHead(ChatReplyReference quote,
-                                          int source, UUID sender,
-                                          String identityName,
-                                          boolean accountLine, String skinId,
-                                          int nameColor) {
-        if (quote == null || !quote.exists()) {
-            return quote;
+    static void noteNarration(String account, ChatChannel channel,
+                              String scope, long messageId,
+                              String fellowshipName) {
+        String link = ChatChannelSuggester.messageLink(channel, scope,
+                messageId);
+        String where = link != null ? link
+                : "#" + logName(channel, scope);
+        String fellowship = fellowshipName == null ? ""
+                : fellowshipName.trim();
+        console(ChatConsoleEvent.Kind.MODERATION, ChatConsoleEvent.Severity.INFO,
+                account, "narrated " + where
+                        + (fellowship.length() == 0 ? "" : " in " + fellowship));
+    }
+
+    /**
+     * The quote a Discord post opens with: the line's own, but for a quote
+     * of a line no longer kept, which Discord is shown as those words in
+     * an author's place, since a post's quote is an author and words.
+     */
+    static ChatReplyReference forDiscord(ChatReplyReference reply) {
+        if (reply == null || !reply.isUnkept()) {
+            return reply;
         }
-        if (source == LostTalesChatSendPacket.QUOTE_OWN && sender != null
-                && quote.getAuthor().equals(identityName)) {
-            return ChatReplyReference.unanchored(quote.getAuthor(),
-                    quote.getExcerpt(), nameColor)
-                    .withHead(sender, accountLine, skinId);
-        }
-        return quote;
+        return ChatReplyReference.unanchored(ChatEpithet.translate(
+                ChatReplyReference.UNKEPT_KEY, ChatReplyReference.UNKEPT_WORDS),
+                "", ChatReplyReference.NO_COLOR);
     }
 
     /** Cleared with the rest of the server's chat state. */
@@ -727,8 +756,9 @@ public final class LostTalesChatService {
 
     /**
      * A Discord member's own edit, found by the bridge's sweep and
-     * delivered on the server thread: the line is rewritten for
-     * everyone who was sent it, exactly as a player's edit is, and in
+     * delivered on the server thread: the line is rewritten and told to
+     * everyone who was sent it and may still read it, exactly as a
+     * player's edit is, and in
      * the other Discord channels the line was carried on to. The bridge
      * signed the line with its own author id when it was recorded, which
      * is what allows the rewrite here and what stops any player from
@@ -754,7 +784,7 @@ public final class LostTalesChatService {
             ChatAuditLog.logDiscordEdit(messageId, author.getPlayerId(),
                     author.getAccount(), message);
         }
-        tellRecipients(recipients,
+        tellReaders(messageId, recipients,
                 LostTalesChatUpdatePacket.edited(messageId, message, named));
         LostTalesDiscordBridge.getInstance().relayEdit(messageId, message);
     }
@@ -910,23 +940,24 @@ public final class LostTalesChatService {
                 worn == null ? null : worn.getCharacterId());
         return new Speaking(worn, fellowship, factionId, roles,
                 ChatChannelPolicy.sendRefusal(channel, fellowship,
-                        ChatIdentitySelection.playedId(sender), factionId, roles,
+                        ChatIdentitySelection.playedId(sender), roles,
                         LostTalesPermissions.isOperator(sender),
                         ChatChannelPolicy.readsConsole(sender)));
     }
 
     /**
      * Rewrites one of {@code editor}'s own messages and tells everyone
-     * who was sent it. Silently does nothing when the message is not
-     * theirs or has fallen out of the log's reach — the client is told
-     * nothing it could learn from, since a refusal that distinguished
-     * "not yours" from "no such message" would answer questions about
-     * messages the asker never saw.
+     * who was sent it and may still read it. Silently does nothing when
+     * the message is not theirs or has fallen out of the log's reach —
+     * the client is told nothing it could learn from, since a refusal
+     * that distinguished "not yours" from "no such message" would answer
+     * questions about messages the asker never saw.
      *
      * <p>The new text passes the same validator a fresh message does,
-     * so an edit is not a way around what a send would have refused.
-     * A line already carried to Discord is corrected there as well,
-     * through the id the bridge kept from its own post.</p>
+     * and the author has to be able to send in that conversation now
+     * ({@link #editRefusal}), so an edit is not a way around what a send
+     * would have refused. A line already carried to Discord is corrected
+     * there as well, through the id the bridge kept from its own post.</p>
      */
     public static void edit(EntityPlayerMP editor, long messageId,
                             String message) {
@@ -943,6 +974,26 @@ public final class LostTalesChatService {
             tellMuted(editor, mute);
             return;
         }
+        ChatNamedPlayer author = ChatHistory.authorOf(messageId);
+        ChatChannel channel = ChatHistory.channelOf(messageId);
+        if (author == null || channel == null
+                || !editor.getUniqueID().equals(author.getPlayerId())) {
+            return;
+        }
+        // The new words reach the conversation's readers as a send's do,
+        // so the author has to be able to speak there now: past its gate,
+        // still in its fellowship, still speaking to its faction.
+        String scope = ChatHistory.scopeOf(messageId);
+        Speaking speaking = speaking(editor, channel, scope);
+        String refusal = editRefusal(channel, scope, speaking.refusal,
+                speaking.factionId);
+        if (refusal != null) {
+            if (ChatChannelPolicy.isGateRefusal(refusal)) {
+                sendAccess(editor);
+            }
+            editor.addChatMessage(new ChatComponentTranslation(refusal));
+            return;
+        }
         if (ChatHistory.isAction(messageId)) {
             // An action edited stays an action, its words ended as a
             // fresh one's are.
@@ -950,9 +1001,8 @@ public final class LostTalesChatService {
         }
         // The new words name whom they name now: a name added is lit, one
         // taken out no longer counts. Nobody is chimed for an edit.
-        ChatChannel channel = ChatHistory.channelOf(messageId);
         List<ChatNamedPlayer> named = ChatMentionTargets.of(editor, channel,
-                ChatHistory.scopeOf(messageId), channel == ChatChannel.WHISPER
+                scope, channel == ChatChannel.WHISPER
                         ? partnerIn(ChatHistory.recipientsOf(messageId), editor) : null,
                 message);
         Set<UUID> recipients = ChatHistory.applyEdit(messageId,
@@ -965,22 +1015,49 @@ public final class LostTalesChatService {
                 ChatMessageValidator.logged(message));
         ChatAuditLog.logEdit(messageId, editor.getUniqueID(),
                 editor.getCommandSenderName(), message);
-        tellRecipients(recipients,
+        tellReaders(messageId, recipients,
                 LostTalesChatUpdatePacket.edited(messageId, message, named));
         // A line carried to Discord is corrected there too: the bridge
         // rewrites its own webhook post by the id it kept. A message of
         // any other channel resolves to no post and nothing happens.
         LostTalesDiscordBridge.getInstance().relayEdit(messageId,
                 ChatHistory.isAction(messageId)
-                        ? DiscordMessageSanitizer.outboundAction(message)
+                        ? DiscordMessageSanitizer.outboundAction(
+                                author.getIdentityName(), message)
                         : DiscordMessageSanitizer.outbound(message));
     }
 
+    /** The notice an edit of a faction's line is refused with once its author speaks to another faction. */
+    static final String EDIT_FACTION_LEFT = "chat.losttales.edit.faction_left";
+
     /**
-     * Takes one of {@code remover}'s own messages back, on the same
-     * terms as {@link #edit}, or — when the remover may moderate the
+     * Why an edit of a line said in {@code channel}'s conversation
+     * {@code lineScope} is refused, as the notice the editor is told, or
+     * null when it may go ahead: whatever a send there would be refused
+     * with now ({@code sendRefusal}, which asks the gate and the
+     * fellowship the line's scope names), and on a faction's channel a
+     * faction other than the one the editor's line would be spoken to
+     * now ({@code factionId}).
+     */
+    static String editRefusal(ChatChannel channel, String lineScope,
+                              String sendRefusal, String factionId) {
+        if (sendRefusal != null) {
+            return sendRefusal;
+        }
+        if (channel != null && channel.getScope() == ChatChannelScope.FACTION
+                && !(lineScope == null ? "" : lineScope).equals(factionId)) {
+            return EDIT_FACTION_LEFT;
+        }
+        return null;
+    }
+
+    /**
+     * Takes one of {@code remover}'s own messages back, wherever they
+     * may speak now and silently when it is not theirs, as an
+     * {@link #edit} is silent, or — when the remover may moderate the
      * chat ({@link LostTalesCapability#CHAT_MODERATE}) — anyone's message
-     * that is still within reach. Everyone who was sent it is told to
+     * that is still within reach and that the moderator may read now
+     * ({@link ChatHistory#removeByOperator}). Everyone who was sent it is told to
      * drop it; nobody else hears that it ever existed. A moderator may
      * remove but never edit another's words: a removal is visibly a
      * removal. The capability is read here, from the server's own
@@ -1003,7 +1080,7 @@ public final class LostTalesChatService {
                 return;
             }
             ChatHistory.Removal removal =
-                    ChatHistory.removeByOperator(messageId);
+                    ChatHistory.removeByOperator(messageId, requesterFor(remover));
             if (removal == null) {
                 return;
             }
@@ -1069,7 +1146,7 @@ public final class LostTalesChatService {
             return;
         }
         if (consoleEntry) {
-            // An entry of the Server Console takes reactions from whoever
+            // An entry of the Server Log takes reactions from whoever
             // reads the console, and they stay in the console: nothing of
             // it crosses to Discord.
             if (ChatConsoleStream.react(messageId, player.getUniqueID(),
@@ -1163,29 +1240,60 @@ public final class LostTalesChatService {
         }
     }
 
-    /** Each online reader is sent the reactions as they are shown them. */
+    /**
+     * Each online reader who may still read the line is sent the
+     * reactions as they are shown them ({@link #onlineReaders}).
+     */
     private static void tellReactions(long messageId, Set<UUID> readers) {
-        MinecraftServer server = MinecraftServer.getServer();
-        if (server == null || server.getConfigurationManager() == null
-                || readers == null) {
-            return;
+        for (EntityPlayerMP player : onlineReaders(messageId, readers)) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(
+                    new LostTalesChatReactionSyncPacket(messageId,
+                            ChatHistory.reactionsFor(messageId,
+                                    player.getUniqueID())),
+                    player);
         }
-        @SuppressWarnings("unchecked")
-        List<EntityPlayerMP> online =
-                server.getConfigurationManager().playerEntityList;
-        for (EntityPlayerMP player : online) {
-            if (player != null && readers.contains(player.getUniqueID())) {
-                LostTalesNetworkHandler.CHANNEL.sendTo(
-                        new LostTalesChatReactionSyncPacket(messageId,
-                                ChatHistory.reactionsFor(messageId,
-                                        player.getUniqueID())),
-                        player);
-            }
+    }
+
+    /** Sends an edit of a kept line to its online readers who may still read it. */
+    private static void tellReaders(long messageId, Set<UUID> readers,
+                                    LostTalesChatUpdatePacket update) {
+        for (EntityPlayerMP player : onlineReaders(messageId, readers)) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(update, player);
         }
     }
 
     /**
-     * The Server Console's kept entries, sent to a player who has come to
+     * The players among {@code readers} who are online and may read the
+     * kept line now ({@link ChatHistory#mayRead}): someone shown a line of
+     * a gated channel, a faction or a fellowship who has since lost it
+     * is sent none of its edits and reactions. A line said to the
+     * accounts that heard it asks nothing more of them, so they are not
+     * asked.
+     */
+    private static List<EntityPlayerMP> onlineReaders(long messageId,
+                                                      Set<UUID> readers) {
+        List<EntityPlayerMP> told = new ArrayList<EntityPlayerMP>();
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || readers == null) {
+            return told;
+        }
+        boolean asked = ChatHistory.asksCurrentAccess(messageId);
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online =
+                server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP player : online) {
+            if (player != null && readers.contains(player.getUniqueID())
+                    && (!asked || ChatHistory.mayRead(messageId,
+                            requesterFor(player)))) {
+                told.add(player);
+            }
+        }
+        return told;
+    }
+
+    /**
+     * The Server Log's kept entries, sent to a player who has come to
      * read it while online — made an operator, given a role — as the ones
      * a staff member is sent on joining: history to them, reactions and
      * all. Entries the client already shows are shown once.
@@ -1230,7 +1338,7 @@ public final class LostTalesChatService {
     }
 
     /**
-     * The quote of an entry of the Server Console, for a reply said in the
+     * The quote of an entry of the Server Log, for a reply said in the
      * console by someone who reads it: the Server's word, in the console's
      * colour and with its head, and what the entry says. None where there
      * is no such entry or the sender cannot read the console.
@@ -1304,10 +1412,11 @@ public final class LostTalesChatService {
     }
 
     /**
-     * Sends one update to whichever of the recorded recipients are
-     * still online. Anyone who has logged out never hears about it, and
-     * needs to hear nothing: the history they are replayed on joining
-     * already says what the message says now, or no longer holds it.
+     * Sends a removal to whichever of the recorded recipients are still
+     * online, whether or not they may still read the line: taking it
+     * away shows nobody anything. Anyone who has logged out never hears
+     * about it, and needs to hear nothing: the history they are replayed
+     * on joining no longer holds it.
      */
     private static void tellRecipients(Set<UUID> recipients,
                                        LostTalesChatUpdatePacket update) {
@@ -1386,13 +1495,6 @@ public final class LostTalesChatService {
     }
 
     /**
-     * The online player whose played character bears the name, or null
-     * for none. Only the character being played answers: a conversation
-     * is with someone as they are presenting themselves, and a name a
-     * player is not wearing names nobody to talk to. The first match
-     * wins, which is the same rule the account lookup keeps.
-     */
-    /**
      * Whom a whisper to {@code target} reaches, found the same way for a
      * line and for typing: the account of that name online, else whoever
      * plays a character of that name. A conversation is with a person as
@@ -1418,6 +1520,13 @@ public final class LostTalesChatService {
         return named;
     }
 
+    /**
+     * The online player whose played character bears the name, or null
+     * for none. Only the character being played answers: a conversation
+     * is with someone as they are presenting themselves, and a name a
+     * player is not wearing names nobody to talk to. The first match
+     * wins, which is the same rule the account lookup keeps.
+     */
     private static EntityPlayerMP findOnlinePlayingAs(String characterName) {
         String named = characterName == null ? "" : characterName.trim();
         if (named.length() == 0) {
@@ -1510,8 +1619,9 @@ public final class LostTalesChatService {
                 LostTalesCapability.CHAT_MODERATE);
         int roles = ChatIdentitySelection.roles(player);
         // The account's own roles apart from the played character's: what
-        // capabilities are granted through, and what the client signs an
-        // account line with and every character of the account wears.
+        // the client signs an account line with and every character of
+        // the account wears. Capabilities come through fewer of them:
+        // only roles assigned to the account or given by operator level.
         int accountRoles = ChatAccountRoleResolver.resolve(player, null);
         // The mute list, and the moderation flag the client offers its
         // moderation menus on, follow the moderation capability; the
@@ -1529,7 +1639,8 @@ public final class LostTalesChatService {
                         moderator,
                         LostTalesPermissions.has(player,
                                 LostTalesCapability.SERVER_CONFIG),
-                        heldCapabilityIds(player, accountRoles),
+                        heldCapabilityIds(player,
+                                ChatAccountRoleResolver.grantingMask(player)),
                         accountRoles,
                         ChatChannelPolicy.ownCharacterRoles(player),
                         LostTalesConfig.chatProximityRadius,
@@ -1550,10 +1661,9 @@ public final class LostTalesChatService {
      * the request the menu makes.
      */
     private static List<String> heldCapabilityIds(EntityPlayerMP player,
-                                                  int accountRoles) {
-        // The account's roles are resolved once by the caller, not once
-        // per capability: resolving reads the catalogue and, for a
-        // faction source, LOTR's player data.
+                                                  int grantingRoles) {
+        // The granting roles are resolved once by the caller, not once
+        // per capability: resolving reads the catalogue.
         ChatRoleCatalog roles = ChatRoleCatalog.server();
         LostTalesPermissionCatalog permissions = LostTalesPermissionCatalog.current();
         List<String> held = new ArrayList<String>();
@@ -1561,7 +1671,7 @@ public final class LostTalesChatService {
             if (LostTalesPermissions.decide(
                     player.canCommandSenderUseCommand(capability.getRequiredOpLevel(),
                             LostTalesPermissions.NODE),
-                    accountRoles, capability, roles, permissions)) {
+                    grantingRoles, capability, roles, permissions)) {
                 held.add(capability.getId());
             }
         }
@@ -1841,7 +1951,9 @@ public final class LostTalesChatService {
      * Sends one line to everyone it resolved to and records who was
      * sent it, and who may still be shown it. The sender, when there is
      * one, is the only recipient to get the line under their own private
-     * name for it; everyone else gets it without. The history is written
+     * name for it; everyone else gets it without, and a Narrator line
+     * signed by the Narrator alone ({@link
+     * LostTalesChatMessagePacket#narratedForOthers}). The history is written
      * from the list the message actually went to, so a reply to it is
      * checked against who was sent it rather than against who would be
      * sent one now; {@code fellowship} and {@code factionId} are the
@@ -1852,7 +1964,8 @@ public final class LostTalesChatService {
                                 EntityPlayerMP sender,
                                 ChatChannelPolicy.Routing routing,
                                 UUID authorId, String identityName) {
-        LostTalesChatMessagePacket shared = packet.withoutEcho();
+        LostTalesChatMessagePacket shared = packet.withoutEcho()
+                .narratedForOthers();
         for (EntityPlayerMP recipient : routing.recipients) {
             LostTalesNetworkHandler.CHANNEL.sendTo(
                     sender != null && recipient == sender ? packet : shared,
@@ -1930,8 +2043,7 @@ public final class LostTalesChatService {
             return;
         }
         ChatHistory.Requester reader = requesterFor(player);
-        if ((channel.isScoped() && !isIn(reader, channel, scope))
-                || !reader.readableChannels.contains(channel.getId())) {
+        if (!readsConversation(reader, channel, scope)) {
             return;
         }
         List<LostTalesChatMessagePacket> lines = sendable(ChatHistory.replayBefore(
@@ -1943,6 +2055,26 @@ public final class LostTalesChatService {
                 Integer.valueOf(lines.size()), channel.getId(),
                 scope.length() == 0 ? "" : "/" + scope,
                 player.getCommandSenderName());
+    }
+
+    /**
+     * Whether the reader may read {@code channel}'s conversation
+     * {@code scope} now: the channel's read rule lets them in, and on a
+     * channel that holds several conversations they belong to the one
+     * {@code scope} names. A scoped channel with no conversation named is
+     * nothing they read. What a request for older lines and a command's
+     * answer filed under its tab are both asked.
+     */
+    static boolean readsConversation(ChatHistory.Requester reader,
+                                     ChatChannel channel, String scope) {
+        if (reader == null || channel == null
+                || !reader.readableChannels.contains(channel.getId())) {
+            return false;
+        }
+        if (!channel.isScoped()) {
+            return true;
+        }
+        return scope != null && scope.length() > 0 && isIn(reader, channel, scope);
     }
 
     /**

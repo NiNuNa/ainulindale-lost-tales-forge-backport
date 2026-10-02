@@ -4,7 +4,7 @@ import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowPages;
@@ -125,7 +125,7 @@ public final class MissiveLetterPage extends PageContent
         if (read == null) {
             return false;
         }
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         boolean same = tab != null && WindowLayout.isOpen(tab)
                 && inventorySlot == this.slot && read.equals(this.questId);
         this.slot = inventorySlot;
@@ -184,7 +184,7 @@ public final class MissiveLetterPage extends PageContent
      */
     @Override
     public void watch() {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (tab == null || !WindowLayout.isOpen(tab)) {
             return;
         }
@@ -217,7 +217,7 @@ public final class MissiveLetterPage extends PageContent
     /** The tab closed, by hand or by itself: the letter goes with it. */
     @Override
     public void hidden() {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (tab == null || !WindowLayout.isOpen(tab)) {
             forget();
         }

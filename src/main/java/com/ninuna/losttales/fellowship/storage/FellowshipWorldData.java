@@ -203,12 +203,6 @@ public final class FellowshipWorldData extends WorldSavedData {
         }
     }
 
-    /** Whether a LOTR fellowship stands behind one of ours. */
-    public synchronized boolean isMirror(UUID lotrFellowshipId) {
-        return lotrFellowshipId != null
-                && this.mirrorIdByFellowshipId.containsValue(lotrFellowshipId);
-    }
-
     public synchronized void saveFellowship(Fellowship fellowship) {
         ensureWritable();
         validateFellowship(fellowship);

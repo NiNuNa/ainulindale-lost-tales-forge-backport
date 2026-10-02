@@ -33,7 +33,7 @@ import java.util.Set;
  */
 public final class TabSelection {
     private static String windowId;
-    private static final Set<WindowTab> TABS = new HashSet<WindowTab>();
+    private static final Set<WindowPage> TABS = new HashSet<WindowPage>();
 
     private TabSelection() {}
 
@@ -43,7 +43,7 @@ public final class TabSelection {
     }
 
     /** Whether the tab is marked; false for a tab in any other window. */
-    public static synchronized boolean isSelected(WindowTab tab) {
+    public static synchronized boolean isSelected(WindowPage tab) {
         return tab != null && TABS.contains(tab);
     }
 
@@ -56,7 +56,7 @@ public final class TabSelection {
      * Leaves the one tab marked, in its own window: what a plain click
      * does. A null tab forgets the marks.
      */
-    public static synchronized void selectOnly(String window, WindowTab tab) {
+    public static synchronized void selectOnly(String window, WindowPage tab) {
         TABS.clear();
         windowId = window;
         if (tab != null && window != null) {
@@ -71,8 +71,8 @@ public final class TabSelection {
      * tab in front of the window being marked in, so the marks always
      * hold it. The anchor itself is never taken out.
      */
-    public static synchronized void toggle(String window, WindowTab anchor,
-                                    WindowTab tab) {
+    public static synchronized void toggle(String window, WindowPage anchor,
+                                    WindowPage tab) {
         if (tab == null || window == null) {
             return;
         }
@@ -93,7 +93,7 @@ public final class TabSelection {
      * Marks exactly these tabs, in the given window: what a group keeps
      * after it has been carried somewhere else.
      */
-    static synchronized void selectAll(String window, List<WindowTab> tabs) {
+    static synchronized void selectAll(String window, List<WindowPage> tabs) {
         TABS.clear();
         windowId = window;
         if (tabs != null && window != null) {
@@ -109,13 +109,13 @@ public final class TabSelection {
      * every other window. The order is the row's, so a group moves and
      * closes in the order it was shown in.
      */
-    public static synchronized List<WindowTab> selectedIn(Window window) {
-        List<WindowTab> result = new ArrayList<WindowTab>();
+    public static synchronized List<WindowPage> selectedIn(Window window) {
+        List<WindowPage> result = new ArrayList<WindowPage>();
         if (window == null || TABS.isEmpty()
                 || !window.getId().equals(windowId)) {
             return result;
         }
-        List<WindowTab> tabs = window.getTabs();
+        List<WindowPage> tabs = window.getTabs();
         for (int index = 0; index < tabs.size(); index++) {
             if (TABS.contains(tabs.get(index))) {
                 result.add(tabs.get(index));

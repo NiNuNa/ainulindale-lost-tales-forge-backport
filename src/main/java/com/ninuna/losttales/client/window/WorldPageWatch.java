@@ -37,7 +37,7 @@ public final class WorldPageWatch {
      * {@code notice} over its window's bar. A locked window keeps the
      * tabs the player put in it, but not one whose thing they left.
      */
-    public static void close(PageTab tab, String notice) {
+    public static void close(OtherPage tab, String notice) {
         if (tab == null) {
             return;
         }
@@ -52,10 +52,10 @@ public final class WorldPageWatch {
             }
         }
         if (WindowLayout.isOpen(tab)) {
-            final PageTab closing = tab;
+            final OtherPage closing = tab;
             WindowLayout.removeTabs(new WindowLayout.TabFilter() {
                 @Override
-                public boolean matches(WindowTab open) {
+                public boolean matches(WindowPage open) {
                     return closing.equals(open);
                 }
             });
@@ -78,7 +78,7 @@ public final class WorldPageWatch {
                 if (!page.opensFromWorld()) {
                     continue;
                 }
-                PageTab tab = page.tab();
+                OtherPage tab = page.tab();
                 Window window = WindowLayout.windowOf(tab);
                 if (window == null || tab.equals(window.getActiveTab())) {
                     continue;

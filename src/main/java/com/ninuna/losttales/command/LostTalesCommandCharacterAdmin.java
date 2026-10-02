@@ -36,6 +36,7 @@ import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
@@ -77,8 +78,10 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         }
         EntityPlayerMP target = resolveTarget(sender, args.length > 1 ? args[1] : null);
         if (target == null) {
-            send(sender, EnumChatFormatting.RED
-                    + "Specify an online player when running this command from the console.");
+            ChatComponentTranslation refusal = new ChatComponentTranslation(
+                    "chat.losttales.command.player_required");
+            refusal.getChatStyle().setColor(EnumChatFormatting.RED);
+            sender.addChatMessage(refusal);
             return;
         }
         String action = args[0];

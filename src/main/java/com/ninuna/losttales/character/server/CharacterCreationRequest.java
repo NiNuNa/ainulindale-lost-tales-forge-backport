@@ -6,8 +6,6 @@ package com.ninuna.losttales.character.server;
  */
 public final class CharacterCreationRequest {
 
-    public static final long REVISION_NOT_CHECKED = -1L;
-
     private final long expectedRosterRevision;
     private final int slotIndex;
     private final String name;

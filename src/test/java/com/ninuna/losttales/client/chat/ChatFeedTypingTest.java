@@ -17,9 +17,9 @@ import org.junit.Test;
 public final class ChatFeedTypingTest {
     private static final long RISE_NANOS =
             Motions.nanos(MotionIds.CHAT_FEED_TYPING);
-    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.GLOBAL);
-    private static final ChatTab PROXIMITY = ChatTab.of(ChatChannel.PROXIMITY);
-    private static final ChatTab OOC = ChatTab.of(ChatChannel.OOC);
+    private static final ConversationPage GLOBAL = ConversationPage.of(ChatChannel.GLOBAL);
+    private static final ConversationPage PROXIMITY = ConversationPage.of(ChatChannel.PROXIMITY);
+    private static final ConversationPage OOC = ConversationPage.of(ChatChannel.OOC);
 
     @Before
     public void setUp() {

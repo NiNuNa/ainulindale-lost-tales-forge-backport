@@ -20,9 +20,9 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Why a channel refuses a send. Membership is asked first — a fellowship line
- * needs a fellowship, a faction line a faction — and then the role gate the
- * config put on the channel. Every answer is the notice the sender is
- * told, so the reason is never guessed at the other end.
+ * needs a fellowship — and then the role gate the config put on the
+ * channel. Every answer is the notice the sender is told, so the reason
+ * is never guessed at the other end.
  */
 public final class ChatChannelSendRefusalTest {
 
@@ -30,10 +30,8 @@ public final class ChatChannelSendRefusalTest {
             UUID.fromString("00000000-0000-0000-0000-0000000000c1");
     private static final UUID BEREN =
             UUID.fromString("00000000-0000-0000-0000-0000000000c2");
-    private static final String GONDOR = "lotr:gondor";
 
     private static final String FELLOWSHIP_REFUSAL = "chat.losttales.channel.fellowship_unavailable";
-    private static final String FACTION_REFUSAL = "chat.losttales.channel.faction_unavailable";
     private static final String GATE_REFUSAL = "chat.losttales.channel.role_unavailable";
 
     @After
@@ -52,51 +50,53 @@ public final class ChatChannelSendRefusalTest {
     /** An open channel refuses nobody, whatever they are or are not in. */
     @Test
     public void anOpenChannelRefusesNobody() {
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.GLOBAL, null, ALDRIC, "", 0, false, false));
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.PROXIMITY, null, ALDRIC, "", 0, false, false));
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.OOC, null, null, "", 0, false, false));
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.GLOBAL, null, ALDRIC, 0, false, false));
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.PROXIMITY, null, ALDRIC, 0, false, false));
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.OOC, null, null, 0, false, false));
     }
 
     /** A channel that is not a channel at all refuses, rather than passing. */
     @Test
     public void noChannelIsRefused() {
         assertEquals(GATE_REFUSAL,
-                ChatChannelPolicy.sendRefusal(null, null, ALDRIC, GONDOR, 0, false, false));
+                ChatChannelPolicy.sendRefusal(null, null, ALDRIC, 0, false, false));
     }
 
     /** A fellowship line needs a fellowship, and the sender's own place in it. */
     @Test
     public void aFellowshipLineNeedsThatFellowshipsMembership() {
         assertEquals(FELLOWSHIP_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, null, ALDRIC, "", 0, false, false));
+                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, null, ALDRIC, 0, false, false));
         Fellowship fellowship = fellowshipOf(ALDRIC);
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, fellowship, ALDRIC, "", 0, false, false));
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, fellowship, ALDRIC, 0, false, false));
         assertEquals("someone else's fellowship is not the sender's",
                 FELLOWSHIP_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, fellowship, BEREN, "", 0, false, false));
+                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, fellowship, BEREN, 0, false, false));
         assertEquals("an identity with no gameplay id is in no fellowship",
                 FELLOWSHIP_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, fellowship, null, "", 0, false, false));
+                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, fellowship, null, 0, false, false));
     }
 
-    /** A faction line needs a faction: the account, which has none, is refused. */
+    /**
+     * A faction line needs no membership: every identity speaks to a
+     * faction, Unaligned when it has none, so only the gate can refuse it.
+     */
     @Test
-    public void aFactionLineNeedsAFaction() {
-        assertEquals(FACTION_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.FACTION, null, ALDRIC, "", 0, false, false));
-        assertEquals(FACTION_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.FACTION, null, ALDRIC, null, 0, false, false));
+    public void aFactionLineIsRefusedByItsGateAlone() {
         assertNull(ChatChannelPolicy.sendRefusal(
-                ChatChannel.FACTION, null, ALDRIC, GONDOR, 0, false, false));
+                ChatChannel.FACTION, null, ALDRIC, 0, false, false));
+        installOperatorGateOn(ChatChannel.FACTION);
+        assertEquals(GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
+                ChatChannel.FACTION, null, ALDRIC, 0, false, false));
     }
 
     /** Membership is asked before the gate, so the notice names the nearer reason. */
     @Test
     public void membershipIsAskedBeforeTheGate() {
-        installOperatorGateOn(ChatChannel.FACTION);
-        assertEquals("no faction is the reason, not the gate",
-                FACTION_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.FACTION, null, ALDRIC, "", 0, false, false));
+        installOperatorGateOn(ChatChannel.FELLOWSHIP);
+        assertEquals("no fellowship is the reason, not the gate",
+                FELLOWSHIP_REFUSAL,
+                ChatChannelPolicy.sendRefusal(ChatChannel.FELLOWSHIP, null, ALDRIC, 0, false, false));
     }
 
     /** The gate the config put on a channel refuses whoever does not hold its role. */
@@ -104,13 +104,13 @@ public final class ChatChannelSendRefusalTest {
     public void theGateRefusesWhoeverDoesNotHoldItsRole() {
         installOperatorGateOn(ChatChannel.OPERATOR);
         assertEquals(GATE_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.OPERATOR, null, ALDRIC, "", 0, false, false));
+                ChatChannelPolicy.sendRefusal(ChatChannel.OPERATOR, null, ALDRIC, 0, false, false));
         int operator = ChatRoleCatalog.server().byId("operator").bit();
         assertNull(ChatChannelPolicy.sendRefusal(
-                ChatChannel.OPERATOR, null, ALDRIC, "", operator, false, false));
+                ChatChannel.OPERATOR, null, ALDRIC, operator, false, false));
         assertTrue("the client is told to ask again for its tabs",
                 ChatChannelPolicy.isGateRefusal(GATE_REFUSAL));
-        assertTrue(!ChatChannelPolicy.isGateRefusal(FACTION_REFUSAL));
+        assertTrue(!ChatChannelPolicy.isGateRefusal(FELLOWSHIP_REFUSAL));
     }
 
     /**
@@ -132,10 +132,10 @@ public final class ChatChannelSendRefusalTest {
                         ChatChannelGates.current()));
         assertEquals("a player who is not an operator is refused",
                 GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                        ChatChannel.OPERATOR, null, ALDRIC, "", 0, false, false));
+                        ChatChannel.OPERATOR, null, ALDRIC, 0, false, false));
         assertNull("an operator still reaches it",
                 ChatChannelPolicy.sendRefusal(
-                        ChatChannel.OPERATOR, null, ALDRIC, "", 0, true, false));
+                        ChatChannel.OPERATOR, null, ALDRIC, 0, true, false));
         assertTrue("no other channel is restricted by its rule",
                 !ChatChannelPolicy.staffOnly(ChatChannel.GLOBAL,
                         ChatChannelGates.current())
@@ -163,7 +163,7 @@ public final class ChatChannelSendRefusalTest {
                         ChatChannelGates.current()));
         assertNull("anyone may send into it",
                 ChatChannelPolicy.sendRefusal(
-                        ChatChannel.OPERATOR, null, ALDRIC, "", 0, false, false));
+                        ChatChannel.OPERATOR, null, ALDRIC, 0, false, false));
     }
 
     /** With a gate in place the config decides again, operator or not. */
@@ -175,7 +175,7 @@ public final class ChatChannelSendRefusalTest {
                         ChatChannelGates.current()));
         assertEquals("the gate refuses whoever does not hold its role",
                 GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                        ChatChannel.OPERATOR, null, ALDRIC, "", 0, true, false));
+                        ChatChannel.OPERATOR, null, ALDRIC, 0, true, false));
     }
 
     /** Installs the seeded operator role and puts its gate on one channel. */
@@ -192,7 +192,7 @@ public final class ChatChannelSendRefusalTest {
     }
 
     /**
-     * The Server Console is opened by the {@code chat.server_console.read}
+     * The Server Log is opened by the {@code chat.server_console.read}
      * capability and by nothing else: no role, no gate and no operator
      * level reaches it on their own, and holding the capability reaches
      * it whatever the config says.
@@ -206,15 +206,15 @@ public final class ChatChannelSendRefusalTest {
                         && !ChatChannelPolicy.isServerConsole(ChatChannel.OPERATOR));
         assertEquals("a player without the capability is refused",
                 GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                        ChatChannel.SERVER_CONSOLE, null, ALDRIC, "", 0,
+                        ChatChannel.SERVER_CONSOLE, null, ALDRIC, 0,
                         false, false));
         assertEquals("being an operator is not the question asked",
                 GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                        ChatChannel.SERVER_CONSOLE, null, ALDRIC, "", 0,
+                        ChatChannel.SERVER_CONSOLE, null, ALDRIC, 0,
                         true, false));
         assertNull("a reader reaches it",
                 ChatChannelPolicy.sendRefusal(ChatChannel.SERVER_CONSOLE,
-                        null, ALDRIC, "", 0, false, true));
+                        null, ALDRIC, 0, false, true));
     }
 
     /**
@@ -224,7 +224,7 @@ public final class ChatChannelSendRefusalTest {
     @Test
     public void theClientConsoleIsEveryPlayersOwn() {
         assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.CLIENT_CONSOLE, null,
-                ALDRIC, "", 0, false, false));
+                ALDRIC, 0, false, false));
     }
 
     /** A side of a gate naming a role nothing knows is closed, not opened. */
@@ -238,8 +238,7 @@ public final class ChatChannelSendRefusalTest {
                 new String[] {"operator=read:opreator;send:opreator"}, catalog,
                 ChatRoleConfig.SILENT));
         assertEquals(GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                ChatChannel.OPERATOR, null, ALDRIC,  "",
-                catalog.byId("operator").bit(), false, false));
+                ChatChannel.OPERATOR, null, ALDRIC, catalog.byId("operator").bit(), false, false));
     }
 
 }

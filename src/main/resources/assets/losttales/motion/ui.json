@@ -125,5 +125,11 @@
   "ui.button.lit": {
     "about": "A control crossing to its lit artwork and back: most of the way in this many seconds.",
     "follow": 0.05
+  },
+  "ui.tip.show": {
+    "about": "A tip beside the pointer fading in, once the pointer has rested for the Tip Delay setting's 'short', 'medium' or 'long' milliseconds (none for Instant). For 'warm' milliseconds after a tip went, the next one stands at once. The rests are the pointer's, so the Animations settings leave them as they are.",
+    "duration": 140,
+    "curve": "ease_out",
+    "params": { "short": 350, "medium": 650, "long": 1100, "warm": 800 }
   }
 }

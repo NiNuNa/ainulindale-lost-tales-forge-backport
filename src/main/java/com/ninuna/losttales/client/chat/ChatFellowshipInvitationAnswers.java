@@ -13,7 +13,7 @@ import net.minecraft.util.ChatComponentTranslation;
 /**
  * Answers to fellowship invitations clicked in the chat. They are sent as the
  * Fellowship page sends them, and since the page may not be open to show the
- * outcome, the outcome is said in the Client Console.
+ * outcome, the outcome is said in the Console.
  */
 public final class ChatFellowshipInvitationAnswers {
     /** Answers waiting for the server; more than a player clicks in a moment. */

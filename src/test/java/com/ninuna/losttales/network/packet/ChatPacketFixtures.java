@@ -177,8 +177,7 @@ public final class ChatPacketFixtures {
         private UUID identityCharacterId;
         private long replyToMessageId = ChatMessageIds.NONE;
         private long echoNonce;
-        private String quoteAuthor = "";
-        private String quoteExcerpt = "";
+        private boolean quotesUnkept;
         private boolean action;
 
         private Send(ChatChannel channel, String message) {
@@ -216,10 +215,9 @@ public final class ChatPacketFixtures {
             return this;
         }
 
-        /** A quote of a line nobody named, as someone else's. */
-        public Send quoting(String author, String excerpt) {
-            this.quoteAuthor = author;
-            this.quoteExcerpt = excerpt;
+        /** A reply to a line no server holds a record of. */
+        public Send quotingUnkept() {
+            this.quotesUnkept = true;
             return this;
         }
 
@@ -239,8 +237,7 @@ public final class ChatPacketFixtures {
                     this.references, this.target, this.identityKind,
                     this.identityCharacterId, this.replyToMessageId,
                     this.targetIdentity, this.echoNonce, this.targetCharacterId,
-                    this.quoteAuthor, this.quoteExcerpt,
-                    LostTalesChatSendPacket.QUOTE_OTHER, this.action);
+                    this.quotesUnkept, this.action);
         }
     }
 

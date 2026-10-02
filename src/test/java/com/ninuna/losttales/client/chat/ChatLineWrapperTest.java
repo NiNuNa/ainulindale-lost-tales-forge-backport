@@ -377,7 +377,7 @@ public final class ChatLineWrapperTest {
                         "and on, down from the door where it began.").colors(0x55AA55, 0x336633)
                         .skin("losttales:human_ranger_male_2").build();
         IChatComponent grouped = LostTalesChatPresentation.build(packet,
-                ChatTab.of(ChatChannel.GLOBAL), new int[0], true);
+                ConversationPage.of(ChatChannel.GLOBAL), new int[0], true);
         for (int state = 0; state < 2; state++) {
             boolean chatOpen = state == 1;
             List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
@@ -412,7 +412,7 @@ public final class ChatLineWrapperTest {
         IChatComponent line = LostTalesChatPresentation.build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "Ranger", command)
                         .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_male_2").build(),
-                ChatTab.of(ChatChannel.GLOBAL), new int[0], false,
+                ConversationPage.of(ChatChannel.GLOBAL), new int[0], false,
                 ChatBodyKind.COMMAND);
         for (int state = 0; state < 2; state++) {
             boolean chatOpen = state == 1;
@@ -689,7 +689,7 @@ public final class ChatLineWrapperTest {
             assertEquals(-1, stampAt(runs(row)));
         }
         IChatComponent grouped = LostTalesChatPresentation.build(packet,
-                ChatTab.of(ChatChannel.GLOBAL), new int[0], true);
+                ConversationPage.of(ChatChannel.GLOBAL), new int[0], true);
         for (IChatComponent row : ChatLineWrapper.wrap(METRICS, grouped,
                 200, true, 1.0F, 1.0F, 1.0F, stamp)) {
             assertEquals(-1, stampAt(runs(row)));

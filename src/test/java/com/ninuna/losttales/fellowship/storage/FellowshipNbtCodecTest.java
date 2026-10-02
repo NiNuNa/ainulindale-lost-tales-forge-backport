@@ -26,7 +26,9 @@ import static org.junit.Assert.assertTrue;
  * A fellowship is saved whole: its name, guides, icon and switches, and
  * which fellowship each character travels with and which LOTR fellowship
  * stands for each. A fellowship whose stored name is not well formed goes
- * to the quarantine whole.
+ * to the quarantine whole, as does a fellowship or a member that lacks a
+ * key this build writes; data at another version keeps the whole store
+ * read-only.
  */
 public final class FellowshipNbtCodecTest {
 
@@ -100,6 +102,95 @@ public final class FellowshipNbtCodecTest {
         assertEquals(1, read.getQuarantineEntriesCopy().size());
         assertEquals("invalid_fellowship_name",
                 read.getQuarantineEntriesCopy().get(0).getString("Reason"));
+    }
+
+    /**
+     * Fellowship data at any version but the one this build writes is not
+     * this build's to read: the root, a fellowship or a member at another
+     * version, or naming none, keeps the whole store as it is, read-only.
+     */
+    @Test
+    public void anotherVersionAnywhereHoldsTheWholeStoreReadOnly() {
+        NBTTagCompound olderRoot = write(fellowship("Grey Company"));
+        olderRoot.setInteger("DataVersion", FellowshipNbtCodec.CURRENT_ROOT_DATA_VERSION - 1);
+        assertReadOnly(olderRoot, FellowshipNbtCodec.CURRENT_ROOT_DATA_VERSION - 1);
+
+        NBTTagCompound unversionedRoot = write(fellowship("Grey Company"));
+        unversionedRoot.removeTag("DataVersion");
+        assertReadOnly(unversionedRoot, 0);
+
+        NBTTagCompound olderFellowship = write(fellowship("Grey Company"));
+        firstFellowship(olderFellowship).setInteger("DataVersion",
+                Fellowship.CURRENT_DATA_VERSION - 1);
+        assertReadOnly(olderFellowship, Fellowship.CURRENT_DATA_VERSION - 1);
+
+        NBTTagCompound unversionedMember = write(fellowship("Grey Company"));
+        member(unversionedMember, 1).removeTag("DataVersion");
+        assertReadOnly(unversionedMember, 0);
+    }
+
+    /**
+     * A member whose stored entry lacks when it joined or the colour it
+     * wears goes to the quarantine whole; nothing is made up for it, and
+     * the rest of the fellowship stands.
+     */
+    @Test
+    public void aMemberMissingAKeyIsQuarantinedNotFilledIn() {
+        NBTTagCompound noJoinedAt = write(fellowship("Grey Company"));
+        member(noJoinedAt, 1).removeTag("JoinedAt");
+        assertMemberQuarantined(noJoinedAt, "missing_or_invalid_joined_at");
+
+        NBTTagCompound noColour = write(fellowship("Grey Company"));
+        member(noColour, 1).removeTag("Color");
+        assertMemberQuarantined(noColour, "missing_or_unknown_color");
+
+        NBTTagCompound unknownColour = write(fellowship("Grey Company"));
+        member(unknownColour, 1).setString("Color", "mauve");
+        assertMemberQuarantined(unknownColour, "missing_or_unknown_color");
+    }
+
+    /** A fellowship whose stored entry lacks a key this build writes goes to the quarantine whole. */
+    @Test
+    public void aFellowshipMissingAKeyIsQuarantinedNotFilledIn() {
+        String[] keys = {"CreatedAt", "Revision", "Switches", "Guides"};
+        for (String key : keys) {
+            NBTTagCompound saved = write(fellowship("Grey Company"));
+            firstFellowship(saved).removeTag(key);
+
+            FellowshipNbtCodec.ReadResult read = FellowshipNbtCodec.read(saved);
+            assertFalse(key, read.isReadOnly());
+            assertNull(key, read.getFellowships().get(FELLOWSHIP));
+            assertEquals(key, 1, read.getQuarantineEntriesCopy().size());
+        }
+    }
+
+    private static void assertReadOnly(NBTTagCompound saved, int version) {
+        NBTTagCompound before = (NBTTagCompound) saved.copy();
+        FellowshipNbtCodec.ReadResult read = FellowshipNbtCodec.read(saved);
+        assertTrue(read.isReadOnly());
+        assertEquals(version, read.getUnsupportedVersion());
+        assertTrue(read.getFellowships().isEmpty());
+        assertEquals("kept as it was", before, read.getOriginalDataCopy());
+    }
+
+    private static void assertMemberQuarantined(NBTTagCompound saved, String reason) {
+        FellowshipNbtCodec.ReadResult read = FellowshipNbtCodec.read(saved);
+        assertFalse(read.isReadOnly());
+        assertTrue(read.wasRepaired());
+        Fellowship back = read.getFellowships().get(FELLOWSHIP);
+        assertEquals(1, back.getMemberCount());
+        assertNull(back.getMember(GUIDE));
+        assertEquals(1, read.getQuarantineEntriesCopy().size());
+        assertEquals(reason, read.getQuarantineEntriesCopy().get(0).getString("Reason"));
+    }
+
+    private static NBTTagCompound firstFellowship(NBTTagCompound saved) {
+        return saved.getTagList("Fellowships", Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
+    }
+
+    private static NBTTagCompound member(NBTTagCompound saved, int index) {
+        return firstFellowship(saved).getTagList("Members", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(index);
     }
 
     private static Fellowship fellowship(String name) {

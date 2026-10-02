@@ -11,14 +11,14 @@ import java.util.UUID;
  * Which identity hired a unit, kept in the entity's own persistent data
  * so it travels with the unit through chunk saves: the owning account
  * and, for a character, the character's id. LOTR itself only knows the
- * account.
+ * account. The tag keys on the identity's gameplay id, so a unit the
+ * account holds belongs to the account character, whose id is the
+ * account's own.
  */
 public final class LotrHiredUnitTag {
 
     static final String KEY_ACCOUNT = "losttales:HiredByAccount";
     static final String KEY_CHARACTER = "losttales:HiredByCharacter";
-    /** The identity key of an account playing as itself. */
-    public static final String ACCOUNT_KEY = "account";
 
     private final UUID ownerId;
     private final UUID characterId;
@@ -44,20 +44,20 @@ public final class LotrHiredUnitTag {
         return this.characterId;
     }
 
-    /** The identity as one key: the character's id, or {@link #ACCOUNT_KEY}. */
+    /** The identity as one key: its gameplay id, the character's or else the account's. */
     public String identityKey() {
-        return identityKey(this.characterId);
+        return PlayableIdentity.gameplayId(this.characterId, this.ownerId).toString();
     }
 
-    public static String identityKey(UUID characterIdOrNull) {
-        return characterIdOrNull == null ? ACCOUNT_KEY : characterIdOrNull.toString();
-    }
-
+    /** The key of {@code identity}, or null for none. */
     public static String identityKey(PlayableIdentity identity) {
-        return identity == null ? null : identityKey(identity.getCharacterId());
+        return identity == null ? null : identity.getGameplayId().toString();
     }
 
-    /** The same owner with the character forgotten: what a deleted character leaves. */
+    /**
+     * The same owner with the character forgotten: what a deleted
+     * character leaves, which the account character takes.
+     */
     public LotrHiredUnitTag asAccount() {
         return new LotrHiredUnitTag(this.ownerId, null);
     }

@@ -332,6 +332,11 @@ public final class QuestJournalPage extends PageContent {
         this.listOut = !this.listOut;
     }
 
+    @Override
+    public void resetPanel() {
+        this.listOut = true;
+    }
+
     /** The tracker, the banners, the conversation and the quests' marks: Quest Settings. */
     @Override
     public Settings.Place settingsPlace() {
@@ -611,7 +616,7 @@ public final class QuestJournalPage extends PageContent {
         LostTalesUiSheet resting = collapsed
                 ? LostTalesUiSheet.PLUS : LostTalesUiSheet.MINUS;
         LostTalesUiSheet marked = collapsed
-                ? LostTalesUiSheet.PLUS_HOVER : LostTalesUiSheet.MINUS_HOVER;
+                ? LostTalesUiSheet.PLUS_LIT : LostTalesUiSheet.MINUS_LIT;
         LostTalesUiButton.drawGlyph(resting, marked, motion,
                 (float)rows.left + 2,
                 (float)Math.round(y + (CATEGORY_ROW_HEIGHT

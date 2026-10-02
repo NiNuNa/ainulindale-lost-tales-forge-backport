@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.chat.TwoWindowLayout;
-import com.ninuna.losttales.client.chat.ChatTab;
+import com.ninuna.losttales.client.chat.ConversationPage;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import java.util.Arrays;
 import java.util.Collections;
@@ -183,33 +183,33 @@ public final class WindowGesturesTest {
     @Test
     public void aVisibleSlotIsTranslatedPastHiddenTabsAndTheMovingOnes() {
         Window window = WindowLayout.windows().get(1);
-        List<WindowTab> tabs = window.getTabs();
+        List<WindowPage> tabs = window.getTabs();
         // A server gate hides Fellowship while its layout slot stays intact.
         java.util.List<String> allowed = new java.util.ArrayList<String>();
         for (ChatChannel channel : ChatChannel.values()) {
             if (channel != ChatChannel.FELLOWSHIP) { allowed.add(channel.getId()); }
         }
         ClientChatChannelState.setChannelGates(allowed, allowed);
-        assertTrue(tabs.contains(ChatTab.of(ChatChannel.FELLOWSHIP)));
+        assertTrue(tabs.contains(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertFalse(ClientChatChannelState.isAvailable(
-                ChatTab.of(ChatChannel.FELLOWSHIP)));
+                ConversationPage.of(ChatChannel.FELLOWSHIP)));
         // The k-th visible slot lands on the list index of the k-th
         // available tab, hidden ones between counted past.
         int visible = 0;
         for (int index = 0; index < tabs.size(); index++) {
             if (tabs.get(index).isAvailable()) {
                 assertEquals(index, WindowGestures.listPosition(window,
-                        Collections.<WindowTab>emptyList(), visible));
+                        Collections.<WindowPage>emptyList(), visible));
                 visible++;
             }
         }
         // Past the end: the position after the last tab.
         assertEquals(tabs.size(), WindowGestures.listPosition(window,
-                Collections.<WindowTab>emptyList(), visible));
+                Collections.<WindowPage>emptyList(), visible));
         // A tab on its way out is neither counted nor stood on: with the
         // first available tab moving, slot zero lands where the second
         // available tab stands, less the moving tab's own place.
-        WindowTab first = null;
+        WindowPage first = null;
         int firstIndex = -1;
         int secondIndex = -1;
         for (int index = 0; index < tabs.size(); index++) {

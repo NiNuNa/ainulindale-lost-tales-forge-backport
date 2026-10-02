@@ -17,15 +17,21 @@ import java.util.concurrent.ConcurrentHashMap;
  * connection, and the note is taken as it is read off the wire, so it
  * is in place before the command is run; queued to the server tick it
  * could land a tick late and miss the command. Nothing here touches the
- * world. Presentation only: the id is an opaque, bounded string the
- * client chose, shown to console readers as a link and trusted for
- * nothing else. Cleared with the rest of the server's chat state.</p>
+ * world. The id is a bounded string the client chose: console readers
+ * are shown it as a link, and it names the tab the command's answers are
+ * kept under. That is all it decides, and the server checks it first —
+ * an answer stays under the tab only while the player may read that
+ * conversation, and goes to their Console otherwise
+ * ({@link LostTalesServerBroadcastHook#answerTab}). Cleared with the rest
+ * of the server's chat state.</p>
  *
  * <p>Once the command runs, its note becomes the player's running
  * context ({@link #beginCommand}): the tab the command's answers are
  * kept under, answered line by line ({@link #answerLine}) for as long
  * as a note is fresh and for at most {@link #MAX_LINES_PER_COMMAND}
- * lines, so a listing command cannot fill the history with itself.</p>
+ * lines. The history charges every answer to the player's own share
+ * ({@link ChatHistory}), so a listing command only ever pushes out that
+ * player's own lines.</p>
  */
 public final class ChatCommandContexts {
     /** How long a note answers for a command; commands follow at once. */

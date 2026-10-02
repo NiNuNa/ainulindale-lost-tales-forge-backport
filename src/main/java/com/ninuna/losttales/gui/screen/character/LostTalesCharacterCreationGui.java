@@ -110,11 +110,11 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private static final int CONTROL_GAP = 6;
     /** How far one wheel notch scrolls the column. */
     private static final int SCROLL_STEP = 20;
-    /** Inside the tab strip's ends. */
     /** Where the header's title is drawn; the status takes its subtitle line when there is no stage. */
     private static final int HEADER_TEXT_Y = 8;
     private static final int HEADER_SUBTITLE_OFFSET =
             LostTalesSkyrimUiStyle.HEADER_SUBTITLE_OFFSET;
+    /** Inside the tab strip's ends. */
     private static final int TAB_INSET = 4;
     private static final int BUTTON_HEIGHT = 20;
     private static final int BUTTON_GAP = 6;

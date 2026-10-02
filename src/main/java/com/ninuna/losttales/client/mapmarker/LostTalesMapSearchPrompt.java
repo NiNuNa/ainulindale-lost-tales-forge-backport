@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import cpw.mods.fml.relauncher.Side;
@@ -160,7 +161,8 @@ final class LostTalesMapSearchPrompt {
                 this, mouseY, pivotY);
         LostTalesMapPopupAnimation.pushFixed();
         try {
-            Gui.drawRect(0, 0, screenWidth, screenHeight, 0x66000000);
+            Gui.drawRect(0, 0, screenWidth, screenHeight,
+                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x66));
         } finally {
             LostTalesMapPopupAnimation.pop();
         }

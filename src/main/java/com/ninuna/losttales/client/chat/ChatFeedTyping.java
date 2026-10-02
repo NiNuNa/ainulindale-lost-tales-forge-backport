@@ -20,10 +20,10 @@ import java.util.List;
 final class ChatFeedTyping {
     /** One conversation and who is typing into it, oldest first. */
     static final class Segment {
-        final ChatTab tab;
+        final ConversationPage tab;
         final List<String> names;
 
-        Segment(ChatTab tab, List<String> names) {
+        Segment(ConversationPage tab, List<String> names) {
             this.tab = tab;
             this.names = Collections.unmodifiableList(
                     new ArrayList<String>(names));
@@ -38,12 +38,12 @@ final class ChatFeedTyping {
     private ChatFeedTyping() {}
 
     /** The conversations of {@code tabs} someone is typing into, in their order. */
-    static List<Segment> segments(List<ChatTab> tabs) {
+    static List<Segment> segments(List<ConversationPage> tabs) {
         List<Segment> segments = new ArrayList<Segment>();
         if (!LostTalesConfig.showChatTypingIndicators) {
             return segments;
         }
-        for (ChatTab tab : tabs) {
+        for (ConversationPage tab : tabs) {
             List<String> names = ClientChatTypingState.namesTyping(tab);
             if (!names.isEmpty()) {
                 segments.add(new Segment(tab, names));

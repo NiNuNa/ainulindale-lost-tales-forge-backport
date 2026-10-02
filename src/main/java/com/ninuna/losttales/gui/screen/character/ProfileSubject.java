@@ -5,7 +5,7 @@ import com.ninuna.losttales.character.sync.CharacterSummary;
 import java.util.UUID;
 
 /**
- * Whose profile the Characters tab shows, as far as this client knows
+ * Whose profile the Characters page shows, as far as this client knows
  * them: a character of the player's own roster, the account while its
  * record is not made, or another person's character — with everything
  * their appearance tells when it is the one they play, and only its name

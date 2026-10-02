@@ -65,8 +65,7 @@ public final class CharacterValidator {
         if (roster == null) {
             return CharacterValidationResult.failure(CharacterErrorId.INTERNAL_ERROR);
         }
-        if (expectedRevision != CharacterCreationRequest.REVISION_NOT_CHECKED
-                && expectedRevision != roster.getRevision()) {
+        if (expectedRevision != roster.getRevision()) {
             return CharacterValidationResult.failure(CharacterErrorId.STALE_ROSTER);
         }
         return CharacterValidationResult.success();

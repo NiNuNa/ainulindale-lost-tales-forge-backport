@@ -18,8 +18,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.I18n;
 
 /**
- * The Characters tab's capes menu, in a sub-window of its own in the
- * tab's window: the capes of the identity picked. Every change is sent at
+ * The Characters page's capes menu, in a sub-window of its own in the
+ * page's window: the capes of the identity picked. Every change is sent at
  * once, as a setting is, and the menu stays for the next; while the
  * server answers, the rows wait.
  */
@@ -31,7 +31,7 @@ final class CharacterMenus {
 
     private CharacterMenus() {}
 
-    /** Gives every screen the tab's menu. */
+    /** Gives every screen the page's menu. */
     static void install() {
         WindowMenus.registerShared(CharacterSubWindows.CAPES, new CapesSource());
     }

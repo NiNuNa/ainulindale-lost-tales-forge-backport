@@ -49,7 +49,7 @@ public final class LostTalesWorldQuestMarkerRenderer {
         double cameraY = player.lastTickPosY + (player.posY - player.lastTickPosY) * partialTicks;
         double cameraZ = player.lastTickPosZ + (player.posZ - player.lastTickPosZ) * partialTicks;
         int dimension = minecraft.theWorld.provider.dimensionId;
-        double maxDistance = Math.max(24.0D, LostTalesConfig.worldQuestMarkerMaxDistance);
+        double maxDistance = Math.max(48.0D, LostTalesConfig.worldQuestMarkerMaxDistance);
         double maxDistanceSq = maxDistance * maxDistance;
 
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
@@ -78,7 +78,7 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 double dyPlayer = player.posY - markerY;
                 double dzPlayer = player.posZ - marker.getZ();
                 double distSq = dxPlayer * dxPlayer + dyPlayer * dyPlayer + dzPlayer * dzPlayer;
-                if (distSq > maxDistanceSq * 4.0D) {
+                if (distSq > maxDistanceSq) {
                     continue;
                 }
                 renderMarkerLabel(minecraft.fontRenderer, label, marker.getX(), markerY, marker.getZ(), Math.sqrt(distSq), cameraX, cameraY, cameraZ);
@@ -92,7 +92,7 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 double dyPlayer = player.posY - marker.getY();
                 double dzPlayer = player.posZ - marker.getZ();
                 double distSq = dxPlayer * dxPlayer + dyPlayer * dyPlayer + dzPlayer * dzPlayer;
-                if (distSq > maxDistanceSq * 4.0D) {
+                if (distSq > maxDistanceSq) {
                     continue;
                 }
                 renderMarkerLabel(minecraft.fontRenderer, marker.getLabel(), marker.getX(), marker.getY(), marker.getZ(), Math.sqrt(distSq), cameraX, cameraY, cameraZ);

@@ -31,11 +31,12 @@ import java.util.UUID;
  * said, who was sent it, and who else may still be shown it.
  *
  * <p>Three things read it. A <em>reply</em> names a message, and is
- * honoured only when the message is here and the player replying was
- * sent it — otherwise naming an id would quote a private line into a
- * channel of the replier's choosing. An <em>edit</em> or a
- * <em>removal</em> asks whether the player is the author, and where the
- * change has to go, which is the same recorded set. And a player
+ * honoured only when the message is here and the player replying may
+ * read it ({@link #canRead}) — otherwise naming an id would quote a
+ * private line into a channel of the replier's choosing. An
+ * <em>edit</em> or a <em>removal</em> asks whether the player is the
+ * author, and where the change has to go: the recorded set, narrowed for
+ * an edit to those who may still read the line. And a player
  * <em>joining</em> is shown the recent messages they are entitled to,
  * so a conversation that went on without them is not lost: every entry
  * keeps the line exactly as it was sent, and an {@link Audience} that
@@ -47,17 +48,23 @@ import java.util.UUID;
  * account whose chat identity was in the faction then, a gated line
  * (Operator Chat, the consoles, a read gate) whoever may read the channel
  * when they ask.
- * Gaining a role, a fellowship or a faction afterwards never opens what was
+ * Gaining a fellowship or a faction afterwards never opens what was
  * said before. Proximity lines reach only those who were near, since
- * where a player stood then cannot be asked again.</p>
+ * where a player stood then cannot be asked again. Having been shown a
+ * line of a conversation one can leave — a gated channel, a faction's, a
+ * fellowship's — counts only while one is still in it ({@link #canRead}).</p>
  *
  * <p>Bounded per channel — per faction and per fellowship on the channels
- * that hold several, and per conversation for whispers, so one busy
- * faction, fellowship or pair cannot push another's lines out —
+ * that hold several, per conversation for whispers, and per account for
+ * a line kept for that account alone, so one busy faction, fellowship,
+ * pair or player cannot push another's lines out —
  * ({@link #perChannelCapacity}, the server's {@code historyPerChannel})
  * and in all
  * ({@link #MAX_TOTAL}), the oldest
- * going first; a replay hands a player at most
+ * going first. Lines kept for one account alone hold at most
+ * {@link #MAX_PRIVATE} between them and never push out a shared line: a
+ * private line past either bound drops the oldest private line, and only
+ * a shared line drops the oldest line of all. A replay hands a player at most
  * {@link #MAX_REPLAY_PER_CONVERSATION} of a conversation and
  * {@link #MAX_REPLAY_TOTAL} in all. The live store is this class; the
  * world save keeps a copy through {@link ChatHistoryWorldData}, written
@@ -68,6 +75,11 @@ import java.util.UUID;
 public final class ChatHistory {
     /** Messages kept in all, whatever the channels. */
     public static final int MAX_TOTAL = 2000;
+    /**
+     * The most lines kept for one account alone — Console notes,
+     * commands' answers — between every account: a fifth of the total.
+     */
+    public static final int MAX_PRIVATE = MAX_TOTAL / 5;
     /** The most one request for older lines of a channel is answered with. */
     public static final int MAX_OLDER_PER_REQUEST = 50;
     /** The most of one conversation a joining player is shown: a channel, or one faction's or fellowship's talk. */
@@ -75,10 +87,19 @@ public final class ChatHistory {
     /** The most a joining player is shown in all. */
     public static final int MAX_REPLAY_TOTAL = 400;
 
+    /**
+     * Before an account's id, the budget of the lines kept for that
+     * account alone. A channel's id is letters, digits and underscores,
+     * so no channel's budget can share the key.
+     */
+    private static final String ACCOUNT_BUDGET = "|account:";
+
     private static final LinkedHashMap<Long, Entry> ENTRIES =
             new LinkedHashMap<Long, Entry>();
     private static final Map<String, Integer> COUNT_BY_CHANNEL =
             new HashMap<String, Integer>();
+    /** How many kept lines are kept for one account alone, every account's together. */
+    private static int privateCount;
     /** The save the history is written with, or null while it has none. */
     private static ChatHistoryWorldData store;
 
@@ -293,14 +314,40 @@ public final class ChatHistory {
     }
 
     /**
-     * The one rule for who may quote, react to, forward, share or report
-     * a line: whoever was sent it, or may read it now as the replay
-     * would show it to them.
+     * The one rule for who may quote, react to, forward, share, report or
+     * remove a line, and who is told of its edits and reactions: whoever
+     * may read it now as the replay would show it to them, or was sent
+     * it and still holds what its conversation asks — the channel's read
+     * gate, the fellowship, the faction ({@link Audience#stillReaches}).
      */
     private static boolean canRead(Entry entry, Requester requester) {
-        return requester != null && requester.accountId != null
-                && (entry.seenBy.contains(requester.accountId)
-                        || entry.audience.admits(requester, entry));
+        if (requester == null || requester.accountId == null) {
+            return false;
+        }
+        return entry.audience.admits(requester, entry)
+                || (entry.seenBy.contains(requester.accountId)
+                        && entry.audience.stillReaches(requester, entry));
+    }
+
+    /**
+     * Whether {@code requester} may read the kept line {@code messageId}
+     * now, by {@link #canRead}; false for a line not kept.
+     */
+    public static synchronized boolean mayRead(long messageId,
+                                               Requester requester) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry != null && canRead(entry, requester);
+    }
+
+    /**
+     * Whether who may read the kept line {@code messageId} depends on what
+     * a reader holds now — a read gate, a fellowship, a faction — so each
+     * reader has to be asked ({@link #mayRead}) before an edit or a
+     * reaction is sent to them. False for a line not kept.
+     */
+    public static synchronized boolean asksCurrentAccess(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry != null && entry.audience.asksCurrentAccess();
     }
 
     /**
@@ -326,7 +373,7 @@ public final class ChatHistory {
 
     /**
      * The message a player may forward, as the server holds it, or null:
-     * one they were sent or may read now — what they may react to — said
+     * one they may read now ({@link #canRead}), what they may react to, said
      * by a player or a Discord member, never by the Server, in a
      * conversation a link can name. The forward names it by that link and
      * by its author, wearing the head the line was drawn with.
@@ -399,7 +446,7 @@ public final class ChatHistory {
 
     /**
      * The message a player may report, as the server holds it, or null:
-     * one they were shown, or one said for everyone, spoken by another
+     * one they may read now ({@link #canRead}), spoken by another
      * player or a Discord member — never by the Server, the Client or
      * themselves.
      */
@@ -414,8 +461,25 @@ public final class ChatHistory {
         }
         ChatChannel channel = ChatChannel.fromId(entry.channelId);
         return channel == null ? null : new Reportable(channel,
-                entry.forOthers.getScopeValue(), entry.author,
+                entry.forOthers.getScopeValue(), staffAuthorOf(entry),
                 entry.forOthers.getNameColor(), entry.excerpt);
+    }
+
+    /**
+     * Who said a kept line, as staff are told: the name it was signed
+     * with, or for a Narrator line the account that narrated it, which
+     * the server keeps on the narrator's own copy and on no other.
+     */
+    private static String staffAuthorOf(Entry entry) {
+        if (entry.forOthers.isNarrator() && entry.forSender != null) {
+            String account = entry.forSender.getAccountName();
+            if (account != null && account.trim().length() > 0
+                    && !LostTalesChatMessagePacket.isSystemSender(
+                            entry.forSender.getSenderId())) {
+                return account.trim();
+            }
+        }
+        return entry.author;
     }
 
     /** A message as a report names it: where it was said, by whom, and how it began. */
@@ -590,7 +654,7 @@ public final class ChatHistory {
      * with what changed, or null when nothing did: no such message, a
      * reactor who may not read it, a reaction already there or not
      * there to take back, or one past the bounds. A player may react to
-     * what they were sent or may be shown now, exactly what a reply may
+     * what they may read now ({@link #canRead}), exactly what a reply may
      * quote; {@code requester} is null for a Discord member, whose
      * message crossed the bridge and whose reaction reached the game by
      * it. A player who reacts is one of the message's readers from then
@@ -752,8 +816,9 @@ public final class ChatHistory {
      * The copy of a kept line {@code requester} is handed — their own
      * copy of a line they sent, everyone else's of every other — with
      * the reactions on it as they are shown them. Handing it makes them
-     * one of its readers: an edit, a removal or a reaction made later
-     * reaches them as it reaches those who were online when it was said.
+     * one of its readers: a removal made later reaches them as it reaches
+     * those who were online when it was said, and an edit or a reaction
+     * does while they may still read it.
      */
     private static LostTalesChatMessagePacket shownTo(Requester requester,
                                                       Entry entry) {
@@ -797,17 +862,20 @@ public final class ChatHistory {
 
     /**
      * Forgets a message whoever wrote it and answers with who wrote it
-     * and who has to be told, or null for a message out of reach. What
-     * a moderator's removal calls: the author check is the caller's,
-     * made against the moderator's own standing rather than the entry.
+     * and who has to be told, or null for a message out of reach: one
+     * not kept, or one {@code moderator} may not read ({@link #canRead}),
+     * so a whisper or another faction's line is never theirs to take.
+     * What a moderator's removal calls: whether they may moderate is the
+     * caller's check, made against the moderator's own standing.
      */
-    public static synchronized Removal removeByOperator(long messageId) {
+    public static synchronized Removal removeByOperator(long messageId,
+                                                        Requester moderator) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
-        if (entry == null) {
+        if (entry == null || !canRead(entry, moderator)) {
             return null;
         }
         forget(messageId);
-        return new Removal(entry.author,
+        return new Removal(staffAuthorOf(entry),
                 Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy)));
     }
 
@@ -1083,6 +1151,40 @@ public final class ChatHistory {
             }
             return !this.gated || requester.readableChannels.contains(entry.channelId);
         }
+
+        /**
+         * Whether someone the line was shown to still holds what its
+         * conversation asks: the channel's read gate, the fellowship, the
+         * faction. A line said to the accounts that heard it — a whisper's,
+         * Proximity's, a note to oneself — asks nothing more.
+         */
+        boolean stillReaches(Requester requester, Entry entry) {
+            if (this.fellowshipId != null
+                    && !requester.fellowshipIds.contains(this.fellowshipId)) {
+                return false;
+            }
+            if (this.factionId != null
+                    && !requester.ownedFactions.containsKey(this.factionId)) {
+                return false;
+            }
+            return !this.gated || requester.readableChannels.contains(entry.channelId);
+        }
+
+        /** Whether reading the line asks what a reader holds now: a gate, a fellowship, a faction. */
+        boolean asksCurrentAccess() {
+            return this.gated || this.fellowshipId != null || this.factionId != null;
+        }
+
+        /**
+         * The one account the line is kept for, when it is kept for one
+         * alone — a command's answer, a note to oneself, a line nobody else
+         * heard — and belongs to no fellowship or faction; null otherwise.
+         */
+        UUID soleAccount() {
+            return this.accounts != null && this.accounts.size() == 1
+                    && this.fellowshipId == null && this.factionId == null
+                    ? this.accounts.iterator().next() : null;
+        }
     }
 
     /**
@@ -1152,15 +1254,31 @@ public final class ChatHistory {
         } else {
             COUNT_BY_CHANNEL.put(channelId, Integer.valueOf(next));
         }
+        if (isPrivateBudget(channelId)) {
+            privateCount = Math.max(0, privateCount + delta);
+        }
+    }
+
+    /** Whether a budget is one account's own: lines kept for that account alone. */
+    private static boolean isPrivateBudget(String budgetKey) {
+        return budgetKey != null && budgetKey.startsWith(ACCOUNT_BUDGET);
     }
 
     /**
-     * The budget a line is charged to: its channel; on a channel that
-     * holds several conversations, the one faction or fellowship it was said
-     * in; for a whisper the pair of identities. So a busy faction, fellowship
-     * or pair only ever pushes out its own lines.
+     * The budget a line is charged to: for a line kept for one account
+     * alone, that account's, one for all its channels; otherwise its
+     * channel; on a channel that holds several conversations, the one
+     * faction or fellowship it was said in; for a whisper the pair of
+     * identities. So a busy faction, fellowship or pair only ever pushes
+     * out its own lines, and a player's own answers and notes only ever
+     * push out private lines: that player's past their own cap, the
+     * oldest of anyone's past {@link #MAX_PRIVATE} or the total.
      */
     private static String budgetKeyOf(Entry entry) {
+        UUID sole = entry.audience.soleAccount();
+        if (sole != null) {
+            return ACCOUNT_BUDGET + sole;
+        }
         LostTalesChatMessagePacket copy = entry.forSender;
         if (!ChatChannel.WHISPER.getId().equals(entry.channelId)) {
             String scope = copy.getScopeValue();
@@ -1175,37 +1293,61 @@ public final class ChatHistory {
                 ? one + "|" + other : other + "|" + one);
     }
 
-    /** Drops the oldest of a budget past its cap, then the oldest of all past the total. */
+    /**
+     * Makes room after a line charged to {@code budgetKey} was kept: the
+     * oldest of that budget past its cap; for a private line, the oldest
+     * private line past {@link #MAX_PRIVATE} and past the total, so a
+     * private line never pushes out a shared one; for a shared line, the
+     * oldest line of all past the total.
+     */
     private static void trim(String budgetKey) {
         Integer count = COUNT_BY_CHANNEL.get(budgetKey);
         if (count != null && count.intValue() > perChannelCapacity()) {
-            Iterator<Map.Entry<Long, Entry>> oldest = ENTRIES.entrySet().iterator();
-            while (oldest.hasNext()) {
-                Map.Entry<Long, Entry> candidate = oldest.next();
-                if (budgetKey.equals(budgetKeyOf(candidate.getValue()))) {
-                    oldest.remove();
-                    count(budgetKey, -1);
-                    break;
-                }
+            dropOldest(budgetKey, false);
+        }
+        boolean privateLine = isPrivateBudget(budgetKey);
+        while (privateCount > MAX_PRIVATE && dropOldest(null, true)) {
+            // One private line goes each time round.
+        }
+        while (ENTRIES.size() > MAX_TOTAL && dropOldest(null, privateLine)) {
+            // One line goes each time round: a private one for a private line.
+        }
+    }
+
+    /**
+     * Drops the oldest kept line of {@code budgetKey}, or of any private
+     * budget when {@code privateOnly}, or the oldest of all when neither
+     * narrows it. False when no line matched.
+     */
+    private static boolean dropOldest(String budgetKey, boolean privateOnly) {
+        Iterator<Map.Entry<Long, Entry>> oldest = ENTRIES.entrySet().iterator();
+        while (oldest.hasNext()) {
+            String key = budgetKeyOf(oldest.next().getValue());
+            if ((budgetKey == null || budgetKey.equals(key))
+                    && (!privateOnly || isPrivateBudget(key))) {
+                oldest.remove();
+                count(key, -1);
+                return true;
             }
         }
-        while (ENTRIES.size() > MAX_TOTAL) {
-            Iterator<Map.Entry<Long, Entry>> oldest = ENTRIES.entrySet().iterator();
-            Map.Entry<Long, Entry> gone = oldest.next();
-            oldest.remove();
-            count(budgetKeyOf(gone.getValue()), -1);
-        }
+        return false;
     }
 
     /** Cleared with the rest of the server's chat state. */
     public static synchronized void clear() {
         ENTRIES.clear();
         COUNT_BY_CHANNEL.clear();
+        privateCount = 0;
     }
 
     /** Messages currently within reach. */
     static synchronized int size() {
         return ENTRIES.size();
+    }
+
+    /** Lines kept for one account alone, every account's together. */
+    static synchronized int privateSize() {
+        return privateCount;
     }
 
     /** One distributed message: who wrote it, how it reads, who saw it, who may. */

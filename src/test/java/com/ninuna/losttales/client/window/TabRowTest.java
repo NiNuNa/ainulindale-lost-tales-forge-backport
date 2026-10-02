@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.client.chat.ChatTab;
+import com.ninuna.losttales.client.chat.ConversationPage;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.awt.image.BufferedImage;
@@ -435,7 +435,7 @@ public final class TabRowTest {
     private static TabRow.Tab tab(double fromLeft, double fromWidth,
                                             double toLeft, double toWidth) {
         TabRow.Tab tab = new TabRow.Tab(
-                ChatTab.of(com.ninuna.losttales.chat.ChatChannel.GLOBAL), 0, false,
+                ConversationPage.of(com.ninuna.losttales.chat.ChatChannel.GLOBAL), 0, false,
                 "Global", 30, false, 0, (int)toWidth, -1, -1, -1, false);
         tab.standAt(fromLeft, fromWidth, 1.0D / 3.0D);
         tab.toLeft = toLeft;

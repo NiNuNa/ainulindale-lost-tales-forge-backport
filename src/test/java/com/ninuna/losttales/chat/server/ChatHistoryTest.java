@@ -235,11 +235,46 @@ public final class ChatHistoryTest {
         // A moderator's removal likewise, and it says whose the message was.
         long other = record(ChatChannel.GLOBAL, BOB, "and that", Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.everyone());
-        ChatHistory.Removal removal = ChatHistory.removeByOperator(other);
+        ChatHistory.Removal removal = ChatHistory.removeByOperator(other,
+                requester(CAROL));
         assertEquals("Aldric", removal.author);
         assertTrue(removal.recipients.contains(ALICE));
-        assertNull(ChatHistory.removeByOperator(other));
+        assertNull(ChatHistory.removeByOperator(other, requester(CAROL)));
         assertEquals(0, ChatHistory.size());
+    }
+
+    /**
+     * A moderator removes only what they may read: ids are handed out in
+     * order, so naming one must not reach a whisper or another faction's
+     * line they were never shown.
+     */
+    @Test
+    public void aModeratorRemovesOnlyWhatTheyMayRead() {
+        long whisper = record(ChatChannel.WHISPER, ALICE, "the vault code",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        long mordor = record(ChatChannel.FACTION, BOB, "for Mordor",
+                Arrays.asList(BOB), ChatHistory.Audience.faction("MORDOR", false),
+                "MORDOR");
+        long operator = record(ChatChannel.OPERATOR, ALICE, "staff only",
+                Arrays.asList(ALICE), ChatHistory.Audience.readers());
+        ChatHistory.Requester moderator = ChatHistoryRequesters.oneFaction(CAROL,
+                GONDOR, 0L, null, Collections.singletonList(ChatChannel.GLOBAL));
+
+        assertNull("a whisper between others", ChatHistory.removeByOperator(
+                whisper, moderator));
+        assertNull("another faction's line", ChatHistory.removeByOperator(
+                mordor, moderator));
+        assertNull("a channel they may not read", ChatHistory.removeByOperator(
+                operator, moderator));
+        assertNull(ChatHistory.removeByOperator(whisper, null));
+        assertEquals(3, ChatHistory.size());
+
+        assertNotNull("one of the whisper's two people may",
+                ChatHistory.removeByOperator(whisper, requester(BOB)));
+        assertNotNull("a reader of the channel may", ChatHistory.removeByOperator(
+                operator, requester(CAROL)));
+        assertEquals(1, ChatHistory.size());
     }
 
     /* ---- bounds ---- */
@@ -264,6 +299,171 @@ public final class ChatHistoryTest {
         assertEquals(ChatHistory.perChannelCapacity() + 1, ChatHistory.size());
         ChatHistory.clear();
         assertEquals(0, ChatHistory.size());
+    }
+
+    /**
+     * A line kept for one account alone — a command's answer, wherever it
+     * was typed, a note to oneself — is charged to that account's own
+     * budget, so however many a player piles up they only ever push out
+     * their own, never a conversation's shared lines or another player's.
+     */
+    @Test
+    public void aPlayersOwnLinesNeverPushOutASharedLine() {
+        int kept = LostTalesConfig.chatHistoryPerChannel;
+        LostTalesConfig.chatHistoryPerChannel = 3;
+        try {
+            long staff = record(ChatChannel.OPERATOR, BOB, "restarting at nine",
+                    Arrays.asList(BOB), ChatHistory.Audience.readers());
+            long global = record(ChatChannel.GLOBAL, BOB, "well met",
+                    Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+            long bobsNote = record(ChatChannel.CLIENT_CONSOLE, BOB, "remember the gate",
+                    Arrays.asList(BOB), ChatHistory.Audience.accounts(
+                            Arrays.asList(BOB), false));
+            long alicesFirst = 0L;
+            long alicesLast = 0L;
+            for (int index = 0; index < 40; index++) {
+                ChatChannel channel = index % 2 == 0 ? ChatChannel.OPERATOR
+                        : ChatChannel.GLOBAL;
+                long answer = record(channel,
+                        LostTalesChatMessagePacket.SERVER_SENDER_ID, "answer " + index,
+                        Arrays.asList(ALICE), ChatHistory.Audience.accounts(
+                                Arrays.asList(ALICE), false));
+                if (index == 0) {
+                    alicesFirst = answer;
+                }
+                alicesLast = answer;
+            }
+
+            assertTrue("Operator Chat keeps its line", ChatHistory.quoteFor(staff,
+                    requester(CAROL), ChatChannel.OPERATOR, "").exists());
+            assertTrue("Global keeps its line", ChatHistory.quoteFor(global,
+                    requester(CAROL), ChatChannel.GLOBAL, "").exists());
+            assertTrue("another player's own line stays", ChatHistory.quoteFor(
+                    bobsNote, requester(BOB), ChatChannel.CLIENT_CONSOLE, "").exists());
+            assertFalse("her oldest answer went", ChatHistory.mayRead(alicesFirst,
+                    requester(ALICE)));
+            assertTrue(ChatHistory.mayRead(alicesLast, requester(ALICE)));
+            assertEquals("two shared lines, Bob's own, and Alice's budget",
+                    3 + ChatHistory.perChannelCapacity(), ChatHistory.size());
+        } finally {
+            LostTalesConfig.chatHistoryPerChannel = kept;
+        }
+    }
+
+    /**
+     * However many private lines one account piles up, they never push a
+     * shared line out of the 2,000: at the total, a private line being
+     * kept drops the oldest private line instead.
+     */
+    @Test
+    public void oneAccountFloodingNeverEvictsASharedLine() {
+        int kept = LostTalesConfig.chatHistoryPerChannel;
+        LostTalesConfig.chatHistoryPerChannel = ChatHistory.MAX_TOTAL;
+        try {
+            long firstShared = 0L;
+            for (int index = 0; index < ChatHistory.MAX_TOTAL - 10; index++) {
+                long id = record(ChatChannel.GLOBAL, BOB, "line " + index,
+                        Arrays.asList(BOB), ChatHistory.Audience.everyone());
+                if (index == 0) {
+                    firstShared = id;
+                }
+            }
+            long firstNote = 0L;
+            long lastNote = 0L;
+            for (int index = 0; index < 100; index++) {
+                lastNote = record(ChatChannel.CLIENT_CONSOLE, ALICE, "note " + index,
+                        Arrays.asList(ALICE), ChatHistory.Audience.accounts(
+                                Arrays.asList(ALICE), false));
+                if (index == 0) {
+                    firstNote = lastNote;
+                }
+            }
+            assertTrue("the oldest shared line stays", ChatHistory.quoteFor(
+                    firstShared, requester(CAROL), ChatChannel.GLOBAL, "").exists());
+            assertEquals(ChatHistory.MAX_TOTAL, ChatHistory.size());
+            assertEquals(10, ChatHistory.privateSize());
+            assertFalse(ChatHistory.mayRead(firstNote, requester(ALICE)));
+            assertTrue(ChatHistory.mayRead(lastNote, requester(ALICE)));
+        } finally {
+            LostTalesConfig.chatHistoryPerChannel = kept;
+        }
+    }
+
+    /** A shared line kept at the total drops the oldest line of all, a private one too. */
+    @Test
+    public void aSharedLineAtTheTotalDropsTheOldestLineOfAll() {
+        int kept = LostTalesConfig.chatHistoryPerChannel;
+        LostTalesConfig.chatHistoryPerChannel = ChatHistory.MAX_TOTAL;
+        try {
+            long note = record(ChatChannel.CLIENT_CONSOLE, ALICE, "an early note",
+                    Arrays.asList(ALICE), ChatHistory.Audience.accounts(
+                            Arrays.asList(ALICE), false));
+            for (int index = 0; index < ChatHistory.MAX_TOTAL; index++) {
+                record(ChatChannel.GLOBAL, BOB, "line " + index,
+                        Arrays.asList(BOB), ChatHistory.Audience.everyone());
+            }
+            assertFalse(ChatHistory.mayRead(note, requester(ALICE)));
+            assertEquals(ChatHistory.MAX_TOTAL, ChatHistory.size());
+            assertEquals(0, ChatHistory.privateSize());
+        } finally {
+            LostTalesConfig.chatHistoryPerChannel = kept;
+        }
+    }
+
+    /**
+     * Many accounts' private lines together never hold more than a fifth
+     * of the 2,000: past it the oldest private line goes, whoever's, and
+     * each account still keeps to its own cap.
+     */
+    @Test
+    public void manyAccountsTogetherNeverTakeMoreThanAFifth() {
+        int kept = LostTalesConfig.chatHistoryPerChannel;
+        LostTalesConfig.chatHistoryPerChannel = 150;
+        try {
+            long shared = record(ChatChannel.GLOBAL, BOB, "well met",
+                    Arrays.asList(BOB), ChatHistory.Audience.everyone());
+            UUID firstPlayer = null;
+            UUID lastPlayer = null;
+            long firstOfAll = 0L;
+            long lastOfAll = 0L;
+            for (int account = 0; account < 10; account++) {
+                UUID player = UUID.randomUUID();
+                lastPlayer = player;
+                for (int index = 0; index < 100; index++) {
+                    lastOfAll = record(ChatChannel.CLIENT_CONSOLE, player,
+                            "note " + index, Arrays.asList(player),
+                            ChatHistory.Audience.accounts(Arrays.asList(player), false));
+                    if (account == 0 && index == 0) {
+                        firstPlayer = player;
+                        firstOfAll = lastOfAll;
+                    }
+                    assertTrue(ChatHistory.privateSize() <= ChatHistory.MAX_PRIVATE);
+                }
+            }
+            assertEquals(ChatHistory.MAX_PRIVATE, ChatHistory.privateSize());
+            assertEquals(1 + ChatHistory.MAX_PRIVATE, ChatHistory.size());
+            assertTrue("the shared line stays", ChatHistory.quoteFor(shared,
+                    requester(CAROL), ChatChannel.GLOBAL, "").exists());
+            assertFalse("the oldest private line went",
+                    ChatHistory.mayRead(firstOfAll, requester(firstPlayer)));
+            assertTrue(ChatHistory.mayRead(lastOfAll, requester(lastPlayer)));
+
+            // One account past its own cap drops its own oldest first.
+            UUID flooding = UUID.randomUUID();
+            long[] notes = new long[200];
+            for (int index = 0; index < notes.length; index++) {
+                notes[index] = record(ChatChannel.CLIENT_CONSOLE, flooding,
+                        "note " + index, Arrays.asList(flooding),
+                        ChatHistory.Audience.accounts(Arrays.asList(flooding), false));
+            }
+            assertFalse(ChatHistory.mayRead(notes[49], requester(flooding)));
+            assertTrue(ChatHistory.mayRead(notes[50], requester(flooding)));
+            assertEquals(ChatHistory.MAX_PRIVATE, ChatHistory.privateSize());
+            assertTrue(ChatHistory.quoteFor(shared, requester(CAROL),
+                    ChatChannel.GLOBAL, "").exists());
+        } finally {
+            LostTalesConfig.chatHistoryPerChannel = kept;
+        }
     }
 
     @Test
@@ -416,7 +616,7 @@ public final class ChatHistoryTest {
 
     /** A whisper is its two people's and nobody else's, however long after. */
     @Test
-    public void aWhisperReplaysToItsTwoFellowshipsOnly() {
+    public void aWhisperReplaysToItsTwoPeopleOnly() {
         record(ChatChannel.WHISPER, ALICE, "between us", Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
         assertEquals(1, ChatHistory.replayFor(requester(ALICE), ChatMessageIds.NONE).size());
@@ -492,6 +692,77 @@ public final class ChatHistoryTest {
         assertEquals(1, ChatHistory.replayFor(requester(BOB), ChatMessageIds.NONE).size());
         assertTrue(ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE).isEmpty());
         assertTrue(ChatHistory.replayFor(null, ChatMessageIds.NONE).isEmpty());
+    }
+
+    /**
+     * Being shown a line of a conversation one can leave counts only while
+     * one is in it: a reader who lost the channel's gate, left the
+     * fellowship or speaks to another faction may no longer quote, react
+     * to, forward or report it, and is not one of those its edits and
+     * reactions reach.
+     */
+    @Test
+    public void aFormerReaderOfAConversationTheyLeftMayNoLongerUseItsLines() {
+        long staff = record(ChatChannel.OPERATOR, ALICE, "staff only",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.readers());
+        ChatHistory.Requester bobNoLongerStaff = ChatHistoryRequesters.oneFaction(
+                BOB, "", 0L, null, Collections.singletonList(ChatChannel.GLOBAL));
+        assertTrue(ChatHistory.mayRead(staff, requester(BOB)));
+        assertTrue(ChatHistory.asksCurrentAccess(staff));
+        assertFalse(ChatHistory.mayRead(staff, bobNoLongerStaff));
+        assertFalse(ChatHistory.quoteFor(staff, bobNoLongerStaff,
+                ChatChannel.OPERATOR, "").exists());
+        assertNull(ChatHistory.react(staff, bobNoLongerStaff, BOB, "Beren",
+                "smile", true));
+        assertNull(ChatHistory.forwardable(staff, bobNoLongerStaff));
+        assertNull(ChatHistory.reportable(staff, bobNoLongerStaff));
+
+        // Shown it by a replay while she could read it, then no longer.
+        assertEquals(1, ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE).size());
+        assertFalse(ChatHistory.mayRead(staff, ChatHistoryRequesters.oneFaction(
+                CAROL, "", 0L, null, Collections.singletonList(ChatChannel.GLOBAL))));
+
+        long fellowship = record(ChatChannel.FELLOWSHIP, ALICE, "form up",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.fellowship(FELLOWSHIP, Arrays.asList(ALICE, BOB)),
+                FELLOWSHIP.toString());
+        assertTrue(ChatHistory.mayRead(fellowship, ChatHistoryRequesters.oneFaction(
+                BOB, "", 0L, FELLOWSHIP, EVERY_CHANNEL)));
+        assertFalse("Bob left the fellowship", ChatHistory.mayRead(fellowship,
+                requester(BOB)));
+
+        long gondor = record(ChatChannel.FACTION, ALICE, "for Gondor",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.faction(GONDOR, false),
+                GONDOR);
+        assertTrue("still speaking to Gondor, by a character made since",
+                ChatHistory.mayRead(gondor, ChatHistoryRequesters.oneFaction(
+                        BOB, GONDOR, SENT_AT + 1L, null, EVERY_CHANNEL)));
+        assertFalse("speaking to Mordor now", ChatHistory.mayRead(gondor,
+                ChatHistoryRequesters.oneFaction(BOB, "MORDOR", 0L, null,
+                        EVERY_CHANNEL)));
+    }
+
+    /**
+     * A whisper and a Proximity line keep their own rule: whoever heard
+     * them may still use them, whatever channels they may read now, and
+     * nobody else may.
+     */
+    @Test
+    public void whoHeardAWhisperOrAProximityLineKeepsIt() {
+        long whisper = record(ChatChannel.WHISPER, ALICE, "between us",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        long near = record(ChatChannel.PROXIMITY, ALICE, "over here",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        ChatHistory.Requester bobReadingNothing = ChatHistoryRequesters.oneFaction(
+                BOB, "", 0L, null, Collections.<ChatChannel>emptyList());
+        assertFalse(ChatHistory.asksCurrentAccess(whisper));
+        assertTrue(ChatHistory.mayRead(whisper, bobReadingNothing));
+        assertTrue(ChatHistory.mayRead(near, bobReadingNothing));
+        assertFalse(ChatHistory.mayRead(whisper, requester(CAROL)));
+        assertFalse(ChatHistory.mayRead(near, requester(CAROL)));
+        assertFalse(ChatHistory.mayRead(whisper + 99, requester(BOB)));
     }
 
     /**
@@ -834,12 +1105,16 @@ public final class ChatHistoryTest {
                     Arrays.asList(ALICE), gondor, "gondor");
             long third = record(ChatChannel.FACTION, ALICE, "three",
                     Arrays.asList(ALICE), gondor, "gondor");
+            ChatHistory.Requester ofGondor = ChatHistoryRequesters.oneFaction(ALICE,
+                    "gondor", 0L, null, EVERY_CHANNEL);
+            ChatHistory.Requester ofRohan = ChatHistoryRequesters.oneFaction(BOB,
+                    "rohan", 0L, null, EVERY_CHANNEL);
             assertFalse("the faction's oldest line went",
-                    ChatHistory.quoteFor(first, ChatHistoryRequesters.reader(ALICE), ChatChannel.FACTION, "gondor").exists());
-            assertTrue(ChatHistory.quoteFor(second, ChatHistoryRequesters.reader(ALICE), ChatChannel.FACTION, "gondor").exists());
-            assertTrue(ChatHistory.quoteFor(third, ChatHistoryRequesters.reader(ALICE), ChatChannel.FACTION, "gondor").exists());
+                    ChatHistory.quoteFor(first, ofGondor, ChatChannel.FACTION, "gondor").exists());
+            assertTrue(ChatHistory.quoteFor(second, ofGondor, ChatChannel.FACTION, "gondor").exists());
+            assertTrue(ChatHistory.quoteFor(third, ofGondor, ChatChannel.FACTION, "gondor").exists());
             assertTrue("the other faction's line stays",
-                    ChatHistory.quoteFor(rohan, ChatHistoryRequesters.reader(BOB), ChatChannel.FACTION, "rohan").exists());
+                    ChatHistory.quoteFor(rohan, ofRohan, ChatChannel.FACTION, "rohan").exists());
 
             UUID otherFellowship = UUID.randomUUID();
             ChatHistory.Audience ours = ChatHistory.Audience.fellowship(FELLOWSHIP, Arrays.asList(ALICE, BOB));
@@ -852,9 +1127,12 @@ public final class ChatHistoryTest {
             record(ChatChannel.FELLOWSHIP, ALICE, "hold", Arrays.asList(ALICE, BOB), ours, ourScope);
             record(ChatChannel.FELLOWSHIP, ALICE, "charge", Arrays.asList(ALICE, BOB), ours, ourScope);
             assertFalse("the fellowship's oldest line went",
-                    ChatHistory.quoteFor(formUp, ChatHistoryRequesters.reader(BOB), ChatChannel.FELLOWSHIP, ourScope).exists());
-            assertTrue("the other party's line stays",
-                    ChatHistory.quoteFor(theirs, ChatHistoryRequesters.reader(CAROL), ChatChannel.FELLOWSHIP, otherFellowship.toString()).exists());
+                    ChatHistory.quoteFor(formUp, ChatHistoryRequesters.oneFaction(BOB, "", 0L,
+                            FELLOWSHIP, EVERY_CHANNEL), ChatChannel.FELLOWSHIP, ourScope).exists());
+            assertTrue("the other fellowship's line stays",
+                    ChatHistory.quoteFor(theirs, ChatHistoryRequesters.oneFaction(CAROL, "", 0L,
+                            otherFellowship, EVERY_CHANNEL), ChatChannel.FELLOWSHIP,
+                            otherFellowship.toString()).exists());
         } finally {
             LostTalesConfig.chatHistoryPerChannel = kept;
         }
@@ -866,7 +1144,7 @@ public final class ChatHistoryTest {
      * its two people and nobody else.
      */
     @Test
-    public void aWhisperConversationPagesItsOlderLinesForItsFellowships() {
+    public void aWhisperConversationPagesItsOlderLinesForItsTwoPeople() {
         long older = record(ChatChannel.WHISPER, ALICE, "first", Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
         long newer = record(ChatChannel.WHISPER, ALICE, "second", Arrays.asList(ALICE, BOB),
@@ -1024,7 +1302,7 @@ public final class ChatHistoryTest {
                 FELLOWSHIP.toString());
         assertTrue("its own fellowship", ChatHistory.mayShowTo(fellowship,
                 ChatChannel.FELLOWSHIP, FELLOWSHIP.toString(), reader(BOB), null));
-        assertFalse("another party", ChatHistory.mayShowTo(fellowship,
+        assertFalse("another fellowship", ChatHistory.mayShowTo(fellowship,
                 ChatChannel.FELLOWSHIP, UUID.randomUUID().toString(), reader(BOB), null));
         assertFalse("OOC", ChatHistory.mayShowTo(fellowship,
                 ChatChannel.OOC, "", reader(BOB), null));

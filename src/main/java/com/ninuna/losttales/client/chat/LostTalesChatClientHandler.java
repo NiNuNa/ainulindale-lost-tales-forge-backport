@@ -89,13 +89,11 @@ public final class LostTalesChatClientHandler {
             return;
         }
         // A server's answer to a page's action stands over that page's
-        // bar while the page is shown; the chat keeps to conversation.
-        if (event.message instanceof ChatComponentTranslation
-                && WindowPages.claimLine(
-                        ((ChatComponentTranslation)event.message).getKey(),
-                        event.message.getUnformattedText())) {
-            event.setCanceled(true);
-            return;
+        // bar while the page is shown, and goes to the chat as well.
+        if (event.message instanceof ChatComponentTranslation) {
+            WindowPages.answerOnPage(
+                    ((ChatComponentTranslation)event.message).getKey(),
+                    event.message.getUnformattedText());
         }
         if (!LostTalesConfig.showQuestChatFeedback
                 && isQuestNote(event.message)) {

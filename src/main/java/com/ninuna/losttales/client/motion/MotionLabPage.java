@@ -6,7 +6,7 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageAnswer;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageSearch;
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.ScreenPart;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.ToolStrip;
@@ -16,7 +16,7 @@ import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
@@ -879,6 +879,11 @@ public final class MotionLabPage extends PageContent {
     }
 
     @Override
+    public void resetPanel() {
+        this.listOut = true;
+    }
+
+    @Override
     public String searchPrompt() {
         return word("search");
     }
@@ -1046,7 +1051,7 @@ public final class MotionLabPage extends PageContent {
     /** The Lab's tab closed while it was shown: what was tuned and not saved goes with it. */
     @Override
     public void hidden() {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (tab == null || !WindowLayout.isOpen(tab)) {
             dropPreviews();
         }
@@ -1068,7 +1073,7 @@ public final class MotionLabPage extends PageContent {
         }
 
         @Override
-        public boolean closeTab(WindowTab tab) {
+        public boolean closeTab(WindowPage tab) {
             if (tab != null && tab.equals(WindowPages.tab(PAGE_ID))) {
                 dropPreviews();
             }
@@ -1077,7 +1082,7 @@ public final class MotionLabPage extends PageContent {
 
         @Override
         public boolean closeWindow(Window window) {
-            PageTab tab = WindowPages.tab(PAGE_ID);
+            OtherPage tab = WindowPages.tab(PAGE_ID);
             Window holding = tab == null ? null : WindowLayout.windowOf(tab);
             if (window != null && holding != null
                     && holding.getId().equals(window.getId())) {

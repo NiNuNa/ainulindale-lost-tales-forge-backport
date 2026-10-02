@@ -22,27 +22,30 @@ import org.lwjgl.input.Mouse;
 /**
  * A window's tool strip under its tab row: the controls that read the
  * tab in front rather than pick one, each offered by that tab
- * ({@link WindowTab#panel} and on). At its left, under the tab search,
- * the panel button: over a conversation the timestamp area's person, for
- * the heads the area holds, which drives the area out of the window and
- * back in; over a page the page's own panel, the journal's quest list.
- * After it the page's options, each a button of its own
- * ({@link PageOption}): Mark as Read, Notifications, the journal's
- * filters, the map's kinds of marker, a fellowship colour; a gap between two
- * groups, and those the strip has no room for left to the tab's options.
- * At its right end the help button, a question mark, which opens the
- * page's help: what the page is for and its keys. Before it the search,
- * a well a third of the strip wide naming what it searches — {@code
+ * ({@link WindowPage#panel} and on). At its left, under the tab search,
+ * the panel button and nothing else: over a conversation the timestamp
+ * area's person, which drives the area out of the window and back in;
+ * over a page the page's own panel, the journal's quest list.
+ * Everything else stands at the right. From the right end: the help
+ * button, a question mark, which opens the page's help; the search, a
+ * well a third of the strip wide naming what it searches — {@code
  * Search Global}, {@code Search active quests} — with its magnifier at
- * the well's right end; before the well the member list's button, two
- * people, which a page has none of; before that the full window button,
- * which lets the tab in front fill its window ({@link ContentView}); and
- * first the cog, which opens the settings of the page's kind (Chat
- * Settings for every conversation). The panel buttons rest lit while
- * their panels are out, the cog and the question mark while what they
- * open is, and an option while it is on. A cog with no settings, an
- * option that cannot be taken and a well with nothing to search stay
- * where they are, greyed, and their tips say why.
+ * the well's right end; the member list's button, two people, which a
+ * page has none of; the full window button, which lets the tab in front
+ * fill its window ({@link ContentView}); the split view button, which
+ * opens the pages that can stand beside it, or the split's own rows; the
+ * cog, which opens the settings of the page's kind (Chat Settings for
+ * every conversation); a hairline; and the page's options, each a button
+ * of its own ({@link PageOption}), a hairline between two groups: Mark
+ * as Read, Notification Settings, the journal's filters, the map's kinds
+ * of marker. Options the strip has no room for are left to the tab's
+ * options, from the end of the list. The panel buttons rest lit while
+ * their panels are out, the cog, the split and the question mark while
+ * what they open is, and an option while it is on. A cog with no
+ * settings, a split with no page to stand beside, an option that cannot
+ * be taken and a well with nothing to search stay where they are,
+ * greyed, and their tips say why; a split the padlock holds says
+ * nothing, as the lit padlock says it.
  * While a search stands in a well, the count stands inside the well
  * before its end, and the magnifier has crossed over to the cross that
  * clears it: over a conversation the match stood on of how many, with
@@ -66,6 +69,8 @@ public final class ToolStrip {
         OPTION,
         /** The cog: the settings of the kind of the tab in front. */
         SETTINGS,
+        /** The split view button: the pages that can stand beside the tab in front, or its split's rows. */
+        SPLIT,
         /** The full window button: the tab in front filling its window. */
         VIEW,
         MEMBERS_TOGGLE,
@@ -129,8 +134,13 @@ public final class ToolStrip {
     /** Clear pixels round a glyph that answer with it. */
     private static final int SLACK = 2;
     private static final int MAX_QUERY = 64;
-    /** Clear space between two groups of a page's options. */
-    private static final int GROUP_GAP = END_GAP * 2;
+    /** The least clear space the options keep from the panel button. */
+    private static final int PANEL_CLEARANCE = END_GAP * 2;
+    /** The hairline between two groups of buttons: the tab row's own. */
+    private static final int DIVIDER_WIDTH = WindowStyle.DIVIDER_WIDTH;
+    private static final int DIVIDER_HEIGHT = TabRow.END_CONTROL_SIZE;
+    /** A hairline with a button's gap either side of it. */
+    private static final int DIVIDER_ROOM = END_GAP + DIVIDER_WIDTH + END_GAP;
     private static final int HELP_WIDTH = LostTalesUiSheet.QUESTION.getWidth();
     private static final int HELP_HEIGHT = LostTalesUiSheet.QUESTION.getHeight();
     private static final int MEMBERS_WIDTH = LostTalesUiSheet.MEMBERS.getWidth();
@@ -141,6 +151,8 @@ public final class ToolStrip {
     private static final int VIEW_WIDTH = LostTalesUiSheet.FULLSCREEN.getWidth();
     private static final int VIEW_HEIGHT =
             LostTalesUiSheet.FULLSCREEN.getHeight();
+    private static final int SPLIT_WIDTH = LostTalesUiSheet.SPLIT.getWidth();
+    private static final int SPLIT_HEIGHT = LostTalesUiSheet.SPLIT.getHeight();
 
     /** Where one window's strip stands this frame, in its row's space. */
     static final class Layout {
@@ -159,7 +171,10 @@ public final class ToolStrip {
         /** The page's options the strip has room for, and where each stands. */
         PageOption[] options = new PageOption[0];
         int[] optionX = new int[0];
+        /** The hairlines: between two groups of options, and after the last before the cog. */
+        int[] dividerX = new int[0];
         int settingsX;
+        int splitX;
         int viewX;
         int membersX;
         int helpX;
@@ -190,6 +205,8 @@ public final class ToolStrip {
         final LostTalesUiButtonMotion settingsMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion membersMotion =
+                new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+        final LostTalesUiButtonMotion splitMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion viewMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
@@ -255,7 +272,7 @@ public final class ToolStrip {
         if (font == null || frame == null || row == null) {
             return;
         }
-        WindowTab front = row.selected;
+        WindowPage front = row.selected;
         if (front == null) {
             // A window with no tab in front keeps nothing of a strip.
             frame.toolStrip.layout = null;
@@ -297,7 +314,8 @@ public final class ToolStrip {
      * centred under the tab search; the help button against the strip's
      * right end, {@link #EDGE_MARGIN} in; the well before it, a third of
      * the strip wide; before the well the member list's button where the
-     * strip has one, the full window button and the cog. A
+     * strip has one, the full window button, the split view button and
+     * the cog. A
      * strip whose third is too narrow for a well, or leaves the buttons no
      * room, keeps none, and the buttons stand before the help button. A
      * {@code count} stands its text, {@code countWidth} wide, inside the
@@ -322,7 +340,8 @@ public final class ToolStrip {
         laid.wellRight = laid.helpX - END_GAP;
         laid.wellLeft = laid.wellRight
                 - Math.floorDiv(stripRight - stripLeft, 3);
-        int buttons = COG_WIDTH + END_GAP + VIEW_WIDTH + END_GAP
+        int buttons = COG_WIDTH + END_GAP + SPLIT_WIDTH + END_GAP
+                + VIEW_WIDTH + END_GAP
                 + (members ? MEMBERS_WIDTH + END_GAP : 0);
         int floor = panelWidth > 0 ? laid.panelX + panelWidth + END_GAP
                 : searchButtonLeft + searchButtonSize + END_GAP;
@@ -333,7 +352,8 @@ public final class ToolStrip {
         laid.membersX = buttonsRight - MEMBERS_WIDTH;
         laid.viewX = (members ? laid.membersX - END_GAP : buttonsRight)
                 - VIEW_WIDTH;
-        laid.settingsX = laid.viewX - END_GAP - COG_WIDTH;
+        laid.splitX = laid.viewX - END_GAP - SPLIT_WIDTH;
+        laid.settingsX = laid.splitX - END_GAP - COG_WIDTH;
         laid.iconSlotLeft = laid.wellRight - WELL_INSET
                 - LostTalesUiSheet.SEARCH.getWidth();
         laid.fieldX = laid.wellLeft + WELL_INSET;
@@ -355,33 +375,55 @@ public final class ToolStrip {
     }
 
     /**
-     * Lays the page's options out after {@code after}, the panel button's
-     * right edge, in their order, a gap between two groups: as many as
-     * stand whole before the cog, the rest left to the tab's options.
+     * Lays the page's options out against the cog, in their order, a
+     * hairline between two groups and one between the last option and
+     * the cog: as many as stand whole right of {@code after}, the panel
+     * button's right edge. They are counted from the start of the list,
+     * so those left out are the last ones; they stay in the tab's options.
      */
     static void layOptions(Layout laid, List<PageOption> options, int after) {
-        int limit = laid.settingsX - GROUP_GAP;
-        int x = after + GROUP_GAP;
-        List<PageOption> shown = new ArrayList<PageOption>(options.size());
-        List<Integer> places = new ArrayList<Integer>(options.size());
-        String group = null;
+        int room = laid.settingsX - DIVIDER_ROOM - (after + PANEL_CLEARANCE);
+        int shown = 0;
+        int width = 0;
         for (PageOption option : options) {
-            if (group != null && !group.equals(option.group())) {
-                x += GROUP_GAP - END_GAP;
-            }
-            group = option.group();
-            if (x + option.glyph.width() > limit) {
+            int step = option.glyph.width() + (shown == 0 ? 0
+                    : sameGroup(options.get(shown - 1), option) ? END_GAP
+                    : DIVIDER_ROOM);
+            if (width + step > room) {
                 break;
             }
-            shown.add(option);
-            places.add(Integer.valueOf(x));
-            x += option.glyph.width() + END_GAP;
+            width += step;
+            shown++;
         }
-        laid.options = shown.toArray(new PageOption[shown.size()]);
-        laid.optionX = new int[places.size()];
-        for (int index = 0; index < places.size(); index++) {
-            laid.optionX[index] = places.get(index).intValue();
+        laid.options = new PageOption[shown];
+        laid.optionX = new int[shown];
+        List<Integer> dividers = new ArrayList<Integer>();
+        int x = laid.settingsX - DIVIDER_ROOM - width;
+        for (int index = 0; index < shown; index++) {
+            PageOption option = options.get(index);
+            if (index > 0) {
+                if (sameGroup(options.get(index - 1), option)) {
+                    x += END_GAP;
+                } else {
+                    dividers.add(Integer.valueOf(x + END_GAP));
+                    x += DIVIDER_ROOM;
+                }
+            }
+            laid.options[index] = option;
+            laid.optionX[index] = x;
+            x += option.glyph.width();
         }
+        if (shown > 0) {
+            dividers.add(Integer.valueOf(x + END_GAP));
+        }
+        laid.dividerX = new int[dividers.size()];
+        for (int index = 0; index < dividers.size(); index++) {
+            laid.dividerX[index] = dividers.get(index).intValue();
+        }
+    }
+
+    private static boolean sameGroup(PageOption one, PageOption other) {
+        return one.group().equals(other.group());
     }
 
     /**
@@ -396,7 +438,7 @@ public final class ToolStrip {
               PageOption underOption, Out out) {
         State state = frame == null ? null : frame.toolStrip;
         Layout laid = state == null ? null : state.layout;
-        WindowTab front = row == null ? null : row.selected;
+        WindowPage front = row == null ? null : row.selected;
         if (laid == null || font == null || window == null || front == null) {
             return;
         }
@@ -417,10 +459,24 @@ public final class ToolStrip {
         }
         drawOptions(state, laid, underOption, out == null ? "" : out.pick,
                 now, ink);
+        int divider = Math.round(WindowStyle.DIVIDER_ALPHA * ink / 255.0F);
+        for (int x : laid.dividerX) {
+            WindowStyle.drawDivider(x, glyphTop(laid, DIVIDER_HEIGHT),
+                    DIVIDER_HEIGHT, divider);
+        }
         drawButton(state.settingsMotion, front.settingsPlace() != null,
                 out != null && out.settings, under, Part.SETTINGS,
                 LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER,
                 laid.settingsX, glyphTop(laid, COG_HEIGHT), now, ink);
+        // The split view button rests lit while its page shares the
+        // window, as a panel's button does while its panel is out; the
+        // padlock holds a split, so a locked window's stands greyed.
+        drawButton(state.splitMotion, !window.isLocked()
+                        && TabMenus.canSplit(front),
+                (out != null && out.split) || window.splitOf(front) != null,
+                under, Part.SPLIT, LostTalesUiSheet.SPLIT,
+                LostTalesUiSheet.SPLIT_LIT, laid.splitX,
+                glyphTop(laid, SPLIT_HEIGHT), now, ink);
         drawButton(state.viewMotion, true, false, under, Part.VIEW,
                 LostTalesUiSheet.FULLSCREEN, LostTalesUiSheet.FULLSCREEN_HOVER,
                 laid.viewX, glyphTop(laid, VIEW_HEIGHT), now, ink);
@@ -512,7 +568,7 @@ public final class ToolStrip {
      * end where it is cut, as a cut tab name does.
      */
     private static void drawPrompt(FontRenderer font, Layout laid,
-                                   WindowTab front, TabRow.Row row, int x,
+                                   WindowPage front, TabRow.Row row, int x,
                                    int alpha) {
         String prompt = "§o" + front.searchPrompt();
         int right = laid.iconSlotLeft - GAP;
@@ -601,16 +657,19 @@ public final class ToolStrip {
     }
 
     /**
-     * Which of what the tab in front opens is out: its settings, its help,
-     * and the option whose words are out ({@code pick}, empty for none).
+     * Which of what the tab in front opens is out: its settings, its split
+     * view, its help, and the option whose words are out ({@code pick},
+     * empty for none).
      */
     public static final class Out {
         final boolean settings;
+        final boolean split;
         final boolean help;
         final String pick;
 
-        public Out(boolean settings, boolean help, String pick) {
+        public Out(boolean settings, boolean split, boolean help, String pick) {
             this.settings = settings;
+            this.split = split;
             this.help = help;
             this.pick = pick == null ? "" : pick;
         }
@@ -625,12 +684,13 @@ public final class ToolStrip {
 
     /**
      * Why a part of {@code window}'s strip has nothing to do for the tab
-     * in front, for its tip: options with nothing to choose, a cog with
-     * no settings, a well with nothing to search; empty while it acts.
+     * in front, for its tip: a cog with no settings, a split with no page
+     * to stand beside, a well with nothing to search; empty while it acts,
+     * and for what the padlock holds ({@link #heldByPadlock}).
      */
     static String greyedWhy(Part part, Window window) {
-        WindowTab front = window == null ? null : window.getActiveTab();
-        if (part == null || front == null) {
+        WindowPage front = window == null ? null : window.getActiveTab();
+        if (part == null || front == null || heldByPadlock(part, window)) {
             return "";
         }
         switch (part) {
@@ -639,12 +699,26 @@ public final class ToolStrip {
                         : StatCollector.translateToLocalFormatted(
                                 "gui.losttales.window.cog.nothing",
                                 front.title());
+            case SPLIT:
+                return TabMenus.canSplit(front) ? ""
+                        : StatCollector.translateToLocalFormatted(
+                                "gui.losttales.window.split.nothing",
+                                front.title());
             case FIELD:
             case ICON:
                 return front.searchUnavailable();
             default:
                 return "";
         }
+    }
+
+    /**
+     * Whether the padlock holds what a part of {@code window}'s strip
+     * would do: a locked window's split. It stands greyed with no tip,
+     * and a press lights the padlock.
+     */
+    static boolean heldByPadlock(Part part, Window window) {
+        return part == Part.SPLIT && window != null && window.isLocked();
     }
 
     /** A glyph's top: centred on the well's capitals, the odd pixel up. */
@@ -676,6 +750,10 @@ public final class ToolStrip {
         if (glyphBox(laid, laid.settingsX, COG_WIDTH, COG_HEIGHT)
                 .contains(x, y)) {
             return Part.SETTINGS;
+        }
+        if (glyphBox(laid, laid.splitX, SPLIT_WIDTH, SPLIT_HEIGHT)
+                .contains(x, y)) {
+            return Part.SPLIT;
         }
         if (glyphBox(laid, laid.viewX, VIEW_WIDTH, VIEW_HEIGHT).contains(x, y)) {
             return Part.VIEW;
@@ -756,13 +834,16 @@ public final class ToolStrip {
         if (part == null) {
             return "";
         }
-        WindowTab front = window == null ? null : window.getActiveTab();
+        WindowPage front = window == null ? null : window.getActiveTab();
         if (front == null) {
             return "";
         }
         String greyed = greyedWhy(part, window);
         if (greyed.length() > 0) {
             return greyed;
+        }
+        if (heldByPadlock(part, window)) {
+            return "";
         }
         switch (part) {
             case PANEL: {
@@ -777,6 +858,9 @@ public final class ToolStrip {
             case SETTINGS:
                 return StatCollector.translateToLocal(
                         front.settingsPlace().titleKey);
+            case SPLIT:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.window.split.title");
             case HELP:
                 return StatCollector.translateToLocalFormatted(
                         "gui.losttales.window.help", front.title());

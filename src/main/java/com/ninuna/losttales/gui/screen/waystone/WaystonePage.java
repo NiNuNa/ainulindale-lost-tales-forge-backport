@@ -15,7 +15,7 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageRows;
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.SubWindowAnchor;
 import com.ninuna.losttales.client.window.Window;
@@ -186,7 +186,7 @@ public final class WaystonePage extends PageContent
      * not saved.
      */
     private void open(LostTalesWaystoneStatePacket packet) {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         boolean tabOpen = tab != null && WindowLayout.isOpen(tab);
         if (tabOpen && isShown(packet)) {
             this.draft.rebase(this.state.getSettings(), packet.getSettings());
@@ -218,7 +218,7 @@ public final class WaystonePage extends PageContent
      */
     private void askToDiscard() {
         WindowScreen screen = WindowScreen.current();
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (this.asking == null || screen == null || tab == null
                 || this.state == null) {
             return;
@@ -347,7 +347,7 @@ public final class WaystonePage extends PageContent
     /** Closes the tab where the player no longer stands at the waystone. */
     @Override
     public void watch() {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (tab == null || !WindowLayout.isOpen(tab)) {
             return;
         }
@@ -382,7 +382,7 @@ public final class WaystonePage extends PageContent
      * The tab closes by itself, as a tab closed by hand does, and the
      * notice over its window's bar says why.
      */
-    private void close(PageTab tab, WorldPageReach.Leave leave) {
+    private void close(OtherPage tab, WorldPageReach.Leave leave) {
         String name = this.state == null ? StatCollector.translateToLocal(
                 "gui.losttales.page.waystone") : this.state.getName();
         WorldPageWatch.close(tab, StatCollector.translateToLocalFormatted(
@@ -393,7 +393,7 @@ public final class WaystonePage extends PageContent
     /** The tab closed, by hand or by itself: the waystone goes with it. */
     @Override
     public void hidden() {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (tab == null || !WindowLayout.isOpen(tab)) {
             forget();
         }
@@ -460,7 +460,7 @@ public final class WaystonePage extends PageContent
     /** Settings' own field for a line or a number, hung from its row in the page's window. */
     private void openValue(Settings.Setting setting, LostTalesUiHitBox row) {
         WindowScreen screen = WindowScreen.current();
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         Window window = tab == null ? null : WindowLayout.windowOf(tab);
         if (screen == null || window == null || row == null) {
             return;
@@ -553,8 +553,8 @@ public final class WaystonePage extends PageContent
                 this.mc.thePlayer.dimension, this.state.getX(),
                 this.state.getY(), this.state.getZ(),
                 this.state.getMarkerId());
-        PageTab map = WindowPages.tab(LostTalesMapPage.PAGE_ID);
-        PageTab own = WindowPages.tab(PAGE_ID);
+        OtherPage map = WindowPages.tab(LostTalesMapPage.PAGE_ID);
+        OtherPage own = WindowPages.tab(PAGE_ID);
         Window window = own == null ? null : WindowLayout.windowOf(own);
         if (map == null || !LostTalesMapPage.standsInWindow()
                 || WindowScreen.current() == null) {
@@ -816,7 +816,7 @@ public final class WaystonePage extends PageContent
 
         @Override
         public boolean stands() {
-            PageTab tab = WindowPages.tab(PAGE_ID);
+            OtherPage tab = WindowPages.tab(PAGE_ID);
             return this.made == WaystonePage.this.shownCount
                     && WaystonePage.this.draft != null && tab != null
                     && WindowLayout.isOpen(tab);

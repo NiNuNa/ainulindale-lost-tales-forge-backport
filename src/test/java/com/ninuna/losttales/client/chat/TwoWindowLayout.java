@@ -15,23 +15,23 @@ import java.util.List;
  * and closed by hand; a test about the padlock locks them itself.
  */
 public final class TwoWindowLayout {
-    private static final List<ChatTab> CONSOLES = Arrays.asList(
-            ChatTab.of(ChatChannel.CLIENT_CONSOLE),
-            ChatTab.of(ChatChannel.SERVER_CONSOLE),
-            ChatTab.of(ChatChannel.OPERATOR));
+    private static final List<ConversationPage> CONSOLES = Arrays.asList(
+            ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
+            ConversationPage.of(ChatChannel.SERVER_CONSOLE),
+            ConversationPage.of(ChatChannel.OPERATOR));
 
     private static final Runnable TWO_WINDOWS = new Runnable() {
         @Override
         public void run() {
             WindowLayout.addWindow(CONSOLES, CONSOLES.get(0));
-            List<ChatTab> conversations = new ArrayList<ChatTab>();
+            List<ConversationPage> conversations = new ArrayList<ConversationPage>();
             for (ChatChannel channel : ChatChannel.presentationOrder()) {
-                if (!CONSOLES.contains(ChatTab.of(channel))) {
-                    conversations.add(ChatTab.of(channel));
+                if (!CONSOLES.contains(ConversationPage.of(channel))) {
+                    conversations.add(ConversationPage.of(channel));
                 }
             }
             WindowLayout.addWindow(conversations,
-                    ChatTab.of(ChatChannel.GLOBAL));
+                    ConversationPage.of(ChatChannel.GLOBAL));
         }
     };
 

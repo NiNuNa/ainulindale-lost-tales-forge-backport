@@ -17,8 +17,8 @@ import static org.junit.Assert.assertTrue;
  * the file it is written to reads back to the same marks.
  */
 public final class ClientChatReadMarksTest {
-    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.GLOBAL);
-    private static final ChatTab OOC = ChatTab.of(ChatChannel.OOC);
+    private static final ConversationPage GLOBAL = ConversationPage.of(ChatChannel.GLOBAL);
+    private static final ConversationPage OOC = ConversationPage.of(ChatChannel.OOC);
 
     @Before
     public void setUp() {

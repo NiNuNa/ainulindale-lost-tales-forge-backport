@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.gui;
 
 import com.ninuna.losttales.accessory.inventory.LostTalesContainerPlayer;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.client.gui.Gui;
@@ -21,8 +22,8 @@ public final class LostTalesGuiInventory extends GuiInventory {
         super.drawGuiContainerBackgroundLayer(partialTicks, mouseX, mouseY);
         int left = this.guiLeft + LostTalesContainerPlayer.ACCESSORY_X - 1;
         int top = this.guiTop + LostTalesContainerPlayer.ACCESSORY_Y - 1;
-        Gui.drawRect(left, top, left + 18, top + 18, 0xFF373737);
-        Gui.drawRect(left + 1, top + 1, left + 17, top + 17, 0xFF8B8B8B);
-        Gui.drawRect(left + 2, top + 2, left + 17, top + 17, 0xFF242424);
+        Gui.drawRect(left, top, left + 18, top + 18, LostTalesColors.PLUM_DARK);
+        Gui.drawRect(left + 1, top + 1, left + 17, top + 17, LostTalesColors.ROSE_GRAY);
+        Gui.drawRect(left + 2, top + 2, left + 17, top + 17, LostTalesColors.PLUM_BLACK);
     }
 }

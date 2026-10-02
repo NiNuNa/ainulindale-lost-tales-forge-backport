@@ -17,7 +17,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Versioned NBT codec for persistent personal fellowship markers. */
+/**
+ * Versioned NBT codec for persistent personal fellowship markers. The root
+ * and each marker are read only at the version this build writes; any other
+ * version keeps the whole store as it is, read-only. A marker that lacks a
+ * key this build always writes goes to the quarantine whole.
+ */
 public final class FellowshipGoHereMarkerNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
@@ -59,7 +64,7 @@ public final class FellowshipGoHereMarkerNbtCodec {
         NBTTagCompound safeSource = source == null ? new NBTTagCompound() : source;
         int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
+        if (version != CURRENT_ROOT_DATA_VERSION) {
             LostTalesLog.warning("Fellowship marker data uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
@@ -69,9 +74,8 @@ public final class FellowshipGoHereMarkerNbtCodec {
             return ReadResult.unsupported(safeSource, -1);
         }
 
-        boolean repaired = version != CURRENT_ROOT_DATA_VERSION
-                || !safeSource.hasKey(TAG_MARKERS, Constants.NBT.TAG_LIST);
-        NbtQuarantine.Read quarantine = NbtQuarantine.read(safeSource);
+        boolean repaired = !safeSource.hasKey(TAG_MARKERS, Constants.NBT.TAG_LIST);
+        NbtQuarantine.Read quarantine = NbtQuarantine.readCurrentVersionOnly(safeSource);
         if (!quarantine.isSupported()) {
             return ReadResult.unsupported(safeSource, quarantine.getUnsupportedVersion());
         }
@@ -167,8 +171,10 @@ public final class FellowshipGoHereMarkerNbtCodec {
                 || !source.hasKey(TAG_Z, Constants.NBT.TAG_DOUBLE)) {
             return MarkerReadResult.failed("missing_coordinates");
         }
-        long updatedAt = source.hasKey(TAG_UPDATED_AT, Constants.NBT.TAG_LONG)
-                ? source.getLong(TAG_UPDATED_AT) : 0L;
+        if (!source.hasKey(TAG_UPDATED_AT, Constants.NBT.TAG_LONG)
+                || source.getLong(TAG_UPDATED_AT) < 0L) {
+            return MarkerReadResult.failed("missing_or_invalid_updated_at");
+        }
         try {
             return MarkerReadResult.success(new FellowshipGoHereMarker(
                     fellowshipId,
@@ -177,8 +183,8 @@ public final class FellowshipGoHereMarkerNbtCodec {
                     source.getDouble(TAG_X),
                     source.getDouble(TAG_Y),
                     source.getDouble(TAG_Z),
-                    updatedAt),
-                    !source.hasKey(TAG_UPDATED_AT, Constants.NBT.TAG_LONG));
+                    source.getLong(TAG_UPDATED_AT)),
+                    false);
         } catch (IllegalArgumentException exception) {
             return MarkerReadResult.failed("invalid_marker_data");
         }

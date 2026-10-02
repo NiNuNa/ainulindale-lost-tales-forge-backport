@@ -6,10 +6,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Who declined whose invitation a moment ago. After a decline the inviting
- * account waits {@link #WAIT_MILLIS} before it may invite that account again,
- * so nobody can be chimed at over and over. Static state, at most
- * {@link #MAX_ENTRIES} entries, cleared as the server starts and stops.
+ * Whose invitation to whom was declined or taken back a moment ago. After
+ * either the inviting account waits {@link #WAIT_MILLIS} before it may
+ * invite that account again, so nobody can be chimed at over and over.
+ * Static state, at most {@link #MAX_ENTRIES} entries, cleared as the server
+ * starts and stops.
  */
 public final class FellowshipDeclines {
     static final long WAIT_MILLIS = 60000L;
@@ -19,8 +20,8 @@ public final class FellowshipDeclines {
 
     private FellowshipDeclines() {}
 
-    /** The target declined the inviter's invitation at {@code now}. */
-    static synchronized void declined(UUID inviter, UUID target, long now) {
+    /** The inviter's invitation to the target was declined or taken back at {@code now}. */
+    static synchronized void startWait(UUID inviter, UUID target, long now) {
         if (inviter == null || target == null) {
             return;
         }

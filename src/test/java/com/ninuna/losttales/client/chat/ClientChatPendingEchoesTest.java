@@ -98,8 +98,8 @@ public final class ClientChatPendingEchoesTest {
                 ClientChatPendingEchoes.TIMEOUT_MILLIS + 1L).isEmpty());
     }
 
-    private static ChatTab tab() {
-        return ChatTab.of(ChatChannel.OOC);
+    private static ConversationPage tab() {
+        return ConversationPage.of(ChatChannel.OOC);
     }
 
     private static LostTalesChatMessagePacket packet() {

@@ -39,14 +39,13 @@ public final class CharacterSyncManager {
     public static void sendFailure(EntityPlayerMP player,
                                    int requestId,
                                    CharacterOperationType operationType,
-                                   CharacterErrorId errorId,
-                                   long rosterRevision) {
+                                   CharacterErrorId errorId) {
         if (player == null || operationType == null) {
             return;
         }
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new CharacterOperationResultPacket(
-                        requestId, operationType, errorId, rosterRevision),
+                        requestId, operationType, errorId),
                 player
         );
     }

@@ -15,9 +15,12 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * Sent just ahead of the vanilla chat packet that carries the command,
  * so the console line naming who ran what can also say where; the
  * command itself still travels vanilla's own way and is run by
- * vanilla. The id is the client's own tab id, an opaque string the
- * server bounds, keeps for a few seconds and shows console readers as
- * a link — it decides nothing.
+ * vanilla. The id is the client's own tab id, a string the server
+ * bounds, keeps for a few seconds and shows console readers as a link.
+ * It decides one thing, the tab the command's answers are kept under,
+ * and the server checks that first: the tab stands only while the
+ * player may read its conversation, else the answers go to their Client
+ * Console ({@code ChatCommandContexts}).
  */
 public final class LostTalesChatCommandContextPacket implements IMessage {
     public static final int MAX_TAB_ID_CHARACTERS = ChatConsoleEvent.MAX_CONTEXT_LENGTH;

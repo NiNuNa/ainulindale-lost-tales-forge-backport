@@ -72,8 +72,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /** A channel icon's text is plain ASCII, so its bytes are its characters. */
     private static final int MAX_CHANNEL_ICON_BYTES =
             ChatChannelIconSpec.MAX_TEXT_LENGTH;
-    /** A channel's shown name is bounded like a role's text. */
-    /** Four bytes per character is the most UTF-8 spends on one. */
+    /**
+     * A channel's shown name is bounded like a role's text, at four bytes
+     * a character, the most UTF-8 spends on one.
+     */
     private static final int MAX_CHANNEL_NAME_BYTES =
             ChatChannelDescriptor.MAX_DISPLAY_NAME_LENGTH * 4;
     /** An enum constant's name, for the facts a channel is described by. */
@@ -788,9 +790,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
     }
     /** The server's Proximity radius in blocks; zero when unstated. */
     public int getProximityRadius() { return this.proximityRadius; }
-    /** The icons the server puts on its channels, by id; empty when unstated. */
     /** The words the server adds to the chat's profanity list; none when it adds none. */
     public ChatProfanityWords getProfanityWords() { return this.profanityWords; }
+    /** The icons the server puts on its channels, by id; empty when unstated. */
     public Map<String, ChatChannelIconSpec> getChannelIcons() {
         return this.channelIcons;
     }

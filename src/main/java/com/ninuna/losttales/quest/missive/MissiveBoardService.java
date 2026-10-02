@@ -47,11 +47,11 @@ public final class MissiveBoardService {
         if (board == null) {
             return;
         }
-        if (slot < 0 || slot >= board.getSizeInventory()) {
+        if (slot < 0 || slot >= board.getSlotCount()) {
             answer(player, board, MissiveBoardStateReason.GONE);
             return;
         }
-        ItemStack stack = board.getStackInSlot(slot);
+        ItemStack stack = board.getNotice(slot);
         MissiveBoardStateReason refusal =
                 MissiveAcceptance.check(player.worldObj, stack, expectedQuestId);
         if (refusal != null) {
@@ -63,14 +63,20 @@ public final class MissiveBoardService {
                 MissiveAcceptance.start(player, missive);
         if (outcome == MissiveBoardStateReason.ACCEPTED) {
             if (missive.isFirstComeFirstServed()) {
-                board.setInventorySlotContents(slot, null);
+                board.removeNotice(slot);
             }
             pop(player, board);
         }
         answer(player, board, outcome);
     }
 
-    /** Takes the notice in the board's {@code slot} down into the player's inventory. */
+    /**
+     * Takes the notice in the board's {@code slot} down into the player's
+     * inventory. Its seal is not checked: taking moves the board's own
+     * letter and starts nothing, and a letter without this world's seal
+     * is refused where it would start a quest or go up on a board. A
+     * letter whose seal fails can still be cleared off the board this way.
+     */
     public static void take(EntityPlayerMP player, int dimensionId, int x,
                             int y, int z, int slot, String expectedQuestId) {
         LostTalesTileEntityMissiveBoard board =
@@ -78,8 +84,8 @@ public final class MissiveBoardService {
         if (board == null) {
             return;
         }
-        ItemStack stack = slot >= 0 && slot < board.getSizeInventory()
-                ? board.getStackInSlot(slot) : null;
+        ItemStack stack = slot >= 0 && slot < board.getSlotCount()
+                ? board.getNotice(slot) : null;
         String questId = MissiveAcceptance.pageQuestId(stack);
         if (questId == null) {
             answer(player, board, MissiveBoardStateReason.GONE);
@@ -96,7 +102,7 @@ public final class MissiveBoardService {
             answer(player, board, MissiveBoardStateReason.INVENTORY_FULL);
             return;
         }
-        board.setInventorySlotContents(slot, null);
+        board.removeNotice(slot);
         player.inventory.markDirty();
         pop(player, board);
         answer(player, board, MissiveBoardStateReason.TAKEN);
@@ -195,11 +201,11 @@ public final class MissiveBoardService {
         long worldTime = board.getWorldObj() == null ? 0L
                 : board.getWorldObj().getTotalWorldTime();
         long expiration = LostTalesConfig.getMissiveBoardNoticeExpirationTicks();
-        int slots = Math.min(board.getSizeInventory(),
+        int slots = Math.min(board.getSlotCount(),
                 LostTalesMissiveBoardStatePacket.MAX_NOTICES);
         List<MissiveNotice> notices = new ArrayList<MissiveNotice>();
         for (int slot = 0; slot < slots; slot++) {
-            ItemStack stack = board.getStackInSlot(slot);
+            ItemStack stack = board.getNotice(slot);
             if (!MissiveAcceptance.isLetter(stack)) {
                 continue;
             }

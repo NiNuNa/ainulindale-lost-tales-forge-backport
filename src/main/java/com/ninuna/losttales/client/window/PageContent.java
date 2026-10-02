@@ -106,6 +106,9 @@ public abstract class PageContent {
     /** The panel's button was pressed. */
     public void togglePanel() {}
 
+    /** The panel as it first was, as its window's layout is reset. */
+    public void resetPanel() {}
+
     /**
      * The page's own options: its options menu's rows and its window's
      * tool strip buttons alike ({@link PageOption}); none by default.

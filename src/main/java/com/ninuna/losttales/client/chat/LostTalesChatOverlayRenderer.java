@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.chat.ChatFeedPlacement;
 import com.ninuna.losttales.client.window.ContentView;
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowDrawing;
 import com.ninuna.losttales.client.window.WindowLayout;
@@ -11,7 +11,7 @@ import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowSplit;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
@@ -305,12 +305,12 @@ public final class LostTalesChatOverlayRenderer {
         // answer the pointer.
         frame.clearMarks();
         frame.clearAvatars();
-        WindowTab front = ChatFrame.activeTab(window,
+        WindowPage front = ChatFrame.activeTab(window,
                 ChatFrame.visibleTabs(window));
-        if (front instanceof PageTab) {
+        if (front instanceof OtherPage) {
             // A page is no conversation: its window holds no lines, no
             // member list and no search, and the screen draws the page.
-            WindowDrawing.layOutPage(minecraft, window, frame, (PageTab)front,
+            WindowDrawing.layOutPage(minecraft, window, frame, (OtherPage)front,
                     screenWidth, screenHeight, opening);
             return;
         }
@@ -320,7 +320,7 @@ public final class LostTalesChatOverlayRenderer {
         // keeps its own side of the window.
         WindowSplit split = window.splitOf(front);
         boolean besideOther = WindowDrawing.shows(split, front);
-        ChatTab view = ChatTab.from(front);
+        ConversationPage view = ConversationPage.from(front);
         ChatLineFilter filter = ChatLineFilter.of(view);
         // An open window lays its own lines out: at its own width when
         // it has one, with the grouping its own tab's sequence gives,
@@ -413,9 +413,9 @@ public final class LostTalesChatOverlayRenderer {
             // asks for what was said in it before; a view scrolled to its
             // oldest line asks for the page before that. Both from here,
             // where the view and its lines are exactly what is drawn.
-            String scope = ClientChatContextHistory.scopeOf(ChatTab.viewed(view));
+            String scope = ClientChatContextHistory.scopeOf(ConversationPage.viewed(view));
             if (scope.length() > 0) {
-                ClientChatContextHistory.request(ChatTab.viewed(view), scope);
+                ClientChatContextHistory.request(ConversationPage.viewed(view), scope);
             }
             double maximum = Math.max(0.0D,
                     frame.contentRows() - Math.max(1.0D, roomLines));
@@ -471,7 +471,7 @@ public final class LostTalesChatOverlayRenderer {
                 frame.contentLeft());
         if (besideOther && frame.splitPage == null) {
             // A conversation on the other side, read only.
-            drawBeside(minecraft, window, ChatTab.from(split.other(front)),
+            drawBeside(minecraft, window, ConversationPage.from(split.other(front)),
                     WindowDrawing.otherSideBox(frame), opening);
         }
     }
@@ -481,7 +481,7 @@ public final class LostTalesChatOverlayRenderer {
      * front: its history in its own side, read only. Nothing on it
      * answers the pointer until a press brings it in front.
      */
-    static void drawBeside(Minecraft minecraft, Window window, ChatTab view,
+    static void drawBeside(Minecraft minecraft, Window window, ConversationPage view,
                            LostTalesUiHitBox box,
                            LostTalesGuiAnimationSample opening) {
         if (minecraft == null || minecraft.ingameGUI == null || window == null
@@ -533,7 +533,7 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The closed-chat feed: the lines each conversation's Show in Feed
+     * The closed-chat feed: the lines each conversation's feed choice
      * choice lets through, its tab open or closed, as one fading stack
      * at the feed's own position, with the
      * channel prefixes that tell the channels apart. The feed lays its
@@ -547,10 +547,10 @@ public final class LostTalesChatOverlayRenderer {
                                  List<ChatLine> drawn, int screenWidth,
                                  int screenHeight, float partialTicks) {
         ChatFrame frame = ChatFrame.feed();
-        // Every line of a conversation shown in the feed with All
-        // Messages, and a line addressed to the player of one shown with
-        // Only Mentions; typing shows for the first alone.
-        List<ChatTab> feedTabs = ChatLayout.feedTabs();
+        // Every line of a conversation shown in the feed with
+        // Everything, and a line addressed to the player of one shown
+        // with Only Mentions; typing shows for the first alone.
+        List<ConversationPage> feedTabs = ChatLayout.feedTabs();
         ChatLineFilter filter = ChatLayout.feedFilter();
         // Someone typing into a conversation the feed carries raises
         // the lines a row, and the typing row comes up under them.
@@ -679,7 +679,7 @@ public final class LostTalesChatOverlayRenderer {
                 if (index > 0) {
                     x += FEED_TYPING_SEGMENT_GAP;
                 }
-                ChatTab tab = segments.get(index).tab;
+                ConversationPage tab = segments.get(index).tab;
                 LostTalesUiInk.drawText(font,
                         prefixes.get(index), x, y,
                         ClientChatChannelState.displayColor(tab), alpha);
@@ -3034,28 +3034,6 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The history's own backdrop for one row: the same plum black at the
-     * same opacity, fading out to the right the same way. The empty
-     * screen's strip stands on it, so its hairlines read as the chat's
-     * edges instead of as lines across the world.
-     */
-    static void drawBackdropRow(float left, float top, float right,
-                                float bottom, int alpha) {
-        drawChatBackdrop(left, top, right, bottom, alpha,
-                WindowStyle.backdropRgb());
-    }
-
-    /**
-     * The opacity the chat's backdrop is drawn at, before any opening
-     * fade is applied to it: the empty screen's strip asks here, so it
-     * stands on the same backdrop a window's messages lie on.
-     */
-    static int backdropRowAlpha(Minecraft minecraft) {
-        float opacity = WindowStyle.opacity(minecraft);
-        return Math.max(0, Math.min(255, Math.round(255.0F * opacity))) / 2;
-    }
-
-    /**
      * Where the rows of the message on line {@code lineIndex} start and
      * end, measured as a row's {@code y} is: {@code {top, bottom}}, the
      * top of its oldest row and the bottom of its newest. The rows of one
@@ -4177,7 +4155,7 @@ public final class LostTalesChatOverlayRenderer {
         if (started <= 0L) {
             return 0.0F;
         }
-        ChatTab lastTab = LostTalesChatPresentation.getLastMessageTab();
+        ConversationPage lastTab = LostTalesChatPresentation.getLastMessageTab();
         if (filter != null && !filter.accepts(lastTab)) {
             return 0.0F;
         }

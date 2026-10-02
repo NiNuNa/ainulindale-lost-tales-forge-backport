@@ -86,7 +86,7 @@ public final class ChatShortcutsTest {
                 help(ChatChannel.PROXIMITY).guide.get(1));
         assertEquals("gui.losttales.help.chat.speaking.account",
                 help(ChatChannel.OOC).guide.get(1));
-        // Nobody else reads the Client Console: there is nobody to
+        // Nobody else reads the Console: there is nobody to
         // speak as.
         PageHelp console = help(ChatChannel.CLIENT_CONSOLE);
         assertEquals("gui.losttales.help.chat.readers.self",
@@ -96,7 +96,7 @@ public final class ChatShortcutsTest {
     }
 
     private static PageHelp help(ChatChannel channel) {
-        return ChatTab.of(channel).help();
+        return ConversationPage.of(channel).help();
     }
 
     /** One when {@code shown} is a word's key and the file has it; a failure when it does not. */

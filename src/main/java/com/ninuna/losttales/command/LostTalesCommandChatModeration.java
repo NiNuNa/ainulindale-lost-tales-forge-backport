@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.moderation.ChatMuteDurations;
 import com.ninuna.losttales.chat.moderation.ChatMuteEntry;
 import com.ninuna.losttales.chat.moderation.ChatMuteStorage;
 import com.ninuna.losttales.chat.moderation.ChatMuteWorldData;
+import com.ninuna.losttales.chat.server.ChatAbsentReader;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -26,7 +27,8 @@ import net.minecraft.world.World;
  * so no character switch or rename slips one, and they persist with the
  * world. Muting needs the player
  * online — you mute whoever is talking — while unmuting also works by
- * the stored name after they leave.
+ * the stored name after they leave. Both are only for someone who holds
+ * every capability the account holds ({@link #withheldPower}).
  */
 public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
 
@@ -165,6 +167,24 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
         return null;
     }
 
+    /**
+     * As above for an account whose player is not here, its capabilities
+     * read from the server's operator list and roles; null for no account
+     * to ask, which holds nothing.
+     */
+    static String withheldPower(ICommandSender sender, ChatAbsentReader target) {
+        if (target == null) {
+            return null;
+        }
+        for (LostTalesCapability capability : LostTalesCapability.all()) {
+            if (target.holds(capability)
+                    && !LostTalesPermissions.has(sender, capability)) {
+                return capability.getId();
+            }
+        }
+        return null;
+    }
+
     private void unmute(ICommandSender sender, ChatMuteWorldData mutes,
                         String[] args) {
         if (args.length < 2) {
@@ -175,15 +195,38 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
         EntityPlayerMP online = LostTalesServerPlayers.findOnline(args[1]);
         DiscordMember member = online == null
                 ? DiscordMember.parse(args[1]) : null;
-        ChatMuteEntry lifted = online != null
-                ? mutes.unmute(online.getUniqueID())
-                : member != null ? mutes.unmute(member.senderId)
-                        : mutes.unmuteByName(args[1]);
-        if (lifted == null && member != null) {
+        ChatMuteEntry stored = online != null
+                ? mutes.find(online.getUniqueID())
+                : member != null ? mutes.find(member.senderId)
+                        : mutes.findByName(args[1]);
+        if (stored == null && member != null) {
             // Muted under a name the member has since changed, or by id
             // and now named: the stored label still finds it.
-            lifted = mutes.unmuteByName(args[1]);
+            stored = mutes.findByName(args[1]);
         }
+        if (stored == null) {
+            send(sender, EnumChatFormatting.RED + args[1] + " is not muted.");
+            return;
+        }
+        if (sender instanceof EntityPlayerMP && stored.getAccountId().equals(
+                ((EntityPlayerMP)sender).getUniqueID())) {
+            // As nobody mutes themselves, nobody lifts their own mute.
+            send(sender, EnumChatFormatting.RED + "You cannot unmute yourself.");
+            return;
+        }
+        // Lifting a mute overrules whoever set it, so it asks what muting
+        // asks: someone who can do all the account can. An account whose
+        // player is away is asked of the server's own lists.
+        String withheld = online != null ? withheldPower(sender, online)
+                : withheldPower(sender, ChatAbsentReader.of(
+                        stored.getAccountId(), stored.getAccountName()));
+        if (withheld != null) {
+            send(sender, EnumChatFormatting.RED + "You cannot unmute "
+                    + stored.getAccountName() + ": they hold " + withheld
+                    + ", which you do not.");
+            return;
+        }
+        ChatMuteEntry lifted = mutes.unmute(stored.getAccountId());
         if (lifted == null) {
             send(sender, EnumChatFormatting.RED + args[1] + " is not muted.");
             return;

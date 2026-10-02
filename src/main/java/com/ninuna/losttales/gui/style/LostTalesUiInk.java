@@ -41,6 +41,11 @@ public final class LostTalesUiInk {
     /** A surface fully lit. */
     public static final int SURFACE_HIGHLIGHT_RGB =
             LostTalesColors.rgb(LostTalesColors.PLUM_GRAY);
+    /**
+     * White as the tint a texture is drawn with: it multiplies the art by
+     * one, so the art shows as painted. A tint, never a colour drawn.
+     */
+    public static final int UNTINTED = 0xFFFFFF;
     /** The square an inline icon is drawn in, and the row height it sets. */
     public static final int ICON_SIZE = 10;
 

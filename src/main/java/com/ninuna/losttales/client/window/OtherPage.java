@@ -11,13 +11,13 @@ import net.minecraft.util.StatCollector;
  * The tab of a page: the journal, the map, a waystone. One per page,
  * made by {@link WindowPages}, so a page stands in one window at most.
  */
-public final class PageTab extends WindowTab {
+public final class OtherPage extends WindowPage {
     /** What a page tab's id opens with, before the page's code name. */
     static final String ID_PREFIX = "page:";
 
     private final WindowPages.Page page;
 
-    PageTab(WindowPages.Page page) {
+    OtherPage(WindowPages.Page page) {
         this.page = page;
     }
 
@@ -114,6 +114,11 @@ public final class PageTab extends WindowTab {
     }
 
     @Override
+    public void resetIn(Window window) {
+        content().resetPanel();
+    }
+
+    @Override
     public String searchPrompt() {
         return content().searchPrompt();
     }
@@ -133,8 +138,8 @@ public final class PageTab extends WindowTab {
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof PageTab
-                && ((PageTab)other).page.id.equals(this.page.id);
+        return other instanceof OtherPage
+                && ((OtherPage)other).page.id.equals(this.page.id);
     }
 
     @Override

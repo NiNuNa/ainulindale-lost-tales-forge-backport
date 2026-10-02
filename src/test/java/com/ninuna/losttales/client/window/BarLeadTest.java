@@ -60,7 +60,7 @@ public final class BarLeadTest {
 
     @Test
     public void aTabWithoutAnIconKeepsItsNameWhole() {
-        Tab bare = new Tab("Server Console", false);
+        Tab bare = new Tab("Server Log", false);
         assertEquals(BarLead.wholeWidth(bare, SIX),
                 BarLead.leastWidth(bare, SIX));
         BarLead.Fit fit = BarLead.fit(bare, 0, 10, SIX);
@@ -83,7 +83,7 @@ public final class BarLeadTest {
     }
 
     /** A tab with a name, with or without an icon. */
-    static final class Tab extends WindowTab {
+    static final class Tab extends WindowPage {
         private final String name;
         private final boolean icon;
 

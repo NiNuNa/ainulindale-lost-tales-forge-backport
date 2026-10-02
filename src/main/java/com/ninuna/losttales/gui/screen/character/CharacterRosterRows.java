@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The rows of the Characters tab's roster, as the page draws them and the
+ * The rows of the Characters page's roster, as the page draws them and the
  * pointer hits them: the account character first, then the slots under a
  * heading counting them — a character, or an unlocked slot waiting to be
  * filled — then the way to the lore characters, and at the foot the

@@ -552,9 +552,16 @@ abstract class ChatPickerPanel extends SubWindowContent {
         this.searchField.drawTextBox();
     }
 
+    @Override
+    public String tipKey() {
+        String label = this.hoveredEntry == null ? null : tooltip(this.hoveredEntry);
+        return label == null ? "" : label;
+    }
+
     /** The hovered cell's name, as the chat's pointer tip is drawn. */
     @Override
-    public void drawTip(Minecraft minecraft, int tipX, int tipY, int screenWidth) {
+    public void drawTip(Minecraft minecraft, int tipX, int tipY, int screenWidth,
+                        float share) {
         Entry entry = this.hoveredEntry;
         String label = entry == null ? null : tooltip(entry);
         if (label == null || label.length() == 0) {
@@ -569,7 +576,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
         // than with the interface grid, as every other tooltip does.
         LostTalesTooltipSmoothing.begin(tipX, tipY);
         try {
-            WindowStyle.drawPopupLine(font, label, x, y, 1.0F);
+            WindowStyle.drawPopupLine(font, label, x, y, share);
         } finally {
             LostTalesTooltipSmoothing.end();
         }

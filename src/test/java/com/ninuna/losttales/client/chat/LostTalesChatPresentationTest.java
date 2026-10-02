@@ -48,8 +48,8 @@ public final class LostTalesChatPresentationTest {
     public void ownLinesAndReplayedOnesNeverChime() {
         ChatLayout.reset();
         try {
-            ChatTab whisper = ChatTab.whisper("Bilbo", "");
-            ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+            ConversationPage whisper = ConversationPage.whisper("Bilbo", "");
+            ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
             assertTrue(LostTalesChatPresentation.lineChimes(whisper, false,
                     false, false));
             assertFalse(LostTalesChatPresentation.lineChimes(whisper, false,
@@ -279,7 +279,7 @@ public final class LostTalesChatPresentationTest {
         net.minecraft.util.ChatComponentText printed =
                 new net.minecraft.util.ChatComponentText(
                         "Your game mode has been updated");
-        ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
         LostTalesChatMessagePacket packet = LostTalesChatPresentation
                 .clientPacket(console, printed, 123456789L,
                         com.ninuna.losttales.chat.ChatReplyReference.NONE);
@@ -493,7 +493,7 @@ public final class LostTalesChatPresentationTest {
     }
 
     /**
-     * A direct message follows the same identity rules every other
+     * A whisper follows the same identity rules every other
      * channel does: an account line takes the primary role's colour
      * there too, with no tag, and a character-signed one takes the
      * character's colour and names the character alone.
@@ -599,10 +599,10 @@ public final class LostTalesChatPresentationTest {
                             .colors(0x55AA55, 0x336633).at(123456789L)
                             .skin("losttales:human_ranger_male_2").build();
             IChatComponent said = LostTalesChatPresentation.build(packet,
-                    ChatTab.of(ChatChannel.GLOBAL), new int[0], false,
+                    ConversationPage.of(ChatChannel.GLOBAL), new int[0], false,
                     ChatBodyKind.MESSAGE);
             IChatComponent used = LostTalesChatPresentation.build(packet,
-                    ChatTab.of(ChatChannel.GLOBAL), new int[0], false,
+                    ConversationPage.of(ChatChannel.GLOBAL), new int[0], false,
                     ChatBodyKind.COMMAND);
 
             assertEquals(headerOf(said), headerOf(used));
@@ -622,7 +622,7 @@ public final class LostTalesChatPresentationTest {
             assertTrue(bodyOf(said).size() > 1);
 
             IChatComponent grouped = LostTalesChatPresentation.build(
-                    packet, ChatTab.of(ChatChannel.GLOBAL), new int[0], true,
+                    packet, ConversationPage.of(ChatChannel.GLOBAL), new int[0], true,
                     ChatBodyKind.COMMAND);
             assertEquals("", headerOf(grouped));
             assertEquals(1, bodyOf(grouped).size());
@@ -666,7 +666,7 @@ public final class LostTalesChatPresentationTest {
     private static IChatComponent quoteWordsOf(
             LostTalesChatMessagePacket packet) {
         IChatComponent line = LostTalesChatPresentation.build(packet,
-                ChatTab.of(ChatChannel.GLOBAL), new int[0], false,
+                ConversationPage.of(ChatChannel.GLOBAL), new int[0], false,
                 ChatBodyKind.MESSAGE);
         IChatComponent words = null;
         for (Object value : line) {
@@ -871,7 +871,7 @@ public final class LostTalesChatPresentationTest {
             IChatComponent aragorn = null;
             IChatComponent nobody = null;
             for (IChatComponent part : bodyOf(LostTalesChatPresentation.build(
-                    packet, ChatTab.of(ChatChannel.GLOBAL), new int[0], false,
+                    packet, ConversationPage.of(ChatChannel.GLOBAL), new int[0], false,
                     ChatBodyKind.MESSAGE))) {
                 String text = part.getUnformattedTextForChat();
                 if ("@Aragorn".equals(text)) {

@@ -11,8 +11,8 @@ import static org.junit.Assert.assertTrue;
 
 public final class ChatSentHistoryTest {
 
-    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.GLOBAL);
-    private static final ChatTab OOC = ChatTab.of(ChatChannel.OOC);
+    private static final ConversationPage GLOBAL = ConversationPage.of(ChatChannel.GLOBAL);
+    private static final ConversationPage OOC = ConversationPage.of(ChatChannel.OOC);
 
     @Test
     public void upWalksBackAndDownRestoresThePendingText() {
@@ -92,26 +92,26 @@ public final class ChatSentHistoryTest {
         ChatSentHistory history = new ChatSentHistory();
         history.record(GLOBAL, "kept");
         for (int index = 0; index < ChatSentHistory.MAX_TABS - 1; index++) {
-            history.record(ChatTab.whisper("Partner" + index, ""), "hi");
+            history.record(ConversationPage.whisper("Partner" + index, ""), "hi");
         }
         // Writing to Global again makes it the most recent tab.
         history.record(GLOBAL, "again");
-        history.record(ChatTab.whisper("Newest", ""), "hi");
+        history.record(ConversationPage.whisper("Newest", ""), "hi");
         assertEquals(Arrays.asList("kept", "again"), history.entries(GLOBAL));
         assertTrue("the oldest whisper made room",
-                history.entries(ChatTab.whisper("Partner0", "")).isEmpty());
+                history.entries(ConversationPage.whisper("Partner0", "")).isEmpty());
     }
 
     @Test
     public void conversationsAreForgottenTogether() {
         ChatSentHistory history = new ChatSentHistory();
         history.record(GLOBAL, "kept");
-        history.record(ChatTab.whisper("Bilbo", ""), "gone");
-        history.record(ChatTab.npc("Gandalf"), "gone too");
+        history.record(ConversationPage.whisper("Bilbo", ""), "gone");
+        history.record(ConversationPage.npc("Gandalf"), "gone too");
         history.forgetConversations();
         assertEquals(Arrays.asList("kept"), history.entries(GLOBAL));
-        assertTrue(history.entries(ChatTab.whisper("Bilbo", "")).isEmpty());
-        assertTrue(history.entries(ChatTab.npc("Gandalf")).isEmpty());
+        assertTrue(history.entries(ConversationPage.whisper("Bilbo", "")).isEmpty());
+        assertTrue(history.entries(ConversationPage.npc("Gandalf")).isEmpty());
     }
 
     @Test

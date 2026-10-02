@@ -81,7 +81,7 @@ public final class LostTalesQuestRegistry {
         SERVER_QUESTS_BY_ID.clear();
         for (LostTalesQuestDefinition quest : result.quests) {
             SERVER_QUESTS_BY_ID.put(quest.getId(), quest);
-            // A missive made before the file takes the id no longer.
+            // A server file's quest stands over a runtime quest of its id.
             RUNTIME_QUESTS_BY_ID.remove(quest.getId());
         }
         rebuildSortedQuests();

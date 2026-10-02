@@ -172,13 +172,6 @@ public final class FellowshipInvitationWorldData extends WorldSavedData {
         return removeByIds(copyIds(this.invitationIdsByFellowship.get(fellowshipId)));
     }
 
-    public synchronized int removeInvitationsForTargetIdentity(
-            UUID identityId) {
-        ensureWritable();
-        return removeByIds(copyIds(
-                this.invitationIdsByTargetCharacter.get(identityId)));
-    }
-
     /** The invitations a fellowship sent to one identity: what joining it answers. */
     public synchronized int removeInvitationsForFellowshipAndTarget(
             UUID fellowshipId, UUID targetIdentityId) {

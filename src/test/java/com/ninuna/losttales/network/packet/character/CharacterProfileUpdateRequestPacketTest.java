@@ -165,7 +165,7 @@ public final class CharacterProfileUpdateRequestPacketTest {
     public void aRefusalNamesTheOperationAndItsReason() {
         ByteBuf buffer = Unpooled.buffer();
         new CharacterOperationResultPacket(9, CharacterOperationType.PROFILE_UPDATE,
-                CharacterErrorId.LORE_CHARACTER_CANNOT_EDIT, 4L).toBytes(buffer);
+                CharacterErrorId.LORE_CHARACTER_CANNOT_EDIT).toBytes(buffer);
         CharacterOperationResultPacket decoded = new CharacterOperationResultPacket();
         decoded.fromBytes(buffer);
 

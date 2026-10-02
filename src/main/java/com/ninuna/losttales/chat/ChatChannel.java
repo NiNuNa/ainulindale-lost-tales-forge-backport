@@ -65,29 +65,32 @@ public final class ChatChannel {
             ChatRecipientRule.OPERATORS, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.CRIMSON), true);
     /**
-     * This player's own console: what only they see anyway — command
-     * output, fast-travel countdowns, other mods' notices — plus anything
-     * they type there, which is echoed back to them alone. Nobody else
-     * is ever shown a line of it.
+     * This player's own console, shown as the Console: what only they see
+     * anyway — command output, fast-travel countdowns, other mods'
+     * notices — plus anything they type there, which is echoed back to
+     * them alone. Nobody else is ever shown a line of it.
      */
-    public static final ChatChannel CLIENT_CONSOLE = register("client_console", "Client Console", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel CLIENT_CONSOLE = register("client_console", "Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.SELF, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.CONSOLE_TONE), false);
     /**
-     * The server's own console, one stream every reader shares: what the
-     * server did — started, stopped, a command run, a message taken
-     * back, a setting changed, a warning it had to raise — and the talk
-     * its readers have over it. Held by the {@code chat.server_console.read}
-     * capability rather than by a channel gate, and never bridged.
+     * The server's own console, shown as the Server Log: one stream every
+     * reader shares of what the server did — started, stopped, a command
+     * run, a message taken back, a setting changed, a warning it had to
+     * raise — and the talk its readers have over it. Held by the
+     * {@code chat.server_console.read} capability rather than by a channel
+     * gate, and never bridged.
      */
     // The two consoles wear one grey: they are one kind of place.
-    public static final ChatChannel SERVER_CONSOLE = register("server_console", "Server Console", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel SERVER_CONSOLE = register("server_console", "Server Log", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.CONSOLE_READERS, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.CONSOLE_TONE), false);
     /**
      * A private conversation between two players, in character. Not a tab of its own:
-     * every whisper partner is one tab on this channel, and the client
-     * keeps them apart by the partner's name.
+     * every conversation is one tab on this channel, one per pair of
+     * identities — the partner's account and the identity they speak as,
+     * and the character of this player's the conversation is held as
+     * ({@link ChatTabIds#whisperConversationId}).
      */
     // A conversation wears the colour of the person it is with; this
     // plain ivory is only what one with nobody known behind it reads in.

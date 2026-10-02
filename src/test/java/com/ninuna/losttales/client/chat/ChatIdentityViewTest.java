@@ -66,11 +66,11 @@ public final class ChatIdentityViewTest {
         ClientChatIdentitySelection.accept(sync(BEREN, secondFellowship, 0xABCDEF));
         assertEquals(secondFellowship.toString(), ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP));
         assertEquals(0xABCDEF, ClientChatChannelState.displayColor(
-                ChatTab.of(ChatChannel.FELLOWSHIP, secondFellowship.toString())));
+                ConversationPage.of(ChatChannel.FELLOWSHIP, secondFellowship.toString())));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
-        assertFalse(ClientChatChannelState.isAvailable(ChatTab.of(ChatChannel.FELLOWSHIP, firstFellowship.toString())));
-        assertFalse(ClientChatChannelState.canSend(ChatTab.of(ChatChannel.FELLOWSHIP, firstFellowship.toString())));
-        assertTrue(ClientChatChannelState.isAvailable(ChatTab.of(ChatChannel.FELLOWSHIP, secondFellowship.toString())));
+        assertFalse(ClientChatChannelState.isAvailable(ConversationPage.of(ChatChannel.FELLOWSHIP, firstFellowship.toString())));
+        assertFalse(ClientChatChannelState.canSend(ConversationPage.of(ChatChannel.FELLOWSHIP, firstFellowship.toString())));
+        assertTrue(ClientChatChannelState.isAvailable(ConversationPage.of(ChatChannel.FELLOWSHIP, secondFellowship.toString())));
         assertEquals(ALDRIC, ClientCharacterRosterCache.getSnapshot().getActiveCharacterId());
     }
 
@@ -95,13 +95,13 @@ public final class ChatIdentityViewTest {
         roster();
         String plain = ChatChannel.FELLOWSHIP.getDisplayName();
         UUID grey = new UUID(4L, 4L);
-        ChatTab tab = ChatTab.of(ChatChannel.FELLOWSHIP, grey.toString());
+        ConversationPage tab = ConversationPage.of(ChatChannel.FELLOWSHIP, grey.toString());
         ClientChatIdentitySelection.accept(sync(ALDRIC, grey, 0x123456));
         assertEquals(plain, ClientChatChannelState.displayName(ChatChannel.FELLOWSHIP));
         assertNotEquals(plain, ClientChatChannelState.displayName(tab));
         assertTrue(ClientChatChannelState.isAvailable(tab));
         assertFalse("the channel has no plain tab",
-                ClientChatChannelState.isAvailable(ChatTab.of(ChatChannel.FELLOWSHIP)));
+                ClientChatChannelState.isAvailable(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         ClientChatIdentities.select(identityOf(BEREN));
         assertFalse(ClientChatChannelState.isAvailable(tab));
         assertEquals(plain, ClientChatChannelState.displayName(tab));
@@ -110,8 +110,8 @@ public final class ChatIdentityViewTest {
     @Test
     public void factionMessagesAndTypingOnlyAppearForTheSelectedIdentity() {
         roster();
-        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
-        ChatTab rohan = ChatTab.of(ChatChannel.FACTION, ROHAN);
+        ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
+        ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
         assertTrue(ClientChatChannelState.isAvailable(gondor));
         assertFalse(ClientChatChannelState.isAvailable(rohan));
         ClientChatIdentities.select(identityOf(BEREN));
@@ -119,11 +119,11 @@ public final class ChatIdentityViewTest {
         assertTrue(ClientChatChannelState.isAvailable(rohan));
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "A friend", true,
                         GONDOR, ALDRIC.toString()));
-        assertTrue(ClientChatTypingState.namesTyping(ChatTab.of(ChatChannel.FACTION)).isEmpty());
+        assertTrue(ClientChatTypingState.namesTyping(ConversationPage.of(ChatChannel.FACTION)).isEmpty());
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "Beren's friend", true,
                         ROHAN, BEREN.toString()));
         assertEquals(java.util.Collections.singletonList("Beren's friend"),
-                ClientChatTypingState.namesTyping(ChatTab.of(ChatChannel.FACTION)));
+                ClientChatTypingState.namesTyping(ConversationPage.of(ChatChannel.FACTION)));
     }
 
     /**
@@ -134,14 +134,14 @@ public final class ChatIdentityViewTest {
     @Test
     public void aWhisperTabFollowsTheIdentityBeingRead() {
         roster();
-        ChatTab row = ChatTab.whisper("Steve", "Steve");
-        ChatTab withAldric = ChatTab.whisper("Steve", "Steve", keyOf(ALDRIC));
-        ChatTab withBeren = ChatTab.whisper("Steve", "Steve", keyOf(BEREN));
-        assertEquals(withAldric, ChatTab.viewed(row));
+        ConversationPage row = ConversationPage.whisper("Steve", "Steve");
+        ConversationPage withAldric = ConversationPage.whisper("Steve", "Steve", keyOf(ALDRIC));
+        ConversationPage withBeren = ConversationPage.whisper("Steve", "Steve", keyOf(BEREN));
+        assertEquals(withAldric, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(withAldric));
         assertFalse(ChatLineFilter.of(row).accepts(withBeren));
         ClientChatIdentities.select(identityOf(BEREN));
-        assertEquals(withBeren, ChatTab.viewed(row));
+        assertEquals(withBeren, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(withBeren));
         assertFalse(ChatLineFilter.of(row).accepts(withAldric));
         assertTrue(ClientChatChannelState.isAvailable(row));
@@ -154,14 +154,14 @@ public final class ChatIdentityViewTest {
         ClientChatIdentities.select(identityOf(BEREN));
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
                 "Steve", "Friend", true, "", ALDRIC.toString()));
-        ChatTab beren = ChatTab.whisper("Steve", "Friend", BEREN.toString());
+        ConversationPage beren = ConversationPage.whisper("Steve", "Friend", BEREN.toString());
         assertTrue(ClientChatTypingState.namesTyping(beren).isEmpty());
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
                 "Steve", "Friend", true, "", BEREN.toString()));
         assertEquals(java.util.Collections.singletonList("Friend"),
                 ClientChatTypingState.namesTyping(beren));
         assertTrue(ClientChatTypingState.namesTyping(
-                ChatTab.whisper("Steve", "Another character", BEREN.toString())).isEmpty());
+                ConversationPage.whisper("Steve", "Another character", BEREN.toString())).isEmpty());
     }
 
     /**
@@ -175,7 +175,7 @@ public final class ChatIdentityViewTest {
         roster();
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION}) {
-            ClientChatChannelState.select(ChatTab.of(channel));
+            ClientChatChannelState.select(ConversationPage.of(channel));
             // Opening and resizing the screen both use this availability check.
             ClientChatChannelState.ensureAvailable();
             assertEquals(channel, ClientChatChannelState.getSelected().getChannel());
@@ -186,7 +186,7 @@ public final class ChatIdentityViewTest {
         }
         UUID fellowship = new UUID(5L, 5L);
         ClientChatIdentitySelection.accept(sync(ALDRIC, fellowship, 0x123456));
-        ChatTab conversation = ChatTab.of(ChatChannel.FELLOWSHIP, fellowship.toString());
+        ConversationPage conversation = ConversationPage.of(ChatChannel.FELLOWSHIP, fellowship.toString());
         ChatLayout.openTab(conversation, null);
         ClientChatChannelState.select(conversation);
         assertEquals(ChatChannel.FELLOWSHIP, ClientChatChannelState.getSelected().getChannel());
@@ -314,20 +314,20 @@ public final class ChatIdentityViewTest {
     @Test
     public void theFactionTabShowsTheFactionOfTheIdentityBeingRead() {
         roster();
-        ChatTab row = ChatTab.of(ChatChannel.FACTION);
-        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
-        ChatTab rohan = ChatTab.of(ChatChannel.FACTION, ROHAN);
+        ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
+        ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
+        ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
         assertNotEquals("the two conversations are two tabs", gondor, rohan);
 
         // Read as Aldric: the row stands for Gondor's talk.
-        assertEquals(gondor, ChatTab.viewed(row));
+        assertEquals(gondor, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(gondor));
         assertFalse("Rohan's lines are not shown under it",
                 ChatLineFilter.of(row).accepts(rohan));
 
         // Read as Beren: the same row stands for Rohan's.
         ClientChatIdentities.select(identityOf(BEREN));
-        assertEquals(rohan, ChatTab.viewed(row));
+        assertEquals(rohan, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(rohan));
         assertFalse("Gondor's lines are no longer shown under it",
                 ChatLineFilter.of(row).accepts(gondor));
@@ -343,13 +343,13 @@ public final class ChatIdentityViewTest {
     @Test
     public void aScopedChannelsUnreadStateIsFoundByItsRow() {
         roster();
-        ChatTab row = ChatTab.of(ChatChannel.FACTION);
-        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
+        ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
+        ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
         assertNotEquals("the line's tab is not the row's", gondor, row);
 
         // A faction line arrives while another tab is in front.
         ClientChatChannelViews.record(41, gondor,
-                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+                ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
 
         assertEquals(Integer.valueOf(41),
                 ClientChatChannelViews.unreadDividerLine(row));
@@ -365,8 +365,8 @@ public final class ChatIdentityViewTest {
     @Test
     public void aScopedChannelCountsWhatArrivedWhileItWasScrolledBack() {
         roster();
-        ChatTab row = ChatTab.of(ChatChannel.FACTION);
-        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
+        ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
+        ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
         scroll(row, 5, 100, 10.0D);
         assertTrue("the view is scrolled back",
                 ClientChatChannelViews.getScroll(row, 100, 10.0D) > 0.0D);
@@ -387,10 +387,10 @@ public final class ChatIdentityViewTest {
     @Test
     public void eachConversationKeepsItsOwnUnreadState() {
         roster();
-        ChatTab row = ChatTab.of(ChatChannel.FACTION);
+        ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
         ClientChatChannelViews.record(43,
-                ChatTab.of(ChatChannel.FACTION, GONDOR),
-                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+                ConversationPage.of(ChatChannel.FACTION, GONDOR),
+                ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertEquals(1, ClientChatChannelViews.unreadCount(row));
 
         ClientChatIdentities.select(identityOf(BEREN));
@@ -406,11 +406,11 @@ public final class ChatIdentityViewTest {
     @Test
     public void anUnscopedChannelIsOneConversationWhoeverReadsIt() {
         roster();
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        assertEquals(global, ChatTab.viewed(global));
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        assertEquals(global, ConversationPage.viewed(global));
         ClientChatIdentities.select(identityOf(BEREN));
         assertEquals("still the one tab, still its one conversation",
-                global, ChatTab.viewed(global));
+                global, ConversationPage.viewed(global));
         assertTrue(ChatLineFilter.of(global).accepts(global));
     }
 
@@ -423,8 +423,8 @@ public final class ChatIdentityViewTest {
     @Test
     public void aConversationIsShownOnlyToTheIdentityHoldingIt() {
         roster();
-        ChatTab held = ChatTab.whisper("Steve", "Faramir", keyOf(ALDRIC));
-        ChatTab berens = ChatTab.whisper("Steve", "Faramir", keyOf(BEREN));
+        ConversationPage held = ConversationPage.whisper("Steve", "Faramir", keyOf(ALDRIC));
+        ConversationPage berens = ConversationPage.whisper("Steve", "Faramir", keyOf(BEREN));
         assertTrue(ClientChatChannelState.isAvailable(held));
         assertFalse(ClientChatChannelState.isAvailable(berens));
 
@@ -447,16 +447,16 @@ public final class ChatIdentityViewTest {
     @Test
     public void twoCharactersInOneFactionReadTheSameConversation() {
         rosterWithTwoInGondor();
-        ChatTab row = ChatTab.of(ChatChannel.FACTION);
-        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
+        ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
+        ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
 
         assertEquals("read as Aldric, the row is Gondor's talk",
-                gondor, ChatTab.viewed(row));
+                gondor, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(gondor));
 
         ClientChatIdentities.select(identityOf(CIRION));
         assertEquals("read as Cirion, the same conversation",
-                gondor, ChatTab.viewed(row));
+                gondor, ConversationPage.viewed(row));
         assertTrue("Gondor's lines are still shown",
                 ChatLineFilter.of(row).accepts(gondor));
     }
@@ -468,14 +468,14 @@ public final class ChatIdentityViewTest {
     @Test
     public void theAccountReadsTheUnalignedConversation() {
         // No roster held: the roleplaying channels fall back to the account.
-        ChatTab row = ChatTab.of(ChatChannel.FACTION);
-        ChatTab unaligned = ChatTab.of(ChatChannel.FACTION,
+        ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
+        ConversationPage unaligned = ConversationPage.of(ChatChannel.FACTION,
                 LotrCharacterAdapter.UNALIGNED_FACTION_ID);
         assertEquals("the row stands for Unaligned's talk",
-                unaligned, ChatTab.viewed(row));
+                unaligned, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(unaligned));
         assertFalse(ChatLineFilter.of(row).accepts(
-                ChatTab.of(ChatChannel.FACTION, GONDOR)));
+                ConversationPage.of(ChatChannel.FACTION, GONDOR)));
     }
 
     /**
@@ -487,9 +487,9 @@ public final class ChatIdentityViewTest {
     @Test
     public void aLineInTheConversationOnScreenIsNotCountedUnread() {
         roster();
-        ChatTab row = ChatTab.of(ChatChannel.FACTION);
-        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
-        ChatTab rohan = ChatTab.of(ChatChannel.FACTION, ROHAN);
+        ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
+        ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
+        ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
         try {
             ClientChatChannelViews.record(-501, gondor, row, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
             assertEquals("read as Aldric, Gondor's talk is on screen",
@@ -512,16 +512,16 @@ public final class ChatIdentityViewTest {
      */
     @Test
     public void aConversationBelongsToItsChannelsRowEntry() {
-        ChatTab row = ChatTab.of(ChatChannel.FACTION);
-        assertEquals(row, ChatTab.row(ChatTab.of(ChatChannel.FACTION, GONDOR)));
+        ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
+        assertEquals(row, ConversationPage.row(ConversationPage.of(ChatChannel.FACTION, GONDOR)));
         assertEquals("an unscoped tab is its own row",
-                ChatTab.of(ChatChannel.GLOBAL),
-                ChatTab.row(ChatTab.of(ChatChannel.GLOBAL)));
-        ChatTab whisper = ChatTab.whisper("Steve", "Faramir", keyOf(ALDRIC));
+                ConversationPage.of(ChatChannel.GLOBAL),
+                ConversationPage.row(ConversationPage.of(ChatChannel.GLOBAL)));
+        ConversationPage whisper = ConversationPage.whisper("Steve", "Faramir", keyOf(ALDRIC));
         assertEquals("a whisper conversation belongs to the person's row entry",
-                ChatTab.whisper("Steve", "Faramir"), ChatTab.row(whisper));
-        assertEquals("an NPC tab is its own row", ChatTab.npc("Gandalf"),
-                ChatTab.row(ChatTab.npc("Gandalf")));
+                ConversationPage.whisper("Steve", "Faramir"), ConversationPage.row(whisper));
+        assertEquals("an NPC tab is its own row", ConversationPage.npc("Gandalf"),
+                ConversationPage.row(ConversationPage.npc("Gandalf")));
     }
 
     /**
@@ -532,18 +532,18 @@ public final class ChatIdentityViewTest {
      */
     @Test
     public void aScopedTabRoundTripsThroughItsIdAndACharacterKeyedOneDoesNot() {
-        ChatTab rohan = ChatTab.of(ChatChannel.FACTION, ROHAN);
+        ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
         assertEquals("faction|in:" + ROHAN, rohan.id());
-        assertEquals(rohan, ChatTab.fromId(rohan.id()));
-        ChatTab plain = ChatTab.of(ChatChannel.GLOBAL);
+        assertEquals(rohan, ConversationPage.fromId(rohan.id()));
+        ConversationPage plain = ConversationPage.of(ChatChannel.GLOBAL);
         assertEquals("global", plain.id());
-        assertEquals(plain, ChatTab.fromId(plain.id()));
+        assertEquals(plain, ConversationPage.fromId(plain.id()));
         assertNull("a conversation named by a character names none now",
-                ChatTab.fromId("faction|own:" + keyOf(BEREN)));
+                ConversationPage.fromId("faction|own:" + keyOf(BEREN)));
     }
 
     /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
-    private static void scroll(ChatTab tab, int lines, int totalLines, double roomLines) {
+    private static void scroll(ConversationPage tab, int lines, int totalLines, double roomLines) {
         double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
         ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
     }

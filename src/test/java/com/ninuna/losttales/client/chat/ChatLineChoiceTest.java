@@ -9,8 +9,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Which lines a choice lets through: the lines that chime under
- * Notifications, and the lines that reach the closed feed under Show in
- * Feed, one set of three words for both. A line is addressed to the
+ * Notification Settings, and the lines that reach the closed feed under
+ * Chat Feed Settings, one set of three words for both. A line is addressed to the
  * player when it mentions them or replies to them.
  */
 public final class ChatLineChoiceTest {
@@ -76,14 +76,14 @@ public final class ChatLineChoiceTest {
     }
 
     /**
-     * The feed's filter lets a conversation's lines through as its Show
-     * in Feed says: every line of one, only an addressed line of another.
+     * The feed's filter lets a conversation's lines through as its feed
+     * choice says: every line of one, only an addressed line of another.
      */
     @Test
     public void theFeedFilterFollowsTheChoice() {
-        ChatTab bilbo = ChatTab.npc("Bilbo");
-        ChatTab frodo = ChatTab.npc("Frodo");
-        ChatTab sam = ChatTab.npc("Sam");
+        ConversationPage bilbo = ConversationPage.npc("Bilbo");
+        ConversationPage frodo = ConversationPage.npc("Frodo");
+        ConversationPage sam = ConversationPage.npc("Sam");
         ChatLineFilter feed = ChatLineFilter.of(
                 java.util.Collections.singletonList(bilbo),
                 java.util.Collections.singletonList(frodo));
@@ -95,6 +95,6 @@ public final class ChatLineChoiceTest {
         assertFalse(feed.accepts(frodo));
         assertFalse(feed.equals(ChatLineFilter.of(
                 java.util.Collections.singletonList(bilbo),
-                java.util.Collections.<ChatTab>emptySet())));
+                java.util.Collections.<ConversationPage>emptySet())));
     }
 }

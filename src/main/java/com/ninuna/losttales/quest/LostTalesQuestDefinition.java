@@ -36,17 +36,6 @@ public final class LostTalesQuestDefinition {
     public LostTalesQuestDefinition(String id, String title, String description, boolean repeatable, String startMode, Map<String, String> prerequisites, Map<String, String> rewards, Map<String, String> interaction, Map<String, String> markers, Map<String, String> journalLog, List<LostTalesQuestStageDefinition> stages) {
         this(id, title, description, repeatable, repeatable, startMode,
                 prerequisites, rewards, interaction, markers, journalLog,
-                stages);
-    }
-
-    public LostTalesQuestDefinition(String id, String title,
-            String description, boolean repeatable, boolean restartable,
-            String startMode, Map<String, String> prerequisites,
-            Map<String, String> rewards, Map<String, String> interaction,
-            Map<String, String> markers, Map<String, String> journalLog,
-            List<LostTalesQuestStageDefinition> stages) {
-        this(id, title, description, repeatable, restartable, startMode,
-                prerequisites, rewards, interaction, markers, journalLog,
                 Collections.<String, String>emptyMap(), stages);
     }
 
@@ -159,12 +148,15 @@ public final class LostTalesQuestDefinition {
 
     /**
      * Whether a fellowship member may join this quest from a card shared in
-     * the chat: only a quest a player may start by item or interaction. A
-     * locked quest starts only on its own server path, a missive board's
-     * for one, so its card is never joined.
+     * the chat: only a quest a player may start by item or interaction,
+     * and only by a way the server allows ({@code itemStarts},
+     * {@code interactionStarts}). A locked quest starts only on its own
+     * server path, a missive board's for one, so its card is never joined.
      */
-    public boolean canStartFromShare() {
-        return canStartFromItem() || canStartFromInteraction();
+    public boolean canStartFromShare(boolean itemStarts,
+                                     boolean interactionStarts) {
+        return itemStarts && canStartFromItem()
+                || interactionStarts && canStartFromInteraction();
     }
 
     public Map<String, String> getPrerequisites() {

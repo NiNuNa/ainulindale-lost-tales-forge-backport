@@ -50,10 +50,10 @@ public final class ClientSettingsPage extends PageContent {
         });
     }
 
-    /** A colour's palette, or the field a number or a line is typed into, hung from its row. */
+    /** A colour's palette, a few-word setting's words, or the field a number or a line is typed into, hung from its row. */
     private static void open(WindowScreen screen, Settings.Setting setting,
                              LostTalesUiHitBox row) {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         Window window = tab == null ? null : WindowLayout.windowOf(tab);
         if (window == null) {
             return;
@@ -137,7 +137,7 @@ public final class ClientSettingsPage extends PageContent {
 
     /* ---- The window's strip ---- */
 
-    /** The Client Console's grey. */
+    /** The Console's grey. */
     @Override
     public int tone() {
         return LostTalesColors.rgb(LostTalesColors.CONSOLE_TONE);

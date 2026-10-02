@@ -22,8 +22,8 @@ import static org.junit.Assert.assertTrue;
  * was typed where the place has no name.
  */
 public final class ClientChatDraftsTest {
-    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.GLOBAL);
-    private static final ChatTab OOC = ChatTab.of(ChatChannel.OOC);
+    private static final ConversationPage GLOBAL = ConversationPage.of(ChatChannel.GLOBAL);
+    private static final ConversationPage OOC = ConversationPage.of(ChatChannel.OOC);
     private static final String SERVER = "server:play.example";
     private static final UUID ACCOUNT =
             UUID.fromString("0b1f6a9e-5a3c-4c1d-9a44-3f2f7f0a1c11");
@@ -57,9 +57,9 @@ public final class ClientChatDraftsTest {
 
     @Test
     public void aWhisperIsTheSameConversationHoweverItsNameIsCased() {
-        ClientChatDrafts.set(SERVER, ChatTab.whisper("Alex", ""), "psst");
+        ClientChatDrafts.set(SERVER, ConversationPage.whisper("Alex", ""), "psst");
         assertEquals("psst",
-                ClientChatDrafts.get(SERVER, ChatTab.whisper("alex", "")));
+                ClientChatDrafts.get(SERVER, ConversationPage.whisper("alex", "")));
     }
 
     @Test

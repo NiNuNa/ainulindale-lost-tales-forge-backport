@@ -162,7 +162,7 @@ final class ChatChannelLinkMarker {
 
     static final class Data {
         final int color;
-        /** The tab the link opens, as {@link ChatTab#id()} writes it. */
+        /** The tab the link opens, as {@link ConversationPage#id()} writes it. */
         final String tabId;
         /** The line the click lands on, or zero for the tab alone. */
         final int chatLineId;

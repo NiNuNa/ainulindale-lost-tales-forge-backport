@@ -11,7 +11,7 @@ import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowOpening;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
@@ -671,7 +671,7 @@ public final class ChatInputBar {
      * with a window that is still appearing.
      */
     void drawRestingBar(ChatFrame frame, Window window) {
-        ChatTab tab = ChatTab.from(ChatFrame.activeTab(window,
+        ConversationPage tab = ConversationPage.from(ChatFrame.activeTab(window,
                 ChatFrame.visibleTabs(window)));
         if (tab == null || frame == null || !frame.drawn) {
             return;
@@ -684,7 +684,7 @@ public final class ChatInputBar {
         }
     }
 
-    private void drawRestingBar(ChatFrame frame, ChatTab tab) {
+    private void drawRestingBar(ChatFrame frame, ConversationPage tab) {
         int liveLeft = this.left;
         int liveTop = this.top;
         int liveRight = this.right;
@@ -782,7 +782,7 @@ public final class ChatInputBar {
      * of the caret waiting at the field's start and goes with the first
      * character typed.
      */
-    private void drawHint(ChatInputLine line, String typed, ChatTab tab) {
+    private void drawHint(ChatInputLine line, String typed, ConversationPage tab) {
         if (typed.length() > 0) {
             return;
         }
@@ -884,7 +884,7 @@ public final class ChatInputBar {
      * {@link #COMFORTABLE_FIELD_WIDTH}, else giving the field what it
      * lacks of that, down to the icon alone.
      */
-    private BarLead.Fit leadFit(int barRight, ChatTab channel) {
+    private BarLead.Fit leadFit(int barRight, ConversationPage channel) {
         WindowBar.Measure measure = WindowBar.measure(this.font);
         int left = this.left + BAR_GAP;
         int whole = BarLead.wholeWidth(channel, measure);
@@ -939,7 +939,7 @@ public final class ChatInputBar {
      * voice is taken up on a tab that speaks in character. The head and
      * its sphere are one icon. Null with no player to show.
      */
-    BarLead.Face faceFor(final WindowTab tab) {
+    BarLead.Face faceFor(final WindowPage tab) {
         if (this.mc == null || this.mc.thePlayer == null) {
             return null;
         }

@@ -52,9 +52,12 @@ import net.minecraft.util.IChatComponent;
  * each player on its own that is still shared news, as LOTR's
  * travelling trader is, gets one record and one id for every copy. A
  * line sent to one player that answers a command they typed is recorded
- * for that account alone, under the tab the command was typed in
+ * for that account alone, under the tab the command was typed in while
+ * they may read it and in the Console otherwise
  * ({@link #onPlayerLine}), so the answer comes back with the rest of the
- * tab's history. A line is never delayed or refused: whatever fails,
+ * tab's history. It is charged to that account's own share of the
+ * history, never to the conversation's. A line is never delayed or
+ * refused: whatever fails,
  * the component goes out as it came.
  *
  * <p>A join line's id is also kept for the login replay of the player
@@ -176,13 +179,14 @@ public final class LostTalesServerBroadcastHook {
      * Sees a line about to be sent to one player and hands back the one
      * to send, or null for one this player is not sent. Vanilla's notice
      * to operators of what a command did — {@code [Server: Opped Nils]} —
-     * is not sent to a reader of the Server Console when the console has
+     * is not sent to a reader of the Server Log when the console has
      * just recorded that command: it holds it already. A shared line the
      * game hands each player on its own is stamped as a broadcast is, once
      * for all its copies. A line that answers a command the player typed
      * from a chat tab — their running command's context names the tab —
      * gets an id and its named players and is recorded for that account
-     * alone under that tab. Any other line to one player — a countdown, a
+     * alone, under that tab while they may read it, else in the Client
+     * Console ({@link #answerTab}). Any other line to one player — a countdown, a
      * notice, another mod's word — passes unrecorded: it is this player's
      * alone.
      */
@@ -212,11 +216,13 @@ public final class LostTalesServerBroadcastHook {
             if (shared != ChatChannel.CLIENT_CONSOLE) {
                 return message;
             }
-            String tabId = ChatCommandContexts.answerLine(account,
+            String typedIn = ChatCommandContexts.answerLine(account,
                     System.currentTimeMillis());
-            if (tabId.length() == 0) {
+            if (typedIn.length() == 0) {
                 return message;
             }
+            String tabId = answerTab(typedIn,
+                    LostTalesChatService.requesterFor(player));
             ChatChannel channel = ChatTabIds.channelOf(tabId);
             if (channel == null) {
                 channel = ChatChannel.CLIENT_CONSOLE;
@@ -235,11 +241,39 @@ public final class LostTalesServerBroadcastHook {
     }
 
     /**
+     * The tab a command's answer is kept under: the one its client said
+     * the command was typed in, while {@code reader} may read that
+     * conversation now, as a request for its older lines is asked
+     * ({@link LostTalesChatService#readsConversation}); a whisper's tab
+     * while they may read whispers; an NPC conversation, which is the
+     * player's own. Anything else — a channel they may not read, a
+     * faction or fellowship they are not in, an id naming no channel —
+     * answers with no tab, and the answer is kept in the Console.
+     */
+    static String answerTab(String typedIn, ChatHistory.Requester reader) {
+        String tabId = typedIn == null ? "" : typedIn.trim();
+        String lower = tabId.toLowerCase(Locale.ROOT);
+        if (reader == null || tabId.length() == 0) {
+            return "";
+        }
+        if (lower.startsWith(ChatTabIds.NPC_PREFIX)) {
+            return tabId;
+        }
+        if (lower.startsWith(ChatTabIds.WHISPER_PREFIX)) {
+            return LostTalesChatService.readsConversation(reader,
+                    ChatChannel.WHISPER, "") ? tabId : "";
+        }
+        ChatChannel channel = ChatTabIds.channelOf(tabId);
+        return channel != null && LostTalesChatService.readsConversation(reader,
+                channel, ChatTabIds.scopeOf(tabId)) ? tabId : "";
+    }
+
+    /**
      * Gives a server-wide line of {@code channel} an id and records it
      * for everyone online: they are the ones who can be shown it, so they
      * are the ones who may reply to it by that id. A line of an open
      * channel may be shown to anyone who comes later; one filed in the
-     * Client Console, which is each player's own, only to those it was
+     * Console, which is each player's own, only to those it was
      * sent to. Answers the id, or none for a line that could not be
      * recorded.
      */
@@ -391,7 +425,7 @@ public final class LostTalesServerBroadcastHook {
 
     /**
      * The name the server's lines are recorded under, and the actor of
-     * what the server itself does in the Server Console; the client shows
+     * what the server itself does in the Server Log; the client shows
      * its own word for it.
      */
     public static final String SERVER_NAME = "Server";
@@ -560,7 +594,7 @@ public final class LostTalesServerBroadcastHook {
 
     /**
      * The player's account as an out-of-character line names it: how the
-     * Server Console names whoever did what it records.
+     * Server Log names whoever did what it records.
      */
     public static ChatNamedPlayer namedAccount(EntityPlayerMP player) {
         return ChatNamedPlayer.account(player.getUniqueID(), accountOf(player));

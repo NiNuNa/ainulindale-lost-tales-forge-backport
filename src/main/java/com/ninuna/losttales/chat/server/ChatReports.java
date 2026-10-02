@@ -18,8 +18,8 @@ import net.minecraft.util.ChatComponentTranslation;
  * Messages reported to staff. A player may report a
  * line by another player or a Discord member that they were shown, once
  * per message, and five times in ten minutes at most. A report becomes a
- * Server Console entry, which counts as a mention for everyone reading
- * it; the reporter is thanked in their Client Console, and the reported
+ * Server Log entry, which counts as a mention for everyone reading
+ * it; the reporter is thanked in their Console, and the reported
  * player is never told.
  *
  * <p>What was reported and by whom lives for the server's run only: the

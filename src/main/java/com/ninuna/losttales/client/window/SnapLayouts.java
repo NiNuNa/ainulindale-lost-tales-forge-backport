@@ -586,7 +586,7 @@ public final class SnapLayouts {
     private static void drawWindowIcon(Minecraft minecraft, Zone zone,
                                        int alpha) {
         Window window = WindowLayout.window(zone.windowId);
-        WindowTab front = window == null ? null : WindowFrame.activeTab(
+        WindowPage front = window == null ? null : WindowFrame.activeTab(
                 window, WindowFrame.visibleTabs(window));
         int size = LostTalesUiInk.ICON_SIZE;
         int width = (int)Math.floor(zone.box.width);

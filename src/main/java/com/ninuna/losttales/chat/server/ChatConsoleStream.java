@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The Server Console's memory: the last {@link #MAX_EVENTS}
+ * The Server Log's memory: the last {@link #MAX_EVENTS}
  * administrative events, in the order they happened, so a staff member
  * who joins is shown what went on before them. Written to the world
  * with the chat history ({@link ChatHistoryWorldData}) and read back
@@ -25,7 +25,7 @@ import java.util.UUID;
  * {@code chat.server_console.read} capability at the moment of sending and
  * again at the moment of replay.
  *
- * <p>An entry is a line of the Server Console like any other: its id
+ * <p>An entry is a line of the Server Log like any other: its id
  * comes from the clock messages take theirs from, so a link, a reply and
  * a reaction name it as they name a message, and its reactions are kept
  * here beside it and saved with it.</p>

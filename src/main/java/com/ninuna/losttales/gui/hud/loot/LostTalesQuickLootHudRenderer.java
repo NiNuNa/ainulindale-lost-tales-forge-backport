@@ -8,6 +8,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootDropItemPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
@@ -195,13 +196,13 @@ public final class LostTalesQuickLootHudRenderer {
                 TEXTURE_WIDTH - 12);
         renderHorizontalOrnament(minecraft, font, panelX, panelY, title);
         font.drawStringWithShadow(title, panelX + 3,
-                panelY + font.FONT_HEIGHT / 2, 0xFFFFFF);
+                panelY + font.FONT_HEIGHT / 2, LostTalesColors.IVORY);
 
         if (slots.isEmpty()) {
             drawQuickLootTexture(minecraft, TEXTURE, panelX, rowY, 0, ROW_TEXTURE_V, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
             font.drawStringWithShadow(StatCollector.translateToLocal(
                     snapshot.sealed ? "quickLootHud.losttales.sealed" : "quickLootHud.losttales.empty"),
-                    itemNameX, rowY + 7, 0xFFFFFF);
+                    itemNameX, rowY + 7, LostTalesColors.IVORY);
         } else {
             for (int i = 0; i < rowsToDraw; i++) {
                 int actualRow = scrollOffset + i;
@@ -217,7 +218,7 @@ public final class LostTalesQuickLootHudRenderer {
                 String name = font.trimStringToWidth(
                         stack == null ? "" : stack.getDisplayName(),
                         TEXTURE_WIDTH - (itemNameX - panelX) - 8);
-                font.drawStringWithShadow(name, itemNameX, y + 7, 0xFFFFFF);
+                font.drawStringWithShadow(name, itemNameX, y + 7, LostTalesColors.IVORY);
             }
         }
 
@@ -363,18 +364,18 @@ public final class LostTalesQuickLootHudRenderer {
         if (drawDropKey) {
             cursorX += LostTalesInputIconRenderer.drawKeyBinding(minecraft, LostTalesKeyBindings.getUseKeyBinding(), cursorX, y, 1.0F) + 3;
             String drop = StatCollector.translateToLocal("quickLootHud.losttales.drop");
-            font.drawStringWithShadow(drop, cursorX, textY, 0xFFFFFF);
+            font.drawStringWithShadow(drop, cursorX, textY, LostTalesColors.IVORY);
             cursorX += font.getStringWidth(drop) + 7;
         }
 
         cursorX += LostTalesInputIconRenderer.drawKeyBinding(minecraft, LostTalesKeyBindings.getModifierKeyBinding(), cursorX, y, 1.0F) + 3;
         String plus = StatCollector.translateToLocal("quickLootHud.losttales.plus");
-        font.drawStringWithShadow(plus, cursorX, textY, 0xFFFFFF);
+        font.drawStringWithShadow(plus, cursorX, textY, LostTalesColors.IVORY);
         cursorX += font.getStringWidth(plus) + 3;
 
         cursorX += LostTalesInputIconRenderer.drawMouseWheel(minecraft, cursorX, y, 1.0F) + 3;
         String scroll = StatCollector.translateToLocal("quickLootHud.losttales.scroll");
-        font.drawStringWithShadow(scroll, cursorX, textY, 0xFFFFFF);
+        font.drawStringWithShadow(scroll, cursorX, textY, LostTalesColors.IVORY);
     }
 
     private static Target getLookTarget(Minecraft minecraft) {

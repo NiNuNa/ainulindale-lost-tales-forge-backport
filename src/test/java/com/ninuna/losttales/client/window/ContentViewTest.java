@@ -37,8 +37,8 @@ public final class ContentViewTest {
         ChatLayout.reset();
     }
 
-    private static List<WindowTab> row(WindowTab... tabs) {
-        return new ArrayList<WindowTab>(Arrays.asList(tabs));
+    private static List<WindowPage> row(WindowPage... tabs) {
+        return new ArrayList<WindowPage>(Arrays.asList(tabs));
     }
 
     @Test

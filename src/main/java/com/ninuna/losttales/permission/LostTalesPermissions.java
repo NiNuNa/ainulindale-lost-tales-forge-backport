@@ -11,9 +11,12 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * say yes and nothing can say no: vanilla operator status at the level
  * the capability names, exactly as the command handler reads it from
  * the ops list, the single-player owner rule and the server's own
- * settings; or a role the account holds that the config grants the
- * capability to. Roles are resolved by {@link ChatAccountRoleResolver}
- * from server-side facts alone, so nothing a client sends takes part.
+ * settings; or a role the account holds — assigned to the account or
+ * given by an operator level — that the config grants the capability
+ * to. A role earned by a LOTR faction rank, or assigned to a character,
+ * is worn and grants nothing. Roles are resolved by {@link
+ * ChatAccountRoleResolver#grantingMask} from server-side facts alone, so
+ * nothing a client sends takes part.
  *
  * <p>Every feature asks here at the moment it acts, never earlier and
  * never from a cache: a mute, a removal, a config change, a command. The
@@ -52,13 +55,12 @@ public final class LostTalesPermissions {
             return false;
         }
         // The level answers on its own, and is asked first: resolving
-        // roles reads the config catalogue and, for a faction source,
-        // LOTR's player data, and this is asked per recipient on the
-        // routing path. An operator never pays for it.
+        // roles reads the config catalogue, and this is asked per
+        // recipient on the routing path. An operator never pays for it.
         if (player.canCommandSenderUseCommand(capability.getRequiredOpLevel(), NODE)) {
             return true;
         }
-        return decide(false, ChatAccountRoleResolver.resolve(player), capability,
+        return decide(false, ChatAccountRoleResolver.grantingMask(player), capability,
                 ChatRoleCatalog.server(), LostTalesPermissionCatalog.current());
     }
 

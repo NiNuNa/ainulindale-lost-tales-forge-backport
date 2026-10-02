@@ -362,4 +362,38 @@ public final class ChatRoleConfigTest {
                         "moderator", Collections.<UUID>emptySet(),
                         Collections.<UUID>emptySet()));
     }
+
+    /**
+     * A role earned by a faction rank, or assigned to a character, grants
+     * nothing: an entry that grants something anyway is kept as written
+     * and warned about once, however many ranks or characters it names.
+     */
+    @Test
+    public void grantsARankOrACharacterWouldHoldAreWarnedAboutOnce() {
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {
+                "knight=name:Knight;faction:GONDOR@gondor.knight;faction:ROHAN@rohan.marshal"
+                        + ";grant:chat.moderate",
+                "herald=name:Herald;grant:chat.moderate",
+                "squire=name:Squire;faction:GONDOR@gondor.soldier",
+        }, new String[] {
+                "herald=" + STEVE + ",character:" + ALDRIC + ",character:" + UUID.randomUUID(),
+                "squire=character:" + ALDRIC,
+        }, collect);
+        assertEquals(warnings.toString(), 2, warnings.size());
+        assertTrue(warnings.get(0), warnings.get(0).contains("'knight'"));
+        assertTrue(warnings.get(0), warnings.get(0).contains("ignored"));
+        assertTrue(warnings.get(1), warnings.get(1).contains("'herald'"));
+        assertTrue(warnings.get(1), warnings.get(1).contains("ignored"));
+        // Both entries are read as written, grants and members alike.
+        assertEquals(Collections.singleton(LostTalesCapability.CHAT_MODERATE.getId()),
+                catalog.byId("knight").getGrants());
+        assertEquals(Collections.singleton(STEVE), catalog.membersOf("herald"));
+        assertEquals(2, catalog.characterMembersOf("herald").size());
+
+        // An account's own assignment of a granting role says nothing.
+        warnings.clear();
+        ChatRoleConfig.parse(new String[] {"herald=name:Herald;grant:chat.moderate"},
+                new String[] {"herald=" + STEVE}, collect);
+        assertTrue(warnings.toString(), warnings.isEmpty());
+    }
 }

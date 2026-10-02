@@ -15,7 +15,7 @@ import net.minecraft.util.StatCollector;
  * starts, with the words its tab reads, the item its tab wears, its key
  * and how its content is made; nothing in the window system names a
  * page itself.
- * Each page is one tab ({@link PageTab}), so one window holds it at
+ * Each page is one tab ({@link OtherPage}), so one window holds it at
  * most, and its content is made the first time it is shown and kept
  * until the player leaves the world.
  */
@@ -33,7 +33,7 @@ public final class WindowPages {
         private final KeyBinding key;
         private final Factory factory;
         private final boolean fromWorld;
-        private final PageTab tab;
+        private final OtherPage tab;
         private PageContent content;
 
         Page(String id, String titleKey, ItemStack icon, KeyBinding key,
@@ -44,7 +44,7 @@ public final class WindowPages {
             this.key = key;
             this.factory = factory;
             this.fromWorld = fromWorld;
-            this.tab = new PageTab(this);
+            this.tab = new OtherPage(this);
         }
 
         /**
@@ -62,7 +62,7 @@ public final class WindowPages {
         }
 
         /** The page's one tab. */
-        public PageTab tab() {
+        public OtherPage tab() {
             return this.tab;
         }
 
@@ -98,11 +98,11 @@ public final class WindowPages {
             new LinkedHashMap<String, Page>();
 
     static {
-        WindowTab.addReader(new WindowTab.Reader() {
+        WindowPage.addReader(new WindowPage.Reader() {
             @Override
-            public WindowTab read(String id) {
-                return id.startsWith(PageTab.ID_PREFIX)
-                        ? tab(id.substring(PageTab.ID_PREFIX.length())) : null;
+            public WindowPage read(String id) {
+                return id.startsWith(OtherPage.ID_PREFIX)
+                        ? tab(id.substring(OtherPage.ID_PREFIX.length())) : null;
             }
         });
     }
@@ -172,7 +172,7 @@ public final class WindowPages {
      * tab is never in the layout file.
      */
     public static void closeWorldPages() {
-        final List<PageTab> bound = new ArrayList<PageTab>();
+        final List<OtherPage> bound = new ArrayList<OtherPage>();
         for (Page page : all()) {
             if (page.opensFromWorld() && WindowLayout.isOpen(page.tab())) {
                 bound.add(page.tab());
@@ -183,7 +183,7 @@ public final class WindowPages {
         }
         WindowLayout.removeTabs(new WindowLayout.TabFilter() {
             @Override
-            public boolean matches(WindowTab tab) {
+            public boolean matches(WindowPage tab) {
                 return bound.contains(tab);
             }
         });
@@ -195,13 +195,13 @@ public final class WindowPages {
     }
 
     /** The tab of the page registered under {@code id}; null for none. */
-    public static synchronized PageTab tab(String id) {
+    public static synchronized OtherPage tab(String id) {
         Page page = byId(id);
         return page == null ? null : page.tab();
     }
 
     /** The tab of the page whose key is bound to the keyboard's {@code keyCode}; null for none. */
-    public static synchronized PageTab tabForKey(int keyCode) {
+    public static synchronized OtherPage tabForKey(int keyCode) {
         for (Page page : PAGES.values()) {
             if (page.hasKey(keyCode)) {
                 return page.tab();
@@ -211,13 +211,12 @@ public final class WindowPages {
     }
 
     /**
-     * Takes a line the server sends in the chat to the page it answers,
-     * by the line's lang key, while that page is shown: its words stand
-     * over the page's bar, and the chat never shows it. Answers whether a
-     * page took it; a page not shown takes nothing, and the line stays in
-     * the chat.
+     * Shows a line the server sends in the chat over the bar of the page
+     * it answers, by the line's lang key, while that page is shown; the
+     * chat shows it as well. Answers whether a page showed it; a page not
+     * shown shows nothing.
      */
-    public static boolean claimLine(String key, String words) {
+    public static boolean answerOnPage(String key, String words) {
         if (key == null || key.length() == 0) {
             return false;
         }
@@ -233,8 +232,8 @@ public final class WindowPages {
     }
 
     /** The content of a page's tab; null for any other tab. */
-    public static PageContent contentOf(WindowTab tab) {
-        return tab instanceof PageTab ? ((PageTab)tab).content() : null;
+    public static PageContent contentOf(WindowPage tab) {
+        return tab instanceof OtherPage ? ((OtherPage)tab).content() : null;
     }
 
     /** Every page, in the order they were registered. */

@@ -180,6 +180,8 @@ public final class MotionFilesTest {
                 new String[] {"start_x", "start_y", "start_scale"});
         params.put(MotionIds.SCREEN_CONTROL_BAR, new String[] {"delay", "travel"});
         params.put(MotionIds.CHAT_TOOLBAR_SHOW, new String[] {"rest"});
+        params.put(MotionIds.UI_TIP_SHOW,
+                new String[] {"short", "medium", "long", "warm"});
         params.put(MotionIds.MAP_POPUP_OPEN, new String[] {"travel", "start_scale"});
         params.put(MotionIds.WINDOW_TAB_MARQUEE, new String[] {"speed", "pause"});
         params.put(MotionIds.WINDOW_NOTICE, new String[] {"hold", "rise"});

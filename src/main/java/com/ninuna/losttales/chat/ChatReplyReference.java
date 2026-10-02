@@ -21,6 +21,10 @@ import java.util.UUID;
  * <p>A forwarded message wears one too ({@link #forward}): the message it
  * carries on from, with the link to where that was said, and no excerpt,
  * since the forward's own words are the whole message.</p>
+ *
+ * <p>A reply to a line the server holds no record of quotes it as
+ * {@link #UNKEPT}: a message no longer kept, with no author and no words,
+ * since nothing but the replier's own word could say what that line was.</p>
  */
 public final class ChatReplyReference {
     /** An author whose colour the quote was not told. */
@@ -28,6 +32,16 @@ public final class ChatReplyReference {
     /** A line that is not a reply. */
     public static final ChatReplyReference NONE =
             new ChatReplyReference(ChatMessageIds.NONE, "", "", NO_COLOR);
+    /**
+     * The quote of a line the server holds no record of: it names no
+     * message, no author and no words, and reads as a message no longer
+     * kept ({@link #UNKEPT_KEY}) wherever it is shown.
+     */
+    public static final ChatReplyReference UNKEPT = new ChatReplyReference();
+    /** The words an {@link #UNKEPT} quote is shown as. */
+    public static final String UNKEPT_KEY = "gui.losttales.chat.message.no_longer_kept";
+    /** Those words where no language file says them: a Discord post's. */
+    public static final String UNKEPT_WORDS = "A message no longer kept";
     /** The quoted sender's name, bounded like any other identity name. */
     public static final int MAX_AUTHOR_BYTES = 256;
     /** The quoted text: one glanceable line, not the message again. */
@@ -72,6 +86,22 @@ public final class ChatReplyReference {
      * opening it. Never a forward's.
      */
     private final boolean action;
+    /** Whether this is {@link #UNKEPT}: a quote of a line no record holds. */
+    private final boolean unkept;
+
+    private ChatReplyReference() {
+        this.messageId = ChatMessageIds.NONE;
+        this.author = "";
+        this.excerpt = "";
+        this.authorColor = NO_COLOR;
+        this.senderId = null;
+        this.accountLine = false;
+        this.skinId = "";
+        this.npcLine = false;
+        this.forwardedFrom = "";
+        this.action = false;
+        this.unkept = true;
+    }
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor) {
@@ -94,17 +124,19 @@ public final class ChatReplyReference {
         this.npcLine = npcLine;
         this.forwardedFrom = forwardedFrom == null ? "" : forwardedFrom;
         this.action = action;
+        this.unkept = false;
     }
 
     /**
      * The same quote wearing the quoted sender's head: what the server
      * adds from its record of the line, so the quote is drawn with the
      * face the line was, whether or not the reader still holds it. A
-     * quote of nothing stays nothing.
+     * quote of nothing stays nothing, and a quote of a line no longer
+     * kept wears no head.
      */
     public ChatReplyReference withHead(UUID senderId, boolean accountLine,
                                        String skinId) {
-        if (!exists() || senderId == null) {
+        if (!exists() || this.unkept || senderId == null) {
             return this;
         }
         return new ChatReplyReference(this.messageId, this.author,
@@ -114,11 +146,12 @@ public final class ChatReplyReference {
 
     /**
      * The same quote of an action, or of a line that is not one. A quote
-     * of nothing and a forward are never an action's: a forward's line
-     * carries that itself.
+     * of nothing, of a line no longer kept, and a forward are never an
+     * action's: a forward's line carries that itself.
      */
     public ChatReplyReference asAction(boolean action) {
-        if (action == this.action || (action && (!exists() || isForward()))) {
+        if (action == this.action
+                || (action && (!exists() || this.unkept || isForward()))) {
             return this;
         }
         return new ChatReplyReference(this.messageId, this.author,
@@ -138,7 +171,7 @@ public final class ChatReplyReference {
      * conversation, which only the client that holds it ever builds.
      */
     public ChatReplyReference withNpcHead(UUID npcId, String texturePath) {
-        if (!exists() || npcId == null) {
+        if (!exists() || this.unkept || npcId == null) {
             return this;
         }
         return new ChatReplyReference(this.messageId, this.author,
@@ -223,12 +256,14 @@ public final class ChatReplyReference {
     }
 
     /**
-     * A quote of a line no server named — an announcement, a death
-     * message, a console notice, a command's echo, an NPC's speech —
-     * which travels as its author and its words alone, with no id to
-     * jump to or to match a later edit against. The author is whoever
-     * the line was signed by, or the chat's own word for a line nobody
-     * signed. A nameless one is {@link #NONE}.
+     * A quote of a line no server named — a line of the client's own, a
+     * command's echo, an NPC's speech — by its author and its words
+     * alone, with no id to jump to or to match a later edit against. Only
+     * the client that holds the line builds one, for its own screen: a
+     * line sent with one travels with {@link #UNKEPT} in its place, since
+     * only the server's own record may say who said what. The author is
+     * whoever the line was signed by, or the chat's own word for a line
+     * nobody signed. A nameless one is {@link #NONE}.
      */
     public static ChatReplyReference unanchored(String author,
                                                 String message,
@@ -290,7 +325,16 @@ public final class ChatReplyReference {
 
     /** Whether the line replies to anything at all. */
     public boolean exists() {
-        return this.author.length() > 0;
+        return this.author.length() > 0 || this.unkept;
+    }
+
+    /**
+     * Whether this quotes a line the server holds no record of
+     * ({@link #UNKEPT}): no author, no words, shown as a message no
+     * longer kept.
+     */
+    public boolean isUnkept() {
+        return this.unkept;
     }
 
     /**

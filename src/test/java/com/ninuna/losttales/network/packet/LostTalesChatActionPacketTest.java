@@ -173,34 +173,40 @@ public final class LostTalesChatActionPacketTest {
                 "#global/5").asAction(true).isAction());
     }
 
-    /** A line that quotes nothing cannot say its quote is an action. */
+    /**
+     * A line that quotes no named message cannot say its quote is an
+     * action: neither a line with no quote nor one quoting a line no
+     * longer kept, which tells nothing of that line. A client's own action
+     * quote of a line nobody named travels as no longer kept, plainly.
+     */
     @Test
     public void anActionQuoteOfNothingIsMalformed() {
-        // A quote of a line nobody named sits where a line with no quote
-        // has its empty one; the two differ only in the author's name.
-        ChatReplyReference named = ChatReplyReference.unanchored("A", "",
-                ChatReplyReference.NO_COLOR);
+        // A quote of a line no longer kept sits where a line with no quote
+        // says it has none; the two differ in that one flag.
         ByteBuf plain = encode(ChatPacketFixtures.line(ChatChannel.GLOBAL,
+                "Beren", "Alex", "Not here.").sender(PLAYER).build());
+        ByteBuf unkept = encode(ChatPacketFixtures.line(ChatChannel.GLOBAL,
                 "Beren", "Alex", "Not here.").sender(PLAYER).build()
-                .withReply(named));
-        ByteBuf acted = encode(ChatPacketFixtures.line(ChatChannel.GLOBAL,
-                "Beren", "Alex", "Not here.").sender(PLAYER).build()
-                .withReply(named.asAction(true)));
-        int flagAt = onlyDifference(plain, acted);
+                .withReply(ChatReplyReference.unanchored("A", "",
+                        ChatReplyReference.NO_COLOR).asAction(true)));
+        int unkeptAt = onlyDifference(plain, unkept);
         LostTalesChatMessagePacket decodedQuote =
                 new LostTalesChatMessagePacket();
-        decodedQuote.fromBytes(acted);
+        decodedQuote.fromBytes(unkept.copy());
         assertFalse(decodedQuote.isMalformed());
-        assertTrue(decodedQuote.getReply().isAction());
-        // Without the one-letter author the flag stands a byte earlier.
-        ByteBuf none = encode(ChatPacketFixtures.line(ChatChannel.GLOBAL,
-                "Beren", "Alex", "Not here.").sender(PLAYER).build());
-        assertEquals(0, none.getByte(flagAt - 1));
-        none.setByte(flagAt - 1, 1);
-        LostTalesChatMessagePacket forged = new LostTalesChatMessagePacket();
-        forged.fromBytes(none);
-        assertTrue(forged.isMalformed());
-        assertEquals(ChatMessageIds.NONE, forged.getMessageId());
+        assertTrue(decodedQuote.getReply().isUnkept());
+        assertFalse(decodedQuote.getReply().isAction());
+        // The action flag follows the quote's head: an absent id, the
+        // account flag and an empty skin.
+        int flagAt = unkeptAt + 1 + 17 + 1 + 1;
+        for (ByteBuf forged : new ByteBuf[] {plain, unkept}) {
+            assertEquals(0, forged.getByte(flagAt));
+            forged.setByte(flagAt, 1);
+            LostTalesChatMessagePacket read = new LostTalesChatMessagePacket();
+            read.fromBytes(forged);
+            assertTrue(read.isMalformed());
+            assertEquals(ChatMessageIds.NONE, read.getMessageId());
+        }
     }
 
     private static LostTalesChatSendPacket roundTrip(

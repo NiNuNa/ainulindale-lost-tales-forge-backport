@@ -57,8 +57,8 @@ public final class ClientCharacterNetwork {
 
     /** Offers the account character's look for this world's account character. */
     public static int adoptTemplate(final CharacterTemplateAdoption adoption) {
-        if (adoption == null || adoption.getExpectedRosterRevision() < 0L) {
-            throw new IllegalArgumentException("adoption and revision must be valid");
+        if (adoption == null) {
+            throw new IllegalArgumentException("adoption must not be null");
         }
         final int requestId = nextRequestId();
         return send(requestId, CharacterOperationType.CREATE, new Runnable() {

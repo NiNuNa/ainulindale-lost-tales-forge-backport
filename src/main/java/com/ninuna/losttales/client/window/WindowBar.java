@@ -110,7 +110,7 @@ public final class WindowBar {
      * tab and identity buttons, then the page's own items. The identity
      * button with nobody to show stands greyed and says why.
      */
-    List<BarItem> itemsOf(WindowTab tab, PageContent content) {
+    List<BarItem> itemsOf(WindowPage tab, PageContent content) {
         List<BarItem> items = new ArrayList<BarItem>();
         items.add(BarItem.tabButton(tab, StatCollector.translateToLocal(
                 "gui.losttales.window.bar.tab")));
@@ -724,7 +724,7 @@ public final class WindowBar {
     private void drawIdentityButton(Minecraft minecraft, WindowFrame frame,
                                     Placed placed, int top, boolean pointed,
                                     float share, int alpha) {
-        WindowTab tab = placed.lead.tab;
+        WindowPage tab = placed.lead.tab;
         BarLead.Face face = this.voice == null ? null
                 : this.voice.faceFor(tab);
         boolean live = pointed && face != null;

@@ -500,9 +500,9 @@ public class LostTalesCommonProxy {
     }
 
     /**
-     * The server accepts players from here on: the Server Console's
+     * The server accepts players from here on: the Server Log's
      * entry saying so, and the bridge's clock. The server's coming and
-     * going is said in the Server Console alone; Discord reads it in the
+     * going is said in the Server Log alone; Discord reads it in the
      * linked channels' topics.
      */
     public void onServerStarted(FMLServerStartedEvent event) {
@@ -516,7 +516,7 @@ public class LostTalesCommonProxy {
     }
 
     public void onServerStopping(FMLServerStoppingEvent event) {
-        // The Server Console's entry for the stop, the pair of the one the
+        // The Server Log's entry for the stop, the pair of the one the
         // start records: shown to its readers still online, and kept by
         // the history's snapshot below, so the Console shows it when the
         // server is next up. First, before the ids are reset below.

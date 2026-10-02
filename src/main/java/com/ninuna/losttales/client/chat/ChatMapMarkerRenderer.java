@@ -36,7 +36,7 @@ final class ChatMapMarkerRenderer {
         LostTalesSilhouetteRenderState.begin(shadowRgb);
         try {
             drawArt(minecraft, icon, boxX, boxY, size, fitScale(icon, size),
-                    0xFFFFFF, alpha);
+                    LostTalesUiInk.UNTINTED, alpha);
         } finally {
             LostTalesSilhouetteRenderState.end();
         }

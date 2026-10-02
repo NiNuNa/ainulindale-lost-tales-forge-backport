@@ -197,7 +197,7 @@ final class ChatInlineIcons {
      */
     static int markerTextRgb(String colorName) {
         int rgb = markerRgb(colorName);
-        return rgb == 0xFFFFFF ? LostTalesUiInk.IVORY : rgb;
+        return rgb == markerRgb("white") ? LostTalesUiInk.IVORY : rgb;
     }
 
     static void drawEmoji(Minecraft minecraft, ChatEmoji emoji,

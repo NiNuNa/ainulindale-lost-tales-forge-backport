@@ -1093,7 +1093,7 @@ public final class FellowshipPage extends PageContent {
         String create = I18n.format("gui.losttales.fellowship.create");
         FellowshipErrorId refusal = snapshot.getCreateRefusal();
         items.add(orBusy(BarItem.button(CREATE, create,
-                LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_HOVER)
+                LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_ADD)
                 .tip(create).lit(this.naming == Naming.CREATE),
                 refusal == FellowshipErrorId.NONE ? busy
                         : ClientFellowshipDisplayNames.error(refusal)));

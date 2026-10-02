@@ -166,7 +166,7 @@ public final class LostTalesNpcChatHook {
                     nameColor, plain);
             ResourceLocation texture =
                     EntityRenderTextureAccess.resolveEntityTexture(speaker);
-            ChatTab tab = ChatTab.npc(name);
+            ConversationPage tab = ConversationPage.npc(name);
             LostTalesChatPresentation.receiveNpcSpeech(tab,
                     tab.npcSpeakerId(), name,
                     texture == null ? "" : texture.toString(), plain,
@@ -204,7 +204,7 @@ public final class LostTalesNpcChatHook {
         // Signed as the conversation, not as the creature: the bubble
         // above keeps the creature's own id, which is what finds it in
         // the world this moment.
-        ChatTab tab = ChatTab.npc(name);
+        ConversationPage tab = ConversationPage.npc(name);
         return LostTalesChatPresentation.receiveNpcSpeech(tab,
                 tab.npcSpeakerId(), name,
                 texture == null ? "" : texture.toString(), speech,

@@ -3,7 +3,7 @@ package com.ninuna.losttales.gui.screen.character;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
- * Where every part of the Characters tab stands, worked out from the
+ * Where every part of the Characters page stands, worked out from the
  * page's box alone.
  *
  * <p>The page is the roster, a panel the tool strip's left button folds

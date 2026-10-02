@@ -32,7 +32,7 @@ final class ClientChatMessages {
 
     /** Remembers what a printed message was built from. */
     static synchronized void remember(LostTalesChatMessagePacket packet,
-                                      ChatTab tab, int[] showcaseIds) {
+                                      ConversationPage tab, int[] showcaseIds) {
         remember(packet, tab, showcaseIds, ChatBodyKind.MESSAGE, null);
     }
 
@@ -42,7 +42,7 @@ final class ClientChatMessages {
      * so the line is built again exactly as it was.
      */
     static synchronized void remember(LostTalesChatMessagePacket packet,
-                                      ChatTab tab, int[] showcaseIds,
+                                      ConversationPage tab, int[] showcaseIds,
                                       ChatBodyKind kind, IChatComponent body) {
         if (packet == null || tab == null
                 || !ChatMessageIds.isServerId(packet.getMessageId())) {
@@ -124,7 +124,7 @@ final class ClientChatMessages {
     /** One message, and everything drawing it again needs. */
     static final class Remembered {
         final LostTalesChatMessagePacket packet;
-        final ChatTab tab;
+        final ConversationPage tab;
         final int[] showcaseIds;
         /** Whether the message has been edited; its line says so. */
         final boolean edited;
@@ -136,7 +136,7 @@ final class ClientChatMessages {
          */
         final IChatComponent body;
 
-        private Remembered(LostTalesChatMessagePacket packet, ChatTab tab,
+        private Remembered(LostTalesChatMessagePacket packet, ConversationPage tab,
                            int[] showcaseIds, boolean edited,
                            ChatBodyKind kind, IChatComponent body) {
             this.packet = packet;

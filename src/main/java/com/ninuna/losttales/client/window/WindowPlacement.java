@@ -817,7 +817,6 @@ public final class WindowPlacement {
         return LostTalesGuiPointer.y(minecraft, screenHeight);
     }
 
-    /** Position of an element's leading edge for a percent of its travel. */
     /**
      * Where a percent puts an element's near edge: 0 against the first
      * margin, 100 against the last, the values between a share of the

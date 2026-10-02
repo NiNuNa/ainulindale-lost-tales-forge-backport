@@ -89,15 +89,6 @@ public final class SnapPreview {
                     LostTalesDisplayPixels.snap(this.right),
                     LostTalesDisplayPixels.snap(this.bottom));
         }
-
-        /** The pane with its frame round it, as a box the blur and other windows are measured by. */
-        public WindowPlacement.Box framed(int barHeight) {
-            int ring = WindowPlacement.FRAME_WIDTH;
-            return new WindowPlacement.Box(this.left - ring,
-                    this.top - ring,
-                    (int)Math.ceil(this.right - this.left + 2 * ring),
-                    this.bottom - this.top + 2 * ring, barHeight);
-        }
     }
 
     /** Where a window stands as drawn this frame, by id; null for one that has gone. */
@@ -342,7 +333,7 @@ public final class SnapPreview {
     public static void drawIcon(Minecraft minecraft, String windowId, Pane pane,
                          float opacity) {
         Window window = WindowLayout.window(windowId);
-        WindowTab front = window == null ? null : WindowFrame.activeTab(
+        WindowPage front = window == null ? null : WindowFrame.activeTab(
                 window, WindowFrame.visibleTabs(window));
         int alpha = Math.round(255.0F * Math.min(1.0F, opacity));
         if (minecraft == null || front == null || pane == null

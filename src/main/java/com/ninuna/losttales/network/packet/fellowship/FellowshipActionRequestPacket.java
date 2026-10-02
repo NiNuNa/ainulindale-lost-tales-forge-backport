@@ -150,7 +150,7 @@ public final class FellowshipActionRequestPacket implements IMessage {
         return this.operationType;
     }
 
-    /** The name a rename asks for, as typed; null for every other operation. */
+    /** The name a new fellowship or a rename asks for, as typed; null for every other operation. */
     String getName() {
         return this.name;
     }

@@ -39,7 +39,7 @@ public abstract class ScreenPart {
      * key did. Not asked on a resize, nor when the screen comes back from
      * one opened over it.
      */
-    public void opening(PageTab forPage) {}
+    public void opening(OtherPage forPage) {}
 
     /** Before the screen builds its field: the screen was made or resized. */
     public void beforeInit() {}
@@ -99,7 +99,7 @@ public abstract class ScreenPart {
     /* ---- The identity button on every bar ---- */
 
     /** Who the player is on {@code tab}, for its bar's identity button; null for a part with nobody to show. */
-    public BarLead.Face identityFace(WindowTab tab) {
+    public BarLead.Face identityFace(WindowPage tab) {
         return null;
     }
 
@@ -107,17 +107,17 @@ public abstract class ScreenPart {
      * The identity button pressed on {@code tab}'s bar: its menu, hung
      * from {@code anchor}, out or away again. False for a part with none.
      */
-    public boolean pressIdentity(WindowTab tab, SubWindowAnchor anchor) {
+    public boolean pressIdentity(WindowPage tab, SubWindowAnchor anchor) {
         return false;
     }
 
     /** Whether the identity button's menu is out for {@code tab}: the button rests lit. */
-    public boolean identityMenuOut(WindowTab tab) {
+    public boolean identityMenuOut(WindowPage tab) {
         return false;
     }
 
     /** The card of who the player is on {@code tab}, beside the pointer resting on its identity button; false for none. */
-    public boolean drawIdentityCard(WindowTab tab, int mouseX, int mouseY) {
+    public boolean drawIdentityCard(WindowPage tab, int mouseX, int mouseY) {
         return false;
     }
 
@@ -129,12 +129,12 @@ public abstract class ScreenPart {
     }
 
     /** A tab was picked: false leaves the screen to bring it in front. */
-    public boolean selectTab(WindowTab tab) {
+    public boolean selectTab(WindowPage tab) {
         return false;
     }
 
     /** A tab's cross or Ctrl+W: false leaves the screen to close it. */
-    public boolean closeTab(WindowTab tab) {
+    public boolean closeTab(WindowPage tab) {
         return false;
     }
 
@@ -274,19 +274,19 @@ public abstract class ScreenPart {
     /** While the window's row stands laid out: its search reads what it shows. */
     public void searchWindow(Window window, WindowFrame frame) {}
 
-    /** Over a window of the part's, after its row: whatever stands at its foot. */
     /**
      * Draws {@code tab}, one of this part's, beside the page in front of
      * a split window, in {@code box}, read only. Nothing for a tab that is
      * not this part's.
      */
-    public void drawBeside(Window window, WindowFrame frame, WindowTab tab,
+    public void drawBeside(Window window, WindowFrame frame, WindowPage tab,
                            LostTalesUiHitBox box,
                            LostTalesGuiAnimationSample shown) {}
 
     /** Scrolls this part's tab on the other side of {@code frame}'s split by {@code lines} turns of the wheel. */
     public void scrollBeside(WindowFrame frame, int lines) {}
 
+    /** Over a window of the part's, after its row: whatever stands at its foot. */
     public void drawWindowFoot(Window window, WindowFrame frame,
                                LostTalesGuiAnimationSample shown,
                                int mouseX, int mouseY) {}

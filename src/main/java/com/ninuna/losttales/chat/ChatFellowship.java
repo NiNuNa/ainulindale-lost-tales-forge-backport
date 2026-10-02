@@ -15,8 +15,9 @@ public final class ChatFellowship {
     private final int color;
 
     public ChatFellowship(UUID id, String name, int color) {
+        // The colour is red, green and blue alone, nothing in the alpha byte.
         if (id == null || !Fellowship.isWellFormedName(name)
-                || color < 0 || color > 0xFFFFFF) {
+                || (color & 0xFF000000) != 0) {
             throw new IllegalArgumentException("chat fellowship is not well formed");
         }
         this.id = id;

@@ -3,6 +3,7 @@ package com.ninuna.losttales.gui.hud.mapmarker;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -64,9 +65,9 @@ public final class LostTalesMapMarkerHudRenderer {
         String title = "Location Discovered";
         String name = trimToWidth(font, notice.getName(), DISCOVERY_NOTICE_WIDTH);
 
-        int titleColor = colorWithAlpha(0xD9D1B8, alpha * 0.78F);
-        int nameColor = colorWithAlpha(0xFFFFFF, alpha);
-        int lineColor = colorWithAlpha(0xFFFFFF, alpha * 0.58F);
+        int titleColor = colorWithAlpha(LostTalesColors.SAND, alpha * 0.78F);
+        int nameColor = colorWithAlpha(LostTalesColors.IVORY, alpha);
+        int lineColor = colorWithAlpha(LostTalesColors.IVORY, alpha * 0.58F);
         if (nameColor == 0) {
             return;
         }
@@ -103,7 +104,7 @@ public final class LostTalesMapMarkerHudRenderer {
 
         String text = trimToWidth(font, notice.getName(),
                 Math.round(AREA_NOTICE_WIDTH / 0.72F));
-        int color = colorWithAlpha(0xFFFFFF, alpha * 0.74F);
+        int color = colorWithAlpha(LostTalesColors.IVORY, alpha * 0.74F);
         if (color != 0) {
             float scale = 0.72F;
             GL11.glPushMatrix();

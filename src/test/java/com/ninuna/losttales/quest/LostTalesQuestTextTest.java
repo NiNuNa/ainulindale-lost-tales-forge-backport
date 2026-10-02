@@ -79,7 +79,7 @@ public final class LostTalesQuestTextTest {
             boolean restartable) {
         return new LostTalesQuestDefinition("quest", "Quest", "", repeatable,
                 restartable, LostTalesQuestDefinition.START_MODE_ANY, null,
-                null, null, null, null,
+                null, null, null, null, null, null,
                 Collections.<LostTalesQuestStageDefinition>emptyList());
     }
 

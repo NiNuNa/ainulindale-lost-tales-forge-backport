@@ -22,7 +22,7 @@ public final class ChatWindowLinesSpacerTest {
 
     private static final UUID ALICE = UUID.randomUUID();
     private static final UUID BOB = UUID.randomUUID();
-    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.GLOBAL);
+    private static final ConversationPage GLOBAL = ConversationPage.of(ChatChannel.GLOBAL);
 
     @Before
     public void setUp() {

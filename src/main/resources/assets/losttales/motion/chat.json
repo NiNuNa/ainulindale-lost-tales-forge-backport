@@ -76,7 +76,7 @@
     "params": { "rest": 150 }
   },
   "chat.feed.typing": {
-    "about": "The closed feed's lines rising a row for its typing row, and settling back.",
+    "about": "The chat feed's lines rising a row for its typing row, and settling back.",
     "duration": 180,
     "curve": "ease_out"
   },

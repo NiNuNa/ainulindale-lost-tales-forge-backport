@@ -48,7 +48,7 @@ public final class ClientChatIdentitySelection {
 
     public static void accept(LostTalesChatIdentitySyncPacket packet) {
         if (packet == null || packet.isMalformed()) { return; }
-        String key = ChatTab.ownerKeyOf(packet.getCharacterId());
+        String key = ConversationPage.ownerKeyOf(packet.getCharacterId());
         if (!key.equals(ClientChatIdentities.viewIdentityKey())) { return; }
         confirmedKey = key;
         fellowships = packet.getFellowships();
@@ -64,7 +64,7 @@ public final class ClientChatIdentitySelection {
     /** The fellowship a conversation's key names, of the character played; null for none. */
     static ChatFellowship fellowship(String key) {
         for (ChatFellowship fellowship : fellowships()) {
-            if (ChatTab.ownerKeyOf(fellowship.getId()).equals(key)) {
+            if (ConversationPage.ownerKeyOf(fellowship.getId()).equals(key)) {
                 return fellowship;
             }
         }
@@ -74,7 +74,7 @@ public final class ClientChatIdentitySelection {
     /** The key of the fellowship travelled with; empty for none. */
     static String travellingKey() {
         List<ChatFellowship> all = fellowships();
-        return all.isEmpty() ? "" : ChatTab.ownerKeyOf(all.get(0).getId());
+        return all.isEmpty() ? "" : ConversationPage.ownerKeyOf(all.get(0).getId());
     }
 
     public static void clear() {

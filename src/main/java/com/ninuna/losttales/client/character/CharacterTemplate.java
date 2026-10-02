@@ -106,7 +106,7 @@ public final class CharacterTemplate {
                 && !this.unconventionalSettings;
     }
 
-    /** Whether the race is one a character may still be made as. */
+    /** Whether the race is one a new character may be made as. */
     public boolean hasSelectableRace() {
         CharacterRaceDefinition race = CharacterRaceRegistry.get(this.raceId);
         return race != null && race.isSelectable();

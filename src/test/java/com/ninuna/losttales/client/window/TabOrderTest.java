@@ -39,8 +39,8 @@ public final class TabOrderTest {
         ChatLayout.reset();
     }
 
-    private static List<WindowTab> row(WindowTab... tabs) {
-        return new ArrayList<WindowTab>(Arrays.asList(tabs));
+    private static List<WindowPage> row(WindowPage... tabs) {
+        return new ArrayList<WindowPage>(Arrays.asList(tabs));
     }
 
     /* ---- W5: the tab keys ---- */
@@ -53,7 +53,7 @@ public final class TabOrderTest {
     public void theBarWalksItsWindowsRowRound() {
         Window window = WindowLayout.addWindow(row(this.a, this.hidden,
                 this.b, this.c), this.b);
-        List<WindowTab> row = WindowFrame.visibleTabs(window);
+        List<WindowPage> row = WindowFrame.visibleTabs(window);
         assertSame(this.c, TabWalk.step(row, this.b, 1));
         assertSame(this.a, TabWalk.step(row, this.c, 1));
         assertSame("a tab that cannot be shown is passed over", this.a,
@@ -65,7 +65,7 @@ public final class TabOrderTest {
         Window first = WindowLayout.addWindow(row(this.a, this.b), this.a);
         Window second = WindowLayout.addWindow(row(this.c, this.hidden,
                 this.d), this.c);
-        List<WindowTab> order = TabWalk.everyTab(Arrays.asList(first, second));
+        List<WindowPage> order = TabWalk.everyTab(Arrays.asList(first, second));
         assertEquals("a tab that cannot be shown is passed over",
                 row(this.a, this.b, this.c, this.d), order);
         assertSame(this.c, TabWalk.step(order, this.b, 1));
@@ -76,19 +76,19 @@ public final class TabOrderTest {
                 TabWalk.step(order, null, 1));
         assertSame("and the last going back", this.d,
                 TabWalk.step(order, null, -1));
-        assertNull(TabWalk.step(Collections.<WindowTab>emptyList(),
+        assertNull(TabWalk.step(Collections.<WindowPage>emptyList(),
                 this.a, 1));
     }
 
     @Test
     public void aDigitPicksTheRowsTabByPlaceAndNineTheLast() {
-        List<WindowTab> row = row(this.a, this.b, this.c);
+        List<WindowPage> row = row(this.a, this.b, this.c);
         assertSame(this.a, TabWalk.ordinal(row, 1));
         assertSame(this.c, TabWalk.ordinal(row, 3));
         assertNull("past the row", TabWalk.ordinal(row, 4));
         assertSame("nine is always the last", this.c, TabWalk.ordinal(row, 9));
         assertNull(TabWalk.ordinal(row, 0));
-        assertNull(TabWalk.ordinal(Collections.<WindowTab>emptyList(), 9));
+        assertNull(TabWalk.ordinal(Collections.<WindowPage>emptyList(), 9));
     }
 
     /* ---- W6: which tab comes forward ---- */
@@ -101,7 +101,7 @@ public final class TabOrderTest {
         // d, the last, left a row of a, b, c: none to its right.
         assertSame(this.c, WindowLayout.successor(row(this.a, this.b,
                 this.c), 3));
-        assertNull(WindowLayout.successor(Collections.<WindowTab>emptyList(),
+        assertNull(WindowLayout.successor(Collections.<WindowPage>emptyList(),
                 0));
     }
 
@@ -134,7 +134,7 @@ public final class TabOrderTest {
                 this.c), this.b);
         WindowLayout.removeTabs(new WindowLayout.TabFilter() {
             @Override
-            public boolean matches(WindowTab tab) {
+            public boolean matches(WindowPage tab) {
                 return tab == TabOrderTest.this.a
                         || tab == TabOrderTest.this.b;
             }
@@ -148,7 +148,7 @@ public final class TabOrderTest {
     }
 
     /** A tab of its own, shown or not. */
-    private static final class Tab extends WindowTab {
+    private static final class Tab extends WindowPage {
         private final String name;
         private final boolean available;
 

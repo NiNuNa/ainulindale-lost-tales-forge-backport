@@ -41,47 +41,42 @@ public final class ClientChatChannelStateTest {
     @Test
     public void closingTheSelectedTabStaysInItsWindow() {
         // Proximity and OOC in a window of their own, Global elsewhere.
-        Window own = Tearing.off(ChatTab.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
-        assertTrue(WindowLayout.moveTab(ChatTab.of(ChatChannel.OOC), own.getId(), 1));
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
-        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.OOC)));
+        Window own = Tearing.off(ConversationPage.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
+        assertTrue(WindowLayout.moveTab(ConversationPage.of(ChatChannel.OOC), own.getId(), 1));
+        ClientChatChannelState.select(ConversationPage.of(ChatChannel.OOC));
+        assertTrue(ClientChatChannelState.close(ConversationPage.of(ChatChannel.OOC)));
         assertEquals("the neighbour in the same window, not Global elsewhere",
                 ChatChannel.PROXIMITY, ClientChatChannelState.getSelected().getChannel());
         // Closing the window's last tab is the one case that leaves it.
-        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.PROXIMITY)));
+        assertTrue(ClientChatChannelState.close(ConversationPage.of(ChatChannel.PROXIMITY)));
         assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelected().getChannel());
     }
 
     /**
-     * The command key's visit to the console is not what the chat's key
-     * comes back to: the conversation used before it is, unless another
-     * was picked meanwhile.
+     * A console is never the conversation last used: the consoles have a
+     * view of their own, and the chat's key comes back to the
+     * conversation used before them, or to one picked since.
      */
     @Test
     public void theChatKeyComesBackToTheConversationUsedBeforeTheConsole() {
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
-        ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
+        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
         ClientChatChannelState.select(global);
         ClientChatChannelState.select(console);
-        assertEquals(console, ClientChatChannelState.lastUsed());
-        ClientChatChannelState.comeBackTo(global, console);
+        assertEquals(console, ClientChatChannelState.getSelected());
         assertEquals(global, ClientChatChannelState.lastUsed());
-        // Another conversation picked during the visit stays the last used.
-        ClientChatChannelState.select(console);
         ClientChatChannelState.select(ooc);
-        ClientChatChannelState.comeBackTo(global, console);
-        assertEquals(ooc, ClientChatChannelState.lastUsed());
-        // Opened by the chat's own key, there is nothing to come back to.
         ClientChatChannelState.select(console);
-        ClientChatChannelState.comeBackTo(null, console);
-        assertEquals(console, ClientChatChannelState.lastUsed());
+        assertEquals(ooc, ClientChatChannelState.lastUsed());
+        assertTrue(console.isConsole());
+        assertFalse(ooc.isConsole());
     }
 
     @Test
     public void sentHistoryIsKeptPerTabAndClearedWithTheState() {
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         ClientChatChannelState.recordSent(global, "Hi");
         assertEquals("Hi", ClientChatChannelState.recallSent(global, -1, ""));
         assertEquals(null, ClientChatChannelState.recallSent(ooc, -1, ""));
@@ -93,7 +88,7 @@ public final class ClientChatChannelStateTest {
     @Test
     public void closedChannelsAreNeverSelected() {
         joinFellowship(acceptRoster("lotr:gondor"));
-        Tearing.off(ChatTab.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
+        Tearing.off(ConversationPage.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
         // The Fellowship channel has no plain tab: each fellowship's
         // conversation is a tab of its own.
         assertEquals(java.util.Arrays.asList(ChatChannel.CLIENT_CONSOLE,
@@ -101,17 +96,17 @@ public final class ClientChatChannelStateTest {
                 ChatChannel.PROXIMITY),
                 openChannels());
         // A closed channel stays available (readable) but not selectable.
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
-        ChatLayout.close(ChatTab.of(ChatChannel.OOC));
+        ClientChatChannelState.select(ConversationPage.of(ChatChannel.OOC));
+        ChatLayout.close(ConversationPage.of(ChatChannel.OOC));
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.OOC));
-        assertFalse(ClientChatChannelState.isSelectable(ChatTab.of(ChatChannel.OOC)));
+        assertFalse(ClientChatChannelState.isSelectable(ConversationPage.of(ChatChannel.OOC)));
         assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelected().getChannel());
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
+        ClientChatChannelState.select(ConversationPage.of(ChatChannel.OOC));
         assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelected().getChannel());
         // Without a character and with Global closed, the fallback is OOC
         // (account conversation) even though it now sits after Console.
         ChatLayoutViews.reopen(ChatChannel.OOC);
-        ChatLayout.close(ChatTab.of(ChatChannel.GLOBAL));
+        ChatLayout.close(ConversationPage.of(ChatChannel.GLOBAL));
         acceptRoster("");
         ClientChatChannelState.ensureAvailable();
         assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelected().getChannel());
@@ -149,7 +144,7 @@ public final class ClientChatChannelStateTest {
                 ChatChannel.FELLOWSHIP, ChatChannel.OPERATOR,
                 ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
                 availableChannels());
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.OPERATOR));
+        ClientChatChannelState.select(ConversationPage.of(ChatChannel.OPERATOR));
         ClientChatChannelState.setChannelGates(
                 everyChannelExcept(ChatChannel.OPERATOR),
                 everyChannelExcept(ChatChannel.OPERATOR));
@@ -159,22 +154,22 @@ public final class ClientChatChannelStateTest {
         ClientChatChannelState.setDraft("unsent text");
         assertEquals("unsent text", ClientChatChannelState.getDraft());
         // Drafts belong to the tab they were typed in.
-        ChatTab alex = ChatTab.whisper("Alex", "");
+        ConversationPage alex = ConversationPage.whisper("Alex", "");
         ClientChatChannelState.setDraft(alex, "for alex");
         assertEquals("unsent text", ClientChatChannelState.getDraft());
         assertEquals("for alex", ClientChatChannelState.getDraft(alex));
         assertEquals("for alex",
-                ClientChatChannelState.getDraft(ChatTab.whisper("alex", "")));
+                ClientChatChannelState.getDraft(ConversationPage.whisper("alex", "")));
         ClientChatChannelState.setDraft(alex, "");
         assertEquals("", ClientChatChannelState.getDraft(alex));
         assertEquals("unsent text", ClientChatChannelState.getDraft());
         ClientChatChannelState.clear();
         assertEquals("", ClientChatChannelState.getDraft());
         assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelected().getChannel());
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
+        ClientChatChannelState.select(ConversationPage.of(ChatChannel.OOC));
         assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelected().getChannel());
         // Proximity is selectable without a character now.
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.PROXIMITY));
+        ClientChatChannelState.select(ConversationPage.of(ChatChannel.PROXIMITY));
         assertEquals(ChatChannel.PROXIMITY,
                 ClientChatChannelState.getSelected().getChannel());
     }
@@ -191,7 +186,7 @@ public final class ClientChatChannelStateTest {
                 ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FACTION));
         acceptRoster("lotr:gondor");
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.FACTION));
+        ClientChatChannelState.select(ConversationPage.of(ChatChannel.FACTION));
         assertEquals("lotr:gondor",
                 ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FACTION));
@@ -214,77 +209,77 @@ public final class ClientChatChannelStateTest {
     public void everyVisibleTabClosesAndTheEmptyStateIsReported() {
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
             if (channel != ChatChannel.GLOBAL && channel != ChatChannel.OPERATOR) {
-                assertTrue(ClientChatChannelState.close(ChatTab.of(channel)));
+                assertTrue(ClientChatChannelState.close(ConversationPage.of(channel)));
             }
         }
         assertEquals(2, WindowLayout.order().size());
         assertEquals(Collections.singletonList(ChatChannel.GLOBAL),
                 openChannels());
-        assertTrue(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.GLOBAL)));
-        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.GLOBAL)));
+        assertTrue(ClientChatChannelState.isClosable(ConversationPage.of(ChatChannel.GLOBAL)));
+        assertTrue(ClientChatChannelState.close(ConversationPage.of(ChatChannel.GLOBAL)));
         assertFalse(ChatLayout.isOpen(ChatChannel.GLOBAL));
         // Reopening one makes the chat visible again, and closing the
         // selected tab moves the selection to what is left.
         assertTrue(ChatLayoutViews.reopen(ChatChannel.GLOBAL));
         assertTrue(ChatLayoutViews.reopen(ChatChannel.OOC));
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
-        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.OOC)));
+        ClientChatChannelState.select(ConversationPage.of(ChatChannel.OOC));
+        assertTrue(ClientChatChannelState.close(ConversationPage.of(ChatChannel.OOC)));
         assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelected().getChannel());
     }
 
     /**
-     * The feed reads every channel the player can see whose Show in Feed
+     * The feed reads every channel the player can see whose feed choice
      * lets its lines through, closed ones included: every line where it
-     * is All Messages, a line addressed to the player where it is Only
+     * is Everything, a line addressed to the player where it is Only
      * Mentions, none where it is Nothing. Notifications has no say in it.
      */
     @Test
     public void theFeedShowsClosedChannelsAsShowInFeedAllows() {
-        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
-        ChatTab faction = ChatTab.of(ChatChannel.FACTION, "lotr:gondor");
+        ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
+        ConversationPage faction = ConversationPage.of(ChatChannel.FACTION, "lotr:gondor");
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
-                java.util.Collections.<ChatTab>emptySet()).accepts(ooc));
-        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.OOC)));
+                java.util.Collections.<ConversationPage>emptySet()).accepts(ooc));
+        assertTrue(ChatLayout.close(ConversationPage.of(ChatChannel.OOC)));
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
-                java.util.Collections.<ChatTab>emptySet()).accepts(ooc));
-        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
+                java.util.Collections.<ConversationPage>emptySet()).accepts(ooc));
+        ChatLayout.setNotification(ConversationPage.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
         assertTrue(ChatLayout.feedFilter().accepts(ooc, false));
-        ChatLayout.setFeedChoice(ChatTab.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
+        ChatLayout.setFeedChoice(ConversationPage.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
         assertFalse(ChatLayout.feedFilter().accepts(ooc, false));
         assertFalse(ChatLayout.feedFilter().accepts(ooc, true));
         assertTrue(ChatLayoutViews.reopen(ChatChannel.OOC));
         assertFalse(ChatLayout.feedFilter().accepts(ooc, true));
-        ChatLayout.setFeedChoice(ChatTab.of(ChatChannel.OOC),
+        ChatLayout.setFeedChoice(ConversationPage.of(ChatChannel.OOC),
                 ChatLineChoice.ONLY_MENTIONS);
         assertFalse(ChatLayout.feedFilter().accepts(ooc, false));
         assertTrue(ChatLayout.feedFilter().accepts(ooc, true));
         assertFalse(ChatLayout.feedTabs().contains(ooc));
         assertTrue(ChatLayout.mentionFeedTabs().contains(ooc));
-        ChatLayout.setFeedChoice(ChatTab.of(ChatChannel.OOC),
+        ChatLayout.setFeedChoice(ConversationPage.of(ChatChannel.OOC),
                 ChatLineChoice.EVERYTHING);
         assertTrue(ChatLayout.feedFilter().accepts(ooc, false));
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
-                java.util.Collections.<ChatTab>emptySet()).accepts(ooc));
+                java.util.Collections.<ConversationPage>emptySet()).accepts(ooc));
         // A channel the player cannot see is not in the feed, open or not.
         assertFalse(ChatLineFilter.of(ChatLayout.feedTabs(),
-                java.util.Collections.<ChatTab>emptySet()).accepts(faction));
+                java.util.Collections.<ConversationPage>emptySet()).accepts(faction));
         acceptRoster("lotr:gondor");
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
-                java.util.Collections.<ChatTab>emptySet()).accepts(faction));
-        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.FACTION)));
+                java.util.Collections.<ConversationPage>emptySet()).accepts(faction));
+        assertTrue(ChatLayout.close(ConversationPage.of(ChatChannel.FACTION)));
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
-                java.util.Collections.<ChatTab>emptySet()).accepts(faction));
+                java.util.Collections.<ConversationPage>emptySet()).accepts(faction));
         // Untracked lines ride with the console wherever, or whether, it
         // is placed.
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
-                java.util.Collections.<ChatTab>emptySet()).accepts(null));
-        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+                java.util.Collections.<ConversationPage>emptySet()).accepts(null));
+        assertTrue(ChatLayout.close(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
-                java.util.Collections.<ChatTab>emptySet()).accepts(null));
+                java.util.Collections.<ConversationPage>emptySet()).accepts(null));
         // Conversations are read from their open tabs only.
-        ChatTab whisper = ChatLayout.openWhisper("Bilbo", "", null);
+        ConversationPage whisper = ChatLayout.openWhisper("Bilbo", "", null);
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
-                java.util.Collections.<ChatTab>emptySet()).accepts(whisper));
+                java.util.Collections.<ConversationPage>emptySet()).accepts(whisper));
         ChatLayout.setFeedChoice(whisper, ChatLineChoice.ONLY_MENTIONS);
         assertFalse(ChatLayout.feedFilter().accepts(whisper, false));
         assertTrue(ChatLayout.feedFilter().accepts(whisper, true));
@@ -302,21 +297,21 @@ public final class ClientChatChannelStateTest {
     @Test
     public void conversationsShowForTheIdentityTheyAreHeldAs() {
         UUID played = acceptRoster("GONDOR");
-        ChatTab asPlayed = ChatTab.whisper("Steve", "Aldric", ChatTab.ownerKeyOf(played));
-        ChatTab asOther = ChatTab.whisper("Steve", "Aldric",
-                ChatTab.ownerKeyOf(UUID.randomUUID()));
-        ChatTab asAccount = ChatTab.whisper("Steve", "Aldric");
+        ConversationPage asPlayed = ConversationPage.whisper("Steve", "Aldric", ConversationPage.ownerKeyOf(played));
+        ConversationPage asOther = ConversationPage.whisper("Steve", "Aldric",
+                ConversationPage.ownerKeyOf(UUID.randomUUID()));
+        ConversationPage asAccount = ConversationPage.whisper("Steve", "Aldric");
         assertTrue(ClientChatChannelState.isAvailable(asPlayed));
         assertFalse(ClientChatChannelState.isAvailable(asOther));
         // The person's row entry is always there; what it shows is the
         // conversation held as the identity being read.
         assertTrue(ClientChatChannelState.isAvailable(asAccount));
-        assertEquals(asPlayed, ChatTab.viewed(asAccount));
-        assertEquals(asAccount, ChatTab.row(asPlayed));
-        assertTrue(ClientChatChannelState.isAvailable(ChatTab.npc("Steve")));
+        assertEquals(asPlayed, ConversationPage.viewed(asAccount));
+        assertEquals(asAccount, ConversationPage.row(asPlayed));
+        assertTrue(ClientChatChannelState.isAvailable(ConversationPage.npc("Steve")));
         ClientCharacterRosterCache.clear();
         assertTrue(ClientChatChannelState.isAvailable(asAccount));
-        assertEquals(asAccount, ChatTab.viewed(asAccount));
+        assertEquals(asAccount, ConversationPage.viewed(asAccount));
         assertFalse(ClientChatChannelState.isAvailable(asPlayed));
 
         UUID aldric = UUID.randomUUID();
@@ -329,9 +324,9 @@ public final class ClientChatChannelStateTest {
         ClientChatChannelState.rememberPartnerCharacterId(asAccount, null);
         assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asAccount));
         ClientChatChannelState.rememberPartnerCharacterId(asAccount, aldric);
-        ClientChatChannelState.rememberPartnerCharacterId(ChatTab.of(ChatChannel.GLOBAL), aldric);
+        ClientChatChannelState.rememberPartnerCharacterId(ConversationPage.of(ChatChannel.GLOBAL), aldric);
         assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(
-                ChatTab.of(ChatChannel.GLOBAL)));
+                ConversationPage.of(ChatChannel.GLOBAL)));
         ClientChatChannelState.clear();
         assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asAccount));
     }
@@ -391,7 +386,7 @@ public final class ClientChatChannelStateTest {
     /** The channels of the open, available tabs, in window and tab order. */
     private static List<ChatChannel> openChannels() {
         List<ChatChannel> result = new java.util.ArrayList<ChatChannel>();
-        for (ChatTab tab : ClientChatChannelState.getOpenTabs()) {
+        for (ConversationPage tab : ClientChatChannelState.getOpenTabs()) {
             result.add(tab.getChannel());
         }
         return result;

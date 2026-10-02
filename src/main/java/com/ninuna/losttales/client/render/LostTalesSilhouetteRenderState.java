@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.render;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.nio.FloatBuffer;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
@@ -32,7 +33,7 @@ public final class LostTalesSilhouetteRenderState {
     private static final FloatBuffer CONSTANT_COLOR =
             BufferUtils.createFloatBuffer(4);
     private static boolean active;
-    private static int silhouetteRgb = 0xFFFFFF;
+    private static int silhouetteRgb = LostTalesUiInk.UNTINTED;
     private static boolean alphaActive;
     private static float constantAlpha = 1.0F;
 
@@ -85,7 +86,7 @@ public final class LostTalesSilhouetteRenderState {
                     GL11.GL_MODULATE);
             return;
         }
-        int rgb = active ? silhouetteRgb : 0xFFFFFF;
+        int rgb = active ? silhouetteRgb : LostTalesUiInk.UNTINTED;
         CONSTANT_COLOR.clear();
         CONSTANT_COLOR.put(((rgb >> 16) & 0xFF) / 255.0F)
                 .put(((rgb >> 8) & 0xFF) / 255.0F)

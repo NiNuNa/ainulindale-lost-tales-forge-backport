@@ -45,6 +45,20 @@ public final class LostTalesQuestActionPacketTest {
         LostTalesQuestActionPacket decoded = new LostTalesQuestActionPacket();
         decoded.fromBytes(trailing);
         assertTrue(decoded.isMalformed());
+        assertEquals("a malformed payload is read to its end", 0,
+                trailing.readableBytes());
+    }
+
+    @Test
+    public void aCutPayloadIsMalformedAndReadToItsEnd() {
+        ByteBuf whole = Unpooled.buffer();
+        new LostTalesQuestActionPacket(LostTalesQuestActionPacket.ACTION_CLEAR,
+                LOTR_QUEST).toBytes(whole);
+        ByteBuf cut = whole.copy(0, whole.readableBytes() - 4);
+        LostTalesQuestActionPacket decoded = new LostTalesQuestActionPacket();
+        decoded.fromBytes(cut);
+        assertTrue(decoded.isMalformed());
+        assertEquals(0, cut.readableBytes());
     }
 
     private static LostTalesQuestActionPacket roundTrip(String action,

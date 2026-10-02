@@ -15,12 +15,12 @@ final class TabWalk {
      * Every tab the windows show, in the order Ctrl+Tab walks them. A
      * split shown is one stop, at its side in front.
      */
-    static List<WindowTab> everyTab(List<Window> windows) {
-        List<WindowTab> order = new ArrayList<WindowTab>();
+    static List<WindowPage> everyTab(List<Window> windows) {
+        List<WindowPage> order = new ArrayList<WindowPage>();
         for (Window window : windows) {
-            List<WindowTab> shown = WindowFrame.visibleTabs(window);
-            WindowTab front = WindowFrame.activeTab(window, shown);
-            for (WindowTab tab : shown) {
+            List<WindowPage> shown = WindowFrame.visibleTabs(window);
+            WindowPage front = WindowFrame.activeTab(window, shown);
+            for (WindowPage tab : shown) {
                 if (isStop(window, tab, front)) {
                     order.add(tab);
                 }
@@ -30,7 +30,7 @@ final class TabWalk {
     }
 
     /** Whether Ctrl+Tab stops at {@code tab}: every tab but the side of a split behind the other. */
-    private static boolean isStop(Window window, WindowTab tab, WindowTab front) {
+    private static boolean isStop(Window window, WindowPage tab, WindowPage front) {
         WindowSplit split = window.splitOf(tab);
         if (split == null || !WindowDrawing.shows(split, tab)) {
             return true;
@@ -43,7 +43,7 @@ final class TabWalk {
      * round from one end to the other; from a tab not in it, the first
      * going forward and the last going back. Null for an empty order.
      */
-    static WindowTab step(List<WindowTab> order, WindowTab from, int step) {
+    static WindowPage step(List<WindowPage> order, WindowPage from, int step) {
         if (order.isEmpty()) {
             return null;
         }
@@ -60,7 +60,7 @@ final class TabWalk {
      * browser's Ctrl+1 to Ctrl+8 reach its tabs; nine is always the last.
      * Null for a number past the row or under one.
      */
-    static WindowTab ordinal(List<WindowTab> row, int ordinal) {
+    static WindowPage ordinal(List<WindowPage> row, int ordinal) {
         if (ordinal < 1 || row.isEmpty()) {
             return null;
         }

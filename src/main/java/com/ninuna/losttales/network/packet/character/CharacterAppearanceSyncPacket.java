@@ -25,7 +25,8 @@ import java.util.UUID;
  */
 public final class CharacterAppearanceSyncPacket implements IMessage {
 
-    private static final int MAX_APPEARANCES = 512;
+    /** The most entries one packet carries; a larger snapshot goes in several. */
+    public static final int MAX_APPEARANCES = 512;
 
     private boolean replaceAll;
     private List<CharacterAppearance> appearances = Collections.emptyList();

@@ -38,19 +38,26 @@ public final class LotrHiredUnitTagTest {
         LotrHiredUnitTag read = LotrHiredUnitTag.read(data);
         assertNotNull(read);
         assertNull(read.getCharacterId());
-        assertEquals(LotrHiredUnitTag.ACCOUNT_KEY, read.identityKey());
+        assertEquals(OWNER.toString(), read.identityKey());
         assertFalse(data.hasKey(LotrHiredUnitTag.KEY_CHARACTER));
-        assertEquals(LotrHiredUnitTag.ACCOUNT_KEY,
+        assertEquals(OWNER.toString(),
                 LotrHiredUnitTag.identityKey(PlayableIdentity.account(OWNER)));
         assertNull(LotrHiredUnitTag.identityKey((PlayableIdentity)null));
     }
 
+    /**
+     * A deleted character's units go to the account character, whose id
+     * is the account's own: the tag it leaves keys on that id, so the
+     * units obey while the account character is played.
+     */
     @Test
-    public void aDeletedCharacterLeavesTheAccountsTag() {
+    public void aDeletedCharacterLeavesTheAccountCharactersTag() {
         LotrHiredUnitTag tag = LotrHiredUnitTag.of(
                 PlayableIdentity.character(OWNER, CHARACTER)).asAccount();
         assertEquals(OWNER, tag.getOwnerId());
         assertNull(tag.getCharacterId());
+        assertEquals(LotrHiredUnitTag.identityKey(
+                PlayableIdentity.character(OWNER, OWNER)), tag.identityKey());
     }
 
     @Test

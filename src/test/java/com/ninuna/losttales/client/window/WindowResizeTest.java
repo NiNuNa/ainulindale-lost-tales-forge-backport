@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.client.chat.ChatTab;
+import com.ninuna.losttales.client.chat.ConversationPage;
 import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import java.util.List;
 import org.junit.After;
@@ -54,6 +54,32 @@ public final class WindowResizeTest {
     }
 
     /**
+     * A reset takes the pins and the splits too, and the chat's area and
+     * member list come back out; the pages stay.
+     */
+    @Test
+    public void aResetTakesThePinsAndTheSplitsAndBringsThePanelsBack() {
+        Window window = WindowLayout.firstWindow();
+        window.setLocked(false);
+        List<WindowPage> tabs = window.getTabs();
+        int pages = tabs.size();
+        WindowLayout.setPinnedToHud(window.getId(), true);
+        WindowLayout.setPinnedToGui(window.getId(), true);
+        assertTrue(WindowLayout.split(tabs.get(0), tabs.get(1)));
+        com.ninuna.losttales.client.chat.ChatLayout.setMembersHidden(
+                window.getId(), true);
+        assertTrue(WindowLayout.resetWindow(window.getId()));
+        for (WindowPage tab : window.getTabs()) {
+            tab.resetIn(window);
+        }
+        assertFalse(window.isPinnedToHud());
+        assertFalse(window.isPinnedToGui());
+        assertTrue(window.splits().isEmpty());
+        assertEquals(pages, window.getTabs().size());
+        assertTrue(window.getActiveTab().isMemberListOut(window));
+    }
+
+    /**
      * Height is continuous: a drag that lands part-way through a pixel
      * keeps the fraction instead of snapping to a whole one.
      */
@@ -79,7 +105,7 @@ public final class WindowResizeTest {
 
     @Test
     public void heightIsWrittenAndReadBack() {
-        Tearing.off(ChatTab.of(ChatChannel.FELLOWSHIP), 40.0D, 20.0D);
+        Tearing.off(ConversationPage.of(ChatChannel.FELLOWSHIP), 40.0D, 20.0D);
         WindowLayout.setWindowHeight("w3", 214.25D, true);
         List<String> lines = WindowLayoutStore.describe();
         boolean found = false;
@@ -132,7 +158,7 @@ public final class WindowResizeTest {
                 WindowLayout.clampWindowWidth(99999));
         assertEquals(320, WindowLayout.clampWindowWidth(320));
 
-        Tearing.off(ChatTab.of(ChatChannel.FELLOWSHIP), 40.0D, 20.0D);
+        Tearing.off(ConversationPage.of(ChatChannel.FELLOWSHIP), 40.0D, 20.0D);
         assertTrue(WindowLayout.setWindowWidth("w3", 420, true));
         assertEquals(420, WindowLayout.window("w3").getOwnWidth());
         // Its neighbours are untouched: widths are not shared.

@@ -41,7 +41,7 @@ import org.lwjgl.input.Keyboard;
 
 /**
  * What a character says about itself, in a sub-window of the Characters
- * tab's window, its player's to change at any time: three sections,
+ * page's window, its player's to change at any time: three sections,
  * each a word button at its top — About, with Appearance, Personality and History, each a
  * box of several lines; Facts, with the age and the six short facts; and
  * Glances. Save sends all of it, and the window closes once the server

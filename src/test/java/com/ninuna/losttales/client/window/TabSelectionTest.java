@@ -3,7 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import com.ninuna.losttales.client.chat.ChatLayoutViews;
-import com.ninuna.losttales.client.chat.ChatTab;
+import com.ninuna.losttales.client.chat.ConversationPage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -19,7 +19,7 @@ import static org.junit.Assert.assertTrue;
 /** Marking several tabs of one row, and what that marking is scoped to. */
 public final class TabSelectionTest {
     private Window window;
-    private List<WindowTab> tabs;
+    private List<WindowPage> tabs;
 
     @Before
     public void setUp() {
@@ -28,7 +28,7 @@ public final class TabSelectionTest {
         this.window = WindowLayout.window("w2");
         // A snapshot: the window's own list is live, and these tests
         // close and move tabs out of it.
-        this.tabs = new ArrayList<WindowTab>(this.window.getTabs());
+        this.tabs = new ArrayList<WindowPage>(this.window.getTabs());
     }
 
     @After
@@ -57,7 +57,7 @@ public final class TabSelectionTest {
 
     @Test
     public void togglingAddsAndRemovesAndKeepsRowOrder() {
-        WindowTab anchor = this.tabs.get(0);
+        WindowPage anchor = this.tabs.get(0);
         // Marked back to front; read back in the row's own order, with
         // the anchor the set was seeded from.
         TabSelection.toggle("w2", anchor, this.tabs.get(3));
@@ -82,7 +82,7 @@ public final class TabSelectionTest {
      */
     @Test
     public void theAnchorIsAlwaysMarkedAndNeverUnmarked() {
-        WindowTab anchor = this.tabs.get(2);
+        WindowPage anchor = this.tabs.get(2);
         TabSelection.toggle("w2", anchor, this.tabs.get(0));
         assertTrue(TabSelection.isSelected(anchor));
         assertEquals(Arrays.asList(this.tabs.get(0), anchor),
@@ -102,12 +102,12 @@ public final class TabSelectionTest {
         TabSelection.toggle("w2", this.tabs.get(0), this.tabs.get(1));
         // A tab of another window starts that window's marks instead of
         // joining the ones already made.
-        TabSelection.toggle("w1", ChatTab.of(ChatChannel.CLIENT_CONSOLE),
-                ChatTab.of(ChatChannel.OPERATOR));
+        TabSelection.toggle("w1", ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
+                ConversationPage.of(ChatChannel.OPERATOR));
         assertEquals("w1", TabSelection.windowId());
         assertTrue(TabSelection.selectedIn(this.window).isEmpty());
-        assertEquals(Arrays.asList(ChatTab.of(ChatChannel.CLIENT_CONSOLE),
-                ChatTab.of(ChatChannel.OPERATOR)),
+        assertEquals(Arrays.asList(ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
+                ConversationPage.of(ChatChannel.OPERATOR)),
                 TabSelection.selectedIn(WindowLayout.window("w1")));
     }
 
@@ -123,7 +123,7 @@ public final class TabSelectionTest {
         TabSelection.prune();
         assertNull(TabSelection.windowId());
         // And a window that has gone takes its marks with it.
-        TabSelection.toggle("w1", null, ChatTab.of(ChatChannel.CLIENT_CONSOLE));
+        TabSelection.toggle("w1", null, ConversationPage.of(ChatChannel.CLIENT_CONSOLE));
         assertTrue(WindowLayout.closeWindow("w1"));
         TabSelection.prune();
         assertNull(TabSelection.windowId());

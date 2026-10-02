@@ -79,7 +79,7 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_REACTOR_ORIGIN = "Origin";
     private static final String TAG_UUID_MOST = "Most";
     private static final String TAG_UUID_LEAST = "Least";
-    /** The Server Console's events, written beside the lines. */
+    /** The Server Log's events, written beside the lines. */
     private static final String TAG_CONSOLE_EVENTS = "ConsoleEvents";
     private static final String TAG_EVENT_ID = "Id";
     private static final String TAG_EVENT_TIMESTAMP = "Timestamp";
@@ -802,12 +802,12 @@ public final class ChatHistoryNbtCodec {
             return this.entries;
         }
 
-        /** The console's kept events, oldest first. */
         /** The reactions the console's events were saved with, by the event's id. */
         public Map<Long, ChatReactions> getConsoleReactions() {
             return this.consoleReactions;
         }
 
+        /** The console's kept events, oldest first. */
         public List<ChatConsoleEvent> getConsoleEvents() {
             return this.consoleEvents;
         }

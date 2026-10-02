@@ -20,7 +20,7 @@ import com.ninuna.losttales.client.window.BarLead;
 import com.ninuna.losttales.client.window.FirstTips;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageKeys;
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.ScreenPart;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.SubWindow;
@@ -38,7 +38,7 @@ import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowSearch;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
@@ -101,14 +101,12 @@ public final class ChatScreenPart extends ScreenPart {
         }
     };
 
-    /** The Client Console, which the command key opens the chat on. */
-    private static final ChatTab CONSOLE =
-            ChatTab.of(ChatChannel.CLIENT_CONSOLE);
+    /** The Console, which the command key opens the chat on. */
+    private static final ConversationPage CONSOLE =
+            ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
 
     /** Set once a message or command has gone out; the draft is then spent. */
     private boolean sent;
-    /** The conversation last used as the command key opened the console; null for the chat's key. */
-    private ChatTab usedBeforeCommand;
     /** How often the drafts are written while the chat is open: every five seconds. */
     private static final int DRAFT_SAVE_TICKS = 100;
     private int draftTicks;
@@ -162,7 +160,7 @@ public final class ChatScreenPart extends ScreenPart {
                     }
 
                     @Override
-                    public void forward(ChatTab tab, long messageId) {
+                    public void forward(ConversationPage tab, long messageId) {
                         ChatScreenPart.this.outbox.forward(tab, messageId);
                     }
                 });
@@ -204,13 +202,15 @@ public final class ChatScreenPart extends ScreenPart {
      * last used: in front of its window, over a page there, and the window
      * over the others. A conversation that opened by itself in a window of
      * its own, since no window would take it, and waits there unread comes
-     * first instead. Opened by the command key, the screen brings the
-     * Client Console there, where the command and its answer stand: in
-     * that conversation's window, or where a conversation opens while
-     * that window is locked.
+     * first instead. Opened by the command key, the screen shows the
+     * consoles, the Console in front, where the command and its
+     * answer stand; a closed one opens in the window of the conversation
+     * last used, or where a conversation opens while that window is
+     * locked. The chat's key comes back to the conversation last used,
+     * since a console is never that.
      */
     @Override
-    public void opening(PageTab forPage) {
+    public void opening(OtherPage forPage) {
         if (forPage != null || !this.screen.isOpenedForChat()) {
             return;
         }
@@ -219,19 +219,18 @@ public final class ChatScreenPart extends ScreenPart {
         if (!ChatLayout.hasConversationWindow()) {
             ChatLayout.openFirstWindow();
         }
-        ChatTab last = ClientChatChannelState.lastUsed();
-        ChatTab front = last;
-        ChatTab waiting = ChatLayout.waitingInOwnWindow();
+        ConversationPage last = ClientChatChannelState.lastUsed();
+        ConversationPage front = last;
+        ConversationPage waiting = ChatLayout.waitingInOwnWindow();
         if (waiting != null && !this.screen.isOpenedForCommand()) {
             front = waiting;
         }
         if (this.screen.isOpenedForCommand()) {
             Window beside = WindowLayout.windowOf(last);
-            ChatTab console = ChatLayout.openHere(CONSOLE,
+            ConversationPage console = ChatLayout.openHere(CONSOLE,
                     beside == null ? null : beside.getId());
             if (ClientChatChannelState.isSelectable(console)) {
                 front = console;
-                this.usedBeforeCommand = last;
             }
         }
         if (front == null) {
@@ -342,9 +341,6 @@ public final class ChatScreenPart extends ScreenPart {
             ClientChatChannelState.setDraft(
                     this.sent ? "" : this.inputField.getText());
         }
-        // The command key's visit to the console is not what the chat's
-        // key comes back to, unless another conversation was used since.
-        ClientChatChannelState.comeBackTo(this.usedBeforeCommand, CONSOLE);
         ClientChatChannelViews.setScrollEasingSuppressed(false);
         // Every divider that was on a viewed tab has done its job, and
         // how far the tabs were read is written down, as is what was left
@@ -399,25 +395,25 @@ public final class ChatScreenPart extends ScreenPart {
 
     /** Who the player is on a tab, drawn as the chat's own bar draws it. */
     @Override
-    public BarLead.Face identityFace(WindowTab tab) {
+    public BarLead.Face identityFace(WindowPage tab) {
         return this.bar.faceFor(tab);
     }
 
     /** The character menu, about the page whose bar was pressed. */
     @Override
-    public boolean pressIdentity(WindowTab tab, SubWindowAnchor anchor) {
+    public boolean pressIdentity(WindowPage tab, SubWindowAnchor anchor) {
         this.menus.toggleCharacterMenu(tab, anchor);
         this.screen.syncTypingFocus();
         return true;
     }
 
     @Override
-    public boolean identityMenuOut(WindowTab tab) {
+    public boolean identityMenuOut(WindowPage tab) {
         return this.menus.isCharacterMenuOutFor(tab);
     }
 
     @Override
-    public boolean drawIdentityCard(WindowTab tab, int mouseX, int mouseY) {
+    public boolean drawIdentityCard(WindowPage tab, int mouseX, int mouseY) {
         LostTalesChatHoverCard.drawForIdentity(this.mc, tab, mouseX, mouseY,
                 this.screen.width, this.screen.height);
         return true;
@@ -446,13 +442,13 @@ public final class ChatScreenPart extends ScreenPart {
     }
 
     @Override
-    public boolean selectTab(WindowTab tab) {
+    public boolean selectTab(WindowPage tab) {
         this.tabActions.selectChannel(tab);
         return true;
     }
 
     @Override
-    public boolean closeTab(WindowTab tab) {
+    public boolean closeTab(WindowPage tab) {
         this.tabActions.closeTab(tab);
         return true;
     }
@@ -1251,10 +1247,10 @@ public final class ChatScreenPart extends ScreenPart {
 
     /** A conversation beside the page in front of a split window, read only. */
     @Override
-    public void drawBeside(Window window, WindowFrame frame, WindowTab tab,
+    public void drawBeside(Window window, WindowFrame frame, WindowPage tab,
                            LostTalesUiHitBox box,
                            LostTalesGuiAnimationSample shown) {
-        ChatTab view = ChatTab.from(tab);
+        ConversationPage view = ConversationPage.from(tab);
         if (view != null) {
             LostTalesChatOverlayRenderer.drawBeside(this.mc, window, view, box, shown);
         }
@@ -1497,7 +1493,7 @@ public final class ChatScreenPart extends ScreenPart {
         ClientChatChannelState.setDraft("");
         // The tab the line was typed in, taken before a whisper command
         // moves the selection to the conversation it opens.
-        ChatTab tab = ClientChatChannelState.getSelected();
+        ConversationPage tab = ClientChatChannelState.getSelected();
         if (tab != null && ChatInputRules.isAction(message, tab.getChannel())) {
             // /me in an in-character tab is an action line in that tab,
             // recalled like anything else typed there.
@@ -1553,19 +1549,19 @@ public final class ChatScreenPart extends ScreenPart {
      * The tabs of every window whose member list stands, each window's
      * tab in front first: the lists worth asking for before any is shown.
      */
-    private static List<ChatTab> tabsShowingMembers() {
-        List<ChatTab> fronts = new ArrayList<ChatTab>();
-        List<ChatTab> rest = new ArrayList<ChatTab>();
+    private static List<ConversationPage> tabsShowingMembers() {
+        List<ConversationPage> fronts = new ArrayList<ConversationPage>();
+        List<ConversationPage> rest = new ArrayList<ConversationPage>();
         for (Window window : WindowLayout.windows()) {
             if (ChatLayout.isMembersHidden(window)) {
                 continue;
             }
-            ChatTab front = ChatTab.frontOf(window);
+            ConversationPage front = ConversationPage.frontOf(window);
             if (front != null) {
                 fronts.add(front);
             }
-            for (WindowTab each : ChatFrame.visibleTabs(window)) {
-                ChatTab tab = ChatTab.from(each);
+            for (WindowPage each : ChatFrame.visibleTabs(window)) {
+                ConversationPage tab = ConversationPage.from(each);
                 if (tab != null && !tab.equals(front)) {
                     rest.add(tab);
                 }
@@ -1600,7 +1596,7 @@ public final class ChatScreenPart extends ScreenPart {
                 || !LostTalesConfig.showChatTypingIndicators) {
             return;
         }
-        ChatTab front = ChatTab.from(ChatFrame.activeTab(window,
+        ConversationPage front = ConversationPage.from(ChatFrame.activeTab(window,
                 ChatFrame.visibleTabs(window)));
         List<String> names = ClientChatTypingState.namesTyping(front);
         if (names.isEmpty()) {
@@ -1655,7 +1651,7 @@ public final class ChatScreenPart extends ScreenPart {
         if (text.length() > 0) {
             // Taken before the send: a whisper verb moves the selection
             // to the conversation it opens.
-            ChatTab typedIn = ClientChatChannelState.getSelected();
+            ConversationPage typedIn = ClientChatChannelState.getSelected();
             if (ChatInputRules.isServerCommand(text,
                     typedIn == null ? null : typedIn.getChannel())) {
                 sendCommand(text);
@@ -1697,13 +1693,13 @@ public final class ChatScreenPart extends ScreenPart {
      * Sends a command the server answers, however it was asked for —
      * typed, clicked in a line, chosen from a menu. The command and
      * what it answers are shown in the tab in front — the answer as a
-     * line of the Server's own — and the Server Console is told by
+     * line of the Server's own — and the Server Log is told by
      * the server who ran what, and where. The tab in front stays in
      * front.
      */
     private void sendCommand(String typed) {
         String command = ChatMessageValidator.oneLine(typed).trim();
-        ChatTab typedIn = ClientChatChannelState.getSelected();
+        ConversationPage typedIn = ClientChatChannelState.getSelected();
         LostTalesChatPresentation.expectCommandOutput(typedIn);
         LostTalesChatPresentation.echoCommand(typedIn, command);
         // The tab goes ahead of the command on the same connection, so
@@ -1761,7 +1757,7 @@ public final class ChatScreenPart extends ScreenPart {
      */
     private boolean refuseUnsendableMessage() {
         String message = this.inputField.getText().trim();
-        ChatTab selected = ClientChatChannelState.getSelected();
+        ConversationPage selected = ClientChatChannelState.getSelected();
         if (selected != null
                 && ChatInputRules.isAction(message, selected.getChannel())) {
             // An action is a message: the same refusals, said before the
@@ -1804,7 +1800,7 @@ public final class ChatScreenPart extends ScreenPart {
                     "gui.losttales.chat.whisper.name_required"));
             return;
         }
-        ChatTab tab = this.tabActions.openWhisperTab(parts[1]);
+        ConversationPage tab = this.tabActions.openWhisperTab(parts[1]);
         if (tab != null) {
             this.outbox.sendWhisper(tab, parts.length > 2
                     ? parts[2].trim() : "");
@@ -1879,7 +1875,7 @@ public final class ChatScreenPart extends ScreenPart {
     /** Whether a press on the window brings it forward: it is not the one being typed in. */
     private static boolean bringsForward(ChatFrame frame) {
         Window window = WindowLayout.window(frame.windowId);
-        WindowTab front = window == null ? null
+        WindowPage front = window == null ? null
                 : ChatFrame.activeTab(window,
                         ChatFrame.visibleTabs(window));
         return front != null
@@ -1917,7 +1913,7 @@ public final class ChatScreenPart extends ScreenPart {
     /** Moves the input to the window whose bar strip was pressed. */
     private void focusBarOf(ChatFrame frame) {
         Window window = WindowLayout.window(frame.windowId);
-        WindowTab front = window == null ? null
+        WindowPage front = window == null ? null
                 : ChatFrame.activeTab(window,
                         ChatFrame.visibleTabs(window));
         if (front != null) {
@@ -2248,7 +2244,7 @@ public final class ChatScreenPart extends ScreenPart {
      * the very lines that were on screen.
      */
     private void replyToLine(ChatFrame frame, int chatLineId) {
-        ChatTab tab = ClientChatChannelViews.tabOf(chatLineId);
+        ConversationPage tab = ClientChatChannelViews.tabOf(chatLineId);
         if (!LostTalesChatPresentation.isRepliable(chatLineId)
                 || tab == null) {
             return;
@@ -2358,7 +2354,7 @@ public final class ChatScreenPart extends ScreenPart {
             landOn(band.frame, index, chatLineId);
             return true;
         }
-        ChatTab tab = ClientChatChannelViews.tabOf(chatLineId);
+        ConversationPage tab = ClientChatChannelViews.tabOf(chatLineId);
         if (tab == null) {
             return false;
         }
@@ -2527,7 +2523,7 @@ public final class ChatScreenPart extends ScreenPart {
             // out as the message it is.
             String value = event.getValue() == null ? ""
                     : event.getValue().trim();
-            ChatTab typedIn = ClientChatChannelState.getSelected();
+            ConversationPage typedIn = ClientChatChannelState.getSelected();
             if (ChatInputRules.isServerCommand(value,
                     typedIn == null ? null : typedIn.getChannel())) {
                 sendCommand(value);
@@ -2655,11 +2651,11 @@ public final class ChatScreenPart extends ScreenPart {
      */
     private void openChannelLink(ChatChannelLinkMarker.Data link) {
         int chatLineId = link.chatLineId;
-        ChatTab tab = ChatTab.fromId(link.tabId);
+        ConversationPage tab = ConversationPage.fromId(link.tabId);
         if (link.messageId != ChatMessageIds.NONE) {
             Integer held = ClientChatMessageIds.chatLineIdOf(link.messageId);
             chatLineId = held == null ? 0 : held.intValue();
-            ChatTab filedUnder = held == null ? null
+            ConversationPage filedUnder = held == null ? null
                     : ClientChatChannelViews.tabOf(chatLineId);
             if (filedUnder != null) {
                 tab = filedUnder;

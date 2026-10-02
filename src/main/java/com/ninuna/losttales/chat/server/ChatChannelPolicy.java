@@ -80,8 +80,9 @@ public final class ChatChannelPolicy {
     /**
      * Why the channel refuses a send, as the notice the sender is told,
      * or null when it may be sent into. Membership first — a fellowship line
-     * needs a fellowship, a faction line a faction — then the role gate,
-     * which a channel may ask besides.
+     * needs a fellowship — then the role gate, which a channel may ask
+     * besides. A faction line needs nothing more: every identity speaks
+     * to a faction, Unaligned when it has none ({@link #factionOf}).
      *
      * @param playedId the identity the sender plays, whose fellowship a fellowship line
      *                 needs
@@ -94,7 +95,7 @@ public final class ChatChannelPolicy {
      *                 the server's console; see {@link #readsConsole}
      */
     public static String sendRefusal(ChatChannel channel, Fellowship fellowship, UUID playedId,
-                                     String factionId, int roles, boolean operator,
+                                     int roles, boolean operator,
                                      boolean consoleReader) {
         if (channel == null) {
             return "chat.losttales.channel.role_unavailable";
@@ -102,10 +103,6 @@ public final class ChatChannelPolicy {
         if (channel.getAccess() == ChatChannelAccess.FELLOWSHIP_MEMBERSHIP
                 && (fellowship == null || playedId == null || !fellowship.containsMember(playedId))) {
             return "chat.losttales.channel.fellowship_unavailable";
-        }
-        if (channel.getAccess() == ChatChannelAccess.CHARACTER_FACTION
-                && (factionId == null || factionId.length() == 0)) {
-            return "chat.losttales.channel.faction_unavailable";
         }
         if (staffOnly(channel, ChatChannelGates.current())) {
             return operator ? null : "chat.losttales.channel.role_unavailable";
@@ -332,7 +329,7 @@ public final class ChatChannelPolicy {
                 active == null ? null : active.getCharacterId());
     }
 
-    /** Whether the player may read the Server Console. */
+    /** Whether the player may read the Server Log. */
     public static boolean readsConsole(EntityPlayerMP player) {
         return LostTalesPermissions.has(player, LostTalesCapability.CHAT_SERVER_CONSOLE_READ);
     }

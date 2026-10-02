@@ -25,7 +25,7 @@ import java.util.UUID;
  * ({@link LotrFellowshipMirror}): after every change to a fellowship, when
  * one of its members comes, goes or changes character, and once LOTR has
  * read its data after the server starts. LOTR's fellowship holds the
- * accounts playing one of ours characters now; it is held by the leader's
+ * accounts now playing a member of ours; it is held by the leader's
  * account while that plays the leader, else by the first such account,
  * and while nobody plays one by the leader's account alone.
  */

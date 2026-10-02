@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresence;
@@ -72,7 +72,7 @@ final class LostTalesChatHoverCard {
      * the character a page is about, is read the way anyone else in the
      * chat is.
      */
-    static void drawForIdentity(Minecraft minecraft, WindowTab tab, int mouseX,
+    static void drawForIdentity(Minecraft minecraft, WindowPage tab, int mouseX,
                                 int mouseY, int screenWidth, int screenHeight) {
         if (minecraft == null || minecraft.thePlayer == null
                 || minecraft.fontRenderer == null) {
@@ -1031,7 +1031,7 @@ final class LostTalesChatHoverCard {
                     && !LostTalesChatMessagePacket.isSystemSender(this.playerId);
         }
 
-        /** The visit that shows this character's profile in the Characters tab. */
+        /** The visit that shows this character's profile on the Characters page. */
         CharactersPage.Visit visit() {
             return new CharactersPage.Visit(this.playerId, this.characterId,
                     LostTalesChatVisualStyle.removeColorCodes(

@@ -1,7 +1,6 @@
 package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.character.server.CharacterTemplateAdoption;
-import cpw.mods.fml.common.network.ByteBufUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.Test;
@@ -19,13 +18,12 @@ public final class CharacterTemplateAdoptRequestPacketTest {
     @Test
     public void anOfferedTemplateRoundTrips() {
         CharacterTemplateAdoption sent = new CharacterTemplateAdoption(
-                7L, true, "Beren", "lotr:human", "male", "human_male_1",
+                true, "Beren", "lotr:human", "male", "human_male_1",
                 "slim", "flat", "A ranger of the north.", 34, false, 3);
         CharacterTemplateAdoption decoded = roundTrip(sent).toAdoption();
         assertFalse(decoded.isMinecraftCapeVisible());
         assertEquals(3, decoded.getCosmeticCapeId());
         assertTrue(decoded.isOffered());
-        assertEquals(7L, decoded.getExpectedRosterRevision());
         assertEquals("Beren", decoded.getName());
         assertEquals("lotr:human", decoded.getRaceId());
         assertEquals("male", decoded.getGenderId());
@@ -39,7 +37,7 @@ public final class CharacterTemplateAdoptRequestPacketTest {
     @Test
     public void aCapeIdOutOfTheCatalogueRangeIsMalformed() {
         CharacterTemplateAdoption sent = new CharacterTemplateAdoption(
-                7L, true, "Beren", "lotr:human", "male", "human_male_1",
+                true, "Beren", "lotr:human", "male", "human_male_1",
                 "slim", "flat", "", 34, true, 70000);
         ByteBuf buffer = Unpooled.buffer();
         try {
@@ -56,30 +54,9 @@ public final class CharacterTemplateAdoptRequestPacketTest {
     @Test
     public void anAccountWithNoTemplateStillSpendsTheReading() {
         CharacterTemplateAdoptRequestPacket decoded =
-                roundTrip(CharacterTemplateAdoption.none(4L));
+                roundTrip(CharacterTemplateAdoption.none());
         assertFalse(decoded.isMalformed());
         assertFalse(decoded.toAdoption().isOffered());
-        assertEquals(4L, decoded.toAdoption().getExpectedRosterRevision());
-    }
-
-    @Test
-    public void aNegativeRosterRevisionIsMalformed() {
-        ByteBuf buffer = Unpooled.buffer();
-        try {
-            buffer.writeInt(1);
-            buffer.writeLong(-1L);
-            buffer.writeBoolean(true);
-            for (int field = 0; field < 7; field++) {
-                ByteBufUtils.writeVarInt(buffer, 0, 2);
-            }
-            buffer.writeInt(20);
-            CharacterTemplateAdoptRequestPacket packet =
-                    new CharacterTemplateAdoptRequestPacket();
-            packet.fromBytes(buffer);
-            assertTrue(packet.isMalformed());
-        } finally {
-            buffer.release();
-        }
     }
 
     @Test
@@ -87,7 +64,7 @@ public final class CharacterTemplateAdoptRequestPacketTest {
         ByteBuf buffer = Unpooled.buffer();
         try {
             buffer.writeInt(1);
-            buffer.writeLong(3L);
+            buffer.writeBoolean(true);
             CharacterTemplateAdoptRequestPacket packet =
                     new CharacterTemplateAdoptRequestPacket();
             packet.fromBytes(buffer);
@@ -102,7 +79,7 @@ public final class CharacterTemplateAdoptRequestPacketTest {
         ByteBuf buffer = Unpooled.buffer();
         try {
             new CharacterTemplateAdoptRequestPacket(
-                    2, CharacterTemplateAdoption.none(5L)).toBytes(buffer);
+                    2, CharacterTemplateAdoption.none()).toBytes(buffer);
             buffer.writeByte(0);
             CharacterTemplateAdoptRequestPacket packet =
                     new CharacterTemplateAdoptRequestPacket();

@@ -43,12 +43,12 @@ final class SplitDrop {
      * on {@code edge}: a conversation goes only beside the other side,
      * never over or under it.
      */
-    static boolean takes(WindowTab front, WindowTab carried, int edge) {
+    static boolean takes(WindowPage front, WindowPage carried, int edge) {
         if (front == null || carried == null || front.equals(carried)) {
             return false;
         }
         return edge == LEFT || edge == RIGHT
-                || front instanceof PageTab && carried instanceof PageTab;
+                || front instanceof OtherPage && carried instanceof OtherPage;
     }
 
     /** The half of {@code room} a tab let go on {@code edge} takes: {@code left, top, right, bottom}. */

@@ -32,7 +32,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 public final class CharacterTemplateAdoptRequestPacket implements IMessage {
 
     private int requestId;
-    private long expectedRosterRevision;
     private boolean offered;
     private String name = "";
     private String raceId = "";
@@ -54,7 +53,6 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
             throw new IllegalArgumentException("adoption must not be null");
         }
         this.requestId = requestId;
-        this.expectedRosterRevision = adoption.getExpectedRosterRevision();
         this.offered = adoption.isOffered();
         this.name = adoption.getName();
         this.raceId = adoption.getRaceId();
@@ -72,7 +70,6 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
     public void fromBytes(ByteBuf buffer) {
         try {
             this.requestId = buffer.readInt();
-            this.expectedRosterRevision = buffer.readLong();
             this.offered = buffer.readBoolean();
             this.name = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_NAME_BYTES);
@@ -92,10 +89,6 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
             this.showMinecraftCape = buffer.readBoolean();
             this.cosmeticCapeId = buffer.readInt();
             LostTalesPacketCodec.requireFinished(buffer);
-            if (this.expectedRosterRevision < 0L) {
-                throw new CharacterPacketCodec.DecodeException(
-                        "missing roster revision");
-            }
             if (this.cosmeticCapeId < CharacterCapeCatalog.NONE_ID
                     || this.cosmeticCapeId > CharacterCapeCatalog.MAX_NETWORK_ID) {
                 throw new CharacterPacketCodec.DecodeException(
@@ -109,7 +102,6 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
     @Override
     public void toBytes(ByteBuf buffer) {
         buffer.writeInt(this.requestId);
-        buffer.writeLong(this.expectedRosterRevision);
         buffer.writeBoolean(this.offered);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.name, CharacterPacketCodec.MAX_NAME_BYTES);
@@ -126,7 +118,6 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.history, CharacterPacketCodec.MAX_SECTION_BYTES);
         buffer.writeInt(this.age);
-        // The cape the template chose comes last; the wire layout only grows.
         buffer.writeBoolean(this.showMinecraftCape);
         buffer.writeInt(this.cosmeticCapeId);
     }
@@ -138,7 +129,7 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
 
     /** What the payload asks for, as the server will re-check it. */
     public CharacterTemplateAdoption toAdoption() {
-        return new CharacterTemplateAdoption(this.expectedRosterRevision,
+        return new CharacterTemplateAdoption(
                 this.offered, this.name, this.raceId, this.genderId,
                 this.skinId, this.bodyTypeId, this.chestTypeId,
                 this.history, this.age, this.showMinecraftCape,

@@ -13,7 +13,7 @@ import org.lwjgl.input.Keyboard;
  * listing what can be opened again; the tab search over every tab, open
  * or not; and the quick switcher, the tab search with what the pages find
  * besides. What a tab's options hold is the tab's own
- * ({@link WindowTab#options}, which its tool strip also shows as
+ * ({@link WindowPage#options}, which its tool strip also shows as
  * buttons) and then its kind's settings; what can be
  * opened is each system's ({@link ScreenPart#addOpenable}) and the pages
  * no window holds; what a page finds is its own ({@link PageContent#find}).
@@ -29,14 +29,18 @@ final class TabMenus {
     /** Marks a row a page found: this, the page's id, a colon, and the row's own id. */
     private static final String ENTRY_FIND_PREFIX = "find:";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
-    /** Marks a row that opens settings beside its menu: this and the place's name. */
-    /** The rows of a split's menu, and the page a split is made with after this. */
+    /** The row of a tab's options that opens its split view beside the menu. */
+    private static final String SPLIT_VIEW = "split_view";
+    /** The rows of the split view, and the page a split is made with after this. */
     private static final String SPLIT_WITH_PREFIX = "split_with:";
+    /** A row of the split view that opens a closed page or channel beside the page: this and its id. */
+    private static final String SPLIT_OPEN_PREFIX = "split_open:";
     private static final String SPLIT_SWAP = "split:swap";
     private static final String SPLIT_TURN = "split:turn";
     private static final String SPLIT_CLOSE_FIRST = "split:close_first";
     private static final String SPLIT_CLOSE_SECOND = "split:close_second";
     private static final String SPLIT_SEPARATE = "split:separate";
+    /** Marks a row that opens settings beside its menu: this and the place's name. */
     private static final String SETTINGS_PREFIX = "settings:";
 
     private final WindowScreen screen;
@@ -47,6 +51,7 @@ final class TabMenus {
         this.menus = menus;
         menus.register(SubWindowKind.TAB, new TabSource());
         menus.register(SubWindowKind.PICK, new PickSource());
+        menus.register(SubWindowKind.SPLIT, new SplitSource());
         menus.register(SubWindowKind.WINDOW, new WindowSource());
         menus.register(SubWindowKind.OPEN, new OpenSource());
         menus.register(SubWindowKind.TAB_SEARCH, new SearchSource(
@@ -66,7 +71,7 @@ final class TabMenus {
      * and nothing else: a row that only repeats the button beside it is a
      * second way to lose a tab by accident.
      */
-    void showTabMenu(WindowTab tab, SubWindowAnchor anchor, boolean toggle) {
+    void showTabMenu(WindowPage tab, SubWindowAnchor anchor, boolean toggle) {
         if (tab != null && hasRows(tab)) {
             this.menus.show(SubWindowKind.TAB, tab,
                     WindowMenus.hangingFrom(anchor), toggle);
@@ -74,17 +79,21 @@ final class TabMenus {
     }
 
     /**
-     * Whether a tab's options hold anything: the page's own choices, or
-     * the settings of its kind. The dots of one that holds nothing stay,
-     * greyed, and no menu opens for it.
+     * Whether a tab's options hold anything: the page's own choices, the
+     * settings of its kind, or a split view. The dots of one that holds
+     * nothing stay, greyed, and no menu opens for it.
      */
-    static boolean hasRows(WindowTab tab) {
+    static boolean hasRows(WindowPage tab) {
         return tab.hasOptions() || tab.settingsPlace() != null
-                || hasSplitRows(tab);
+                || canSplit(tab);
     }
 
-    /** Whether a tab has split rows: it stands in a split, or another tab of its window could join it in one. */
-    private static boolean hasSplitRows(WindowTab tab) {
+    /**
+     * Whether the split view does anything for {@code tab}: it stands in a
+     * split, another open page could stand beside it, or something closed
+     * could open beside it. Asked every frame by the split view button.
+     */
+    static boolean canSplit(WindowPage tab) {
         Window window = WindowLayout.windowOf(tab);
         if (window == null) {
             return false;
@@ -92,27 +101,53 @@ final class TabMenus {
         if (window.splitOf(tab) != null) {
             return true;
         }
-        for (WindowTab other : window.getTabs()) {
-            if (canSplitWith(window, tab, other)) {
+        for (Window from : WindowLayout.windows()) {
+            for (WindowPage other : from.getTabs()) {
+                if (canSplitWith(window, tab, from, other)) {
+                    return true;
+                }
+            }
+        }
+        return hasClosed();
+    }
+
+    /** Whether the {@code +} has anything to open: a closed channel, someone to whisper to, a page no window holds. */
+    private static boolean hasClosed() {
+        for (WindowPages.Page page : WindowPages.all()) {
+            if (WindowPages.isOffered(page)) {
                 return true;
+            }
+        }
+        WindowScreen screen = WindowScreen.current();
+        if (screen != null) {
+            for (ScreenPart part : screen.parts()) {
+                if (part.hasRestorable()) {
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    /** Whether {@code other} can be shown beside {@code tab} in a new split. */
-    private static boolean canSplitWith(Window window, WindowTab tab, WindowTab other) {
-        return !other.equals(tab) && window.splitOf(other) == null
-                && other.isAvailable() && WindowView.isShown(other);
+    /**
+     * Whether {@code other}, in {@code from}, can come to stand beside
+     * {@code tab}, in {@code window}, in a new split: it is shown, in no
+     * split, and its window lets it go.
+     */
+    private static boolean canSplitWith(Window window, WindowPage tab,
+                                        Window from, WindowPage other) {
+        return !other.equals(tab) && from.splitOf(other) == null
+                && (from == window || !from.isLocked())
+                && WindowView.isShown(other);
     }
 
     /**
-     * The split's rows of a tab's menu: for a tab in a split, Swap Sides,
-     * the other way, closing either side and separating them; for a tab
-     * in none, the window's other tabs it can be split with. Greyed while
-     * the window is locked.
+     * The split view's rows: for a tab in a split, Swap Sides, the other
+     * way, closing either side and separating them; for a tab in none,
+     * the pages that can stand beside it, this window's first, then the
+     * other windows'. Greyed while the window is locked.
      */
-    static List<MenuWindow.Entry> splitRows(WindowTab tab) {
+    static List<MenuWindow.Entry> splitRows(WindowPage tab) {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
         Window window = WindowLayout.windowOf(tab);
         if (window == null) {
@@ -125,8 +160,8 @@ final class TabMenus {
             MenuWindow.Entry turn = splitRow(SPLIT_TURN, stacked
                     ? "gui.losttales.window.split.side_by_side"
                     : "gui.losttales.window.split.one_over_other", window);
-            rows.add(!stacked && !(split.first() instanceof PageTab
-                    && split.second() instanceof PageTab)
+            rows.add(!stacked && !(split.first() instanceof OtherPage
+                    && split.second() instanceof OtherPage)
                     ? turn.unavailable(StatCollector.translateToLocal(
                             "gui.losttales.window.split.conversation_beside"))
                     : turn);
@@ -137,19 +172,60 @@ final class TabMenus {
             rows.add(splitRow(SPLIT_SEPARATE, "gui.losttales.window.split.separate", window));
             return rows;
         }
-        List<MenuWindow.Entry> pages = new ArrayList<MenuWindow.Entry>();
-        for (WindowTab other : window.getTabs()) {
-            if (canSplitWith(window, tab, other)) {
-                pages.add(heldWhileLocked(new MenuWindow.Entry(SPLIT_WITH_PREFIX
-                        + other.id(), other.title(), false, other.tone(), other), window));
+        List<MenuWindow.Entry> here = new ArrayList<MenuWindow.Entry>();
+        List<MenuWindow.Entry> elsewhere = new ArrayList<MenuWindow.Entry>();
+        for (Window from : WindowLayout.windows()) {
+            for (WindowPage other : from.getTabs()) {
+                if (canSplitWith(window, tab, from, other)) {
+                    (from == window ? here : elsewhere).add(heldWhileLocked(
+                            new MenuWindow.Entry(SPLIT_WITH_PREFIX + other.id(),
+                                    other.title(), false, other.tone(), other),
+                            window));
+                }
             }
         }
-        if (!pages.isEmpty()) {
-            rows.add(MenuWindow.Entry.header(StatCollector.translateToLocal(
-                    "gui.losttales.window.split.with")));
-            rows.addAll(pages);
+        WindowMenus.addSection(rows, StatCollector.translateToLocal(
+                "gui.losttales.window.split.here"), here);
+        WindowMenus.addSection(rows, StatCollector.translateToLocal(
+                "gui.losttales.window.split.elsewhere"), elsewhere);
+        if (rows.isEmpty()) {
+            rows.add(MenuWindow.Entry.passive(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.window.split.nothing", tab.title())));
         }
         return rows;
+    }
+
+    /**
+     * The row of a tab's options that opens its split view beside the
+     * menu, as the split view button does: greyed while the padlock holds
+     * it, and saying why while no page can stand beside the tab.
+     */
+    private static MenuWindow.Entry splitViewRow(WindowPage tab) {
+        Window window = WindowLayout.windowOf(tab);
+        MenuWindow.Entry row = new MenuWindow.Entry(SPLIT_VIEW,
+                StatCollector.translateToLocal("gui.losttales.window.split.title"))
+                .withSprite(LostTalesUiSheet.SPLIT, LostTalesUiSheet.SPLIT_LIT,
+                        window != null && window.splitOf(tab) != null);
+        if (!canSplit(tab)) {
+            return row.unavailable(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.window.split.nothing", tab.title()));
+        }
+        return heldWhileLocked(row, window);
+    }
+
+    /**
+     * The tab's split view, in a sub-window of its own at {@code place}:
+     * a switch, as its button is.
+     */
+    void toggleSplit(WindowPage tab, WindowMenus.FirstPlace place) {
+        if (tab != null && canSplit(tab)) {
+            this.menus.show(SubWindowKind.SPLIT, tab, place, true);
+        }
+    }
+
+    /** Whether the tab's split view is out, which lights its button. */
+    boolean splitOut(WindowPage tab) {
+        return tab != null && this.menus.isOpenFor(SubWindowKind.SPLIT, tab);
     }
 
     private static MenuWindow.Entry splitRow(String id, String labelKey, Window window) {
@@ -158,24 +234,20 @@ final class TabMenus {
     }
 
     /**
-     * Does what a split's row of {@code tab}'s menu says; false for a row
-     * that is no split's. The layout refuses what the padlock holds.
+     * Does what a row of {@code tab}'s split view says. The layout
+     * refuses what the padlock holds.
      */
-    private static boolean actOnSplit(WindowTab tab, String id) {
+    private static void actOnSplit(WindowPage tab, String id) {
         Window window = WindowLayout.windowOf(tab);
         WindowSplit split = window == null ? null : window.splitOf(tab);
         if (id.startsWith(SPLIT_WITH_PREFIX)) {
-            WindowTab other = window == null ? null : findTab(window,
-                    id.substring(SPLIT_WITH_PREFIX.length()));
+            WindowPage other = openTab(id.substring(SPLIT_WITH_PREFIX.length()));
             if (other != null) {
                 WindowLayout.split(tab, other);
             }
-            return true;
-        }
-        if (split == null) {
-            return false;
-        }
-        if (SPLIT_SWAP.equals(id)) {
+        } else if (split == null) {
+            return;
+        } else if (SPLIT_SWAP.equals(id)) {
             WindowLayout.swapSides(tab);
         } else if (SPLIT_TURN.equals(id)) {
             WindowLayout.turnSplit(tab, !split.isStacked());
@@ -185,16 +257,35 @@ final class TabMenus {
             WindowLayout.close(split.second());
         } else if (SPLIT_SEPARATE.equals(id)) {
             WindowLayout.separate(tab);
-        } else {
-            return false;
         }
-        return true;
     }
 
-    private static WindowTab findTab(Window window, String id) {
-        for (WindowTab each : window.getTabs()) {
-            if (each.id().equals(id)) {
-                return each;
+    /**
+     * Opens {@code closed} and shows it beside {@code tab}: it opens where
+     * the {@code +} would put it and comes over into a split, and takes the
+     * keys. Nothing while the padlock holds the window.
+     */
+    private void openBeside(WindowPage tab, WindowPage closed) {
+        Window window = WindowLayout.windowOf(tab);
+        if (closed == null || window == null || window.isLocked()) {
+            return;
+        }
+        WindowPage opened = WindowLayout.openTab(closed, window.getId());
+        if (opened == null) {
+            opened = WindowLayout.openInNewWindow(closed);
+        }
+        if (opened != null && WindowLayout.split(tab, opened)) {
+            this.screen.jumpToTab(opened);
+        }
+    }
+
+    /** The open tab with {@code id}, in any window, or null. */
+    private static WindowPage openTab(String id) {
+        for (Window window : WindowLayout.windows()) {
+            for (WindowPage each : window.getTabs()) {
+                if (each.id().equals(id)) {
+                    return each;
+                }
             }
         }
         return null;
@@ -205,7 +296,7 @@ final class TabMenus {
      * from it: a switch, as the cog is. Every conversation opens the one
      * Chat Settings. A tab of no kind with settings opens nothing.
      */
-    void toggleSettings(WindowTab tab, SubWindowAnchor anchor) {
+    void toggleSettings(WindowPage tab, SubWindowAnchor anchor) {
         Settings.Place place = tab == null ? null : tab.settingsPlace();
         if (place != null) {
             this.screen.settings().toggle(place,
@@ -217,7 +308,7 @@ final class TabMenus {
      * The tab's help, hung from the question mark pressed, else — from
      * F1 — in the middle of its window: a switch, as the question mark is.
      */
-    void toggleHelp(WindowTab tab, SubWindowAnchor anchor) {
+    void toggleHelp(WindowPage tab, SubWindowAnchor anchor) {
         if (tab == null) {
             return;
         }
@@ -229,12 +320,12 @@ final class TabMenus {
     }
 
     /** Whether the tab's help is out, which lights its question mark. */
-    boolean helpOut(WindowTab tab) {
+    boolean helpOut(WindowPage tab) {
         return tab != null && this.menus.isOpenFor(SubWindowKind.HELP, tab);
     }
 
     /** Whether the tab's options are out, which lights the three dots on the tab. */
-    boolean optionsOut(WindowTab tab) {
+    boolean optionsOut(WindowPage tab) {
         return tab != null && this.menus.isOpenFor(SubWindowKind.TAB, tab);
     }
 
@@ -242,7 +333,7 @@ final class TabMenus {
      * The words one of the tab's options picks from, in a sub-window of
      * their own at {@code place}: a switch, as the option's button is.
      */
-    void togglePick(WindowTab tab, PageOption option,
+    void togglePick(WindowPage tab, PageOption option,
                     WindowMenus.FirstPlace place) {
         if (tab != null && option != null && option.kind == PageOption.Kind.PICK) {
             this.menus.show(SubWindowKind.PICK, new Picking(tab, option.id),
@@ -251,7 +342,7 @@ final class TabMenus {
     }
 
     /** The option of the tab whose words are out, which lights its button; empty for none. */
-    String pickOut(WindowTab tab) {
+    String pickOut(WindowPage tab) {
         if (tab == null || !this.menus.isOpen(SubWindowKind.PICK)) {
             return "";
         }
@@ -261,7 +352,7 @@ final class TabMenus {
     }
 
     /** The option of the tab with {@code id}, or null for one it no longer has. */
-    private static PageOption optionOf(WindowTab tab, String id) {
+    private static PageOption optionOf(WindowPage tab, String id) {
         for (PageOption option : tab.options()) {
             if (option.id.equals(id)) {
                 return option;
@@ -271,7 +362,7 @@ final class TabMenus {
     }
 
     /** Whether the settings of the tab's kind are out, which lights its cog. */
-    boolean settingsOut(WindowTab tab) {
+    boolean settingsOut(WindowPage tab) {
         Settings.Place place = tab == null ? null : tab.settingsPlace();
         return place != null
                 && this.menus.isOpenFor(SubWindowKind.SETTINGS, place);
@@ -429,7 +520,7 @@ final class TabMenus {
         }
         List<MenuWindow.Entry> pages = new ArrayList<MenuWindow.Entry>();
         for (WindowPages.Page page : WindowPages.all()) {
-            PageTab tab = page.tab();
+            OtherPage tab = page.tab();
             if (WindowPages.isOffered(page)
                     && WindowMenus.matchesFilter(page.title(), filter)) {
                 pages.add(new MenuWindow.Entry(tab.id(), page.title(), false,
@@ -444,7 +535,7 @@ final class TabMenus {
             // every open tab itself.
             List<MenuWindow.Entry> hidden = new ArrayList<MenuWindow.Entry>();
             for (Window window : WindowLayout.windows()) {
-                for (WindowTab tab : window.getTabs()) {
+                for (WindowPage tab : window.getTabs()) {
                     if (tab.isAvailable() && !WindowView.shows(tab)
                             && WindowMenus.matchesFilter(tab.title(),
                                     filter)) {
@@ -475,7 +566,7 @@ final class TabMenus {
         for (Window window : WindowLayout.windows()) {
             // Every open tab, those the view hides too: a search finds a
             // tab wherever it waits, and going to it shows it.
-            for (WindowTab tab : window.getTabs()) {
+            for (WindowPage tab : window.getTabs()) {
                 String name = tab.title();
                 if (tab.isAvailable()
                         && WindowMenus.matchesFilter(name, filter)) {
@@ -524,10 +615,10 @@ final class TabMenus {
      * else in a window of its own. The tab then takes the keys.
      */
     private void openFromMenu(String windowId, MenuWindow.Entry entry) {
-        open(windowId, WindowTab.fromId(entry.id));
+        open(windowId, WindowPage.fromId(entry.id));
     }
 
-    private void open(String windowId, WindowTab tab) {
+    private void open(String windowId, WindowPage tab) {
         if (tab == null) {
             return;
         }
@@ -535,12 +626,12 @@ final class TabMenus {
         if (target == null) {
             target = WindowLayout.firstWindow();
         }
-        if (tab instanceof PageTab && (target == null || target.isLocked())) {
-            WindowLayout.showPage((PageTab)tab);
+        if (tab instanceof OtherPage && (target == null || target.isLocked())) {
+            WindowLayout.showPage((OtherPage)tab);
             this.screen.jumpToTab(tab);
             return;
         }
-        WindowTab opened = target == null
+        WindowPage opened = target == null
                 ? WindowLayout.openInNewWindow(tab)
                 : WindowLayout.openTab(tab, target.getId());
         if (opened != null) {
@@ -551,41 +642,37 @@ final class TabMenus {
     /* ---- The sources ---- */
 
     /**
-     * A tab's options, named as its dots are: the page's own choices, a
-     * hairline, and the row that opens the settings of its kind.
+     * A tab's options, named as its dots are, in the tool strip's order:
+     * the page's own choices, a hairline, the row that opens the settings
+     * of its kind and the row that opens its split view.
      */
     private final class TabSource extends WindowMenus.Source {
         @Override
         public boolean stillStands(MenuWindow menu) {
-            return menu.about() instanceof WindowTab
-                    && WindowLayout.isOpen((WindowTab)menu.about());
+            return menu.about() instanceof WindowPage
+                    && WindowLayout.isOpen((WindowPage)menu.about());
         }
 
         @Override
         public void rebuild(MenuWindow menu) {
-            WindowTab tab = (WindowTab)menu.about();
+            WindowPage tab = (WindowPage)menu.about();
             menu.setTitle(tab.optionsTitle(), LostTalesUiSheet.MORE);
             List<MenuWindow.Entry> rows = optionRows(tab.options());
+            if (!rows.isEmpty()) {
+                rows.add(MenuWindow.Entry.separator());
+            }
             if (tab.settingsPlace() != null) {
-                if (!rows.isEmpty()) {
-                    rows.add(MenuWindow.Entry.separator());
-                }
                 rows.add(settingsRow(tab.settingsPlace()));
             }
-            List<MenuWindow.Entry> split = splitRows(tab);
-            if (!split.isEmpty()) {
-                if (!rows.isEmpty()) {
-                    rows.add(MenuWindow.Entry.separator());
-                }
-                rows.addAll(split);
-            }
+            rows.add(splitViewRow(tab));
             menu.setRows(rows);
         }
 
         /**
-         * The settings row opens its settings beside the menu, and a
-         * pick's row its words, the menu staying; the rest are the tab's:
-         * its switches stay, its actions are done with it.
+         * The settings row opens its settings beside the menu, the split
+         * view row the split view, and a pick's row its words, the menu
+         * staying; the rest are the tab's: its switches stay, its actions
+         * are done with it.
          */
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
@@ -594,9 +681,10 @@ final class TabMenus {
                 toggleSettingsBeside(entry, window);
                 return true;
             }
-            WindowTab tab = (WindowTab)menu.about();
-            if (actOnSplit(tab, entry.id)) {
-                return false;
+            WindowPage tab = (WindowPage)menu.about();
+            if (SPLIT_VIEW.equals(entry.id)) {
+                toggleSplit(tab, WindowMenus.besideWindow(window));
+                return true;
             }
             PageOption option = optionOf(tab, entry.id);
             if (option != null && option.kind == PageOption.Kind.PICK) {
@@ -609,10 +697,10 @@ final class TabMenus {
 
     /** One of a tab's options whose words a sub-window shows. */
     private static final class Picking {
-        final WindowTab tab;
+        final WindowPage tab;
         final String optionId;
 
-        Picking(WindowTab tab, String optionId) {
+        Picking(WindowPage tab, String optionId) {
             this.tab = tab;
             this.optionId = optionId;
         }
@@ -673,6 +761,71 @@ final class TabMenus {
     }
 
     /**
+     * A tab's split view, named as its button is: the pages that can stand
+     * beside it, or, while it stands in a split, the split's own rows.
+     */
+    private final class SplitSource extends WindowMenus.Source {
+        @Override
+        public boolean stillStands(MenuWindow menu) {
+            return menu.about() instanceof WindowPage
+                    && WindowLayout.isOpen((WindowPage)menu.about());
+        }
+
+        @Override
+        public void rebuild(MenuWindow menu) {
+            WindowPage tab = (WindowPage)menu.about();
+            menu.setTitle(StatCollector.translateToLocal(
+                    "gui.losttales.window.split.title"), LostTalesUiSheet.SPLIT);
+            List<MenuWindow.Entry> rows = splitRows(tab);
+            Window window = WindowLayout.windowOf(tab);
+            if (window != null && window.splitOf(tab) == null) {
+                addOpenBeside(rows, window);
+            }
+            menu.setRows(rows);
+        }
+
+        /**
+         * Under *Open Beside*, what the {@code +} would open, each opening
+         * straight beside the page: closed channels, people to whisper
+         * to, pages no window holds. Greyed while the padlock holds the
+         * window.
+         */
+        private void addOpenBeside(List<MenuWindow.Entry> rows, Window window) {
+            List<MenuWindow.Entry> closed = new ArrayList<MenuWindow.Entry>();
+            for (MenuWindow.Entry row : openRows("", true)) {
+                if (!row.header && !row.separator && !row.passive) {
+                    closed.add(heldWhileLocked(
+                            row.renamed(SPLIT_OPEN_PREFIX + row.id), window));
+                }
+            }
+            if (closed.isEmpty()) {
+                return;
+            }
+            if (rows.size() == 1 && rows.get(0).passive) {
+                // "No other page can stand beside" gives way to what can.
+                rows.clear();
+            }
+            WindowMenus.addSection(rows, StatCollector.translateToLocal(
+                    "gui.losttales.window.split.open_beside"), closed);
+        }
+
+        /** Swapping and turning stay for another try; the rest are done with it. */
+        @Override
+        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
+                           SubWindow window, boolean back) {
+            WindowPage tab = (WindowPage)menu.about();
+            if (entry.id.startsWith(SPLIT_OPEN_PREFIX)) {
+                openBeside(tab, WindowPage.fromId(
+                        entry.id.substring(SPLIT_OPEN_PREFIX.length())));
+                return false;
+            }
+            actOnSplit(tab, entry.id);
+            TabMenus.this.menus.rebuildIfOpen(SubWindowKind.TAB);
+            return SPLIT_SWAP.equals(entry.id) || SPLIT_TURN.equals(entry.id);
+        }
+    }
+
+    /**
      * A tab's help, named as its question mark is: the guide, a hairline,
      * then the tab's own keys and the keys every page shares, under a
      * field that finds keys by their words or their names. While words
@@ -684,8 +837,8 @@ final class TabMenus {
 
         @Override
         public boolean stillStands(MenuWindow menu) {
-            return menu.about() instanceof WindowTab
-                    && WindowLayout.isOpen((WindowTab)menu.about());
+            return menu.about() instanceof WindowPage
+                    && WindowLayout.isOpen((WindowPage)menu.about());
         }
 
         @Override
@@ -700,7 +853,7 @@ final class TabMenus {
 
         @Override
         public void rebuild(MenuWindow menu) {
-            WindowTab tab = (WindowTab)menu.about();
+            WindowPage tab = (WindowPage)menu.about();
             menu.setTitle(StatCollector.translateToLocalFormatted(
                     "gui.losttales.window.help.title", tab.title()),
                     LostTalesUiSheet.QUESTION);
@@ -803,6 +956,9 @@ final class TabMenus {
             if (ENTRY_WINDOW_RESET.equals(entry.id)
                     && WindowLayout.resetWindow(window.getId())) {
                 ContentView.leave(window);
+                for (WindowPage tab : window.getTabs()) {
+                    tab.resetIn(window);
+                }
             }
             return false;
         }
@@ -821,7 +977,7 @@ final class TabMenus {
                            SubWindow window, boolean back) {
             if (entry.id.startsWith(ENTRY_OPEN_PREFIX)) {
                 // A tab the view hides: it shows where it stands.
-                TabMenus.this.screen.jumpToTab(WindowTab.fromId(
+                TabMenus.this.screen.jumpToTab(WindowPage.fromId(
                         entry.id.substring(ENTRY_OPEN_PREFIX.length())));
             } else {
                 openFromMenu((String)menu.about(), entry);
@@ -873,7 +1029,7 @@ final class TabMenus {
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
                            SubWindow window, boolean back) {
             if (entry.id.startsWith(ENTRY_OPEN_PREFIX)) {
-                TabMenus.this.screen.jumpToTab(WindowTab.fromId(
+                TabMenus.this.screen.jumpToTab(WindowPage.fromId(
                         entry.id.substring(ENTRY_OPEN_PREFIX.length())));
             } else if (entry.id.startsWith(ENTRY_FIND_PREFIX)) {
                 showFound((String)menu.about(), entry.id.substring(
@@ -892,7 +1048,7 @@ final class TabMenus {
      */
     private void showFound(String windowId, String pageAndId) {
         int colon = pageAndId.indexOf(':');
-        PageTab tab = colon < 0 ? null
+        OtherPage tab = colon < 0 ? null
                 : WindowPages.tab(pageAndId.substring(0, colon));
         if (tab == null) {
             return;

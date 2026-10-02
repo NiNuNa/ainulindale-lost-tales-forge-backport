@@ -10,6 +10,7 @@ import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
@@ -96,7 +97,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen
         if (this.hoveredOption == NONE) {
             return;
         }
-        int color = 0x22FFFFFF;
+        int color = LostTalesColors.withAlpha(LostTalesColors.IVORY, 0x22);
         switch (this.hoveredOption) {
             case OPTION_PROFILE:
                 drawTriangle(centerX, centerY, 0, 0, this.width, 0, color);
@@ -122,10 +123,11 @@ public class LostTalesCharacterMenuGui extends GuiScreen
         drawLine(centerX + 18, centerY, centerX + radius, centerY, LostTalesSkyrimUiStyle.BORDER_DIM);
         drawLine(centerX, centerY - radius, centerX, centerY - 18, LostTalesSkyrimUiStyle.BORDER_DIM);
         drawLine(centerX, centerY + 18, centerX, centerY + radius, LostTalesSkyrimUiStyle.BORDER_DIM);
-        drawLine(centerX - radius / 2, centerY, centerX, centerY - radius / 2, 0x44D8D1C3);
-        drawLine(centerX, centerY - radius / 2, centerX + radius / 2, centerY, 0x44D8D1C3);
-        drawLine(centerX + radius / 2, centerY, centerX, centerY + radius / 2, 0x44D8D1C3);
-        drawLine(centerX, centerY + radius / 2, centerX - radius / 2, centerY, 0x44D8D1C3);
+        int inner = LostTalesColors.withAlpha(LostTalesColors.SAND, 0x44);
+        drawLine(centerX - radius / 2, centerY, centerX, centerY - radius / 2, inner);
+        drawLine(centerX, centerY - radius / 2, centerX + radius / 2, centerY, inner);
+        drawLine(centerX + radius / 2, centerY, centerX, centerY + radius / 2, inner);
+        drawLine(centerX, centerY + radius / 2, centerX - radius / 2, centerY, inner);
     }
 
     private void drawRadialOption(String label, int option, int labelX, int labelY, int lineX, int lineY) {

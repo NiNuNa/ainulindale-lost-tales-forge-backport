@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Server-to-client: entries of the Server Console, oldest
+ * Server-to-client: entries of the Server Log, oldest
  * first — one as it happens, a batch when a staff member joins. Sent
  * only to players the server has found to hold {@code chat.server_console.read}
  * at that moment; the client is told nothing it may not read and
@@ -218,7 +218,7 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
                 return null;
             }
             if (message.isMalformed()) {
-                FMLLog.warning("[%s] A batch of Server Console entries from the server could not be read and was dropped",
+                FMLLog.warning("[%s] A batch of Server Log entries from the server could not be read and was dropped",
                         LostTalesMetaData.MOD_ID);
                 return null;
             }

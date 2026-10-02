@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.gui.tooltip;
 
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.List;
@@ -38,11 +39,13 @@ public final class LostTalesTooltipHooks {
             LostTalesInputIconRenderer.BASE_ICON_HEIGHT
                     + ICON_LINE_PADDING * 2);
 
-    private static final int BACKGROUND_COLOR = 0xF0100010;
-    private static final int BORDER_TOP_COLOR = 0x505000FF;
+    /** Vanilla's tooltip frame, in the palette entries nearest its colours. */
+    private static final int BACKGROUND_COLOR =
+            LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xF0);
+    private static final int BORDER_TOP_COLOR =
+            LostTalesColors.withAlpha(LostTalesColors.SLATE_BLUE, 0x50);
     private static final int BORDER_BOTTOM_COLOR =
-            (BORDER_TOP_COLOR & 0xFEFEFE) >> 1
-                    | BORDER_TOP_COLOR & 0xFF000000;
+            LostTalesColors.withAlpha(LostTalesColors.INDIGO, 0x50);
     private static final float TOOLTIP_Z = 300.0F;
 
     private static final Canvas CANVAS = new Canvas();
@@ -158,7 +161,7 @@ public final class LostTalesTooltipHooks {
             Minecraft minecraft, FontRenderer font,
             String line, int x, int y) {
         if (!LostTalesTooltipIcons.hasIcon(line)) {
-            font.drawStringWithShadow(line, x, y, -1);
+            font.drawStringWithShadow(line, x, y, LostTalesColors.IVORY);
             return;
         }
         int textY = y + (ICON_LINE_HEIGHT - font.FONT_HEIGHT) / 2;
@@ -197,7 +200,7 @@ public final class LostTalesTooltipHooks {
             return 0;
         }
         String drawn = format + text;
-        font.drawStringWithShadow(drawn, x, y, -1);
+        font.drawStringWithShadow(drawn, x, y, LostTalesColors.IVORY);
         return font.getStringWidth(drawn);
     }
 

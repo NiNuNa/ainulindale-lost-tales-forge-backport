@@ -185,7 +185,13 @@ public final class LostTalesUiSheetTest {
     @Test
     public void hoverStatesMatchTheirRestingSprite() {
         assertSameSize(LostTalesUiSheet.EMOJI, LostTalesUiSheet.EMOJI_HOVER);
-        assertSameSize(LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_HOVER);
+        assertSameSize(LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_ADD);
+        assertSameSize(LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_LIT);
+        assertSameSize(LostTalesUiSheet.MINUS, LostTalesUiSheet.MINUS_LIT);
+        assertSameSize(LostTalesUiSheet.EXCLAMATION,
+                LostTalesUiSheet.EXCLAMATION_REPORT);
+        assertSameSize(LostTalesUiSheet.EXCLAMATION,
+                LostTalesUiSheet.EXCLAMATION_LIT);
         assertSameSize(LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER);
         assertSameSize(LostTalesUiSheet.CLOSE, LostTalesUiSheet.CLOSE_HOVER);
         assertSameSize(LostTalesUiSheet.ITEM, LostTalesUiSheet.ITEM_HOVER);
@@ -266,7 +272,9 @@ public final class LostTalesUiSheetTest {
                 {LostTalesUiSheet.BELL, LostTalesUiSheet.BELL_EVERYTHING,
                         LostTalesUiSheet.BELL_NOTHING, LostTalesUiSheet.BELL_LIT},
                 {LostTalesUiSheet.FEED, LostTalesUiSheet.FEED_EVERYTHING,
-                        LostTalesUiSheet.FEED_NOTHING, LostTalesUiSheet.FEED_LIT}};
+                        LostTalesUiSheet.FEED_NOTHING, LostTalesUiSheet.FEED_LIT},
+                {LostTalesUiSheet.SPLIT, LostTalesUiSheet.SPLIT_LIT},
+                {LostTalesUiSheet.TRASH, LostTalesUiSheet.TRASH_LIT}};
         for (LostTalesUiSheet[] option : states) {
             for (LostTalesUiSheet state : option) {
                 assertSameSize(option[0], state);
@@ -278,7 +286,7 @@ public final class LostTalesUiSheetTest {
         assertSameSize(LostTalesUiSheet.QUESTION, LostTalesUiSheet.QUESTION_LIT);
         assertSameSize(LostTalesUiSheet.DRAFT, LostTalesUiSheet.DRAFT_HOVER);
         // A count tile's figures are one size, the plus among them.
-        for (int figure = 1; figure <= 9; figure++) {
+        for (int figure = 0; figure <= 9; figure++) {
             assertSameSize(LostTalesUiSheet.COUNT_MORE,
                     LostTalesUiSheet.valueOf("COUNT_" + figure));
         }

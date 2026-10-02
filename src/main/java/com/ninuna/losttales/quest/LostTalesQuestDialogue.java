@@ -78,8 +78,8 @@ public final class LostTalesQuestDialogue {
 
     /**
      * Whether the quest is offered in conversation: without an offer
-     * line there is nothing for a giver to say, so it keeps starting the
-     * way it always did.
+     * line there is nothing for a giver to say, so touching the giver
+     * starts the quest at once.
      */
     public boolean isOffered() {
         return line(OFFER).length() > 0;

@@ -92,7 +92,7 @@
     "follow": 0.1
   },
   "window.notice": {
-    "about": "A short notice over a window's bar, why a page's tab closed: fading in as it rises its last pixels, standing hold milliseconds while it is read, then fading out where it stands.",
+    "about": "A short notice over a window's bar, why a page closed by itself or that a locked window cannot be changed: fading in as it rises its last pixels, standing hold milliseconds while it is read, then fading out where it stands.",
     "duration": 100,
     "curve": "ease_out",
     "off": { "duration": 250, "curve": "ease_in" },
@@ -106,7 +106,7 @@
     "params": { "hold": 3000, "rise": 3 }
   },
   "window.view.line": {
-    "about": "The line at the top of the screen saying how to leave a tab standing alone in full screen: fading in, standing hold milliseconds as the tab comes to stand alone and while the pointer is near the top, then fading out where it stands.",
+    "about": "Leave Full Window (Esc), at the top of a window its page fills: fading in, standing hold milliseconds as the page comes to fill it and while the pointer is near the top, then fading out where it stands.",
     "duration": 150,
     "curve": "ease_out",
     "off": { "duration": 250, "curve": "ease_in" },

@@ -47,6 +47,8 @@ public final class Settings {
     private static final String RESTORE_CONFIRM = "restore_confirm";
     /** Marks a palette row; the rest of the id is the palette entry's name. */
     private static final String PALETTE_PREFIX = "palette:";
+    /** Marks a row of a few-word setting's words: this and the word's place. */
+    private static final String WORD_PREFIX = "word:";
     /** The rows of the window a value is typed into. */
     private static final String VALUE_KEEP = "value:keep";
     private static final String VALUE_DEFAULT = "value:default";
@@ -131,8 +133,32 @@ public final class Settings {
         /** The words the row reads for the value now. */
         public abstract String value();
 
-        /** A click steps it on; with {@code back}, a right-click, back. */
-        public abstract void step(boolean back);
+        /**
+         * A click steps it on; with {@code back}, a right-click, back. A
+         * setting of a few words never steps: its row opens its words.
+         */
+        public void step(boolean back) {}
+
+        /**
+         * A few-word setting's words, as its row reads each, in order; its
+         * row opens them in a sub-window of their own. Empty for any other.
+         */
+        public List<String> words() {
+            return Collections.emptyList();
+        }
+
+        /** Which of {@link #words} stands now; -1 for none. */
+        public int wordIndex() {
+            return -1;
+        }
+
+        /** Which of {@link #words} the mod or the game ships; -1 for none. */
+        public int shippedWordIndex() {
+            return -1;
+        }
+
+        /** Takes the word at {@code index} of {@link #words}. */
+        public void pickWord(int index) {}
 
         /** The value as the mod or the game ships it. */
         public abstract void restore();
@@ -217,14 +243,38 @@ public final class Settings {
 
         @Override
         public String value() {
+            return word(get());
+        }
+
+        private String word(String id) {
             return StatCollector.translateToLocal(this.wordKeyPrefix
-                    + get().toLowerCase(Locale.ROOT));
+                    + id.toLowerCase(Locale.ROOT));
         }
 
         @Override
-        public void step(boolean back) {
-            set(this.words[nextIndex(indexOf(this.words, get()),
-                    this.words.length, back)]);
+        public List<String> words() {
+            List<String> read = new ArrayList<String>(this.words.length);
+            for (String id : this.words) {
+                read.add(word(id));
+            }
+            return read;
+        }
+
+        @Override
+        public int wordIndex() {
+            return indexOf(this.words, get());
+        }
+
+        @Override
+        public int shippedWordIndex() {
+            return indexOf(this.words, shipped());
+        }
+
+        @Override
+        public void pickWord(int index) {
+            if (index >= 0 && index < this.words.length) {
+                set(this.words[index]);
+            }
         }
 
         @Override
@@ -673,6 +723,7 @@ public final class Settings {
         menus.register(SubWindowKind.SETTINGS, new SettingsSource());
         menus.register(SubWindowKind.PALETTE, new PaletteSource());
         menus.register(SubWindowKind.SETTING_VALUE, new ValueSource());
+        menus.register(SubWindowKind.SETTING_WORDS, new WordsSource());
     }
 
     /** Gives every Settings made from now on a system's sections, after those already given. */
@@ -740,6 +791,9 @@ public final class Settings {
         if (setting instanceof Numeric || setting instanceof Line) {
             this.menus.show(SubWindowKind.SETTING_VALUE, setting, place,
                     true);
+        } else if (setting != null && !setting.words().isEmpty()) {
+            this.menus.show(SubWindowKind.SETTING_WORDS, setting, place,
+                    true);
         }
     }
 
@@ -763,7 +817,6 @@ public final class Settings {
 
     /* ---- The Windows section ---- */
 
-    /** The windows' colour, then what else reaches every window. */
     /**
      * Every key of every page, each a row that is read, not taken; each
      * page's help lists its own ({@link PageHelp}).
@@ -780,6 +833,7 @@ public final class Settings {
         }
     }
 
+    /** The windows' colour, then what else reaches every window. */
     private static final class WindowsSection extends Section {
         @Override
         public String titleKey() {
@@ -851,6 +905,20 @@ public final class Settings {
                 protected void set(double value) {
                     LostTalesConfig.pinnedWindowOpacity =
                             (int)Math.round(value);
+                }
+            });
+            windows.add(new ModChoice("tipDelay",
+                    "gui.losttales.window.settings.tip_delay",
+                    new String[] {"INSTANT", "SHORT", "MEDIUM", "LONG"},
+                    "gui.losttales.window.settings.tip_delay.") {
+                @Override
+                protected String get() {
+                    return LostTalesConfig.tipDelay;
+                }
+
+                @Override
+                protected void set(String word) {
+                    LostTalesConfig.tipDelay = word;
                 }
             });
             return windows;
@@ -970,7 +1038,8 @@ public final class Settings {
         }
         if (id.startsWith(SETTING_PREFIX)) {
             Setting setting = find(id.substring(SETTING_PREFIX.length()));
-            if (setting instanceof Colour || setting instanceof Line) {
+            if (setting instanceof Colour || setting instanceof Line
+                    || (setting != null && !setting.words().isEmpty())) {
                 return back ? null : setting;
             }
             if (setting instanceof Numeric) {
@@ -1223,6 +1292,9 @@ public final class Settings {
             if (opened instanceof Colour) {
                 Settings.this.menus.show(SubWindowKind.PALETTE, opened.key,
                         WindowMenus.besideWindow(window), true);
+            } else if (opened != null && !opened.words().isEmpty()) {
+                Settings.this.menus.show(SubWindowKind.SETTING_WORDS,
+                        opened, WindowMenus.besideWindow(window), true);
             } else if (opened != null) {
                 Settings.this.menus.show(SubWindowKind.SETTING_VALUE,
                         opened.key, WindowMenus.besideWindow(window), true);
@@ -1257,6 +1329,52 @@ public final class Settings {
             Setting setting = menu.about() instanceof String
                     ? find((String)menu.about()) : null;
             return setting instanceof Colour ? (Colour)setting : null;
+        }
+    }
+
+    /**
+     * A few-word setting's words, about the setting itself, named as its
+     * row is: each word a row, the one standing marked in honey and the
+     * one shipped marked as the default. A word taken stands at once, and
+     * the window stays for another try, as a page option's words do. It
+     * closes once the setting no longer stands.
+     */
+    private final class WordsSource extends WindowMenus.Source {
+        @Override
+        public boolean stillStands(MenuWindow menu) {
+            return menu.about() instanceof Setting
+                    && ((Setting)menu.about()).stands();
+        }
+
+        @Override
+        public void rebuild(MenuWindow menu) {
+            Setting setting = (Setting)menu.about();
+            menu.setTitle(setting.label(), null);
+            List<String> words = setting.words();
+            List<MenuWindow.Entry> rows =
+                    new ArrayList<MenuWindow.Entry>(words.size());
+            for (int index = 0; index < words.size(); index++) {
+                String label = index == setting.shippedWordIndex()
+                        ? defaultLabel(words.get(index)) : words.get(index);
+                MenuWindow.Entry row = new MenuWindow.Entry(
+                        WORD_PREFIX + index, label);
+                rows.add(index == setting.wordIndex() ? row.withLabelColor(
+                        LostTalesColors.rgb(LostTalesColors.HONEY)) : row);
+            }
+            menu.setRows(rows);
+        }
+
+        @Override
+        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
+                           SubWindow window, boolean back) {
+            Setting setting = (Setting)menu.about();
+            if (!back && entry.id.startsWith(WORD_PREFIX)) {
+                setting.pickWord(Integer.parseInt(
+                        entry.id.substring(WORD_PREFIX.length())));
+                applied(setting);
+                Settings.this.menus.rebuildIfOpen(SubWindowKind.SETTINGS);
+            }
+            return true;
         }
     }
 

@@ -43,7 +43,7 @@ public final class ChatMenusTest {
 
     @Test
     public void restorableTabsAreTheClosedOnesThePlayerCouldSee() {
-        for (ChatTab tab : ChatMenus.restorableTabs()) {
+        for (ConversationPage tab : ChatMenus.restorableTabs()) {
             assertTrue(ClientChatChannelState.isAvailable(tab));
             assertFalse(ChatLayout.isOpen(tab));
         }
@@ -57,9 +57,9 @@ public final class ChatMenusTest {
                 Collections.singletonList(new ChatFellowship(grey, "Grey Company", 0x123456)),
                 false));
         try {
-            List<ChatTab> offered = ChatMenus.restorableTabs();
-            assertTrue(offered.contains(ChatTab.of(ChatChannel.FELLOWSHIP, grey.toString())));
-            assertFalse(offered.contains(ChatTab.of(ChatChannel.FELLOWSHIP)));
+            List<ConversationPage> offered = ChatMenus.restorableTabs();
+            assertTrue(offered.contains(ConversationPage.of(ChatChannel.FELLOWSHIP, grey.toString())));
+            assertFalse(offered.contains(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         } finally {
             ClientChatIdentitySelection.clear();
         }
@@ -68,7 +68,7 @@ public final class ChatMenusTest {
     @Test
     public void closedUnreadCountIsCappedJustPastTheCounterLimit() {
         int total = 0;
-        for (ChatTab tab : ChatMenus.restorableTabs()) {
+        for (ConversationPage tab : ChatMenus.restorableTabs()) {
             total += ClientChatChannelViews.unreadCount(tab);
         }
         assertEquals(Math.min(ClientChatChannelViews.MAX_UNREAD + 1, total),
@@ -80,11 +80,11 @@ public final class ChatMenusTest {
     public void theClosedCountTakesInClosedNpcConversations() {
         ClientChatChannelViews.clear();
         try {
-            ChatTab npc = ChatTab.npc("Grey Wanderer");
+            ConversationPage npc = ConversationPage.npc("Grey Wanderer");
             ChatLayout.noteNpcSpoke(npc);
             assertFalse(ChatLayout.isOpen(npc));
             int before = ChatMenus.closedUnreadCount();
-            ChatTab selected = ChatTab.of(ChatChannel.OOC);
+            ConversationPage selected = ConversationPage.of(ChatChannel.OOC);
             ClientChatChannelViews.record(-1, npc, selected, false,
                     ChatMessageIds.NONE, System.currentTimeMillis(), false);
             ClientChatChannelViews.record(-2, npc, selected, false,
@@ -112,7 +112,7 @@ public final class ChatMenusTest {
                 continue;
             }
             rows++;
-            ChatTab tab = ChatTab.fromId(entry.id);
+            ConversationPage tab = ConversationPage.fromId(entry.id);
             assertTrue(tab != null);
             assertFalse(ChatLayout.isOpen(tab));
         }
@@ -130,9 +130,9 @@ public final class ChatMenusTest {
      */
     @Test
     public void theChatOffersItsClosedNpcConversations() {
-        ChatTab bilbo = ChatTab.npc("Bilbo");
-        ChatTab frodo = ChatTab.npc("Frodo");
-        ChatTab sam = ChatTab.npc("Sam");
+        ConversationPage bilbo = ConversationPage.npc("Bilbo");
+        ConversationPage frodo = ConversationPage.npc("Frodo");
+        ConversationPage sam = ConversationPage.npc("Sam");
         ChatLayout.noteNpcSpoke(bilbo);
         ChatLayout.noteNpcSpoke(frodo);
         ChatLayout.noteNpcSpoke(sam);
@@ -143,7 +143,7 @@ public final class ChatMenusTest {
         for (MenuWindow.Entry entry : entries) {
             if (entry.id.startsWith("npc:")) {
                 ids.add(entry.id);
-                assertEquals(ChatTab.fromId(entry.id), entry.icon);
+                assertEquals(ConversationPage.fromId(entry.id), entry.icon);
             }
         }
         assertEquals(Arrays.asList(frodo.id(), bilbo.id()), ids);

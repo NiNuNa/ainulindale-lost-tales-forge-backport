@@ -29,6 +29,12 @@ import java.util.UUID;
  * Versioned NBT codec for the world's fellowships: each fellowship with its
  * members, guides, icon and switches, the fellowship each character travels
  * with, and the LOTR fellowship behind each of ours.
+ *
+ * <p>The root, each fellowship and each member are read only at the version
+ * this build writes; any other version keeps the whole store as it is,
+ * read-only. A fellowship or a member that lacks a key this build always
+ * writes, or holds a value it cannot read, goes to the quarantine whole and
+ * is never filled in.</p>
  */
 public final class FellowshipNbtCodec {
 
@@ -94,23 +100,21 @@ public final class FellowshipNbtCodec {
 
     public static ReadResult read(NBTTagCompound source) {
         NBTTagCompound safeSource = source == null ? new NBTTagCompound() : source;
-        int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
+        int version = versionOf(safeSource);
+        if (version != CURRENT_ROOT_DATA_VERSION) {
             LostTalesLog.warning("Fellowship data root uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
 
-        boolean repaired = version != CURRENT_ROOT_DATA_VERSION;
-        NbtQuarantine.Read quarantineResult = NbtQuarantine.read(safeSource);
+        NbtQuarantine.Read quarantineResult = NbtQuarantine.readCurrentVersionOnly(safeSource);
         if (!quarantineResult.isSupported()) {
             LostTalesLog.warning("Fellowship quarantine data is malformed or uses unsupported "
                             + "version %d; data will remain read-only",
                     Integer.valueOf(quarantineResult.getUnsupportedVersion()));
             return ReadResult.unsupported(safeSource, quarantineResult.getUnsupportedVersion());
         }
-        repaired |= quarantineResult.isRepaired();
+        boolean repaired = quarantineResult.isRepaired();
         ArrayList<NBTTagCompound> quarantine =
                 new ArrayList<NBTTagCompound>(quarantineResult.getEntries());
 
@@ -156,6 +160,12 @@ public final class FellowshipNbtCodec {
                 TAG_FELLOWSHIP_UUID, TAG_MIRROR_UUID);
         return ReadResult.success(fellowships, travelling, mirrors, repaired,
                 quarantine);
+    }
+
+    /** The data version a record carries; zero for a record that names none. */
+    private static int versionOf(NBTTagCompound source) {
+        return source.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
+                ? source.getInteger(TAG_DATA_VERSION) : 0;
     }
 
     public static NBTTagCompound createQuarantineEntry(String reason,
@@ -250,30 +260,36 @@ public final class FellowshipNbtCodec {
         if (source == null) {
             return FellowshipReadResult.failed(true, "missing_fellowship");
         }
-        int version = source.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? source.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > Fellowship.CURRENT_DATA_VERSION || version < 0) {
+        int version = versionOf(source);
+        if (version != Fellowship.CURRENT_DATA_VERSION) {
             LostTalesLog.warning("Fellowship at index %d uses unsupported version %d",
                     Integer.valueOf(fellowshipIndex), Integer.valueOf(version));
             return FellowshipReadResult.unsupported(version);
         }
-        boolean repaired = version != Fellowship.CURRENT_DATA_VERSION;
+        boolean repaired = false;
 
         UUID fellowshipId = NbtTags.readUuid(source, TAG_FELLOWSHIP_UUID);
         if (fellowshipId == null) {
             return FellowshipReadResult.failed(true, "missing_or_invalid_fellowship_uuid");
         }
-        long createdAt = source.hasKey(TAG_CREATED_AT, Constants.NBT.TAG_LONG)
-                ? source.getLong(TAG_CREATED_AT) : 0L;
-        if (createdAt < 0L) {
-            createdAt = 0L;
-            repaired = true;
+        UUID leaderId = NbtTags.readUuid(source, TAG_LEADER_CHARACTER_UUID);
+        if (leaderId == null) {
+            return FellowshipReadResult.failed(true, "missing_or_invalid_leader_uuid");
         }
-        long revision = source.hasKey(TAG_REVISION, Constants.NBT.TAG_LONG)
-                ? source.getLong(TAG_REVISION) : 0L;
-        if (revision < 0L) {
-            revision = 0L;
-            repaired = true;
+        if (!source.hasKey(TAG_CREATED_AT, Constants.NBT.TAG_LONG)
+                || source.getLong(TAG_CREATED_AT) < 0L) {
+            return FellowshipReadResult.failed(true, "missing_or_invalid_created_at");
+        }
+        long createdAt = source.getLong(TAG_CREATED_AT);
+        if (!source.hasKey(TAG_REVISION, Constants.NBT.TAG_LONG)
+                || source.getLong(TAG_REVISION) < 0L) {
+            return FellowshipReadResult.failed(true, "missing_or_invalid_revision");
+        }
+        long revision = source.getLong(TAG_REVISION);
+        if (!source.hasKey(TAG_MEMBERS, Constants.NBT.TAG_LIST)
+                || !source.hasKey(TAG_GUIDES, Constants.NBT.TAG_LIST)
+                || !source.hasKey(TAG_SWITCHES, Constants.NBT.TAG_LIST)) {
+            return FellowshipReadResult.failed(true, "missing_or_malformed_list");
         }
         ArrayList<NBTTagCompound> quarantine = new ArrayList<NBTTagCompound>();
         String name = source.hasKey(TAG_NAME, Constants.NBT.TAG_STRING)
@@ -298,22 +314,17 @@ public final class FellowshipNbtCodec {
         for (int index = 0; index < switchList.tagCount(); index++) {
             FellowshipSwitch on = FellowshipSwitch.fromId(switchList.getStringTagAt(index));
             if (on == null) {
-                repaired = true;
-            } else {
-                switches.add(on);
+                return FellowshipReadResult.failed(true, "unknown_fellowship_switch");
             }
+            switches.add(on);
         }
 
-        if (source.hasKey(TAG_MEMBERS)
-                && !source.hasKey(TAG_MEMBERS, Constants.NBT.TAG_LIST)) {
-            return FellowshipReadResult.failed(true, "malformed_member_list");
-        }
         NBTTagList memberList = source.getTagList(TAG_MEMBERS, Constants.NBT.TAG_COMPOUND);
         ArrayList<FellowshipMember> members = new ArrayList<FellowshipMember>();
         Set<UUID> identityIds = new HashSet<UUID>();
         for (int i = 0; i < memberList.tagCount(); i++) {
             NBTTagCompound rawMember = memberList.getCompoundTagAt(i);
-            MemberReadResult memberResult = readMember(rawMember, createdAt, i);
+            MemberReadResult memberResult = readMember(rawMember);
             if (memberResult.unsupportedVersion >= 0) {
                 return FellowshipReadResult.unsupported(memberResult.unsupportedVersion);
             }
@@ -344,8 +355,9 @@ public final class FellowshipNbtCodec {
             return FellowshipReadResult.failed(true, "fellowship_has_no_valid_members");
         }
 
-        UUID leaderId = NbtTags.readUuid(source, TAG_LEADER_CHARACTER_UUID);
-        if (leaderId == null || !identityIds.contains(leaderId)) {
+        // A leader whose own entry went to the quarantine above is followed
+        // by the member who joined first, as when a leader's character goes.
+        if (!identityIds.contains(leaderId)) {
             leaderId = selectFirstMember(members).getIdentityId();
             repaired = true;
         }
@@ -373,18 +385,14 @@ public final class FellowshipNbtCodec {
         }
     }
 
-    private static MemberReadResult readMember(NBTTagCompound source,
-                                                long fellowshipCreatedAt,
-                                                int memberIndex) {
+    private static MemberReadResult readMember(NBTTagCompound source) {
         if (source == null) {
             return MemberReadResult.failed(true, "missing_member");
         }
-        int version = source.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? source.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > FellowshipMember.CURRENT_DATA_VERSION || version < 0) {
+        int version = versionOf(source);
+        if (version != FellowshipMember.CURRENT_DATA_VERSION) {
             return MemberReadResult.unsupported(version);
         }
-        boolean repaired = version != FellowshipMember.CURRENT_DATA_VERSION;
         UUID identityId = NbtTags.readUuid(source, TAG_CHARACTER_UUID);
         UUID ownerId = NbtTags.readUuid(source, TAG_OWNER_UUID);
         if (identityId == null) {
@@ -395,26 +403,22 @@ public final class FellowshipNbtCodec {
         }
 
         String name = source.hasKey(TAG_CHARACTER_NAME, Constants.NBT.TAG_STRING)
-                ? source.getString(TAG_CHARACTER_NAME) : "Unknown";
-        if (name == null || name.trim().length() == 0) {
-            name = "Unknown";
-            repaired = true;
+                ? source.getString(TAG_CHARACTER_NAME) : "";
+        if (name.trim().length() == 0) {
+            return MemberReadResult.failed(true, "missing_or_blank_character_name");
         }
-        long joinedAt = source.hasKey(TAG_JOINED_AT, Constants.NBT.TAG_LONG)
-                ? source.getLong(TAG_JOINED_AT) : fellowshipCreatedAt + memberIndex;
-        if (joinedAt < 0L) {
-            joinedAt = Math.max(0L, fellowshipCreatedAt + memberIndex);
-            repaired = true;
+        if (!source.hasKey(TAG_JOINED_AT, Constants.NBT.TAG_LONG)
+                || source.getLong(TAG_JOINED_AT) < 0L) {
+            return MemberReadResult.failed(true, "missing_or_invalid_joined_at");
         }
-
+        long joinedAt = source.getLong(TAG_JOINED_AT);
         FellowshipColor color = source.hasKey(TAG_COLOR, Constants.NBT.TAG_STRING)
                 ? FellowshipColor.fromId(source.getString(TAG_COLOR)) : null;
         if (color == null) {
-            color = FellowshipColor.values()[memberIndex % FellowshipColor.values().length];
-            repaired = true;
+            return MemberReadResult.failed(true, "missing_or_unknown_color");
         }
         return MemberReadResult.success(
-                new FellowshipMember(identityId, ownerId, name, joinedAt, color), repaired);
+                new FellowshipMember(identityId, ownerId, name, joinedAt, color), false);
     }
 
     private static FellowshipMember selectFirstMember(List<FellowshipMember> members) {

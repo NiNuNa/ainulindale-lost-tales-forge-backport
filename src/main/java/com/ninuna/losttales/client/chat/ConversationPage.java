@@ -13,7 +13,7 @@ import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowScreen;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -27,7 +27,7 @@ import net.minecraft.util.StatCollector;
  * A conversation's tab: a channel, and for a whisper the <em>identity</em>
  * the conversation is with, the identity of this player's own it is held
  * as — or the NPC, since LOTR speech is addressed to one player and reads
- * as a whisper from the NPC. It is the chat's kind of {@link WindowTab}.
+ * as a whisper from the NPC. It is the chat's kind of {@link WindowPage}.
  *
  * <p>A conversation is between two people as they present themselves,
  * not between the accounts behind them: whispering someone speaking as
@@ -46,7 +46,7 @@ import net.minecraft.util.StatCollector;
  * compared case-insensitively — and are what windows hold, lines are
  * filed under, and the selection points at.</p>
  */
-public final class ChatTab extends WindowTab {
+public final class ConversationPage extends WindowPage {
     /** A conversation's options, behind its tab's three dots and on its tool strip. */
     private static final String MENU_MARK_READ = "mark_read";
     private static final String MENU_JUMP_UNREAD = "jump_unread";
@@ -64,8 +64,8 @@ public final class ChatTab extends WindowTab {
     private static final OptionGlyph JUMP_GLYPH = OptionGlyph.sprite(
             LostTalesUiSheet.CHEVRON_5, LostTalesUiSheet.CHEVRON_5_HOVER);
     /**
-     * The bell of Notifications and the bubble of Show in Feed, one for
-     * each word in {@link ChatLineChoice}'s order: green for Everything,
+     * The bell of Notification Settings and the bubble of Chat Feed
+     * Settings, one for each word in {@link ChatLineChoice}'s order: green for Everything,
      * ivory for Only Mentions, crimson for Nothing, each lighting to
      * honey.
      */
@@ -94,8 +94,7 @@ public final class ChatTab extends WindowTab {
      * Between the account and the identity in a tab's id. A Minecraft
      * account name cannot hold one, so the account is always the part
      * before the first of them and an identity may hold as many as it
-     * likes. An id without one is the account's own conversation, which
-     * is also what every id stored before identities existed reads as.
+     * likes. An id without one is the account's own conversation.
      */
     private static final char IDENTITY_SEPARATOR = ChatTabIds.SEPARATOR;
     private static final String OWNER_MARK = ChatTabIds.OWNER_MARK;
@@ -111,8 +110,8 @@ public final class ChatTab extends WindowTab {
      * than a position: the set of channels is open, so there is no fixed
      * length to index into.
      */
-    private static final java.util.Map<String, ChatTab> PLAIN =
-            new java.util.concurrent.ConcurrentHashMap<String, ChatTab>();
+    private static final java.util.Map<String, ConversationPage> PLAIN =
+            new java.util.concurrent.ConcurrentHashMap<String, ConversationPage>();
 
     private final ChatChannel channel;
     private final String partner;
@@ -123,7 +122,7 @@ public final class ChatTab extends WindowTab {
     private final String ownerKey;
     private final boolean npc;
 
-    private ChatTab(ChatChannel channel, String partner, String identity,
+    private ConversationPage(ChatChannel channel, String partner, String identity,
                     String ownerKey, boolean npc) {
         this.channel = channel;
         this.partner = partner == null ? "" : partner.trim();
@@ -144,7 +143,7 @@ public final class ChatTab extends WindowTab {
      * per identity — see {@link #of(ChatChannel, String)} — and the one
      * being read is {@link #viewed}.
      */
-    public static ChatTab of(ChatChannel channel) {
+    public static ConversationPage of(ChatChannel channel) {
         // A whisper is always with someone: it has no plain tab.
         if (channel == null || channel == ChatChannel.WHISPER) {
             return null;
@@ -155,21 +154,21 @@ public final class ChatTab extends WindowTab {
         // rebuilt when the registry hands out a new object for that id,
         // so the tab always names the channel in force.
         String key = channel.getId();
-        ChatTab cached = PLAIN.get(key);
+        ConversationPage cached = PLAIN.get(key);
         if (cached == null || cached.channel != channel) {
-            cached = new ChatTab(channel, "", "", "", false);
+            cached = new ConversationPage(channel, "", "", "", false);
             PLAIN.put(key, cached);
         }
         return cached;
     }
 
     /** A conversation's tab, or null for any other kind of tab. */
-    public static ChatTab from(WindowTab tab) {
-        return tab instanceof ChatTab ? (ChatTab)tab : null;
+    public static ConversationPage from(WindowPage tab) {
+        return tab instanceof ConversationPage ? (ConversationPage)tab : null;
     }
 
     /** The conversation in front of a window; null for a page in front, or no window. */
-    public static ChatTab frontOf(Window window) {
+    public static ConversationPage frontOf(Window window) {
         return window == null ? null : from(window.getActiveTab());
     }
 
@@ -183,7 +182,7 @@ public final class ChatTab extends WindowTab {
      * and one tab per person; which conversation each shows follows
      * the identity, and nothing else in the layout has to know.
      */
-    public static ChatTab viewed(ChatTab tab) {
+    public static ConversationPage viewed(ConversationPage tab) {
         if (tab == null || tab.npc || tab.ownerKey.length() > 0) {
             return tab;
         }
@@ -207,7 +206,7 @@ public final class ChatTab extends WindowTab {
      * always a tab a window can hold; anything asking the layout about a
      * line asks about this.
      */
-    public static ChatTab row(ChatTab tab) {
+    public static ConversationPage row(ConversationPage tab) {
         if (tab == null || tab.npc || tab.ownerKey.length() == 0
                 || tab.isFellowship()) {
             return tab;
@@ -224,12 +223,12 @@ public final class ChatTab extends WindowTab {
      * answers with its one tab, and so does an empty scope — the
      * account is in no faction, so it is in no conversation.
      */
-    public static ChatTab of(ChatChannel channel, String scopeKey) {
+    public static ConversationPage of(ChatChannel channel, String scopeKey) {
         if (channel == null || !channel.isScoped()
                 || scopeKey == null || scopeKey.trim().length() == 0) {
             return of(channel);
         }
-        return new ChatTab(channel, "", "", scopeKey, false);
+        return new ConversationPage(channel, "", "", scopeKey, false);
     }
 
     /**
@@ -241,7 +240,7 @@ public final class ChatTab extends WindowTab {
      * ({@link #viewed}); the entry is also the conversation held as the
      * account itself, which has no identity of its own to name.
      */
-    public static ChatTab whisper(String partner, String identity) {
+    public static ConversationPage whisper(String partner, String identity) {
         return whisper(partner, identity, "");
     }
 
@@ -250,10 +249,10 @@ public final class ChatTab extends WindowTab {
      * this player's own identities: {@code ownerKey} is the character's
      * id ({@link #ownerKeyOf}), or empty for the account.
      */
-    public static ChatTab whisper(String partner, String identity, String ownerKey) {
+    public static ConversationPage whisper(String partner, String identity, String ownerKey) {
         String name = partner == null ? "" : partner.trim();
         return name.length() == 0 ? null
-                : new ChatTab(ChatChannel.WHISPER, name, identity, ownerKey, false);
+                : new ConversationPage(ChatChannel.WHISPER, name, identity, ownerKey, false);
     }
 
     /** The owner key of a character id; empty for null, the account. */
@@ -265,10 +264,10 @@ public final class ChatTab extends WindowTab {
      * The conversation tab with a named NPC: a whisper nobody is on the
      * other end of, so replies are echoed locally rather than sent.
      */
-    public static ChatTab npc(String name) {
+    public static ConversationPage npc(String name) {
         String trimmed = name == null ? "" : name.trim();
         return trimmed.length() == 0 ? null
-                : new ChatTab(ChatChannel.WHISPER, trimmed, trimmed, "", true);
+                : new ConversationPage(ChatChannel.WHISPER, trimmed, trimmed, "", true);
     }
 
     public ChatChannel getChannel() { return this.channel; }
@@ -343,7 +342,7 @@ public final class ChatTab extends WindowTab {
     }
 
     /** The inverse of {@link #id()}; null for anything unknown. */
-    public static ChatTab fromId(String id) {
+    public static ConversationPage fromId(String id) {
         if (id == null) {
             return null;
         }
@@ -388,10 +387,10 @@ public final class ChatTab extends WindowTab {
 
     @Override
     public boolean equals(Object other) {
-        if (!(other instanceof ChatTab)) {
+        if (!(other instanceof ConversationPage)) {
             return false;
         }
-        ChatTab tab = (ChatTab)other;
+        ConversationPage tab = (ConversationPage)other;
         // By the channel's id, never the object: a channel a server
         // defines is registered again with every access broadcast, and
         // two tabs naming the same channel must stay the same tab across
@@ -456,7 +455,7 @@ public final class ChatTab extends WindowTab {
                 && ClientChatChannelState.getDraft(this).length() > 0;
     }
 
-    /** None of its lines chime: its Notifications is Nothing. */
+    /** None of its lines chime: its notification choice is Nothing. */
     @Override
     public boolean isMuted() {
         return ChatLayout.isMuted(this);
@@ -509,6 +508,12 @@ public final class ChatTab extends WindowTab {
     public void toggleMemberList(Window window) {
         ChatLayout.setMembersHidden(window.getId(),
                 !ChatLayout.isMembersHidden(window));
+    }
+
+    /** The timestamp area and the member list out again, the list at its own width. */
+    @Override
+    public void resetIn(Window window) {
+        ChatLayout.resetView(window.getId());
     }
 
     /** A conversation always has its four options. */
@@ -583,14 +588,15 @@ public final class ChatTab extends WindowTab {
     }
 
     /**
-     * A messenger's channel options. Mark as Read, the counters and the
-     * divider gone at once, and Jump to First Unread, the tab brought
-     * forward and its history taken to where the unread run begins; each
-     * greyed while nothing waits unread. Then Notifications and Show in
-     * Feed (Everything, Only Mentions or Nothing: which lines chime, and
-     * which reach the closed feed), each opening its three words in a
-     * sub-window of its own: the channel's own settings. Their glyphs wear
-     * the colour of the word chosen.
+     * A messenger's channel options, in the tool strip's order. Mark as
+     * Read, the counters and the divider gone at once, and Jump to First
+     * Unread, the tab brought forward and its history taken to where the
+     * unread run begins; each greyed while nothing waits unread. Then Chat
+     * Feed Settings and Notification Settings (Everything, Only Mentions
+     * or Nothing: which lines reach the closed feed, and which chime),
+     * each opening its three words in a sub-window of its own: the
+     * channel's own settings. Their glyphs wear the colour of the word
+     * chosen.
      */
     @Override
     public List<PageOption> options() {
@@ -605,10 +611,10 @@ public final class ChatTab extends WindowTab {
                 word("gui.losttales.chat.tab.jump_unread"), JUMP_GLYPH)
                 .unavailable(divided ? "" : word("gui.losttales.chat.tab.nothing_unread"))
                 .inGroup(GROUP_READING, ""));
-        options.add(pick(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
-                ChatLayout.notification(this), BELL_GLYPHS));
         options.add(pick(MENU_FEED, "gui.losttales.chat.tab.feed",
                 ChatLayout.feedChoice(this), FEED_GLYPHS));
+        options.add(pick(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
+                ChatLayout.notification(this), BELL_GLYPHS));
         return options;
     }
 
@@ -674,6 +680,13 @@ public final class ChatTab extends WindowTab {
             }
         }
         return false;
+    }
+
+    /** The two consoles stand in the command key's view, not the chat key's. */
+    @Override
+    public boolean isConsole() {
+        return this.channel == ChatChannel.CLIENT_CONSOLE
+                || this.channel == ChatChannel.SERVER_CONSOLE;
     }
 
     @Override

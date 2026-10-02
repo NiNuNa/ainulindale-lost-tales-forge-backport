@@ -7,7 +7,7 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageAnswer;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageRows;
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.SubWindowAnchor;
 import com.ninuna.losttales.client.window.Window;
@@ -110,7 +110,7 @@ public final class ServerSettingsPage extends PageContent {
 
             @Override
             public boolean stands(int generation) {
-                PageTab tab = WindowPages.tab(PAGE_ID);
+                OtherPage tab = WindowPages.tab(PAGE_ID);
                 return generation == ServerSettingsPage.this.generation
                         && tab != null && WindowLayout.isOpen(tab);
             }
@@ -148,7 +148,7 @@ public final class ServerSettingsPage extends PageContent {
     /** The tab closed: what waited goes with it. */
     @Override
     public void hidden() {
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (tab == null || !WindowLayout.isOpen(tab)) {
             forget();
         }
@@ -225,7 +225,7 @@ public final class ServerSettingsPage extends PageContent {
             return;
         }
         WindowScreen screen = WindowScreen.current();
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         if (screen != null && tab != null) {
             screen.ask(tab, word("discard.title"), word("discard.question"),
                     word("discard.confirm"), new Runnable() {
@@ -316,8 +316,8 @@ public final class ServerSettingsPage extends PageContent {
 
     /**
      * A row taken: a number's chevrons step it and its value opens the
-     * value window, as does a line; a switch flips, and a few-word option
-     * steps on, or back with the right button.
+     * value window, as does a line, and a few-word option opens its
+     * words; a switch flips.
      */
     private void take(MenuWindow.Entry entry, String part, boolean back,
                       LostTalesUiHitBox row) {
@@ -346,20 +346,13 @@ public final class ServerSettingsPage extends PageContent {
         if (setting.getType() == ServerConfigEntry.Type.BOOLEAN) {
             this.draft.set(setting, String.valueOf(
                     !ServerSettingsRows.isOn(this.draft.value(setting))));
-            return;
-        }
-        List<String> choices = setting.getValidValues();
-        if (!choices.isEmpty()) {
-            this.draft.set(setting, choices.get(Settings.nextIndex(
-                    choices.indexOf(this.draft.value(setting)),
-                    choices.size(), back)));
         }
     }
 
-    /** Settings' own value window for a number or a line, hung from its row in the page's window. */
+    /** Settings' own value window for a number or a line, or the words of a few-word option, hung from its row in the page's window. */
     private void openValue(Settings.Setting setting, LostTalesUiHitBox row) {
         WindowScreen screen = WindowScreen.current();
-        PageTab tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = WindowPages.tab(PAGE_ID);
         Window window = tab == null ? null : WindowLayout.windowOf(tab);
         if (screen == null || window == null || row == null) {
             return;
@@ -436,7 +429,7 @@ public final class ServerSettingsPage extends PageContent {
         return true;
     }
 
-    /** The Server Console's grey. */
+    /** The Server Log's grey. */
     @Override
     public int tone() {
         return LostTalesColors.rgb(LostTalesColors.CONSOLE_TONE);

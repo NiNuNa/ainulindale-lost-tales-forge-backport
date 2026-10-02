@@ -7,10 +7,12 @@ import java.util.Locale;
 
 /**
  * How a command reads wherever it is shown: {@code /name arg arg}, with
- * what must not be repeated left out. The Server Console writes its
+ * what must not be repeated left out. The Server Log writes its
  * entries with it, and the chat shows a typed command's echo with it, so
  * a reply quoting the echo carries no secret either. A private message
- * keeps only whom it went to; a config change keeps the category and key
+ * keeps only whom it went to, and a fellowship message
+ * ({@code /fmsg}, {@code /fchat}) only the fellowship it names, or that it
+ * binds or lets go; a config change keeps the category and key
  * but not the value, since a value may be a secret; a Discord binding
  * keeps its channel and direction but never a webhook address or a
  * channel id. Everything is cut to a line.
@@ -20,6 +22,9 @@ public final class ChatCommandText {
     public static final int MAX_LENGTH = 256;
     /** Three full stops rather than an ellipsis: the chat's font has no glyph for one. */
     private static final String ELIDED = "...";
+    /** The words of {@code /fmsg} that bind it to a fellowship and let it go. */
+    private static final String FELLOWSHIP_BIND = "bind";
+    private static final String FELLOWSHIP_UNBIND = "unbind";
 
     private ChatCommandText() {}
 
@@ -50,6 +55,8 @@ public final class ChatCommandText {
             if (arguments.length > 1) {
                 kept.add(ELIDED);
             }
+        } else if (name.equals("fmsg") || name.equals("fchat")) {
+            keepFellowshipMessage(arguments, kept);
         } else if (name.equals("losttales") && arguments.length > 1
                 && arguments[0].equalsIgnoreCase("config")
                 && arguments[1].equalsIgnoreCase("set")) {
@@ -80,5 +87,38 @@ public final class ChatCommandText {
             line.append(ELIDED);
         }
         return line.toString();
+    }
+
+    /**
+     * What a fellowship message keeps, read as the command reads it:
+     * {@code unbind}, {@code bind} and the fellowship named in quotes, and
+     * nothing of any other words, which are what it says.
+     */
+    private static void keepFellowshipMessage(String[] arguments, List<String> kept) {
+        StringBuilder joined = new StringBuilder();
+        for (String argument : arguments) {
+            if (joined.length() > 0) {
+                joined.append(' ');
+            }
+            joined.append(argument);
+        }
+        String text = joined.toString().trim();
+        if (text.equalsIgnoreCase(FELLOWSHIP_UNBIND)) {
+            kept.add(text);
+            return;
+        }
+        String rest = text;
+        if (text.toLowerCase(Locale.ROOT).startsWith(FELLOWSHIP_BIND + " ")) {
+            kept.add(text.substring(0, FELLOWSHIP_BIND.length()));
+            rest = text.substring(FELLOWSHIP_BIND.length()).trim();
+        }
+        int close = rest.startsWith("\"") ? rest.indexOf('"', 1) : -1;
+        if (close > 0) {
+            kept.add(rest.substring(0, close + 1));
+            rest = rest.substring(close + 1).trim();
+        }
+        if (rest.length() > 0) {
+            kept.add(ELIDED);
+        }
     }
 }

@@ -4,7 +4,7 @@ import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatStatusLine;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatPresencePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
@@ -312,7 +312,7 @@ public final class ClientChatPresence {
      * sets: the chat identity on a roleplaying tab, the account on every
      * other conversation, the character played on a page.
      */
-    static ChatPresenceIdentity speakerOf(WindowTab tab) {
+    static ChatPresenceIdentity speakerOf(WindowPage tab) {
         ClientChatIdentities.Identity identity =
                 ClientChatIdentities.effectiveFor(tab);
         return identity == null || identity.account
@@ -321,7 +321,7 @@ public final class ClientChatPresence {
     }
 
     /** Whether the mention cue stays silent in a tab: its speaker is not to be disturbed. */
-    static boolean holdsCues(ChatTab tab) {
+    static boolean holdsCues(ConversationPage tab) {
         return chosen(speakerOf(tab)) == ChatPresence.DO_NOT_DISTURB;
     }
 

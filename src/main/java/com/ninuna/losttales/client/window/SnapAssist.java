@@ -220,8 +220,8 @@ public final class SnapAssist {
 
     /** A card's whole width: its icons, the front tab's name, the inset round them. */
     private static int cardWidth(Window window, FontRenderer font) {
-        List<WindowTab> tabs = WindowFrame.visibleTabs(window);
-        WindowTab front = WindowFrame.activeTab(window, tabs);
+        List<WindowPage> tabs = WindowFrame.visibleTabs(window);
+        WindowPage front = WindowFrame.activeTab(window, tabs);
         int icons = tabs.size() * LostTalesUiInk.ICON_SIZE
                 + Math.max(0, tabs.size() - 1) * ICON_GAP;
         int name = front == null || font == null ? 0
@@ -323,13 +323,13 @@ public final class SnapAssist {
         LostTalesUiFramedButton.drawSurface(left, top, width, height, lit,
                 Math.round(WindowStyle.INSET_ALPHA * share
                         * WindowStyle.opacity(minecraft)));
-        List<WindowTab> tabs = WindowFrame.visibleTabs(window);
-        WindowTab front = WindowFrame.activeTab(window, tabs);
+        List<WindowPage> tabs = WindowFrame.visibleTabs(window);
+        WindowPage front = WindowFrame.activeTab(window, tabs);
         float right = left + width - LostTalesUiFramedButton.INSET;
         float x = left + LostTalesUiFramedButton.INSET;
         float iconTop = top + LostTalesUiFramedButton.INSET;
         LostTalesUiInk.beginContent();
-        for (WindowTab tab : tabs) {
+        for (WindowPage tab : tabs) {
             if (x + LostTalesUiInk.ICON_SIZE > right) {
                 break;
             }

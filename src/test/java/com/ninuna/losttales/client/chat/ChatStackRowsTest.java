@@ -85,7 +85,7 @@ public final class ChatStackRowsTest {
      */
     @Test
     public void theScrollCeilingReachesTheDividersRow() {
-        ChatTab tab = ChatTab.of(ChatChannel.OOC);
+        ConversationPage tab = ConversationPage.of(ChatChannel.OOC);
         int lines = 30;
         int rows = lines + 1;
         double room = 10.0D;
@@ -104,7 +104,7 @@ public final class ChatStackRowsTest {
     }
 
     /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
-    private static void scroll(ChatTab tab, int lines, int totalLines, double roomLines) {
+    private static void scroll(ConversationPage tab, int lines, int totalLines, double roomLines) {
         double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
         ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
     }

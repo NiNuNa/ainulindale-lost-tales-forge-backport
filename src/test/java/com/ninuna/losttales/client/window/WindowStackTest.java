@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.chat.ChatLayout;
-import com.ninuna.losttales.client.chat.ChatTab;
+import com.ninuna.losttales.client.chat.ConversationPage;
 import java.util.Collections;
 import java.util.List;
 import org.junit.After;
@@ -52,7 +52,7 @@ public final class WindowStackTest {
 
     private static void detach(ChatChannel channel) {
         Tearing.off(
-                Collections.singletonList(ChatTab.of(channel)), 0.5D, 0.5D);
+                Collections.singletonList(ConversationPage.of(channel)), 0.5D, 0.5D);
     }
 
     @Test

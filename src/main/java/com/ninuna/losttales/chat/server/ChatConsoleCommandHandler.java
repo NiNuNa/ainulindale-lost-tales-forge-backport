@@ -9,7 +9,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.event.CommandEvent;
 
 /**
- * Puts every command a person runs into the Server Console:
+ * Puts every command a person runs into the Server Log:
  * one entry naming who ran what, and for a player where — the tab
  * their client reported just ahead of the command
  * ({@link ChatCommandContexts}) — with the words the console must not

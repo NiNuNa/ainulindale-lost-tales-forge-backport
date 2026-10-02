@@ -10,10 +10,14 @@ import net.minecraft.entity.player.EntityPlayer;
 /**
  * LOTR's own rules for fellowships, which ours keep: whether players may
  * make them, how many members one may hold, and how many one character may
- * lead. Each answers LOTR's setting, and the most lenient answer where LOTR
- * cannot be asked, so a fault here never locks players out.
+ * lead. Each answers LOTR's setting. Where LOTR cannot be asked, players
+ * may make fellowships and a fellowship holds our most members, so a fault
+ * here never locks players out; a character may then lead one fellowship,
+ * the least LOTR lets any character lead.
  */
 public final class LotrFellowshipRules {
+    /** The fellowships every character may lead, whatever its achievements. */
+    public static final int LEAST_LEAD_LIMIT = 1;
     /** Middle-earth achievements that let a character lead one fellowship more. */
     private static final int ACHIEVEMENTS_PER_LEAD = 20;
 
@@ -52,20 +56,20 @@ public final class LotrFellowshipRules {
      */
     public static int leadLimit(EntityPlayer player) {
         if (player == null) {
-            return 1;
+            return LEAST_LEAD_LIMIT;
         }
         try {
             int achievements = LOTRLevelData.getData(player)
                     .getEarnedAchievements(LOTRDimension.MIDDLE_EARTH).size();
-            return 1 + achievements / ACHIEVEMENTS_PER_LEAD;
+            return LEAST_LEAD_LIMIT + achievements / ACHIEVEMENTS_PER_LEAD;
         } catch (RuntimeException exception) {
             LostTalesLog.warning("LOTR's achievements could not be counted for %s: %s",
                     player.getCommandSenderName(), exception.toString());
-            return 1;
+            return LEAST_LEAD_LIMIT;
         } catch (LinkageError error) {
             LostTalesLog.warning("LOTR's achievements could not be counted: %s",
                     error.toString());
-            return 1;
+            return LEAST_LEAD_LIMIT;
         }
     }
 }

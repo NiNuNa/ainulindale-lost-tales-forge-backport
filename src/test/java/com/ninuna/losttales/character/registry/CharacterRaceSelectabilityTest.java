@@ -12,17 +12,16 @@ import static org.junit.Assert.assertTrue;
 /**
  * A race nobody may choose is still a race.
  *
- * <p>Half-trolls are no longer anyone's to be: the body is half again as
- * broad as a biped and eight pixels taller, built from boxes of its own,
- * and no armour in the game is cut for it. Taking one away is not the
- * same as forgetting it — a character who already is one has to keep
- * loading, rendering and playing, or their record would be repaired into
- * somebody else the next time the world was read.</p>
+ * <p>No player may make a half-troll: the body is half again as broad as
+ * a biped and eight pixels taller, built from boxes of its own, and no
+ * armour in the game is cut for it. The race stays known, since a
+ * server's own lore file may describe one, and that character has to
+ * load, render and play.</p>
  */
 public final class CharacterRaceSelectabilityTest {
 
     @Test
-    public void aHalfTrollIsNoLongerAnyonesToChoose() {
+    public void nobodyMayChooseAHalfTroll() {
         CharacterRaceDefinition halfTroll =
                 CharacterRaceRegistry.get(CharacterRaceRegistry.HALF_TROLL);
         assertNotNull("the race is still known", halfTroll);

@@ -54,8 +54,8 @@ import org.lwjgl.opengl.GL11;
  * those an answer too long to list leaves out, who are counted on a line
  * of their own at the end. The Server stands in every
  * conversation's list, since it can speak in every one. A whisper lists
- * its two people and the Client Console the player; a conversation with
- * an NPC lists the player and the NPC, and the Client Console the Client,
+ * its two people and the Console the player; a conversation with
+ * an NPC lists the player and the NPC, and the Console the Client,
  * whom this client adds itself, as the server knows nothing of either
  * ({@link #membersOf}).</p>
  *
@@ -173,7 +173,7 @@ public final class ChatMemberList {
         float titleSlide;
         /** The answer and the tab the rows were laid out for; they are laid out again for others. */
         ClientChatMembers.Answer laidFor;
-        ChatTab laidTab;
+        ConversationPage laidTab;
         /** How far the list is scrolled, in the chat's pixels, as drawn. */
         float scroll;
         /** Where the scroll is heading. */
@@ -253,10 +253,10 @@ public final class ChatMemberList {
     /**
      * The members a tab's list shows: the server's answer, and those the
      * server knows nothing of — in a conversation with an NPC the NPC, and
-     * in the Client Console the Client, this computer's own voice there —
+     * in the Console the Client, this computer's own voice there —
      * in the order the list keeps.
      */
-    static List<LostTalesChatMembersPacket.Member> membersOf(ChatTab tab,
+    static List<LostTalesChatMembersPacket.Member> membersOf(ConversationPage tab,
             List<LostTalesChatMembersPacket.Member> answered) {
         boolean console = tab != null && tab.getChannel() == ChatChannel.CLIENT_CONSOLE;
         if (tab == null || !(tab.isNpc() || console)) {
@@ -269,7 +269,7 @@ public final class ChatMemberList {
         return members;
     }
 
-    /** The Client as the Client Console's list shows it: here, in the consoles' colour, with no status. */
+    /** The Client as the Console's list shows it: here, in the consoles' colour, with no status. */
     static LostTalesChatMembersPacket.Member clientMember() {
         int color = ChatChannel.CLIENT_CONSOLE.getDisplayColor();
         return new LostTalesChatMembersPacket.Member(
@@ -285,7 +285,7 @@ public final class ChatMemberList {
      * goes by that name, so the two stand under one heading — or the plain
      * one where no faction was captured.
      */
-    static LostTalesChatMembersPacket.Member npcOf(ChatTab tab,
+    static LostTalesChatMembersPacket.Member npcOf(ConversationPage tab,
             List<LostTalesChatMembersPacket.Member> answered) {
         UUID id = ChatChannelIcons.npcId(tab);
         if (id == null) {
@@ -524,7 +524,7 @@ public final class ChatMemberList {
             state.clearDrawn();
             return;
         }
-        ChatTab tab = frame.view;
+        ConversationPage tab = frame.view;
         ClientChatMembers.requestIfDue(tab);
         ClientChatMembers.Answer answer = ClientChatMembers.of(tab);
         if (answer == null) {
@@ -650,7 +650,7 @@ public final class ChatMemberList {
      * window's edge on screen.
      */
     private static void drawHeading(Minecraft minecraft, FontRenderer font,
-                                    ChatTab tab, Row row, float rowsLeft,
+                                    ConversationPage tab, Row row, float rowsLeft,
                                     float rowTop, float unit, float roomRight,
                                     float rowsOriginX, float scale,
                                     float listRight, float clipTop,
@@ -708,7 +708,7 @@ public final class ChatMemberList {
      * capitals whose top is {@code textTop}. A faction with no banner
      * wears the Faction tab's emoji.
      */
-    private static void drawHeadingIcon(Minecraft minecraft, ChatTab tab,
+    private static void drawHeadingIcon(Minecraft minecraft, ConversationPage tab,
                                         LostTalesChatMembersPacket.Member first,
                                         int x, int textTop, int alpha) {
         int boxTop = textTop - WindowStyle.ROW_TEXT_TOP;

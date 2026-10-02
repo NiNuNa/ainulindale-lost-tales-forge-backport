@@ -213,8 +213,7 @@ public final class WindowLayoutStore {
     }
 
     /**
-     * Where a page's window last stood: its padlock, its pins, its place
-     * and its size, a size of 0 standing for the default place; null for
+     * Where a page's window last stood: its pins, its place and its size, a size of 0 standing for the default place; null for
      * a line that cannot be read, which leaves the page to open at the
      * default place.
      */
@@ -224,15 +223,12 @@ public final class WindowLayoutStore {
         double height = Double.NaN;
         int width = -1;
         Window.ScreenFill fill = Window.ScreenFill.NONE;
-        boolean locked = false;
         boolean hud = false;
         boolean gui = false;
         for (int index = 2; index < parts.length; index++) {
             String part = parts[index];
             try {
-                if (part.startsWith("locked=")) {
-                    locked = Boolean.parseBoolean(part.substring(7));
-                } else if (part.startsWith("hud=")) {
+                if (part.startsWith("hud=")) {
                     hud = Boolean.parseBoolean(part.substring(4));
                 } else if (part.startsWith("gui=")) {
                     gui = Boolean.parseBoolean(part.substring(4));
@@ -255,8 +251,7 @@ public final class WindowLayoutStore {
                 || height < 0.0D || width < 0) {
             return null;
         }
-        return new WindowLayout.Place(x, y, height, width, fill, locked, hud,
-                gui);
+        return new WindowLayout.Place(x, y, height, width, fill, hud, gui);
     }
 
     /**
@@ -307,8 +302,8 @@ public final class WindowLayoutStore {
         if (!WindowLayout.isWindowId(id)) {
             return null;
         }
-        List<WindowTab> tabs = new ArrayList<WindowTab>();
-        WindowTab active = null;
+        List<WindowPage> tabs = new ArrayList<WindowPage>();
+        WindowPage active = null;
         // A line that says nothing of them: unlocked, as a window opens
         // that is not a new player's first, and pinned nowhere.
         boolean locked = false;
@@ -331,13 +326,13 @@ public final class WindowLayoutStore {
             String value = part.substring(equals + 1);
             if ("tabs".equals(key)) {
                 for (String tab : value.split(",")) {
-                    WindowTab parsed = WindowTab.fromId(tab);
+                    WindowPage parsed = WindowPage.fromId(tab);
                     if (parsed != null) {
                         tabs.add(parsed);
                     }
                 }
             } else if ("active".equals(key)) {
-                active = WindowTab.fromId(value);
+                active = WindowPage.fromId(value);
             } else if ("locked".equals(key)) {
                 locked = "true".equalsIgnoreCase(value);
             } else if ("hud".equals(key)) {
@@ -381,8 +376,8 @@ public final class WindowLayoutStore {
         if (fields.length != 4) {
             return null;
         }
-        WindowTab first = WindowTab.fromId(fields[0]);
-        WindowTab second = WindowTab.fromId(fields[1]);
+        WindowPage first = WindowPage.fromId(fields[0]);
+        WindowPage second = WindowPage.fromId(fields[1]);
         if (first == null || second == null || first.equals(second)) {
             return null;
         }
@@ -475,7 +470,6 @@ public final class WindowLayoutStore {
                 : WindowLayout.places().entrySet()) {
             WindowLayout.Place place = entry.getValue();
             lines.add("place " + entry.getKey()
-                    + " locked=" + place.locked
                     + (place.pinnedToHud ? " hud=true" : "")
                     + (place.pinnedToGui ? " gui=true" : "")
                     + " x=" + format(place.x)

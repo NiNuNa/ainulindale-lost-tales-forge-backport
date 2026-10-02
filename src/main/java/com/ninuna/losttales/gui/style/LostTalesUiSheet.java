@@ -42,16 +42,22 @@ public enum LostTalesUiSheet {
      */
     SEND(87, 0, 10, 10),
     SEND_HOVER(98, 0, 10, 10),
+    /**
+     * The {@code +} at rest, lit in honey as every glyph lights, and in
+     * green where it adds something: a character, a glance, a fellowship.
+     */
     PLUS(0, 11, 5, 5),
-    PLUS_HOVER(6, 11, 5, 5),
+    PLUS_ADD(6, 11, 5, 5),
+    PLUS_LIT(12, 11, 5, 5),
     /**
      * The {@code +} with its upright stroke taken away: what the restore
-     * control wears while the list it opens is out. One row of artwork
-     * rather than a five-row cell, so it centres on the same row of the
-     * strip the {@code +}'s own crossbar stands on.
+     * control wears while the list it opens is out, the map's zoom out and
+     * a folded group. One row of artwork rather than a five-row cell, so
+     * it centres on the same row of the strip the {@code +}'s own crossbar
+     * stands on. Lit in honey.
      */
     MINUS(18, 13, 5, 1),
-    MINUS_HOVER(24, 13, 5, 1),
+    MINUS_LIT(30, 13, 5, 1),
     CLOSE(36, 11, 5, 5),
     CLOSE_HOVER(42, 11, 5, 5),
     COG(48, 11, 5, 5),
@@ -143,11 +149,13 @@ public enum LostTalesUiSheet {
     FORWARD(20, 23, 4, 5),
     FORWARD_HOVER(25, 23, 4, 5),
     /**
-     * An exclamation mark in ivory and in crimson: the message menu's
-     * report row and the report menu, and the journal's Active filter.
+     * An exclamation mark in ivory, in crimson where it reports (the
+     * message menu's report row and the report menu), and lit in honey
+     * (the journal's Active filter).
      */
     EXCLAMATION(30, 23, 1, 5),
-    EXCLAMATION_LIT(32, 23, 1, 5),
+    EXCLAMATION_REPORT(32, 23, 1, 5),
+    EXCLAMATION_LIT(34, 23, 1, 5),
     /**
      * The insert-toolbar chevron's animation, five frames from pointing
      * right (the inserts are out and fold back toward it) to pointing
@@ -165,8 +173,8 @@ public enum LostTalesUiSheet {
     TOGGLE_4_HOVER(61, 23, 2, 5),
     TOGGLE_5_HOVER(64, 23, 3, 5),
     /**
-     * A conversation's Notifications: the bell in the colour of what it
-     * is set to (ivory for Only Mentions, green for Everything, crimson
+     * A conversation's Notification Settings: the bell in the colour of
+     * what it is set to (ivory for Only Mentions, green for Everything, crimson
      * for Nothing), and its lit artwork in honey.
      */
     BELL(68, 23, 5, 5),
@@ -174,13 +182,25 @@ public enum LostTalesUiSheet {
     BELL_NOTHING(80, 23, 5, 5),
     BELL_LIT(86, 23, 5, 5),
     /**
-     * A conversation's Show in Feed: a small speech bubble in the colours
-     * the bell wears for the same three words, and in honey lit.
+     * A trash bin: deleting a message, deleting a character. Ivory at
+     * rest, lit in crimson, as what it does cannot be undone.
+     */
+    TRASH(92, 23, 5, 5),
+    TRASH_LIT(98, 23, 5, 5),
+    /**
+     * A conversation's Chat Feed Settings: a small speech bubble in the
+     * colours the bell wears for the same three words, and in honey lit.
      */
     FEED(0, 29, 6, 5),
     FEED_EVERYTHING(7, 29, 6, 5),
     FEED_NOTHING(14, 29, 6, 5),
     FEED_LIT(21, 29, 6, 5),
+    /**
+     * The tool strip's split view button, ivory at rest and honey lit; it
+     * rests lit while its page shares the window.
+     */
+    SPLIT(56, 29, 7, 5),
+    SPLIT_LIT(64, 29, 7, 5),
     GRIP(0, 35, 6, 8),
     GRIP_HOVER(7, 35, 6, 8),
     /**
@@ -201,21 +221,22 @@ public enum LostTalesUiSheet {
      * A tab's count of unread mentions, as a messenger's mention badge
      * is: a crimson tile as tall as the capitals with rounded corners,
      * built from its left edge, a row shorter at each end, and its
-     * figures after it: one to nine in ivory, and the plus. Each figure
-     * carries the tile's right edge in its last column
+     * figures after it: the plus, then nought to nine in ivory. Each
+     * figure carries the tile's right edge in its last column
      * ({@link #drawCountTile}).
      */
     COUNT_LEFT(52, 36, 1, 5),
     COUNT_MORE(54, 35, 4, 7),
-    COUNT_1(59, 35, 4, 7),
-    COUNT_2(64, 35, 4, 7),
-    COUNT_3(69, 35, 4, 7),
-    COUNT_4(74, 35, 4, 7),
-    COUNT_5(79, 35, 4, 7),
-    COUNT_6(84, 35, 4, 7),
-    COUNT_7(89, 35, 4, 7),
-    COUNT_8(94, 35, 4, 7),
-    COUNT_9(99, 35, 4, 7),
+    COUNT_0(59, 35, 4, 7),
+    COUNT_1(64, 35, 4, 7),
+    COUNT_2(69, 35, 4, 7),
+    COUNT_3(74, 35, 4, 7),
+    COUNT_4(79, 35, 4, 7),
+    COUNT_5(84, 35, 4, 7),
+    COUNT_6(89, 35, 4, 7),
+    COUNT_7(94, 35, 4, 7),
+    COUNT_8(99, 35, 4, 7),
+    COUNT_9(104, 35, 4, 7),
     /**
      * A tab's two border pieces. Each carries the corner it turns at the
      * top, the line that runs down the tab's side, and the tab's own
@@ -479,7 +500,7 @@ public enum LostTalesUiSheet {
 
     /** How wide the tile for {@code count} stands: its left edge and a cell per figure. */
     public static int countTileWidth(int count) {
-        return COUNT_LEFT.width + countText(count).length() * COUNT_1.width;
+        return COUNT_LEFT.width + countText(count).length() * COUNT_0.width;
     }
 
     /**
@@ -488,36 +509,27 @@ public enum LostTalesUiSheet {
      * top and the bottom, then a figure per digit and the plus past 99.
      * Each figure's last column is the tile's right edge, its corners
      * rounded; between two figures those corners are filled from the
-     * figure's own top and bottom rows, so the tile runs on unbroken. The
-     * sheet has no nought yet: it is drawn from the eight with its waist
-     * taken out, until it is painted.
+     * figure's own top and bottom rows, so the tile runs on unbroken.
      */
     public static void drawCountTile(int count, float x, float y, int alpha) {
         String text = countText(count);
-        int[][] pieces = new int[4 + text.length() * 6][];
+        int[][] pieces = new int[1 + text.length() * 3][];
         int laid = 0;
         pieces[laid++] = new int[] {COUNT_LEFT.u, COUNT_LEFT.v, 1, 5, 0, 1};
         int left = COUNT_LEFT.width;
         for (int index = 0; index < text.length(); index++) {
             char figure = text.charAt(index);
-            // COUNT_1 to COUNT_9 stand in order, so a digit is an offset.
+            // COUNT_0 to COUNT_9 stand in order, so a digit is an offset.
             LostTalesUiSheet cell = figure == '+' ? COUNT_MORE
-                    : figure == '0' ? COUNT_8
-                    : values()[COUNT_1.ordinal() + figure - '1'];
-            if (figure == '0') {
-                pieces[laid++] = new int[] {cell.u, cell.v, 4, 3, left, 0};
-                pieces[laid++] = new int[] {cell.u, cell.v + 4, 4, 1, left, 3};
-                pieces[laid++] = new int[] {cell.u, cell.v + 4, 4, 3, left, 4};
-            } else {
-                pieces[laid++] = new int[] {cell.u, cell.v, 4, 7, left, 0};
-            }
+                    : values()[COUNT_0.ordinal() + figure - '0'];
+            pieces[laid++] = new int[] {cell.u, cell.v, 4, 7, left, 0};
             if (index < text.length() - 1) {
                 pieces[laid++] = new int[] {cell.u + 2, cell.v, 1, 1,
                         left + 3, 0};
                 pieces[laid++] = new int[] {cell.u + 2, cell.v + 6, 1, 1,
                         left + 3, 6};
             }
-            left += COUNT_1.width;
+            left += COUNT_0.width;
         }
         for (int index = 0; index < laid; index++) {
             int[] piece = pieces[index];
@@ -606,10 +618,10 @@ public enum LostTalesUiSheet {
                 for (float x = left; x < right; x += this.width) {
                     float x1 = Math.min(right, x + this.width);
                     float u1 = (this.u + (x1 - x)) / (float)SHEET_WIDTH;
-                    tessellator.setColorRGBA_I(0xFFFFFF, bottomAlpha);
+                    tessellator.setColorRGBA_I(LostTalesUiInk.UNTINTED,bottomAlpha);
                     tessellator.addVertexWithUV(x, y1, 0.0D, u0, v1);
                     tessellator.addVertexWithUV(x1, y1, 0.0D, u1, v1);
-                    tessellator.setColorRGBA_I(0xFFFFFF, topAlpha);
+                    tessellator.setColorRGBA_I(LostTalesUiInk.UNTINTED,topAlpha);
                     tessellator.addVertexWithUV(x1, y, 0.0D, u1, v0);
                     tessellator.addVertexWithUV(x, y, 0.0D, u0, v0);
                 }
@@ -711,13 +723,13 @@ public enum LostTalesUiSheet {
             float v1 = (v + (column ? texels : 1)) / (float)SHEET_HEIGHT;
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawingQuads();
-            tessellator.setColorRGBA_I(0xFFFFFF, column ? end : start);
+            tessellator.setColorRGBA_I(LostTalesUiInk.UNTINTED,column ? end : start);
             tessellator.addVertexWithUV(x, y + height, 0.0D, u0, v1);
-            tessellator.setColorRGBA_I(0xFFFFFF, end);
+            tessellator.setColorRGBA_I(LostTalesUiInk.UNTINTED,end);
             tessellator.addVertexWithUV(x + width, y + height, 0.0D, u1, v1);
-            tessellator.setColorRGBA_I(0xFFFFFF, column ? start : end);
+            tessellator.setColorRGBA_I(LostTalesUiInk.UNTINTED,column ? start : end);
             tessellator.addVertexWithUV(x + width, y, 0.0D, u1, v0);
-            tessellator.setColorRGBA_I(0xFFFFFF, start);
+            tessellator.setColorRGBA_I(LostTalesUiInk.UNTINTED,start);
             tessellator.addVertexWithUV(x, y, 0.0D, u0, v0);
             tessellator.draw();
         } finally {

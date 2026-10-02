@@ -11,7 +11,7 @@ import com.ninuna.losttales.client.chat.ChatLineChoice;
 import com.ninuna.losttales.client.chat.ChatLineChoice;
 import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import com.ninuna.losttales.client.chat.ChatLayoutViews;
-import com.ninuna.losttales.client.chat.ChatTab;
+import com.ninuna.losttales.client.chat.ConversationPage;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -59,14 +59,14 @@ public final class WindowLayoutStoreTest {
                 "window w1 locked=false x=0.00 y=0.00 split=ooc,global,down,0.6000 split=global,operator,across,0.5000 active=global tabs=global,ooc,client_console",
                 "window w2 locked=false x=0.00 y=100.00 split=client_console,nowhere,across,0.5000 active=operator tabs=operator"));
         Window first = WindowLayout.window("w1");
-        WindowSplit split = first.splitOf(ChatTab.of(ChatChannel.GLOBAL));
+        WindowSplit split = first.splitOf(ConversationPage.of(ChatChannel.GLOBAL));
         assertNotNull(split);
-        assertEquals(ChatTab.of(ChatChannel.OOC), split.first());
+        assertEquals(ConversationPage.of(ChatChannel.OOC), split.first());
         assertFalse("a conversation stands only side by side", split.isStacked());
         assertEquals(0.6D, split.share(), 1.0E-9D);
         assertEquals("the second split shares a page with the first", 1,
-                first.getSplits().size());
-        assertTrue(WindowLayout.window("w2").getSplits().isEmpty());
+                first.splits().size());
+        assertTrue(WindowLayout.window("w2").splits().isEmpty());
         List<String> described = WindowLayoutStore.describe();
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());
@@ -91,9 +91,9 @@ public final class WindowLayoutStoreTest {
         assertTrue(described.contains(
                 "conversation\tworld:My World\tw2\twhisper:Sam|Sam Gamgee"));
         ChatLayout.restoreConversations("server:a");
-        assertTrue(ChatLayout.isOpen(ChatTab.whisper("Steve", "Aldric")));
-        assertFalse(ChatLayout.isOpen(ChatTab.whisper("Sam", "Sam Gamgee")));
-        assertFalse(ChatLayout.opensByItself(ChatTab.whisper("Bob", "Bob")));
+        assertTrue(ChatLayout.isOpen(ConversationPage.whisper("Steve", "Aldric")));
+        assertFalse(ChatLayout.isOpen(ConversationPage.whisper("Sam", "Sam Gamgee")));
+        assertFalse(ChatLayout.opensByItself(ConversationPage.whisper("Bob", "Bob")));
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());
     }
@@ -322,7 +322,7 @@ public final class WindowLayoutStoreTest {
         WindowLayoutStore.initialize(null);
         WindowLayoutStore.load(Collections.singletonList(
                 "window w1 locked=false x=0.00 y=0.00 active=global tabs=global,trade"));
-        ChatLayout.close(ChatTab.of(ChatChannel.GLOBAL));
+        ChatLayout.close(ConversationPage.of(ChatChannel.GLOBAL));
 
         ChatChannel.installDefined(Collections.singletonList(
                 tradeChannel()), null);
@@ -340,9 +340,9 @@ public final class WindowLayoutStoreTest {
     @Test
     public void theEmptyLayoutRoundTripsThroughLoad() {
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
-            ChatLayout.close(ChatTab.of(channel));
+            ChatLayout.close(ConversationPage.of(channel));
         }
-        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
+        ChatLayout.setNotification(ConversationPage.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
         assertTrue(WindowLayout.isEmpty());
         List<String> described = WindowLayoutStore.describe();
         for (String line : described) {
@@ -355,21 +355,21 @@ public final class WindowLayoutStoreTest {
         assertEquals(ChatChannel.presentationOrder().size(),
                 ChatLayout.closedChannels().size());
         assertEquals(ChatLineChoice.NOTHING,
-                ChatLayout.notification(ChatTab.of(ChatChannel.OOC)));
+                ChatLayout.notification(ConversationPage.of(ChatChannel.OOC)));
     }
 
     @Test
     public void describeRoundTripsThroughLoad() {
-        Tearing.off(ChatTab.of(ChatChannel.FELLOWSHIP), 62.5D, 8.0D);
-        WindowLayout.moveTab(ChatTab.of(ChatChannel.FACTION), "w3", 1);
+        Tearing.off(ConversationPage.of(ChatChannel.FELLOWSHIP), 62.5D, 8.0D);
+        WindowLayout.moveTab(ConversationPage.of(ChatChannel.FACTION), "w3", 1);
         WindowLayout.setLocked("w3", true);
-        ChatLayout.close(ChatTab.of(ChatChannel.OPERATOR));
-        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
-        ChatLayout.setNotification(ChatTab.of(ChatChannel.FELLOWSHIP),
+        ChatLayout.close(ConversationPage.of(ChatChannel.OPERATOR));
+        ChatLayout.setNotification(ConversationPage.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
+        ChatLayout.setNotification(ConversationPage.of(ChatChannel.FELLOWSHIP),
                 ChatLineChoice.EVERYTHING);
-        ChatLayout.setFeedChoice(ChatTab.of(ChatChannel.GLOBAL),
+        ChatLayout.setFeedChoice(ConversationPage.of(ChatChannel.GLOBAL),
                 ChatLineChoice.NOTHING);
-        WindowLayout.setActiveTab(ChatTab.of(ChatChannel.OOC));
+        WindowLayout.setActiveTab(ConversationPage.of(ChatChannel.OOC));
         WindowLayout.setPosition("w2", 3.0D, 97.5D, true);
         ChatLayout.setFeedPosition(12.25D, 88.0D, true);
         ChatLayout.setToolbarCollapsed(true);
@@ -417,17 +417,17 @@ public final class WindowLayoutStoreTest {
         assertEquals(Collections.singletonList(ChatChannel.OPERATOR),
                 ChatLayout.closedChannels());
         assertEquals(ChatLineChoice.NOTHING,
-                ChatLayout.notification(ChatTab.of(ChatChannel.OOC)));
+                ChatLayout.notification(ConversationPage.of(ChatChannel.OOC)));
         assertEquals(ChatLineChoice.EVERYTHING,
-                ChatLayout.notification(ChatTab.of(ChatChannel.FELLOWSHIP)));
+                ChatLayout.notification(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertEquals(ChatLineChoice.ONLY_MENTIONS,
-                ChatLayout.notification(ChatTab.of(ChatChannel.GLOBAL)));
+                ChatLayout.notification(ConversationPage.of(ChatChannel.GLOBAL)));
         assertEquals(ChatLineChoice.NOTHING,
-                ChatLayout.feedChoice(ChatTab.of(ChatChannel.GLOBAL)));
+                ChatLayout.feedChoice(ConversationPage.of(ChatChannel.GLOBAL)));
         assertEquals(ChatLineChoice.EVERYTHING,
-                ChatLayout.feedChoice(ChatTab.of(ChatChannel.OOC)));
-        assertFalse(ChatLayout.opensByItself(ChatTab.of(ChatChannel.OPERATOR)));
-        assertTrue(ChatLayout.opensByItself(ChatTab.of(ChatChannel.OOC)));
+                ChatLayout.feedChoice(ConversationPage.of(ChatChannel.OOC)));
+        assertFalse(ChatLayout.opensByItself(ConversationPage.of(ChatChannel.OPERATOR)));
+        assertTrue(ChatLayout.opensByItself(ConversationPage.of(ChatChannel.OOC)));
         assertEquals(lines, WindowLayoutStore.describe());
     }
 
@@ -480,17 +480,17 @@ public final class WindowLayoutStoreTest {
                 ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
                 ChatLayout.closedChannels());
         assertEquals(ChatLineChoice.NOTHING,
-                ChatLayout.notification(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+                ChatLayout.notification(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
         assertEquals(ChatLineChoice.ONLY_MENTIONS,
-                ChatLayout.feedChoice(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+                ChatLayout.feedChoice(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
         // A choice with no name, a line without its tab and an old mute
         // line leave their conversations as they ship.
         assertEquals(ChatLineChoice.ONLY_MENTIONS,
-                ChatLayout.notification(ChatTab.of(ChatChannel.FACTION)));
+                ChatLayout.notification(ConversationPage.of(ChatChannel.FACTION)));
         assertEquals(ChatLineChoice.ONLY_MENTIONS,
-                ChatLayout.notification(ChatTab.of(ChatChannel.GLOBAL)));
+                ChatLayout.notification(ConversationPage.of(ChatChannel.GLOBAL)));
         assertEquals(ChatLineChoice.EVERYTHING,
-                ChatLayout.feedChoice(ChatTab.of(ChatChannel.FACTION)));
+                ChatLayout.feedChoice(ConversationPage.of(ChatChannel.FACTION)));
     }
 
     /**
@@ -509,8 +509,8 @@ public final class WindowLayoutStoreTest {
         Window window = WindowLayout.window("w1");
         assertNotNull(window);
         int factionTabs = 0;
-        for (WindowTab each : window.tabs()) {
-            ChatTab tab = (ChatTab)each;
+        for (WindowPage each : window.tabs()) {
+            ConversationPage tab = (ConversationPage)each;
             if (tab.getChannel() == ChatChannel.FACTION) {
                 factionTabs++;
                 assertTrue("the row entry, not a conversation",

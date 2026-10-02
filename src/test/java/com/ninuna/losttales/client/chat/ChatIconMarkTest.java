@@ -41,8 +41,8 @@ public final class ChatIconMarkTest {
 
     @Test
     public void pingsComeBeforeTheSphereAndNothingReadWearsNone() {
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatTab selected = ChatTab.of(ChatChannel.OOC);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage selected = ConversationPage.of(ChatChannel.OOC);
         assertTrue(TabMark.of(global).isNone());
         ClientChatChannelViews.record(-1, global, selected, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertSame(TabMark.UNREAD, TabMark.of(global));
@@ -55,9 +55,9 @@ public final class ChatIconMarkTest {
 
     @Test
     public void severalChannelsTogetherAddTheirPings() {
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
-        ChatTab selected = ChatTab.of(ChatChannel.OOC);
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage proximity = ConversationPage.of(ChatChannel.PROXIMITY);
+        ConversationPage selected = ConversationPage.of(ChatChannel.OOC);
         ClientChatChannelViews.record(-1, proximity, selected, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertSame(TabMark.UNREAD,
                 TabMark.combined(Arrays.asList(global, proximity)));
@@ -141,7 +141,8 @@ public final class ChatIconMarkTest {
     @Test
     public void theTilesOutlineIsTheSheets() throws Exception {
         BufferedImage sheet = readSheet();
-        LostTalesUiSheet[] figures = {LostTalesUiSheet.COUNT_1,
+        LostTalesUiSheet[] figures = {LostTalesUiSheet.COUNT_0,
+                LostTalesUiSheet.COUNT_1,
                 LostTalesUiSheet.COUNT_2, LostTalesUiSheet.COUNT_3,
                 LostTalesUiSheet.COUNT_4, LostTalesUiSheet.COUNT_5,
                 LostTalesUiSheet.COUNT_6, LostTalesUiSheet.COUNT_7,

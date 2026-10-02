@@ -10,7 +10,11 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
- * The safety boundary every character C2S packet handler comes through.
+ * The safety boundary for the character-management C2S packets: every
+ * request that carries a request id and waits on a
+ * {@link CharacterOperationType} answer. A profile read
+ * ({@code CharacterProfileRequestPacket}) is answered with a profile packet
+ * either way and goes through {@link LostTalesServerPacketDispatcher}.
  *
  * <p>The gate itself — the per-player request window, the throttled
  * diagnostics — is every family's and is
@@ -53,7 +57,7 @@ public final class CharacterServerPacketDispatcher {
                     RATE_LIMIT_REPLY_INTERVAL_MILLIS)) {
                 CharacterSyncManager.sendFailure(
                         player, requestId, operationType,
-                        CharacterErrorId.RATE_LIMITED, -1L);
+                        CharacterErrorId.RATE_LIMITED);
             }
             return;
         }
@@ -61,14 +65,14 @@ public final class CharacterServerPacketDispatcher {
             LostTalesRequestRateLimiter.logMalformed(player, packetName);
             CharacterSyncManager.sendFailure(
                     player, requestId, operationType,
-                    CharacterErrorId.MALFORMED_REQUEST, -1L);
+                    CharacterErrorId.MALFORMED_REQUEST);
             return;
         }
         final long requestEpoch = CharacterLifecycleStateTracker.captureRequestEpoch(player);
         if (requestEpoch <= 0L) {
             CharacterSyncManager.sendFailure(
                     player, requestId, operationType,
-                    CharacterErrorId.INVALID_PLAYER, -1L);
+                    CharacterErrorId.INVALID_PLAYER);
             return;
         }
         final LostTalesServerTaskQueue.PlayerTask guardedTask = task;
@@ -86,8 +90,7 @@ public final class CharacterServerPacketDispatcher {
                                     guardedOperationType,
                                     guardedOperationType == CharacterOperationType.SELECT
                                             ? CharacterErrorId.SWITCH_SESSION_CHANGED
-                                            : CharacterErrorId.INVALID_PLAYER,
-                                    -1L);
+                                            : CharacterErrorId.INVALID_PLAYER);
                             return;
                         }
                         guardedTask.run(livePlayer);
@@ -96,7 +99,7 @@ public final class CharacterServerPacketDispatcher {
             LostTalesRequestRateLimiter.logQueueFull(player, packetName);
             CharacterSyncManager.sendFailure(
                     player, requestId, operationType,
-                    CharacterErrorId.INTERNAL_ERROR, -1L);
+                    CharacterErrorId.INTERNAL_ERROR);
         }
     }
 }

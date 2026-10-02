@@ -410,24 +410,43 @@ public final class DiscordMessageSanitizer {
     }
 
     /**
-     * An action as Discord shows it: its words in italics under the
-     * speaker's name, as the game shows <em>Aldric draws his sword.</em>,
-     * each paragraph in italics of its own.
-     * Empty for no words.
+     * The action mark an action's post opens with. The backslash makes
+     * Discord show the asterisk as it is, so the line is no list item
+     * and the mark opens no italics.
      */
-    public static String outboundAction(String message) {
+    static final String ACTION_MARK = "\\* ";
+
+    /**
+     * An action as Discord shows it, the way the game tells it under the
+     * Narrator's name: the action mark, then the sentence the speaker's
+     * name opens, in italics. {@code /me draws his sword.} said as Aldric
+     * posts as {@code \* *Aldric draws his sword.*}. The name is escaped,
+     * so it reads as written; the words cross as a line's do, and each
+     * paragraph after the first is in italics of its own. Empty for no
+     * words.
+     */
+    public static String outboundAction(String speaker, String message) {
         String words = outbound(message).trim();
         if (words.length() == 0) {
             return "";
         }
-        StringBuilder action = new StringBuilder(words.length() + 8);
+        String name = escapeMarkdown(outbound(speaker));
+        StringBuilder action = new StringBuilder(
+                words.length() + name.length() + 8);
         for (String paragraph : words.split("\n")) {
-            if (paragraph.trim().length() > 0) {
-                if (action.length() > 0) {
-                    action.append('\n');
-                }
-                action.append(italic(paragraph.trim()));
+            String said = paragraph.trim();
+            if (said.length() == 0) {
+                continue;
             }
+            if (action.length() == 0) {
+                action.append(ACTION_MARK);
+                if (name.length() > 0) {
+                    said = name + " " + said;
+                }
+            } else {
+                action.append('\n');
+            }
+            action.append(italic(said));
         }
         return action.toString();
     }

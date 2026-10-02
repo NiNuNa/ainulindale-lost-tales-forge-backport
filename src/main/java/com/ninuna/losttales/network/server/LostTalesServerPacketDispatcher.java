@@ -3,7 +3,13 @@ package com.ninuna.losttales.network.server;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import net.minecraft.entity.player.EntityPlayerMP;
 
-/** Shared safety boundary for non-character client-to-server packet handlers. */
+/**
+ * Shared safety boundary for client-to-server packet handlers whose
+ * refusals go unanswered, among them chat, quests, waystones, missives,
+ * quick loot and the character profile read. A refused request is logged
+ * and dropped. Character management and fellowship
+ * requests have dispatchers of their own, which answer every refusal.
+ */
 public final class LostTalesServerPacketDispatcher {
 
     private LostTalesServerPacketDispatcher() {}

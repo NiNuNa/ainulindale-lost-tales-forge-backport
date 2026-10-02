@@ -57,8 +57,10 @@ public final class ChatChannelSuggesterTest {
         assertEquals(Arrays.asList(ChatChannel.OOC),
                 ChatChannelSuggester.matches("OO", all, "lotr:gondor", 20));
         assertEquals("the shown name finds a channel too",
-                Arrays.asList(ChatChannel.CLIENT_CONSOLE),
-                ChatChannelSuggester.matches("clientcon", all, "lotr:gondor", 20));
+                Arrays.asList(ChatChannel.SERVER_CONSOLE),
+                ChatChannelSuggester.matches("serverl", all, "lotr:gondor", 20));
+        assertEquals(Arrays.asList(ChatChannel.CLIENT_CONSOLE),
+                ChatChannelSuggester.matches("cons", all, "lotr:gondor", 20));
         assertEquals("the Faction channel answers to its faction's name",
                 Arrays.asList(ChatChannel.FACTION),
                 ChatChannelSuggester.matches("gon", all, "lotr:gondor", 20));

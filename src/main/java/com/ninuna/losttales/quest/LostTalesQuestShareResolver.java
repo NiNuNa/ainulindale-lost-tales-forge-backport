@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.compat.lotr.LotrQuestReference;
 import com.ninuna.losttales.compat.lotr.LotrQuestShareAdapter;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -31,9 +32,12 @@ public final class LostTalesQuestShareResolver {
                 ChatShareTokenParser.normalizeName(quest.getTitle()))) {
             return null;
         }
-        return ChatShowcase.quest(tokenIndex, reference, quest.getTitle(),
+        return ChatShowcase.quest(tokenIndex, reference,
+                fitBytes(quest.getTitle(), ChatShowcase.MAX_QUEST_TITLE_BYTES),
                 LostTalesQuestCategory.of(quest), objective(quest, progress),
-                rewards(quest), quest.canStartFromShare());
+                rewards(quest), quest.canStartFromShare(
+                        LostTalesConfig.allowQuestItemStarts,
+                        LostTalesConfig.allowQuestInteractionStarts));
     }
 
     private static String objective(LostTalesQuestDefinition quest,
@@ -41,7 +45,8 @@ public final class LostTalesQuestShareResolver {
         int stage = LostTalesQuestObjectiveSelection.getCurrentStageIndex(
                 quest, progress);
         if (stage < 0) {
-            return quest.getDescription();
+            return fitBytes(quest.getDescription(),
+                    ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES);
         }
         StringBuilder text = new StringBuilder();
         for (LostTalesQuestObjectiveDefinition objective
@@ -55,19 +60,45 @@ public final class LostTalesQuestShareResolver {
                 break;
             }
         }
-        return bounded(text.length() == 0 ? quest.getDescription()
+        return fitBytes(text.length() == 0 ? quest.getDescription()
                 : text.toString(), ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES);
     }
 
     private static String rewards(LostTalesQuestDefinition quest) {
         String rewards = LostTalesQuestRewardText.summary(quest.getRewards());
-        return bounded(rewards.length() == 0
+        return fitBytes(rewards.length() == 0
                 ? StatCollector.translateToLocal("gui.losttales.quest.reward.pending")
                 : rewards, ChatShowcase.MAX_QUEST_REWARD_BYTES);
     }
 
-    private static String bounded(String value, int maximum) {
+    /**
+     * The text cut to at most {@code maximumBytes} bytes of UTF-8, at the
+     * end of a character, so a card always fits what the chat sends.
+     */
+    public static String fitBytes(String value, int maximumBytes) {
         String text = value == null ? "" : value;
-        return text.length() <= maximum ? text : text.substring(0, maximum);
+        int bytes = 0;
+        int index = 0;
+        while (index < text.length()) {
+            int codePoint = text.codePointAt(index);
+            int width = utf8Width(codePoint);
+            if (bytes + width > maximumBytes) {
+                return text.substring(0, index);
+            }
+            bytes += width;
+            index += Character.charCount(codePoint);
+        }
+        return text;
+    }
+
+    /** The bytes a character takes in UTF-8; a lone surrogate counts three, more than it is written as. */
+    private static int utf8Width(int codePoint) {
+        if (codePoint < 0x80) {
+            return 1;
+        }
+        if (codePoint < 0x800) {
+            return 2;
+        }
+        return codePoint < 0x10000 ? 3 : 4;
     }
 }

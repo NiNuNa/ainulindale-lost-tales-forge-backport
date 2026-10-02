@@ -36,7 +36,7 @@ public final class ChatChannelIconsTest {
 
         assertEquals(ChatEmoji.JOY, ChatChannelIcons.iconOf(ChatChannel.OPERATOR));
         assertEquals(ChatEmoji.JOY,
-                ChatChannelIcons.iconOf(ChatTab.of(ChatChannel.OPERATOR)));
+                ChatChannelIcons.iconOf(ConversationPage.of(ChatChannel.OPERATOR)));
         // Every other channel keeps its own.
         assertEquals(ChatEmoji.JOY, ChatChannelIcons.iconOf(ChatChannel.FELLOWSHIP));
         assertEquals(ChatEmoji.SLIGHT_SMILE,
@@ -73,17 +73,17 @@ public final class ChatChannelIconsTest {
                     ChatChannelIcons.iconOf(channel));
             if (channel == ChatChannel.WHISPER) {
                 // A whisper has no plain tab: each names a partner.
-                assertNull(ChatTab.of(channel));
+                assertNull(ConversationPage.of(channel));
                 continue;
             }
             assertEquals(ChatChannelIcons.iconOf(channel),
-                    ChatChannelIcons.iconOf(ChatTab.of(channel)));
+                    ChatChannelIcons.iconOf(ConversationPage.of(channel)));
         }
         assertEquals(ChatEmoji.BLUSH,
-                ChatChannelIcons.iconOf(ChatTab.whisper("Bilbo", "")));
+                ChatChannelIcons.iconOf(ConversationPage.whisper("Bilbo", "")));
         assertEquals(ChatEmoji.GRINNING,
-                ChatChannelIcons.iconOf(ChatTab.npc("Bilbo")));
-        assertNull(ChatChannelIcons.iconOf((ChatTab)null));
+                ChatChannelIcons.iconOf(ConversationPage.npc("Bilbo")));
+        assertNull(ChatChannelIcons.iconOf((ConversationPage)null));
         assertNull(ChatChannelIcons.iconOf((ChatChannel)null));
     }
 }

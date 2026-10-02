@@ -76,7 +76,7 @@ public final class ChatRunBackdropsTest {
                 link(ChatChannelLinkMarker.MESSAGE_SEPARATOR, 1234L)));
         assertEquals(0, ChatRunBackdrops.padBefore(link(ChatChannelLinkMarker.ICON_SLOT, 1234L)));
         assertEquals(PAD, ChatRunBackdrops.padAfter(link(ChatChannelLinkMarker.ICON_SLOT, 1234L)));
-        // A link to one of this client's own lines, as the Server Console's
+        // A link to one of this client's own lines, as the Server Log's
         // "used /command in #Channel" names the command, is one element
         // too: the same three pieces, one backdrop.
         ChatComponentText localName = ChatChannelLinkMarker.apply(

@@ -63,7 +63,7 @@ final class ServerSettingsRows {
         return this.host.draft();
     }
 
-    /** The setting a typed row stands for, a number or a line; null for any other row. */
+    /** The setting a typed or picked row stands for, a number, a line or a few words; null for any other row. */
     Settings.Setting typedFor(String rowId) {
         return this.typed.get(rowId);
     }
@@ -141,6 +141,9 @@ final class ServerSettingsRows {
                     ServerSettingNames.name(entry.getKey())).withValue(
                             Settings.onOff(isOn(draft().value(entry))));
         } else if (!entry.getValidValues().isEmpty() && !entry.isSecret()) {
+            if (!this.typed.containsKey(OWN_ROW + name)) {
+                this.typed.put(OWN_ROW + name, new WordsValue(name));
+            }
             row = new MenuWindow.Entry(OWN_ROW + name,
                     ServerSettingNames.name(entry.getKey()))
                     .withValue(draft().value(entry));
@@ -393,6 +396,79 @@ final class ServerSettingsRows {
      * within the bounds the server names; its value is typed in Settings'
      * value window, whose Use the Default is the server's shipped value.
      */
+    /**
+     * A few-word option of the server's, its words picked in a sub-window
+     * of their own as every few-word setting's are, into the page's
+     * waiting changes.
+     */
+    private final class WordsValue extends Settings.Setting {
+        private final String name;
+        private final int made = ServerSettingsRows.this.host.generation();
+
+        WordsValue(String name) {
+            super(name, "");
+            this.name = name;
+        }
+
+        @Override
+        public String label() {
+            ServerConfigEntry entry = entry(this.name);
+            return entry == null ? "" : ServerSettingNames.name(entry.getKey());
+        }
+
+        @Override
+        public String value() {
+            ServerConfigEntry entry = entry(this.name);
+            return entry == null ? "" : draft().value(entry);
+        }
+
+        @Override
+        public List<String> words() {
+            ServerConfigEntry entry = entry(this.name);
+            return entry == null ? java.util.Collections.<String>emptyList()
+                    : entry.getValidValues();
+        }
+
+        @Override
+        public int wordIndex() {
+            return words().indexOf(value());
+        }
+
+        @Override
+        public int shippedWordIndex() {
+            ServerConfigEntry entry = entry(this.name);
+            return entry == null ? -1 : words().indexOf(entry.getDefault());
+        }
+
+        @Override
+        public void pickWord(int index) {
+            ServerConfigEntry entry = entry(this.name);
+            List<String> words = words();
+            if (entry != null && index >= 0 && index < words.size()) {
+                draft().set(entry, words.get(index));
+            }
+        }
+
+        @Override
+        public void restore() {
+            ServerConfigEntry entry = entry(this.name);
+            if (entry != null) {
+                draft().set(entry, entry.getDefault());
+            }
+        }
+
+        @Override
+        public Settings.Store store() {
+            return Settings.Store.NONE;
+        }
+
+        @Override
+        public boolean stands() {
+            return ServerSettingsRows.this.host.stands(this.made)
+                    && entry(this.name) != null;
+        }
+    }
+
     private final class NumberValue extends Settings.Numeric {
         private final String name;
         private final int made = ServerSettingsRows.this.host.generation();

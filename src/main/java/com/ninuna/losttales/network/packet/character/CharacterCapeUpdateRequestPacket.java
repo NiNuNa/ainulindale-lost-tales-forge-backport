@@ -16,9 +16,7 @@ import java.util.UUID;
 
 /**
  * Client request to update the persistent cape settings of one owned
- * identity: a character by id, or the account itself (a null id; on the
- * wire the id slot holds the nil UUID and the last field, a flag, names
- * the account).
+ * identity: a character by id, or the account itself (no id).
  */
 public final class CharacterCapeUpdateRequestPacket implements IMessage {
 
@@ -54,13 +52,10 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
         try {
             this.requestId = buffer.readInt();
             this.expectedRosterRevision = buffer.readLong();
-            UUID characterId = LostTalesPacketCodec.readUuid(buffer);
+            this.characterId = LostTalesPacketCodec.readNullableUuid(buffer);
             this.showMinecraftCape = buffer.readBoolean();
             this.cosmeticCapeId = buffer.readUnsignedShort();
-            // Whether the request is the account's own.
-            boolean forAccount = buffer.readBoolean();
-            this.characterId = forAccount ? null : characterId;
-            if (!forAccount && NIL_UUID.equals(characterId)) {
+            if (NIL_UUID.equals(this.characterId)) {
                 throw new CharacterPacketCodec.DecodeException("nil character id");
             }
             LostTalesPacketCodec.requireFinished(buffer);
@@ -83,11 +78,9 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
     public void toBytes(ByteBuf buffer) {
         buffer.writeInt(this.requestId);
         buffer.writeLong(this.expectedRosterRevision);
-        LostTalesPacketCodec.writeUuid(buffer,
-                this.characterId == null ? NIL_UUID : this.characterId);
+        LostTalesPacketCodec.writeNullableUuid(buffer, this.characterId);
         buffer.writeBoolean(this.showMinecraftCape);
         buffer.writeShort(this.cosmeticCapeId);
-        buffer.writeBoolean(this.characterId == null);
     }
 
     /** The character asked about; null for the account itself. */

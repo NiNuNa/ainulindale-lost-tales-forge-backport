@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.HashMap;
 import com.ninuna.losttales.chat.ChatAccountRole;
@@ -43,13 +43,14 @@ public final class ClientChatChannelState {
     private static final long FACTION_NAME_RETRY_NANOS = 5000L * 1000000L;
 
     /** The conversation the input is in. */
-    private static ChatTab selected = ChatTab.of(ChatChannel.GLOBAL);
+    private static ConversationPage selected = ConversationPage.of(ChatChannel.GLOBAL);
     /**
-     * The conversation the player last picked or typed in. It stays when a
-     * page covers it and the input is lent to another window, so the chat
-     * key brings it back.
+     * The conversation the player last picked or typed in, never a
+     * console: the chat key brings it back, and the consoles have a key of
+     * their own. It stays when a page covers it and the input is lent to
+     * another window.
      */
-    private static ChatTab lastUsed = selected;
+    private static ConversationPage lastUsed = selected;
     /**
      * Whether the player has picked or typed in a conversation since
      * joining; until then the chat key brings the one in front of the top
@@ -58,22 +59,22 @@ public final class ClientChatChannelState {
     private static boolean lastUsedKnown;
     /** Conversations remembered for their partner's colour; oldest go first. */
     private static final int MAX_PARTNER_COLORS = 64;
-    private static final LinkedHashMap<ChatTab, Integer> PARTNER_COLORS =
-            new LinkedHashMap<ChatTab, Integer>();
+    private static final LinkedHashMap<ConversationPage, Integer> PARTNER_COLORS =
+            new LinkedHashMap<ConversationPage, Integer>();
     /**
      * How a conversation's tab names its partner: the identity their
      * last line wore, the account in brackets behind it when the two
      * differ. Remembered like the colours, from their lines alone.
      */
-    private static final LinkedHashMap<ChatTab, String> PARTNER_NAMES =
-            new LinkedHashMap<ChatTab, String>();
+    private static final LinkedHashMap<ConversationPage, String> PARTNER_NAMES =
+            new LinkedHashMap<ConversationPage, String>();
     /**
      * The id of the character a conversation is with, when the server
      * has said; a reply is then addressed by it. Remembered like the
      * names, from the conversation's lines alone.
      */
-    private static final LinkedHashMap<ChatTab, UUID> PARTNER_CHARACTER_IDS =
-            new LinkedHashMap<ChatTab, UUID>();
+    private static final LinkedHashMap<ConversationPage, UUID> PARTNER_CHARACTER_IDS =
+            new LinkedHashMap<ConversationPage, UUID>();
     /**
      * LOTR's name for each faction asked about, by faction id. An empty
      * name is one LOTR could not give; it is asked again after a while
@@ -124,10 +125,10 @@ public final class ClientChatChannelState {
      */
     private static java.util.Set<String> readableChannels = DEFAULT_READABLE;
     private static java.util.Set<String> sendableChannels = DEFAULT_SENDABLE;
-    /** Server-stated muted senders; filled for operators only. */
     /** The channels linked to Discord, by link key, as the server said. */
     private static final java.util.Set<String> DISCORD_LINKS =
             new java.util.HashSet<String>();
+    /** Server-stated muted senders; filled for operators only. */
     private static final java.util.Set<UUID> MUTED_SENDERS =
             new java.util.HashSet<UUID>();
     /**
@@ -151,13 +152,13 @@ public final class ClientChatChannelState {
 
     private ClientChatChannelState() {}
 
-    public static synchronized ChatTab getSelected() {
+    public static synchronized ConversationPage getSelected() {
         ensureAvailable();
         return selected;
     }
 
     /** The player's own pick: the input goes there, and it is the last used. */
-    public static synchronized void select(ChatTab tab) {
+    public static synchronized void select(ConversationPage tab) {
         choose(isSelectable(tab) ? tab : fallbackTab());
     }
 
@@ -165,15 +166,15 @@ public final class ClientChatChannelState {
      * Moves the input to a conversation while a page covers the one last
      * used, which is kept for the chat key.
      */
-    public static synchronized void lendInput(ChatTab tab) {
+    public static synchronized void lendInput(ConversationPage tab) {
         if (isSelectable(tab)) {
             selected = tab;
         }
     }
 
-    /** Something was typed where the input is: that conversation is the last used. */
+    /** Something was typed where the input is: that conversation is the last used, a console aside. */
     public static synchronized void markUsed() {
-        if (isSelectable(selected)) {
+        if (isSelectable(selected) && !selected.isConsole()) {
             lastUsed = selected;
             lastUsedKnown = true;
         }
@@ -182,14 +183,14 @@ public final class ClientChatChannelState {
     /**
      * The conversation last picked or typed in, while it is still open;
      * before any since joining, the one in front of the top window that
-     * shows one. Null when there is none.
+     * shows one. Never a console. Null when there is none.
      */
-    public static synchronized ChatTab lastUsed() {
+    public static synchronized ConversationPage lastUsed() {
         if (!lastUsedKnown) {
             List<Window> stacked = WindowLayout.stacked();
             for (int index = stacked.size() - 1; index >= 0; index--) {
-                ChatTab front = ChatTab.from(stacked.get(index).getActiveTab());
-                if (isSelectable(front)) {
+                ConversationPage front = ConversationPage.from(stacked.get(index).getActiveTab());
+                if (isSelectable(front) && !front.isConsole()) {
                     return front;
                 }
             }
@@ -197,31 +198,22 @@ public final class ClientChatChannelState {
         return isSelectable(lastUsed) ? lastUsed : null;
     }
 
-    /**
-     * Makes {@code tab} the conversation last used again while
-     * {@code visited} is: what the chat's key comes back to after a visit
-     * that was not the player's pick, as the command key's to the console.
-     */
-    public static synchronized void comeBackTo(ChatTab tab, ChatTab visited) {
-        if (visited != null && visited.equals(lastUsed) && isSelectable(tab)) {
-            lastUsed = tab;
-        }
-    }
-
-    private static void choose(ChatTab tab) {
+    private static void choose(ConversationPage tab) {
         selected = tab;
-        lastUsed = tab;
-        lastUsedKnown = true;
+        if (!tab.isConsole()) {
+            lastUsed = tab;
+            lastUsedKnown = true;
+        }
     }
 
     /**
      * Available conversations open in some window, pages left out, in
      * window and tab order.
      */
-    public static synchronized List<ChatTab> getOpenTabs() {
-        ArrayList<ChatTab> result = new ArrayList<ChatTab>();
-        for (WindowTab each : WindowLayout.order()) {
-            ChatTab tab = ChatTab.from(each);
+    public static synchronized List<ConversationPage> getOpenTabs() {
+        ArrayList<ConversationPage> result = new ArrayList<ConversationPage>();
+        for (WindowPage each : WindowLayout.order()) {
+            ConversationPage tab = ConversationPage.from(each);
             if (tab != null && isAvailable(tab)) {
                 result.add(tab);
             }
@@ -239,7 +231,7 @@ public final class ClientChatChannelState {
      * Available to this player and open in a window, and a conversation:
      * a page is never the tab typed into.
      */
-    public static synchronized boolean isSelectable(ChatTab tab) {
+    public static synchronized boolean isSelectable(ConversationPage tab) {
         return tab != null && isAvailable(tab) && ChatLayout.isOpen(tab);
     }
 
@@ -248,7 +240,7 @@ public final class ClientChatChannelState {
      * unlocked. Nothing is held back — the last tab of the last window
      * closes like any other, and the screen shows its empty state.
      */
-    public static synchronized boolean isClosable(ChatTab tab) {
+    public static synchronized boolean isClosable(ConversationPage tab) {
         return WindowLayout.isClosable(tab);
     }
 
@@ -262,14 +254,14 @@ public final class ClientChatChannelState {
      * emptied by the close hands the selection elsewhere. Closing never
      * mutes: the channel keeps receiving and keeps its own choice.
      */
-    public static synchronized boolean close(ChatTab tab) {
+    public static synchronized boolean close(ConversationPage tab) {
         Window window = WindowLayout.windowOf(tab);
         boolean wasSelected = tab != null && tab.equals(selected);
         if (!isClosable(tab) || !ChatLayout.close(tab)) {
             return false;
         }
         if (wasSelected) {
-            ChatTab neighbour = neighbourIn(window);
+            ConversationPage neighbour = neighbourIn(window);
             choose(neighbour != null ? neighbour : fallbackTab());
         }
         ensureAvailable();
@@ -281,16 +273,16 @@ public final class ClientChatChannelState {
      * one the window brought forward, else any selectable one it holds;
      * null when the window is gone or holds nothing selectable.
      */
-    private static ChatTab neighbourIn(Window window) {
+    private static ConversationPage neighbourIn(Window window) {
         if (window == null) {
             return null;
         }
-        ChatTab front = ChatTab.from(window.getActiveTab());
+        ConversationPage front = ConversationPage.from(window.getActiveTab());
         if (isSelectable(front)) {
             return front;
         }
-        for (WindowTab each : window.getTabs()) {
-            ChatTab candidate = ChatTab.from(each);
+        for (WindowPage each : window.getTabs()) {
+            ConversationPage candidate = ConversationPage.from(each);
             if (isSelectable(candidate)) {
                 return candidate;
             }
@@ -310,7 +302,7 @@ public final class ClientChatChannelState {
      * fellowship's conversation is its own row entry, shown while the
      * character played is in it; the Fellowship channel has no plain tab.
      */
-    public static synchronized boolean isAvailable(ChatTab tab) {
+    public static synchronized boolean isAvailable(ConversationPage tab) {
         if (tab == null || !isAvailable(tab.getChannel())) {
             return false;
         }
@@ -350,7 +342,7 @@ public final class ClientChatChannelState {
 
     /**
      * The channels the seeded gates leave open to a player with no role.
-     * The Server Console is left out whatever the gates say: a
+     * The Server Log is left out whatever the gates say: a
      * capability opens it, and only the server knows who holds one, so
      * its tab waits for the server's word rather than showing for a
      * frame to everybody.
@@ -399,7 +391,7 @@ public final class ClientChatChannelState {
         return java.util.Collections.unmodifiableSet(copy);
     }
 
-    public static synchronized boolean canSend(ChatTab tab) {
+    public static synchronized boolean canSend(ConversationPage tab) {
         return isAvailable(tab) && canSend(tab.getChannel());
     }
 
@@ -427,11 +419,11 @@ public final class ClientChatChannelState {
      * with. Every other tab
      * takes its channel's colour.
      */
-    public static synchronized int displayColor(ChatTab tab) {
+    public static synchronized int displayColor(ConversationPage tab) {
         if (tab == null) {
             return LostTalesUiInk.IVORY;
         }
-        Integer partner = PARTNER_COLORS.get(ChatTab.row(tab));
+        Integer partner = PARTNER_COLORS.get(ConversationPage.row(tab));
         if (partner != null) {
             return partner.intValue();
         }
@@ -477,10 +469,10 @@ public final class ClientChatChannelState {
      * among the partner's — and the chat's plain ivory for an account, or
      * for a character the client cannot place.
      */
-    private static int partnerNameColor(ChatTab tab) {
+    private static int partnerNameColor(ConversationPage tab) {
         int plain = com.ninuna.losttales.chat.ChatRolePresentation
                 .unassignedColor();
-        UUID characterId = PARTNER_CHARACTER_IDS.get(ChatTab.row(tab));
+        UUID characterId = PARTNER_CHARACTER_IDS.get(ConversationPage.row(tab));
         String identity = tab.getPartnerIdentity();
         for (CharacterAppearance appearance
                 : ClientCharacterAppearanceCache.snapshot().values()) {
@@ -507,14 +499,14 @@ public final class ClientChatChannelState {
      * conversation's own tab. Only their lines say it: the player's own
      * copy of a whisper carries the player's colour, not theirs.
      */
-    public static synchronized void rememberPartnerColor(ChatTab tab,
+    public static synchronized void rememberPartnerColor(ConversationPage tab,
                                                          int color) {
         if (tab == null || (!tab.isWhisper() && !tab.isNpc())) {
             return;
         }
-        PARTNER_COLORS.put(ChatTab.row(tab), Integer.valueOf(color & 0xFFFFFF));
+        PARTNER_COLORS.put(ConversationPage.row(tab), Integer.valueOf(color & 0xFFFFFF));
         while (PARTNER_COLORS.size() > MAX_PARTNER_COLORS) {
-            Iterator<ChatTab> oldest = PARTNER_COLORS.keySet().iterator();
+            Iterator<ConversationPage> oldest = PARTNER_COLORS.keySet().iterator();
             oldest.next();
             oldest.remove();
         }
@@ -525,15 +517,15 @@ public final class ClientChatChannelState {
      * person's tab names them the way they speak: the character's name
      * alone, never the account behind it.
      */
-    public static synchronized void rememberPartnerName(ChatTab tab,
+    public static synchronized void rememberPartnerName(ConversationPage tab,
                                                         String identityName) {
         if (tab == null || !tab.isWhisper() || identityName == null
                 || identityName.length() == 0) {
             return;
         }
-        PARTNER_NAMES.put(ChatTab.row(tab), identityName);
+        PARTNER_NAMES.put(ConversationPage.row(tab), identityName);
         while (PARTNER_NAMES.size() > MAX_PARTNER_COLORS) {
-            Iterator<ChatTab> oldest = PARTNER_NAMES.keySet().iterator();
+            Iterator<ConversationPage> oldest = PARTNER_NAMES.keySet().iterator();
             oldest.next();
             oldest.remove();
         }
@@ -543,26 +535,26 @@ public final class ClientChatChannelState {
      * Remembers which character of the other party a conversation is
      * with; null forgets, for a conversation with their account.
      */
-    public static synchronized void rememberPartnerCharacterId(ChatTab tab,
+    public static synchronized void rememberPartnerCharacterId(ConversationPage tab,
                                                                UUID characterId) {
         if (tab == null || !tab.isWhisper() || tab.isNpc()) {
             return;
         }
         if (characterId == null) {
-            PARTNER_CHARACTER_IDS.remove(ChatTab.row(tab));
+            PARTNER_CHARACTER_IDS.remove(ConversationPage.row(tab));
             return;
         }
-        PARTNER_CHARACTER_IDS.put(ChatTab.row(tab), characterId);
+        PARTNER_CHARACTER_IDS.put(ConversationPage.row(tab), characterId);
         while (PARTNER_CHARACTER_IDS.size() > MAX_PARTNER_COLORS) {
-            Iterator<ChatTab> oldest = PARTNER_CHARACTER_IDS.keySet().iterator();
+            Iterator<ConversationPage> oldest = PARTNER_CHARACTER_IDS.keySet().iterator();
             oldest.next();
             oldest.remove();
         }
     }
 
     /** The id of the character a conversation is with; null for their account, or unknown. */
-    public static synchronized UUID partnerCharacterIdOf(ChatTab tab) {
-        return tab == null ? null : PARTNER_CHARACTER_IDS.get(ChatTab.row(tab));
+    public static synchronized UUID partnerCharacterIdOf(ConversationPage tab) {
+        return tab == null ? null : PARTNER_CHARACTER_IDS.get(ConversationPage.row(tab));
     }
 
     public static synchronized int displayColor(ChatChannel channel) {
@@ -583,12 +575,12 @@ public final class ClientChatChannelState {
      * identity their last line wore, when one is remembered — and for
      * one faction's conversation that faction's name.
      */
-    public static synchronized String displayName(ChatTab tab) {
+    public static synchronized String displayName(ConversationPage tab) {
         if (tab == null) {
             return "";
         }
         if (tab.isWhisper()) {
-            String remembered = PARTNER_NAMES.get(ChatTab.row(tab));
+            String remembered = PARTNER_NAMES.get(ConversationPage.row(tab));
             // The identity is what the conversation is with; the account
             // behind it is never shown beside it.
             return remembered != null ? remembered
@@ -744,7 +736,7 @@ public final class ClientChatChannelState {
      * Whether what is said in a tab crosses to Discord: its channel is
      * linked, and for Faction chat the faction the tab shows now.
      */
-    public static synchronized boolean isLinkedToDiscord(ChatTab tab) {
+    public static synchronized boolean isLinkedToDiscord(ConversationPage tab) {
         if (tab == null || tab.getChannel() == null || DISCORD_LINKS.isEmpty()) {
             return false;
         }
@@ -958,7 +950,7 @@ public final class ClientChatChannelState {
      * Remembers a tab's unsent input where the client is now
      * ({@link ClientChatDrafts}); empty text forgets it.
      */
-    public static synchronized void setDraft(ChatTab tab, String text) {
+    public static synchronized void setDraft(ConversationPage tab, String text) {
         ClientChatDrafts.set(ClientChatSession.currentKey(), tab, text);
     }
 
@@ -967,7 +959,7 @@ public final class ClientChatChannelState {
     }
 
     /** Remembers a line sent from a tab, for the arrows to recall there and nowhere else. */
-    public static synchronized void recordSent(ChatTab tab, String text) {
+    public static synchronized void recordSent(ConversationPage tab, String text) {
         SENT_HISTORY.record(tab, text);
     }
 
@@ -975,7 +967,7 @@ public final class ClientChatChannelState {
      * Walks a tab's sent lines: Up is {@code -1}, Down {@code +1}. The
      * text the field should now hold, or null when nothing changes.
      */
-    public static synchronized String recallSent(ChatTab tab, int direction,
+    public static synchronized String recallSent(ConversationPage tab, int direction,
                                                  String fieldText) {
         return SENT_HISTORY.step(tab, direction, fieldText);
     }
@@ -991,12 +983,12 @@ public final class ClientChatChannelState {
     }
 
     /** A tab's unsent input where the client is now; empty when it has none. */
-    public static synchronized String getDraft(ChatTab tab) {
+    public static synchronized String getDraft(ConversationPage tab) {
         return ClientChatDrafts.get(ClientChatSession.currentKey(), tab);
     }
 
     public static synchronized void clear() {
-        choose(ChatTab.of(ChatChannel.GLOBAL));
+        choose(ConversationPage.of(ChatChannel.GLOBAL));
         lastUsedKnown = false;
         PARTNER_COLORS.clear();
         PARTNER_NAMES.clear();
@@ -1082,7 +1074,7 @@ public final class ClientChatChannelState {
         }
         for (CharacterSummary character : roster.getCharacters()) {
             if (character != null && ownerKey.equals(
-                    ChatTab.ownerKeyOf(character.getCharacterId()))) {
+                    ConversationPage.ownerKeyOf(character.getCharacterId()))) {
                 return LotrCharacterAdapter.factionIdOrUnaligned(
                         character.getFactionId());
             }
@@ -1095,10 +1087,10 @@ public final class ClientChatChannelState {
      * for the identity the chat is being read as. What the tab row, the
      * selection and the composer point at.
      */
-    public static synchronized ChatTab tabRead(ChatChannel channel) {
+    public static synchronized ConversationPage tabRead(ChatChannel channel) {
         return channel == null || !channel.isScoped()
-                ? ChatTab.of(channel)
-                : ChatTab.of(channel, scopeKeyRead(channel));
+                ? ConversationPage.of(channel)
+                : ConversationPage.of(channel, scopeKeyRead(channel));
     }
 
     /**
@@ -1131,17 +1123,17 @@ public final class ClientChatChannelState {
      * send to, else the first open readable one; with nothing open at
      * all, the catalogue default.
      */
-    private static ChatTab fallbackTab() {
-        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+    private static ConversationPage fallbackTab() {
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         if (isSelectable(global) && canSend(global)) {
             return global;
         }
-        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         if (isSelectable(ooc)) {
             return ooc;
         }
-        List<ChatTab> open = getOpenTabs();
-        for (ChatTab tab : open) {
+        List<ConversationPage> open = getOpenTabs();
+        for (ConversationPage tab : open) {
             if (canSend(tab)) {
                 return tab;
             }

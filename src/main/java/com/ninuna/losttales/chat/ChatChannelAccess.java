@@ -13,7 +13,12 @@ package com.ninuna.losttales.chat;
 public enum ChatChannelAccess {
     /** Open to everyone online. */
     NONE,
-    /** An active character with a LOTR faction. */
+    /**
+     * The faction of the chat identity, which decides the conversation a
+     * line goes to rather than whether it may be sent: every identity has
+     * one, the account and a character with no LOTR faction speaking as
+     * Unaligned.
+     */
     CHARACTER_FACTION,
     /** An active character belonging to a Lost Tales fellowship. */
     FELLOWSHIP_MEMBERSHIP

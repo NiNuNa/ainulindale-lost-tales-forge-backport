@@ -7,6 +7,9 @@ import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 
@@ -563,9 +566,9 @@ public final class ClientSettingsSections {
     }
 
     /**
-     * The camera's preset: one of the preset files there are now, read by
-     * the name the file gives it, stepping on with a click and back with
-     * a right-click. A new preset starts the camera's session again.
+     * The camera's preset: one of the preset files there are now, each
+     * read by the name the file gives it, picked from its words. A new
+     * preset starts the camera's session again.
      */
     private static final class CameraPreset extends Settings.ModSetting {
         CameraPreset() {
@@ -581,20 +584,34 @@ public final class ClientSettingsSections {
         }
 
         @Override
-        public void step(boolean back) {
+        public List<String> words() {
+            List<String> words = new ArrayList<String>();
+            for (String preset : CameraPresetFileStore.getConfigValues()) {
+                CameraPresetDefinition definition =
+                        CameraPresetFileStore.getDefinition(preset);
+                words.add(definition == null ? preset : definition.getName());
+            }
+            return words;
+        }
+
+        @Override
+        public int wordIndex() {
+            return Arrays.asList(CameraPresetFileStore.getConfigValues())
+                    .indexOf(LostTalesThirdPersonConfig.cameraPreset);
+        }
+
+        @Override
+        public int shippedWordIndex() {
+            return Arrays.asList(CameraPresetFileStore.getConfigValues())
+                    .indexOf(CameraPresetFileStore.normalizeId(shipped()));
+        }
+
+        @Override
+        public void pickWord(int index) {
             String[] presets = CameraPresetFileStore.getConfigValues();
-            if (presets.length == 0) {
-                return;
+            if (index >= 0 && index < presets.length) {
+                LostTalesThirdPersonConfig.cameraPreset = presets[index];
             }
-            int at = -1;
-            for (int index = 0; index < presets.length; index++) {
-                if (presets[index].equals(
-                        LostTalesThirdPersonConfig.cameraPreset)) {
-                    at = index;
-                }
-            }
-            LostTalesThirdPersonConfig.cameraPreset =
-                    presets[Settings.nextIndex(at, presets.length, back)];
         }
 
         @Override

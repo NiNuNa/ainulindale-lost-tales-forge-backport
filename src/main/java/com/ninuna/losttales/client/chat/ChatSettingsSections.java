@@ -7,7 +7,7 @@ import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowScreen;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.config.LostTalesConfig;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,9 +20,9 @@ import net.minecraft.util.StatCollector;
 
 /**
  * The chat's sections of Settings, Chat Settings, after the windows' own:
- * its Look, Messages, Mentions, Typing and Closed Feed, and everyone
- * ignored. A conversation's own Notifications and Show in Feed stand in
- * its options, not here. Every Settings has them.
+ * its Look, Messages, Mentions, Typing and Chat Feed, and everyone
+ * ignored. A conversation's own Notification Settings and Chat Feed
+ * Settings stand in its options, not here. Every Settings has them.
  */
 public final class ChatSettingsSections {
     /**
@@ -227,7 +227,7 @@ public final class ChatSettingsSections {
         }
     }
 
-    /* ---- Messages, Mentions, Typing, Closed Feed ---- */
+    /* ---- Messages, Mentions, Typing, Chat Feed ---- */
 
     private static List<Settings.Setting> messages() {
         List<Settings.Setting> messages = new ArrayList<Settings.Setting>();
@@ -310,18 +310,42 @@ public final class ChatSettingsSections {
                 "gui.losttales.chat.settings.visibility") {
             @Override
             public String value() {
+                return word(game().chatVisibility);
+            }
+
+            private String word(EntityPlayer.EnumChatVisibility visibility) {
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.settings.visibility."
-                                + game().chatVisibility.name()
-                                        .toLowerCase(Locale.ROOT));
+                                + visibility.name().toLowerCase(Locale.ROOT));
             }
 
             @Override
-            public void step(boolean back) {
+            public List<String> words() {
+                List<String> words = new ArrayList<String>();
+                for (EntityPlayer.EnumChatVisibility visibility
+                        : EntityPlayer.EnumChatVisibility.values()) {
+                    words.add(word(visibility));
+                }
+                return words;
+            }
+
+            @Override
+            public int wordIndex() {
+                return game().chatVisibility.ordinal();
+            }
+
+            @Override
+            public int shippedWordIndex() {
+                return EntityPlayer.EnumChatVisibility.FULL.ordinal();
+            }
+
+            @Override
+            public void pickWord(int index) {
                 EntityPlayer.EnumChatVisibility[] all =
                         EntityPlayer.EnumChatVisibility.values();
-                game().chatVisibility = all[Settings.nextIndex(
-                        game().chatVisibility.ordinal(), all.length, back)];
+                if (index >= 0 && index < all.length) {
+                    game().chatVisibility = all[index];
+                }
             }
 
             @Override

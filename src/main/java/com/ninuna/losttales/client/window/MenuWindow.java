@@ -163,7 +163,7 @@ public final class MenuWindow extends SubWindowContent {
          */
         boolean chip;
         /** The tab whose icon stands before the name, or null for none. */
-        public final WindowTab icon;
+        public final WindowPage icon;
         /** A picture before the name, a person's head; null for none. */
         Picture picture;
         /** A sheet sprite before the name, or null. */
@@ -337,12 +337,12 @@ public final class MenuWindow extends SubWindowContent {
         }
 
         public Entry(String id, String label, boolean dim, int color,
-                     WindowTab icon) {
+                     WindowPage icon) {
             this(id, label, false, false, dim, color, icon);
         }
 
         private Entry(String id, String label, boolean header,
-                      boolean passive, boolean dim, int color, WindowTab icon) {
+                      boolean passive, boolean dim, int color, WindowPage icon) {
             this.id = id;
             this.label = label == null ? "" : label;
             this.header = header;
@@ -352,7 +352,7 @@ public final class MenuWindow extends SubWindowContent {
             this.icon = icon;
         }
 
-        /** A section label: {@code Channels}, {@code Direct Messages}. */
+        /** A section label: {@code Channels}, {@code Whispers}. */
         public static Entry header(String label) {
             return new Entry("", label, true, false, false, -1, null);
         }
@@ -377,7 +377,7 @@ public final class MenuWindow extends SubWindowContent {
         }
 
         /** A group's name in {@code rgb}, a channel's {@code icon} before it or none. */
-        public static Entry group(String label, WindowTab icon, int rgb) {
+        public static Entry group(String label, WindowPage icon, int rgb) {
             Entry entry = new Entry("", label, false, true, false, -1, icon);
             entry.group = true;
             entry.labelColor = rgb;

@@ -1,7 +1,7 @@
 package com.ninuna.losttales.chat;
 
 /**
- * Builds Server Console entries for tests through the entry's full
+ * Builds Server Log entries for tests through the entry's full
  * constructor: no command context, actor identity or report unless the
  * helper's name says so.
  */

@@ -55,10 +55,19 @@ public final class StackFadeTest {
     public void aWindowFirstSeenStandsAtItsStrength() {
         StackFade fade = new StackFade();
         fade.advance(Arrays.asList("back", "front"),
-                Arrays.asList(box(0, 0), box(20, 20)), 1000L);
+                Arrays.asList(box(0, 0), box(20, 20)), null, 1000L);
         assertEquals(0.875F, fade.shareOf("back"), 0.0F);
         assertEquals(1.0F, fade.shareOf("front"), 0.0F);
         assertEquals(1.0F, fade.shareOf("elsewhere"), 0.0F);
+    }
+
+    /** The window the pointer rests on is led toward whole, however many lie over it. */
+    @Test
+    public void theWindowPointedAtShowsWhole() {
+        StackFade fade = new StackFade();
+        fade.advance(Arrays.asList("back", "front"),
+                Arrays.asList(box(0, 0), box(20, 20)), "back", 1000L);
+        assertEquals(1.0F, fade.shareOf("back"), 0.0F);
     }
 
     private static LostTalesUiHitBox box(double left, double top) {

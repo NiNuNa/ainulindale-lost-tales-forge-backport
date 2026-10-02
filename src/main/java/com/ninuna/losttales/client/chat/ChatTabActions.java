@@ -1,12 +1,12 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.TabSelection;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowDrawing;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowSplit;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
@@ -27,7 +27,7 @@ public final class ChatTabActions {
     private final ChatComposer composer;
     private Minecraft mc;
     private GuiTextField field;
-    private ChatTab lastSelected;
+    private ConversationPage lastSelected;
 
     ChatTabActions(ChatInputBar bar, ChatInputCompletion completion,
                    ChatComposer composer) {
@@ -53,7 +53,7 @@ public final class ChatTabActions {
      * its own unsent text, if any. A walk through the tab's sent lines
      * ends here, so the line it left in the field is what goes back.
      */
-    private void swapDraft(ChatTab previous, ChatTab selected) {
+    private void swapDraft(ConversationPage previous, ConversationPage selected) {
         if (this.field == null) {
             return;
         }
@@ -71,7 +71,7 @@ public final class ChatTabActions {
      * window's front tab counts as read while the screen is open.
      */
     void syncSelection() {
-        ChatTab selected = ClientChatChannelState.getSelected();
+        ConversationPage selected = ClientChatChannelState.getSelected();
         // A set of marks is anchored on the tab being typed in and
         // always holds it: a tab that has gone is forgotten, and moving
         // the input off the set — to another tab, or another window —
@@ -91,7 +91,7 @@ public final class ChatTabActions {
         // the page with no bar. The covered tab stays the last used.
         boolean moved = false;
         if (WindowLayout.showsPage(WindowLayout.windowOf(selected))) {
-            ChatTab elsewhere = frontConversationElsewhere();
+            ConversationPage elsewhere = frontConversationElsewhere();
             if (elsewhere != null) {
                 ClientChatChannelState.lendInput(elsewhere);
                 selected = ClientChatChannelState.getSelected();
@@ -102,7 +102,7 @@ public final class ChatTabActions {
             WindowLayout.setActiveTab(selected);
         }
         if (!selected.equals(this.lastSelected)) {
-            ChatTab previous = this.lastSelected;
+            ConversationPage previous = this.lastSelected;
             this.lastSelected = selected;
             // The window being typed in comes to the front, a completion
             // walked in the tab just left is over, and so is its read
@@ -120,17 +120,17 @@ public final class ChatTabActions {
         List<Window> windows = WindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
             Window window = windows.get(index);
-            WindowTab shown = ChatFrame.activeTab(window,
+            WindowPage shown = ChatFrame.activeTab(window,
                     ChatFrame.visibleTabs(window));
-            ChatTab front = ChatTab.from(shown);
+            ConversationPage front = ConversationPage.from(shown);
             if (front != null) {
                 ClientChatChannelViews.markViewed(front);
             }
             // A conversation on the other side of a split is read where
             // it stands too.
             WindowSplit split = shown == null ? null : window.splitOf(shown);
-            ChatTab beside = WindowDrawing.shows(split, shown)
-                    ? ChatTab.from(split.other(shown)) : null;
+            ConversationPage beside = WindowDrawing.shows(split, shown)
+                    ? ConversationPage.from(split.other(shown)) : null;
             if (beside != null) {
                 ClientChatChannelViews.markViewed(beside);
             }
@@ -141,11 +141,11 @@ public final class ChatTabActions {
      * The conversation in front of the window last brought forward among
      * those that show one; null while every window shows a page.
      */
-    private static ChatTab frontConversationElsewhere() {
+    private static ConversationPage frontConversationElsewhere() {
         List<Window> stacked = WindowLayout.stacked();
         for (int index = stacked.size() - 1; index >= 0; index--) {
             Window window = stacked.get(index);
-            ChatTab front = ChatTab.from(ChatFrame.activeTab(window,
+            ConversationPage front = ConversationPage.from(ChatFrame.activeTab(window,
                     ChatFrame.visibleTabs(window)));
             if (front != null && ClientChatChannelState.isSelectable(front)) {
                 return front;
@@ -163,9 +163,9 @@ public final class ChatTabActions {
         if (window == null) {
             return;
         }
-        WindowTab front = ChatFrame.activeTab(window,
+        WindowPage front = ChatFrame.activeTab(window,
                 ChatFrame.visibleTabs(window));
-        if (front instanceof PageTab) {
+        if (front instanceof OtherPage) {
             // A page takes no input: its window only comes forward.
             WindowLayout.raise(window.getId());
             return;
@@ -183,15 +183,15 @@ public final class ChatTabActions {
      * the field takes focus, and the mention candidates — shaped per
      * channel identity — are rebuilt.
      */
-    public void selectChannel(WindowTab picked) {
-        if (picked instanceof PageTab) {
+    public void selectChannel(WindowPage picked) {
+        if (picked instanceof OtherPage) {
             // A page is never typed into: it comes in front of its
             // window, and the input moves off it.
-            WindowLayout.showPage((PageTab)picked);
+            WindowLayout.showPage((OtherPage)picked);
             syncSelection();
             return;
         }
-        ChatTab tab = ChatTab.from(picked);
+        ConversationPage tab = ConversationPage.from(picked);
         this.composer.onTabSelected(tab);
         ClientChatChannelState.select(tab);
         if (tab != null && tab.equals(ClientChatChannelState.getSelected())) {
@@ -213,14 +213,14 @@ public final class ChatTabActions {
      * server refuses if it is nobody's — the notice is the server's to
      * give, not a guess made here.
      */
-    ChatTab openWhisperTab(String account) {
+    ConversationPage openWhisperTab(String account) {
         String[] played = ClientChatChannelState.playedBy(account);
         return played == null ? openWhisperTab(account, "")
                 : openWhisperTab(played[0], played[1]);
     }
 
     /** As above with one identity of that account; empty is its own. */
-    ChatTab openWhisperTab(String account, String identity) {
+    ConversationPage openWhisperTab(String account, String identity) {
         String name = account == null ? "" : account.trim();
         if (name.length() == 0) {
             return null;
@@ -233,7 +233,7 @@ public final class ChatTabActions {
         }
         Window current = WindowLayout.windowOf(
                 ClientChatChannelState.getSelected());
-        ChatTab tab = ChatLayout.openWhisper(name, identity,
+        ConversationPage tab = ChatLayout.openWhisper(name, identity,
                 current == null ? null : current.getId());
         if (tab != null) {
             selectChannel(tab);
@@ -260,8 +260,8 @@ public final class ChatTabActions {
      * Closes one tab, a conversation through the chat and a page as any
      * window's tab; the group it was marked with ends with it.
      */
-    void closeTab(WindowTab tab) {
-        ChatTab conversation = ChatTab.from(tab);
+    void closeTab(WindowPage tab) {
+        ConversationPage conversation = ConversationPage.from(tab);
         if (conversation != null ? ClientChatChannelState.close(conversation)
                 : WindowLayout.close(tab)) {
             // What is left of the marks would be anchored on a tab that
@@ -282,11 +282,11 @@ public final class ChatTabActions {
             closeTab(ClientChatChannelState.getSelected());
             return;
         }
-        List<WindowTab> marked = TabSelection.selectedIn(
+        List<WindowPage> marked = TabSelection.selectedIn(
                 WindowLayout.window(TabSelection.windowId()));
         boolean closed = false;
         for (int index = 0; index < marked.size(); index++) {
-            ChatTab conversation = ChatTab.from(marked.get(index));
+            ConversationPage conversation = ConversationPage.from(marked.get(index));
             closed |= conversation != null
                     ? ClientChatChannelState.close(conversation)
                     : WindowLayout.close(marked.get(index));

@@ -70,7 +70,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /**
      * The sender id of the server's own lines: a command's answer, and
-     * the Server Console's word on who ran what. Nobody's account, so
+     * the Server Log's word on who ran what. Nobody's account, so
      * it is never ignored, muted, whispered or looked up a skin for; a
      * client shows it with the console mark for a head. Such lines are
      * built on the client from what the server sent and never travel
@@ -469,21 +469,16 @@ public final class LostTalesChatMessagePacket implements IMessage {
             }
             this.scopeValue = scope;
             // The colour the quoted author's name was drawn in; a line that
-            // names no message carries, in its place, the quote of a line
-            // nobody named: its author, its words and the author's colour.
-            // An empty author is no quote.
+            // names no message carries, in its place, whether it quotes a
+            // line the server holds no record of, which travels as nothing
+            // of that line.
             if (this.reply.isAnchored()) {
                 this.reply = ChatReplyReference.of(
                         this.reply.getMessageId(), this.reply.getAuthor(),
                         this.reply.getExcerpt(), buffer.readInt());
             } else {
-                String quoteAuthor = LostTalesPacketCodec.readUtf8String(
-                        buffer, ChatReplyReference.MAX_AUTHOR_BYTES);
-                String quoteExcerpt = LostTalesPacketCodec.readUtf8String(
-                        buffer, ChatReplyReference.MAX_EXCERPT_BYTES);
-                int quoteColor = buffer.readInt();
-                this.reply = ChatReplyReference.unanchored(quoteAuthor,
-                        quoteExcerpt, quoteColor);
+                this.reply = buffer.readBoolean() ? ChatReplyReference.UNKEPT
+                        : ChatReplyReference.NONE;
             }
             // The head the quote wears — a sender id, whether the line
             // wore the account, its skin — then a server line's own
@@ -493,13 +488,17 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String quotedSkin = LostTalesPacketCodec.readUtf8String(
                     buffer, ChatReplyReference.MAX_SKIN_ID_BYTES);
             if (quotedSender != null) {
+                if (!this.reply.isAnchored()) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "a head on a quote that names no message");
+                }
                 this.reply = this.reply.withHead(quotedSender,
                         quotedAccountLine, quotedSkin);
             }
             // Whether the quoted line is an action; only a quote that
-            // exists may say so, and a forward below never does.
+            // names its message may say so, and a forward below never does.
             boolean quotedAction = buffer.readBoolean();
-            if (quotedAction && !this.reply.exists()) {
+            if (quotedAction && !this.reply.isAnchored()) {
                 throw new LostTalesPacketCodec.DecodeException(
                         "an action quote of nothing");
             }
@@ -689,27 +688,24 @@ public final class LostTalesChatMessagePacket implements IMessage {
         writeOptionalUuid(buffer, this.partnerCharacterId);
         LostTalesPacketCodec.writeUtf8String(buffer, this.scopeValue,
                 MAX_SCOPE_VALUE_BYTES);
-        if (this.reply.isAnchored()) {
+        boolean anchored = this.reply.isAnchored();
+        if (anchored) {
             buffer.writeInt(this.reply.getAuthorColor());
         } else {
-            // A quote of a line nobody named: author, words and colour.
-            // Written whether or not there is one, so the tail behind
-            // it stands at one place: an empty author is no quote.
-            LostTalesPacketCodec.writeUtf8String(buffer,
-                    this.reply.getAuthor(),
-                    ChatReplyReference.MAX_AUTHOR_BYTES);
-            LostTalesPacketCodec.writeUtf8String(buffer,
-                    this.reply.getExcerpt(),
-                    ChatReplyReference.MAX_EXCERPT_BYTES);
-            buffer.writeInt(this.reply.getAuthorColor());
+            // A quote of a line nobody named travels as one no longer
+            // kept: that there is one, and nothing of the line it quotes,
+            // whose author and words only a client's own screen holds.
+            buffer.writeBoolean(this.reply.exists());
         }
         // The quote's head, the server line's component, the players it
-        // names: see fromBytes.
-        writeOptionalUuid(buffer, this.reply.getSenderId());
-        buffer.writeBoolean(this.reply.isAccountLine());
-        LostTalesPacketCodec.writeUtf8String(buffer, this.reply.getSkinId(),
+        // names: see fromBytes. Only a quote naming its message wears a
+        // head or reads as an action.
+        writeOptionalUuid(buffer, anchored ? this.reply.getSenderId() : null);
+        buffer.writeBoolean(anchored && this.reply.isAccountLine());
+        LostTalesPacketCodec.writeUtf8String(buffer,
+                anchored ? this.reply.getSkinId() : "",
                 ChatReplyReference.MAX_SKIN_ID_BYTES);
-        buffer.writeBoolean(this.reply.isAction());
+        buffer.writeBoolean(anchored && this.reply.isAction());
         LostTalesPacketCodec.writeUtf8String(buffer,
                 this.reply.getForwardedFrom(),
                 ChatReplyReference.MAX_LINK_BYTES);
@@ -794,6 +790,11 @@ public final class LostTalesChatMessagePacket implements IMessage {
                         && !isSystemSender(this.senderId))
                 // The Server and the Client say things; they do none.
                 || (this.action && isSystemSender(this.senderId))
+                // The Narrator's own id signs a Narrator line and nothing
+                // else, and names no character behind it.
+                || (ChatNarrator.SENDER_ID.equals(this.senderId)
+                        && (!isNarrator() || this.accountLine
+                                || this.identityCharacterId != null))
                 || !LostTalesPacketCodec.isUtf8WithinLimit(this.tabId,
                         MAX_TAB_ID_BYTES)
                 || !ChatConsoleEvent.isContext(this.tabId)
@@ -1037,6 +1038,26 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /** Whether the line is the Narrator's: told, not said. */
     public boolean isNarrator() { return ChatNarrator.isNarratorSkin(this.skinId); }
+
+    /**
+     * The same line as everyone but the one narrating it is sent it: a
+     * Narrator line signed by the Narrator alone, with no account, no
+     * account id, no title, no roles and no character behind it. A
+     * whisper keeps the partner and the characters its conversation is
+     * filed under. Any other line is returned as it is.
+     */
+    public LostTalesChatMessagePacket narratedForOthers() {
+        if (!isNarrator() || ChatNarrator.SENDER_ID.equals(this.senderId)) {
+            return this;
+        }
+        return carrying(new LostTalesChatMessagePacket(getChannel(),
+                ChatNarrator.SENDER_ID, ChatNarrator.NAME, ChatNarrator.NAME,
+                "", this.titleColor, this.nameColor, this.message,
+                this.timestampMillis, this.skinId, this.showcases,
+                "", this.partner, 0, false, this.messageId,
+                this.reply, this.partnerIdentity, this.echoNonce, null,
+                this.ownCharacterId, this.partnerCharacterId, this.scopeValue));
+    }
 
     /** Whether the channel is as many conversations as it has scope values. */
     private static boolean scopedChannel(ChatChannel channel) {

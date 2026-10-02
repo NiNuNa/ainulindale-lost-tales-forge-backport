@@ -8,9 +8,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
  * What a tab's icon says in its corner about what waits there: the
  * crimson tile counting the pings not yet read, or else the white sphere
  * for anything else not yet read, or nothing. Each kind of tab says what
- * its own mark is ({@link WindowTab#mark}); a conversation with one
+ * its own mark is ({@link WindowPage#mark}); a conversation with one
  * person counts every line not yet read as a ping, as a messenger's
- * direct messages are. The tile counts to 99 and then reads {@code 99+},
+ * whispers are. The tile counts to 99 and then reads {@code 99+},
  * as Discord's does, growing to the left as its figures grow.
  *
  * <p>It stands where a head's status sphere stands, two pixels past the
@@ -44,15 +44,15 @@ public final class TabMark {
     }
 
     /** What waits in a tab's corner, as the tab says; nothing for no tab. */
-    public static TabMark of(WindowTab tab) {
+    public static TabMark of(WindowPage tab) {
         return tab == null ? NONE : tab.mark();
     }
 
     /** The mark for several tabs together: the sum of their pings, else the sphere if any has something unread. */
-    public static TabMark combined(Iterable<? extends WindowTab> tabs) {
+    public static TabMark combined(Iterable<? extends WindowPage> tabs) {
         int pings = 0;
         boolean unread = false;
-        for (WindowTab tab : tabs) {
+        for (WindowPage tab : tabs) {
             TabMark mark = of(tab);
             pings += mark.pings;
             unread |= mark.unread;

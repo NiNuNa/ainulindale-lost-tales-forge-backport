@@ -17,23 +17,80 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * counts for the identity a line wears and for the identity being
  * played, and never for the account's other characters.
  *
- * <p>Two questions, two answers: {@link #resolve(EntityPlayerMP)} is the
- * account's roles, what a capability is granted through; {@link
+ * <p>Three questions, three answers: {@link #resolve(EntityPlayerMP)} is
+ * the account's roles, what an account line wears; {@link
  * #resolve(EntityPlayerMP, UUID)} adds the roles assigned to one of the
  * account's characters, what a line is signed with and a gate is passed
- * with. Nothing a client sends takes part in either. {@link #absentMask}
- * answers the second question for an identity whose player is not here,
- * which a member list asks of everyone absent.</p>
+ * with; {@link #grantingMask(EntityPlayerMP)} is the roles a capability
+ * is granted through, those the account holds by assignment or by
+ * operator level. A role earned by a LOTR faction rank, or assigned to a
+ * character, keeps its look, its order and the gates it opens, and
+ * grants nothing. Nothing a client sends takes part in any of them.
+ * {@link #absentMask} answers the second question for an identity whose
+ * player is not here, which a member list asks of everyone absent.</p>
  */
 public final class ChatAccountRoleResolver {
     /** The operator level of an account the server does not list as an operator. */
     public static final int NOT_OPERATOR = -1;
+
+    /** Whether an account reaches an operator level, as the server reads it. */
+    interface OperatorLevel {
+        boolean reaches(int level, String roleId);
+    }
 
     private ChatAccountRoleResolver() {}
 
     /** The account's own role mask; zero for no roles or no player. */
     public static int resolve(EntityPlayerMP player) {
         return resolve(player, null);
+    }
+
+    /**
+     * The roles a capability is granted through: those assigned to the
+     * account, the team mark, and those an operator level gives. A role
+     * the played character earned by a LOTR faction rank, and a role
+     * assigned to a character, are worn and grant nothing. Zero for no
+     * player.
+     */
+    public static int grantingMask(final EntityPlayerMP player) {
+        if (player == null) {
+            return 0;
+        }
+        return grantingMask(ChatRoleCatalog.server(), player.getUniqueID(),
+                new OperatorLevel() {
+                    @Override
+                    public boolean reaches(int level, String roleId) {
+                        return player.canCommandSenderUseCommand(level,
+                                "losttales.role." + roleId);
+                    }
+                });
+    }
+
+    /**
+     * The rule itself: the account's own assignments, the team mark, and
+     * every role whose operator level {@code operator} reaches. Faction
+     * ranks and character assignments take no part. Pure, so the rule can
+     * be checked without a server.
+     */
+    static int grantingMask(ChatRoleCatalog catalog, UUID accountId,
+                            OperatorLevel operator) {
+        int mask = assignedMask(catalog, accountId, null) | teamMask(accountId);
+        if (catalog == null || operator == null) {
+            return mask;
+        }
+        for (ChatAccountRole role : catalog.roles()) {
+            if (role.isLocked()) {
+                continue;
+            }
+            for (ChatRoleSource source : role.getSources()) {
+                if (source.getKind() == ChatRoleSource.Kind.OP_LEVEL
+                        && operator.reaches(source.getLevel(), role.getId())) {
+                    mask |= role.bit();
+                    break;
+                }
+            }
+        }
+        return mask;
     }
 
     /**

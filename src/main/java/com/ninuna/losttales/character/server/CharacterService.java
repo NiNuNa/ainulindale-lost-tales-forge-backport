@@ -335,6 +335,11 @@ public final class CharacterService {
         if (!playerValidation.isValid()) {
             return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
         }
+        CharacterValidationResult managementValidation =
+                CharacterValidator.validatePlayerCanManage(player);
+        if (!managementValidation.isValid()) {
+            return CharacterOperationResult.failure(managementValidation.getErrorId(), null);
+        }
         if (adoption == null) {
             return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
         }
@@ -349,12 +354,8 @@ public final class CharacterService {
         if (roster == null) {
             return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
         }
-        // The revision the offer was made against is not checked: the
-        // offer names no character and no slot, so there is nothing a
-        // revision protects, and the roster is re-read and re-checked
-        // here anyway. The login sequence itself moves the revision —
-        // the roster exists before its account character does — and an
-        // offer made against the earlier snapshot must still be taken.
+        // The offer names no character and no slot, so it carries no
+        // roster revision; the roster is re-read and re-checked here.
         RoleplayCharacter current = roster.getDefaultCharacter();
         if (current == null || roster.isTemplateTaken()) {
             // Either there is nothing to take it onto yet, or this world

@@ -25,6 +25,7 @@ import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.WorldServer;
 import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementResult;
@@ -450,7 +451,10 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             if (sender instanceof EntityPlayerMP) {
                 return (EntityPlayerMP) sender;
             }
-            send(sender, EnumChatFormatting.RED + "Console must specify a player.");
+            ChatComponentTranslation refusal = new ChatComponentTranslation(
+                    "chat.losttales.command.player_required");
+            refusal.getChatStyle().setColor(EnumChatFormatting.RED);
+            sender.addChatMessage(refusal);
             return null;
         } catch (Exception e) {
             String playerName = args.length > playerArgIndex ? args[playerArgIndex] : "";

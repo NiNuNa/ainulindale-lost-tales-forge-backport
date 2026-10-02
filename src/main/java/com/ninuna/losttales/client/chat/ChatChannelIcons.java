@@ -64,8 +64,8 @@ public final class ChatChannelIcons {
     private static final float HEAD_SIZE = 8.0F;
     /** NPCs remembered per conversation; the oldest go first. */
     private static final int MAX_PORTRAITS = 64;
-    private static final Map<ChatTab, Speaker> NPC_SPEAKERS =
-            new LinkedHashMap<ChatTab, Speaker>();
+    private static final Map<ConversationPage, Speaker> NPC_SPEAKERS =
+            new LinkedHashMap<ConversationPage, Speaker>();
     /**
      * Faction names remembered per NPC, captured when it spoke: what the
      * hover card names as the NPC's faction, so an NPC's card reads like
@@ -163,7 +163,7 @@ public final class ChatChannelIcons {
      * list: its id and the portrait its speech was drawn with, the last
      * one seen kept where this speech had none.
      */
-    static synchronized void rememberNpc(ChatTab tab, UUID npcId,
+    static synchronized void rememberNpc(ConversationPage tab, UUID npcId,
                                          String texturePath) {
         if (tab == null || !tab.isNpc() || npcId == null) {
             return;
@@ -173,20 +173,20 @@ public final class ChatChannelIcons {
                 ? texturePath : previous == null ? null : previous.portrait;
         NPC_SPEAKERS.put(tab, new Speaker(npcId, portrait));
         while (NPC_SPEAKERS.size() > MAX_PORTRAITS) {
-            Iterator<ChatTab> oldest = NPC_SPEAKERS.keySet().iterator();
+            Iterator<ConversationPage> oldest = NPC_SPEAKERS.keySet().iterator();
             oldest.next();
             oldest.remove();
         }
     }
 
     /** The portrait an NPC conversation's speech was drawn with; null until one is seen. */
-    static synchronized String npcPortrait(ChatTab tab) {
+    static synchronized String npcPortrait(ConversationPage tab) {
         Speaker speaker = tab == null ? null : NPC_SPEAKERS.get(tab);
         return speaker == null ? null : speaker.portrait;
     }
 
     /** The NPC an NPC conversation is with; null until it has spoken this session. */
-    static synchronized UUID npcId(ChatTab tab) {
+    static synchronized UUID npcId(ConversationPage tab) {
         Speaker speaker = tab == null ? null : NPC_SPEAKERS.get(tab);
         return speaker == null ? null : speaker.id;
     }
@@ -222,13 +222,13 @@ public final class ChatChannelIcons {
      * head for a whisper with a player the client can place, the tab's
      * emoji otherwise, and no mark in its corner.
      */
-    public static void draw(Minecraft minecraft, ChatTab tab, float x, float y,
+    public static void draw(Minecraft minecraft, ConversationPage tab, float x, float y,
                      int alpha) {
         draw(minecraft, tab, x, y, alpha, TabMark.NONE);
     }
 
     /** As above, the icon wearing {@code mark} in its corner. */
-    public static void draw(final Minecraft minecraft, ChatTab tab, float x, float y,
+    public static void draw(final Minecraft minecraft, ConversationPage tab, float x, float y,
                      final int alpha, final TabMark mark) {
         if (minecraft == null || tab == null) {
             return;
@@ -312,7 +312,7 @@ public final class ChatChannelIcons {
     static void drawChannelEmoji(Minecraft minecraft, ChatChannel channel,
                                  float x, float y, float size, int alpha) {
         drawEmojiIcon(minecraft, iconOf(channel), x, y, size, alpha,
-                ClientChatChannelState.isLinkedToDiscord(ChatTab.of(channel)),
+                ClientChatChannelState.isLinkedToDiscord(ConversationPage.of(channel)),
                 TabMark.NONE);
     }
 
@@ -605,7 +605,7 @@ public final class ChatChannelIcons {
      * The emoji a tab wears, which also says whether it has an icon's slot
      * at all.
      */
-    public static ChatEmoji iconOf(ChatTab tab) {
+    public static ChatEmoji iconOf(ConversationPage tab) {
         if (tab == null) {
             return null;
         }

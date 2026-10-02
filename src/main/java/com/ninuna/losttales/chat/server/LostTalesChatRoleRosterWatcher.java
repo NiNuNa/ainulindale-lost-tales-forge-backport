@@ -26,8 +26,8 @@ import net.minecraft.util.EnumChatFormatting;
  * string build per minute and sends nothing.
  *
  * <p>It also says so to the player it happened to: someone who has just
- * become an operator is told in their Client Console, and so is someone
- * who no longer is. Someone who has just come to read the Server Console
+ * become an operator is told in their Console, and so is someone
+ * who no longer is. Someone who has just come to read the Server Log
  * is sent what it holds, as they would have been on joining.</p>
  */
 public final class LostTalesChatRoleRosterWatcher {

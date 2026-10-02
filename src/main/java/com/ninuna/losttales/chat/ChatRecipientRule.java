@@ -24,8 +24,10 @@ public enum ChatRecipientRule {
      * ({@link ChatChannelGates}), which a fresh file seeds with the
      * operator role and which is put back whenever its line is missing
      * ({@link ChatRoleConfig#withRequiredGates}), so a deleted line never
-     * opens the channel. What the rule does say is that a line said
-     * here is never opened to anyone by a role granted afterwards.
+     * opens the channel. A line said here is kept for whoever the gate
+     * admits when they ask, not for those it reached: a role granted
+     * afterwards opens what was said before, and a role taken away closes
+     * it ({@code ChatChannelPolicy.audienceFor}).
      */
     OPERATORS,
     /** The sender and one named online player. */

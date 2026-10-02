@@ -46,7 +46,7 @@ public final class BarItem {
     /** A button's word, a field's hint, the words themselves. */
     public final String label;
     /** The tab a tab button names. */
-    WindowTab tab;
+    WindowPage tab;
     ItemStack icon;
     LostTalesUiSheet glyph;
     LostTalesUiSheet glyphLit;
@@ -66,7 +66,7 @@ public final class BarItem {
     }
 
     /** The tab button for {@code tab}: its tip says what it does and its keys. */
-    static BarItem tabButton(WindowTab tab, String tip) {
+    static BarItem tabButton(WindowPage tab, String tip) {
         BarItem item = new BarItem(Kind.TAB, TAB_ID,
                 tab == null ? "" : tab.title());
         item.tab = tab;

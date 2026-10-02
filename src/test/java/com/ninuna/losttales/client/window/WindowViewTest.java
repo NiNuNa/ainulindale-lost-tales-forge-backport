@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.client.chat.ChatTab;
+import com.ninuna.losttales.client.chat.ConversationPage;
 import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import java.util.Arrays;
@@ -30,8 +30,8 @@ public final class WindowViewTest {
     private static final String OTHER = "view_other";
     private static final String WORLD = "view_world";
 
-    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.GLOBAL);
-    private static final ChatTab OOC = ChatTab.of(ChatChannel.OOC);
+    private static final ConversationPage GLOBAL = ConversationPage.of(ChatChannel.GLOBAL);
+    private static final ConversationPage OOC = ConversationPage.of(ChatChannel.OOC);
 
     @BeforeClass
     public static void registerPages() {
@@ -71,7 +71,7 @@ public final class WindowViewTest {
 
     @Test
     public void withNoScreenOpenEveryTabCountsAsShown() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
         assertEquals(WindowView.Kind.NONE, WindowView.kind());
         assertTrue(WindowView.shows(GLOBAL));
@@ -82,7 +82,7 @@ public final class WindowViewTest {
 
     @Test
     public void theChatsKeyShowsTheConversationsAndNoPage() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
         WindowView.forChat();
         assertTrue(WindowView.shows(GLOBAL));
@@ -94,10 +94,26 @@ public final class WindowViewTest {
         assertTrue(WindowLayout.hasHidden());
     }
 
+    /** The command key shows the consoles alone; the chat's key everything else but them. */
+    @Test
+    public void theConsolesAreAViewOfTheirOwn() {
+        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage serverLog = ConversationPage.of(ChatChannel.SERVER_CONSOLE);
+        WindowView.forChat();
+        assertTrue(WindowView.shows(GLOBAL));
+        assertFalse(WindowView.shows(console));
+        assertFalse(WindowView.shows(serverLog));
+        WindowView.forConsole();
+        assertTrue(WindowView.shows(console));
+        assertTrue(WindowView.shows(serverLog));
+        assertFalse(WindowView.shows(GLOBAL));
+        assertFalse(WindowView.shows(WindowPages.tab(PAGE)));
+    }
+
     @Test
     public void aPagesKeyShowsThatPageAlone() {
-        PageTab page = WindowPages.tab(PAGE);
-        PageTab other = WindowPages.tab(OTHER);
+        OtherPage page = WindowPages.tab(PAGE);
+        OtherPage other = WindowPages.tab(OTHER);
         WindowLayout.showPage(page);
         WindowLayout.showPage(other);
         WindowView.forPage(page);
@@ -110,7 +126,7 @@ public final class WindowViewTest {
 
     @Test
     public void aTabOpenedByHandJoinsTheViewUntilTheScreenCloses() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
         WindowView.forChat();
         WindowView.show(page);
@@ -125,8 +141,8 @@ public final class WindowViewTest {
 
     @Test
     public void turningToAnotherViewLetsGoOfWhatWasOpenedByHand() {
-        PageTab page = WindowPages.tab(PAGE);
-        PageTab other = WindowPages.tab(OTHER);
+        OtherPage page = WindowPages.tab(PAGE);
+        OtherPage other = WindowPages.tab(OTHER);
         WindowLayout.showPage(page);
         WindowLayout.showPage(other);
         WindowView.forChat();
@@ -138,7 +154,7 @@ public final class WindowViewTest {
 
     @Test
     public void aWindowPinnedToTheGuiShowsInEveryView() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
         String chat = WindowLayout.windowOf(GLOBAL).getId();
         assertTrue(WindowLayout.setPinnedToGui(chat, true));
@@ -147,14 +163,14 @@ public final class WindowViewTest {
         assertTrue(WindowView.shows(GLOBAL));
         assertTrue("every page the window holds", WindowView.shows(OOC));
         assertFalse("another window's pages wait for their key",
-                WindowView.shows(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+                WindowView.shows(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
         assertTrue(WindowLayout.setPinnedToGui(chat, false));
         assertFalse(WindowView.shows(GLOBAL));
     }
 
     @Test
     public void aWindowPinnedToTheHudAloneStaysOutOfOtherViews() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
         String chat = WindowLayout.windowOf(GLOBAL).getId();
         assertTrue(WindowLayout.setPinnedToHud(chat, true));
@@ -169,18 +185,18 @@ public final class WindowViewTest {
         Window chat = WindowLayout.windowOf(GLOBAL);
         WindowLayout.setPinnedToHud(chat.getId(), true);
         WindowLayout.setPinnedToGui(WindowLayout.windowOf(
-                ChatTab.of(ChatChannel.CLIENT_CONSOLE)).getId(), true);
+                ConversationPage.of(ChatChannel.CLIENT_CONSOLE)).getId(), true);
         assertEquals(Arrays.asList(chat), WindowLayout.hudWindows());
         WindowView.beginPinnedPass();
         try {
             assertTrue(WindowView.shows(GLOBAL));
             assertTrue(WindowView.shows(OOC));
             assertFalse("pinned to the GUI only",
-                    WindowView.shows(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+                    WindowView.shows(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
         } finally {
             WindowView.endPinnedPass();
         }
-        assertTrue(WindowView.shows(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+        assertTrue(WindowView.shows(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
     }
 
     @Test
@@ -199,7 +215,7 @@ public final class WindowViewTest {
 
     @Test
     public void aPageOfTheWorldNeverShowsPinned() {
-        PageTab world = WindowPages.tab(WORLD);
+        OtherPage world = WindowPages.tab(WORLD);
         assertNotNull(world);
         assertFalse(WindowLayout.staysPut(world));
         assertFalse(WindowLayout.staysPut(null));
@@ -214,18 +230,18 @@ public final class WindowViewTest {
 
     @Test
     public void closingAWindowLeavesTheTabsTheViewHides() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         Window window = WindowLayout.windowOf(GLOBAL);
         assertTrue(WindowLayout.addTab(window.getId(), page));
-        List<WindowTab> conversations =
+        List<WindowPage> conversations =
                 WindowFrame.visibleTabs(window);
         conversations.remove(page);
         WindowView.forChat();
         assertTrue(WindowLayout.closeWindow(window.getId()));
         assertNotNull("the window stays for the page",
                 WindowLayout.window(window.getId()));
-        assertEquals(Arrays.asList((WindowTab)page), window.getTabs());
-        for (WindowTab tab : conversations) {
+        assertEquals(Arrays.asList((WindowPage)page), window.getTabs());
+        for (WindowPage tab : conversations) {
             assertFalse(tab.id(), WindowLayout.isOpen(tab));
         }
         assertTrue(WindowLayout.hasHidden());
@@ -239,7 +255,7 @@ public final class WindowViewTest {
     public void theWindowsPinsRoundTripThroughTheLayoutFile() {
         Window chat = WindowLayout.windowOf(GLOBAL);
         Window consoles = WindowLayout.windowOf(
-                ChatTab.of(ChatChannel.CLIENT_CONSOLE));
+                ConversationPage.of(ChatChannel.CLIENT_CONSOLE));
         WindowLayout.setPinnedToHud(chat.getId(), true);
         WindowLayout.setPinnedToGui(consoles.getId(), true);
         List<String> described = WindowLayoutStore.describe();
@@ -259,13 +275,13 @@ public final class WindowViewTest {
 
     @Test
     public void aPageComesBackWithTheWindowsPinsItLeft() {
-        PageTab page = WindowPages.tab(PAGE);
+        OtherPage page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
         WindowLayout.setPinnedToHud(window.getId(), true);
         assertTrue(WindowLayout.close(page));
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.toString(), described.toString().contains(
-                "place " + page.id() + " locked=false hud=true x="));
+                "place " + page.id() + " hud=true x="));
         TwoWindowLayout.reset();
         WindowLayoutStore.load(described);
         assertTrue(WindowLayout.showPage(page).isPinnedToHud());

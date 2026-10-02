@@ -47,6 +47,35 @@ public final class ChatCommandTextTest {
         assertTrue(cut.endsWith("..."));
     }
 
+    /**
+     * A fellowship message keeps the fellowship it names, as a private
+     * message keeps whom it went to, and never its words; binding and
+     * letting go say nothing and are kept whole.
+     */
+    @Test
+    public void aFellowshipMessageKeepsItsFellowshipAndNotItsWords() {
+        assertEquals("/fmsg \"Grey Company\" ...", ChatCommandText.describe("fmsg",
+                new String[] {"\"Grey", "Company\"", "the", "vault", "code"}));
+        assertEquals("/fmsg ...", ChatCommandText.describe("fmsg",
+                new String[] {"the", "vault", "code"}));
+        assertEquals("/fchat ...", ChatCommandText.describe("FChat",
+                new String[] {"meet", "at", "dawn"}));
+        assertEquals("/fmsg bind \"Grey Company\"", ChatCommandText.describe("fmsg",
+                new String[] {"bind", "\"Grey", "Company\""}));
+        assertEquals("/fmsg unbind", ChatCommandText.describe("fmsg",
+                new String[] {"unbind"}));
+        // Words after unbind are words, said to the bound fellowship.
+        assertEquals("/fmsg ...", ChatCommandText.describe("fmsg",
+                new String[] {"unbind", "the", "gate"}));
+        // A bind with no fellowship in quotes is words the command refuses.
+        assertEquals("/fmsg bind ...", ChatCommandText.describe("fmsg",
+                new String[] {"bind", "the", "gate"}));
+        assertEquals("/fmsg", ChatCommandText.describe("fmsg", new String[0]));
+        String typed = ChatCommandText.describeTyped("/fchat \"Rangers\" the vault code is 4417");
+        assertEquals("/fchat \"Rangers\" ...", typed);
+        assertFalse(typed.contains("4417"));
+    }
+
     /** A typed command reads as the console would write it, so its echo holds no secret. */
     @Test
     public void aTypedCommandIsDescribedAsTheConsoleWritesIt() {

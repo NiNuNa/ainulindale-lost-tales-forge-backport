@@ -92,8 +92,9 @@ public final class CharacterRaceRegistry {
         // for it — which is why it alone needs a rule refusing armour, a
         // notice explaining the refusal, and equipment moved out of its
         // slots on every switch. Somebody who wants to stand with the
-        // half-trolls plays an orc or an uruk in their faction. The race
-        // stays registered so a character who already is one still loads,
+        // half-trolls plays an orc or an uruk in their faction. It is
+        // registered all the same, so a character that is one, such as a
+        // lore character a server's own lore file describes, loads,
         // renders and plays.
         register(definitions, definition(
                 HALF_TROLL, "lotr:half_troll",

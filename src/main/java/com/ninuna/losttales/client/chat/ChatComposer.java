@@ -39,9 +39,9 @@ final class ChatComposer {
      * sender.
      */
     private ChatHeadMarker.Data replyToHead;
-    private ChatTab replyTab;
+    private ConversationPage replyTab;
     private long editingMessageId = ChatMessageIds.NONE;
-    private ChatTab editingTab;
+    private ConversationPage editingTab;
     /** The chip drawn this frame, for the click that dismisses it. */
     private double chipLeft;
     private double chipTop;
@@ -53,7 +53,7 @@ final class ChatComposer {
      * it was drawn ({@link LostTalesChatPresentation#headOfLine}); whatever
      * was composed goes.
      */
-    void startReply(ChatTab tab, long messageId, String name, String excerpt,
+    void startReply(ConversationPage tab, long messageId, String name, String excerpt,
                     ChatHeadMarker.Data head) {
         this.replyToMessageId = messageId;
         this.replyToName = name == null ? "" : name;
@@ -63,7 +63,7 @@ final class ChatComposer {
     }
 
     /** Starts rewriting a message in its tab; a reply in progress goes. */
-    void startEdit(ChatTab tab, long messageId) {
+    void startEdit(ConversationPage tab, long messageId) {
         cancelReply();
         this.editingMessageId = messageId;
         this.editingTab = tab;
@@ -175,7 +175,7 @@ final class ChatComposer {
      * aimed at another tab is dropped when this one is selected rather
      * than carried along.
      */
-    void onTabSelected(ChatTab tab) {
+    void onTabSelected(ConversationPage tab) {
         if (this.replyTab != null && !this.replyTab.equals(tab)) {
             cancelReply();
         }
@@ -185,7 +185,7 @@ final class ChatComposer {
     }
 
     /** The tab whose strip the chip stands in, or null with nothing composed. */
-    private ChatTab composingTab() {
+    private ConversationPage composingTab() {
         return isEditing() ? this.editingTab : isReplying() ? this.replyTab : null;
     }
 
@@ -202,7 +202,7 @@ final class ChatComposer {
                      ChatFrame frame, LostTalesGuiAnimationSample opening,
                      int mouseX, int mouseY) {
         this.chipRight = 0;
-        ChatTab composing = composingTab();
+        ConversationPage composing = composingTab();
         if (composing == null || !composing.equals(
                 ChatFrame.activeTab(window,
                         ChatFrame.visibleTabs(window)))) {

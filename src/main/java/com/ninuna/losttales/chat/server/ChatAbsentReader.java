@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.mojang.authlib.GameProfile;
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
@@ -16,9 +17,9 @@ import net.minecraft.server.management.UserListOpsEntry;
  * server would let the account in at all — not banned, and on the
  * whitelist where one is enforced — its level on the operator list, read
  * as vanilla reads a player's, and the roles and capabilities that follow
- * from them ({@link ChatAccountRoleResolver#absentMask}). Everything is
- * read from the server's own lists and the role catalogue, never from
- * Mojang, and each answer is worked out once. Server thread.
+ * from them ({@link ChatAccountRoleResolver#absentMask}, {@link #holds}).
+ * Everything is read from the server's own lists and the role catalogue,
+ * never from Mojang, and each answer is worked out once. Server thread.
  *
  * <p>A world played on the game's own server has operators its list does
  * not name: the owner of a single-player world that allows commands,
@@ -28,7 +29,7 @@ import net.minecraft.server.management.UserListOpsEntry;
  * ({@code spokeAsOperator}); a dedicated server has no such operators,
  * and its list alone answers.</p>
  */
-final class ChatAbsentReader implements ChatChannelPolicy.Reader {
+public final class ChatAbsentReader implements ChatChannelPolicy.Reader {
     private final MinecraftServer server;
     private final GameProfile profile;
     private final boolean spokeAsOperator;
@@ -47,6 +48,22 @@ final class ChatAbsentReader implements ChatChannelPolicy.Reader {
         this.server = server;
         this.profile = profile;
         this.spokeAsOperator = spokeAsOperator;
+    }
+
+    /**
+     * The account with that id, last known by that name, as the server's
+     * own lists know it, whether or not its player is here; null with no
+     * server to ask or no id.
+     */
+    public static ChatAbsentReader of(UUID accountId, String accountName) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || accountId == null) {
+            return null;
+        }
+        return new ChatAbsentReader(server, new GameProfile(accountId,
+                accountName == null ? "" : accountName.trim()),
+                ChatHistory.authorsIn(ChatChannel.OPERATOR)
+                        .contains(accountId));
     }
 
     /** Whether the server would let the account in: not banned, and whitelisted where that is asked. */
@@ -68,7 +85,18 @@ final class ChatAbsentReader implements ChatChannelPolicy.Reader {
 
     @Override
     public boolean readsConsole() {
-        LostTalesCapability capability = LostTalesCapability.CHAT_SERVER_CONSOLE_READ;
+        return holds(LostTalesCapability.CHAT_SERVER_CONSOLE_READ);
+    }
+
+    /**
+     * Whether the account holds the capability, by its level on the
+     * operator list or by a role, as {@link LostTalesPermissions#has}
+     * asks a player who is here.
+     */
+    public boolean holds(LostTalesCapability capability) {
+        if (capability == null) {
+            return false;
+        }
         int level = opLevel();
         return LostTalesPermissions.decide(
                 level != ChatAccountRoleResolver.NOT_OPERATOR

@@ -21,12 +21,11 @@ public final class CharacterTemplateOfferTest {
 
     @Test
     public void aTemplateIsOfferedAsItWasWritten() {
-        CharacterTemplateAdoption adoption = CharacterTemplateOffer.adoption(11L,
+        CharacterTemplateAdoption adoption = CharacterTemplateOffer.adoption(
                 new CharacterTemplate("Beren", CharacterRaceRegistry.HUMAN, "male",
                         "human_male_1", "slim", "flat", "gondor",
                         "A ranger of the north.", 34, false));
         assertTrue(adoption.isOffered());
-        assertEquals(11L, adoption.getExpectedRosterRevision());
         assertEquals("Beren", adoption.getName());
         assertEquals(CharacterRaceRegistry.HUMAN, adoption.getRaceId());
         assertEquals("male", adoption.getGenderId());
@@ -40,16 +39,15 @@ public final class CharacterTemplateOfferTest {
     @Test
     public void anEmptyTemplateStillSpendsTheReading() {
         CharacterTemplateAdoption adoption =
-                CharacterTemplateOffer.adoption(3L, CharacterTemplate.EMPTY);
+                CharacterTemplateOffer.adoption(CharacterTemplate.EMPTY);
         assertFalse(adoption.isOffered());
-        assertEquals(3L, adoption.getExpectedRosterRevision());
     }
 
     @Test
     public void aTemplateWithNoUsableNameIsNotOffered() {
         // A name too short is one no server would accept, and offering it
         // would spend the reading on a refusal the player never asked for.
-        CharacterTemplateAdoption adoption = CharacterTemplateOffer.adoption(3L,
+        CharacterTemplateAdoption adoption = CharacterTemplateOffer.adoption(
                 new CharacterTemplate("A", CharacterRaceRegistry.HUMAN, "male", "human_male_1",
                         "", "", "", "", 30, false));
         assertFalse(adoption.isOffered());
@@ -61,7 +59,7 @@ public final class CharacterTemplateOfferTest {
         // naming it is not sent, so the world spends its one reading cleanly
         // instead of on a refusal; the template editor names the missing
         // choice the next time it is opened.
-        CharacterTemplateAdoption adoption = CharacterTemplateOffer.adoption(3L,
+        CharacterTemplateAdoption adoption = CharacterTemplateOffer.adoption(
                 new CharacterTemplate("Bogdal", CharacterRaceRegistry.HALF_TROLL,
                         "non_binary", "", "", "", "", "", 30, false));
         assertFalse(adoption.isOffered());
@@ -70,7 +68,7 @@ public final class CharacterTemplateOfferTest {
     @Test
     public void aTemplateThatNamedNoAgeTakesTheLowestOne() {
         // Zero is "never chosen", and no server accepts it as an age.
-        CharacterTemplateAdoption adoption = CharacterTemplateOffer.adoption(3L,
+        CharacterTemplateAdoption adoption = CharacterTemplateOffer.adoption(
                 new CharacterTemplate("Beren", CharacterRaceRegistry.HUMAN, "male",
                         "human_male_1", "", "", "", "", 0, false));
         assertTrue(adoption.isOffered());

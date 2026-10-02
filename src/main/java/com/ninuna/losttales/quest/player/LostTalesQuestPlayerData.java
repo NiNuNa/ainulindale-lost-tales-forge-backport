@@ -646,10 +646,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return changed;
     }
 
-    public boolean setPinnedQuestId(String questId) {
-        return pinQuestId(questId);
-    }
-
     public boolean pinQuestId(String questId) {
         if (!isWritable()) {
             return false;
@@ -846,8 +842,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     /**
-     * Removes references that can become stale after a quest completes, is abandoned,
-     * or older NBT is loaded. Returns true when anything was cleaned up.
+     * Removes the references that no longer point at anything: a tracked
+     * quest that is not running, a pinned marker that is not discovered.
+     * Runs as the log is loaded or copied, and after login, respawn or a
+     * change of world. A log held read-only (saved under any version but
+     * {@link #CURRENT_DATA_VERSION}, or malformed) is left as it is.
+     * Returns true when anything was cleaned up.
      */
     public boolean pruneInvalidReferences() {
         if (!isWritable()) {

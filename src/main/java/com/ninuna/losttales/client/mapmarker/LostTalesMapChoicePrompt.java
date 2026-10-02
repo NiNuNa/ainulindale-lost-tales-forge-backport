@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -17,7 +18,8 @@ import net.minecraft.client.gui.Gui;
  */
 @SideOnly(Side.CLIENT)
 final class LostTalesMapChoicePrompt {
-    private static final int SCREEN_SHADE = 0x66000000;
+    private static final int SCREEN_SHADE =
+            LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x66);
     private static final int MAX_WIDTH = 320;
     private static final int PANEL_HEIGHT = 70;
     private static final int SCREEN_MARGIN = 8;

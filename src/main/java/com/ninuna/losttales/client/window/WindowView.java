@@ -5,7 +5,7 @@ import java.util.Set;
 
 /**
  * What the screen shows: the tabs of the key that opened it — T the
- * conversations, a page's key or Ctrl+, that page —
+ * conversations, {@code /} the consoles, a page's key or Ctrl+, that page —
  * every tab of a window pinned to the GUI ({@link WindowLayout#isOnGui}),
  * and every tab the player opened by hand since. The rest wait hidden in
  * their windows for their own key; a window with nothing shown is not
@@ -17,17 +17,19 @@ public final class WindowView {
     public enum Kind {
         /** No screen is open: every tab counts as shown. */
         NONE,
-        /** The chat's key: the conversations. */
+        /** The chat's key: the conversations, the consoles left out. */
         CHAT,
+        /** The command key: the consoles. */
+        CONSOLE,
         /** A page's key: that page. */
         PAGE
     }
 
     private static Kind kind = Kind.NONE;
     /** The page a page's view is for; null otherwise. */
-    private static PageTab page;
+    private static OtherPage page;
     /** Tabs the player opened by hand while this view stands. */
-    private static final Set<WindowTab> BY_HAND = new HashSet<WindowTab>();
+    private static final Set<WindowPage> BY_HAND = new HashSet<WindowPage>();
     /** Whether the windows pinned to the HUD are being drawn: only what the HUD shows counts. */
     private static boolean pinnedPass;
 
@@ -38,8 +40,13 @@ public final class WindowView {
         set(Kind.CHAT, null);
     }
 
+    /** The screen opens for a command: the consoles. */
+    public static synchronized void forConsole() {
+        set(Kind.CONSOLE, null);
+    }
+
     /** The screen opens for a page, or turns to it by its key: that page alone. */
-    public static synchronized void forPage(PageTab shown) {
+    public static synchronized void forPage(OtherPage shown) {
         set(Kind.PAGE, shown);
     }
 
@@ -48,7 +55,7 @@ public final class WindowView {
         set(Kind.NONE, null);
     }
 
-    private static void set(Kind next, PageTab shown) {
+    private static void set(Kind next, OtherPage shown) {
         kind = next;
         page = shown;
         BY_HAND.clear();
@@ -72,7 +79,7 @@ public final class WindowView {
     }
 
     /** A tab the player opened by hand joins what is shown until the screen closes. */
-    public static synchronized void show(WindowTab tab) {
+    public static synchronized void show(WindowPage tab) {
         if (tab != null && kind != Kind.NONE && !shows(tab)) {
             BY_HAND.add(tab);
         }
@@ -83,12 +90,12 @@ public final class WindowView {
     }
 
     /** Whether the view stands for this page: its key turned the screen to it. */
-    public static synchronized boolean isFor(PageTab shown) {
+    public static synchronized boolean isFor(OtherPage shown) {
         return kind == Kind.PAGE && shown != null && shown.equals(page);
     }
 
     /** Whether the view shows the tab, whether or not it can be shown now. */
-    public static synchronized boolean shows(WindowTab tab) {
+    public static synchronized boolean shows(WindowPage tab) {
         if (tab == null) {
             return false;
         }
@@ -101,7 +108,9 @@ public final class WindowView {
         }
         switch (kind) {
             case CHAT:
-                return !(tab instanceof PageTab);
+                return !(tab instanceof OtherPage) && !tab.isConsole();
+            case CONSOLE:
+                return tab.isConsole();
             case PAGE:
                 return tab.equals(page);
             default:
@@ -110,7 +119,7 @@ public final class WindowView {
     }
 
     /** Whether the tab stands on screen now: the view shows it and it can be shown. */
-    public static boolean isShown(WindowTab tab) {
+    public static boolean isShown(WindowPage tab) {
         return tab != null && tab.isAvailable() && shows(tab);
     }
 }

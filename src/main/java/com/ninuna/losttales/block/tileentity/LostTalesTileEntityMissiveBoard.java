@@ -8,7 +8,6 @@ import com.ninuna.losttales.quest.missive.LostTalesMissiveGenerator;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveNbt;
 import com.ninuna.losttales.quest.missive.MissiveBoardWatches;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -23,8 +22,14 @@ import net.minecraft.tileentity.TileEntity;
  * {@link #REACH_SQ}; every change here tells the players watching it. The
  * board's model shows none of its notices, so no client is sent them
  * with the block.
+ *
+ * <p>The board is no inventory: hoppers, pipes, quick loot and other
+ * mods' automation never reach its notices, so a letter goes up only
+ * through the board's own refill or a sealed Pin, and comes down only
+ * through Accept, Take, expiry or the board being broken.</p>
  */
-public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInventory {
+public class LostTalesTileEntityMissiveBoard extends TileEntity {
+    /** The slots a board's notices stand in. */
     public static final int INVENTORY_SIZE = 9;
     /**
      * How near a player stands to use the board, squared, measured to the
@@ -34,7 +39,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
     public static final double REACH_SQ = 64.0D;
     private static final long EXPIRATION_CHECK_INTERVAL_TICKS = 1200L;
 
-    private final ItemStack[] inventory = new ItemStack[INVENTORY_SIZE];
+    private final ItemStack[] notices = new ItemStack[INVENTORY_SIZE];
     private long lastGenerationWorldTime;
     private long nextGenerationWorldTime;
     private int generationSequence;
@@ -59,8 +64,8 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
 
     public int countAvailableMissives() {
         int count = 0;
-        for (int slot = 0; slot < this.inventory.length; slot++) {
-            ItemStack stack = this.inventory[slot];
+        for (int slot = 0; slot < this.notices.length; slot++) {
+            ItemStack stack = this.notices[slot];
             if (this.isMissiveLetter(stack)) {
                 count++;
             }
@@ -73,14 +78,14 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
     }
 
     public boolean addMissive(ItemStack stack) {
-        if (!this.isItemValidForSlot(0, stack) || !this.hasRoomForMissive()) return false;
+        if (!this.isMissiveLetter(stack) || !this.hasRoomForMissive()) return false;
 
         int slot = this.getFirstEmptySlot();
         if (slot < 0) return false;
 
         ItemStack copy = stack.copy();
         copy.stackSize = 1;
-        this.inventory[slot] = copy;
+        this.notices[slot] = copy;
         this.markDirtyAndSync();
         return true;
     }
@@ -141,8 +146,8 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
         this.nextExpirationCheckWorldTime = worldTime + EXPIRATION_CHECK_INTERVAL_TICKS;
 
         boolean changed = false;
-        for (int slot = 0; slot < this.inventory.length; slot++) {
-            ItemStack stack = this.inventory[slot];
+        for (int slot = 0; slot < this.notices.length; slot++) {
+            ItemStack stack = this.notices[slot];
             if (!this.isMissiveLetter(stack)) {
                 continue;
             }
@@ -152,7 +157,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
             }
             long generatedAt = missive.getGenerationWorldTime();
             if (generatedAt > 0L && worldTime >= generatedAt && worldTime - generatedAt >= expirationTicks) {
-                this.inventory[slot] = null;
+                this.notices[slot] = null;
                 changed = true;
             }
         }
@@ -164,8 +169,8 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
 
     private int getEmptySlotCount() {
         int count = 0;
-        for (int slot = 0; slot < this.inventory.length; slot++) {
-            if (this.inventory[slot] == null) {
+        for (int slot = 0; slot < this.notices.length; slot++) {
+            if (this.notices[slot] == null) {
                 count++;
             }
         }
@@ -178,8 +183,8 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
     }
 
     public int getFirstEmptySlot() {
-        for (int slot = 0; slot < this.inventory.length; slot++) {
-            if (this.inventory[slot] == null) {
+        for (int slot = 0; slot < this.notices.length; slot++) {
+            if (this.notices[slot] == null) {
                 return slot;
             }
         }
@@ -225,72 +230,25 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
         }
     }
 
-    @Override
-    public int getSizeInventory() {
-        return this.inventory.length;
+    /** How many slots the board's notices stand in. */
+    public int getSlotCount() {
+        return this.notices.length;
     }
 
-    @Override
-    public ItemStack getStackInSlot(int slot) {
-        return slot >= 0 && slot < this.inventory.length ? this.inventory[slot] : null;
+    /** The letter in the slot; null for an empty slot or one out of range. */
+    public ItemStack getNotice(int slot) {
+        return slot >= 0 && slot < this.notices.length ? this.notices[slot] : null;
     }
 
-    @Override
-    public ItemStack decrStackSize(int slot, int count) {
-        if (slot < 0 || slot >= this.inventory.length || this.inventory[slot] == null) return null;
+    /** Takes the notice in the slot down; an empty slot or one out of range stays as it is. */
+    public void removeNotice(int slot) {
+        if (slot < 0 || slot >= this.notices.length || this.notices[slot] == null) return;
 
-        ItemStack stack = this.inventory[slot];
-        if (stack.stackSize <= count) {
-            this.inventory[slot] = null;
-            this.markDirtyAndSync();
-            return stack;
-        }
-
-        ItemStack result = stack.splitStack(count);
-        if (stack.stackSize <= 0) {
-            this.inventory[slot] = null;
-        }
+        this.notices[slot] = null;
         this.markDirtyAndSync();
-        return result;
-    }
-
-    @Override
-    public ItemStack getStackInSlotOnClosing(int slot) {
-        if (slot < 0 || slot >= this.inventory.length) return null;
-        ItemStack stack = this.inventory[slot];
-        this.inventory[slot] = null;
-        return stack;
-    }
-
-    @Override
-    public void setInventorySlotContents(int slot, ItemStack stack) {
-        if (slot < 0 || slot >= this.inventory.length) return;
-
-        if (stack != null) {
-            if (!this.isItemValidForSlot(slot, stack)) return;
-            stack.stackSize = Math.min(stack.stackSize, this.getInventoryStackLimit());
-        }
-        this.inventory[slot] = stack;
-        this.markDirtyAndSync();
-    }
-
-    @Override
-    public String getInventoryName() {
-        return "container.losttales.missive_board";
-    }
-
-    @Override
-    public boolean hasCustomInventoryName() {
-        return false;
-    }
-
-    @Override
-    public int getInventoryStackLimit() {
-        return 1;
     }
 
     /** The board still stands here, and the player is within {@link #REACH_SQ} of it. */
-    @Override
     public boolean isUseableByPlayer(EntityPlayer player) {
         return player != null && this.worldObj != null
                 && this.worldObj.getTileEntity(this.xCoord, this.yCoord, this.zCoord) == this
@@ -306,17 +264,6 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
     }
 
     @Override
-    public void openInventory() {}
-
-    @Override
-    public void closeInventory() {}
-
-    @Override
-    public boolean isItemValidForSlot(int slot, ItemStack stack) {
-        return this.isMissiveLetter(stack);
-    }
-
-    @Override
     public void readFromNBT(NBTTagCompound nbt) {
         super.readFromNBT(nbt);
 
@@ -325,18 +272,18 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
         this.generationSequence = Math.max(0, nbt.getInteger("GenerationSequence"));
         this.nextExpirationCheckWorldTime = nbt.getLong("NextExpirationCheckWorldTime");
 
-        for (int slot = 0; slot < this.inventory.length; slot++) {
-            this.inventory[slot] = null;
+        for (int slot = 0; slot < this.notices.length; slot++) {
+            this.notices[slot] = null;
         }
 
         NBTTagList list = nbt.getTagList("Items", 10);
         for (int i = 0; i < list.tagCount(); i++) {
             NBTTagCompound itemTag = list.getCompoundTagAt(i);
             int slot = itemTag.getByte("Slot") & 255;
-            if (slot >= 0 && slot < this.inventory.length) {
+            if (slot >= 0 && slot < this.notices.length) {
                 ItemStack stack = ItemStack.loadItemStackFromNBT(itemTag);
-                if (this.isItemValidForSlot(slot, stack)) {
-                    this.inventory[slot] = stack;
+                if (this.isMissiveLetter(stack)) {
+                    this.notices[slot] = stack;
                 }
             }
         }
@@ -352,8 +299,8 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
         nbt.setLong("NextExpirationCheckWorldTime", this.nextExpirationCheckWorldTime);
 
         NBTTagList list = new NBTTagList();
-        for (int slot = 0; slot < this.inventory.length; slot++) {
-            ItemStack stack = this.inventory[slot];
+        for (int slot = 0; slot < this.notices.length; slot++) {
+            ItemStack stack = this.notices[slot];
             if (stack != null) {
                 NBTTagCompound itemTag = new NBTTagCompound();
                 itemTag.setByte("Slot", (byte) slot);

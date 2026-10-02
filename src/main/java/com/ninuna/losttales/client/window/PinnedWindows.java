@@ -49,9 +49,9 @@ public final class PinnedWindows {
     /** A row registers what it draws; while playing nothing answers the pointer. */
     private static final PointerRegions REGIONS = new PointerRegions();
     /** The pages drawn from here last frame, which are told when they leave. */
-    private static final List<PageTab> SHOWN = new ArrayList<PageTab>();
+    private static final List<OtherPage> SHOWN = new ArrayList<OtherPage>();
     /** The pages drawn from here this frame, both passes. */
-    private static final List<PageTab> DRAWN = new ArrayList<PageTab>();
+    private static final List<OtherPage> DRAWN = new ArrayList<OtherPage>();
     /**
      * The windows the window screen's view hid as it last stood: they
      * fade with the HUD, and go back under it once the HUD is whole.
@@ -92,9 +92,9 @@ public final class PinnedWindows {
      * The tabs of a window that show while playing, in row order: every
      * page that can be shown now but a world page.
      */
-    private static List<WindowTab> hudTabs(Window window) {
-        List<WindowTab> tabs = new ArrayList<WindowTab>();
-        for (WindowTab tab : window.getTabs()) {
+    private static List<WindowPage> hudTabs(Window window) {
+        List<WindowPage> tabs = new ArrayList<WindowPage>();
+        for (WindowPage tab : window.getTabs()) {
             if (tab.isAvailable() && WindowLayout.isOnHud(tab)) {
                 tabs.add(tab);
             }
@@ -107,7 +107,7 @@ public final class PinnedWindows {
      * tab in front of a window pinned to the HUD, with no window screen
      * open. Its lines are read there, so the feed leaves them out.
      */
-    public static boolean shows(WindowTab tab) {
+    public static boolean shows(WindowPage tab) {
         if (tab == null || !standing(Minecraft.getMinecraft())) {
             return false;
         }
@@ -141,7 +141,7 @@ public final class PinnedWindows {
 
     /** Whether the open window screen draws the window: its view shows one of its tabs. */
     private static boolean shownByScreen(Window window) {
-        for (WindowTab tab : window.getTabs()) {
+        for (WindowPage tab : window.getTabs()) {
             if (WindowView.isShown(tab)) {
                 return true;
             }
@@ -275,7 +275,7 @@ public final class PinnedWindows {
                                    int screenWidth, int screenHeight,
                                    float strength, float partialTicks,
                                    boolean depthTest) {
-        List<WindowTab> tabs = WindowFrame.visibleTabs(window);
+        List<WindowPage> tabs = WindowFrame.visibleTabs(window);
         if (tabs.isEmpty()) {
             return;
         }
@@ -285,7 +285,7 @@ public final class PinnedWindows {
         frame.stackShare = 1.0F;
         LostTalesGuiAnimationSample shown =
                 LostTalesGuiAnimationSample.SETTLED.withOpacity(strength);
-        WindowTab front = WindowFrame.activeTab(window, tabs);
+        WindowPage front = WindowFrame.activeTab(window, tabs);
         // The page fills the window, cut to what it shows, its row, strip
         // and bar sliding out past the edges as the screen closes; once
         // they are out they are not drawn at all.
@@ -294,9 +294,9 @@ public final class PinnedWindows {
                 screenWidth, screenHeight));
         boolean cut = false;
         try {
-            if (front instanceof PageTab) {
+            if (front instanceof OtherPage) {
                 WindowDrawing.layOutPage(minecraft, window, frame,
-                        (PageTab)front, screenWidth, screenHeight, shown);
+                        (OtherPage)front, screenWidth, screenHeight, shown);
             } else if (painter != null) {
                 painter.draw(minecraft, window, screenWidth, screenHeight,
                         shown);
@@ -357,7 +357,7 @@ public final class PinnedWindows {
      * one that it left the screen, and starts a new frame's count.
      */
     private static void settlePages() {
-        for (PageTab page : SHOWN) {
+        for (OtherPage page : SHOWN) {
             if (!DRAWN.contains(page)) {
                 page.content().hidden();
             }
@@ -378,8 +378,8 @@ public final class PinnedWindows {
             return;
         }
         for (Window window : WindowLayout.hudWindows()) {
-            List<WindowTab> tabs = hudTabs(window);
-            WindowTab front = tabs.isEmpty() ? null
+            List<WindowPage> tabs = hudTabs(window);
+            WindowPage front = tabs.isEmpty() ? null
                     : WindowFrame.activeTab(window, tabs);
             PageContent content = WindowPages.contentOf(front);
             if (content == null) {
@@ -387,7 +387,7 @@ public final class PinnedWindows {
             }
             content.tick();
             WindowSplit split = window.splitOf(front);
-            WindowTab other = split == null ? null : split.other(front);
+            WindowPage other = split == null ? null : split.other(front);
             PageContent beside = other == null || !tabs.contains(other) ? null
                     : WindowPages.contentOf(other);
             if (beside != null) {
@@ -421,9 +421,9 @@ public final class PinnedWindows {
         if (window == null) {
             return false;
         }
-        List<WindowTab> tabs = hudTabs(window);
-        WindowTab from = WindowFrame.activeTab(window, tabs);
-        WindowTab next = TabWalk.step(tabs, from, step);
+        List<WindowPage> tabs = hudTabs(window);
+        WindowPage from = WindowFrame.activeTab(window, tabs);
+        WindowPage next = TabWalk.step(tabs, from, step);
         if (next != null && !next.equals(from)) {
             WindowLayout.setActiveTab(next);
         }

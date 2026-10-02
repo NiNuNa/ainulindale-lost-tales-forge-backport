@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberAvailability;
@@ -167,7 +168,8 @@ public final class LostTalesFellowshipHudRenderer {
         int heldItemX = x + width - 18;
         if (heldItem != null) {
             Gui.drawRect(heldItemX - 1, y + 8,
-                    heldItemX + 17, y + 26, 0x66302D28);
+                    heldItemX + 17, y + 26,
+                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x66));
             renderStack(minecraft, heldItem, heldItemX, y + 9, 1.0F, true);
         }
 
@@ -337,7 +339,7 @@ public final class LostTalesFellowshipHudRenderer {
                 minecraft, ownerId, x, y, HEAD_SIZE,
                 brightness, 1.0F)) {
             Gui.drawRect(x, y, x + HEAD_SIZE, y + HEAD_SIZE,
-                    0xAA272727);
+                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xAA));
         }
     }
 

@@ -63,7 +63,7 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
                 int color = buffer.readInt();
                 String name = LostTalesPacketCodec.readUtf8String(buffer,
                         MAX_FELLOWSHIP_NAME_BYTES);
-                if (color < 0 || color > 0xFFFFFF || !Fellowship.isWellFormedName(name)) {
+                if ((color & 0xFF000000) != 0 || !Fellowship.isWellFormedName(name)) {
                     throw new LostTalesPacketCodec.DecodeException("invalid chat fellowship");
                 }
                 read.add(new ChatFellowship(id, name, color));

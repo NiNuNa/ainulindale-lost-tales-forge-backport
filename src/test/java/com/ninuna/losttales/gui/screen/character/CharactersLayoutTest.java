@@ -8,7 +8,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The Characters tab keeps its roster and its profile side by side where
+ * The Characters page keeps its roster and its profile side by side where
  * the page is wide enough, and lets them take turns where it is not; the
  * figure stands beside the words in a wide profile and above them in a
  * narrow one, where it scrolls with them.

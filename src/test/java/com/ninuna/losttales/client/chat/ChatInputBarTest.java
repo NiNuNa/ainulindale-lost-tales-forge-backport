@@ -187,7 +187,7 @@ public final class ChatInputBarTest {
     @Test
     public void theTabButtonNamesTheChannelAsItsTabDoes() {
         ClientChatChannelState.clear();
-        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         assertEquals(ClientChatChannelState.displayName(ooc),
                 BarLead.fit(ooc, 0, 1000, new WindowBar.Measure() {
                     @Override

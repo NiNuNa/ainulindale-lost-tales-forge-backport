@@ -62,7 +62,9 @@ import net.minecraft.world.storage.IPlayerFileData;
  * rosters that may read it — every character of the faction for Faction,
  * the fellowship's members for Fellowship — including a player's characters other
  * than the one they speak as; on an out-of-character one, every other
- * account the world has made a roster for. An account the server would
+ * account the world has made a roster or a player file for. Either way
+ * only an identity played or heard in the last
+ * {@link #OFFLINE_WINDOW_MILLIS} stands there. An account the server would
  * not let in, banned or off an enforced whitelist, is nobody's member. A
  * player whose presence is Invisible stands among the absent, as Discord
  * shows them, in their own list as in everyone else's. Proximity has no
@@ -96,7 +98,8 @@ public final class ChatMemberDirectory {
     /** How long the identities that may be absent from a conversation are kept before they are read again. */
     static final long ABSENT_REFRESH_MILLIS = 15000L;
     /**
-     * How lately a character must have been played or heard to stand under
+     * How lately a character, or an account as itself or as any of its
+     * characters, must have been played or heard to stand under
      * *Offline*: the rest are nobody's business.
      */
     static final long OFFLINE_WINDOW_MILLIS = 30L * 24L * 3600000L;
@@ -439,13 +442,15 @@ public final class ChatMemberDirectory {
     }
 
     /**
-     * Every identity that has been in the world and may read the channel:
-     * each character of the world's rosters played or heard in the last
-     * {@link #OFFLINE_WINDOW_MILLIS}, of {@code factionId} where one is
-     * named, on an in-character channel; on an out-of-character one
-     * each account the world keeps a roster or a player file for, so an
-     * operator who never made a character still stands among the
-     * operators. An account the server knows no name for is left out.
+     * Every identity that has been in the world lately and may read the
+     * channel: each character of the world's rosters played or heard in
+     * the last {@link #OFFLINE_WINDOW_MILLIS}, of {@code factionId} where
+     * one is named, on an in-character channel; on an out-of-character one
+     * each account the world keeps a roster or a player file for that was
+     * played or heard in that window, as itself or as any of its
+     * characters ({@link #seenLately}), so an operator who never made a
+     * character still stands among the operators. An account the server
+     * knows no name for is left out.
      */
     private static List<Absentee> readAbsentees(MinecraftServer server,
                                                 EntityPlayerMP viewer,
@@ -487,7 +492,8 @@ public final class ChatMemberDirectory {
                 continue;
             }
             if (!inCharacter) {
-                if (ChatChannelPolicy.canRead(reader, channel,
+                if (seenLately(viewer.worldObj, owner, roster)
+                        && ChatChannelPolicy.canRead(reader, channel,
                         reader.accountRoles(), gates)) {
                     absent.add(new Absentee(accountKey(owner),
                             accountMember(channel, owner, account,
@@ -515,6 +521,30 @@ public final class ChatMemberDirectory {
         }
         Collections.sort(absent, BY_NAME);
         return absent;
+    }
+
+    /**
+     * Whether the account was played or heard in the last
+     * {@link #OFFLINE_WINDOW_MILLIS}: as itself, or as any character of
+     * its roster, by the same record a character's place under
+     * <em>Offline</em> is read from ({@link CharacterLastSeen}).
+     */
+    private static boolean seenLately(World world, UUID owner,
+                                      CharacterRoster roster) {
+        if (CharacterLastSeen.seenWithin(world, owner, OFFLINE_WINDOW_MILLIS)) {
+            return true;
+        }
+        if (roster == null) {
+            return false;
+        }
+        for (RoleplayCharacter character : roster.getCharacters()) {
+            if (character != null && character.getCharacterId() != null
+                    && CharacterLastSeen.seenWithin(world,
+                            character.getCharacterId(), OFFLINE_WINDOW_MILLIS)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

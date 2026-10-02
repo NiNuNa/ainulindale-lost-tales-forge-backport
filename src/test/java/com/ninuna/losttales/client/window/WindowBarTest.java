@@ -82,9 +82,9 @@ public final class WindowBarTest {
         List<WindowBar.Placed> placed = WindowBar.layOut(Arrays.asList(
                 button("here"), BarItem.words("date"),
                 BarItem.glyph("out", LostTalesUiSheet.MINUS,
-                        LostTalesUiSheet.MINUS_HOVER, "Zoom out"),
+                        LostTalesUiSheet.MINUS_LIT, "Zoom out"),
                 BarItem.glyph("in", LostTalesUiSheet.PLUS,
-                        LostTalesUiSheet.PLUS_HOVER, "Zoom in")), 0, 400, SIX);
+                        LostTalesUiSheet.PLUS_LIT, "Zoom in")), 0, 400, SIX);
         WindowBar.Placed out = of(placed, "out");
         WindowBar.Placed in = of(placed, "in");
         assertEquals(400 - WindowBar.GAP, in.right);

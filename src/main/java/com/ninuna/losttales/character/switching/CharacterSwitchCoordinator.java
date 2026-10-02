@@ -375,6 +375,9 @@ public final class CharacterSwitchCoordinator {
                 CharacterSwitchStorage.flush(world);
                 return true;
             } catch (RuntimeException exception) {
+                FMLLog.warning("[%s] Could not reset the character switch "
+                                + "cooldown for owner %s: %s",
+                        LostTalesMetaData.MOD_ID, ownerId, exception.toString());
                 return false;
             }
         }
@@ -432,6 +435,9 @@ public final class CharacterSwitchCoordinator {
                         Long.valueOf(discarded.getTargetStateGeneration()));
                 return JournalDiscard.DISCARDED;
             } catch (RuntimeException exception) {
+                FMLLog.warning("[%s] Could not discard the character switch "
+                                + "journal for owner %s: %s",
+                        LostTalesMetaData.MOD_ID, ownerId, exception.toString());
                 return JournalDiscard.UNAVAILABLE;
             }
         }
@@ -453,6 +459,10 @@ public final class CharacterSwitchCoordinator {
                 CharacterSwitchStorage.flush(world);
                 return true;
             } catch (RuntimeException exception) {
+                FMLLog.warning("[%s] Could not %s character switching for "
+                                + "owner %s: %s",
+                        LostTalesMetaData.MOD_ID, frozen ? "freeze" : "thaw",
+                        ownerId, exception.toString());
                 return false;
             }
         }

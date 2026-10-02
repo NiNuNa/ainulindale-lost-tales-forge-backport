@@ -28,10 +28,10 @@ public final class ContentView {
             new LinkedHashMap<String, Filled>();
 
     private static final class Filled {
-        final WindowTab page;
+        final WindowPage page;
         final long enteredNanos;
 
-        Filled(WindowTab page, long enteredNanos) {
+        Filled(WindowPage page, long enteredNanos) {
             this.page = page;
             this.enteredNanos = enteredNanos;
         }
@@ -41,7 +41,7 @@ public final class ContentView {
 
     /** Lets the page in front of {@code window} fill it; false for a window with none. */
     public static synchronized boolean enter(Window window) {
-        WindowTab front = window == null ? null : window.getActiveTab();
+        WindowPage front = window == null ? null : window.getActiveTab();
         if (front == null) {
             return false;
         }

@@ -605,8 +605,10 @@ public final class LostTalesDiscordBridge {
      * Queues a game line for Discord through every binding of its
      * channel — for the Faction channel, of the sender's faction — that
      * posts; dropped where none does. Each post is the line as plain
-     * text under the sender's name and picture; a Discord channel holds
-     * one game channel's lines, so nothing on the post need say which.
+     * text under the sender's name and picture, or the Narrator's name
+     * for a line the Narrator tells, an action among them; a Discord
+     * channel holds one game channel's lines, so nothing on the post need
+     * say which.
      * {@code messageId} is the line's own name, kept so each post's
      * Discord copy can be linked back to it; {@code reply} is the quote
      * the line was distributed with, opening the post as a line of
@@ -1404,7 +1406,7 @@ public final class LostTalesDiscordBridge {
      * Saves a link whose webhook the bot made: the entry goes into the
      * config, which restarts the bridge on it; the Discord member is
      * answered through the restarted gateway, the operator who asked for
-     * the code is told in the game, and the Server Console records it. A
+     * the code is told in the game, and the Server Log records it. A
      * link that can no longer be saved — the channel taken meanwhile, the
      * file refusing — says so, and its webhook is deleted again. Server
      * thread.
@@ -1881,7 +1883,6 @@ public final class LostTalesDiscordBridge {
                 message.authorName);
     }
 
-    /** The names a message's mentions of members are written with, by the same rule. */
     /**
      * A member's message as the game shows it: its words with mentions,
      * emoji and links made the game's, then what it carries besides
@@ -1909,6 +1910,11 @@ public final class LostTalesDiscordBridge {
                 : null;
     }
 
+    /**
+     * The names a message's mentions of members are written with, by the
+     * rule an author's name follows ({@link #authorNameIn}): the member's
+     * nickname in that Discord server where the bridge has heard it.
+     */
     private Map<String, String> mentionNamesIn(DiscordJson.Message message) {
         Map<String, String> names = new HashMap<String, String>();
         for (Map.Entry<String, String> entry : message.mentionNames.entrySet()) {

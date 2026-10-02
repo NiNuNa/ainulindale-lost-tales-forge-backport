@@ -144,6 +144,7 @@ public class WindowHover {
                 }
                 return this.stripPart != null
                         && this.stripPart != ToolStrip.Part.FIELD
+                        && !ToolStrip.heldByPadlock(this.stripPart, this.window)
                         && ToolStrip.greyedWhy(this.stripPart,
                                 this.window).length() == 0;
             case SNAP_LAYOUT:

@@ -231,12 +231,12 @@ public final class ChatRoleConfig {
     }
 
     /**
-     * Says so when a role is both earned by a LOTR faction rank and
-     * grants a capability. A faction rank is the played character's, so
-     * the role comes and goes with the character being played, while
-     * what it allows is the account's everywhere else — a capability
-     * held only while one character is played is rarely what the entry
-     * means. The entry is kept as written; this only tells the operator.
+     * Says so, once for the entry, when a role is both earned by a LOTR
+     * faction rank and grants something. Capabilities come only from roles
+     * the account holds, by assignment or by operator level; a rank is the
+     * played character's, so the role it earns keeps its look, its order
+     * and the gates it opens, and its grants are ignored. The entry is
+     * kept as written.
      */
     private static void warnIfGrantsFollowAFaction(String id, List<ChatRoleSource> sources,
                                                    Set<String> grants,
@@ -246,12 +246,27 @@ public final class ChatRoleConfig {
         }
         for (ChatRoleSource source : sources) {
             if (source.getKind() == ChatRoleSource.Kind.FACTION_RANK) {
-                out.warn("Chat role '" + id + "' is earned by a faction rank, which the "
-                        + "played character holds, and grants a capability besides; that "
-                        + "capability comes and goes as the account switches character");
+                out.warn("Chat role '" + id + "' is earned by a faction rank and grants "
+                        + "something. A role earned by a rank grants nothing, so its grants "
+                        + "are ignored for those who hold it by rank; they apply only where "
+                        + "an account holds it by assignment or operator level");
                 return;
             }
         }
+    }
+
+    /**
+     * Says so, once for the entry, when a members entry assigns characters
+     * a role that grants something. A role a character holds keeps its
+     * look, its order and the gates it opens, and grants nothing; the
+     * accounts the entry names still hold its grants.
+     */
+    private static void warnGrantsIgnoredForCharacters(String entry, ChatAccountRole role,
+                                                    Warnings out) {
+        out.warn("Role members entry '" + entry + "' assigns characters the role '"
+                + role.getId() + "', which grants something. A role a character holds "
+                + "grants nothing, so its grants are ignored for those characters; they "
+                + "apply only to the accounts the entry names");
     }
 
     private static void parseMembers(String[] entries, ChatRoleCatalog catalog,
@@ -273,6 +288,7 @@ public final class ChatRoleConfig {
                         + "Team mark, which is never assigned; skipped");
                 continue;
             }
+            boolean characterWarned = false;
             for (String value : valueOf(entry).split(",")) {
                 String trimmed = value.trim();
                 if (trimmed.length() == 0) {
@@ -284,6 +300,10 @@ public final class ChatRoleConfig {
                         ? trimmed.substring(CHARACTER_MEMBER_PREFIX.length()).trim() : trimmed;
                 try {
                     UUID member = UUID.fromString(raw);
+                    if (character && !characterWarned && !role.getGrants().isEmpty()) {
+                        warnGrantsIgnoredForCharacters(entry, role, out);
+                        characterWarned = true;
+                    }
                     Map<String, Set<UUID>> into = character ? characters : accounts;
                     Set<UUID> assigned = into.get(id);
                     if (assigned == null) {

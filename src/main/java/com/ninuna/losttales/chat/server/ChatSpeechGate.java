@@ -28,7 +28,7 @@ public final class ChatSpeechGate {
             new HashSet<String>(Arrays.asList(
                     "me", "say", "tell", "msg", "w", "fmsg", "fchat")));
 
-    /** After the Server Console has recorded the attempt, which stands either way. */
+    /** After the Server Log has recorded the attempt, which stands either way. */
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onCommand(CommandEvent event) {
         if (event == null || event.isCanceled() || event.command == null

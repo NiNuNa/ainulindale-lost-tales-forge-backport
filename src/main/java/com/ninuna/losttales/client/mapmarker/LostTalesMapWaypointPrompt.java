@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import cpw.mods.fml.relauncher.Side;
@@ -32,7 +33,8 @@ final class LostTalesMapWaypointPrompt {
     static final int MAX_NAME_LENGTH = 30;
     /** Fellowship rows the panel shows at once; the rest are scrolled to. */
     static final int VISIBLE_FELLOWSHIPS = 4;
-    private static final int SCREEN_SHADE = 0x66000000;
+    private static final int SCREEN_SHADE =
+            LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x66);
     private static final int MAX_WIDTH = 320;
     private static final int CREATE_PANEL_HEIGHT = 134;
     private static final int EDIT_PANEL_HEIGHT = 212;

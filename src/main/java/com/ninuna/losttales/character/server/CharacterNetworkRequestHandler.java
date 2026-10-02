@@ -222,7 +222,7 @@ public final class CharacterNetworkRequestHandler {
                     throwable.toString());
             CharacterSyncManager.sendFailure(
                     player, requestId, operationType,
-                    CharacterErrorId.INTERNAL_ERROR, -1L);
+                    CharacterErrorId.INTERNAL_ERROR);
             return;
         }
 

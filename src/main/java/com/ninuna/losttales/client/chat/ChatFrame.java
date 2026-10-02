@@ -154,7 +154,7 @@ public final class ChatFrame extends WindowFrame {
     private int dividerSourceLineId;
 
     /** The conversation shown while open; null for the closed-chat feed and for a page. */
-    public ChatTab view;
+    public ConversationPage view;
 
     /**
      * The scroll offset the window was drawn at this frame, in lines.

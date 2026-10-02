@@ -479,7 +479,7 @@ public final class DiscordJson {
     /**
      * The guild and id of a channel, read from the channel object the
      * bot is answered with, or null for anything else — a channel with
-     * no guild (a direct message) included, since nothing is bound there.
+     * no guild (a whisper) included, since nothing is bound there.
      */
     public static ChannelInfo parseChannelInfo(String json) {
         return channelInfo(parseObject(json), "id");

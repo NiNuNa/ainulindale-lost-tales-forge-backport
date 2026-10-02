@@ -367,8 +367,14 @@ final class LoreCharactersWindow extends SubWindowContent {
      * press does nothing where it does not.
      */
     @Override
+    public String tipKey() {
+        return this.hovered == null || this.hovered.character == null ? ""
+                : this.hovered.character.getName();
+    }
+
+    @Override
     public void drawTip(Minecraft minecraft, int tipX, int tipY,
-                        int screenWidth) {
+                        int screenWidth, float share) {
         Line line = this.hovered;
         if (line == null || line.character == null) {
             return;
@@ -406,13 +412,14 @@ final class LoreCharactersWindow extends SubWindowContent {
         int y = Math.max(2, tipY - 3 - height);
         LostTalesTooltipSmoothing.begin(tipX, tipY);
         try {
-            WindowStyle.drawPopup(x, y, x + width, y + height, 1.0F);
+            WindowStyle.drawPopup(x, y, x + width, y + height, share);
             LostTalesUiInk.beginContent();
             int lineY = y + WindowStyle.POPUP_INSET;
             for (int index = 0; index < text.size(); index++) {
                 LostTalesUiInk.drawText(font, text.get(index),
                         x + WindowStyle.POPUP_INSET, lineY,
-                        colours.get(index).intValue(), 255);
+                        colours.get(index).intValue(),
+                        Math.round(255.0F * share));
                 lineY += DESCRIPTION_LINE;
             }
         } finally {

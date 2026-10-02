@@ -31,7 +31,8 @@ public final class LostTalesControlBar {
     public static final int INPUT_TEXT_GAP = 3;
     public static final int CONTROL_GAP = 10;
 
-    private static final int BACKGROUND = 0xA0000000;
+    private static final int BACKGROUND =
+            LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xA0);
     private static final int STATUS_GAP = 20;
     private static final int SEPARATOR_INSET = 7;
     private static final float INPUT_SCALE = 1.0F;

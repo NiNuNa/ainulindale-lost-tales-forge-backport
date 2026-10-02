@@ -14,11 +14,11 @@ import net.minecraft.util.StatCollector;
  * system it belongs to. Tabs are values: two tabs with the same id are
  * the same tab.
  */
-public abstract class WindowTab {
+public abstract class WindowPage {
     /** Reads a tab back from the id the layout file keeps it by. */
     public interface Reader {
         /** The tab {@code id} names; null for an id this reader does not know. */
-        WindowTab read(String id);
+        WindowPage read(String id);
     }
 
     private static final List<Reader> READERS = new CopyOnWriteArrayList<Reader>();
@@ -31,12 +31,12 @@ public abstract class WindowTab {
     }
 
     /** The tab an id names, asked of every kind in turn; null for an unknown one. */
-    public static WindowTab fromId(String id) {
+    public static WindowPage fromId(String id) {
         if (id == null) {
             return null;
         }
         for (Reader reader : READERS) {
-            WindowTab tab = reader.read(id);
+            WindowPage tab = reader.read(id);
             if (tab != null) {
                 return tab;
             }
@@ -96,6 +96,11 @@ public abstract class WindowTab {
     /** Whether the tab can be shown now; one that cannot waits in its window unseen. */
     public boolean isAvailable() {
         return true;
+    }
+
+    /** Whether the tab is a console, which the command key's view shows and the chat key's does not. */
+    public boolean isConsole() {
+        return false;
     }
 
     /* ---- What the window's tool strip offers while the tab is in front ---- */
@@ -170,6 +175,13 @@ public abstract class WindowTab {
 
     /** Puts the member list away in {@code window}, or brings it out. */
     public void toggleMemberList(Window window) {}
+
+    /**
+     * Puts back what the tab lays out in {@code window} as it first was —
+     * its panel, its member list and that list's width — as the window's
+     * layout is reset.
+     */
+    public void resetIn(Window window) {}
 
     /** What the well says while nothing is typed in it. */
     public String searchPrompt() {

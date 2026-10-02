@@ -72,10 +72,6 @@ public final class CharacterOperationResult {
         return this.character;
     }
 
-    public long getRosterRevision() {
-        return this.roster == null ? -1L : this.roster.getRevision();
-    }
-
     public long getRetryAtEpochMillis() {
         return this.retryAtEpochMillis;
     }

@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -43,6 +44,11 @@ public final class LostTalesMapTerrainRenderer {
     /** How long a new mesh takes to fade in at speed 1, as a motion fade. */
     static final int MESH_FADE_MILLIS = 250;
     private static final float LOG_TWO = (float)Math.log(2.0D);
+    /**
+     * Land with no map colour of its own. It stands among the world's map
+     * colours and is toned with them, so it is the land's grey, not one of
+     * the interface's palette.
+     */
     private static final int FALLBACK_SURFACE_COLOR = 0x777777;
     private static final float EAST_FACE_SHADE = 0.58F;
     private static final float SOUTH_FACE_SHADE = 0.72F;
@@ -520,7 +526,7 @@ public final class LostTalesMapTerrainRenderer {
             return surfaceColor(tile.colorAt(x, z), true);
         }
         int color = tile.renderColorAt(x, z);
-        return color == 0 ? 0x00FFFFFF : color;
+        return color == 0 ? LostTalesUiInk.UNTINTED : color;
     }
 
     private static Block sampleBlock(

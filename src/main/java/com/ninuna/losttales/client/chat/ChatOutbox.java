@@ -46,7 +46,7 @@ final class ChatOutbox {
     private final ChatNoticeSink notices;
     private Minecraft mc;
     /** The tab the server last heard this player typing into, or null. */
-    private ChatTab typingTab;
+    private ConversationPage typingTab;
     private long typingSentNanos;
     /** The field's text as the typing check last saw it, and when. */
     private String typedText = "";
@@ -72,7 +72,7 @@ final class ChatOutbox {
      * anything else is shown at once and sent, answering whatever the
      * composer holds.
      */
-    void sendMessage(ChatTab tab, String message) {
+    void sendMessage(ConversationPage tab, String message) {
         ClientChatIdentitySelection.update();
         // What goes out may have its emoticons converted; the history
         // the caller recorded keeps the raw text.
@@ -105,7 +105,7 @@ final class ChatOutbox {
      * was; in an NPC conversation the action is shown here, as a line
      * there is.
      */
-    void sendAction(ChatTab tab, String words) {
+    void sendAction(ConversationPage tab, String words) {
         ClientChatIdentitySelection.update();
         String outgoing = ChatAction.sentence(
                 ChatInputRules.outgoingMessage(words));
@@ -148,7 +148,7 @@ final class ChatOutbox {
      * is. A body too long to send is refused with the same notice the
      * bar gives, rather than dropped; an empty one only opens the tab.
      */
-    void sendWhisper(ChatTab tab, String text) {
+    void sendWhisper(ConversationPage tab, String text) {
         if (text.length() == 0) {
             return;
         }
@@ -169,7 +169,7 @@ final class ChatOutbox {
      * The server builds the line from its own record, so nothing is shown
      * before it arrives.
      */
-    void forward(ChatTab tab, long messageId) {
+    void forward(ConversationPage tab, long messageId) {
         if (tab == null || !ChatMessageIds.isServerId(messageId)) {
             return;
         }
@@ -193,17 +193,21 @@ final class ChatOutbox {
      * references the server re-checks; {@code action} sends the words as
      * an action.
      */
-    private void sendToTab(ChatTab tab, String outgoing,
+    private void sendToTab(ConversationPage tab, String outgoing,
                            ChatReplyReference reply, boolean action) {
         if (tab == null) {
             return;
         }
         ClientChatIdentitySelection.update();
-        long echoNonce = LostTalesChatPresentation.echoPending(tab, outgoing,
-                resolveLocalShowcases(outgoing), reply, action);
-        // Only a message the server named travels as its id; a line
-        // this client anchored for itself is quoted by its words.
+        // Only a message the server named travels as its id. A line no
+        // server holds a record of is quoted as a message no longer kept:
+        // its author and words are this screen's word alone, and the
+        // line shown at once reads as the server will send it back.
         boolean named = ChatMessageIds.isServerId(reply.getMessageId());
+        boolean unkept = !named && reply.exists();
+        long echoNonce = LostTalesChatPresentation.echoPending(tab, outgoing,
+                resolveLocalShowcases(outgoing),
+                unkept ? ChatReplyReference.UNKEPT : reply, action);
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatSendPacket(tab.getChannel(), outgoing,
                         resolveShareReferences(outgoing), tab.target(),
@@ -215,19 +219,7 @@ final class ChatOutbox {
                         tab.isWhisper()
                                 ? ClientChatChannelState.partnerCharacterIdOf(tab)
                                 : null,
-                        named ? "" : reply.getAuthor(),
-                        named ? "" : reply.getExcerpt(),
-                        // Whose the unnamed line is, as this screen shows
-                        // it: the server draws a head for it only where
-                        // it can vouch for one.
-                        named ? LostTalesChatSendPacket.QUOTE_OTHER
-                                : LostTalesChatSendPacket.quoteSourceOf(reply,
-                                        this.mc == null
-                                                || this.mc.thePlayer == null
-                                                ? null
-                                                : this.mc.thePlayer
-                                                        .getUniqueID()),
-                        action));
+                        unkept, action));
     }
 
     /**
@@ -384,7 +376,7 @@ final class ChatOutbox {
      * the message goes out or the screen closes. Commands are not
      * messages and say nothing; an NPC conversation has nobody to tell.
      */
-    void updateTyping(String text, ChatTab selected) {
+    void updateTyping(String text, ConversationPage selected) {
         long now = System.nanoTime();
         if (!text.equals(this.typedText)) {
             this.typedText = text;
@@ -411,7 +403,7 @@ final class ChatOutbox {
      * last changed, counts as typing into {@code selected}. An action
      * being written is typing; any other command is not.
      */
-    static boolean isTyping(String text, ChatTab selected,
+    static boolean isTyping(String text, ConversationPage selected,
                             long sinceKeystrokeNanos) {
         return LostTalesConfig.sendChatTypingStatus
                 && text.trim().length() > 0
@@ -430,7 +422,7 @@ final class ChatOutbox {
         }
     }
 
-    private static void sendTyping(ChatTab tab, boolean typing) {
+    private static void sendTyping(ConversationPage tab, boolean typing) {
         if (tab == null) {
             return;
         }

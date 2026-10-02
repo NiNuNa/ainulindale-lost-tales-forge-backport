@@ -5,6 +5,7 @@ import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
+import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -17,7 +18,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Every fellowship has a name its leader gives it: 32 characters at most,
  * trimmed, with no formatting codes or control characters, no word of the
- * profanity list, and none another fellowship of the character has.
+ * profanity list, and none another fellowship of one of its members has.
  */
 public final class FellowshipNameTest {
 
@@ -80,6 +81,31 @@ public final class FellowshipNameTest {
                 Arrays.asList(grey, rangers), "the grey company", null));
         assertFalse("its own name is no other's", FellowshipService.hasFellowshipNamed(
                 Arrays.asList(grey, rangers), "The Grey Company", grey.getFellowshipId()));
+    }
+
+    /**
+     * A rename may not give a fellowship the name of another one any of its
+     * members is in, so no character ends up in two fellowships of one name.
+     */
+    @Test
+    public void aRenameMayNotTakeTheNameOfAnotherFellowshipOfAMember() {
+        FellowshipMember aldric = new FellowshipMember(UUID.randomUUID(), UUID.randomUUID(),
+                "Aldric", 1L, FellowshipColor.GREEN);
+        FellowshipMember beren = new FellowshipMember(UUID.randomUUID(), UUID.randomUUID(),
+                "Beren", 2L, FellowshipColor.BLUE);
+        Fellowship grey = Fellowship.createNew(UUID.randomUUID(), "The Grey Company",
+                aldric, 1L);
+        grey.addMember(beren);
+        Fellowship rangers = Fellowship.createNew(UUID.randomUUID(), "Rangers", beren, 1L);
+        FellowshipWorldData data = new FellowshipWorldData(FellowshipWorldData.DATA_NAME);
+        data.saveFellowship(grey);
+        data.saveFellowship(rangers);
+
+        assertTrue("a member's other fellowship, whatever its case",
+                FellowshipService.isNameTakenByMember(data, grey, "rangers"));
+        assertFalse("its own name is no other's",
+                FellowshipService.isNameTakenByMember(data, grey, "the grey company"));
+        assertFalse(FellowshipService.isNameTakenByMember(data, grey, "Dunedain"));
     }
 
     @Test

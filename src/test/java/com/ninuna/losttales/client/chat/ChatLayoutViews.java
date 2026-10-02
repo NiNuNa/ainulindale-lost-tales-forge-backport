@@ -3,7 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
-import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.client.window.WindowPage;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,8 +17,8 @@ public final class ChatLayoutViews {
     /** The channels of a window's conversations, in row order; whispers as WHISPER. */
     public static List<ChatChannel> channelsOf(Window window) {
         List<ChatChannel> result = new ArrayList<ChatChannel>();
-        for (WindowTab tab : window.getTabs()) {
-            ChatTab conversation = ChatTab.from(tab);
+        for (WindowPage tab : window.getTabs()) {
+            ConversationPage conversation = ConversationPage.from(tab);
             if (conversation != null) {
                 result.add(conversation.getChannel());
             }
@@ -28,15 +28,15 @@ public final class ChatLayoutViews {
 
     /** The channel of the conversation in front of a window, or null. */
     public static ChatChannel frontChannelOf(Window window) {
-        ChatTab front = ChatTab.frontOf(window);
+        ConversationPage front = ConversationPage.frontOf(window);
         return front == null ? null : front.getChannel();
     }
 
     /** The channels of the conversations open, in window and row order. */
     public static List<ChatChannel> orderChannels() {
         List<ChatChannel> result = new ArrayList<ChatChannel>();
-        for (WindowTab each : WindowLayout.order()) {
-            ChatTab tab = ChatTab.from(each);
+        for (WindowPage each : WindowLayout.order()) {
+            ConversationPage tab = ConversationPage.from(each);
             if (tab != null) {
                 result.add(tab.getChannel());
             }
@@ -64,7 +64,7 @@ public final class ChatLayoutViews {
     }
 
     private static boolean reopenIn(ChatChannel channel, String windowId) {
-        ChatTab tab = ChatTab.of(channel);
+        ConversationPage tab = ConversationPage.of(channel);
         return tab != null && !WindowLayout.isOpen(tab)
                 && WindowLayout.openTab(tab, windowId) != null;
     }

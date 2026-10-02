@@ -208,7 +208,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     /**
      * The quest journal, the fellowship, the map and the characters, each a
      * page a window can hold, with the key that opens it from another
-     * page; the Characters tab's own kinds of sub-window; the Motion Lab
+     * page; the Characters page's own kinds of sub-window; the Motion Lab
      * and the Server Settings, pages with no key, which need no world;
      * and the pages that open only from a thing in the world: a
      * waystone's, a missive board's and a missive letter's.
@@ -538,19 +538,19 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         }
     }
 
+    /** A catalog that could not be read leaves the last good one, as a roster does. */
     @Override
     public void handleCharacterCreationCatalogSync(CharacterCreationCatalogSyncPacket packet) {
         if (packet == null || packet.isMalformed() || packet.getCatalog() == null) {
-            ClientCharacterCreationCatalogCache.clear();
             return;
         }
         ClientCharacterCreationCatalogCache.accept(packet.getCatalog());
     }
 
+    /** A lore list that could not be read leaves the last good one, as a roster does. */
     @Override
     public void handleLoreCharacterSync(LoreCharacterSyncPacket packet) {
         if (packet == null || packet.isMalformed() || packet.getSnapshot() == null) {
-            ClientLoreCharacterCache.clear();
             return;
         }
         ClientLoreCharacterCache.accept(packet.getSnapshot());
@@ -784,7 +784,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     /**
-     * Entries of the Server Console: one as it happens, or the kept
+     * Entries of the Server Log: one as it happens, or the kept
      * ones the server replays on joining, which sound no cue and are
      * filed against where this player last read the Console — one read
      * before is not unread again. An entry from before this player

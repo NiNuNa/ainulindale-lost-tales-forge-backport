@@ -912,69 +912,66 @@ public final class LostTalesChatPacketTest {
     }
 
     /**
-     * A line nobody named is quoted by its author and words: the quote
-     * crosses both wires whole, names no message, and a request may not
-     * carry both a quote and an id, nor words without an author.
+     * A line no server holds a record of is quoted as a message no longer
+     * kept: the request says only that it answers one, never an author or
+     * words, and may not name an id besides; the line carries the quote
+     * with no author, no words and no head, whatever its sender's screen
+     * showed.
      */
     @Test
-    public void anUnnamedLineIsQuotedByItsWordsOverTheWire() {
+    public void aLineNoRecordHoldsIsQuotedAsNoLongerKept() {
         LostTalesChatSendPacket request = ChatPacketFixtures.send(ChatChannel.GLOBAL, "well done")
-                .quoting("System", "Bilbo has just earned the achievement [Taking Inventory]")
-                .build();
+                .quotingUnkept().build();
         ByteBuf buffer = Unpooled.buffer();
         request.toBytes(buffer);
         LostTalesChatSendPacket decodedRequest = new LostTalesChatSendPacket();
         decodedRequest.fromBytes(buffer);
         assertFalse(decodedRequest.isMalformed());
         assertEquals(ChatMessageIds.NONE, decodedRequest.getReplyToMessageId());
-        assertEquals("System", decodedRequest.getQuoteAuthor());
-        assertEquals("Bilbo has just earned the achievement [Taking Inventory]",
-                decodedRequest.getQuoteExcerpt());
+        assertTrue(decodedRequest.quotesUnkept());
         // A request without a quote reads back without one.
         ByteBuf plain = Unpooled.buffer();
         ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello").build().toBytes(plain);
         LostTalesChatSendPacket decodedPlain = new LostTalesChatSendPacket();
         decodedPlain.fromBytes(plain);
         assertFalse(decodedPlain.isMalformed());
-        assertEquals("", decodedPlain.getQuoteAuthor());
-        assertEquals("", decodedPlain.getQuoteExcerpt());
+        assertFalse(decodedPlain.quotesUnkept());
         try {
             ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello")
-                    .replyingTo(ChatMessageIdAllocator.next()).quoting("System", "x").build();
-            fail("a quote and an id were both accepted");
-        } catch (IllegalArgumentException expected) {
-            assertNotNull(expected);
-        }
-        try {
-            ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello").quoting("", "x").build();
-            fail("words without an author were accepted");
+                    .replyingTo(ChatMessageIdAllocator.next()).quotingUnkept().build();
+            fail("an unkept quote and an id were both accepted");
         } catch (IllegalArgumentException expected) {
             assertNotNull(expected);
         }
 
-        ChatReplyReference reply = ChatReplyReference.unanchored("System",
-                "Bilbo has just earned the achievement [Taking Inventory]",
-                0x4A90D9);
-        assertTrue(reply.exists());
-        assertFalse(reply.isAnchored());
+        assertTrue(ChatReplyReference.UNKEPT.exists());
+        assertTrue(ChatReplyReference.UNKEPT.isUnkept());
+        assertFalse(ChatReplyReference.UNKEPT.isAnchored());
+        assertEquals("", ChatReplyReference.UNKEPT.getAuthor());
         assertEquals(ChatReplyReference.NONE,
                 ChatReplyReference.unanchored("  ", "x", 0));
-        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Beren", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, "well done", 1L, "", null, "", "", 0,
-                false, ChatMessageIdAllocator.next(), reply);
-        ByteBuf line = Unpooled.buffer();
-        packet.toBytes(line);
-        LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
-        decoded.fromBytes(line);
-        assertFalse(decoded.isMalformed());
-        assertTrue(decoded.getReply().exists());
-        assertFalse(decoded.getReply().isAnchored());
-        assertEquals(ChatMessageIds.NONE, decoded.getReply().getMessageId());
-        assertEquals("System", decoded.getReply().getAuthor());
-        assertEquals("Bilbo has just earned the achievement [Taking Inventory]",
-                decoded.getReply().getExcerpt());
-        assertEquals(0x4A90D9, decoded.getReply().getAuthorColor());
+        // What a client's own screen quotes by words travels as unkept.
+        ChatReplyReference seen = ChatReplyReference.unanchored("System",
+                "Bilbo has just earned the achievement [Taking Inventory]",
+                0x4A90D9).withHead(UUID.randomUUID(), true, "");
+        for (ChatReplyReference reply : new ChatReplyReference[] {
+                seen, ChatReplyReference.UNKEPT}) {
+            LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                    ChatChannel.GLOBAL, UUID.randomUUID(), "Beren", "Steve", "",
+                    0xFFFFFF, 0xFFFFFF, "well done", 1L, "", null, "", "", 0,
+                    false, ChatMessageIdAllocator.next(), reply);
+            ByteBuf line = Unpooled.buffer();
+            packet.toBytes(line);
+            LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
+            decoded.fromBytes(line);
+            assertFalse(decoded.isMalformed());
+            assertTrue(decoded.getReply().isUnkept());
+            assertFalse(decoded.getReply().isAnchored());
+            assertEquals(ChatMessageIds.NONE, decoded.getReply().getMessageId());
+            assertEquals("", decoded.getReply().getAuthor());
+            assertEquals("", decoded.getReply().getExcerpt());
+            assertFalse(decoded.getReply().hasHead());
+        }
     }
 
     /** A request may only name an id a server could have handed out. */
@@ -1195,14 +1192,11 @@ public final class LostTalesChatPacketTest {
     private static int scopeTailBytes(String scopeValue) {
         ByteBuf probe = Unpooled.buffer();
         LostTalesPacketCodec.writeUtf8String(probe, scopeValue, 128);
-        // Behind the scope, for a line quoting nothing: the empty quote
-        // of a line nobody named (author, words, colour), then the
-        // quote's head and whether it quotes an action, a forward's
-        // link, a server line's component and its named players, every
-        // one of them empty.
-        LostTalesPacketCodec.writeUtf8String(probe, "", 256);
-        LostTalesPacketCodec.writeUtf8String(probe, "", 297);
-        probe.writeInt(0);
+        // Behind the scope, for a line quoting nothing: whether it quotes
+        // a line no longer kept, then the quote's head and whether it
+        // quotes an action, a forward's link, a server line's component
+        // and its named players, every one of them empty.
+        probe.writeBoolean(false);
         probe.writeBoolean(false);
         probe.writeLong(0L);
         probe.writeLong(0L);

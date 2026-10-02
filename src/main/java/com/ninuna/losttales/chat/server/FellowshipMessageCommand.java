@@ -7,6 +7,7 @@ import com.ninuna.losttales.compat.lotr.LotrFellowshipMirror;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
+import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import java.util.Collections;
@@ -25,13 +26,15 @@ import net.minecraftforge.event.CommandEvent;
  * {@code /fmsg unbind} lets it go. The fellowship is one of the character
  * played, found by its name whatever its case. LOTR's own yellow line is
  * never sent. The binding is kept where LOTR keeps it, on the account, as
- * the LOTR fellowship behind ours.
+ * the LOTR fellowship behind ours. The words spend the message budget a
+ * typed line spends ({@code CHAT_MESSAGE}), and the Server Log shows
+ * the command without them ({@code ChatCommandText}).
  */
 public final class FellowshipMessageCommand {
     private static final String BIND = "bind";
     private static final String UNBIND = "unbind";
 
-    /** After the speech gate and the Server Console have had their say. */
+    /** After the speech gate and the Server Log have had their say. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onCommand(CommandEvent event) {
         if (event == null || event.isCanceled() || event.command == null
@@ -85,9 +88,17 @@ public final class FellowshipMessageCommand {
                     Collections.<ChatShareReference>emptyList(),
                     fellowship.getFellowshipId().toString(),
                     LostTalesChatSendPacket.IDENTITY_DEFAULT, null, ChatMessageIds.NONE,
-                    "", 0L, null, "", "", LostTalesChatSendPacket.QUOTE_OTHER);
+                    "", 0L, null, false);
         } catch (IllegalArgumentException refused) {
             tell(player, "chat.losttales.fmsg.usage");
+            return;
+        }
+        // Words said this way spend the budget a typed line spends, and a
+        // spent budget drops them the same way: logged, and nobody told.
+        if (!LostTalesRequestRateLimiter.allow(player,
+                LostTalesRequestRateLimiter.RequestType.CHAT_MESSAGE)) {
+            LostTalesRequestRateLimiter.logRateLimited(player,
+                    LostTalesRequestRateLimiter.RequestType.CHAT_MESSAGE, "/fmsg");
             return;
         }
         LostTalesChatService.send(player, said);
