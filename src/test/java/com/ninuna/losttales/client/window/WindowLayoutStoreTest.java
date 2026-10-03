@@ -50,8 +50,8 @@ public final class WindowLayoutStoreTest {
     /**
      * A split is kept on its window's line: its two pages, its way and
      * its share. One naming a page the window does not hold, or written
-     * wrong, is left out, and one holding a conversation stands side by
-     * side.
+     * wrong, is left out; two conversations stand one over the other as
+     * well as side by side.
      */
     @Test
     public void aSplitRoundTripsOnItsWindowsLine() {
@@ -62,7 +62,7 @@ public final class WindowLayoutStoreTest {
         WindowSplit split = first.splitOf(ConversationPage.of(ChatChannel.GLOBAL));
         assertNotNull(split);
         assertEquals(ConversationPage.of(ChatChannel.OOC), split.first());
-        assertFalse("a conversation stands only side by side", split.isStacked());
+        assertTrue("conversations one over the other", split.isStacked());
         assertEquals(0.6D, split.share(), 1.0E-9D);
         assertEquals("the second split shares a page with the first", 1,
                 first.splits().size());
@@ -70,7 +70,7 @@ public final class WindowLayoutStoreTest {
         List<String> described = WindowLayoutStore.describe();
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());
-        assertTrue(described.get(1).contains(" split=ooc,global,across,0.6000 "));
+        assertTrue(described.get(1).contains(" split=ooc,global,down,0.6000 "));
     }
 
     /**
@@ -525,37 +525,67 @@ public final class WindowLayoutStoreTest {
     }
 
     /**
-     * A window whose timestamp area is driven out, or whose member list is
-     * put away, says so in its line and keeps it across a reload; a window
-     * whose line says neither shows both.
+     * A conversation whose timestamp area is driven out, or whose member
+     * list is put away or given a width, says so on a view line of its
+     * own and keeps it across a reload; a conversation with no such line
+     * shows both, and none is written for it.
      */
     @Test
     public void aDrivenOutAreaAndAPutAwayListRoundTrip() {
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         WindowLayoutStore.load(Arrays.asList(
-                "window w1 locked=false x=0.00 y=0.00 area=hidden members=hidden active=global tabs=global",
-                "window w2 locked=false x=0.00 y=100.00 active=ooc tabs=ooc"));
-        assertTrue(ChatLayout.isAreaHidden(WindowLayout.window("w1")));
-        assertTrue(ChatLayout.isMembersHidden(WindowLayout.window("w1")));
-        assertFalse(ChatLayout.isAreaHidden(WindowLayout.window("w2")));
-        assertFalse(ChatLayout.isMembersHidden(WindowLayout.window("w2")));
-        List<String> lines = WindowLayoutStore.describe();
-        boolean hiddenLine = false;
-        boolean plainLine = false;
-        for (String line : lines) {
-            if (line.startsWith("window w1 ")) {
-                hiddenLine = line.contains(" area=hidden")
-                        && line.contains(" members=hidden");
-            } else if (line.startsWith("window w2 ")) {
-                plainLine = !line.contains("area=") && !line.contains("members=");
+                "window w1 locked=false x=0.00 y=0.00 active=global tabs=global,ooc",
+                "view\tglobal\tarea=hidden members=hidden members_width=90.00"));
+        assertTrue(ChatLayout.isAreaHidden(global));
+        assertTrue(ChatLayout.isMembersHidden(global));
+        assertEquals(90.0D, ChatLayout.getMembersWidth(global), 1.0E-9D);
+        assertFalse(ChatLayout.isAreaHidden(ooc));
+        assertFalse(ChatLayout.isMembersHidden(ooc));
+        boolean globalLine = false;
+        for (String line : WindowLayoutStore.describe()) {
+            if (line.startsWith("view\tglobal\t")) {
+                globalLine = line.contains("area=hidden")
+                        && line.contains("members=hidden")
+                        && line.contains("members_width=90.00");
             }
+            assertFalse(line, line.startsWith("view\tooc"));
+            assertFalse(line, line.startsWith("window") && line.contains("area="));
         }
-        assertTrue(hiddenLine);
-        assertTrue(plainLine);
-        assertTrue(ChatLayout.setAreaHidden("w2", true));
+        assertTrue(globalLine);
+        assertTrue(ChatLayout.setAreaHidden(ooc, true));
         assertFalse("asking for what stands already changes nothing",
-                ChatLayout.setAreaHidden("w2", true));
-        assertTrue(ChatLayout.setMembersHidden("w1", false));
-        assertFalse(ChatLayout.isMembersHidden(WindowLayout.window("w1")));
+                ChatLayout.setAreaHidden(ooc, true));
+        assertTrue(ChatLayout.setMembersHidden(global, false));
+        assertFalse(ChatLayout.isMembersHidden(global));
+    }
+
+    /**
+     * Two conversations of one window keep their own area, list and list
+     * width: what is done to the one in front of a split leaves the one
+     * beside it as it was.
+     */
+    @Test
+    public void twoConversationsOfASplitKeepTheirOwnPanels() {
+        Window window = WindowLayout.firstWindow();
+        window.setLocked(false);
+        List<WindowPage> tabs = window.getTabs();
+        WindowPage first = tabs.get(0);
+        WindowPage second = tabs.get(1);
+        assertTrue(WindowLayout.split(first, second));
+        first.toggleMemberList();
+        first.togglePanel();
+        assertTrue(ChatLayout.setMembersWidth(ConversationPage.from(first),
+                72.0D, true));
+        assertFalse(first.isMemberListOut());
+        assertFalse(first.isPanelOut());
+        assertTrue(second.isMemberListOut());
+        assertTrue(second.isPanelOut());
+        assertEquals(0.0D, ChatLayout.getMembersWidth(ConversationPage.from(second)),
+                1.0E-9D);
+        first.resetView();
+        assertTrue(first.isMemberListOut());
+        assertTrue(first.isPanelOut());
     }
 
     /** The server-defined Trade channel the reload tests install. */

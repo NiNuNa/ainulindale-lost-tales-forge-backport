@@ -104,17 +104,17 @@ public final class OtherPage extends WindowPage {
     }
 
     @Override
-    public boolean isPanelOut(Window window) {
+    public boolean isPanelOut() {
         return content().isPanelOut();
     }
 
     @Override
-    public void togglePanel(Window window) {
+    public void togglePanel() {
         content().togglePanel();
     }
 
     @Override
-    public void resetIn(Window window) {
+    public void resetView() {
         content().resetPanel();
     }
 

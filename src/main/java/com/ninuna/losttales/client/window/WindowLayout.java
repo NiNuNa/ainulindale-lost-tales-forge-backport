@@ -783,9 +783,7 @@ public final class WindowLayout {
     /** Turns {@code tab}'s split side by side, or one over the other. */
     public static synchronized boolean turnSplit(WindowPage tab, boolean stacked) {
         Window window = splitWindow(tab, false);
-        if (window == null || window.splitOf(tab).isStacked() == stacked
-                || stacked && !(window.splitOf(tab).first() instanceof OtherPage
-                        && window.splitOf(tab).second() instanceof OtherPage)) {
+        if (window == null || window.splitOf(tab).isStacked() == stacked) {
             return false;
         }
         replaceSplit(window, window.splitOf(tab), window.splitOf(tab).turned(stacked));
@@ -1001,13 +999,7 @@ public final class WindowLayout {
                 window.setOwnHeight(clampWindowHeight(spec.height));
                 window.setOwnWidth(clampWindowWidth(spec.width));
                 window.setActiveTab(spec.activeTab);
-                for (WindowSplit split : spec.splits) {
-                    // A conversation stands only side by side.
-                    window.splits().add(split.isStacked()
-                            && !(split.first() instanceof OtherPage
-                                    && split.second() instanceof OtherPage)
-                            ? split.turned(false) : split);
-                }
+                window.splits().addAll(spec.splits);
                 settleSplits(window);
                 WINDOWS.add(window);
             }
@@ -1296,8 +1288,8 @@ public final class WindowLayout {
      * Puts a window's layout back as it first was: at the default place,
      * in the middle of the screen at two thirds of it, filling no part of
      * the screen, pinned nowhere, its splits parted, and locked again. Its
-     * pages stay; what each lays out in it is put back by the tab
-     * ({@link WindowPage#resetIn}), and the settings keep their own reset.
+     * pages stay; what each lays out is put back by the page
+     * ({@link WindowPage#resetView}), and the settings keep their own reset.
      * A locked window stays where it is, so only an unlocked one resets.
      */
     public static synchronized boolean resetWindow(String windowId) {

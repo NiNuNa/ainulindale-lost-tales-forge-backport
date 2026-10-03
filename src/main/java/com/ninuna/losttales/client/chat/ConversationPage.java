@@ -482,16 +482,15 @@ public final class ConversationPage extends WindowPage {
         return AREA_PANEL;
     }
 
-    /** The timestamp area is a conversation's panel. */
+    /** The timestamp area is a conversation's panel, its own wherever it stands. */
     @Override
-    public boolean isPanelOut(Window window) {
-        return !ChatLayout.isAreaHidden(window);
+    public boolean isPanelOut() {
+        return !ChatLayout.isAreaHidden(this);
     }
 
     @Override
-    public void togglePanel(Window window) {
-        ChatLayout.setAreaHidden(window.getId(),
-                !ChatLayout.isAreaHidden(window));
+    public void togglePanel() {
+        ChatLayout.setAreaHidden(this, !ChatLayout.isAreaHidden(this));
     }
 
     @Override
@@ -500,26 +499,19 @@ public final class ConversationPage extends WindowPage {
     }
 
     @Override
-    public boolean isMemberListOut(Window window) {
-        return !ChatLayout.isMembersHidden(window);
+    public boolean isMemberListOut() {
+        return !ChatLayout.isMembersHidden(this);
     }
 
     @Override
-    public void toggleMemberList(Window window) {
-        ChatLayout.setMembersHidden(window.getId(),
-                !ChatLayout.isMembersHidden(window));
+    public void toggleMemberList() {
+        ChatLayout.setMembersHidden(this, !ChatLayout.isMembersHidden(this));
     }
 
     /** The timestamp area and the member list out again, the list at its own width. */
     @Override
-    public void resetIn(Window window) {
-        ChatLayout.resetView(window.getId());
-    }
-
-    /** A conversation always has its four options. */
-    @Override
-    public boolean hasOptions() {
-        return true;
+    public void resetView() {
+        ChatLayout.resetView(this);
     }
 
     /** Every conversation's cog opens the one Chat Settings. */
@@ -611,8 +603,11 @@ public final class ConversationPage extends WindowPage {
                 word("gui.losttales.chat.tab.jump_unread"), JUMP_GLYPH)
                 .unavailable(divided ? "" : word("gui.losttales.chat.tab.nothing_unread"))
                 .inGroup(GROUP_READING, ""));
+        // The feed's own settings, every conversation's, stand under the
+        // words that say what of this one reaches it.
         options.add(pick(MENU_FEED, "gui.losttales.chat.tab.feed",
-                ChatLayout.feedChoice(this), FEED_GLYPHS));
+                ChatLayout.feedChoice(this), FEED_GLYPHS)
+                .withSettings(Settings.Place.FEED));
         options.add(pick(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
                 ChatLayout.notification(this), BELL_GLYPHS));
         return options;

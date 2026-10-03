@@ -123,6 +123,22 @@ public final class LostTalesGuiRegionBlur {
     }
 
     /**
+     * The whole sharp frame, the screen as it stood before any window,
+     * drawn shrunk into {@code left} to {@code right} by {@code top} to
+     * {@code bottom}: a picture of the screen, behind the HUD Placement
+     * page's preview. Answers whether a fresh capture was there to draw.
+     */
+    public boolean drawScreenInto(double left, double top, double right,
+                                  double bottom, float opacity) {
+        if (!fresh(this.sharpNanos)) {
+            return false;
+        }
+        drawMapped(this.sharpTexture, left, top, right, bottom, null, 0.0D,
+                0.0D, this.guiWidth, this.guiHeight, 0.0D, 1.0D, opacity);
+        return true;
+    }
+
+    /**
      * Softens the world under a framed box: the blurred frame pasted over
      * the box and its frame's {@code ring}, in the frame's own shape, as
      * {@link #cutFramedRegion} cuts it. Nothing is drawn without a fresh

@@ -35,7 +35,7 @@ final class ChatTrailingStrip {
         ChatTimestampColumn columns = ChatTimestampColumn.of(frame, font);
         double originX = LostTalesDisplayPixels.snap(
                 frame.contentLeft() + columns.messageX() * frame.scale);
-        double originY = frame.drawnBaseline();
+        double originY = frame.linesBaseline();
         int wholeX = (int)Math.floor(originX);
         int wholeY = (int)Math.floor(originY);
         int room = (int)Math.round(frame.contentWidth()

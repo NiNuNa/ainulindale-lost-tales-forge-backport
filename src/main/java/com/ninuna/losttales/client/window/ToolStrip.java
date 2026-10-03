@@ -22,11 +22,13 @@ import org.lwjgl.input.Mouse;
 /**
  * A window's tool strip under its tab row: the controls that read the
  * tab in front rather than pick one, each offered by that tab
- * ({@link WindowPage#panel} and on). At its left, under the tab search,
- * the panel button and nothing else: over a conversation the timestamp
- * area's person, which drives the area out of the window and back in;
- * over a page the page's own panel, the journal's quest list.
- * Everything else stands at the right. From the right end: the help
+ * ({@link WindowPage#panel} and on). The page's options menu holds the
+ * very same, row for row and group for group ({@link TabMenus#stripRows}).
+ * At its left, under the tab search, the panel button and nothing else:
+ * over a conversation the timestamp area's person, which drives the area
+ * out of the window and back in; over a page the page's own panel, the
+ * journal's quest list. Everything else stands at the right, a hairline
+ * before it where the panel button stands. From the right end: the help
  * button, a question mark, which opens the page's help; the search, a
  * well a third of the strip wide naming what it searches — {@code
  * Search Global}, {@code Search active quests} — with its magnifier at
@@ -38,14 +40,15 @@ import org.lwjgl.input.Mouse;
  * every conversation); a hairline; and the page's options, each a button
  * of its own ({@link PageOption}), a hairline between two groups: Mark
  * as Read, Notification Settings, the journal's filters, the map's kinds
- * of marker. Options the strip has no room for are left to the tab's
- * options, from the end of the list. The panel buttons rest lit while
- * their panels are out, the cog, the split and the question mark while
- * what they open is, and an option while it is on. A cog with no
- * settings, a split with no page to stand beside, an option that cannot
- * be taken and a well with nothing to search stay where they are,
- * greyed, and their tips say why; a split the padlock holds says
- * nothing, as the lit padlock says it.
+ * of marker. Options the strip has no room for go behind its overflow
+ * button, from the end of the list, so every option is on the strip at
+ * every width. The panel buttons rest lit while their panels are out,
+ * the cog, the split, the overflow and the question mark while what they
+ * open is, and an option while it is on. A cog with no settings, a split
+ * with no page to stand beside, an option that cannot be taken and a
+ * well with nothing to search stay where they are, greyed, and their
+ * tips say why; a split the padlock holds says nothing, as the lit
+ * padlock says it.
  * While a search stands in a well, the count stands inside the well
  * before its end, and the magnifier has crossed over to the cross that
  * clears it: over a conversation the match stood on of how many, with
@@ -67,6 +70,8 @@ public final class ToolStrip {
         PANEL,
         /** One of the options of the tab in front, a button of its own ({@link #optionAt}). */
         OPTION,
+        /** The options the strip has no room for, behind one button after the last that fits. */
+        OVERFLOW,
         /** The cog: the settings of the kind of the tab in front. */
         SETTINGS,
         /** The split view button: the pages that can stand beside the tab in front, or its split's rows. */
@@ -153,6 +158,11 @@ public final class ToolStrip {
             LostTalesUiSheet.FULLSCREEN.getHeight();
     private static final int SPLIT_WIDTH = LostTalesUiSheet.SPLIT.getWidth();
     private static final int SPLIT_HEIGHT = LostTalesUiSheet.SPLIT.getHeight();
+    /** The overflow button: the chevron a list opens from, until Nils draws its own. */
+    private static final LostTalesUiSheet OVERFLOW_GLYPH = LostTalesUiSheet.CHEVRON_1;
+    private static final LostTalesUiSheet OVERFLOW_LIT = LostTalesUiSheet.CHEVRON_1_HOVER;
+    static final int OVERFLOW_WIDTH = OVERFLOW_GLYPH.getWidth();
+    private static final int OVERFLOW_HEIGHT = OVERFLOW_GLYPH.getHeight();
 
     /** Where one window's strip stands this frame, in its row's space. */
     static final class Layout {
@@ -171,8 +181,13 @@ public final class ToolStrip {
         /** The page's options the strip has room for, and where each stands. */
         PageOption[] options = new PageOption[0];
         int[] optionX = new int[0];
-        /** The hairlines: between two groups of options, and after the last before the cog. */
+        /**
+         * The hairlines: after the panel button's group, between two
+         * groups of options, and after the last option before the cog.
+         */
         int[] dividerX = new int[0];
+        /** The overflow button's left edge; -1 while every option stands on the strip. */
+        int overflowX = -1;
         int settingsX;
         int splitX;
         int viewX;
@@ -209,6 +224,8 @@ public final class ToolStrip {
         final LostTalesUiButtonMotion splitMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion viewMotion =
+                new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+        final LostTalesUiButtonMotion overflowMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         /** The magnifier turns on its handle; the cross it becomes answers like a switch. */
         final LostTalesUiButtonMotion iconMotion =
@@ -294,7 +311,7 @@ public final class ToolStrip {
                 font.getStringWidth(front.searchCount()));
         layOptions(laid, front.options(), panel == null
                 ? TabRow.searchButtonLeft(row) + TabRow.searchButtonSize()
-                : laid.panelX + laid.panelWidth);
+                : laid.panelX + laid.panelWidth, panel != null);
         frame.toolStrip.layout = laid;
         frame.tabBar.setToolStripHole(laid.hasWell
                 ? new LostTalesUiHitBox(laid.wellLeft, laid.wellTop,
@@ -375,30 +392,34 @@ public final class ToolStrip {
     }
 
     /**
-     * Lays the page's options out against the cog, in their order, a
-     * hairline between two groups and one between the last option and
-     * the cog: as many as stand whole right of {@code after}, the panel
-     * button's right edge. They are counted from the start of the list,
-     * so those left out are the last ones; they stay in the tab's options.
+     * Lays the page's options out against the cog, in their order, with
+     * the strip's hairlines, which part the same groups the page's options
+     * menu parts: one after the panel button's group where it has one
+     * ({@code leading}), one between two groups of options, and one between
+     * the last option and the cog. As many options as stand whole right of
+     * {@code after}, the panel button's right edge, stand on the strip;
+     * they are counted from the start of the list, and the ones left over
+     * go behind the overflow button after the last that fits.
      */
-    static void layOptions(Layout laid, List<PageOption> options, int after) {
-        int room = laid.settingsX - DIVIDER_ROOM - (after + PANEL_CLEARANCE);
-        int shown = 0;
-        int width = 0;
-        for (PageOption option : options) {
-            int step = option.glyph.width() + (shown == 0 ? 0
-                    : sameGroup(options.get(shown - 1), option) ? END_GAP
-                    : DIVIDER_ROOM);
-            if (width + step > room) {
-                break;
-            }
-            width += step;
-            shown++;
+    static void layOptions(Layout laid, List<PageOption> options, int after,
+                           boolean leading) {
+        int tail = options.isEmpty() ? 0 : DIVIDER_ROOM;
+        int lead = leading ? DIVIDER_ROOM : 0;
+        int room = laid.settingsX - tail - lead - (after + PANEL_CLEARANCE);
+        int shown = fitting(options, room);
+        boolean overflow = shown < options.size();
+        if (overflow) {
+            shown = fitting(options, room - END_GAP - OVERFLOW_WIDTH);
         }
+        int width = runWidth(options, shown)
+                + (overflow ? (shown > 0 ? END_GAP : 0) + OVERFLOW_WIDTH : 0);
         laid.options = new PageOption[shown];
         laid.optionX = new int[shown];
         List<Integer> dividers = new ArrayList<Integer>();
-        int x = laid.settingsX - DIVIDER_ROOM - width;
+        int x = laid.settingsX - tail - width;
+        if (leading) {
+            dividers.add(Integer.valueOf(x - DIVIDER_ROOM + END_GAP));
+        }
         for (int index = 0; index < shown; index++) {
             PageOption option = options.get(index);
             if (index > 0) {
@@ -413,13 +434,67 @@ public final class ToolStrip {
             laid.optionX[index] = x;
             x += option.glyph.width();
         }
-        if (shown > 0) {
+        laid.overflowX = -1;
+        if (overflow) {
+            x += shown > 0 ? END_GAP : 0;
+            laid.overflowX = x;
+            x += OVERFLOW_WIDTH;
+        }
+        if (tail > 0) {
             dividers.add(Integer.valueOf(x + END_GAP));
         }
         laid.dividerX = new int[dividers.size()];
         for (int index = 0; index < dividers.size(); index++) {
             laid.dividerX[index] = dividers.get(index).intValue();
         }
+    }
+
+    /** How many of {@code options}, from the first, stand whole in {@code room}. */
+    private static int fitting(List<PageOption> options, int room) {
+        int shown = 0;
+        int width = 0;
+        for (PageOption option : options) {
+            int step = option.glyph.width() + (shown == 0 ? 0
+                    : sameGroup(options.get(shown - 1), option) ? END_GAP
+                    : DIVIDER_ROOM);
+            if (width + step > room) {
+                break;
+            }
+            width += step;
+            shown++;
+        }
+        return shown;
+    }
+
+    /** How wide the first {@code shown} of {@code options} stand, gaps and hairlines between. */
+    private static int runWidth(List<PageOption> options, int shown) {
+        int width = 0;
+        for (int index = 0; index < shown; index++) {
+            width += options.get(index).glyph.width() + (index == 0 ? 0
+                    : sameGroup(options.get(index - 1), options.get(index))
+                            ? END_GAP : DIVIDER_ROOM);
+        }
+        return width;
+    }
+
+    /**
+     * The options of {@code tab} its window's strip has no room for this
+     * frame, in their order: what its overflow button opens. Empty while
+     * every one stands on the strip.
+     */
+    static List<PageOption> leftOut(WindowPage tab) {
+        Window window = WindowLayout.windowOf(tab);
+        Layout laid = window == null ? null
+                : WindowFrame.of(window).toolStrip.layout;
+        List<PageOption> left = new ArrayList<PageOption>();
+        if (laid == null || laid.overflowX < 0) {
+            return left;
+        }
+        List<PageOption> all = tab.options();
+        for (int index = laid.options.length; index < all.size(); index++) {
+            left.add(all.get(index));
+        }
+        return left;
     }
 
     private static boolean sameGroup(PageOption one, PageOption other) {
@@ -450,7 +525,7 @@ public final class ToolStrip {
         Panel panel = front.panel();
         if (laid.panelWidth > 0 && panel != null) {
             state.panelMotion.advance(now,
-                    front.isPanelOut(window) || under == Part.PANEL,
+                    front.isPanelOut() || under == Part.PANEL,
                     under == Part.PANEL,
                     under == Part.PANEL && Mouse.isButtonDown(0));
             LostTalesUiButton.drawGlyph(panel.glyph, panel.litGlyph,
@@ -459,6 +534,12 @@ public final class ToolStrip {
         }
         drawOptions(state, laid, underOption, out == null ? "" : out.pick,
                 now, ink);
+        if (laid.overflowX >= 0) {
+            drawButton(state.overflowMotion, true,
+                    out != null && out.overflow, under, Part.OVERFLOW,
+                    OVERFLOW_GLYPH, OVERFLOW_LIT, laid.overflowX,
+                    glyphTop(laid, OVERFLOW_HEIGHT), now, ink);
+        }
         int divider = Math.round(WindowStyle.DIVIDER_ALPHA * ink / 255.0F);
         for (int x : laid.dividerX) {
             WindowStyle.drawDivider(x, glyphTop(laid, DIVIDER_HEIGHT),
@@ -482,7 +563,7 @@ public final class ToolStrip {
                 laid.viewX, glyphTop(laid, VIEW_HEIGHT), now, ink);
         if (laid.hasMembers) {
             drawButton(state.membersMotion, true,
-                    front.isMemberListOut(window), under,
+                    front.isMemberListOut(), under,
                     Part.MEMBERS_TOGGLE, LostTalesUiSheet.MEMBERS,
                     LostTalesUiSheet.MEMBERS_HOVER, laid.membersX,
                     glyphTop(laid, MEMBERS_HEIGHT), now, ink);
@@ -658,19 +739,22 @@ public final class ToolStrip {
 
     /**
      * Which of what the tab in front opens is out: its settings, its split
-     * view, its help, and the option whose words are out ({@code pick},
-     * empty for none).
+     * view, its help, the options left out of the strip, and the option
+     * whose words are out ({@code pick}, empty for none).
      */
     public static final class Out {
         final boolean settings;
         final boolean split;
         final boolean help;
+        final boolean overflow;
         final String pick;
 
-        public Out(boolean settings, boolean split, boolean help, String pick) {
+        public Out(boolean settings, boolean split, boolean help,
+                   boolean overflow, String pick) {
             this.settings = settings;
             this.split = split;
             this.help = help;
+            this.overflow = overflow;
             this.pick = pick == null ? "" : pick;
         }
     }
@@ -746,6 +830,10 @@ public final class ToolStrip {
         }
         if (optionIndexAt(laid, x, y) >= 0) {
             return Part.OPTION;
+        }
+        if (laid.overflowX >= 0 && glyphBox(laid, laid.overflowX,
+                OVERFLOW_WIDTH, OVERFLOW_HEIGHT).contains(x, y)) {
+            return Part.OVERFLOW;
         }
         if (glyphBox(laid, laid.settingsX, COG_WIDTH, COG_HEIGHT)
                 .contains(x, y)) {
@@ -850,11 +938,14 @@ public final class ToolStrip {
                 Panel panel = front.panel();
                 return panel == null ? ""
                         : StatCollector.translateToLocal(
-                                front.isPanelOut(window)
+                                front.isPanelOut()
                                         ? panel.hideKey : panel.showKey);
             }
             case OPTION:
                 return "";
+            case OVERFLOW:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.window.option.more");
             case SETTINGS:
                 return StatCollector.translateToLocal(
                         front.settingsPlace().titleKey);
@@ -866,7 +957,7 @@ public final class ToolStrip {
                         "gui.losttales.window.help", front.title());
             case MEMBERS_TOGGLE:
                 return StatCollector.translateToLocal(
-                        front.isMemberListOut(window)
+                        front.isMemberListOut()
                                 ? "gui.losttales.window.members.hide"
                                 : "gui.losttales.window.members.show");
             case VIEW:

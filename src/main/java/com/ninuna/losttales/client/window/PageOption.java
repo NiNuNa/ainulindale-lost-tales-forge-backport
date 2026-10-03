@@ -50,6 +50,8 @@ public final class PageOption {
     private String group = "";
     /** The group's heading in the menu, as a lang key; empty for none. */
     private String headingKey = "";
+    /** The settings a pick's sub-window shows under its words; null for none. */
+    private Settings.Place settings;
 
     private PageOption(String id, String label, Kind kind, boolean on,
                        String value, OptionGlyph glyph) {
@@ -102,6 +104,22 @@ public final class PageOption {
     /** A pick's words; empty for every other kind. */
     public List<PageOption> choices() {
         return this.choices;
+    }
+
+    /**
+     * The same pick showing the settings of {@code place} under its words,
+     * a hairline between: a conversation's Chat Feed Settings holds the
+     * feed's own under the three words that say what of it reaches the
+     * feed.
+     */
+    public PageOption withSettings(Settings.Place place) {
+        this.settings = place;
+        return this;
+    }
+
+    /** The settings a pick's sub-window shows under its words; null for none. */
+    Settings.Place settings() {
+        return this.settings;
     }
 
     /** The same option, greyed, saying {@code reason}; an empty reason leaves it as it is. */

@@ -109,27 +109,27 @@ public final class WindowSplitTest {
     }
 
     @Test
-    public void aConversationGoesOnlySideBySide() {
+    public void anyPageGoesOnAnyEdge() {
         OtherPage page = WindowPages.tab(PAGE);
         OtherPage other = WindowPages.tab(OTHER_PAGE);
-        assertTrue(SplitDrop.takes(page, other, SplitDrop.TOP));
-        assertTrue(SplitDrop.takes(this.a, page, SplitDrop.LEFT));
-        assertTrue(SplitDrop.takes(page, this.a, SplitDrop.RIGHT));
-        assertTrue("two conversations side by side", SplitDrop.takes(this.a, this.b, SplitDrop.RIGHT));
-        assertFalse("never over or under a page", SplitDrop.takes(this.a, page, SplitDrop.BOTTOM));
-        assertFalse("never over or under each other", SplitDrop.takes(this.a, this.b, SplitDrop.TOP));
-        assertFalse("never itself", SplitDrop.takes(page, page, SplitDrop.LEFT));
+        assertTrue(SplitDrop.takes(page, other));
+        assertTrue(SplitDrop.takes(this.a, page));
+        assertTrue(SplitDrop.takes(page, this.a));
+        assertTrue("two conversations", SplitDrop.takes(this.a, this.b));
+        assertFalse("never itself", SplitDrop.takes(page, page));
     }
 
     @Test
-    public void twoConversationsShowOnlySideBySide() {
+    public void conversationsShowEitherWay() {
         WindowSplit across = new WindowSplit(this.a, this.b, false, 0.5D);
         assertTrue(WindowDrawing.shows(across, this.a));
-        assertFalse(WindowDrawing.shows(across.turned(true), this.a));
+        assertTrue("one over the other", WindowDrawing.shows(across.turned(true), this.a));
         OtherPage page = WindowPages.tab(PAGE);
         OtherPage other = WindowPages.tab(OTHER_PAGE);
         assertTrue("two pages either way",
                 WindowDrawing.shows(new WindowSplit(page, other, true, 0.5D), page));
+        assertTrue("a conversation over a page",
+                WindowDrawing.shows(new WindowSplit(this.a, page, true, 0.5D), page));
     }
 
     /* ---- The layout ---- */

@@ -6,6 +6,7 @@ import com.ninuna.losttales.accessory.player.AccessoryInventory;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.client.LostTalesClientThread;
+import com.ninuna.losttales.client.chat.ChatFeedPlacement;
 import com.ninuna.losttales.client.chat.ChatLayout;
 import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.WindowScreen;
@@ -236,6 +237,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientChatIgnores.clearSessionNames();
         ClientAccessoryEffectCache.clear();
         LostTalesHudFade.reset();
+        ChatFeedPlacement.reset();
         WraithWorldVisualEffect.reset();
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();

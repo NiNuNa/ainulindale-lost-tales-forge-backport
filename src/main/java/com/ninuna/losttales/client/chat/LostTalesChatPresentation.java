@@ -1135,8 +1135,8 @@ public final class LostTalesChatPresentation {
 
     /**
      * Stamps a line said before this player arrived as one the closed
-     * feed has already let go: its arrival tick is set a whole fade back
-     * in both of the game's lists, so the feed — which shows only what
+     * feed has already let go: its arrival tick is set back the longest
+     * the feed may keep a line in both of the game's lists, so the feed — which shows only what
      * arrived in its last few seconds — passes over it, while the open
      * windows, which show a line whatever its age, keep it. The game
      * puts a printed line at the head of each list, so only the head is
@@ -1145,7 +1145,7 @@ public final class LostTalesChatPresentation {
     private static void ageOutOfFeed(Minecraft minecraft, GuiNewChat chat,
                                      int chatLineId) {
         int aged = minecraft.ingameGUI.getUpdateCounter()
-                - LostTalesChatOverlayRenderer.FEED_FADE_TICKS;
+                - ChatFeedPlacement.MOST_TICKS;
         restampHead(ChatWindowLines.messageHistory(chat), chatLineId, aged);
         List<ChatLine> drawn;
         try {

@@ -45,7 +45,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
             send(sender, EnumChatFormatting.RED
                     + "HUD settings are client-side and cannot be changed by a dedicated server command.");
             send(sender, EnumChatFormatting.GRAY
-                    + "Use the Lost Tales config screen or hold the Modifier Key and press H on the client.");
+                    + "Use the HUD Placement page on the client: hold the Modifier Key and press H.");
             return;
         }
 
@@ -171,7 +171,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
                 + ", quest " + formatOffset("quest"));
         send(sender, EnumChatFormatting.GRAY
                 + "Notifications " + formatOffset("notifications"));
-        send(sender, EnumChatFormatting.DARK_GRAY + "Tip: hold the Lost Tales Modifier Key and press H client-side to open the HUD placement editor.");
+        send(sender, EnumChatFormatting.DARK_GRAY + "Tip: hold the Lost Tales Modifier Key and press H client-side to open the HUD Placement page.");
     }
 
     private String formatOffset(String element) {

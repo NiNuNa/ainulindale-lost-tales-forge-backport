@@ -261,18 +261,10 @@ public final class WindowDrawing {
         return frame.splitOther == null ? null : sideBox(frame, frame.splitOther);
     }
 
-    /**
-     * Whether a window shows {@code split} with {@code front} in front:
-     * its other side can be seen, and a conversation stands only side by
-     * side.
-     */
+    /** Whether a window shows {@code split} with {@code front} in front: its other side can be seen. */
     public static boolean shows(WindowSplit split, WindowPage front) {
         WindowPage other = split == null ? null : split.other(front);
-        if (other == null || !other.isAvailable() || !WindowView.isShown(other)) {
-            return false;
-        }
-        return !split.isStacked()
-                || other instanceof OtherPage && front instanceof OtherPage;
+        return other != null && other.isAvailable() && WindowView.isShown(other);
     }
 
     /** The box of whichever side shows {@code page}; null for a page the window does not show. */

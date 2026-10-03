@@ -1,5 +1,6 @@
 package com.ninuna.losttales.proxy;
 
+import com.ninuna.losttales.gui.hud.placement.HudPlacementPage;
 import com.ninuna.losttales.client.chat.ChatLayout;
 import com.ninuna.losttales.client.chat.ChatScreenPart;
 import com.ninuna.losttales.client.settings.ClientSettingsSections;
@@ -208,8 +209,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     /**
      * The quest journal, the fellowship, the map and the characters, each a
      * page a window can hold, with the key that opens it from another
-     * page; the Characters page's own kinds of sub-window; the Motion Lab
-     * and the Server Settings, pages with no key, which need no world;
+     * page; the Characters page's own kinds of sub-window; the Motion Lab,
+     * the Client Settings, the HUD Placement and the Server Settings, pages
+     * with no key of their own;
      * and the pages that open only from a thing in the world: a
      * waystone's, a missive board's and a missive letter's.
      */
@@ -266,6 +268,14 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     @Override
                     public PageContent create() {
                         return new ClientSettingsPage();
+                    }
+                });
+        WindowPages.register(HudPlacementPage.PAGE_ID,
+                "gui.losttales.page.hud_placement", HudPlacementPage.ICON,
+                null, new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new HudPlacementPage();
                     }
                 });
         WindowPages.register(ServerSettingsPage.PAGE_ID,

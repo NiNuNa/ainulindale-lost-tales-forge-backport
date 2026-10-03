@@ -66,17 +66,17 @@ public final class WindowResizeTest {
         WindowLayout.setPinnedToHud(window.getId(), true);
         WindowLayout.setPinnedToGui(window.getId(), true);
         assertTrue(WindowLayout.split(tabs.get(0), tabs.get(1)));
-        com.ninuna.losttales.client.chat.ChatLayout.setMembersHidden(
-                window.getId(), true);
+        window.getActiveTab().toggleMemberList();
+        assertFalse(window.getActiveTab().isMemberListOut());
         assertTrue(WindowLayout.resetWindow(window.getId()));
         for (WindowPage tab : window.getTabs()) {
-            tab.resetIn(window);
+            tab.resetView();
         }
         assertFalse(window.isPinnedToHud());
         assertFalse(window.isPinnedToGui());
         assertTrue(window.splits().isEmpty());
         assertEquals(pages, window.getTabs().size());
-        assertTrue(window.getActiveTab().isMemberListOut(window));
+        assertTrue(window.getActiveTab().isMemberListOut());
     }
 
     /**

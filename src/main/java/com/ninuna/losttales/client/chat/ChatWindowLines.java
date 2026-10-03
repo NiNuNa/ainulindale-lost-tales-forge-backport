@@ -273,7 +273,7 @@ public final class ChatWindowLines {
         for (int index = 0; index + 1 < count; index++) {
             if (held[index] && arrivalsNewestFirst[index]
                     - arrivalsNewestFirst[index + 1]
-                    >= LostTalesChatOverlayRenderer.FEED_FADE_TICKS) {
+                    >= ChatFeedPlacement.fadeTicks()) {
                 held[index] = false;
             }
         }
@@ -445,7 +445,7 @@ public final class ChatWindowLines {
         }
         return forView(minecraft, chat, ChatFrame.feed().windowId,
                 filter, WindowPlacement.wrapWidth(
-                        WindowPlacement.chatWidth(minecraft),
+                        ChatFeedPlacement.chatWidth(minecraft),
                         chat.func_146244_h()), false, true, 0);
     }
 

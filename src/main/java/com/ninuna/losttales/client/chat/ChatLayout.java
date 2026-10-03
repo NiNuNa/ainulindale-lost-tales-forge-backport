@@ -43,7 +43,7 @@ import java.util.Set;
  * counts and its preferences.</li>
  * <li>Whisper tabs, remembered per server.</li>
  * <li>Where the closed feed stands, whether the picker strip is folded,
- * and each window's timestamp area and member list.</li>
+ * and each conversation's timestamp area and member list.</li>
  * </ul>
  *
  * <p>All of it is written into the layout file as the chat's part of it.
@@ -112,7 +112,10 @@ public final class ChatLayout {
             new LinkedHashMap<String, Set<String>>();
     /** The place whose whisper and fellowship tabs are on screen; empty before a join. */
     private static String conversationsPlace = "";
-    /** Each window's timestamp area and member list, by window id. */
+    /**
+     * Each conversation's timestamp area and member list, by its id, only
+     * where they differ from how they first are.
+     */
     private static final Map<String, View> VIEWS = new HashMap<String, View>();
     /** The channels the file said were closed, while it is read. */
     private static final Set<ChatChannel> CLOSED_READ =
@@ -130,18 +133,28 @@ public final class ChatLayout {
      * null for none.
      */
     private static String collectingWindowId;
-    /** Closed-chat feed position, percent of its travel; vanilla's spot. */
-    private static double feedOffsetX;
+    /**
+     * The chat feed's place once the player has placed it, percent of its
+     * travel; until then ({@link #feedPlaced} false) it stands at its
+     * default place, centred over the hotbar's rows.
+     */
+    private static double feedOffsetX = 50.0D;
     private static double feedOffsetY = 100.0D;
+    private static boolean feedPlaced;
     private static boolean toolbarCollapsed;
     private static boolean installed;
 
-    /** A window's timestamp area and member list, as the player left them. */
+    /** A conversation's timestamp area and member list, as the player left them. */
     private static final class View {
         boolean areaHidden;
         boolean membersHidden;
         /** The member list's width in the chat's pixels; 0 for its own. */
         double membersWidth;
+
+        boolean isAsFirst() {
+            return !this.areaHidden && !this.membersHidden
+                    && this.membersWidth <= 0.0D;
+        }
     }
 
     private ChatLayout() {}
@@ -841,13 +854,32 @@ public final class ChatLayout {
         return feedOffsetY;
     }
 
-    /** Positions the closed-chat feed; {@code persist} false while dragging. */
+    /**
+     * Whether the player has placed the chat feed; until then it stands at
+     * its default place ({@link ChatFeedPlacement}).
+     */
+    public static synchronized boolean isFeedPlaced() {
+        return feedPlaced;
+    }
+
+    /** Places the chat feed; {@code persist} false while dragging. */
     public static synchronized void setFeedPosition(double offsetX,
                                                     double offsetY,
                                                     boolean persist) {
         feedOffsetX = clampPercent(offsetX);
         feedOffsetY = clampPercent(offsetY);
+        feedPlaced = true;
         if (persist) {
+            WindowLayout.persist();
+        }
+    }
+
+    /** Puts the chat feed back at its default place, and writes it so. */
+    public static synchronized void resetFeedPlace() {
+        if (feedPlaced) {
+            feedPlaced = false;
+            feedOffsetX = 50.0D;
+            feedOffsetY = 100.0D;
             WindowLayout.persist();
         }
     }
@@ -871,6 +903,21 @@ public final class ChatLayout {
         return Math.max(0.0D, Math.min(100.0D, value));
     }
 
+    /** A view as its line writes it: what is put away, then the list's width. */
+    private static String describeView(View view) {
+        StringBuilder line = new StringBuilder();
+        if (view.areaHidden) {
+            line.append(" area=").append(PUT_AWAY);
+        }
+        if (view.membersHidden) {
+            line.append(" members=").append(PUT_AWAY);
+        }
+        if (view.membersWidth > 0.0D) {
+            line.append(" members_width=").append(format(view.membersWidth));
+        }
+        return line.toString().trim();
+    }
+
     /** Whether the picker strip above the input bar is folded away. */
     public static synchronized boolean isToolbarCollapsed() {
         return toolbarCollapsed;
@@ -883,88 +930,125 @@ public final class ChatLayout {
         }
     }
 
-    /* ---- A window's timestamp area and member list ---- */
+    /* ---- A conversation's timestamp area and member list ---- */
 
-    private static View view(String windowId) {
-        View view = VIEWS.get(windowId);
+    /** The most conversations whose area and list are kept apart from how they first are. */
+    static final int MAX_VIEWS = 256;
+
+    /** The conversation's view to change, made where it has none; null for no conversation. */
+    private static View view(ConversationPage tab) {
+        if (tab == null) {
+            return null;
+        }
+        View view = VIEWS.get(viewKey(tab));
         if (view == null) {
+            if (VIEWS.size() >= MAX_VIEWS) {
+                return null;
+            }
             view = new View();
-            VIEWS.put(windowId, view);
+            VIEWS.put(viewKey(tab), view);
         }
         return view;
     }
 
-    /** Whether the window's timestamp area is driven out. */
-    public static synchronized boolean isAreaHidden(Window window) {
-        View view = window == null ? null : VIEWS.get(window.getId());
+    /**
+     * What a conversation's view is kept by: the id of the tab its window
+     * holds, so a faction's conversation keeps one view whichever
+     * identity reads it.
+     */
+    private static String viewKey(ConversationPage tab) {
+        return ConversationPage.row(tab).id();
+    }
+
+    /** A conversation's view as it stands; null while it stands as it first was. */
+    private static View viewOf(ConversationPage tab) {
+        return tab == null ? null : VIEWS.get(viewKey(tab));
+    }
+
+    /** Drops a view that stands as it first was, so only changed ones are kept. */
+    private static void settle(ConversationPage tab, View view) {
+        if (view.isAsFirst()) {
+            VIEWS.remove(viewKey(tab));
+        }
+    }
+
+    /** Whether the conversation's timestamp area is driven out. */
+    public static synchronized boolean isAreaHidden(ConversationPage tab) {
+        View view = viewOf(tab);
         return view != null && view.areaHidden;
     }
 
-    /** Whether the window's member list is put away. */
-    public static synchronized boolean isMembersHidden(Window window) {
-        View view = window == null ? null : VIEWS.get(window.getId());
+    /** Whether the conversation's member list is put away. */
+    public static synchronized boolean isMembersHidden(ConversationPage tab) {
+        View view = viewOf(tab);
         return view != null && view.membersHidden;
     }
 
-    /** The member list's width the player chose, in the chat's pixels; 0 for its own. */
-    public static synchronized double getMembersWidth(Window window) {
-        View view = window == null ? null : VIEWS.get(window.getId());
+    /** The width the player gave the conversation's member list, in the chat's pixels; 0 for its own. */
+    public static synchronized double getMembersWidth(ConversationPage tab) {
+        View view = viewOf(tab);
         return view == null ? 0.0D : view.membersWidth;
     }
 
     /**
-     * Drives a window's timestamp area out, or back in: the window keeps
-     * its size and its words take the area's room. Written to the file.
+     * Drives a conversation's timestamp area out, or back in: its window
+     * keeps its size and the words take the area's room. Only this
+     * conversation's: the one beside it in a split keeps its own. Written
+     * to the file.
      */
-    public static synchronized boolean setAreaHidden(String windowId,
+    public static synchronized boolean setAreaHidden(ConversationPage tab,
                                                      boolean hidden) {
-        Window window = WindowLayout.window(windowId);
-        if (window == null || isAreaHidden(window) == hidden) {
+        View view = isAreaHidden(tab) == hidden ? null : view(tab);
+        if (view == null) {
             return false;
         }
-        view(windowId).areaHidden = hidden;
+        view.areaHidden = hidden;
+        settle(tab, view);
         WindowLayout.persist();
         return true;
     }
 
     /**
-     * Puts a window's member list away, or brings it out: the window
-     * keeps its size and its words take the list's room. Written to the
-     * file.
+     * Puts a conversation's member list away, or brings it out: its window
+     * keeps its size and the words take the list's room. Only this
+     * conversation's. Written to the file.
      */
-    public static synchronized boolean setMembersHidden(String windowId,
+    public static synchronized boolean setMembersHidden(ConversationPage tab,
                                                         boolean hidden) {
-        Window window = WindowLayout.window(windowId);
-        if (window == null || isMembersHidden(window) == hidden) {
+        View view = isMembersHidden(tab) == hidden ? null : view(tab);
+        if (view == null) {
             return false;
         }
-        view(windowId).membersHidden = hidden;
+        view.membersHidden = hidden;
+        settle(tab, view);
         WindowLayout.persist();
         return true;
     }
 
     /**
-     * A window's timestamp area and member list as they first are: both
-     * out, the list at its own width. Written to the file.
+     * A conversation's timestamp area and member list as they first are:
+     * both out, the list at its own width. Written to the file.
      */
-    public static synchronized void resetView(String windowId) {
-        if (VIEWS.remove(windowId) != null) {
+    public static synchronized void resetView(ConversationPage tab) {
+        if (tab != null && VIEWS.remove(viewKey(tab)) != null) {
             WindowLayout.persist();
         }
     }
 
     /**
-     * Gives a window's member list the width its edge was dragged to, in
-     * the chat's pixels, written to the file when {@code persist} says so
-     * — once, as the drag ends.
+     * Gives a conversation's member list the width its edge was dragged
+     * to, in the chat's pixels, written to the file when {@code persist}
+     * says so — once, as the drag ends.
      */
-    public static synchronized boolean setMembersWidth(String windowId,
+    public static synchronized boolean setMembersWidth(ConversationPage tab,
                                                        double width,
                                                        boolean persist) {
-        if (WindowLayout.window(windowId) == null) {
+        View view = view(tab);
+        if (view == null) {
             return false;
         }
-        view(windowId).membersWidth = clampMembersWidth(width);
+        view.membersWidth = clampMembersWidth(width);
+        settle(tab, view);
         if (persist) {
             WindowLayout.persist();
         }
@@ -997,7 +1081,9 @@ public final class ChatLayout {
     private static final String FEED_CHOICE = "feedchoice";
     private static final String CONVERSATION = "conversation";
     private static final String CLOSED_CONVERSATION = "closedconversation";
-    /** What a window line says of an area or member list put away. */
+    /** A conversation's timestamp area and member list, where they differ from how they first are. */
+    private static final String VIEW = "view";
+    /** What a view line says of an area or member list put away. */
     private static final String PUT_AWAY = "hidden";
 
     private static String format(double value) {
@@ -1008,14 +1094,22 @@ public final class ChatLayout {
      * The chat's lines in the layout file:
      *
      * <pre>
-     * window w2 ... area=hidden members=hidden members_width=90.00 ...
-     * feed x=0.00 y=100.00
+     * view global area=hidden members=hidden members_width=90.00
+     * feed x=50.00 y=88.00
      * toolbar collapsed=false
      * closed faction
      * notify everything ooc
      * notify mentions whisper:Steve|Aldric
      * feedchoice nothing server_console
      * </pre>
+     *
+     * <p>A conversation's timestamp area and member list, where either
+     * differs from how it first is, stand on a {@code view} line: the tab
+     * id, then the area or the list put away and the list's width. Never
+     * an NPC conversation's, whose view ends with the session.</p>
+     *
+     * <p>The {@code feed} line stands only once the player has placed the
+     * chat feed; without it the feed stands at its default place.</p>
      *
      * <p>A conversation's notification choice, where it is not the
      * conversation's default, stands on a {@code notify} line: the choice
@@ -1041,8 +1135,9 @@ public final class ChatLayout {
             conversationsPlace = "";
             VIEWS.clear();
             CLOSED_READ.clear();
-            feedOffsetX = 0.0D;
+            feedOffsetX = 50.0D;
             feedOffsetY = 100.0D;
+            feedPlaced = false;
             toolbarCollapsed = false;
         }
 
@@ -1061,6 +1156,10 @@ public final class ChatLayout {
                 readFeedChoice(line.split("\t"));
                 return true;
             }
+            if (line.startsWith(VIEW + "\t")) {
+                readView(line.split("\t"));
+                return true;
+            }
             String[] parts = line.split("\\s+");
             String key = parts[0];
             if (parts.length == 2 && CLOSED.equals(key)) {
@@ -1071,6 +1170,7 @@ public final class ChatLayout {
                 return true;
             }
             if (FEED.equals(key)) {
+                feedPlaced = true;
                 for (int index = 1; index < parts.length; index++) {
                     if (parts[index].startsWith("x=")) {
                         feedOffsetX = clampPercent(
@@ -1107,6 +1207,30 @@ public final class ChatLayout {
             }
         }
 
+        /** A {@code view} line: the tab it is for, then its area, its list and the list's width. */
+        private void readView(String[] fields) {
+            ConversationPage tab = fields.length == 3
+                    ? ConversationPage.row(ConversationPage.fromId(fields[1])) : null;
+            View view = tab == null || tab.isNpc() ? null : view(tab);
+            if (view == null) {
+                return;
+            }
+            for (String part : fields[2].split("\\s+")) {
+                int equals = part.indexOf('=');
+                String key = equals < 0 ? part : part.substring(0, equals);
+                String value = equals < 0 ? "" : part.substring(equals + 1);
+                if ("area".equals(key)) {
+                    view.areaHidden = PUT_AWAY.equalsIgnoreCase(value);
+                } else if ("members".equals(key)) {
+                    view.membersHidden = PUT_AWAY.equalsIgnoreCase(value);
+                } else if ("members_width".equals(key)) {
+                    view.membersWidth = clampMembersWidth(
+                            WindowLayoutStore.parseDouble(value));
+                }
+            }
+            settle(tab, view);
+        }
+
         /** A {@code feedchoice} line: the choice, then the tab it is for. */
         private void readFeedChoice(String[] fields) {
             if (fields.length != 3) {
@@ -1137,24 +1261,6 @@ public final class ChatLayout {
                 }
                 closedHere.add(fields[2]);
             }
-        }
-
-        @Override
-        public boolean readWindow(String windowId, String key, String value) {
-            if ("area".equals(key)) {
-                view(windowId).areaHidden = PUT_AWAY.equalsIgnoreCase(value);
-                return true;
-            }
-            if ("members".equals(key)) {
-                view(windowId).membersHidden = PUT_AWAY.equalsIgnoreCase(value);
-                return true;
-            }
-            if ("members_width".equals(key)) {
-                view(windowId).membersWidth = clampMembersWidth(
-                        WindowLayoutStore.parseDouble(value));
-                return true;
-            }
-            return false;
         }
 
         /**
@@ -1193,22 +1299,10 @@ public final class ChatLayout {
         }
 
         @Override
-        public void describeWindow(Window window, StringBuilder line) {
-            if (isAreaHidden(window)) {
-                line.append(" area=").append(PUT_AWAY);
-            }
-            if (isMembersHidden(window)) {
-                line.append(" members=").append(PUT_AWAY);
-            }
-            if (getMembersWidth(window) > 0.0D) {
-                line.append(" members_width=")
-                        .append(format(getMembersWidth(window)));
-            }
-        }
-
-        @Override
         public void describe(List<String> lines) {
-            lines.add(feedLine());
+            if (feedPlaced) {
+                lines.add(feedLine());
+            }
             lines.add(TOOLBAR + " collapsed=" + toolbarCollapsed);
             for (ChatChannel channel : closedChannels()) {
                 lines.add(CLOSED + " " + channel.getId());
@@ -1220,6 +1314,13 @@ public final class ChatLayout {
             for (ConversationPage tab : feedChoiceTabs()) {
                 lines.add(FEED_CHOICE + "\t" + feedChoice(tab).id() + "\t"
                         + tab.id());
+            }
+            for (Map.Entry<String, View> each : VIEWS.entrySet()) {
+                ConversationPage tab = ConversationPage.fromId(each.getKey());
+                if (tab != null && !tab.isNpc()) {
+                    lines.add(VIEW + "\t" + each.getKey() + "\t"
+                            + describeView(each.getValue()));
+                }
             }
             rememberConversations(conversationsPlace);
             for (Map.Entry<String, List<String[]>> place

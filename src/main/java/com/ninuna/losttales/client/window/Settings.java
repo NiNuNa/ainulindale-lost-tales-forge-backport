@@ -93,8 +93,20 @@ public final class Settings {
         WINDOWS("gui.losttales.window.settings.title.windows"),
         /** Chat Settings, from every conversation's cog. */
         CHAT("gui.losttales.window.settings.title.chat"),
+        /**
+         * The chat feed's own settings, under a conversation's three words
+         * in its Chat Feed Settings: what reaches the feed of every
+         * conversation.
+         */
+        FEED("gui.losttales.window.settings.title.feed"),
         /** Quest Settings, from the journal's cog. */
         QUESTS("gui.losttales.window.settings.title.quests"),
+        /**
+         * HUD Settings, from the HUD Placement page's cog: where each panel
+         * stands as numbers, whether it follows the HUD key, and the
+         * compass's own.
+         */
+        HUD("gui.losttales.window.settings.title.hud"),
         /** Map Settings, from the map's cog. */
         MAP("gui.losttales.window.settings.title.map"),
         /** Motion Settings, from the Motion Lab's cog: what every screen's and the HUD's motion answers to. */
@@ -797,6 +809,42 @@ public final class Settings {
         }
     }
 
+    /**
+     * A place's rows as its own sub-window lists them, search aside: for
+     * a menu that shows them under rows of its own, as a conversation's
+     * Chat Feed Settings shows the feed's.
+     */
+    List<MenuWindow.Entry> placeRows(Place place) {
+        return rows(place, "");
+    }
+
+    /** Whether a row is one of a place's: a setting's, an action's, or Restore Defaults. */
+    static boolean isPlaceRow(MenuWindow.Entry entry) {
+        return entry.id.startsWith(SETTING_PREFIX)
+                || entry.id.startsWith(ACTION_PREFIX)
+                || RESTORE.equals(entry.id) || RESTORE_CONFIRM.equals(entry.id);
+    }
+
+    /**
+     * A row of {@code place} taken in another menu, {@code window}: done as
+     * in the place's own sub-window, and what it opens — a palette, a
+     * value's field, a setting's words — standing beside that menu.
+     */
+    void takeInPlace(Place place, MenuWindow.Entry entry, String part,
+                     SubWindow window, boolean back) {
+        Setting opened = take(place, entry, part, back);
+        if (opened instanceof Colour) {
+            this.menus.show(SubWindowKind.PALETTE, opened.key,
+                    WindowMenus.besideWindow(window), true);
+        } else if (opened != null && !opened.words().isEmpty()) {
+            this.menus.show(SubWindowKind.SETTING_WORDS, opened,
+                    WindowMenus.besideWindow(window), true);
+        } else if (opened != null) {
+            this.menus.show(SubWindowKind.SETTING_VALUE, opened.key,
+                    WindowMenus.besideWindow(window), true);
+        }
+    }
+
     /** The headings of a place's sections, in the order they stand. */
     List<String> sectionTitleKeys(Place place) {
         List<String> keys = new ArrayList<String>();
@@ -1288,17 +1336,7 @@ public final class Settings {
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
                            String part, SubWindow window, boolean back) {
-            Setting opened = take((Place)menu.about(), entry, part, back);
-            if (opened instanceof Colour) {
-                Settings.this.menus.show(SubWindowKind.PALETTE, opened.key,
-                        WindowMenus.besideWindow(window), true);
-            } else if (opened != null && !opened.words().isEmpty()) {
-                Settings.this.menus.show(SubWindowKind.SETTING_WORDS,
-                        opened, WindowMenus.besideWindow(window), true);
-            } else if (opened != null) {
-                Settings.this.menus.show(SubWindowKind.SETTING_VALUE,
-                        opened.key, WindowMenus.besideWindow(window), true);
-            }
+            takeInPlace((Place)menu.about(), entry, part, window, back);
             return true;
         }
     }

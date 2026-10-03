@@ -229,6 +229,12 @@ public final class LostTalesConfig {
     public static String chatQuoteSize = CHAT_SIZE_SMALLER;
     /** The same row in the closed feed, as large as the feed's words. */
     public static String chatFeedQuoteSize = CHAT_SIZE_SAME;
+    /** How wide the chat feed stands, in GUI pixels. */
+    public static int chatFeedWidth = 320;
+    /** The most lines the chat feed shows at once. */
+    public static int chatFeedLines = 10;
+    /** How many seconds a line stays in the chat feed before it has faded. */
+    public static int chatFeedSeconds = 10;
     /**
      * Whether the game's HUD and the mod's panels fade out while the
      * window screen is open, leaving the world and the windows.
@@ -1292,6 +1298,15 @@ public final class LostTalesConfig {
                             + "feed's own words: SMALLER, SAME or LARGER. "
                             + "SAME, the default, draws the quote as large "
                             + "as the words it stands over.");
+            chatFeedWidth = config.getInt("chatFeedWidth", CATEGORY_CLIENT,
+                    chatFeedWidth, 80, 640,
+                    "How wide the chat feed stands, in GUI pixels. Set in a conversation's Chat Feed Settings.");
+            chatFeedLines = config.getInt("chatFeedLines", CATEGORY_CLIENT,
+                    chatFeedLines, 1, 20,
+                    "The most lines the chat feed shows at once; never more than half the screen holds. Set in a conversation's Chat Feed Settings.");
+            chatFeedSeconds = config.getInt("chatFeedSeconds", CATEGORY_CLIENT,
+                    chatFeedSeconds, 2, 60,
+                    "How many seconds a line stays in the chat feed, fading in the last of them. Set in a conversation's Chat Feed Settings.");
             hideHudWithWindows = config.getBoolean(
                     "hideHudWithWindows",
                     CATEGORY_CLIENT,
@@ -1767,18 +1782,40 @@ public final class LostTalesConfig {
         return true;
     }
 
+    /**
+     * Where a panel stands in the Default layout, as shares of the screen
+     * {x, y}; null for a name no panel goes by. The HUD Placement page puts
+     * one panel back there.
+     */
+    public static double[] defaultHudOffset(String element) {
+        String key = normalizeHudElement(element);
+        if ("compass".equals(key)) {
+            return new double[] {50, 2};
+        }
+        if ("fellowship".equals(key)) {
+            return new double[] {2, 18};
+        }
+        if ("quickloot".equals(key)) {
+            return new double[] {62, 32};
+        }
+        if ("quest".equals(key)) {
+            return new double[] {2, 38};
+        }
+        if ("notifications".equals(key)) {
+            return new double[] {50, 35};
+        }
+        return null;
+    }
+
     private static void applyHudPresetValues(String preset) {
         String key = normalizeHudPreset(preset);
         if (HUD_PRESET_DEFAULT.equals(key)) {
-            compassHudOffsetX = 50;
-            compassHudOffsetY = 2;
-            fellowshipHudOffsetX = 2;
-            fellowshipHudOffsetY = 18;
-            quickLootHudOffsetX = 62;
-            quickLootHudOffsetY = 32;
-            questHudOffsetX = 2;
-            questHudOffsetY = 38;
-            setNotificationPresetOffsets(50, 35);
+            for (String element : new String[] {"compass", "fellowship",
+                    "quickloot", "quest", "notifications"}) {
+                double[] place = defaultHudOffset(element);
+                updateHudOffset(element, place[0], place[1]);
+            }
+            hudPlacementPreset = HUD_PRESET_DEFAULT;
         } else if (HUD_PRESET_LOTR_SAFE.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 12;
@@ -2164,6 +2201,12 @@ public final class LostTalesConfig {
         writeSize(config, "chatFeedMessageSize", chatFeedMessageSize);
         writeSize(config, "chatQuoteSize", chatQuoteSize);
         writeSize(config, "chatFeedQuoteSize", chatFeedQuoteSize);
+        config.get(CATEGORY_CLIENT, "chatFeedWidth", chatFeedWidth)
+                .set(chatFeedWidth);
+        config.get(CATEGORY_CLIENT, "chatFeedLines", chatFeedLines)
+                .set(chatFeedLines);
+        config.get(CATEGORY_CLIENT, "chatFeedSeconds", chatFeedSeconds)
+                .set(chatFeedSeconds);
         Property profanityProperty = config.get(
                 CATEGORY_CLIENT, "chatProfanityFilter", chatProfanityFilter);
         profanityProperty.set(chatProfanityFilter);

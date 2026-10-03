@@ -21,6 +21,9 @@ public final class SubWindowKind {
     /** A tab's options, behind the three dots on the tab. */
     public static final SubWindowKind TAB = register("tab",
             "gui.losttales.window.sub.tab");
+    /** The options of a tab its tool strip has no room for, behind the strip's overflow button. */
+    public static final SubWindowKind OVERFLOW = register("overflow",
+            "gui.losttales.window.sub.overflow");
     /** The few words one of a tab's options picks from: a conversation's Notifications. */
     public static final SubWindowKind PICK = register("pick",
             "gui.losttales.window.sub.pick");

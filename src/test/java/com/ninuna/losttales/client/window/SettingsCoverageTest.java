@@ -32,6 +32,14 @@ public final class SettingsCoverageTest {
             new HashSet<String>(Arrays.asList(
                     // The map's legend writes the categories it hides.
                     "hiddenMapLegendCategories",
+                    // The HUD Placement page's own options switch the HUD
+                    // and its panels and pick the panels' layout.
+                    "showLostTalesHud",
+                    "showCompassHud",
+                    "showFellowshipHud",
+                    "showQuickLootHud",
+                    "showQuestHud",
+                    "hudPlacementPreset",
                     // The map's waypoint editor writes a custom
                     // waypoint's colour and its note.
                     "customWaypointColors",
@@ -130,9 +138,10 @@ public final class SettingsCoverageTest {
                 "gui.losttales.chat.settings.section.messages",
                 "gui.losttales.chat.settings.section.mentions",
                 "gui.losttales.chat.settings.section.typing",
-                "gui.losttales.chat.settings.section.feed",
                 "gui.losttales.chat.settings.section.ignored"),
                 settings.sectionTitleKeys(Settings.Place.CHAT));
+        assertEquals(Arrays.asList("gui.losttales.chat.settings.section.feed"),
+                settings.sectionTitleKeys(Settings.Place.FEED));
         assertEquals(Arrays.asList("gui.losttales.settings.section.quests"),
                 settings.sectionTitleKeys(Settings.Place.QUESTS));
         assertEquals(Arrays.asList("gui.losttales.settings.section.map"),
@@ -140,9 +149,11 @@ public final class SettingsCoverageTest {
         assertEquals(Arrays.asList("gui.losttales.settings.section.motion"),
                 settings.sectionTitleKeys(Settings.Place.MOTION));
         assertEquals(Arrays.asList(
-                "gui.losttales.window.settings.section.shortcuts",
                 "gui.losttales.settings.section.hud",
-                "gui.losttales.settings.section.compass",
+                "gui.losttales.settings.section.compass"),
+                settings.sectionTitleKeys(Settings.Place.HUD));
+        assertEquals(Arrays.asList(
+                "gui.losttales.window.settings.section.shortcuts",
                 "gui.losttales.settings.section.camera",
                 "gui.losttales.settings.section.screens",
                 "gui.losttales.settings.section.appearance",

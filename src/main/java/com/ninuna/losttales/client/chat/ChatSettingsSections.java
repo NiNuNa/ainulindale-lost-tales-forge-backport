@@ -9,6 +9,7 @@ import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.hud.placement.HudPlacementPage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -19,10 +20,12 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.StatCollector;
 
 /**
- * The chat's sections of Settings, Chat Settings, after the windows' own:
- * its Look, Messages, Mentions, Typing and Chat Feed, and everyone
- * ignored. A conversation's own Notification Settings and Chat Feed
- * Settings stand in its options, not here. Every Settings has them.
+ * The chat's sections of Settings: Chat Settings, after the windows' own,
+ * with its Look, Messages, Mentions and Typing, and everyone ignored; and
+ * the chat feed's own settings, which every conversation's Chat Feed
+ * Settings holds under its three words. A conversation's own Notification
+ * Settings and Chat Feed Settings stand in its options. Every Settings has
+ * them.
  */
 public final class ChatSettingsSections {
     /**
@@ -67,8 +70,8 @@ public final class ChatSettingsSections {
                 settingsOnly("mentions", mentions()));
         settings.addSection(Settings.Place.CHAT,
                 settingsOnly("typing", typing()));
-        settings.addSection(Settings.Place.CHAT, settingsOnly("feed", feed()));
         settings.addSection(Settings.Place.CHAT, new IgnoredSection(notices));
+        settings.addSection(Settings.Place.FEED, new FeedSection());
     }
 
     private static String titleKey(String id) {
@@ -471,29 +474,100 @@ public final class ChatSettingsSections {
         return typing;
     }
 
-    private static List<Settings.Setting> feed() {
-        List<Settings.Setting> feed = new ArrayList<Settings.Setting>();
-        feed.add(new Settings.ModChoice("chatFeedAlignment",
-                "gui.losttales.chat.settings.feed_alignment",
-                new String[] {"LEFT", "CENTRE", "RIGHT"},
-                "gui.losttales.chat.settings.alignment.") {
-            @Override
-            protected String get() {
-                return ChatFeedAlignment.current().name();
-            }
+    /* ---- The chat feed ---- */
 
-            @Override
-            protected void set(String word) {
-                LostTalesConfig.chatFeedAlignment = word;
-            }
-        });
-        feed.add(size("chatFeedSpeakerSize",
-                "gui.losttales.chat.settings.feed_speaker_size"));
-        feed.add(size("chatFeedMessageSize",
-                "gui.losttales.chat.settings.feed_message_size"));
-        feed.add(size("chatFeedQuoteSize",
-                "gui.losttales.chat.settings.feed_quote_size"));
-        return feed;
+    /**
+     * The chat feed's own settings, the same for every conversation: its
+     * width, its lines and how long a line stays; how its lines stand and
+     * how big their rows are; and where it stands, placed on the HUD
+     * Placement page or back at its default place over the hotbar.
+     */
+    private static final class FeedSection extends Settings.GroupedSection {
+        FeedSection() {
+            add(new Settings.Numeric("chatFeedWidth",
+                    "gui.losttales.chat.settings.feed_width", 10.0D, 0) {
+                @Override
+                protected double get() {
+                    return LostTalesConfig.chatFeedWidth;
+                }
+
+                @Override
+                protected void set(double value) {
+                    LostTalesConfig.chatFeedWidth = (int)Math.round(value);
+                }
+            });
+            add(new Settings.Numeric("chatFeedLines",
+                    "gui.losttales.chat.settings.feed_lines", 1.0D, 0) {
+                @Override
+                protected double get() {
+                    return LostTalesConfig.chatFeedLines;
+                }
+
+                @Override
+                protected void set(double value) {
+                    LostTalesConfig.chatFeedLines = (int)Math.round(value);
+                }
+            });
+            add(new Settings.Numeric("chatFeedSeconds",
+                    "gui.losttales.chat.settings.feed_seconds", 1.0D, 0) {
+                @Override
+                protected double get() {
+                    return LostTalesConfig.chatFeedSeconds;
+                }
+
+                @Override
+                protected void set(double value) {
+                    LostTalesConfig.chatFeedSeconds = (int)Math.round(value);
+                }
+            });
+            add(new Settings.ModChoice("chatFeedAlignment",
+                    "gui.losttales.chat.settings.feed_alignment",
+                    new String[] {"LEFT", "CENTRE", "RIGHT"},
+                    "gui.losttales.chat.settings.alignment.") {
+                @Override
+                protected String get() {
+                    return ChatFeedAlignment.current().name();
+                }
+
+                @Override
+                protected void set(String word) {
+                    LostTalesConfig.chatFeedAlignment = word;
+                }
+            });
+            add(size("chatFeedSpeakerSize",
+                    "gui.losttales.chat.settings.feed_speaker_size"));
+            add(size("chatFeedMessageSize",
+                    "gui.losttales.chat.settings.feed_message_size"));
+            add(size("chatFeedQuoteSize",
+                    "gui.losttales.chat.settings.feed_quote_size"));
+            group("gui.losttales.chat.settings.feed_place");
+            add(new Settings.Action("feed_arrange",
+                    "gui.losttales.chat.settings.feed_arrange") {
+                @Override
+                protected void run() {
+                    WindowScreen.openPage(HudPlacementPage.PAGE_ID);
+                }
+            });
+            add(new Settings.Action("feed_default_place",
+                    "gui.losttales.chat.settings.feed_default_place") {
+                @Override
+                protected String unavailable() {
+                    return ChatLayout.isFeedPlaced() ? ""
+                            : StatCollector.translateToLocal(
+                                    "gui.losttales.chat.settings.feed_at_default");
+                }
+
+                @Override
+                protected void run() {
+                    ChatLayout.resetFeedPlace();
+                }
+            });
+        }
+
+        @Override
+        public String titleKey() {
+            return ChatSettingsSections.titleKey("feed");
+        }
     }
 
     /** One of the chat's row sizes: smaller, the same or larger than the words. */

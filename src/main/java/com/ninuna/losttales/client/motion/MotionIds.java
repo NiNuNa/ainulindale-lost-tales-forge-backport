@@ -96,6 +96,8 @@ public final class MotionIds {
 
     /** The HUD fading out while the chat is open. */
     public static final String HUD_CHAT_HIDE = "hud.chat.hide";
+    /** The chat feed at its default place gliding as the rows over the hotbar come and go. */
+    public static final String HUD_FEED_RISE = "hud.feed.rise";
 
     /* ---- screen ---- */
 

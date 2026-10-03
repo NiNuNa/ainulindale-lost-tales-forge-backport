@@ -206,8 +206,8 @@ public final class WindowPlacement {
 
     /**
      * The box width at the default place: two thirds of the screen, in
-     * whole pixels, inside its margins. The feed's width where there is no
-     * screen to measure.
+     * whole pixels, inside its margins; the game's chat width where there
+     * is no screen to measure.
      */
     static int defaultWidth(Minecraft minecraft) {
         int screenWidth = scaledScreenWidth(minecraft);
@@ -255,7 +255,7 @@ public final class WindowPlacement {
                         screenHeight), false);
     }
 
-    private static int scaledScreenWidth(Minecraft minecraft) {
+    public static int scaledScreenWidth(Minecraft minecraft) {
         try {
             return new net.minecraft.client.gui.ScaledResolution(minecraft,
                     minecraft.displayWidth, minecraft.displayHeight)
@@ -275,7 +275,7 @@ public final class WindowPlacement {
         }
     }
 
-    /** The box width of the feed, and of a window without one of its own. */
+    /** The box width of a window without one of its own: the game's chat width. */
     public static int windowWidth(Minecraft minecraft) {
         GuiNewChat chat = chat(minecraft);
         return chat == null ? 160 : gameChatBoxWidth(chat);

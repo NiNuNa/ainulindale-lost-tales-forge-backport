@@ -1546,23 +1546,22 @@ public final class ChatScreenPart extends ScreenPart {
     }
 
     /**
-     * The tabs of every window whose member list stands, each window's
-     * tab in front first: the lists worth asking for before any is shown.
+     * The conversations whose member list stands, each window's
+     * conversation in front first: the lists worth asking for before any
+     * is shown.
      */
     private static List<ConversationPage> tabsShowingMembers() {
         List<ConversationPage> fronts = new ArrayList<ConversationPage>();
         List<ConversationPage> rest = new ArrayList<ConversationPage>();
         for (Window window : WindowLayout.windows()) {
-            if (ChatLayout.isMembersHidden(window)) {
-                continue;
-            }
             ConversationPage front = ConversationPage.frontOf(window);
-            if (front != null) {
+            if (front != null && !ChatLayout.isMembersHidden(front)) {
                 fronts.add(front);
             }
             for (WindowPage each : ChatFrame.visibleTabs(window)) {
                 ConversationPage tab = ConversationPage.from(each);
-                if (tab != null && !tab.equals(front)) {
+                if (tab != null && !tab.equals(front)
+                        && !ChatLayout.isMembersHidden(tab)) {
                     rest.add(tab);
                 }
             }

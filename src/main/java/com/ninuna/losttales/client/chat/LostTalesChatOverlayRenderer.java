@@ -165,14 +165,13 @@ public final class LostTalesChatOverlayRenderer {
         return weights;
     }
     /**
-     * How long a line stays on screen in the closed feed, in the update
-     * counter's own ticks: vanilla's own ten seconds, held to full
-     * opacity for the first nine and falling to nothing over the last.
-     * A line older than this is not drawn at all, which is also what
-     * decides how long a run may go on there — see
-     * {@link ChatGroupRuns}.
+     * The update counter's ticks a feed line takes to fade out at the end
+     * of its time ({@link ChatFeedPlacement#fadeTicks}): its last second,
+     * held to full opacity until then. A line older than its time is not
+     * drawn at all, which is also what decides how long a run may go on
+     * there — see {@link ChatGroupRuns}.
      */
-    static final int FEED_FADE_TICKS = 200;
+    private static final int FEED_FADE_OUT_TICKS = 20;
     /** Between the speech bubble and the words of the feed's typing row. */
     private static final int FEED_TYPING_BUBBLE_GAP = 3;
     /** Between two conversations on the feed's typing row. */
@@ -215,6 +214,9 @@ public final class LostTalesChatOverlayRenderer {
                     minecraft.displayWidth, minecraft.displayHeight);
             int screenWidth = resolution.getScaledWidth();
             int screenHeight = resolution.getScaledHeight();
+            // The rows over the hotbar are drawn by now: the feed's
+            // default place stands over them.
+            ChatFeedPlacement.noteHud(minecraft);
             List<Window> windows = WindowLayout.windows();
             // Both per-window caches are let go together: the frame that
             // records where a window drew, and the lines it laid out for
@@ -316,10 +318,12 @@ public final class LostTalesChatOverlayRenderer {
         }
         frame.page = null;
         frame.showSplit(null, null, null);
-        // A split shows its other side beside the conversation, which
-        // keeps its own side of the window.
+        // A split shows its other side beside the conversation, or over
+        // or under it, and the conversation keeps its own side of the
+        // window.
         WindowSplit split = window.splitOf(front);
         boolean besideOther = WindowDrawing.shows(split, front);
+        boolean stacked = besideOther && split.isStacked();
         ConversationPage view = ConversationPage.from(front);
         ChatLineFilter filter = ChatLineFilter.of(view);
         // An open window lays its own lines out: at its own width when
@@ -333,7 +337,7 @@ public final class LostTalesChatOverlayRenderer {
         frame.advanceFill(ContentView.fillOf(window));
         int chatWidth = WindowPlacement.drawnChatWidth(window, minecraft,
                 screenWidth);
-        if (besideOther) {
+        if (besideOther && !stacked) {
             double boxWidth = WindowPlacement.windowBounds(window, minecraft,
                     screenWidth, screenHeight).width;
             double[] side = split.box(front.equals(split.first()), 0.0D, 0.0D,
@@ -347,13 +351,12 @@ public final class LostTalesChatOverlayRenderer {
         // with the window down to its heads rather than leaving. A window
         // with nothing on screen leaves both as they stand.
         float windowChatWidth = chatWidth / chat.func_146244_h() + 6.0F;
+        ConversationPage frontTab = ConversationPage.from(front);
         ChatMemberList.measure(frame.members,
-                ChatLayout.getMembersWidth(window), windowChatWidth,
+                ChatLayout.getMembersWidth(frontTab), windowChatWidth,
                 ChatTimestampColumn.of(frame, minecraft.fontRenderer)
                         .messageX());
-        if (view != null) {
-            frame.advancePanels(window);
-        }
+        frame.advancePanels(frontTab);
         // The unread divider opens a run of its own under it while it
         // stands, so the window lays its lines out knowing where it is.
         Integer unread = view == null ? null
@@ -385,6 +388,14 @@ public final class LostTalesChatOverlayRenderer {
                 opening.getTranslationY());
         frame.showSplit(besideOther ? split : null, front,
                 besideOther ? split.other(front) : null);
+        // The window's own room, what lies behind it is softened over.
+        double wholeRoom = frame.room;
+        if (stacked) {
+            // Over or under the other side, the lines stand in the
+            // conversation's own half.
+            layInHalf(frame, minecraft, WindowDrawing.pageBox(frame),
+                    front.equals(split.first()));
+        }
         // The frame's message room says how much of the stack the window
         // shows: the box's, laid on whole display pixels against the
         // drawn baseline. The room is the height the player dragged the
@@ -440,7 +451,7 @@ public final class LostTalesChatOverlayRenderer {
         double blurTop = shownBox.top - ring;
         double blurBottom = shownBox.top + shownBox.height + ring;
         double historyTop = Math.max(blurTop, Math.min(blurBottom,
-                frame.drawnBaseline() - room));
+                frame.drawnBaseline() - wholeRoom));
         double historyBottom = Math.max(historyTop, Math.min(blurBottom,
                 frame.drawnBaseline() + WindowPlacement.lineHeight(minecraft)));
         blur.drawFramedBand(blurLeft, blurTop, blurRight, historyTop,
@@ -465,7 +476,7 @@ public final class LostTalesChatOverlayRenderer {
                 ChatTimestampColumn.of(frame, minecraft.fontRenderer);
         float originX = (float)LostTalesDisplayPixels.snap(
                 frame.contentLeft() + columns.messageX() * scale);
-        float originY = (float)frame.drawnBaseline();
+        float originY = (float)frame.linesBaseline();
         drawWindow(minecraft, chat, frame, filter, lines, scroll, room,
                 originX, originY, true, opening, chatWidth, columns,
                 frame.contentLeft());
@@ -477,9 +488,31 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
+     * Lays a conversation's lines in its half of a split one over the
+     * other, {@code half}: the top half's newest line a line above its foot,
+     * the bottom half's on the window's own baseline. Each half reaches
+     * into the divider to its middle row, where the two meet under the
+     * divider's rule, so nothing behind the window shows between them.
+     */
+    private static void layInHalf(ChatFrame frame, Minecraft minecraft,
+                                  LostTalesUiHitBox half, boolean top) {
+        if (half == null) {
+            return;
+        }
+        double reach = WindowSplit.DIVIDER / 2 + 1;
+        if (top) {
+            frame.layLinesIn(half.top, half.top + half.height + reach
+                    - WindowPlacement.lineHeight(minecraft));
+        } else {
+            frame.layLinesIn(half.top - reach, frame.drawnBaseline());
+        }
+    }
+
+    /**
      * A conversation on the other side of a split window from the tab in
-     * front: its history in its own side, read only. Nothing on it
-     * answers the pointer until a press brings it in front.
+     * front: its history in its own side, beside it or over or under it,
+     * read only. Nothing on it answers the pointer until a press brings it
+     * in front.
      */
     static void drawBeside(Minecraft minecraft, Window window, ConversationPage view,
                            LostTalesUiHitBox box,
@@ -493,7 +526,11 @@ public final class LostTalesChatOverlayRenderer {
         ChatFrame frame = front.besideFrame();
         if (frame != front) {
             frame.beginAs(front);
-            frame.advancePanels(window);
+            frame.advancePanels(view);
+        }
+        WindowSplit split = front.split;
+        if (split != null && split.isStacked()) {
+            layInHalf(frame, minecraft, box, split.first().equals(front.splitOther));
         }
         ChatLineFilter filter = ChatLineFilter.of(view);
         float scale = chat.func_146244_h();
@@ -501,7 +538,7 @@ public final class LostTalesChatOverlayRenderer {
         // The member list is held to its side before the lines are laid
         // out against it.
         ChatMemberList.measure(frame.members,
-                ChatLayout.getMembersWidth(window), chatWidth / scale + 6.0F,
+                ChatLayout.getMembersWidth(view), chatWidth / scale + 6.0F,
                 ChatTimestampColumn.of(frame, minecraft.fontRenderer)
                         .messageX());
         Integer unread = ClientChatChannelViews.unreadDividerLine(view);
@@ -524,7 +561,7 @@ public final class LostTalesChatOverlayRenderer {
         float originX = (float)LostTalesDisplayPixels.snap(
                 box.left + columns.messageX() * scale);
         drawWindow(minecraft, chat, frame, filter, lines, scroll,
-                (float)frame.room, originX, (float)frame.drawnBaseline(), true,
+                (float)frame.room, originX, (float)frame.linesBaseline(), true,
                 opening, chatWidth, columns, box.left);
         // Read only: what the draw recorded for the pointer is let go.
         frame.clearMarks();
@@ -572,7 +609,7 @@ public final class LostTalesChatOverlayRenderer {
                         && lines.get(0) != null
                         && minecraft.ingameGUI.getUpdateCounter()
                                 - lines.get(0).getUpdatedCounter()
-                                        < FEED_FADE_TICKS)) {
+                                        < ChatFeedPlacement.fadeTicks())) {
             LostTalesGuiRegionBlur.getInstance().capture(minecraft,
                     partialTicks, (float)LostTalesConfig.guiBlurStrength);
         }
@@ -592,7 +629,7 @@ public final class LostTalesChatOverlayRenderer {
         // whole display pixels as the stack always moves.
         float lift = snapToDisplayPixels(minecraft,
                 typingShare * LINE_HEIGHT * scale);
-        int chatWidth = WindowPlacement.chatWidth(minecraft);
+        int chatWidth = ChatFeedPlacement.chatWidth(minecraft);
         drawWindow(minecraft, chat, frame, filter, lines, 0.0D,
                 (float)frame.room, originX, baseline - lift, false,
                 LostTalesGuiAnimationSample.SETTLED, chatWidth, columns,
@@ -999,7 +1036,9 @@ public final class LostTalesChatOverlayRenderer {
         ChatLineBands bands = frame.bands;
         bands.reset(lines, totalLineCount, scale);
         if (totalLineCount <= 0) {
-            frame.setStackTop(restingY - room);
+            if (!frame.isInHalf()) {
+                frame.setStackTop(restingY - room);
+            }
             if (!open) {
                 // The feed simply shows nothing while it is empty.
                 return;
@@ -1152,10 +1191,13 @@ public final class LostTalesChatOverlayRenderer {
         boolean full = open || totalRowCount <= 0 || reachesTop;
         // Laid on a whole display pixel, like every edge the window is
         // drawn from: the tab row hangs from it, and a row standing
-        // between two pixels would lose one to its own inward cut.
-        frame.setStackTop(full ? restingY - room
-                : LostTalesDisplayPixels.snap(
-                        restingY + stackOffset - plannedHeight * scale));
+        // between two pixels would lose one to its own inward cut. Lines
+        // laid in a half of the window leave the window's own as it was.
+        if (!frame.isInHalf()) {
+            frame.setStackTop(full ? restingY - room
+                    : LostTalesDisplayPixels.snap(
+                            restingY + stackOffset - plannedHeight * scale));
+        }
 
         // A scrolled view starts below the baseline: every row whose top
         // the scroll slid into the trailing strip, clipped where the
@@ -1350,12 +1392,12 @@ public final class LostTalesChatOverlayRenderer {
                             ? WindowPlacement.HISTORY_TOP_MARGIN : 0.0F;
                     int age = minecraft.ingameGUI.getUpdateCounter()
                             - line.getUpdatedCounter();
-                    if (age >= FEED_FADE_TICKS && !open) {
+                    int feedTicks = ChatFeedPlacement.fadeTicks();
+                    if (age >= feedTicks && !open) {
                         continue;
                     }
-                    double fade = 1.0D - age / (double)FEED_FADE_TICKS;
-                    fade = Math.max(0.0D,
-                            Math.min(1.0D, fade * 10.0D));
+                    double fade = Math.max(0.0D, Math.min(1.0D,
+                            (feedTicks - age) / (double)FEED_FADE_OUT_TICKS));
                     fade *= fade;
                     int alpha = Math.round(lineAlpha(
                             open ? 255 : (int)(255.0D * fade), line, opacity,
@@ -1966,7 +2008,7 @@ public final class LostTalesChatOverlayRenderer {
         }
         int age = minecraft.ingameGUI.getUpdateCounter()
                 - lines.get(older).getUpdatedCounter();
-        return age < FEED_FADE_TICKS;
+        return age < ChatFeedPlacement.fadeTicks();
     }
 
     /**

@@ -12,8 +12,8 @@ import net.minecraft.util.StatCollector;
 
 /**
  * The Client Settings page: every client option that has no window or
- * page of its own ({@link Settings.Place#CLIENT}) — the HUD, the compass,
- * the camera, motion, the screens, the look of bodies, the shortcuts —
+ * page of its own ({@link Settings.Place#CLIENT}) — the camera, the
+ * screens, the look of bodies, the shortcuts —
  * in Settings' sections and rows, under the search in the window's tool
  * strip, Defaults last. Ctrl+, opens it on the window screen, and so
  * does the character menu. A colour's row opens its palette and a

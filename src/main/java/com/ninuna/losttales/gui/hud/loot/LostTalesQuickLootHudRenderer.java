@@ -105,6 +105,25 @@ public final class LostTalesQuickLootHudRenderer {
         renderSnapshot(minecraft, snapshot);
     }
 
+    /**
+     * The panel as the HUD Placement page's preview draws it: from what is
+     * already known of the container looked at, asking the server for
+     * nothing and changing no selection.
+     */
+    public static void renderKnown(Minecraft minecraft) {
+        if (!LostTalesConfig.showLostTalesHud || !LostTalesConfig.showQuickLootHud
+                || minecraft == null || minecraft.thePlayer == null
+                || minecraft.theWorld == null) {
+            return;
+        }
+        Target target = getLookTarget(minecraft);
+        LostTalesClientQuickLootCache.Snapshot snapshot = target == null ? null
+                : LostTalesClientQuickLootCache.get(target.x, target.y, target.z);
+        if (snapshot != null) {
+            renderSnapshot(minecraft, snapshot);
+        }
+    }
+
     public static void moveSelection(int delta) {
         Target target = getLookTarget(Minecraft.getMinecraft());
         if (target == null) return;

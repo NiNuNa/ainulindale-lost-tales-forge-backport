@@ -921,7 +921,7 @@ public final class WindowScreen extends GuiChat
                 && press.key != Keyboard.KEY_NUMPADENTER) {
             return false;
         }
-        toggleContentView(isEmpty() ? null : keysWindow());
+        toggleFullWindow(isEmpty() ? null : keysWindow());
         return true;
     }
 
@@ -929,9 +929,10 @@ public final class WindowScreen extends GuiChat
      * Lets the page in front of {@code window} fill the window, with the
      * keys ({@link ContentView}); while it fills it, gives the window its
      * row, strip and bar back. The search goes, its well being out of
-     * sight.
+     * sight. The full window button, its row in the page's options and
+     * Alt+Enter.
      */
-    private void toggleContentView(Window window) {
+    void toggleFullWindow(Window window) {
         if (window == null || ContentView.leave(window)
                 || !ContentView.enter(window)) {
             return;
@@ -1222,9 +1223,10 @@ public final class WindowScreen extends GuiChat
     /**
      * Opens the search over a window and gives it the keys: the window
      * takes the keys, since the search follows them; a page's window only
-     * comes forward, and the page lets the keys go.
+     * comes forward, and the page lets the keys go. The well, and the
+     * search's row in the page's options.
      */
-    private void searchIn(Window window) {
+    void searchIn(Window window) {
         selectWindow(window);
         leavePage();
         if (!WindowSearch.isOpenOn(window.getId())) {
@@ -1268,7 +1270,8 @@ public final class WindowScreen extends GuiChat
 
     /**
      * A press on a window's tool strip: the panel button drives the tab's
-     * panel out or back in, an option's button takes that option, the cog
+     * panel out or back in, an option's button takes that option, the
+     * overflow button opens the options the strip has no room for, the cog
      * opens the settings of its kind, the split view button the pages that
      * can stand beside it (a locked window's lights its padlock), the full
      * window button lets the page fill
@@ -1300,11 +1303,16 @@ public final class WindowScreen extends GuiChat
         switch (press.stripPart) {
             case PANEL:
                 if (front != null) {
-                    front.togglePanel(press.window);
+                    front.togglePanel();
                 }
                 return;
             case OPTION:
                 takeStripOption(press, x);
+                return;
+            case OVERFLOW:
+                this.tabMenus.toggleOverflow(press.window.getActiveTab(),
+                        SubWindowAnchor.onToolStrip(press.frame, press.row,
+                                (int)Math.floor(x), this.width, this.height));
                 return;
             case SETTINGS:
                 this.tabMenus.toggleSettings(press.window.getActiveTab(),
@@ -1325,11 +1333,11 @@ public final class WindowScreen extends GuiChat
                 return;
             case MEMBERS_TOGGLE:
                 if (front != null) {
-                    front.toggleMemberList(press.window);
+                    front.toggleMemberList();
                 }
                 return;
             case VIEW:
-                toggleContentView(press.window);
+                toggleFullWindow(press.window);
                 return;
             case FIELD:
                 searchIn(press.window);
@@ -2056,6 +2064,7 @@ public final class WindowScreen extends GuiChat
                                 this.tabMenus.settingsOut(window.getActiveTab()),
                                 this.tabMenus.splitOut(window.getActiveTab()),
                                 this.tabMenus.helpOut(window.getActiveTab()),
+                                this.tabMenus.overflowOut(window.getActiveTab()),
                                 this.tabMenus.pickOut(window.getActiveTab())));
             } finally {
                 GL11.glPopMatrix();
@@ -2861,10 +2870,7 @@ public final class WindowScreen extends GuiChat
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.tab.draft");
             case OPTIONS:
-                return TabMenus.hasRows(hit.tab) ? hit.tab.optionsTitle()
-                        : StatCollector.translateToLocalFormatted(
-                                "gui.losttales.window.options.nothing",
-                                hit.tab.title());
+                return hit.tab.optionsTitle();
             case LOCK:
                 return StatCollector.translateToLocal(window.isLocked()
                         ? "gui.losttales.window.tab.unlock"

@@ -6,7 +6,6 @@ import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
-import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -14,14 +13,17 @@ import java.util.Locale;
 import net.minecraft.client.Minecraft;
 
 /**
- * Every client option but the chat's, each section where it belongs: HUD,
- * Compass, Camera (the camera's own file, its options under small
- * headings), Screens, Appearance and Developer on the Client Settings
- * page; Quests in Quest Settings, Map in Map Settings, and Motion in
- * Motion Settings, the Motion Lab's. A row reads and writes its option's
+ * Every client option but the chat's, each section where it belongs:
+ * Camera (the camera's own file, its options under small headings),
+ * Screens, Appearance and Developer on the Client Settings page; the
+ * HUD's panels and the Compass in HUD Settings, the HUD Placement page's;
+ * Quests in Quest Settings, Map in Map Settings, and Motion in Motion
+ * Settings, the Motion Lab's. A row reads and writes its option's
  * field ({@link OptionField}), keeps within the bounds its option is
  * defined with, restores the value the mod ships, and saves its file the
- * moment it changes. The HUD section opens the HUD placement editor.
+ * moment it changes. The HUD's panels and the compass stand in HUD
+ * Settings, behind the HUD Placement page's cog; the switches that show
+ * them are that page's own options.
  */
 public final class ClientSettingsSections {
     private static final String PREFIX = "gui.losttales.settings.";
@@ -30,8 +32,8 @@ public final class ClientSettingsSections {
     public static final Settings.Sections SECTIONS = new Settings.Sections() {
         @Override
         public void addTo(Settings settings) {
-            settings.addSection(Settings.Place.CLIENT, hud());
-            settings.addSection(Settings.Place.CLIENT, compass());
+            settings.addSection(Settings.Place.HUD, hud());
+            settings.addSection(Settings.Place.HUD, compass());
             settings.addSection(Settings.Place.QUESTS, quests());
             settings.addSection(Settings.Place.MAP, map());
             settings.addSection(Settings.Place.CLIENT, camera());
@@ -106,49 +108,14 @@ public final class ClientSettingsSections {
     /* ---- HUD ---- */
 
     /**
-     * The placement editor first, then the HUD as a whole and its layout,
-     * then each panel under its name: shown or not, whether it is shown
-     * and hidden with the HUD, and where it stands, a share of the screen.
+     * Each panel under its name, in HUD Settings: whether it follows the
+     * HUD key, where the panel has a switch of its own, and where it
+     * stands, a share of the screen. Whether the HUD and each panel show,
+     * and the layout, are the HUD Placement page's own options.
      */
     private static Settings.Section hud() {
         return new OptionSection("hud") {
             {
-                add(new Settings.Action("arrange", PREFIX + "hud.arrange") {
-                    @Override
-                    protected void run() {
-                        Minecraft minecraft = Minecraft.getMinecraft();
-                        minecraft.displayGuiScreen(new LostTalesHudPlacementGui(
-                                minecraft.currentScreen));
-                    }
-                });
-                add(new Settings.ModSwitch("showLostTalesHud",
-                        PREFIX + "hud.show") {
-                    @Override
-                    protected boolean get() {
-                        return LostTalesConfig.showLostTalesHud;
-                    }
-
-                    @Override
-                    protected void set(boolean on) {
-                        // The panels switched with the HUD follow it.
-                        LostTalesConfig.setShowLostTalesHud(on);
-                    }
-                });
-                add(new Settings.ModChoice("hudPlacementPreset",
-                        PREFIX + "hud.preset", LostTalesConfig.HUD_PRESET_VALUES,
-                        PREFIX + "hud.preset.") {
-                    @Override
-                    protected String get() {
-                        return LostTalesConfig.normalizeHudPreset(
-                                LostTalesConfig.hudPlacementPreset);
-                    }
-
-                    @Override
-                    protected void set(String word) {
-                        // A layout puts every panel in its place.
-                        LostTalesConfig.applyHudPreset(word);
-                    }
-                });
                 panel("compass", "compass", "Compass", true);
                 panel("fellowship", "fellowship", "Fellowship", true);
                 panel("quick_loot", "quickloot", "QuickLoot", true);
@@ -159,8 +126,8 @@ public final class ClientSettingsSections {
             }
 
             /**
-             * A panel's rows under its name: its switches, where the panel
-             * has them, and its place.
+             * A panel's rows under its name: whether it follows the HUD
+             * key, where the panel has a switch, and its place.
              */
             private void panel(String group, String element, String name,
                                boolean switched) {
@@ -168,8 +135,6 @@ public final class ClientSettingsSections {
                 String field = Character.toLowerCase(name.charAt(0))
                         + name.substring(1);
                 if (switched) {
-                    add(toggle(OptionFile.CLIENT, "show" + name + "Hud",
-                            "hud.panel.show"));
                     add(toggle(OptionFile.CLIENT, "linkShow" + name + "Hud",
                             "hud.panel.link"));
                 }
@@ -183,8 +148,8 @@ public final class ClientSettingsSections {
 
     /**
      * One axis of where a panel stands, a share of the screen: moving it
-     * moves the panel as dragging it in the editor does, and leaves the
-     * layout the panels' own.
+     * moves the panel as dragging its box on the HUD Placement page does,
+     * and leaves the layout the panels' own.
      */
     private static Settings.Setting offset(final String element, String key,
                                            String otherKey,

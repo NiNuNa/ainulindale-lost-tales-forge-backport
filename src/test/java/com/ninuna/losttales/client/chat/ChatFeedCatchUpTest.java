@@ -14,7 +14,7 @@ import static org.junit.Assert.assertEquals;
  */
 public final class ChatFeedCatchUpTest {
 
-    private static final int FADE = LostTalesChatOverlayRenderer.FEED_FADE_TICKS;
+    private static final int FADE = ChatFeedPlacement.fadeTicks();
 
     @Test
     public void aRunBreaksWhereAWholeFadeLiesBetweenTwoArrivals() {

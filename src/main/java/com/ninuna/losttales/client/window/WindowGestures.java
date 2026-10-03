@@ -2101,7 +2101,7 @@ public final class WindowGestures {
             int edge = SplitDrop.edgeAt(WindowDrawing.contentBox(frame), x, y);
             if (edge >= 0 && !window.isLocked() && front != null
                     && window.splitOf(front) == null
-                    && SplitDrop.takes(front, drag.tab, edge)) {
+                    && SplitDrop.takes(front, drag.tab)) {
                 drag.splitWindowId = window.getId();
                 drag.splitEdge = edge;
             }

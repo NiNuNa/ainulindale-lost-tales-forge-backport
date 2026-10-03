@@ -182,10 +182,15 @@ public final class PageKeys {
     }
 
     /**
-     * A shortcut's parts as a row draws them: the command key this
-     * computer's, words read, and typed text in italics, the chat's
-     * inline code.
+     * A shortcut's parts as a row draws them, for a row of a menu that
+     * names its key: the command key this computer's, words read, and
+     * typed text in italics, the chat's inline code.
      */
+    public static Object[] keysOf(Object... parts) {
+        return shown(parts == null ? new Object[0] : parts);
+    }
+
+    /** {@link #keysOf}, for the rows this lists. */
     private static Object[] shown(Object[] parts) {
         Object[] shown = new Object[parts.length];
         for (int index = 0; index < parts.length; index++) {

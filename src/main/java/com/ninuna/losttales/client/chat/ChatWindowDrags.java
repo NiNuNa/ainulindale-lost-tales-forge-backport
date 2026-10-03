@@ -71,9 +71,13 @@ final class ChatWindowDrags {
         }
         WindowLayout.raise(window.getId());
         actions.selectWindow(window);
-        gestures.startContentDrag(new MembersResize(window.getId(),
+        ConversationPage tab = ConversationPage.frontOf(window);
+        if (tab == null) {
+            return;
+        }
+        gestures.startContentDrag(new MembersResize(window.getId(), tab,
                 mouseX - frame.members.screenLeft,
-                ChatLayout.getMembersWidth(window)));
+                ChatLayout.getMembersWidth(tab)));
     }
 
     /** A scrollbar being dragged: which window, and where it was grabbed. */
@@ -137,23 +141,28 @@ final class ChatWindowDrags {
     }
 
     /**
-     * A window's member list being resized by its left edge: the list
-     * grows as the edge is carried left and narrows as it goes right,
+     * A conversation's member list being resized by its left edge: the
+     * list grows as the edge is carried left and narrows as it goes right,
      * between its heads alone and a third of the window, and the words
-     * beside it reflow live. The width is written into the layout without
-     * persisting while the drag runs, once on release, and Escape puts
-     * the stored width back.
+     * beside it reflow live. Only that conversation's list: the one beside
+     * it in a split keeps its width. The width is written into the layout
+     * without persisting while the drag runs, once on release, and Escape
+     * puts the stored width back.
      */
     private static final class MembersResize
             implements WindowGestures.ContentDrag {
         final String windowId;
+        /** The conversation whose list it is. */
+        final ConversationPage tab;
         /** How far right of the list's edge the pointer took hold of it. */
         final double grabOffset;
-        /** The width the window had stored, for Escape. */
+        /** The width the conversation had stored, for Escape. */
         final double storedWidth;
 
-        MembersResize(String windowId, double grabOffset, double storedWidth) {
+        MembersResize(String windowId, ConversationPage tab, double grabOffset,
+                      double storedWidth) {
             this.windowId = windowId;
+            this.tab = tab;
             this.grabOffset = grabOffset;
             this.storedWidth = storedWidth;
         }
@@ -174,7 +183,7 @@ final class ChatWindowDrags {
             float width = ChatMemberList.clampWidth(
                     (float)((frame.members.screenRight - edge) / frame.scale),
                     frame.members.minWidth, frame.members.maxWidth);
-            ChatLayout.setMembersWidth(this.windowId, width, false);
+            ChatLayout.setMembersWidth(this.tab, width, false);
         }
 
         /** The width the edge was left at is written down, once. */
@@ -186,7 +195,7 @@ final class ChatWindowDrags {
         /** Escape means "as it was": the list takes back its width. */
         @Override
         public void cancel() {
-            ChatLayout.setMembersWidth(this.windowId, this.storedWidth, false);
+            ChatLayout.setMembersWidth(this.tab, this.storedWidth, false);
         }
 
         @Override

@@ -101,9 +101,12 @@ public final class ChatLayoutTest {
         assertFalse(ChatLayout.opensByItself(ConversationPage.of(ChatChannel.OPERATOR)));
         assertFalse(ChatLayout.opensByItself(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
         assertFalse(ChatLayout.opensByItself(ConversationPage.of(ChatChannel.SERVER_CONSOLE)));
-        // The closed-chat feed starts where vanilla draws the chat.
-        assertEquals(0.0D, ChatLayout.feedOffsetX(), 0.0D);
-        assertEquals(100.0D, ChatLayout.feedOffsetY(), 0.0D);
+        // The chat feed starts at its default place, over the hotbar,
+        // and no line in the file says where it stands.
+        assertFalse(ChatLayout.isFeedPlaced());
+        for (String line : WindowLayoutStore.describe()) {
+            assertFalse(line, line.startsWith("feed "));
+        }
 
         List<String> written = WindowLayoutStore.describe();
         WindowLayoutStore.load(written);
@@ -1046,7 +1049,7 @@ public final class ChatLayoutTest {
         // no window, so none is opened.
         assertTrue(WindowLayout.isEmpty());
         assertNull(WindowLayout.firstWindow());
-        assertEquals(0.0D, ChatLayout.feedOffsetX(), 0.0D);
+        assertFalse(ChatLayout.isFeedPlaced());
         WindowLayoutStore.load(Arrays.asList("closed operator"));
         // No windows at all: one window with everything still open but
         // the consoles, which wait in the + as for a new player.

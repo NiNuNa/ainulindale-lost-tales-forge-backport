@@ -188,7 +188,7 @@ public final class ChatGroupRunsTest {
      */
     @Test
     public void aFeedRunContinuesWhileItsGroupIsStillOnScreen() {
-        long step = ChatGroupRuns.FEED_RUN_MILLIS * 3L / 4L;
+        long step = ChatGroupRuns.feedRunMillis() * 3L / 4L;
         remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
         remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + step);
         remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2L * step);
@@ -206,7 +206,7 @@ public final class ChatGroupRunsTest {
      */
     @Test
     public void aFeedRunEndsEightMinutesAfterItsHeadAsAWindowRunDoes() {
-        long step = ChatGroupRuns.FEED_RUN_MILLIS / 2L;
+        long step = ChatGroupRuns.feedRunMillis() / 2L;
         int lines = (int)(8L * 60L * 1000L / step) + 2;
         int[] oldestFirst = new int[lines];
         boolean[] expected = new boolean[lines];
@@ -235,14 +235,14 @@ public final class ChatGroupRunsTest {
     public void aFeedRunEndsOnceItsGroupHasFaded() {
         remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
         remember(2, ChatChannel.GLOBAL, ALICE, "Alice",
-                START + ChatGroupRuns.FEED_RUN_MILLIS);
+                START + ChatGroupRuns.feedRunMillis());
         assertArrayEquals(new boolean[] { true, false },
                 ChatGroupRuns.continuationsInFeed(newestFirst(1, 2)));
 
         ChatGroupRuns.clear();
         remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
         remember(2, ChatChannel.GLOBAL, ALICE, "Alice",
-                START + ChatGroupRuns.FEED_RUN_MILLIS + 1L);
+                START + ChatGroupRuns.feedRunMillis() + 1L);
         assertArrayEquals(new boolean[] { false, false },
                 ChatGroupRuns.continuationsInFeed(newestFirst(1, 2)));
     }

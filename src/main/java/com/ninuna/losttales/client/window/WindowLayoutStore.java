@@ -35,10 +35,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * </pre>
  */
 public final class WindowLayoutStore {
-    /**
-     * A system's own lines in the layout file, and its own attributes on
-     * a window's line.
-     */
+    /** A system's own lines in the layout file. */
     public interface Part {
         /** Back to nothing read: before a file is read, and when there is none. */
         void clear();
@@ -46,14 +43,8 @@ public final class WindowLayoutStore {
         /** A line that is not the window system's own; answers whether it was this part's. */
         boolean read(String line);
 
-        /** An attribute on a window's line the window system does not know; answers whether it was this part's. */
-        boolean readWindow(String windowId, String key, String value);
-
         /** Once every line is read and the windows stand. */
         void loaded();
-
-        /** This part's attributes on a window's line, each written as {@code " key=value"}. */
-        void describeWindow(Window window, StringBuilder line);
 
         /** This part's own lines. */
         void describe(List<String> lines);
@@ -354,12 +345,6 @@ public final class WindowLayoutStore {
                 if (split != null) {
                     splits.add(split);
                 }
-            } else {
-                for (Part owner : PARTS) {
-                    if (owner.readWindow(id, key, value)) {
-                        break;
-                    }
-                }
             }
         }
         return new WindowLayout.WindowSpec(id, tabs, active, locked, hud, gui,
@@ -439,10 +424,6 @@ public final class WindowLayoutStore {
                 line.append(" split=").append(split.first().id()).append(',')
                         .append(split.second().id()).append(',').append(split.wayId())
                         .append(',').append(String.format(Locale.ROOT, "%.4f", split.share()));
-            }
-            Window window = WindowLayout.window(spec.id);
-            for (Part part : PARTS) {
-                part.describeWindow(window, line);
             }
             if (spec.activeTab != null) {
                 line.append(" active=").append(spec.activeTab.id());

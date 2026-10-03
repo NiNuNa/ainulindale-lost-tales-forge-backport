@@ -74,6 +74,56 @@ public final class ChatFrame extends WindowFrame {
                       float openingMotionX, float openingMotionY) {
         super.begin(box, chatScale, openingMotionX, openingMotionY);
         this.renderedScrollLines = 0.0D;
+        layLinesWhole();
+    }
+
+    @Override
+    public void beginAs(WindowFrame front) {
+        super.beginAs(front);
+        layLinesWhole();
+    }
+
+    /**
+     * How far above the window's baseline the newest line of the
+     * conversation drawn here sits: none, but for a conversation on top
+     * in a split one over the other, whose lines stand on its own half's
+     * foot.
+     */
+    private double linesLift;
+    /** Whether the conversation drawn here lays its lines in a half of a split one over the other. */
+    private boolean inHalf;
+
+    /** The edge the newest message of the conversation drawn here sits on, as drawn this frame. */
+    public double linesBaseline() {
+        return drawnBaseline() - this.linesLift;
+    }
+
+    /**
+     * Whether the lines are laid in a half of the window: their stack's
+     * top is then the half's, and the window's own, which its row hangs
+     * from, stays as the window was laid.
+     */
+    boolean isInHalf() {
+        return this.inHalf;
+    }
+
+    /**
+     * Lays the conversation's lines in a half of a split one over the
+     * other: its room from {@code top}, the half's first row, down to
+     * {@code restingY}, where its newest line sits. The window's row,
+     * strip and bar stay where the window put them.
+     */
+    void layLinesIn(double top, double restingY) {
+        this.inHalf = true;
+        this.linesLift = drawnBaseline() - restingY;
+        this.room = Math.max(0.0D,
+                restingY - (top + WindowPlacement.HISTORY_TOP_MARGIN));
+    }
+
+    /** The lines laid in the whole window again, as every frame begins. */
+    private void layLinesWhole() {
+        this.inHalf = false;
+        this.linesLift = 0.0D;
     }
 
     /** A page is no conversation: the window holds no lines, no member list and no marks. */
@@ -174,6 +224,9 @@ public final class ChatFrame extends WindowFrame {
     /** The member list coming out and going away: 1 while it stands whole. */
     private final MotionTransition membersMotion =
             new MotionTransition(MotionIds.CHAT_WINDOW_MEMBERS, true);
+
+    /** The conversation the two motions above were last moved for; null before the first. */
+    private ConversationPage panelsOf;
 
     /**
      * The delivery marks drawn this frame, each with the chat line id it
@@ -473,18 +526,28 @@ public final class ChatFrame extends WindowFrame {
 
     /**
      * Moves the timestamp area's and the member list's motions on to
-     * this instant, toward where their buttons left them. Called once a
-     * frame before a conversation is laid out; the first call stands them
-     * in their state. Only the buttons move them: a window the view hides
-     * comes back with its list as it was.
+     * this instant, toward where {@code tab}'s buttons left them. Called
+     * once a frame before a conversation is laid out. Each conversation
+     * keeps its own area and list, so another conversation coming to this
+     * frame stands them in its state at once, as switching pages is a hard
+     * cut. Only the buttons move them: a window the view hides comes back
+     * with its list as it was.
      */
-    public void advancePanels(Window window) {
-        if (window == null) {
+    public void advancePanels(ConversationPage tab) {
+        if (tab == null) {
+            return;
+        }
+        boolean areaOut = !ChatLayout.isAreaHidden(tab);
+        boolean membersOut = !ChatLayout.isMembersHidden(tab);
+        if (!tab.equals(this.panelsOf)) {
+            this.panelsOf = tab;
+            this.areaMotion.settle(areaOut);
+            this.membersMotion.settle(membersOut);
             return;
         }
         long now = System.nanoTime();
-        this.areaMotion.advance(now, !ChatLayout.isAreaHidden(window));
-        this.membersMotion.advance(now, !ChatLayout.isMembersHidden(window));
+        this.areaMotion.advance(now, areaOut);
+        this.membersMotion.advance(now, membersOut);
     }
 
     /** How far the timestamp area stands in the window, 0..1. */

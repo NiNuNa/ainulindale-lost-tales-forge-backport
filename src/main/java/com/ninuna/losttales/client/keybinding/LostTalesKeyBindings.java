@@ -9,7 +9,7 @@ import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.hud.LostTalesHudHelper;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
-import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
+import com.ninuna.losttales.gui.hud.placement.HudPlacementPage;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.gui.screen.fellowship.FellowshipPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
@@ -121,7 +121,7 @@ public class LostTalesKeyBindings {
         }
         if (TOGGLE_HUD.isPressed()) {
             if (isModifierKeyDown()) {
-                minecraft.displayGuiScreen(new LostTalesHudPlacementGui(minecraft.currentScreen));
+                WindowScreen.openPage(HudPlacementPage.PAGE_ID);
             } else {
                 LostTalesHudHelper.toggleLostTalesHud();
             }

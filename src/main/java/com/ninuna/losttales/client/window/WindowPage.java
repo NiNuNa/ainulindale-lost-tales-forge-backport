@@ -125,15 +125,6 @@ public abstract class WindowPage {
     }
 
     /**
-     * Whether the tab has any option, asked every frame to grey the three
-     * dots of a tab with nothing to choose; a tab whose options cost
-     * something to build answers without building them.
-     */
-    public boolean hasOptions() {
-        return !options().isEmpty();
-    }
-
-    /**
      * One of its options taken, on its row or its button, or one of a
      * pick's words in the pick's sub-window. Answers whether the menu
      * stays open.
@@ -155,33 +146,35 @@ public abstract class WindowPage {
         return null;
     }
 
-    /** Whether the panel is out in {@code window}. */
-    public boolean isPanelOut(Window window) {
+    /**
+     * Whether the page's panel is out. Each page keeps its own, wherever
+     * it stands: the page beside it in a split keeps another.
+     */
+    public boolean isPanelOut() {
         return false;
     }
 
-    /** Drives the panel out of {@code window}, or back in. */
-    public void togglePanel(Window window) {}
+    /** Drives the page's panel out, or back in. */
+    public void togglePanel() {}
 
     /** Whether the strip offers the member list's button. */
     public boolean hasMemberList() {
         return false;
     }
 
-    /** Whether the member list is out in {@code window}. */
-    public boolean isMemberListOut(Window window) {
+    /** Whether the page's member list is out; each page keeps its own. */
+    public boolean isMemberListOut() {
         return false;
     }
 
-    /** Puts the member list away in {@code window}, or brings it out. */
-    public void toggleMemberList(Window window) {}
+    /** Puts the page's member list away, or brings it out. */
+    public void toggleMemberList() {}
 
     /**
-     * Puts back what the tab lays out in {@code window} as it first was —
-     * its panel, its member list and that list's width — as the window's
-     * layout is reset.
+     * Puts back what the page lays out as it first was — its panel, its
+     * member list and that list's width — as its window's layout is reset.
      */
-    public void resetIn(Window window) {}
+    public void resetView() {}
 
     /** What the well says while nothing is typed in it. */
     public String searchPrompt() {

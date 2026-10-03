@@ -14,7 +14,10 @@ import static org.junit.Assert.assertTrue;
  * the left; the help button at the strip's right end, the search's well a
  * third of the strip before it, and before the well the member list's
  * button where the strip has one, the full window button, the split view
- * button, the cog, a hairline and the options. A standing
+ * button, the cog, a hairline and the options, and a hairline before them
+ * where the panel button stands: the groups the page's options menu
+ * parts. Options a narrow strip has no room for go behind its overflow
+ * button. A standing
  * search's count stands inside the well, with the chevrons over a
  * conversation; a narrow strip keeps no well, and its buttons stand
  * before the help button. A page's strip is the same strip with the
@@ -65,43 +68,68 @@ public final class ToolStripTest {
 
     /**
      * A page's options stand against the cog, a hairline between the last
-     * of them and the cog and between two groups, a gap either side of
-     * each hairline; only the panel button stays at the left.
+     * of them and the cog, between two groups and between the panel
+     * button's group and the first of them, a gap either side of each
+     * hairline; only the panel button stays at the left.
      */
     @Test
     public void thePagesOptionsStandAgainstTheCog() {
         ToolStrip.Layout laid = conversation(400, ToolStrip.Count.NONE);
         ToolStrip.layOptions(laid, threeOptions(),
-                laid.panelX + laid.panelWidth);
+                laid.panelX + laid.panelWidth, true);
         assertEquals(3, laid.options.length);
-        assertEquals(2, laid.dividerX.length);
-        assertEquals(laid.settingsX - END_GAP - 1, laid.dividerX[1]);
-        assertEquals(laid.dividerX[1] - END_GAP - 5, laid.optionX[2]);
-        assertEquals(laid.optionX[2] - END_GAP - 1, laid.dividerX[0]);
-        assertEquals(laid.dividerX[0] - END_GAP - 5, laid.optionX[1]);
+        assertEquals(-1, laid.overflowX);
+        assertEquals(3, laid.dividerX.length);
+        assertEquals(laid.settingsX - END_GAP - 1, laid.dividerX[2]);
+        assertEquals(laid.dividerX[2] - END_GAP - 5, laid.optionX[2]);
+        assertEquals(laid.optionX[2] - END_GAP - 1, laid.dividerX[1]);
+        assertEquals(laid.dividerX[1] - END_GAP - 5, laid.optionX[1]);
         assertEquals(laid.optionX[1] - END_GAP - 5, laid.optionX[0]);
+        assertEquals(laid.optionX[0] - END_GAP - 1, laid.dividerX[0]);
     }
 
     /**
      * A narrow strip keeps the first options that stand whole clear of
-     * the panel button; the last ones stay in the tab's options. A page
-     * with no option keeps no hairline before its cog.
+     * the panel button, and the rest behind its overflow button, which
+     * stands after them and before the hairline at the cog: every option
+     * is still on the strip.
      */
     @Test
-    public void aNarrowStripLeavesTheLastOptionsToTheMenu() {
+    public void aNarrowStripPutsTheLastOptionsBehindItsOverflow() {
         ToolStrip.Layout narrow = conversation(100, ToolStrip.Count.NONE);
         int after = narrow.panelX + narrow.panelWidth;
-        ToolStrip.layOptions(narrow, threeOptions(), after);
-        assertEquals(2, narrow.options.length);
-        assertEquals("a", narrow.options[0].id);
-        assertEquals("b", narrow.options[1].id);
-        assertTrue(narrow.optionX[0] >= after + 2 * END_GAP);
-        assertEquals(1, narrow.dividerX.length);
-        ToolStrip.Layout none = conversation(400, ToolStrip.Count.NONE);
-        ToolStrip.layOptions(none, java.util.Collections.<PageOption>emptyList(),
-                none.panelX + none.panelWidth);
-        assertEquals(0, none.options.length);
-        assertEquals(0, none.dividerX.length);
+        ToolStrip.layOptions(narrow, threeOptions(), after, true);
+        assertTrue(narrow.options.length < 3);
+        assertTrue(narrow.overflowX >= 0);
+        int last = narrow.dividerX.length - 1;
+        assertEquals(narrow.settingsX - END_GAP - 1, narrow.dividerX[last]);
+        assertEquals(narrow.dividerX[last] - END_GAP
+                - ToolStrip.OVERFLOW_WIDTH, narrow.overflowX);
+        assertTrue(narrow.dividerX[0] >= after + 2 * END_GAP);
+        for (int index = 0; index < narrow.options.length; index++) {
+            assertEquals(threeOptions().get(index).id, narrow.options[index].id);
+            assertTrue(narrow.optionX[index] < narrow.overflowX);
+        }
+    }
+
+    /**
+     * A page with no option keeps a hairline before its cog only where a
+     * panel button stands left of it; with neither, the strip has none.
+     */
+    @Test
+    public void aPageWithNoOptionPartsOnlyThePanelButton() {
+        ToolStrip.Layout panelled = conversation(400, ToolStrip.Count.NONE);
+        ToolStrip.layOptions(panelled,
+                java.util.Collections.<PageOption>emptyList(),
+                panelled.panelX + panelled.panelWidth, true);
+        assertEquals(0, panelled.options.length);
+        assertEquals(1, panelled.dividerX.length);
+        assertEquals(panelled.settingsX - END_GAP - 1, panelled.dividerX[0]);
+        ToolStrip.Layout bare = conversation(400, ToolStrip.Count.NONE);
+        ToolStrip.layOptions(bare, java.util.Collections.<PageOption>emptyList(),
+                bare.panelX + bare.panelWidth, false);
+        assertEquals(0, bare.dividerX.length);
+        assertEquals(-1, bare.overflowX);
     }
 
     private static List<PageOption> threeOptions() {

@@ -28,7 +28,7 @@ import net.minecraft.util.IChatComponent;
  * whole run at once on the clock of its newest message. A message there
  * can only continue a group still on screen, which is exactly while the
  * message <em>before</em> it is within the fade
- * ({@link #continuationsInFeed}, {@link #FEED_RUN_MILLIS}); after longer
+ * ({@link #continuationsInFeed}, {@link #feedRunMillis}); after longer
  * silence it would stand headless under nothing, so it opens a run with
  * its name.</p>
  *
@@ -55,12 +55,13 @@ final class ChatGroupRuns {
             "losttales:narrator".getBytes(java.nio.charset.Charset.forName("UTF-8")));
     /**
      * How long the closed feed keeps a line on screen, in milliseconds:
-     * the fade the renderer draws, in the units a message's timestamp is
-     * in. A message there this long after the one before it finds the
-     * whole group gone and opens one of its own.
+     * its setting's time, in the units a message's timestamp is in. A
+     * message there this long after the one before it finds the whole
+     * group gone and opens one of its own.
      */
-    static final long FEED_RUN_MILLIS =
-            LostTalesChatOverlayRenderer.FEED_FADE_TICKS * 1000L / 20L;
+    static long feedRunMillis() {
+        return ChatFeedPlacement.fadeTicks() * 1000L / 20L;
+    }
     private static final LinkedHashMap<Integer, Entry> ENTRIES =
             new LinkedHashMap<Integer, Entry>();
 
@@ -154,7 +155,7 @@ final class ChatGroupRuns {
      */
     static synchronized boolean[] continuationsInFeed(
             int[] lineIdsNewestFirst) {
-        return walk(lineIdsNewestFirst, FEED_RUN_MILLIS, null);
+        return walk(lineIdsNewestFirst, feedRunMillis(), null);
     }
 
     /**
