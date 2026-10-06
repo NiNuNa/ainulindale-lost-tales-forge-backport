@@ -426,9 +426,9 @@ public final class LostTalesChatOverlayRenderer {
             // asks for what was said in it before; a view scrolled to its
             // oldest line asks for the page before that. Both from here,
             // where the view and its lines are exactly what is drawn.
-            String scope = ClientChatContextHistory.scopeOf(ConversationPage.viewed(view));
+            String scope = ClientChatContextHistory.scopeOf(ConversationPage.viewedConversation(view));
             if (scope.length() > 0) {
-                ClientChatContextHistory.request(ConversationPage.viewed(view), scope);
+                ClientChatContextHistory.request(ConversationPage.viewedConversation(view), scope);
             }
             double maximum = Math.max(0.0D,
                     frame.contentRows() - Math.max(1.0D, roomLines));
@@ -985,6 +985,9 @@ public final class LostTalesChatOverlayRenderer {
             float restingY, boolean open,
             LostTalesGuiAnimationSample opening, int chatWidth,
             ChatTimestampColumn columns, double sideLeft) {
+        // The chips light for the identity this copy speaks as; the feed's
+        // for the character played.
+        ChatReactionMarker.readAs(frame.view);
         // The offset is in rows and fractions of one: whole rows pick
         // where the stack starts, the fraction slides it by that much of
         // the row it is inside, and one more row is drawn so the gap the

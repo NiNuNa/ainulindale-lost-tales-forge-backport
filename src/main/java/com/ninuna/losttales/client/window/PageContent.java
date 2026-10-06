@@ -39,6 +39,20 @@ import net.minecraft.client.Minecraft;
  */
 public abstract class PageContent {
     private final PageAnswer answer = new PageAnswer();
+    private OtherPage tab;
+
+    /**
+     * The tab this content belongs to: its own copy of the page, which
+     * its questions and sub-windows hang from.
+     */
+    public final OtherPage tab() {
+        return this.tab;
+    }
+
+    /** Made for {@code tab}, once, as that copy of the page is first asked for. */
+    final void attach(OtherPage tab) {
+        this.tab = tab;
+    }
 
     /** What the page answered last, standing over its bar. */
     public final PageAnswer lastAnswer() {

@@ -29,6 +29,9 @@ import static org.junit.Assert.fail;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesChatPacketTest {
+    /** One of a reader's identities that reacted. */
+    private static final UUID READER = new UUID(77L, 77L);
+
     /** An optional id at the payload's tail: a presence flag and a UUID, written whole either way. */
     private static final int IDENTITY_ID_TAIL_BYTES = 1 + 16;
 
@@ -755,9 +758,9 @@ public final class LostTalesChatPacketTest {
     @Test
     public void aLineCarriesItsReactionsAsItsReaderSeesThem() {
         ChatReactionSummary reactions = new ChatReactionSummary(Arrays.asList(
-                new ChatReactionSummary.Reaction("smile", 3, true,
+                new ChatReactionSummary.Reaction("smile", 3, Collections.singletonList(READER),
                         Arrays.asList("Aldric", "Beren")),
-                new ChatReactionSummary.Reaction("joy", 1, false,
+                new ChatReactionSummary.Reaction("joy", 1, Collections.<UUID>emptyList(),
                         Arrays.asList("Nils"))));
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 ChatChannel.GLOBAL, UUID.randomUUID(), "Beren", "Steve", "",
@@ -772,7 +775,7 @@ public final class LostTalesChatPacketTest {
         assertEquals(2, decoded.getReactions().getReactions().size());
         ChatReactionSummary.Reaction smile = decoded.getReactions().find("smile");
         assertEquals(3, smile.count);
-        assertTrue(smile.mine);
+        assertTrue(smile.isMine(READER));
         assertEquals(Arrays.asList("Aldric", "Beren"), smile.names);
         assertEquals(1, decoded.withMessage("edited").getReactions()
                 .find("joy").count);
@@ -782,7 +785,7 @@ public final class LostTalesChatPacketTest {
     public void aReactionRequestNamesAKnownEmojiAndAServerMessage() {
         long id = ChatMessageIdAllocator.next();
         LostTalesChatReactPacket request = new LostTalesChatReactPacket(id,
-                "smile", true);
+                "smile", true, LostTalesChatSendPacket.IDENTITY_CHARACTER, READER);
         ByteBuf buffer = Unpooled.buffer();
         request.toBytes(buffer);
         LostTalesChatReactPacket decoded = new LostTalesChatReactPacket();
@@ -791,21 +794,35 @@ public final class LostTalesChatPacketTest {
         assertEquals(id, decoded.getMessageId());
         assertEquals("smile", decoded.getEmoji());
         assertTrue(decoded.isAdd());
+        // Who the reaction is made as: the identity its copy speaks as.
+        assertEquals(LostTalesChatSendPacket.IDENTITY_CHARACTER, decoded.getIdentityKind());
+        assertEquals(READER, decoded.getIdentityCharacterId());
 
         ByteBuf forged = Unpooled.buffer();
         forged.writeLong(id);
         LostTalesPacketCodec.writeUtf8String(forged, "not_an_emoji", 64);
         forged.writeBoolean(true);
+        forged.writeByte(LostTalesChatSendPacket.IDENTITY_DEFAULT);
         LostTalesChatReactPacket refused = new LostTalesChatReactPacket();
         refused.fromBytes(forged);
         assertTrue(refused.isMalformed());
+
+        // A character named without an id, or an id without a character, is no identity.
+        ByteBuf unnamed = Unpooled.buffer();
+        unnamed.writeLong(id);
+        LostTalesPacketCodec.writeUtf8String(unnamed, "smile", 64);
+        unnamed.writeBoolean(true);
+        unnamed.writeByte(9);
+        LostTalesChatReactPacket wrongKind = new LostTalesChatReactPacket();
+        wrongKind.fromBytes(unnamed);
+        assertTrue(wrongKind.isMalformed());
     }
 
     @Test
     public void aReactionSyncRoundTripsAndRefusesAnEmojiTwice() {
         long id = ChatMessageIdAllocator.next();
         ChatReactionSummary reactions = new ChatReactionSummary(Arrays.asList(
-                new ChatReactionSummary.Reaction("smile", 2, false,
+                new ChatReactionSummary.Reaction("smile", 2, Collections.<UUID>emptyList(),
                         Arrays.asList("Aldric"))));
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesChatReactionSyncPacket(id, reactions).toBytes(buffer);
@@ -839,9 +856,9 @@ public final class LostTalesChatPacketTest {
         String parrot = "Party_Parrot:123456789012345678";
         String family = "👨‍👩‍👧";
         ChatReactionSummary reactions = new ChatReactionSummary(Arrays.asList(
-                new ChatReactionSummary.Reaction(parrot, 2, true,
+                new ChatReactionSummary.Reaction(parrot, 2, Collections.singletonList(READER),
                         Arrays.asList("Nils", "Aldric")),
-                new ChatReactionSummary.Reaction(family, 1, false,
+                new ChatReactionSummary.Reaction(family, 1, Collections.<UUID>emptyList(),
                         Arrays.asList("Nils"))));
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesChatReactionSyncPacket(id, reactions).toBytes(buffer);
@@ -850,7 +867,7 @@ public final class LostTalesChatPacketTest {
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
         assertEquals(2, decoded.getReactions().find(parrot).count);
-        assertTrue(decoded.getReactions().find(parrot).mine);
+        assertTrue(decoded.getReactions().find(parrot).isMine(READER));
         assertEquals(Arrays.asList("Nils"),
                 decoded.getReactions().find(family).names);
 
@@ -883,7 +900,7 @@ public final class LostTalesChatPacketTest {
     public void aReactionRequestMayNameAForeignKeyAndNothingElse() {
         long id = ChatMessageIdAllocator.next();
         LostTalesChatReactPacket request = new LostTalesChatReactPacket(id,
-                "partyparrot:556", true);
+                "partyparrot:556", true, LostTalesChatSendPacket.IDENTITY_DEFAULT, null);
         ByteBuf buffer = Unpooled.buffer();
         request.toBytes(buffer);
         LostTalesChatReactPacket decoded = new LostTalesChatReactPacket();
@@ -898,6 +915,7 @@ public final class LostTalesChatPacketTest {
             forged.writeLong(id);
             LostTalesPacketCodec.writeUtf8String(forged, forgery, 64);
             forged.writeBoolean(true);
+            forged.writeByte(LostTalesChatSendPacket.IDENTITY_DEFAULT);
             LostTalesChatReactPacket refused = new LostTalesChatReactPacket();
             refused.fromBytes(forged);
             assertTrue(forgery, refused.isMalformed());

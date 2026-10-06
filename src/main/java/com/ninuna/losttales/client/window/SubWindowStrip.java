@@ -195,8 +195,12 @@ final class SubWindowStrip {
                 this.closeX, this.closeTop, alpha);
         WindowStyle.drawDivider(this.secondDividerX, this.dividerTop,
                 DIVIDER_HEIGHT, divider);
+        // A locked sub-window's grip moves nothing: greyed, as the
+        // window's own grip is.
         LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.GRIP,
                 LostTalesUiSheet.GRIP_HOVER, window.gripFade, this.gripX,
-                this.gripTop, alpha);
+                this.gripTop, window.isLocked()
+                        ? Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY)
+                        : alpha);
     }
 }

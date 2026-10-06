@@ -3,10 +3,8 @@ package com.ninuna.losttales.compat.lotr;
 import com.ninuna.losttales.fellowship.model.FellowshipIcon;
 import com.ninuna.losttales.util.LostTalesLog;
 import lotr.common.LOTRLevelData;
-import lotr.common.LOTRPlayerData;
 import lotr.common.fellowship.LOTRFellowship;
 import lotr.common.fellowship.LOTRFellowshipData;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
@@ -22,8 +20,8 @@ import java.util.UUID;
  * the three rules, shows members on its map, and shares waypoints and
  * banners, so each of ours keeps one in step with it. The fellowship is
  * changed through its own methods; of a player's LOTR data only the list of
- * fellowships and the {@code /fmsg} binding are touched, never the methods
- * that send LOTR's notices, so nobody is told anything in LOTR's words.
+ * fellowships is touched, never the methods that send LOTR's notices, so
+ * nobody is told anything in LOTR's words.
  * Nothing here fails the game: where LOTR cannot be reached the mirror
  * stands as it was, and that is said once.
  */
@@ -181,31 +179,6 @@ public final class LotrFellowshipMirror {
         } catch (LinkageError error) {
             warn(error);
             return false;
-        }
-    }
-
-    /** The LOTR fellowship a player's {@code /fmsg} is bound to; null for none. */
-    public static UUID boundTo(EntityPlayer player) {
-        try {
-            return LOTRLevelData.getData(player).getChatBoundFellowshipID();
-        } catch (RuntimeException failure) {
-            warn(failure);
-            return null;
-        } catch (LinkageError error) {
-            warn(error);
-            return null;
-        }
-    }
-
-    /** Binds a player's plain {@code /fmsg} to a LOTR fellowship, or unbinds it with null. */
-    public static void bind(EntityPlayer player, UUID mirrorId) {
-        try {
-            LOTRPlayerData data = LOTRLevelData.getData(player);
-            data.setChatBoundFellowshipID(mirrorId);
-        } catch (RuntimeException failure) {
-            warn(failure);
-        } catch (LinkageError error) {
-            warn(error);
         }
     }
 

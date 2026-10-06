@@ -449,7 +449,7 @@ public final class ChatLayoutTest {
             ChatLayout.noteNpcSpoke(npc);
             assertNotNull(ChatLayout.openTab(npc, "w2"));
         }
-        assertFalse(ChatLayout.hasClosedNpcConversation());
+        assertTrue(ChatLayout.npcConversations(true).isEmpty());
         // Frodo stands behind the consoles in their window, locked.
         assertTrue(WindowLayout.moveTab(npcs.get(1), "w1", 0));
         WindowLayout.setActiveTab(ConversationPage.of(ChatChannel.CLIENT_CONSOLE));
@@ -463,8 +463,8 @@ public final class ChatLayoutTest {
         assertTrue(ChatLayout.isOpen(npcs.get(2)));
         assertTrue(ChatLayout.isOpen(npcs.get(4)));
         assertEquals(Arrays.asList(npcs.get(1), npcs.get(0)),
-                ChatLayout.closedNpcConversations());
-        assertTrue(ChatLayout.hasClosedNpcConversation());
+                ChatLayout.npcConversations(true));
+        assertFalse(ChatLayout.npcConversations(true).isEmpty());
         // Sam, the quietest left, is in front of its window, and Merry
         // holds a draft: at a limit of one, only Pippin could go, and he
         // just spoke.
@@ -478,17 +478,17 @@ public final class ChatLayoutTest {
         assertTrue(ChatLayout.isOpen(npcs.get(2)));
         assertTrue(ChatLayout.isOpen(npcs.get(3)));
         assertTrue(ChatLayout.isOpen(npcs.get(4)));
-        // Speaking again makes a closed one the latest in the +.
+        // Speaking again makes a closed one the latest on the menu.
         ChatLayout.noteNpcSpoke(npcs.get(0));
         assertEquals(Arrays.asList(npcs.get(0), npcs.get(1)),
-                ChatLayout.closedNpcConversations());
+                ChatLayout.npcConversations(true));
         // A player's whisper is never counted.
         ChatLayout.openWhisper("Alex", "", "w2");
         ChatLayout.closeQuietNpcConversations(npcs.get(4), 1);
         assertTrue(ChatLayout.isOpen(ConversationPage.whisper("Alex", "")));
         ChatLayout.closeConversations();
-        assertTrue(ChatLayout.closedNpcConversations().isEmpty());
-        assertFalse(ChatLayout.hasClosedNpcConversation());
+        assertTrue(ChatLayout.npcConversations(true).isEmpty());
+        assertTrue(ChatLayout.npcConversations(true).isEmpty());
     }
 
     /** The session remembers the NPC conversations that spoke last, and no more. */
@@ -499,13 +499,13 @@ public final class ChatLayoutTest {
             ChatLayout.noteNpcSpoke(ConversationPage.npc("Orc " + index));
         }
         ChatLayout.noteNpcSpoke(ConversationPage.whisper("Alex", ""));
-        List<ConversationPage> closed = ChatLayout.closedNpcConversations();
+        List<ConversationPage> closed = ChatLayout.npcConversations(true);
         assertEquals(ChatLayout.MAX_NPC_CONVERSATIONS, closed.size());
         assertEquals(ConversationPage.npc("Orc " + (ChatLayout.MAX_NPC_CONVERSATIONS + 5)),
                 closed.get(0));
         assertEquals(ConversationPage.npc("Orc 6"), closed.get(closed.size() - 1));
         ChatLayout.reset();
-        assertTrue(ChatLayout.closedNpcConversations().isEmpty());
+        assertTrue(ChatLayout.npcConversations(true).isEmpty());
     }
 
     /**
@@ -587,7 +587,7 @@ public final class ChatLayoutTest {
         // The + opens one back into a window of its own, unlocked as
         // every window but a new player's first.
         assertNotNull(WindowLayout.openInNewWindow(
-                ConversationPage.of(order.get(0))));
+                ConversationPage.of(order.get(0)), null));
         assertTrue(WindowLayout.isClosable(ConversationPage.of(order.get(0))));
         assertEquals(1, WindowLayout.windows().size());
         assertEquals(Collections.singletonList(order.get(0)),
@@ -599,7 +599,7 @@ public final class ChatLayoutTest {
             assertTrue(ChatLayout.close(ConversationPage.of(order.get(0))));
             assertTrue(WindowLayout.isEmpty());
             assertNotNull(WindowLayout.openInNewWindow(
-                    ConversationPage.of(order.get(0))));
+                    ConversationPage.of(order.get(0)), null));
         }
         assertEquals(1, WindowLayout.order().size());
     }
@@ -935,7 +935,7 @@ public final class ChatLayoutTest {
         WindowLayout.setWindowWidth("w2", 200, true);
         WindowLayout.raise("w2");
         ConversationPage plus = ConversationPage.whisper("Frodo", "");
-        assertNotNull(WindowLayout.openInNewWindow(plus));
+        assertNotNull(WindowLayout.openInNewWindow(plus, null));
         Window opened = WindowLayout.windowOf(plus);
         java.util.List<Window> order = WindowLayout.stacked();
         assertSame(opened, order.get(order.size() - 1));

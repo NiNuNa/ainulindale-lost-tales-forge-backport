@@ -188,15 +188,34 @@ public final class CharacterDeletionService {
         return CharacterOperationResult.success(true, roster, removed);
     }
 
+    /** An administrator's restore for a player online: see {@link #restore(World, UUID, String, EntityPlayerMP, UUID)}. */
     public synchronized CharacterDeletionMaintenanceResult restore(
             EntityPlayerMP target, UUID characterId) {
         if (!isValidTarget(target, characterId)) {
             return CharacterDeletionMaintenanceResult.NOT_FOUND;
         }
+        return restore(target.worldObj, target.getUniqueID(),
+                SeenAccountNames.accountNameOf(target), target, characterId);
+    }
+
+    /**
+     * An administrator's restore of one of {@code ownerId}'s deleted
+     * characters into its own slot, its player online or not (R15 a):
+     * {@code accountName} is the account's own name, which its characters
+     * may bear, and {@code online} the player, sent the roster at once, or
+     * null while they are away, who finds it on their next visit.
+     */
+    public synchronized CharacterDeletionMaintenanceResult restore(
+            World world, UUID ownerId, String accountName,
+            EntityPlayerMP online, UUID characterId) {
+        if (world == null || world.isRemote || ownerId == null
+                || characterId == null) {
+            return CharacterDeletionMaintenanceResult.NOT_FOUND;
+        }
         try {
-            CharacterWorldData characterData = CharacterStorage.get(target.worldObj);
+            CharacterWorldData characterData = CharacterStorage.get(world);
             CharacterDeletionWorldData deletionData =
-                    CharacterDeletionStorage.get(target.worldObj);
+                    CharacterDeletionStorage.get(world);
             if (characterData.isReadOnlyForNewerVersion()
                     || deletionData.isReadOnlyForNewerVersion()) {
                 return CharacterDeletionMaintenanceResult.STORAGE_READ_ONLY;
@@ -204,16 +223,16 @@ public final class CharacterDeletionService {
             CharacterDeletionTombstone tombstone =
                     deletionData.getTombstone(characterId);
             if (tombstone == null
-                    || !target.getUniqueID().equals(tombstone.getOwnerId())) {
+                    || !ownerId.equals(tombstone.getOwnerId())) {
                 return CharacterDeletionMaintenanceResult.NOT_FOUND;
             }
             CharacterRoster roster = characterData.getOrCreateRoster(
-                    target.getUniqueID());
+                    ownerId);
             RoleplayCharacter existing = roster.getCharacter(characterId);
             if (existing != null) {
                 deletionData.removeTombstone(characterId);
-                flushCommitted(target.worldObj, "restore_reconcile",
-                        target.getUniqueID(), characterId);
+                flushCommitted(world, "restore_reconcile",
+                        ownerId, characterId);
                 return CharacterDeletionMaintenanceResult.RECONCILED;
             }
             if (characterData.containsCharacter(characterId)) {
@@ -225,20 +244,20 @@ public final class CharacterDeletionService {
                 return CharacterDeletionMaintenanceResult.SLOT_OCCUPIED;
             }
             if (nameRefusal(characterData, character,
-                    SeenAccountNames.accountNameOf(target),
-                    SeenAccountNames.ofServer(target.worldObj, target.getUniqueID()))
+                    accountName,
+                    SeenAccountNames.ofServer(world, ownerId))
                     != CharacterErrorId.NONE) {
                 return CharacterDeletionMaintenanceResult.NAME_TAKEN;
             }
             CharacterPlayerStateWorldData playerStateData =
                     CharacterPlayerStateStorage.get(
-                            target.worldObj, target.getUniqueID());
+                            world, ownerId);
             if (playerStateData.isReadOnlyForNewerVersion()
-                    || playerStateData.isOwnerBlocked(target.getUniqueID())) {
+                    || playerStateData.isOwnerBlocked(ownerId)) {
                 return CharacterDeletionMaintenanceResult.PLAYER_STATE_UNAVAILABLE;
             }
             CharacterPlayerStateAccount account = playerStateData.getAccount(
-                    target.getUniqueID());
+                    ownerId);
             CharacterPlayerStateRecord record = account == null ? null
                     : account.getRecord(characterId);
             if (record == null
@@ -258,35 +277,37 @@ public final class CharacterDeletionService {
             // durable. If the server stops here, the next restore simply
             // reconciles the stale tombstone instead of losing both copies.
             try {
-                CharacterDeletionStorage.flush(target.worldObj);
+                CharacterDeletionStorage.flush(world);
             } catch (RuntimeException exception) {
-                logFailure("restore_publish_roster", target.getUniqueID(),
+                logFailure("restore_publish_roster", ownerId,
                         characterId, exception);
                 return CharacterDeletionMaintenanceResult.INTERNAL_ERROR;
             }
             deletionData.removeTombstone(characterId);
-            flushCommitted(target.worldObj, "restore_commit",
-                    target.getUniqueID(), characterId);
+            flushCommitted(world, "restore_commit",
+                    ownerId, characterId);
             try {
-                CharacterSyncManager.sendRoster(
-                        target,
-                        CharacterSyncManager.UNSOLICITED_REQUEST_ID,
-                        roster);
+                if (online != null) {
+                    CharacterSyncManager.sendRoster(
+                            online,
+                            CharacterSyncManager.UNSOLICITED_REQUEST_ID,
+                            roster);
+                }
             } catch (RuntimeException exception) {
-                logFailure("restore_sync", target.getUniqueID(),
+                logFailure("restore_sync", ownerId,
                         characterId, exception);
             }
             FMLLog.info("[%s] Restored character %s for owner %s from state generation %d",
                     LostTalesMetaData.MOD_ID, characterId,
-                    target.getUniqueID(),
+                    ownerId,
                     Long.valueOf(record.getCurrentGeneration()));
             return CharacterDeletionMaintenanceResult.SUCCESS;
         } catch (CharacterStateValidationException exception) {
-            logFailure("restore_validate_state", target.getUniqueID(),
+            logFailure("restore_validate_state", ownerId,
                     characterId, exception);
             return CharacterDeletionMaintenanceResult.PLAYER_STATE_UNAVAILABLE;
         } catch (RuntimeException exception) {
-            logFailure("restore", target.getUniqueID(), characterId, exception);
+            logFailure("restore", ownerId, characterId, exception);
             return CharacterDeletionMaintenanceResult.INTERNAL_ERROR;
         }
     }

@@ -223,7 +223,8 @@ final class ChatOutbox {
                         tab.isWhisper()
                                 ? ClientChatChannelState.partnerCharacterIdOf(tab)
                                 : null,
-                        unkept, action));
+                        unkept, action)
+                        .narrating(ClientChatIdentities.wireNarrating(tab)));
     }
 
     /**
@@ -460,6 +461,7 @@ final class ChatOutbox {
                         tab.target(), typing,
                         ClientChatIdentities.wireKind(tab),
                         ClientChatIdentities.wireCharacterId(tab),
+                        ClientChatIdentities.wireNarrating(tab),
                         tab.isWhisper() ? tab.getPartnerIdentity() : "",
                         tab.isWhisper() ? ClientChatChannelState.partnerCharacterIdOf(tab) : null));
     }

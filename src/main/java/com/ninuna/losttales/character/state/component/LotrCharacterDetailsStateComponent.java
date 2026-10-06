@@ -12,7 +12,12 @@ import net.minecraftforge.common.util.Constants;
 
 import java.util.Set;
 
-/** LOTR shield, alcohol tolerance, and last-death marker. */
+/**
+ * LOTR's smaller things each character keeps: the shield, the alcohol
+ * tolerance, the last death, the fast-travel wait and the last waypoint,
+ * the last biome, the mount, the faction the alignment bar shows, and
+ * LOTR's options ({@link LotrCharacterDetailsStateAdapter}).
+ */
 public final class LotrCharacterDetailsStateComponent
         implements CharacterStateComponent {
 

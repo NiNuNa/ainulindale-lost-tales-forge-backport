@@ -41,14 +41,16 @@ public final class LostTalesChatTypingPacket implements IMessage {
     /** Which identity the message would wear; see the send packet. */
     private int identityKind = LostTalesChatSendPacket.IDENTITY_DEFAULT;
     private UUID identityCharacterId;
+    /** Whether the message would sign as the Narrator; see the send packet. */
+    private boolean narrating;
     private boolean malformed;
 
     public LostTalesChatTypingPacket() {}
 
     public LostTalesChatTypingPacket(ChatChannel channel, String target,
                                      boolean typing, int identityKind,
-                                     UUID identityCharacterId, String targetIdentity,
-                                     UUID targetCharacterId) {
+                                     UUID identityCharacterId, boolean narrating,
+                                     String targetIdentity, UUID targetCharacterId) {
         this.targetIdentity = targetIdentity == null ? "" : targetIdentity.trim();
         this.targetCharacterId = targetCharacterId;
         this.channelId = channel == null ? "" : channel.getId();
@@ -56,6 +58,7 @@ public final class LostTalesChatTypingPacket implements IMessage {
         this.typing = typing;
         this.identityKind = identityKind;
         this.identityCharacterId = identityCharacterId;
+        this.narrating = narrating;
         validate();
     }
 
@@ -76,6 +79,11 @@ public final class LostTalesChatTypingPacket implements IMessage {
             this.identityCharacterId = this.identityKind
                     == LostTalesChatSendPacket.IDENTITY_CHARACTER
                     ? new UUID(buffer.readLong(), buffer.readLong()) : null;
+            int voice = buffer.readUnsignedByte();
+            if (voice > 1) {
+                throw new IllegalArgumentException("invalid narrator flag");
+            }
+            this.narrating = voice == 1;
             this.targetIdentity = LostTalesPacketCodec.readUtf8String(buffer, 96).trim();
             int namedCharacter = buffer.readUnsignedByte();
             if (namedCharacter > 1) {
@@ -94,6 +102,7 @@ public final class LostTalesChatTypingPacket implements IMessage {
             this.typing = false;
             this.identityKind = LostTalesChatSendPacket.IDENTITY_DEFAULT;
             this.identityCharacterId = null;
+            this.narrating = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -114,6 +123,7 @@ public final class LostTalesChatTypingPacket implements IMessage {
             buffer.writeLong(
                     this.identityCharacterId.getLeastSignificantBits());
         }
+        buffer.writeBoolean(this.narrating);
         LostTalesPacketCodec.writeUtf8String(buffer, this.targetIdentity, 96);
         buffer.writeBoolean(this.targetCharacterId != null);
         if (this.targetCharacterId != null) {
@@ -139,7 +149,9 @@ public final class LostTalesChatTypingPacket implements IMessage {
                         > LostTalesChatSendPacket.IDENTITY_CHARACTER
                 || (this.identityKind
                         == LostTalesChatSendPacket.IDENTITY_CHARACTER
-                        && this.identityCharacterId == null)) {
+                        && this.identityCharacterId == null)
+                || (this.narrating && this.identityKind
+                        == LostTalesChatSendPacket.IDENTITY_ACCOUNT)) {
             throw new IllegalArgumentException("invalid chat typing request");
         }
     }
@@ -160,6 +172,8 @@ public final class LostTalesChatTypingPacket implements IMessage {
     public UUID getIdentityCharacterId() {
         return this.identityCharacterId;
     }
+    /** Whether the message would sign as the Narrator. */
+    public boolean isNarrating() { return this.narrating; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<
@@ -186,6 +200,7 @@ public final class LostTalesChatTypingPacket implements IMessage {
                                     message.isTyping(),
                                     message.getIdentityKind(),
                                     message.getIdentityCharacterId(),
+                                    message.isNarrating(),
                                     message.getTargetIdentity(),
                                     message.getTargetCharacterId());
                         }

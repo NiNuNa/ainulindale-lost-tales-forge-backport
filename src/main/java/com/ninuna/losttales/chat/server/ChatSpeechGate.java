@@ -17,8 +17,7 @@ import net.minecraftforge.event.ServerChatEvent;
 /**
  * Holds the ways to speak that bypass the chat's own sending to the
  * chat's rules: the game's {@code /me}, {@code /say} and private
- * messages, LOTR's fellowship messages, and plain chat a client sends
- * the game's way. A muted account is refused, and so are words the chat
+ * messages, and plain chat a client sends the game's way. A muted account is refused, and so are words the chat
  * would refuse (a hidden break, a direction mark). The chat's own lines
  * are checked where they are sent ({@link LostTalesChatService#send}).
  */
@@ -26,7 +25,7 @@ public final class ChatSpeechGate {
     /** The commands, by name or alias, that put a player's words before others. */
     static final Set<String> SPEAKING_COMMANDS = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList(
-                    "me", "say", "tell", "msg", "w", "fmsg", "fchat")));
+                    "me", "say", "tell", "msg", "w")));
 
     /** After the Server Log has recorded the attempt, which stands either way. */
     @SubscribeEvent(priority = EventPriority.LOW)

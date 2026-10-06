@@ -36,10 +36,7 @@ public final class SubWindowKind {
     /** The palette a colour setting opens. */
     public static final SubWindowKind PALETTE = register("palette",
             "gui.losttales.window.sub.palette");
-    /** The closed tabs to open, behind the {@code +}. */
-    public static final SubWindowKind OPEN = register("open",
-            "gui.losttales.window.sub.open");
-    /** What a right-click on a category's name in the {@code +} offers for all its pages. */
+    /** What a right-click on a category's name on the Lost Tales Menu offers for all its pages. */
     public static final SubWindowKind CATEGORY = register("category",
             "gui.losttales.window.sub.category");
     /** The words of an option taken for every page of a category at once. */

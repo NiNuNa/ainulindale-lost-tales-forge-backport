@@ -106,7 +106,7 @@ public final class ServerSettingsPage extends PageContent {
 
             @Override
             public boolean stands(int generation) {
-                OtherPage tab = WindowPages.tab(PAGE_ID);
+                OtherPage tab = tab();
                 return generation == ServerSettingsPage.this.generation
                         && tab != null && WindowLayout.isOpen(tab);
             }
@@ -144,7 +144,7 @@ public final class ServerSettingsPage extends PageContent {
     /** The tab closed: what waited goes with it. */
     @Override
     public void hidden() {
-        OtherPage tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = tab();
         if (tab == null || !WindowLayout.isOpen(tab)) {
             forget();
         }
@@ -221,7 +221,7 @@ public final class ServerSettingsPage extends PageContent {
             return;
         }
         WindowScreen screen = WindowScreen.current();
-        OtherPage tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = tab();
         if (screen != null && tab != null) {
             screen.ask(tab, word("discard.title"), word("discard.question"),
                     word("discard.confirm"), new Runnable() {

@@ -29,6 +29,7 @@ import com.ninuna.losttales.character.validation.ValidatedCharacterCreation;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.world.World;
 
 import java.util.UUID;
 
@@ -417,6 +418,66 @@ public final class CharacterService {
     }
 
     /**
+     * An administrator's rename of one of {@code ownerId}'s characters, its
+     * player online or not (R10 b): the one way a character's name ever
+     * changes. The new name is checked as a new character's is — its form,
+     * a lore character's or a voice's name, another character's or another
+     * account's — and a lore character keeps its own. Lines already said
+     * keep the name they were said under. {@code accountName} is the owner's
+     * account, whose own name their characters may bear.
+     */
+    public synchronized CharacterOperationResult renameByAdmin(World world,
+            UUID ownerId, String accountName, UUID characterId, String newName) {
+        if (world == null || world.isRemote || ownerId == null || characterId == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INVALID_CHARACTER_ID, null);
+        }
+        CharacterWorldData data = CharacterStorage.get(world);
+        if (data.isReadOnlyForNewerVersion()) {
+            return CharacterOperationResult.failure(CharacterErrorId.STORAGE_READ_ONLY, null);
+        }
+        CharacterRoster roster = data.getRoster(ownerId);
+        RoleplayCharacter current = roster == null ? null : roster.getCharacter(characterId);
+        if (current == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.CHARACTER_NOT_FOUND, roster);
+        }
+        CharacterErrorId lore = refuseLoreCharacter(world, characterId,
+                CharacterErrorId.LORE_CHARACTER_CANNOT_EDIT);
+        if (lore != CharacterErrorId.NONE) {
+            return CharacterOperationResult.failure(lore, roster);
+        }
+        CharacterAppearanceValidationResult appearance =
+                CharacterValidator.validateAppearance(roster, characterId,
+                        current.getRaceId(), newName, current.getRaceId(),
+                        current.getGenderId(), current.getSkinId(),
+                        current.getBodyTypeId(), current.getChestTypeId(),
+                        current.getProfile().section(CharacterProfile.Section.HISTORY),
+                        current.getAge());
+        if (!appearance.isValid()) {
+            return CharacterOperationResult.failure(appearance.getErrorId(), roster);
+        }
+        String name = appearance.getAppearance().getName();
+        if (nameTakenElsewhere(data, ownerId, name)) {
+            return CharacterOperationResult.failure(CharacterErrorId.DUPLICATE_NAME, roster);
+        }
+        if (SeenAccountNames.isAnotherAccountsName(name, accountName,
+                SeenAccountNames.ofServer(world, ownerId))) {
+            return CharacterOperationResult.failure(CharacterErrorId.ACCOUNT_NAME, roster);
+        }
+        if (name.equals(current.getName())) {
+            return CharacterOperationResult.success(false, roster, current);
+        }
+        RoleplayCharacter renamed = RoleplayCharacter.builder(current).name(name).build();
+        if (!roster.replaceCharacter(renamed)) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, roster);
+        }
+        roster.incrementRevision();
+        data.saveRoster(roster);
+        FMLLog.info("[%s] Character %s of %s renamed by an administrator",
+                LostTalesMetaData.MOD_ID, characterId, ownerId);
+        return CharacterOperationResult.success(true, roster, renamed);
+    }
+
+    /**
      * Whether a character of another account already goes by the name.
      * Names are unique on the server, so a whisper by name reaches the one
      * person it names; a roster's own names are the validator's to check.
@@ -728,9 +789,15 @@ public final class CharacterService {
     private static CharacterErrorId refuseLoreCharacter(EntityPlayerMP player,
                                                         UUID characterId,
                                                         CharacterErrorId refusal) {
+        return refuseLoreCharacter(player.worldObj, characterId, refusal);
+    }
+
+    private static CharacterErrorId refuseLoreCharacter(World world,
+                                                        UUID characterId,
+                                                        CharacterErrorId refusal) {
         try {
             LoreCharacterOwnershipWorldData loreOwnership =
-                    LoreCharacterOwnershipStorage.get(player.worldObj);
+                    LoreCharacterOwnershipStorage.get(world);
             if (loreOwnership.isReadOnly()) {
                 return CharacterErrorId.LORE_CHARACTER_OWNERSHIP_STORAGE_READ_ONLY;
             }

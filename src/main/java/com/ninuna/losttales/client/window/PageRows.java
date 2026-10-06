@@ -80,6 +80,26 @@ public final class PageRows {
                 Math.max(0.0D, Math.floor(box.height)));
     }
 
+    /** How wide the rows ask to be, each whole. */
+    public int naturalWidth() {
+        return this.menu.naturalWidth();
+    }
+
+    /** How tall the rows ask to be at {@code width}, up to the rows shown at most. */
+    public int naturalHeight(int width) {
+        return this.menu.naturalHeight(width);
+    }
+
+    /** How many rows the rows ask room for at most; past them they scroll. */
+    public void setVisibleRows(int rows) {
+        this.menu.setVisibleRows(rows);
+    }
+
+    /** The row under the point, takeable or not; null for none. */
+    public MenuWindow.Entry rowAt(LostTalesUiHitBox box, double x, double y) {
+        return this.menu.rowAt(box, x, y);
+    }
+
     /** Back at the top with no row lit: the page turned to something else. */
     public void toTop() {
         this.menu.restart();
@@ -127,6 +147,11 @@ public final class PageRows {
             this.pressBox = null;
         }
         return true;
+    }
+
+    /** Scrolls the chosen row into view as the rows are next drawn: the keys walked to it. */
+    public void revealChosen() {
+        this.menu.revealChosen();
     }
 
     /** A wheel turn, in lines, positive toward later rows. */

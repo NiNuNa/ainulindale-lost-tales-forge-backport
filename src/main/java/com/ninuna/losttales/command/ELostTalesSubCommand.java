@@ -16,23 +16,17 @@ import net.minecraft.command.ICommandSender;
  */
 public enum ELostTalesSubCommand {
     QUEST(new LostTalesCommandQuest("quest", LostTalesMetaData.MOD_ID + " quest"),
-            "quest <defs|list|start|complete|reset|abandon|pin|unpin|starter|scan>",
+            "quest <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|reload|world> ...",
             "quest", "quests", "q"),
     MAP_MARKER(new LostTalesCommandMapMarker("mapmarker",
             LostTalesMetaData.MOD_ID + " mapmarker"),
-            "mapmarker <known|list|discover|forget|track|untrack|retry|reseed>",
+            "mapmarker <known|list|dynamic|discover|forget|track|untrack|retry|reseed>",
             "mapmarker", "mapmarkers", "marker", "markers"),
-    HUD(new LostTalesCommandHud("hud", LostTalesMetaData.MOD_ID + " hud"),
-            "hud <status|preset|set|move|toggle>",
-            "hud", "overlay"),
-    SUMMON(new LostTalesCommandSummon("summon"),
-            "summon <entity> [x] [y] [z] [dataTag]",
-            "summon", "entity"),
     FELLOWSHIP(new LostTalesCommandFellowshipAdmin(),
             "fellowship <status|validate|repair|clearcombat>",
             "fellowship", "fellowships"),
     CHARACTER(new LostTalesCommandCharacterAdmin(),
-            "character <status|recover|cooldown|freeze|unfreeze|deleted|restore|rollback|purge> ...",
+            "character <status|recover|cooldown|freeze|unfreeze|deleted|restore|rename|rollback|purge|discard-journal|lore> ...",
             "character", "characters", "char"),
     CHAT(new LostTalesCommandChatModeration(),
             "chat <mute|unmute|mutes>",
@@ -41,7 +35,7 @@ public enum ELostTalesSubCommand {
             "config <list|get|set|reload> ...",
             "config", "cfg"),
     DISCORD(new LostTalesCommandDiscord(),
-            "discord <list|link|unlink|reload> ...",
+            "discord <list|link|unlink> ...",
             "discord"),
     ROLE(new LostTalesCommandRole(),
             "role <list|assign|unassign|create|edit|delete> ...",
@@ -69,6 +63,11 @@ public enum ELostTalesSubCommand {
     /** The name the sub-command is listed and completed under. */
     public String getPrimaryName() {
         return this.names[0];
+    }
+
+    /** Every name the sub-command answers to, the one it is listed under first. */
+    public List<String> getNames() {
+        return java.util.Collections.unmodifiableList(java.util.Arrays.asList(this.names));
     }
 
     /** The sub-command one of these names asks for, or null. */

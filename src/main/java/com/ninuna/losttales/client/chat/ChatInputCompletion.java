@@ -638,7 +638,8 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
     private void acceptChannelSuggestion(ChatChannel channel) {
         ChatChannelSuggester.Query query = this.channelSuggestions.getQuery();
         String token = channel == null ? null : ChatChannelSuggester.token(
-                channel, ClientChatChannelState.scopeKeyRead(ChatChannel.FACTION));
+                channel, ClientChatChannelState.scopeKeyRead(ChatChannel.FACTION,
+                        ClientChatChannelState.getSelected()));
         if (token == null || query == null) {
             return;
         }

@@ -6,17 +6,20 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
 
 /**
- * The tab of a page: the journal, the map, a waystone. One per page,
- * made by {@link WindowPages}, so a page stands in one window at most.
+ * The tab of a page: the journal, the map, a waystone. A page may stand
+ * open more than once, each copy with a tab and a content of its own; a
+ * page standing for a thing in the world opens once.
  */
 public final class OtherPage extends WindowPage {
     /** What a page tab's id opens with, before the page's code name. */
     static final String ID_PREFIX = "page:";
 
     private final WindowPages.Page page;
+    private final int instance;
 
-    OtherPage(WindowPages.Page page) {
+    OtherPage(WindowPages.Page page, int instance) {
         this.page = page;
+        this.instance = instance;
     }
 
     /** The page the tab shows. */
@@ -24,14 +27,38 @@ public final class OtherPage extends WindowPage {
         return this.page;
     }
 
-    /** What the page holds, made the first time it is asked for. */
+    /** What this copy of the page holds, made the first time it is asked for. */
     public PageContent content() {
-        return this.page.content();
+        return this.page.content(this.instance);
     }
 
     @Override
     public String id() {
-        return ID_PREFIX + this.page.id;
+        return instanceId(ID_PREFIX + this.page.id, this.instance);
+    }
+
+    @Override
+    public int instance() {
+        return this.instance;
+    }
+
+    @Override
+    public WindowPage withInstance(int instance) {
+        return instance == this.instance ? this
+                : instance == 1 || opensMoreThanOnce() ? this.page.tab(instance)
+                : null;
+    }
+
+    /** A new copy past the first starts afresh. */
+    @Override
+    public void forgetCopy() {
+        this.page.forgetCopy(this.instance);
+    }
+
+    /** Every page opens more than once but one standing for a thing in the world, or one registered to open once. */
+    @Override
+    public boolean opensMoreThanOnce() {
+        return this.page.opensMoreThanOnce();
     }
 
     @Override
@@ -142,11 +169,12 @@ public final class OtherPage extends WindowPage {
     @Override
     public boolean equals(Object other) {
         return other instanceof OtherPage
-                && ((OtherPage)other).page.id.equals(this.page.id);
+                && ((OtherPage)other).page.id.equals(this.page.id)
+                && ((OtherPage)other).instance == this.instance;
     }
 
     @Override
     public int hashCode() {
-        return this.page.id.hashCode() * 31 + 7;
+        return (this.page.id.hashCode() * 31 + 7) * 31 + this.instance;
     }
 }

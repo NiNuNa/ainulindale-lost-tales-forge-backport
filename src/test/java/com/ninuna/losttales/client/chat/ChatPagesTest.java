@@ -171,7 +171,7 @@ public final class ChatPagesTest {
     public void aConversationCoveredByAPageStaysTheLastUsed() {
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         ConversationPage friend = ConversationPage.whisper("friend", "");
-        WindowLayout.openInNewWindow(friend);
+        WindowLayout.openInNewWindow(friend, null);
         Window window = WindowLayout.windowOf(global);
         ClientChatChannelState.select(global);
         OtherPage page = WindowPages.tab(PAGE);
@@ -196,7 +196,7 @@ public final class ChatPagesTest {
     @Test
     public void beforeAnyPickTheChatKeyBringsTheTopWindowsConversation() {
         ConversationPage friend = ConversationPage.whisper("friend", "");
-        WindowLayout.openInNewWindow(friend);
+        WindowLayout.openInNewWindow(friend, null);
         ClientChatChannelState.clear();
         assertEquals("the top window's, as the layout left it", friend,
                 ClientChatChannelState.lastUsed());
@@ -214,7 +214,7 @@ public final class ChatPagesTest {
     @Test
     public void aPageOpensAWindowHoweverManyStand() {
         for (int index = 0; index < 12; index++) {
-            WindowLayout.openInNewWindow(ConversationPage.whisper("friend" + index, ""));
+            WindowLayout.openInNewWindow(ConversationPage.whisper("friend" + index, ""), null);
         }
         assertNotNull(WindowLayout.showPage(WindowPages.tab(PAGE)));
     }

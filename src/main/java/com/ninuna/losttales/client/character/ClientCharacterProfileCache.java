@@ -46,7 +46,7 @@ public final class ClientCharacterProfileCache {
         return characterId == null ? null : PROFILES.get(characterId);
     }
 
-    /** Whether the server said this player may not read the character's profile. */
+    /** Whether the server said there is no such character to read the profile of. */
     public static synchronized boolean isUnavailable(UUID characterId) {
         return characterId != null && UNAVAILABLE.containsKey(characterId);
     }

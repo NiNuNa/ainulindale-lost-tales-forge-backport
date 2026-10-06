@@ -29,6 +29,7 @@ import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.chat.ChatEmojiUsageStore;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.window.ClientSettingsPage;
+import com.ninuna.losttales.client.window.LostTalesMenuPage;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.WindowPages;
@@ -208,15 +209,24 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     /**
-     * The quest journal, the fellowship, the map and the characters, each a
-     * page a window can hold, with the key that opens it from another
-     * page; the Characters page's own kinds of sub-window; the Motion Lab,
+     * The Lost Tales Menu, every page's way in; the quest journal, the
+     * fellowship, the map and the characters, each a page a window can
+     * hold, with the key that opens it from another page; the Characters
+     * page's own kinds of sub-window; the Motion Lab,
      * the Client Settings, the HUD Placement and the Server Settings, pages
      * with no key of their own;
      * and the pages that open only from a thing in the world: a
      * waystone's, a missive board's and a missive letter's.
      */
     private static void registerPages() {
+        WindowPages.register(LostTalesMenuPage.PAGE_ID, "gui.losttales.page.menu",
+                LostTalesMenuPage.ICON, LostTalesKeyBindings.getMenuKeyBinding(),
+                PageCategory.MENU, new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new LostTalesMenuPage();
+                    }
+                });
         WindowPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",
                 new ItemStack(Items.writable_book),
                 LostTalesKeyBindings.getQuestJournalKeyBinding(),
@@ -279,7 +289,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                         return new HudPlacementPage();
                     }
                 });
-        WindowPages.register(ServerSettingsPage.PAGE_ID,
+        // The server's settings open once: their changes wait as one set.
+        WindowPages.registerOnce(ServerSettingsPage.PAGE_ID,
                 "gui.losttales.page.server_settings", ServerSettingsPage.ICON,
                 null, PageCategory.SETTINGS, new WindowPages.Factory() {
                     @Override

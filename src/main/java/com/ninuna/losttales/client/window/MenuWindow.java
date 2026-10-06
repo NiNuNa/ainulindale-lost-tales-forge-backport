@@ -11,7 +11,6 @@ import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
-import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
@@ -542,6 +541,8 @@ public final class MenuWindow extends SubWindowContent {
      */
     private double renderedScrollPixels;
     private long scrollNanos;
+    /** Whether the chosen row is to be scrolled into the band as the menu is next drawn. */
+    private boolean revealChosen;
     /**
      * The field above the rows — the windows' one text field, caret,
      * selection and clipboard and all — or null for a menu without one.
@@ -1149,6 +1150,14 @@ public final class MenuWindow extends SubWindowContent {
         return this.fieldIcon.getWidth() + TabIcons.GAP;
     }
 
+    /** The row under the point, takeable or not; null for none. */
+    public Entry rowAt(LostTalesUiHitBox box, double x, double y) {
+        Layout at = layOut(box);
+        clampScroll(at);
+        int index = rowIndexAt(at, x, y);
+        return index < 0 ? null : this.entries.get(index);
+    }
+
     /**
      * A row the menu takes, or the menu's bare content, which says why a
      * row it keeps in its place cannot be taken.
@@ -1176,6 +1185,29 @@ public final class MenuWindow extends SubWindowContent {
             }
         }
         return hover;
+    }
+
+    /** Scrolls the first chosen row into the band as the menu is next drawn: the keys walked to it. */
+    void revealChosen() {
+        this.revealChosen = true;
+    }
+
+    /** Moves the target just far enough that the first chosen row stands whole in the band. */
+    private void reveal(Layout at) {
+        int[] tops = rowTops();
+        for (int index = 0; index < this.entries.size(); index++) {
+            if (!this.entries.get(index).chosen) {
+                continue;
+            }
+            if (tops[index] < this.scrollPixels) {
+                this.scrollPixels = tops[index];
+            } else if (tops[index + 1] > this.scrollPixels + at.band()) {
+                this.scrollPixels = tops[index + 1] - at.band();
+            }
+            this.scrollPixels = Math.max(0.0D,
+                    Math.min(maxScroll(at), this.scrollPixels));
+            return;
+        }
     }
 
     /**
@@ -1232,6 +1264,10 @@ public final class MenuWindow extends SubWindowContent {
         FontRenderer font = minecraft.fontRenderer;
         Layout at = layOut(box);
         clampScroll(at);
+        if (this.revealChosen) {
+            this.revealChosen = false;
+            reveal(at);
+        }
         advanceScrollEasing();
         long now = System.nanoTime();
         double elapsed = this.spriteNanos == 0L ? 0.0D
@@ -1334,6 +1370,12 @@ public final class MenuWindow extends SubWindowContent {
             drawGroup(minecraft, font, at, entry, labelTop, alpha);
             return;
         }
+        // A row that cannot be taken is greyed as every control is: its
+        // colour, its icon and its words at half strength, each in its
+        // own colour, and nothing lights under the pointer.
+        boolean greyed = entry.unavailable.length() > 0 || entry.held;
+        int markAlpha = greyed
+                ? Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY) : alpha;
         if (entry.color >= 0) {
             // The channel's colour as a one-pixel upright bar the height
             // of the row's text; a palette row's as a chip the width of
@@ -1342,17 +1384,16 @@ public final class MenuWindow extends SubWindowContent {
                     at.left + PADDING_X
                             + (entry.chip ? this.swatchWidth : SWATCH_WIDTH),
                     rowY + rowHeight() - 1,
-                    LostTalesUiInk.argb(entry.color, alpha));
+                    LostTalesUiInk.argb(entry.color, markAlpha));
         }
-        drawRowIcon(minecraft, at, entry, labelTop, hovered, elapsed, alpha);
-        int labelRgb = entry.unavailable.length() > 0 || entry.held
-                ? WindowStyle.asideRgb()
-                : entry.labelColor >= 0 ? entry.labelColor
+        drawRowIcon(minecraft, at, entry, labelTop, hovered && !greyed,
+                elapsed, markAlpha);
+        int labelRgb = entry.labelColor >= 0 ? entry.labelColor
                 : LostTalesUiInk.IVORY;
         if (entry.icon != null) {
             labelRgb = LostTalesUiInk.blend(labelRgb,
                     entry.icon.tone(),
-                    labelFade(entry, hovered, elapsed));
+                    labelFade(entry, hovered && !greyed, elapsed));
         }
         int labelLeft = at.left + this.labelX;
         int right = at.left + at.width - PADDING_X;
@@ -1361,11 +1402,11 @@ public final class MenuWindow extends SubWindowContent {
             drawStepper(font, entry, right, labelTop, hovered
                     ? stepperPartAt(pointerX, pointerY, right, rowY,
                             rowHeight(), stepperTextWidth(font, entry))
-                    : null, alpha);
+                    : null, markAlpha);
             right = (int)Math.floor(right - value) - VALUE_GAP;
         } else if (value > 0.0F) {
             drawValue(minecraft, font, entry, right - value, rowY, labelTop,
-                    alpha);
+                    markAlpha);
             right = (int)Math.floor(right - value) - VALUE_GAP;
         }
         if (entry.labelStyle != null) {
@@ -1373,12 +1414,12 @@ public final class MenuWindow extends SubWindowContent {
             // line longer than the window at its edge.
             entry.labelStyle.draw(minecraft, font, entry.label,
                     entry.dim ? "§o" : "", labelLeft, labelTop, labelRgb,
-                    alpha);
+                    markAlpha);
         } else {
             String label = trimmed(font, entry.label, right - labelLeft);
             LostTalesUiInk.drawText(font,
                     entry.dim ? "§o" + label : label, labelLeft, labelTop,
-                    labelRgb, alpha);
+                    labelRgb, markAlpha);
         }
     }
 
@@ -1620,23 +1661,10 @@ public final class MenuWindow extends SubWindowContent {
             LostTalesUiButton.drawGlyph(sprite, lit, motion, x, top, alpha);
             return;
         }
-        // At its bound the chevron stands as a flat shape in the aside
-        // tone, as a row that cannot be taken is worded, over its shadow.
-        LostTalesUiFlatLayers.draw(alpha, x, top,
-                x + sprite.getWidth() + LostTalesUiInk.SHADOW_OFFSET,
-                top + sprite.getHeight() + LostTalesUiInk.SHADOW_OFFSET,
-                new LostTalesUiFlatLayers.Layers() {
-                    @Override
-                    public void draw() {
-                        sprite.drawSilhouette(LostTalesUiInk.SHADOW,
-                                x + LostTalesUiInk.SHADOW_OFFSET,
-                                top + LostTalesUiInk.SHADOW_OFFSET,
-                                LostTalesUiInk.shadowAlpha(alpha));
-                        LostTalesUiFlatLayers.nextLayer();
-                        sprite.drawSilhouette(WindowStyle.asideRgb(), x, top,
-                                alpha);
-                    }
-                });
+        // At its bound the chevron is greyed as every control is: still,
+        // at half strength, over its shadow as one picture.
+        LostTalesUiSheet.drawPairWithShadow(sprite, sprite, 0.0F, x, top,
+                Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY));
     }
 
     /**

@@ -30,6 +30,7 @@ public final class ToolStripTest {
     private static final int AREA_HEIGHT = LostTalesUiSheet.AREA.getHeight();
     private static final int HELP_WIDTH = LostTalesUiSheet.QUESTION.getWidth();
     private static final int SPLIT_WIDTH = LostTalesUiSheet.SPLIT.getWidth();
+    private static final int DUPLICATE_WIDTH = LostTalesUiSheet.COPY.getWidth();
 
     /** A conversation's strip, the timestamp area's person at its left. */
     private static ToolStrip.Layout conversation(int right,
@@ -61,7 +62,8 @@ public final class ToolStripTest {
                 - LostTalesUiSheet.MEMBERS.getWidth(), laid.membersX);
         assertEquals(laid.membersX - END_GAP
                 - LostTalesUiSheet.FULLSCREEN.getWidth(), laid.viewX);
-        assertEquals(laid.viewX - END_GAP - SPLIT_WIDTH, laid.splitX);
+        assertEquals(laid.viewX - END_GAP - DUPLICATE_WIDTH, laid.duplicateX);
+        assertEquals(laid.duplicateX - END_GAP - SPLIT_WIDTH, laid.splitX);
         assertEquals(laid.splitX - END_GAP - LostTalesUiSheet.COG.getWidth(),
                 laid.settingsX);
     }
@@ -96,7 +98,9 @@ public final class ToolStripTest {
      */
     @Test
     public void aNarrowStripPutsTheLastOptionsBehindItsOverflow() {
-        ToolStrip.Layout narrow = conversation(100, ToolStrip.Count.NONE);
+        // As narrow as the strip was before the duplicate button, plus its room.
+        ToolStrip.Layout narrow = conversation(100 + DUPLICATE_WIDTH + END_GAP,
+                ToolStrip.Count.NONE);
         int after = narrow.panelX + narrow.panelWidth;
         ToolStrip.layOptions(narrow, threeOptions(), after, true);
         assertTrue(narrow.options.length < 3);
@@ -184,14 +188,15 @@ public final class ToolStripTest {
         ToolStrip.Layout chat = conversation(400, ToolStrip.Count.NONE);
         assertFalse(page.hasMembers);
         // The same well and help; the full window button stands where the
-        // member list's button would, and the split view button, the cog
-        // and the options follow it.
+        // member list's button would, and the duplicate button, the split
+        // view button, the cog and the options follow it.
         assertEquals(chat.wellLeft, page.wellLeft);
         assertEquals(chat.wellRight, page.wellRight);
         assertEquals(chat.helpX, page.helpX);
         assertEquals(page.wellLeft - END_GAP
                 - LostTalesUiSheet.FULLSCREEN.getWidth(), page.viewX);
-        assertEquals(page.viewX - END_GAP - SPLIT_WIDTH, page.splitX);
+        assertEquals(page.viewX - END_GAP - DUPLICATE_WIDTH, page.duplicateX);
+        assertEquals(page.duplicateX - END_GAP - SPLIT_WIDTH, page.splitX);
         assertEquals(page.splitX - END_GAP - LostTalesUiSheet.COG.getWidth(),
                 page.settingsX);
         assertEquals(3 + Math.floorDiv(15 - questWidth, 2), page.panelX);

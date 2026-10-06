@@ -785,7 +785,7 @@ public final class ChatHistoryTest {
         both.put(GONDOR, Long.valueOf(SENT_AT - 1L));
         both.put("MORDOR", Long.valueOf(SENT_AT - 1L));
         List<LostTalesChatMessagePacket> lines = ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, both, null, EVERY_CHANNEL),
+                new ChatHistory.Requester(CAROL, both, null, EVERY_CHANNEL, null),
                 ChatMessageIds.NONE);
         assertEquals(2, lines.size());
 
@@ -793,7 +793,7 @@ public final class ChatHistoryTest {
         java.util.Map<String, Long> gondorOnly = new java.util.HashMap<String, Long>();
         gondorOnly.put(GONDOR, Long.valueOf(SENT_AT - 1L));
         List<LostTalesChatMessagePacket> gondor = ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, gondorOnly, null, EVERY_CHANNEL),
+                new ChatHistory.Requester(CAROL, gondorOnly, null, EVERY_CHANNEL, null),
                 ChatMessageIds.NONE);
         assertEquals(1, gondor.size());
         assertEquals(gondorLine, gondor.get(0).getMessageId());
@@ -805,7 +805,7 @@ public final class ChatHistoryTest {
         laterMordor.put(GONDOR, Long.valueOf(SENT_AT - 1L));
         laterMordor.put("MORDOR", Long.valueOf(SENT_AT + 1L));
         List<LostTalesChatMessagePacket> mixed = ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, laterMordor, null, EVERY_CHANNEL),
+                new ChatHistory.Requester(CAROL, laterMordor, null, EVERY_CHANNEL, null),
                 ChatMessageIds.NONE);
         assertEquals(1, mixed.size());
         assertEquals(gondorLine, mixed.get(0).getMessageId());
@@ -838,7 +838,7 @@ public final class ChatHistoryTest {
         java.util.Map<String, Long> gondor = new java.util.HashMap<String, Long>();
         gondor.put(GONDOR, Long.valueOf(SENT_AT - 1L));
         ChatHistory.Requester requester =
-                new ChatHistory.Requester(CAROL, gondor, null, EVERY_CHANNEL);
+                new ChatHistory.Requester(CAROL, gondor, null, EVERY_CHANNEL, null);
 
         List<LostTalesChatMessagePacket> all = ChatHistory.replayForContext(
                 requester, ChatChannel.FACTION, GONDOR, ChatMessageIds.NONE);
@@ -975,9 +975,9 @@ public final class ChatHistoryTest {
         assertNull("the same reaction twice changes nothing",
                 ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true));
 
-        ChatReactionSummary forBob = ChatHistory.reactionsFor(id, BOB);
-        assertTrue(forBob.find("smile").mine);
-        assertFalse(ChatHistory.reactionsFor(id, ALICE).find("smile").mine);
+        ChatReactionSummary forBob = ChatHistory.reactionsFor(id, Collections.singleton(BOB));
+        assertTrue(forBob.find("smile").isMine(BOB));
+        assertFalse(ChatHistory.reactionsFor(id, Collections.singleton(ALICE)).find("smile").isMine(ALICE));
     }
 
     @Test
@@ -1000,7 +1000,7 @@ public final class ChatHistoryTest {
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true);
         assertNotNull(ChatHistory.applyEdit(id, ALICE, "hail, friends", "", NOBODY));
-        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("smile").count);
+        assertEquals(1, ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("smile").count);
     }
 
     @Test
@@ -1015,7 +1015,7 @@ public final class ChatHistoryTest {
         ChatReactionSummary.Reaction smile =
                 replay.get(0).getReactions().find("smile");
         assertNotNull(smile);
-        assertFalse(smile.mine);
+        assertFalse(smile.isMine(CAROL));
         assertEquals("Aldric", smile.names.get(0));
 
         // Carol was handed the line, so a reaction made later reaches her.
@@ -1036,7 +1036,7 @@ public final class ChatHistoryTest {
         assertFalse(change.readers.contains(member));
         ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true);
         assertNotNull(ChatHistory.clearDiscordReactions(id, null, "", "7"));
-        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("smile").count);
+        assertEquals(1, ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("smile").count);
         assertNull(ChatHistory.clearDiscordReactions(id, null, "", "7"));
     }
 
@@ -1056,8 +1056,8 @@ public final class ChatHistoryTest {
         assertFalse(change.before.players());
         assertTrue("the first player", change.after.players());
         assertNotNull(ChatHistory.clearDiscordReactions(id, parrot, "556", "7"));
-        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find(parrot).count);
-        assertTrue(ChatHistory.reactionsFor(id, BOB).find(parrot).mine);
+        assertEquals(1, ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find(parrot).count);
+        assertTrue(ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find(parrot).isMine(BOB));
     }
 
     /** The custom emoji pepe:556 renamed on Discord to pepe_happy keeps its id. */
@@ -1073,19 +1073,19 @@ public final class ChatHistoryTest {
         assertNotNull("a reaction after the rename joins the chip",
                 ChatHistory.reactFromDiscord(id, second, "Ana",
                         "pepe_happy:556", "556", "7", true));
-        assertEquals(2, ChatHistory.reactionsFor(id, BOB).find("pepe:556").count);
-        assertNull(ChatHistory.reactionsFor(id, BOB).find("pepe_happy:556"));
+        assertEquals(2, ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("pepe:556").count);
+        assertNull(ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("pepe_happy:556"));
 
         assertNotNull("a removal after the rename finds it",
                 ChatHistory.reactFromDiscord(id, first, "", "pepe_happy:556",
                         "556", "7", false));
-        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("pepe:556").count);
+        assertEquals(1, ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("pepe:556").count);
         assertNull("a member with no reaction takes nothing back",
                 ChatHistory.reactFromDiscord(id, first, "", null, "556", "7", false));
 
         assertNotNull("a removal without a name finds it by the id",
                 ChatHistory.reactFromDiscord(id, second, "", null, "556", "7", false));
-        assertNull(ChatHistory.reactionsFor(id, BOB).find("pepe:556"));
+        assertNull(ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("pepe:556"));
     }
 
     @Test
@@ -1102,8 +1102,8 @@ public final class ChatHistoryTest {
 
         assertNotNull(ChatHistory.clearDiscordReactions(id, "pepe_happy:556",
                 "556", "7"));
-        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("pepe:556").count);
-        assertTrue(ChatHistory.reactionsFor(id, BOB).find("pepe:556").mine);
+        assertEquals(1, ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("pepe:556").count);
+        assertTrue(ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("pepe:556").isMine(BOB));
         assertNull("nothing of Discord's left to clear",
                 ChatHistory.clearDiscordReactions(id, null, "556", "7"));
     }

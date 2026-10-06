@@ -15,33 +15,31 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * The server's answer to a chat identity selection: the identity it now
- * holds for the player, and the fellowships of the character they play as
- * the chat sees them, the one they travel with first: each one's id, name
- * and the colour worn in it, which name and colour its conversation.
+ * The server's word on whom the player reads the chat as: the characters
+ * it kept of those the copies read as besides the one played, and the
+ * fellowships of the character played as the chat sees them, the one
+ * they travel with first: each one's id, name and the colour worn in it,
+ * which name and colour its conversation.
  */
 public final class LostTalesChatIdentitySyncPacket implements IMessage {
     /** A fellowship's name in UTF-8: its most characters, at four bytes each at most. */
     static final int MAX_FELLOWSHIP_NAME_BYTES = Fellowship.MAX_NAME_LENGTH * 4;
-    /** The optional id, the count, each fellowship's id, colour and name, the voice's flag. */
-    private static final int MAX_PACKET_BYTES = 17 + 1
-            + Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY * (16 + 4 + 2 + MAX_FELLOWSHIP_NAME_BYTES)
-            + 1;
+    /** The characters read as and their count, then each fellowship's id, colour and name and their count. */
+    private static final int MAX_PACKET_BYTES = 1 + LostTalesChatIdentityPacket.MAX_READ * 16
+            + 1 + Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY * (16 + 4 + 2 + MAX_FELLOWSHIP_NAME_BYTES);
 
-    private UUID characterId;
+    private List<UUID> characterIds = Collections.emptyList();
     private List<ChatFellowship> fellowships = Collections.emptyList();
-    /** Whether the Narrator's voice is taken up over the identity. */
-    private boolean narrating;
     private boolean malformed;
 
     public LostTalesChatIdentitySyncPacket() {}
 
-    public LostTalesChatIdentitySyncPacket(UUID characterId, List<ChatFellowship> fellowships,
-                                           boolean narrating) {
-        this.characterId = characterId;
+    public LostTalesChatIdentitySyncPacket(List<UUID> characterIds,
+                                           List<ChatFellowship> fellowships) {
+        this.characterIds = characterIds == null ? Collections.<UUID>emptyList()
+                : Collections.unmodifiableList(new ArrayList<UUID>(characterIds));
         this.fellowships = fellowships == null ? Collections.<ChatFellowship>emptyList()
                 : Collections.unmodifiableList(new ArrayList<ChatFellowship>(fellowships));
-        this.narrating = narrating;
         validate();
     }
 
@@ -52,7 +50,15 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
             if (buffer == null || buffer.readableBytes() > MAX_PACKET_BYTES) {
                 throw new LostTalesPacketCodec.DecodeException("invalid chat identity sync size");
             }
-            this.characterId = readId(buffer);
+            int readCount = buffer.readUnsignedByte();
+            if (readCount > LostTalesChatIdentityPacket.MAX_READ) {
+                throw new LostTalesPacketCodec.DecodeException("too many identities");
+            }
+            List<UUID> ids = new ArrayList<UUID>(readCount);
+            for (int index = 0; index < readCount; index++) {
+                ids.add(new UUID(buffer.readLong(), buffer.readLong()));
+            }
+            this.characterIds = Collections.unmodifiableList(ids);
             int count = buffer.readUnsignedByte();
             if (count > Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY) {
                 throw new LostTalesPacketCodec.DecodeException("too many fellowships");
@@ -69,18 +75,12 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
                 read.add(new ChatFellowship(id, name, color));
             }
             this.fellowships = Collections.unmodifiableList(read);
-            int voice = buffer.readUnsignedByte();
-            if (voice > 1) {
-                throw new LostTalesPacketCodec.DecodeException("invalid narrator flag");
-            }
-            this.narrating = voice == 1;
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException failure) {
             this.malformed = true;
-            this.characterId = null;
+            this.characterIds = Collections.emptyList();
             this.fellowships = Collections.emptyList();
-            this.narrating = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -88,7 +88,11 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
     @Override
     public void toBytes(ByteBuf buffer) {
         validate();
-        writeId(buffer, this.characterId);
+        buffer.writeByte(this.characterIds.size());
+        for (UUID id : this.characterIds) {
+            buffer.writeLong(id.getMostSignificantBits());
+            buffer.writeLong(id.getLeastSignificantBits());
+        }
         buffer.writeByte(this.fellowships.size());
         for (ChatFellowship fellowship : this.fellowships) {
             buffer.writeLong(fellowship.getId().getMostSignificantBits());
@@ -97,27 +101,10 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer, fellowship.getName(),
                     MAX_FELLOWSHIP_NAME_BYTES);
         }
-        buffer.writeBoolean(this.narrating);
-    }
-
-    /** An id behind a presence byte that is exactly 0 or 1. */
-    private static UUID readId(ByteBuf buffer) {
-        int present = buffer.readUnsignedByte();
-        if (present > 1) {
-            throw new LostTalesPacketCodec.DecodeException("invalid identity flag");
-        }
-        return present == 0 ? null : new UUID(buffer.readLong(), buffer.readLong());
-    }
-
-    private static void writeId(ByteBuf buffer, UUID id) {
-        buffer.writeBoolean(id != null);
-        if (id != null) {
-            buffer.writeLong(id.getMostSignificantBits());
-            buffer.writeLong(id.getLeastSignificantBits());
-        }
     }
 
     private void validate() {
+        LostTalesChatIdentityPacket.validate(this.characterIds);
         if (this.fellowships.size() > Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY) {
             throw new IllegalArgumentException("too many fellowships");
         }
@@ -131,18 +118,14 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
         }
     }
 
-    public UUID getCharacterId() {
-        return this.characterId;
+    /** The characters the server keeps as read besides the one played. */
+    public List<UUID> getCharacterIds() {
+        return this.characterIds;
     }
 
     /** The fellowships of the character played, the one travelled with first. */
     public List<ChatFellowship> getFellowships() {
         return this.fellowships;
-    }
-
-    /** Whether the Narrator's voice is taken up over the identity. */
-    public boolean isNarrating() {
-        return this.narrating;
     }
 
     public boolean isMalformed() {

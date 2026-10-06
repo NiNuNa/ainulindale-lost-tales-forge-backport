@@ -81,7 +81,7 @@ public final class ChatColumnTimeTest {
 
     private static ChatLine reactions(int id) {
         ChatComponentText row = new ChatComponentText("");
-        row.appendSibling(ChatReactionMarker.create("smile", 1, false, 1L, 6));
+        row.appendSibling(ChatReactionMarker.create("smile", 1, java.util.Collections.<java.util.UUID>emptyList(), 1L, 6));
         return new ChatLine(0, row, id);
     }
 }

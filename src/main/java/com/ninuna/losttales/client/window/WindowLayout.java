@@ -14,7 +14,10 @@ import java.util.Set;
  * each holds in what order, which tab is in front, whether a window is
  * locked, where each window sits and how big it is, and which window
  * stands in front of which. A tab lives in at most one window, and a page
- * opens in a window of its category ({@link PageCategory}). Every window is equal: one that loses its last
+ * opens in a window of its category ({@link PageCategory}). A page may
+ * stand open more than once, each copy a tab of its own; asked about a
+ * page, the layout answers with the copy used last ({@link #lastUsed}).
+ * Every window is equal: one that loses its last
  * tab disappears, and the layout with no windows left at all is a valid
  * state. Windows stand on their own: one dragged against another's edge
  * lines up with it and stays where it was put.
@@ -63,6 +66,22 @@ public final class WindowLayout {
     private static Runnable changeListener;
     /** What lays the windows out for a new player; see {@link #reset}. */
     private static Runnable defaults;
+    /** The pages a category's first window opens with besides the one asked for. */
+    private static final Map<PageCategory, FirstPages> FIRST_PAGES =
+            new EnumMap<PageCategory, FirstPages>(PageCategory.class);
+
+    /** The pages a category's first window opens with: the chat's Global and OOC. */
+    public interface FirstPages {
+        List<? extends WindowPage> pages();
+    }
+
+    /** Gives a category the pages its first window opens with, besides the one asked for. */
+    public static synchronized void setFirstPages(PageCategory category,
+                                                  FirstPages pages) {
+        if (category != null) {
+            FIRST_PAGES.put(category, pages);
+        }
+    }
 
     static {
         reset();
@@ -99,18 +118,19 @@ public final class WindowLayout {
      * Adds a window holding {@code tabs}, {@code active} in front, as a
      * category's first window stands: at the default place, filling the
      * part of the screen its category's first window fills
-     * ({@link PageCategory#firstFill}), and locked. How a system lays out
-     * its windows for a new player, how a category with no window opens
-     * one, and how tabs a loaded layout placed nowhere find a home. These
-     * are the only windows that open locked. Null with no tabs; a tab
-     * already open elsewhere stays where it is.
+     * ({@link PageCategory#firstFill}), and locked but the menu's
+     * ({@link PageCategory#firstLocked}). How a system lays out its windows
+     * for a new player, how a category with no window opens one, and how
+     * tabs a loaded layout placed nowhere find a home. These are the only
+     * windows that open locked. Null with no tabs; a tab already open
+     * elsewhere stays where it is.
      */
     public static synchronized Window addWindow(List<? extends WindowPage> tabs,
                                                 WindowPage active) {
         List<WindowPage> fresh = new ArrayList<WindowPage>();
         if (tabs != null) {
             for (WindowPage tab : tabs) {
-                if (tab != null && !isOpen(tab) && !fresh.contains(tab)) {
+                if (tab != null && !holds(tab) && !fresh.contains(tab)) {
                     fresh.add(tab);
                 }
             }
@@ -119,10 +139,11 @@ public final class WindowLayout {
             return null;
         }
         Window window = newWindow();
-        window.setLocked(true);
         window.tabs().addAll(fresh);
         window.setActiveTab(active);
-        Place place = CATEGORY_PLACES.get(categoryOf(window));
+        PageCategory category = categoryOf(window);
+        window.setLocked(category == null || category.firstLocked());
+        Place place = CATEGORY_PLACES.get(category);
         if (place == null || !staysPut(window.getActiveTab())) {
             window.setFill(firstFillOf(window));
         } else {
@@ -211,14 +232,12 @@ public final class WindowLayout {
      * page.
      */
     public static synchronized Window showPage(OtherPage page) {
-        if (page == null) {
+        WindowPage shown = openInCategory(page, null);
+        if (shown == null) {
             return null;
         }
-        if (openInCategory(page, null) == null) {
-            return null;
-        }
-        Window holding = windowOf(page);
-        holding.setActiveTab(page);
+        Window holding = windowOf(shown);
+        holding.setActiveTab(shown);
         raise(holding.getId());
         changed();
         return holding;
@@ -240,15 +259,138 @@ public final class WindowLayout {
         if (tab == null) {
             return null;
         }
-        Window existing = windowOf(tab);
-        if (existing != null) {
-            return existing.getTabs().get(existing.getTabs().indexOf(tab));
+        WindowPage open = lastUsed(tab);
+        if (open != null) {
+            return open;
         }
+        return placeInCategory(tab, askedWindowId);
+    }
+
+    /**
+     * Opens a new copy of {@code tab}'s page where a page opened by hand
+     * opens ({@link #openInCategory}), however many copies stand open
+     * already: the menu's way, Page Search's and Duplicate Page's. A page
+     * that opens once is brought forward instead. Answers the copy; null
+     * for none.
+     */
+    public static synchronized WindowPage openCopy(WindowPage tab,
+                                                   String askedWindowId) {
+        WindowPage copy = freshCopy(tab);
+        return copy == null ? openInCategory(tab, askedWindowId)
+                : placeInCategory(copy, askedWindowId);
+    }
+
+    /**
+     * Opens a new copy of {@code tab}'s page at the end of a window's row,
+     * in front, whatever the window's kind: the {@code +}'s new page. A
+     * locked window, or one with no room, has it open in a new window a
+     * step on from it, unlocked and in front. Null for no such window.
+     */
+    public static synchronized WindowPage openCopyIn(WindowPage tab,
+                                                     String windowId) {
+        Window window = window(windowId);
+        WindowPage copy = freshCopy(tab);
+        if (window == null || copy == null) {
+            return null;
+        }
+        if (!takes(window, Collections.singletonList(copy))) {
+            return openInNewWindow(copy, window);
+        }
+        window.tabs().add(copy);
+        window.setActiveTab(copy);
+        changed();
+        return copy;
+    }
+
+    /**
+     * Opens another copy of {@code tab}'s page right after it, in front, as
+     * Chrome's Duplicate does: a view of its own of the same page. A
+     * locked window, or one with no room, has it open where a page opened
+     * by hand from there would. Null for a page that opens once.
+     */
+    public static synchronized WindowPage duplicate(WindowPage tab) {
+        Window window = exactWindowOf(tab);
+        if (window == null || !tab.opensMoreThanOnce()) {
+            return null;
+        }
+        WindowPage copy = freshCopy(tab);
+        if (copy == null) {
+            return null;
+        }
+        copy.duplicatedFrom(tab);
+        if (!takes(window, Collections.singletonList(copy))) {
+            return placeInCategory(copy, window.getId());
+        }
+        window.tabs().add(window.tabs().indexOf(tab) + 1, copy);
+        window.setActiveTab(copy);
+        settleSplits(window);
+        changed();
+        return copy;
+    }
+
+    /**
+     * Puts a new copy of {@code page}'s page in {@code old}'s place, in
+     * front, and closes {@code old}: a page picked on a menu tab takes the
+     * menu's place, whatever the window's category, as a tab carried there
+     * by hand may. Refused in a locked window and for a tab no window
+     * holds. Answers the copy; null when refused.
+     */
+    public static synchronized WindowPage replaceTab(WindowPage old,
+                                                     WindowPage page) {
+        Window window = old == null ? null : exactWindowOf(old);
+        WindowPage copy = freshCopy(page);
+        if (window == null || window.isLocked() || copy == null) {
+            return null;
+        }
+        int index = window.tabs().indexOf(old);
+        window.tabs().set(index, copy);
+        for (int at = 0; at < window.splits().size(); at++) {
+            WindowSplit split = window.splits().get(at);
+            if (old.equals(split.first()) || old.equals(split.second())) {
+                window.splits().set(at, split.replacing(old, copy));
+            }
+        }
+        window.setActiveTab(copy);
+        settleSplits(window);
+        changed();
+        return copy;
+    }
+
+    /**
+     * A copy of {@code tab}'s page no window holds: the first free number,
+     * starting afresh past the first. The page itself for a page that
+     * opens once and stands nowhere; null for one open already.
+     */
+    private static WindowPage freshCopy(WindowPage tab) {
+        if (tab == null) {
+            return null;
+        }
+        WindowPage first = tab.firstInstance();
+        if (!first.opensMoreThanOnce()) {
+            return holds(first) ? null : first;
+        }
+        for (int instance = 1; instance <= WindowPage.MAX_INSTANCE; instance++) {
+            WindowPage copy = first.withInstance(instance);
+            if (copy != null && !holds(copy)) {
+                copy.forgetCopy();
+                return copy;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Where a page opened by hand goes: the window asked for while it holds
+     * pages of its category and takes it, else where its category keeps
+     * its pages ({@link #openInCategory}).
+     */
+    private static WindowPage placeInCategory(WindowPage tab,
+                                              String askedWindowId) {
         Window asked = window(askedWindowId);
         Window window = receivingWindow(
                 asked != null && holdsKindOf(asked, tab) ? asked : null, tab);
         if (window == null) {
-            Window first = addWindow(Collections.singletonList(tab), tab);
+            Window first = addWindow(firstPagesWith(tab), tab);
             raise(first.getId());
             changed();
             return tab;
@@ -259,6 +401,26 @@ public final class WindowLayout {
         }
         changed();
         return tab;
+    }
+
+    /**
+     * The pages a category's first window opens with: those its category
+     * gives ({@link #setFirstPages}) that no window holds, then {@code tab}.
+     */
+    private static List<WindowPage> firstPagesWith(WindowPage tab) {
+        List<WindowPage> pages = new ArrayList<WindowPage>();
+        FirstPages first = FIRST_PAGES.get(tab.category().home());
+        if (first != null) {
+            for (WindowPage page : first.pages()) {
+                if (page != null && !isOpen(page) && !pages.contains(page)) {
+                    pages.add(page);
+                }
+            }
+        }
+        if (!pages.contains(tab)) {
+            pages.add(tab);
+        }
+        return pages;
     }
 
     /** Whether the window has a page in front. */
@@ -341,8 +503,21 @@ public final class WindowLayout {
 
     /* ---- Tabs ---- */
 
-    /** The window holding the tab, or null when it is closed. */
+    /**
+     * The window holding the tab, or, while that copy is closed, the window
+     * of the copy of its page used last; null when no copy is open.
+     */
     public static synchronized Window windowOf(WindowPage tab) {
+        Window exact = exactWindowOf(tab);
+        if (exact != null || tab == null) {
+            return exact;
+        }
+        WindowPage copy = lastUsed(tab);
+        return copy == null ? null : exactWindowOf(copy);
+    }
+
+    /** The window holding exactly this copy; null when it is closed. */
+    private static Window exactWindowOf(WindowPage tab) {
         if (tab == null) {
             return null;
         }
@@ -354,8 +529,66 @@ public final class WindowLayout {
         return null;
     }
 
+    /** Whether some copy of the tab's page is open. */
     public static synchronized boolean isOpen(WindowPage tab) {
         return windowOf(tab) != null;
+    }
+
+    /** Whether a window holds exactly this copy. */
+    public static synchronized boolean holds(WindowPage tab) {
+        return exactWindowOf(tab) != null;
+    }
+
+    /**
+     * The open copy of {@code tab}'s page used last, whichever copy
+     * {@code tab} is: the copy in the window brought to the front last,
+     * the one in front there first. What a key, a link or a page's news
+     * reaches. Null with no copy open.
+     */
+    public static synchronized WindowPage lastUsed(WindowPage tab) {
+        if (tab == null) {
+            return null;
+        }
+        for (Window window : byRecency()) {
+            WindowPage active = window.getActiveTab();
+            if (active != null && active.isCopyOf(tab)) {
+                return active;
+            }
+            for (WindowPage held : window.tabs()) {
+                if (held.isCopyOf(tab)) {
+                    return held;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Every open copy of {@code tab}'s page, in window and row order. */
+    public static synchronized List<WindowPage> copiesOf(WindowPage tab) {
+        List<WindowPage> copies = new ArrayList<WindowPage>();
+        if (tab == null) {
+            return copies;
+        }
+        for (Window window : WINDOWS) {
+            for (WindowPage held : window.tabs()) {
+                if (held.isCopyOf(tab)) {
+                    copies.add(held);
+                }
+            }
+        }
+        return copies;
+    }
+
+    /**
+     * The copy a request about {@code tab} reaches: the tab itself while a
+     * window holds it, else the copy of its page used last.
+     */
+    private static WindowPage resolved(WindowPage tab) {
+        if (holds(tab)) {
+            return tab;
+        }
+        WindowPage open = lastUsed(tab);
+        return open == null ? tab : open;
     }
 
     /** Every open tab in window order, each window's tabs in row order. */
@@ -388,7 +621,8 @@ public final class WindowLayout {
         if (!isClosable(tab)) {
             return false;
         }
-        removeTab(windowOf(tab), tab);
+        WindowPage held = resolved(tab);
+        removeTab(exactWindowOf(held), held);
         changed();
         return true;
     }
@@ -426,18 +660,6 @@ public final class WindowLayout {
         dropWindow(window);
         changed();
         return true;
-    }
-
-    /** Whether a window holds a tab the view hides now, which the {@code +} offers. */
-    public static synchronized boolean hasHidden() {
-        for (Window window : WINDOWS) {
-            for (WindowPage tab : window.tabs()) {
-                if (tab.isAvailable() && !WindowView.shows(tab)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /** Picks tabs out of the layout; see {@link #removeTabs}. */
@@ -607,10 +829,11 @@ public final class WindowLayout {
         if (tab == null) {
             return null;
         }
-        Window existing = windowOf(tab);
-        if (existing != null) {
+        WindowPage open = lastUsed(tab);
+        if (open != null) {
             // The tab as first opened, with the name's original casing.
-            return existing.getTabs().get(existing.getTabs().indexOf(tab));
+            Window existing = exactWindowOf(open);
+            return existing.getTabs().get(existing.getTabs().indexOf(open));
         }
         Window window = receivingWindow(window(preferredWindowId), tab);
         if (window == null) {
@@ -625,17 +848,19 @@ public final class WindowLayout {
     }
 
     /**
-     * Opens a tab in a window of its own, a step on from the window in
-     * front, unlocked and in front of it: where a page opened beside
-     * another goes when that page's window has no room for it. Refused for
-     * a tab that is already open.
+     * Opens a tab in a window of its own, a step on from {@code reference},
+     * else from the window in front, unlocked and in front of it: where a
+     * new page goes when the window it was asked for takes none. Refused
+     * for a tab a window holds.
      */
-    public static synchronized WindowPage openInNewWindow(WindowPage tab) {
-        if (tab == null || isOpen(tab)) {
+    public static synchronized WindowPage openInNewWindow(WindowPage tab,
+                                                          Window reference) {
+        if (tab == null || holds(tab)) {
             return null;
         }
         Window created = newWindow();
-        cascadeFrom(created, frontWindow());
+        cascadeFrom(created, reference != null && WINDOWS.contains(reference)
+                ? reference : frontWindow());
         created.tabs().add(tab);
         created.setActiveTab(tab);
         WINDOWS.add(created);
@@ -784,8 +1009,10 @@ public final class WindowLayout {
      * split, and where first's window has no room for the second.
      */
     public static synchronized boolean split(WindowPage first, WindowPage second) {
-        Window window = windowOf(first);
-        Window from = windowOf(second);
+        first = resolved(first);
+        second = resolved(second);
+        Window window = exactWindowOf(first);
+        Window from = exactWindowOf(second);
         if (window == null || from == null || first.equals(second)
                 || window.isLocked() || from.isLocked()
                 || window.splitOf(first) != null || from.splitOf(second) != null) {
@@ -804,13 +1031,14 @@ public final class WindowLayout {
 
     /** The split {@code tab} stands in, and its window; refused while it is locked. */
     private static Window splitWindow(WindowPage tab, boolean evenLocked) {
-        Window window = windowOf(tab);
+        Window window = exactWindowOf(tab);
         return window == null || window.splitOf(tab) == null
                 || (window.isLocked() && !evenLocked) ? null : window;
     }
 
     /** The two pages of {@code tab}'s split become two tabs again, side by side in the row. */
     public static synchronized boolean separate(WindowPage tab) {
+        tab = resolved(tab);
         Window window = splitWindow(tab, false);
         if (window == null) {
             return false;
@@ -822,6 +1050,7 @@ public final class WindowLayout {
 
     /** Changes the two sides of {@code tab}'s split round. */
     public static synchronized boolean swapSides(WindowPage tab) {
+        tab = resolved(tab);
         Window window = splitWindow(tab, false);
         if (window == null) {
             return false;
@@ -833,6 +1062,7 @@ public final class WindowLayout {
 
     /** Turns {@code tab}'s split side by side, or one over the other. */
     public static synchronized boolean turnSplit(WindowPage tab, boolean stacked) {
+        tab = resolved(tab);
         Window window = splitWindow(tab, false);
         if (window == null || window.splitOf(tab).isStacked() == stacked) {
             return false;
@@ -849,6 +1079,7 @@ public final class WindowLayout {
      */
     public static synchronized boolean shareSplit(WindowPage tab, double share,
                                                   boolean persist) {
+        tab = resolved(tab);
         Window window = splitWindow(tab, true);
         if (window == null) {
             return false;
@@ -953,7 +1184,8 @@ public final class WindowLayout {
 
     /** Brings a tab to the front of its own window; not a layout change. */
     public static synchronized boolean setActiveTab(WindowPage tab) {
-        Window window = windowOf(tab);
+        tab = resolved(tab);
+        Window window = exactWindowOf(tab);
         if (window == null || tab.equals(window.getActiveTab())) {
             return false;
         }
@@ -1146,7 +1378,7 @@ public final class WindowLayout {
     public static synchronized boolean addTab(String windowId, WindowPage tab) {
         Window window = window(windowId);
         if (tab == null || window == null || window.isLocked()
-                || isOpen(tab)) {
+                || holds(tab)) {
             return false;
         }
         window.tabs().add(tab);
@@ -1168,7 +1400,7 @@ public final class WindowLayout {
             return;
         }
         for (WindowPage tab : tabs) {
-            if (tab != null && !isOpen(tab)) {
+            if (tab != null && !holds(tab)) {
                 window.tabs().add(tab);
             }
         }

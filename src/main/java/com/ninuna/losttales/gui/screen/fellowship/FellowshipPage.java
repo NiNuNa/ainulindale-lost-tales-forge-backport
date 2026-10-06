@@ -1460,7 +1460,7 @@ public final class FellowshipPage extends PageContent {
         }
         final UUID fellowshipId = fellowship.getFellowshipId();
         final long revision = fellowship.getRevision();
-        screen.ask(WindowPages.tab(PAGE_ID),
+        screen.ask(tab(),
                 I18n.format("gui.losttales.fellowship.confirm." + question
                         + ".title", name),
                 I18n.format("gui.losttales.fellowship.confirm." + question

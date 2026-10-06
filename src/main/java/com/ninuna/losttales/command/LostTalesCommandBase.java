@@ -22,7 +22,7 @@ import net.minecraft.util.IChatComponent;
  * {@code chat.losttales.command.<sub-command>.}. Only the usage lines,
  * the command's own syntax, are sent as they are ({@link #usage}).</p>
  */
-public class LostTalesCommandBase extends CommandBase {
+public abstract class LostTalesCommandBase extends CommandBase {
 
     /** The answer when a command run from the console names no player. */
     static final String PLAYER_REQUIRED = "chat.losttales.command.player_required";
@@ -36,11 +36,6 @@ public class LostTalesCommandBase extends CommandBase {
     @Override
     public String getCommandName() {
         return this.commandName;
-    }
-
-    @Override
-    public String getCommandUsage(ICommandSender sender) {
-        return "commands." + LostTalesMetaData.MOD_ID + "." + this.getCommandName() + ".usage";
     }
 
     /**

@@ -45,7 +45,7 @@ public final class ChatPacketFixtures {
                                                    String target,
                                                    boolean typing) {
         return new LostTalesChatTypingPacket(channel, target, typing,
-                LostTalesChatSendPacket.IDENTITY_DEFAULT, null, "", null);
+                LostTalesChatSendPacket.IDENTITY_DEFAULT, null, false, "", null);
     }
 
     /**

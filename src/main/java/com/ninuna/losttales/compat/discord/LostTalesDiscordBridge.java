@@ -1859,12 +1859,13 @@ public final class LostTalesDiscordBridge {
     /**
      * The Discord channels linked to the game channels a player may read
      * now, each once in the links' order; for the Faction channel, only
-     * those linked to the faction the player speaks for.
+     * those linked to a faction the player reads as one of their
+     * identities.
      */
     private static List<String> linkedChannelsReadBy(EntityPlayerMP player,
                                                      DiscordChannelBindings bound) {
         int roles = ChatIdentitySelection.roles(player);
-        String factionId = ChatChannelPolicy.factionOf(ChatIdentitySelection.character(player));
+        Set<String> factionIds = ChatIdentitySelection.readFactions(player);
         Map<ChatChannel, Boolean> readable = new HashMap<ChatChannel, Boolean>();
         List<String> channels = new ArrayList<String>();
         for (DiscordChannelBinding binding : bound.all()) {
@@ -1874,7 +1875,7 @@ public final class LostTalesDiscordBridge {
                     || discordChannelId.length() == 0
                     || channels.contains(discordChannelId)
                     || !DiscordBridgePolicy.isOpenToTheBridge(channel)
-                    || !bound.forGame(channel, factionId).contains(binding)) {
+                    || !boundForAny(bound, channel, factionIds, binding)) {
                 continue;
             }
             Boolean may = readable.get(channel);
@@ -1887,6 +1888,19 @@ public final class LostTalesDiscordBridge {
             }
         }
         return channels;
+    }
+
+    /** Whether the binding links the channel for any of the factions. */
+    private static boolean boundForAny(DiscordChannelBindings bound,
+                                       ChatChannel channel,
+                                       Set<String> factionIds,
+                                       DiscordChannelBinding binding) {
+        for (String factionId : factionIds) {
+            if (bound.forGame(channel, factionId).contains(binding)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

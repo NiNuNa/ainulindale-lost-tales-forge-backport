@@ -27,10 +27,18 @@ final class ChatEmojiPicker extends ChatPickerPanel {
      * it ends the aim.
      */
     private long reactionTarget = ChatMessageIds.NONE;
+    /** The copy the picker was aimed from: a pick reacts as its identity. */
+    private ConversationPage reactionCopy;
 
-    /** Aims the picker at {@code messageId}: every pick reacts to it. */
-    void aimAt(long messageId) {
+    /** Aims the picker at {@code messageId}: every pick reacts to it, as {@code copy}'s identity. */
+    void aimAt(long messageId, ConversationPage copy) {
         this.reactionTarget = messageId;
+        this.reactionCopy = copy;
+    }
+
+    /** The copy the picker was aimed from; null for none known. */
+    ConversationPage reactionCopy() {
+        return this.reactionCopy;
     }
 
     /** The message a pick reacts to, or NONE while the picker inserts. */
@@ -42,6 +50,7 @@ final class ChatEmojiPicker extends ChatPickerPanel {
     public void closed() {
         super.closed();
         this.reactionTarget = ChatMessageIds.NONE;
+        this.reactionCopy = null;
     }
 
     /** The Reactions window comes back with the chat aimed where it was. */

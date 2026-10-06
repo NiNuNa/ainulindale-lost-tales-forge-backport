@@ -695,7 +695,7 @@ public final class WindowBar {
                 int wordLeft = contentLeft + (icon ? TabIcons.SIZE
                         + TabIcons.GAP : 0);
                 LostTalesUiInk.drawText(font, item.label, wordLeft,
-                        textTop(top), wordRgb(item, lit), alpha);
+                        textTop(top), wordRgb(item, lit), iconAlpha);
             }
         } finally {
             if (available) {
@@ -750,11 +750,8 @@ public final class WindowBar {
         return lead;
     }
 
-    /** A button's word: ivory, an ending one red; lit, both ivory; greyed, the aside tone. */
+    /** A button's word: ivory, an ending one red; lit, both ivory. Greyed, it keeps its colour at half strength. */
     static int wordRgb(BarItem item, float lit) {
-        if (!item.isAvailable()) {
-            return WindowStyle.asideRgb();
-        }
         return item.ending ? LostTalesUiInk.blend(
                 LostTalesColors.rgb(LostTalesColors.RED), LostTalesUiInk.IVORY,
                 lit) : LostTalesUiInk.IVORY;

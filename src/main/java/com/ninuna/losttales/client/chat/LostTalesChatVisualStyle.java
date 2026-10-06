@@ -1322,7 +1322,7 @@ public final class LostTalesChatVisualStyle {
         int left = x;
         int top = y - ChatReactionMarker.TEXT_DROP;
         int accent = LostTalesColors.rgb(LostTalesColors.HONEY);
-        float lit = chip.mine ? 1.0F
+        float lit = chip.mineFor(ChatReactionMarker.reader()) ? 1.0F
                 : LostTalesChatPresentation.chipHoverFade(chip, hovered);
         GL11.glPushMatrix();
         try {
@@ -1344,7 +1344,8 @@ public final class LostTalesChatVisualStyle {
             LostTalesUiInk.beginContent();
             LostTalesUiInk.drawText(font, chip.countText(), left + ChatReactionMarker.PAD
                     + ChatReactionMarker.ICON + ChatReactionMarker.GAP, y,
-                    chip.mine && colours ? accent : LostTalesUiInk.IVORY, alpha);
+                    chip.mineFor(ChatReactionMarker.reader()) && colours
+                            ? accent : LostTalesUiInk.IVORY, alpha);
             LostTalesUiFramedButton.drawInk(left, top, chip.width,
                     ChatReactionMarker.HEIGHT, lit, alpha);
         } finally {

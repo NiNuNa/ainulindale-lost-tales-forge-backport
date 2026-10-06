@@ -12,9 +12,9 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 /**
- * The chat identity request and the server's answer to it: every field
- * survives the wire, and nothing short, overlong, trailing or out of
- * range ever applies.
+ * Whom the chat's copies read as and the server's answer to it: every
+ * field survives the wire, and nothing short, overlong, repeated,
+ * trailing or out of range ever applies.
  */
 public final class LostTalesChatIdentityPacketTest {
     private static final UUID CHARACTER = new UUID(1L, 2L);
@@ -23,53 +23,60 @@ public final class LostTalesChatIdentityPacketTest {
     private static final ChatFellowship RANGERS = new ChatFellowship(new UUID(5L, 6L), "Rangers", 0xABCDEF);
 
     @Test
-    public void accountAndCharacterSelectionsRoundTripWithTheVoice() {
-        for (UUID id : new UUID[] {null, CHARACTER}) {
-            for (boolean narrating : new boolean[] {false, true}) {
-                ByteBuf wire = Unpooled.buffer();
-                new LostTalesChatIdentityPacket(id, narrating).toBytes(wire);
-                LostTalesChatIdentityPacket decoded = new LostTalesChatIdentityPacket();
-                decoded.fromBytes(wire);
-                assertFalse(decoded.isMalformed());
-                assertEquals(id, decoded.getCharacterId());
-                assertEquals(narrating, decoded.isNarrating());
-            }
+    public void noneOneAndTheMostCharactersReadRoundTrip() {
+        for (List<UUID> ids : readLists()) {
+            ByteBuf wire = Unpooled.buffer();
+            new LostTalesChatIdentityPacket(ids).toBytes(wire);
+            LostTalesChatIdentityPacket decoded = new LostTalesChatIdentityPacket();
+            decoded.fromBytes(wire);
+            assertFalse(decoded.isMalformed());
+            assertEquals(ids, decoded.getCharacterIds());
         }
     }
 
     @Test
-    public void everyTruncatedSelectionAndInvalidFlagIsRejected() {
+    public void everyTruncatedRepeatedOverlongOrTrailingRequestIsRejected() {
         ByteBuf wire = Unpooled.buffer();
-        new LostTalesChatIdentityPacket(CHARACTER, true).toBytes(wire);
+        new LostTalesChatIdentityPacket(Arrays.asList(CHARACTER, FELLOWSHIP)).toBytes(wire);
         for (int length = 0; length < wire.readableBytes(); length++) {
-            assertBadSelection(wire.copy(0, length));
+            assertBadRequest(wire.copy(0, length));
         }
-        assertBadSelection(Unpooled.buffer().writeByte(2));
-        assertBadSelection(Unpooled.buffer().writeByte(0).writeByte(2));
-        assertBadSelection(Unpooled.buffer().writeByte(0).writeByte(0).writeByte(0));
-        assertBadSelection(wire.copy().writeByte(0));
+        assertBadRequest(wire.copy().writeByte(0));
+        ByteBuf repeated = Unpooled.buffer().writeByte(2);
+        for (int index = 0; index < 2; index++) {
+            repeated.writeLong(CHARACTER.getMostSignificantBits())
+                    .writeLong(CHARACTER.getLeastSignificantBits());
+        }
+        assertBadRequest(repeated);
+        ByteBuf tooMany = Unpooled.buffer().writeByte(LostTalesChatIdentityPacket.MAX_READ + 1);
+        for (int index = 0; index <= LostTalesChatIdentityPacket.MAX_READ; index++) {
+            tooMany.writeLong(index).writeLong(index);
+        }
+        assertBadRequest(tooMany);
+        try {
+            new LostTalesChatIdentityPacket(manyIds(LostTalesChatIdentityPacket.MAX_READ + 1));
+            fail("more characters than the bound were accepted");
+        } catch (IllegalArgumentException expected) {
+            // The bound holds locally too.
+        }
     }
 
     @Test
-    public void membershipRoundTripsForAccountCharacterAndAnyFellowships() {
+    public void theAnswerRoundTripsForAnyCharactersAndFellowships() {
         List<List<ChatFellowship>> lists = new ArrayList<List<ChatFellowship>>();
         lists.add(Collections.<ChatFellowship>emptyList());
         lists.add(Collections.singletonList(GREY));
         lists.add(Arrays.asList(GREY, RANGERS));
-        for (UUID id : new UUID[] {null, CHARACTER}) {
+        for (List<UUID> ids : readLists()) {
             for (List<ChatFellowship> fellowships : lists) {
-                for (boolean narrating : new boolean[] {false, true}) {
-                    ByteBuf wire = Unpooled.buffer();
-                    new LostTalesChatIdentitySyncPacket(id, fellowships, narrating)
-                            .toBytes(wire);
-                    LostTalesChatIdentitySyncPacket decoded =
-                            new LostTalesChatIdentitySyncPacket();
-                    decoded.fromBytes(wire);
-                    assertFalse(decoded.isMalformed());
-                    assertEquals(id, decoded.getCharacterId());
-                    assertEquals(fellowships, decoded.getFellowships());
-                    assertEquals(narrating, decoded.isNarrating());
-                }
+                ByteBuf wire = Unpooled.buffer();
+                new LostTalesChatIdentitySyncPacket(ids, fellowships).toBytes(wire);
+                LostTalesChatIdentitySyncPacket decoded =
+                        new LostTalesChatIdentitySyncPacket();
+                decoded.fromBytes(wire);
+                assertFalse(decoded.isMalformed());
+                assertEquals(ids, decoded.getCharacterIds());
+                assertEquals(fellowships, decoded.getFellowships());
             }
         }
     }
@@ -89,8 +96,8 @@ public final class LostTalesChatIdentityPacketTest {
             // The bound holds locally too.
         }
         ByteBuf wire = Unpooled.buffer();
-        new LostTalesChatIdentitySyncPacket(CHARACTER, Collections.singletonList(GREY), false)
-                .toBytes(wire);
+        new LostTalesChatIdentitySyncPacket(Collections.singletonList(CHARACTER),
+                Collections.singletonList(GREY)).toBytes(wire);
         // The fields before the name, then a length past the bound and
         // that many bytes: a well-formed frame the bound still refuses.
         ByteBuf claimed = wire.copy(0, 38);
@@ -99,47 +106,59 @@ public final class LostTalesChatIdentityPacketTest {
         for (int index = 0; index < length; index++) {
             claimed.writeByte('a');
         }
-        claimed.writeByte(0);
-        assertBadMembership(claimed);
+        assertBadAnswer(claimed);
     }
 
     @Test
-    public void partialInvalidAndTrailingMembershipDataNeverApply() {
+    public void partialInvalidAndTrailingAnswersNeverApply() {
         ByteBuf wire = Unpooled.buffer();
-        new LostTalesChatIdentitySyncPacket(CHARACTER, Collections.singletonList(GREY), true)
-                .toBytes(wire);
+        new LostTalesChatIdentitySyncPacket(Collections.singletonList(CHARACTER),
+                Collections.singletonList(GREY)).toBytes(wire);
         for (int length = 0; length < wire.readableBytes(); length++) {
-            assertBadMembership(wire.copy(0, length));
+            assertBadAnswer(wire.copy(0, length));
         }
-        assertBadMembership(wire.copy().setByte(0, 2));
-        assertBadMembership(wire.copy().setByte(17, 9));
-        assertBadMembership(wire.copy().setInt(34, -1));
-        assertBadMembership(wire.copy().setInt(34, 0x1000000));
-        assertBadMembership(wire.copy().setByte(39, ' '));
-        assertBadMembership(wire.copy().setByte(wire.readableBytes() - 1, 2));
-        assertBadMembership(wire.copy().writeByte(0));
-        ByteBuf account = Unpooled.buffer();
-        new LostTalesChatIdentitySyncPacket(null, Collections.<ChatFellowship>emptyList(), false)
-                .toBytes(account);
-        assertBadMembership(account.writeByte(0));
+        assertBadAnswer(wire.copy().setByte(0, LostTalesChatIdentityPacket.MAX_READ + 1));
+        assertBadAnswer(wire.copy().setByte(17, 9));
+        assertBadAnswer(wire.copy().setInt(34, -1));
+        assertBadAnswer(wire.copy().setInt(34, 0x1000000));
+        assertBadAnswer(wire.copy().setByte(39, ' '));
+        assertBadAnswer(wire.copy().writeByte(0));
+        ByteBuf empty = Unpooled.buffer();
+        new LostTalesChatIdentitySyncPacket(Collections.<UUID>emptyList(),
+                Collections.<ChatFellowship>emptyList()).toBytes(empty);
+        assertBadAnswer(empty.writeByte(0));
     }
 
-    private static void assertBadSelection(ByteBuf wire) {
+    private static List<List<UUID>> readLists() {
+        List<List<UUID>> lists = new ArrayList<List<UUID>>();
+        lists.add(Collections.<UUID>emptyList());
+        lists.add(Collections.singletonList(CHARACTER));
+        lists.add(manyIds(LostTalesChatIdentityPacket.MAX_READ));
+        return lists;
+    }
+
+    private static List<UUID> manyIds(int count) {
+        List<UUID> ids = new ArrayList<UUID>(count);
+        for (int index = 0; index < count; index++) {
+            ids.add(new UUID(100L, index));
+        }
+        return ids;
+    }
+
+    private static void assertBadRequest(ByteBuf wire) {
         LostTalesChatIdentityPacket decoded = new LostTalesChatIdentityPacket();
         decoded.fromBytes(wire);
         assertTrue(decoded.isMalformed());
-        assertNull(decoded.getCharacterId());
-        assertFalse(decoded.isNarrating());
+        assertTrue(decoded.getCharacterIds().isEmpty());
         assertEquals(0, wire.readableBytes());
     }
 
-    private static void assertBadMembership(ByteBuf wire) {
+    private static void assertBadAnswer(ByteBuf wire) {
         LostTalesChatIdentitySyncPacket decoded = new LostTalesChatIdentitySyncPacket();
         decoded.fromBytes(wire);
         assertTrue(decoded.isMalformed());
-        assertNull(decoded.getCharacterId());
+        assertTrue(decoded.getCharacterIds().isEmpty());
         assertTrue(decoded.getFellowships().isEmpty());
-        assertFalse(decoded.isNarrating());
         assertEquals(0, wire.readableBytes());
     }
 }

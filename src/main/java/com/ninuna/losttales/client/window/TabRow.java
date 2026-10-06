@@ -405,7 +405,6 @@ public final class TabRow {
     private int endEdge;
     private float endFraction;
     private boolean cachedShowClose;
-    private boolean cachedShowRestore;
     /** Whether the row being drawn shows its tabs alone ({@link Row#bare}). */
     private boolean bare;
     /** Whether the row being drawn is a locked window's ({@link Row#locked}). */
@@ -521,8 +520,6 @@ public final class TabRow {
     private List<WindowPage> carriedLastFrame = Collections.emptyList();
     /** When the row was last drawn. */
     private long lastFrameNanos;
-    /** Whether the row is showing the restore control at all. */
-    private boolean showRestore;
     private int lockX = -1;
     private int restoreX = -1;
     /**
@@ -641,12 +638,8 @@ public final class TabRow {
          * to its inward ones with it.
          */
         public float fullscreenShare;
-        /** Whether the restore control is offered after the row. */
-        public boolean showRestore;
         /** Whether this row's tab search panel is open right now. */
         public boolean searchOpen;
-        /** Whether this row's restore list is open right now. */
-        public boolean restoreOpen;
         /** The tab of this row whose options are out right now; null for none. */
         public WindowPage optionsOpen;
         /** What waits unread in the closed channels, marked after the +. */
@@ -1048,9 +1041,10 @@ public final class TabRow {
                     row.offsetX + row.left - STRIP_INSET, stripRight, bottom);
             // A window being dragged holds the grip's highlight wherever the
             // pointer has gone, the way a control keeps its pressed look.
+            // A locked window's grip moves nothing, so it never lights.
             this.gripFade = WindowStyle.hoverFade(
-                    this.gripFade, row.moving
-                            || isOverGripHandle(font, row, mouseX, mouseY),
+                    this.gripFade, row.moving || !row.locked
+                            && isOverGripHandle(font, row, mouseX, mouseY),
                     this.frameElapsed);
             // The grip and the window's controls hang from the edge as
             // it really stands: laid out from its whole pixels, drawn
@@ -1061,7 +1055,7 @@ public final class TabRow {
                 if (!row.bare) {
                     drawGrip(row.offsetX + this.controlsRight,
                             row.offsetX + this.endEdge, bottom,
-                            this.gripFade);
+                            this.gripFade, row.locked);
                 }
             } finally {
                 GL11.glPopMatrix();
@@ -1124,16 +1118,10 @@ public final class TabRow {
                 drawDivider(row.offsetX + this.tabDividerX, bottom);
             }
             if (!row.bare && this.restoreX >= 0) {
-                // The control says which way it goes: a + while the
-                // list it opens is away, and the same crossbar without
-                // its upright — a minus — while the list is out.
-                // A locked window's + still opens: what it offers opens
-                // in another window.
-                drawEndControl(
-                        row.restoreOpen ? LostTalesUiSheet.MINUS
-                                : LostTalesUiSheet.PLUS,
-                        row.restoreOpen ? LostTalesUiSheet.MINUS_LIT
-                                : LostTalesUiSheet.PLUS_LIT,
+                // A new page, as a browser's new tab. A locked window's +
+                // still opens: its page opens in another window.
+                drawEndControl(LostTalesUiSheet.PLUS,
+                        LostTalesUiSheet.PLUS_LIT,
                         step(this.restoreMotion, hovered, HitKind.RESTORE),
                         row.offsetX + this.restoreX, bottom, false);
                 if (!this.restoreMark.isNone()) {
@@ -2770,12 +2758,6 @@ public final class TabRow {
      * row is still settling.
      */
     private void placeLeftRun() {
-        if (!this.showRestore) {
-            this.tabDividerX = -1;
-            this.restoreX = -1;
-            this.restoreRunFraction = 0.0F;
-            return;
-        }
         // Whole pixels for hit testing, and the fraction the tabs stand
         // on kept beside them: the run is drawn inside a matrix moved by
         // it, so it travels with the tabs a display pixel at a time
@@ -3338,15 +3320,20 @@ public final class TabRow {
                 lit, scaled(0xFF));
     }
 
-    /** The drag handle at the strip's right end, where a title bar keeps it. */
-    private void drawGrip(int left, int right, int rowBottom, float fade) {
+    /**
+     * The drag handle at the strip's right end, where a title bar keeps it;
+     * greyed and still on a locked window, which it cannot move.
+     */
+    private void drawGrip(int left, int right, int rowBottom, float fade,
+                          boolean held) {
         if (right - left < MIN_GRIP_WIDTH) {
             return;
         }
         LostTalesUiHitBox glyph = gripGlyphBox(right, rowBottom);
         LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.GRIP,
-                LostTalesUiSheet.GRIP_HOVER, fade, (int)glyph.left,
-                (int)glyph.top, scaled(0xFF));
+                LostTalesUiSheet.GRIP_HOVER, held ? 0.0F : fade,
+                (int)glyph.left, (int)glyph.top,
+                heldAlpha(scaled(0xFF), held));
     }
 
     /**
@@ -3383,13 +3370,12 @@ public final class TabRow {
         }
         List<WindowPage> channels = row.tabs;
         int count = channels.size();
-        TabMark restoreMark = row.showRestore ? row.closedMark
-                : TabMark.NONE;
-        // The restore control's run is reserved whether or not the + is
-        // showing, and with its mark: the very room the narrowest window
-        // is bounded by, so a window dragged to that bound shows every
-        // tab at its narrowest and nothing less, and the tabs never
-        // reflow as the + comes and goes.
+        TabMark restoreMark = row.closedMark;
+        // The restore control's run is reserved with room for its mark:
+        // the very room the narrowest window is bounded by, so a window
+        // dragged to that bound shows every tab at its narrowest and
+        // nothing less, and the tabs never reflow as the mark comes and
+        // goes.
         int restoreRun = restoreRunWidth();
         int windowRun = WINDOW_CONTROLS_WIDTH;
         int endControls = restoreRun + END_CONTROL_GAP + windowRun
@@ -3518,9 +3504,8 @@ public final class TabRow {
         // The + opens a channel into this row, so it stands with the
         // tabs; everything that acts on the window itself stands with
         // the grip, against the row's right edge.
-        this.showRestore = row.showRestore;
         this.restoreMark = restoreMark;
-        this.restoreWidth = !row.showRestore ? 0 : PLUS_WIDTH
+        this.restoreWidth = PLUS_WIDTH
                 + (restoreMark.isNone() ? 0 : COUNTER_GAP + restoreMark.width());
         placeLeftRun();
         // The window's own controls hang from the row's right edge, past
@@ -3553,7 +3538,6 @@ public final class TabRow {
         this.cachedRight = row.right;
         this.cachedRightExact = row.rightExact;
         this.cachedShowClose = showClose;
-        this.cachedShowRestore = row.showRestore;
         return this.cachedTabs;
     }
 
@@ -3919,7 +3903,6 @@ public final class TabRow {
                         : row.splitPartner.equals(this.cachedPartner))
                 && row.splitPairs.equals(this.cachedPairs)
                 && showClose == this.cachedShowClose
-                && row.showRestore == this.cachedShowRestore
                 && row.closedMark.equals(this.restoreMark)
                 && row.tabs.equals(this.cachedChannels);
         for (int index = 0; index < row.tabs.size(); index++) {

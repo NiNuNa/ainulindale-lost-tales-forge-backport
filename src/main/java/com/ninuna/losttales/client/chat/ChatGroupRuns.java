@@ -89,7 +89,7 @@ final class ChatGroupRuns {
         // place to the reader, and a line filed under one — this
         // player's own echo, a command's echo — must run on with lines
         // filed under the other.
-        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(ConversationPage.viewed(tab),
+        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(ConversationPage.viewedConversation(tab),
                 senderId, identityName, accountLine, timestampMillis,
                 groupable, groupedLine));
         while (ENTRIES.size() > ClientChatChannelViews.maxTrackedLines()) {

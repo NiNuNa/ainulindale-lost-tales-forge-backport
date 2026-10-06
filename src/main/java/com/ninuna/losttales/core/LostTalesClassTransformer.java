@@ -3808,19 +3808,6 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     }
 
     /**
-     * Opens the server's broadcast seam.
-     *
-     * <p>Every line the whole server sees — death messages, vanilla and
-     * LOTR achievement announcements, joins and leaves, {@code /say} —
-     * goes out through {@code ServerConfigurationManager.sendChatMsg}.
-     * The component is handed to
-     * {@code LostTalesServerBroadcastHook.onBroadcast} at the head of
-     * the method, before it is sent, exactly as every player is about
-     * to receive it; the hook observes and never alters it. Without the
-     * patch the Discord bridge cannot hear of deaths or achievements
-     * and says so when it starts.</p>
-     */
-    /**
      * Patches the head of {@code EntityPlayerMP.addChatMessage}, where
      * every line sent to one player passes, to call
      * {@code LostTalesServerBroadcastHook.onPlayerLine}, which records
@@ -3874,6 +3861,20 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
     }
 
+    /**
+     * Opens the server's broadcast seam.
+     *
+     * <p>Every line the whole server sees — death messages, vanilla and
+     * LOTR achievement announcements, joins and leaves, {@code /say} —
+     * goes out through {@code ServerConfigurationManager.sendChatMsg}.
+     * The component is handed to
+     * {@code LostTalesServerBroadcastHook.onBroadcast} at the head of
+     * the method, and what it hands back is sent: the line with its id
+     * and the players it names, a join or a leave naming the account,
+     * or nothing for a line held back for a moment, and the method
+     * returns there. Without the patch the Discord bridge cannot hear of
+     * deaths or achievements and says so when it starts.</p>
+     */
     private static byte[] transformServerBroadcast(byte[] basicClass) {
         try {
             ClassNode owner = read(basicClass);
@@ -3893,7 +3894,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 // The hook hands the component back, written over the
                 // parameter itself, so the whole body sends the line
-                // with the id run the hook appended.
+                // with the id run the hook appended; nothing handed back
+                // sends nothing.
                 InsnList hook = new InsnList();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
                 hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
@@ -3901,6 +3903,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         "(Lnet/minecraft/util/IChatComponent;)"
                                 + "Lnet/minecraft/util/IChatComponent;"));
                 hook.add(new VarInsnNode(Opcodes.ASTORE, 1));
+                LabelNode send = new LabelNode();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                hook.add(new JumpInsnNode(Opcodes.IFNONNULL, send));
+                hook.add(new InsnNode(Opcodes.RETURN));
+                hook.add(send);
                 method.instructions.insert(hook);
                 System.setProperty(SERVER_BROADCAST_ACTIVE_PROPERTY, "true");
                 info("Patched server chat broadcasts to report every "

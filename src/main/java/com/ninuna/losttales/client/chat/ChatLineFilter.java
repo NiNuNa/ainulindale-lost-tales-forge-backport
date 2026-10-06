@@ -12,7 +12,7 @@ import java.util.Set;
  * Tales did not route, which belong to the console — are included. A tab
  * standing for a channel that is more than one conversation is taken as
  * the conversation being read ({@link ConversationPage#viewed}), so one Faction
- * row shows one faction. One tab is its open view; the closed-chat feed
+ * row shows one faction, and every copy of a conversation shows its lines. One tab is its open view; the closed-chat feed
  * shows what each conversation's feed choice lets through
  * ({@link ChatLayout#feedFilter}). Value semantics, so
  * {@link ClientChatChannelViews} can cache per filter.
@@ -36,7 +36,7 @@ final class ChatLineFilter {
             return new ChatLineFilter(Collections.<ConversationPage>emptySet(),
                     Collections.<ConversationPage>emptySet(), false);
         }
-        return new ChatLineFilter(Collections.singleton(ConversationPage.viewed(tab)),
+        return new ChatLineFilter(Collections.singleton(ConversationPage.viewedConversation(tab)),
                 Collections.<ConversationPage>emptySet(),
                 tab.getChannel() == ClientChatChannelViews.SYSTEM_LINE_VIEW);
     }
@@ -53,7 +53,7 @@ final class ChatLineFilter {
         if (tabs != null) {
             for (ConversationPage tab : tabs) {
                 if (tab != null) {
-                    set.add(ConversationPage.viewed(tab));
+                    set.add(ConversationPage.viewedConversation(tab));
                     untracked |= tab.getChannel()
                             == ClientChatChannelViews.SYSTEM_LINE_VIEW;
                 }
@@ -63,7 +63,7 @@ final class ChatLineFilter {
         if (mentionTabs != null) {
             for (ConversationPage tab : mentionTabs) {
                 if (tab != null) {
-                    mentions.add(ConversationPage.viewed(tab));
+                    mentions.add(ConversationPage.viewedConversation(tab));
                 }
             }
         }
@@ -81,7 +81,7 @@ final class ChatLineFilter {
         // conversation, or with a channel's row entry, which stands for
         // whichever conversation is being read: both answer the same.
         return tab == null ? this.includeUntracked
-                : this.tabs.contains(ConversationPage.viewed(tab));
+                : this.tabs.contains(ConversationPage.viewedConversation(tab));
     }
 
     /**
@@ -91,7 +91,7 @@ final class ChatLineFilter {
      */
     boolean accepts(ConversationPage tab, boolean addressed) {
         return accepts(tab) || (addressed && tab != null
-                && this.mentionTabs.contains(ConversationPage.viewed(tab)));
+                && this.mentionTabs.contains(ConversationPage.viewedConversation(tab)));
     }
 
     @Override

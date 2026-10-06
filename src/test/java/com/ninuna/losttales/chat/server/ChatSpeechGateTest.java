@@ -12,15 +12,15 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The game's and LOTR's ways to speak are found by name or alias, and
+ * The game's ways to speak are found by name or alias, and
  * their words are read as the game joins them.
  */
 public final class ChatSpeechGateTest {
 
     @Test
-    public void theGamesAndLotrsSpeakingCommandsAreFound() {
+    public void theGamesSpeakingCommandsAreFound() {
         for (String name : Arrays.asList("me", "say", "tell", "msg", "w",
-                "fmsg", "fchat", "ME", " Tell ")) {
+                "ME", " Tell ")) {
             assertTrue(name, ChatSpeechGate.isSpeaking(name));
         }
         for (String name : Arrays.asList("give", "tp", "losttales", "", null)) {

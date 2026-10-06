@@ -38,14 +38,16 @@ public final class WordButton {
         int textX = (int)at.left + LostTalesUiFramedButton.WIDE_INSET;
         int textY = (int)at.top + (LostTalesUiFramedButton.HEIGHT
                 - WindowStyle.LINE_HEIGHT) / 2 + WindowStyle.ROW_TEXT_TOP;
-        int rgb = !enabled ? WindowStyle.asideRgb()
-                : ending ? LostTalesUiInk.blend(LostTalesColors.rgb(
+        // Greyed, the word keeps its colour at half strength, as every
+        // greyed control does.
+        int rgb = ending ? LostTalesUiInk.blend(LostTalesColors.rgb(
                         LostTalesColors.RED), LostTalesUiInk.IVORY, lit)
                 : LostTalesUiInk.IVORY;
         LostTalesUiButton.beginPose(motion, textX, (float)at.top, width,
                 (float)at.height);
         try {
-            LostTalesUiInk.drawText(font, label, textX, textY, rgb, alpha);
+            LostTalesUiInk.drawText(font, label, textX, textY, rgb, enabled
+                    ? alpha : Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY));
         } finally {
             LostTalesUiButton.endPose();
         }

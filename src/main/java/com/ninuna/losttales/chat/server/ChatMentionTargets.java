@@ -30,10 +30,13 @@ final class ChatMentionTargets {
     /**
      * Whom {@code message}, said by {@code sender} in {@code channel}'s
      * conversation {@code scope}, mentions: a whisper reaches its two
-     * people, any other conversation its members.
+     * people, as each is in it — the sender as {@code senderAs}, the
+     * other end as {@code whisperPartner} — any other conversation its
+     * members.
      */
-    static List<ChatNamedPlayer> of(EntityPlayerMP sender, ChatChannel channel,
-                                    String scope, EntityPlayerMP whisperTarget,
+    static List<ChatNamedPlayer> of(EntityPlayerMP sender, ChatNamedPlayer senderAs,
+                                    ChatChannel channel, String scope,
+                                    ChatNamedPlayer whisperPartner,
                                     String message) {
         if (sender == null || channel == null || message == null
                 || message.indexOf('@') < 0) {
@@ -42,9 +45,9 @@ final class ChatMentionTargets {
         List<ChatNamedPlayer> candidates;
         if (channel == ChatChannel.WHISPER) {
             candidates = new ArrayList<ChatNamedPlayer>(2);
-            candidates.add(LostTalesServerBroadcastHook.namedPlayer(sender));
-            if (whisperTarget != null) {
-                candidates.add(LostTalesServerBroadcastHook.namedPlayer(whisperTarget));
+            candidates.add(senderAs);
+            if (whisperPartner != null) {
+                candidates.add(whisperPartner);
             }
         } else {
             candidates = candidatesOf(

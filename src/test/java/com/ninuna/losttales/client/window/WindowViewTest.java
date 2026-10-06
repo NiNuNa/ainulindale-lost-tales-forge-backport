@@ -79,7 +79,6 @@ public final class WindowViewTest {
         assertNull(WindowView.category());
         assertTrue(WindowView.shows(GLOBAL));
         assertTrue(WindowView.shows(page));
-        assertFalse(WindowLayout.hasHidden());
         assertFalse("no tab is no tab in any view", WindowView.shows(null));
     }
 
@@ -94,7 +93,6 @@ public final class WindowViewTest {
         assertTrue("the page waits in its window",
                 WindowLayout.isOpen(page));
         assertTrue(WindowFrame.visibleTabs(window).isEmpty());
-        assertTrue(WindowLayout.hasHidden());
     }
 
     /** The command key shows the consoles alone; the chat's key everything else but them. */
@@ -254,7 +252,7 @@ public final class WindowViewTest {
         for (WindowPage tab : conversations) {
             assertFalse(tab.id(), WindowLayout.isOpen(tab));
         }
-        assertTrue(WindowLayout.hasHidden());
+        assertFalse("the page waits hidden", WindowView.shows(page));
         WindowView.forPage(page);
         assertTrue(WindowLayout.closeWindow(window.getId()));
         assertNull("nothing hidden was left in it",

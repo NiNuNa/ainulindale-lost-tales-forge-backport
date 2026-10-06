@@ -62,7 +62,7 @@ public final class ChatFoldMarkerTest {
         root.appendSibling(text(body.toString()));
         root.appendSibling(ChatLayoutMarker.rowBreak());
         root.appendSibling(ChatReactionMarker.create(
-                ChatEmoji.SMILE.getName(), 1, false, 12345L, 6));
+                ChatEmoji.SMILE.getName(), 1, java.util.Collections.<java.util.UUID>emptyList(), 12345L, 6));
         return root;
     }
 

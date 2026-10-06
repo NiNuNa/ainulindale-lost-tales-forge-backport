@@ -124,8 +124,8 @@ import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.ChatConsoleCommandHandler;
 import com.ninuna.losttales.chat.server.ChatSpeechGate;
-import com.ninuna.losttales.chat.server.FellowshipMessageCommand;
 import com.ninuna.losttales.chat.server.ChatArrivals;
+import com.ninuna.losttales.chat.server.ChatLinesAwaitingNames;
 import com.ninuna.losttales.chat.server.ChatWelcome;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.server.ChatCommandContexts;
@@ -218,9 +218,10 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(new CharacterRoomWorldHandler());
         MinecraftForge.EVENT_BUS.register(new ChatConsoleCommandHandler());
         MinecraftForge.EVENT_BUS.register(new ChatSpeechGate());
-        MinecraftForge.EVENT_BUS.register(new FellowshipMessageCommand());
         MinecraftForge.EVENT_BUS.register(new ChatArrivals());
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatWelcome());
+        cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(
+                new ChatLinesAwaitingNames());
         MinecraftForge.TERRAIN_GEN_BUS.register(waystoneGenerationHandler);
         GameRegistry.registerWorldGenerator(
                 waystoneGenerationHandler, 1000);
@@ -458,6 +459,7 @@ public class LostTalesCommonProxy {
         LostTalesServerBroadcastHook.clear();
         ChatArrivals.clear();
         ChatWelcome.clear();
+        ChatLinesAwaitingNames.clear();
         ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();
@@ -589,6 +591,7 @@ public class LostTalesCommonProxy {
         LostTalesServerBroadcastHook.clear();
         ChatArrivals.clear();
         ChatWelcome.clear();
+        ChatLinesAwaitingNames.clear();
         ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();

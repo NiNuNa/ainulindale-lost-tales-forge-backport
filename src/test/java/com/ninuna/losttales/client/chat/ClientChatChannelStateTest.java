@@ -177,24 +177,25 @@ public final class ClientChatChannelStateTest {
     /**
      * No identity is in no faction: the account and a character created
      * without one speak in Unaligned, so the Faction tab is always open
-     * and follows the faction of whoever is selected.
+     * and follows the faction of whoever its copy speaks as.
      */
     @Test
     public void theAccountAndAFactionlessCharacterSpeakInUnaligned() {
+        ConversationPage faction = ConversationPage.of(ChatChannel.FACTION);
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.FACTION));
         assertEquals(LotrCharacterAdapter.UNALIGNED_FACTION_ID,
-                ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
+                ClientChatChannelState.wornFactionId(faction));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FACTION));
         acceptRoster("lotr:gondor");
-        ClientChatChannelState.select(ConversationPage.of(ChatChannel.FACTION));
-        assertEquals("lotr:gondor",
-                ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
+        ClientChatChannelState.select(faction);
+        assertEquals("lotr:gondor", ClientChatChannelState.wornFactionId(faction));
+        assertEquals("lotr:gondor", ClientChatChannelState.playedFactionId());
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FACTION));
         acceptRoster("");
         ClientChatChannelState.ensureAvailable();
         assertEquals(ChatChannel.FACTION, ClientChatChannelState.getSelected().getChannel());
         assertEquals(LotrCharacterAdapter.UNALIGNED_FACTION_ID,
-                ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
+                ClientChatChannelState.wornFactionId(faction));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FACTION));
     }
 
@@ -331,11 +332,11 @@ public final class ClientChatChannelStateTest {
         assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asAccount));
     }
 
-    /** The server's word that the selected identity is in a fellowship. */
+    /** The server's word that the character played is in a fellowship. */
     private static void joinFellowship(UUID characterId) {
         ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
-                characterId, Collections.singletonList(new ChatFellowship(
-                        new UUID(9L, 9L), "Grey Company", 0x123456)), false));
+                Collections.<UUID>emptyList(), Collections.singletonList(new ChatFellowship(
+                        new UUID(9L, 9L), "Grey Company", 0x123456))));
     }
 
     private static UUID acceptRoster(String factionId) {

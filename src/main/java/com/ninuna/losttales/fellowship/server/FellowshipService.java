@@ -672,8 +672,8 @@ public final class FellowshipService {
     /**
      * Whether a member's character is in another fellowship of the name,
      * compared as {@link #hasFellowshipNamed} compares. A character is never
-     * in two fellowships of one name, so {@code /fmsg "Name"} finds the one
-     * meant.
+     * in two fellowships of one name, so its pages and conversations never
+     * show two alike.
      */
     static boolean isNameTakenByMember(FellowshipWorldData data, Fellowship fellowship,
                                        String name) {

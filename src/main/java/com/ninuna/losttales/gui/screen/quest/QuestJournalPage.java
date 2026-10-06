@@ -924,7 +924,7 @@ public final class QuestJournalPage extends PageContent {
             return;
         }
         String kind = clear ? "clear" : "abandon";
-        screen.ask(WindowPages.tab(PAGE_ID),
+        screen.ask(tab(),
                 translate("gui.losttales.quest.ask." + kind + ".title"),
                 translate("gui.losttales.quest.ask." + kind + ".detail",
                         quest.getTitle()),

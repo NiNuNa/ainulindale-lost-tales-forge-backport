@@ -1873,65 +1873,14 @@ public final class LostTalesConfig {
         return true;
     }
 
-    public static boolean moveHudOffset(String element, int dx, int dy) {
-        String key = normalizeHudElement(element);
-        if ("compass".equals(key)) {
-            return setHudOffset(key, compassHudOffsetX + dx, compassHudOffsetY + dy);
-        }
-        if ("fellowship".equals(key)) {
-            return setHudOffset(key, fellowshipHudOffsetX + dx, fellowshipHudOffsetY + dy);
-        }
-        if ("quickloot".equals(key)) {
-            return setHudOffset(key, quickLootHudOffsetX + dx, quickLootHudOffsetY + dy);
-        }
-        if ("quest".equals(key)) {
-            return setHudOffset(key, questHudOffsetX + dx, questHudOffsetY + dy);
-        }
-        if ("notifications".equals(key)) {
-            return setHudOffset(key, notificationHudOffsetX + dx,
-                    notificationHudOffsetY + dy);
-        }
-        return false;
-    }
+    /** The HUD panels by the names the client file keeps their places under. */
+    private static final java.util.List<String> HUD_ELEMENTS = java.util.Arrays.asList(
+            "compass", "fellowship", "quickloot", "quest", "notifications");
 
+    /** A panel's name as the client file keeps it; empty for a name no panel goes by. */
     public static String normalizeHudElement(String element) {
-        if (element == null) {
-            return "";
-        }
-        String key = element.trim().toLowerCase()
-                .replace("_", "")
-                .replace("-", "")
-                .replace(" ", "");
-        if ("compass".equals(key)) {
-            return "compass";
-        }
-        if ("fellowship".equals(key) || "fellowshiphud".equals(key)) {
-            return "fellowship";
-        }
-        if ("quickloot".equals(key) || "loot".equals(key) || "quickloothud".equals(key)) {
-            return "quickloot";
-        }
-        if ("quest".equals(key) || "quests".equals(key) || "questhud".equals(key) || "tracker".equals(key)) {
-            return "quest";
-        }
-        // The three notices share one slot; every name any of them went
-        // by names the slot.
-        if ("notifications".equals(key)
-                || "notification".equals(key)
-                || "notices".equals(key)
-                || "questnotifications".equals(key)
-                || "questnotification".equals(key)
-                || "toast".equals(key)
-                || "toasts".equals(key)
-                || "mapdiscovery".equals(key)
-                || "locationdiscovery".equals(key)
-                || "discovery".equals(key)
-                || "areanotice".equals(key)
-                || "areaname".equals(key)
-                || "area".equals(key)) {
-            return "notifications";
-        }
-        return "";
+        String key = element == null ? "" : element.trim().toLowerCase(java.util.Locale.ROOT);
+        return HUD_ELEMENTS.contains(key) ? key : "";
     }
 
     public static void clampHudOffsets() {

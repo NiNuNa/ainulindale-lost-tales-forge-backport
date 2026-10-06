@@ -23,7 +23,6 @@ public final class WindowSession {
         ContentView.leaveAll();
         SubWindowPlaces.forgetOpen();
         WindowView.clear();
-        TabMenus.clearFolds();
         PinnedWindows.clear();
     }
 }

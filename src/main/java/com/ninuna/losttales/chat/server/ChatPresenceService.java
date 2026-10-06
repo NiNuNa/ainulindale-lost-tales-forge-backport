@@ -27,8 +27,9 @@ import net.minecraft.server.MinecraftServer;
  * the status it chose for each of its identities, the status line it
  * set for each ({@link ChatStatusLine}), and whether anybody is at its
  * keyboard; the server decides which identities show at all — the ones
- * in use: the account, the character played and the character spoken
- * as — and tells everyone what each of them shows, with its line, as it
+ * in use: the account, the character played and every character the
+ * chat's copies read as — and tells everyone what each of them shows,
+ * with its line, as it
  * changes, and all of it to a player who joins, with each one's
  * role-play status ({@link ChatRoleplayStatus}). Every other identity
  * reads as Offline, and so does one whose choice is Invisible; neither
@@ -37,8 +38,8 @@ import net.minecraft.server.MinecraftServer;
  * <p>Nothing of a player shows until their client has stated its
  * presence, so a player who hides never shows for a moment as they join.
  * The identities in use are looked at again once a second, which is how
- * a change of character reaches everyone; a change of chat identity is
- * told at once. Session state, cleared at both ends of a run.</p>
+ * a change of character reaches everyone; a copy reading as another
+ * character is told at once. Session state, cleared at both ends of a run.</p>
  */
 public final class ChatPresenceService {
     /** Ticks between two looks at which identities each player uses. */
@@ -208,7 +209,7 @@ public final class ChatPresenceService {
         return shown;
     }
 
-    /** The identities a player is using: the account, and the characters played and spoken as. */
+    /** The identities a player is using: the account, the character played and every character their copies read as. */
     private static Set<ChatPresenceIdentity> inUse(EntityPlayerMP player) {
         Set<ChatPresenceIdentity> identities =
                 new LinkedHashSet<ChatPresenceIdentity>();
@@ -218,10 +219,9 @@ public final class ChatPresenceService {
             identities.add(ChatPresenceIdentity.character(
                     played.getCharacterId()));
         }
-        RoleplayCharacter speaking = ChatIdentitySelection.character(player);
-        if (speaking != null) {
+        for (RoleplayCharacter read : ChatIdentitySelection.alsoRead(player)) {
             identities.add(ChatPresenceIdentity.character(
-                    speaking.getCharacterId()));
+                    read.getCharacterId()));
         }
         return identities;
     }

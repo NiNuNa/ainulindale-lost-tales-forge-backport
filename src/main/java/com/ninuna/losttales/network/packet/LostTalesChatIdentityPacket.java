@@ -8,27 +8,35 @@ import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
- * Client-to-server: the chat identity chosen — one owned character, or
- * with no id the played character — and whether the Narrator's voice is
- * taken up over it. A presence byte, the id when present, and the
- * voice's flag; anything short, trailing or out of range is malformed.
+ * Client-to-server: the characters the chat's copies read as besides the
+ * one played, each copy its own person. A count and that many distinct
+ * ids, at most {@link #MAX_READ}; anything short, trailing, repeated or
+ * over the bound is malformed. The server keeps only the ones the player
+ * owns.
  */
 public final class LostTalesChatIdentityPacket implements IMessage {
-    private static final int MAX_PACKET_BYTES = 18;
+    /** Most characters the copies may read as besides the one played. */
+    public static final int MAX_READ = 16;
+    private static final int MAX_PACKET_BYTES = 1 + MAX_READ * 16;
 
-    private UUID characterId;
-    private boolean narrating;
+    private List<UUID> characterIds = Collections.emptyList();
     private boolean malformed;
 
     public LostTalesChatIdentityPacket() {}
 
-    public LostTalesChatIdentityPacket(UUID characterId, boolean narrating) {
-        this.characterId = characterId;
-        this.narrating = narrating;
+    public LostTalesChatIdentityPacket(List<UUID> characterIds) {
+        this.characterIds = characterIds == null ? Collections.<UUID>emptyList()
+                : Collections.unmodifiableList(new ArrayList<UUID>(characterIds));
+        validate(this.characterIds);
     }
 
     @Override
@@ -38,43 +46,49 @@ public final class LostTalesChatIdentityPacket implements IMessage {
             if (buffer == null || buffer.readableBytes() > MAX_PACKET_BYTES) {
                 throw new LostTalesPacketCodec.DecodeException("invalid chat identity size");
             }
-            int present = buffer.readUnsignedByte();
-            if (present > 1) {
-                throw new LostTalesPacketCodec.DecodeException("invalid identity flag");
+            int count = buffer.readUnsignedByte();
+            if (count > MAX_READ) {
+                throw new LostTalesPacketCodec.DecodeException("too many identities");
             }
-            this.characterId = present == 0 ? null
-                    : new UUID(buffer.readLong(), buffer.readLong());
-            int voice = buffer.readUnsignedByte();
-            if (voice > 1) {
-                throw new LostTalesPacketCodec.DecodeException("invalid narrator flag");
+            List<UUID> read = new ArrayList<UUID>(count);
+            for (int index = 0; index < count; index++) {
+                read.add(new UUID(buffer.readLong(), buffer.readLong()));
             }
-            this.narrating = voice == 1;
             LostTalesPacketCodec.requireFinished(buffer);
+            validate(read);
+            this.characterIds = Collections.unmodifiableList(read);
         } catch (RuntimeException failure) {
             this.malformed = true;
-            this.characterId = null;
-            this.narrating = false;
+            this.characterIds = Collections.emptyList();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
 
     @Override
     public void toBytes(ByteBuf buffer) {
-        buffer.writeBoolean(this.characterId != null);
-        if (this.characterId != null) {
-            buffer.writeLong(this.characterId.getMostSignificantBits());
-            buffer.writeLong(this.characterId.getLeastSignificantBits());
+        buffer.writeByte(this.characterIds.size());
+        for (UUID id : this.characterIds) {
+            buffer.writeLong(id.getMostSignificantBits());
+            buffer.writeLong(id.getLeastSignificantBits());
         }
-        buffer.writeBoolean(this.narrating);
     }
 
-    public UUID getCharacterId() {
-        return this.characterId;
+    /** At most {@link #MAX_READ} ids, none null and none twice. */
+    static void validate(List<UUID> ids) {
+        if (ids.size() > MAX_READ) {
+            throw new IllegalArgumentException("too many identities");
+        }
+        Set<UUID> seen = new HashSet<UUID>();
+        for (UUID id : ids) {
+            if (id == null || !seen.add(id)) {
+                throw new IllegalArgumentException("identities must be distinct");
+            }
+        }
     }
 
-    /** Whether the Narrator's voice is taken up over the identity. */
-    public boolean isNarrating() {
-        return this.narrating;
+    /** The characters read as besides the one played. */
+    public List<UUID> getCharacterIds() {
+        return this.characterIds;
     }
 
     public boolean isMalformed() {
@@ -96,8 +110,8 @@ public final class LostTalesChatIdentityPacket implements IMessage {
                     new LostTalesServerTaskQueue.PlayerTask() {
                         @Override
                         public void run(EntityPlayerMP sender) {
-                            ChatIdentitySelection.select(sender,
-                                    message.getCharacterId(), message.isNarrating());
+                            ChatIdentitySelection.read(sender,
+                                    message.getCharacterIds());
                         }
                     });
             return null;

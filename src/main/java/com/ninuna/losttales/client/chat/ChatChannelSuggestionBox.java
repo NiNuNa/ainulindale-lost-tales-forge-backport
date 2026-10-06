@@ -47,7 +47,9 @@ final class ChatChannelSuggestionBox extends ChatSuggestionBox {
         if (changed) {
             this.matches = ChatChannelSuggester.matches(found.prefix,
                     channels, ClientChatChannelState.scopeKeyRead(
-                            ChatChannel.FACTION), MAX_ROWS, LostTalesWords.LANG);
+                            ChatChannel.FACTION,
+                            ClientChatChannelState.getSelected()),
+                    MAX_ROWS, LostTalesWords.LANG);
             if (this.selectedIndex >= this.matches.size()) {
                 this.selectedIndex = 0;
             }

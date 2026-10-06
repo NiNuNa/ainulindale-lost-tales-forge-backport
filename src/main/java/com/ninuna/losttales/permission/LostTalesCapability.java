@@ -56,14 +56,12 @@ public final class LostTalesCapability {
     public static final LostTalesCapability QUEST_ADMIN = register("quest.admin", OPERATOR);
     /** Check and repair the fellowship stores, and clear the combat markers (/losttales fellowship). */
     public static final LostTalesCapability FELLOWSHIP_ADMIN = register("fellowship.admin", OPERATOR);
-    /** Place, move and remove the shared map markers. */
+    /** Inspect players' map markers, discover, forget, track or untrack them, and place failed waystones again (/losttales mapmarker). */
     public static final LostTalesCapability MAPMARKER_MANAGE =
             register("mapmarker.manage", OPERATOR);
     /** Place public waystones and change their settings. */
     public static final LostTalesCapability WAYSTONE_MANAGE =
             register("waystone.manage", OPERATOR);
-    /** Change the HUD defaults the server ships. */
-    public static final LostTalesCapability HUD_ADMIN = register("hud.admin", OPERATOR);
 
     private final String id;
     private final int requiredOpLevel;

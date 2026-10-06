@@ -50,11 +50,9 @@ public enum LostTalesUiSheet {
     PLUS_ADD(6, 11, 5, 5),
     PLUS_LIT(12, 11, 5, 5),
     /**
-     * The {@code +} with its upright stroke taken away: what the restore
-     * control wears while the list it opens is out, the map's zoom out and
-     * a folded group. One row of artwork rather than a five-row cell, so
-     * it centres on the same row of the strip the {@code +}'s own crossbar
-     * stands on. Lit in honey.
+     * The {@code +} with its upright stroke taken away: the map's zoom out.
+     * One row of artwork rather than a five-row cell, so it centres on the
+     * same row the {@code +}'s own crossbar stands on. Lit in honey.
      */
     MINUS(18, 13, 5, 1),
     MINUS_LIT(30, 13, 5, 1),

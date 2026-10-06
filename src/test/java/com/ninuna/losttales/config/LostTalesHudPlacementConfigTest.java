@@ -26,23 +26,12 @@ public final class LostTalesHudPlacementConfigTest {
 
     @Test
     public void everyPlacementScreenElementHasAStableConfigKey() {
-        assertEquals("compass",
-                LostTalesConfig.normalizeHudElement("compass"));
-        assertEquals("fellowship",
-                LostTalesConfig.normalizeHudElement("fellowshipHud"));
-        assertEquals("quickloot",
-                LostTalesConfig.normalizeHudElement("quick-loot"));
-        assertEquals("quest",
-                LostTalesConfig.normalizeHudElement("tracker"));
-        assertEquals("notifications",
-                LostTalesConfig.normalizeHudElement("notifications"));
-        // The three notices used to be three slots; their old names still
-        // reach the one they share.
-        assertEquals("notifications",
-                LostTalesConfig.normalizeHudElement("quest notifications"));
-        assertEquals("notifications",
-                LostTalesConfig.normalizeHudElement("location discovery"));
-        assertEquals("notifications",
-                LostTalesConfig.normalizeHudElement("area name"));
+        for (String element : new String[] {"compass", "fellowship", "quickloot",
+                "quest", "notifications"}) {
+            assertEquals(element, LostTalesConfig.normalizeHudElement(element));
+        }
+        assertEquals("quest", LostTalesConfig.normalizeHudElement(" Quest "));
+        assertEquals("a name no panel goes by is none",
+                "", LostTalesConfig.normalizeHudElement("tracker"));
     }
 }

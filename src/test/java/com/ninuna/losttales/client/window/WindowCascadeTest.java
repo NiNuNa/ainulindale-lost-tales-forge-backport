@@ -22,8 +22,9 @@ public final class WindowCascadeTest {
     }
 
     @Test
-    public void theStepKeepsTheTabStripBehindInView() {
-        assertTrue(WindowCascade.STEP >= TabRow.ROW_HEIGHT);
+    public void theStepShowsTheTopsOfTheTabsBehind() {
+        assertTrue(WindowCascade.STEP > TabRow.HEADROOM);
+        assertTrue(WindowCascade.STEP < TabRow.ROW_HEIGHT);
     }
 
     @Test

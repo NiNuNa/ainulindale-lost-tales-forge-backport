@@ -5,14 +5,29 @@ import lotr.common.LOTRPlayerData;
 import lotr.common.LOTRShields;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Selected shield, alcohol tolerance, and last-death marker for one character. */
+/**
+ * The smaller things of LOTR's each character keeps of its own: the shield
+ * it wears, its alcohol tolerance, where it last died, its fast-travel wait
+ * and the waypoint it last travelled to, the biome it last stood in, the
+ * mount it logged out on, the faction its alignment bar shows (in each
+ * region), LOTR's options (friendly fire, hiding the alignment or the
+ * map position, hired units' death notices, conquest notices, which
+ * waypoints the map shows) and an admin's structure ban
+ * ({@code /banStructures}), which bans the character played as it was
+ * given. An admin hidden from the map, LOTR's one-time notices and the
+ * last time online stay with the account.
+ */
 public final class LotrCharacterDetailsStateAdapter {
 
     private static final UUID DETACHED_PLAYER_ID =
@@ -24,9 +39,27 @@ public final class LotrCharacterDetailsStateAdapter {
     private static final String TAG_DEATH_Y = "DeathY";
     private static final String TAG_DEATH_Z = "DeathZ";
     private static final String TAG_DEATH_DIMENSION = "DeathDim";
+    private static final String TAG_FAST_TRAVEL_SINCE = "FTSince";
+    private static final String TAG_LAST_WAYPOINT = "LastWP";
+    private static final String TAG_LAST_BIOME = "LastBiome";
+    private static final String TAG_MOUNT = "MountUUID";
+    private static final String TAG_MOUNT_TIME = "MountUUIDTime";
+    private static final String TAG_VIEWED_FACTION = "CurrentFaction";
+    private static final String TAG_REGION_FACTIONS = "PrevRegionFactions";
+    private static final String TAG_REGION = "Region";
+    private static final String TAG_FACTION = "Faction";
+    private static final String TAG_STRUCTURES_BANNED = "StructuresBanned";
+    private static final String[] OPTION_TAGS = {
+            "FriendlyFire", "HideAlignment", "HideOnMap",
+            "HiredDeathMessages", "ShowWP", "ShowCWP", "ShowHiddenSWP",
+            "ConquestKills"};
 
     private static final int MAX_SHIELD_NAME_LENGTH = 128;
     private static final int MAX_ABSOLUTE_WORLD_COORDINATE = 30000000;
+    /** Longest waypoint, region or faction code name kept. */
+    private static final int MAX_CODE_NAME_LENGTH = 64;
+    /** Most regions the alignment bar remembers a faction for. */
+    private static final int MAX_REGION_FACTIONS = 32;
 
     private static final Set<String> REQUIRED_KEYS = setOf(TAG_ALCOHOL);
     private static final Set<String> CHARACTER_KEYS = setOf(
@@ -35,7 +68,17 @@ public final class LotrCharacterDetailsStateAdapter {
             TAG_DEATH_X,
             TAG_DEATH_Y,
             TAG_DEATH_Z,
-            TAG_DEATH_DIMENSION);
+            TAG_DEATH_DIMENSION,
+            TAG_FAST_TRAVEL_SINCE,
+            TAG_LAST_WAYPOINT,
+            TAG_LAST_BIOME,
+            TAG_MOUNT,
+            TAG_MOUNT_TIME,
+            TAG_VIEWED_FACTION,
+            TAG_REGION_FACTIONS,
+            OPTION_TAGS[0], OPTION_TAGS[1], OPTION_TAGS[2], OPTION_TAGS[3],
+            OPTION_TAGS[4], OPTION_TAGS[5], OPTION_TAGS[6], OPTION_TAGS[7],
+            TAG_STRUCTURES_BANNED);
 
     public NBTTagCompound capture(EntityPlayerMP player) {
         try {
@@ -72,7 +115,7 @@ public final class LotrCharacterDetailsStateAdapter {
             LOTRPlayerData detached = new LOTRPlayerData(DETACHED_PLAYER_ID);
             detached.load(full);
             NBTTagCompound canonical = extract(save(detached));
-            if (!canonical.equals(details)) {
+            if (!canonical.equals(inRegionOrder(details))) {
                 throw new IllegalArgumentException(
                         "LOTR character details contain non-canonical values");
             }
@@ -156,7 +199,37 @@ public final class LotrCharacterDetailsStateAdapter {
                 details.setTag(key, full.getTag(key).copy());
             }
         }
-        return details;
+        return inRegionOrder(details);
+    }
+
+    /**
+     * The details with the alignment bar's faction per region listed by
+     * region. LOTR keeps them in a hash map, so the order it writes them in
+     * may change from one run of the server to the next.
+     */
+    private static NBTTagCompound inRegionOrder(NBTTagCompound details) {
+        if (!details.hasKey(TAG_REGION_FACTIONS, Constants.NBT.TAG_LIST)) {
+            return details;
+        }
+        NBTTagList regions = details.getTagList(TAG_REGION_FACTIONS,
+                Constants.NBT.TAG_COMPOUND);
+        List<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
+        for (int index = 0; index < regions.tagCount(); index++) {
+            entries.add(regions.getCompoundTagAt(index));
+        }
+        Collections.sort(entries, new Comparator<NBTTagCompound>() {
+            @Override
+            public int compare(NBTTagCompound a, NBTTagCompound b) {
+                return a.getString(TAG_REGION).compareTo(b.getString(TAG_REGION));
+            }
+        });
+        NBTTagList sorted = new NBTTagList();
+        for (NBTTagCompound entry : entries) {
+            sorted.appendTag(entry.copy());
+        }
+        NBTTagCompound ordered = (NBTTagCompound)details.copy();
+        ordered.setTag(TAG_REGION_FACTIONS, sorted);
+        return ordered;
     }
 
     private static void overlay(NBTTagCompound full,
@@ -231,6 +304,77 @@ public final class LotrCharacterDetailsStateAdapter {
                         "LOTR last-death marker coordinates are outside supported bounds");
             }
         }
+        validateTravelAndOptions(details);
+    }
+
+    /** The travel state, the mount, the faction shown, the options and the structure ban, each of LOTR's own type and in bounds. */
+    private static void validateTravelAndOptions(NBTTagCompound details) {
+        if (details.hasKey(TAG_FAST_TRAVEL_SINCE)
+                && requireInteger(details, TAG_FAST_TRAVEL_SINCE) < 0) {
+            throw new IllegalArgumentException(
+                    "LOTR fast-travel wait is outside supported bounds");
+        }
+        if (details.hasKey(TAG_LAST_WAYPOINT)) {
+            requireCodeName(details, TAG_LAST_WAYPOINT);
+        }
+        if (details.hasKey(TAG_LAST_BIOME)
+                && !details.hasKey(TAG_LAST_BIOME, Constants.NBT.TAG_SHORT)) {
+            throw new IllegalArgumentException(TAG_LAST_BIOME + " must be a short");
+        }
+        if (details.hasKey(TAG_MOUNT)) {
+            if (!details.hasKey(TAG_MOUNT, Constants.NBT.TAG_STRING)) {
+                throw new IllegalArgumentException(TAG_MOUNT + " must be a string");
+            }
+            try {
+                UUID.fromString(details.getString(TAG_MOUNT));
+            } catch (IllegalArgumentException malformed) {
+                throw new IllegalArgumentException("LOTR mount id is malformed");
+            }
+        }
+        if (details.hasKey(TAG_MOUNT_TIME)) {
+            requireInteger(details, TAG_MOUNT_TIME);
+        }
+        if (details.hasKey(TAG_VIEWED_FACTION)) {
+            requireCodeName(details, TAG_VIEWED_FACTION);
+        }
+        if (details.hasKey(TAG_REGION_FACTIONS)) {
+            if (!details.hasKey(TAG_REGION_FACTIONS, Constants.NBT.TAG_LIST)) {
+                throw new IllegalArgumentException(
+                        TAG_REGION_FACTIONS + " must be a list");
+            }
+            NBTTagList regions = details.getTagList(TAG_REGION_FACTIONS,
+                    Constants.NBT.TAG_COMPOUND);
+            if (regions.tagCount() > MAX_REGION_FACTIONS) {
+                throw new IllegalArgumentException(
+                        "LOTR region factions are outside supported bounds");
+            }
+            for (int index = 0; index < regions.tagCount(); index++) {
+                NBTTagCompound entry = regions.getCompoundTagAt(index);
+                requireCodeName(entry, TAG_REGION);
+                requireCodeName(entry, TAG_FACTION);
+            }
+        }
+        for (String option : OPTION_TAGS) {
+            requireSwitch(details, option);
+        }
+        requireSwitch(details, TAG_STRUCTURES_BANNED);
+    }
+
+    private static void requireSwitch(NBTTagCompound details, String key) {
+        if (details.hasKey(key) && !details.hasKey(key, Constants.NBT.TAG_BYTE)) {
+            throw new IllegalArgumentException(key + " must be a switch");
+        }
+    }
+
+    private static String requireCodeName(NBTTagCompound compound, String key) {
+        if (!compound.hasKey(key, Constants.NBT.TAG_STRING)) {
+            throw new IllegalArgumentException(key + " must be a string");
+        }
+        String name = compound.getString(key);
+        if (name.length() == 0 || name.length() > MAX_CODE_NAME_LENGTH) {
+            throw new IllegalArgumentException(key + " is outside supported bounds");
+        }
+        return name;
     }
 
     private static int requireInteger(NBTTagCompound compound, String key) {

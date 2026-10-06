@@ -8,9 +8,10 @@ import net.minecraft.command.ICommandSender;
 import net.minecraft.util.EnumChatFormatting;
 
 /**
- * The one command Lost Tales registers: {@code /losttales <sub-command>
- * ...}, dispatched to the sub-commands {@link ELostTalesSubCommand}
- * lists. The root is open to operators of level two and to anyone who
+ * Lost Tales' own command: {@code /losttales <sub-command> ...},
+ * dispatched to the sub-commands {@link ELostTalesSubCommand} lists
+ * (besides it the mod registers LOTR's {@code /strscan}; see
+ * {@link ELostTalesCommand}). The root is open to operators of level two and to anyone who
  * may use at least one sub-command through a capability their roles
  * grant; each sub-command is asked for itself before it runs, so the
  * root opening never opens more than the sub-commands do.

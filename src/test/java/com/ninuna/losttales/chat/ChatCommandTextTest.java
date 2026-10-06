@@ -29,13 +29,16 @@ public final class ChatCommandTextTest {
         assertEquals("/losttales config get discord botToken",
                 ChatCommandText.describe("losttales", new String[] {
                         "config", "get", "discord", "botToken"}));
-        // A binding keeps its channel and direction, never the addresses.
-        String bind = ChatCommandText.describe("losttales", new String[] {
-                "discord", "bind", "ooc", "BIDIRECTIONAL",
-                "channel=123456789012345678",
-                "webhook=https://discord.com/api/webhooks/1/secret"});
-        assertEquals("/losttales discord bind ooc BIDIRECTIONAL channel=... webhook=...", bind);
-        assertFalse(bind.contains("secret"));
+        // Under the alias too: a token set with /losttales cfg never shows.
+        String alias = ChatCommandText.describe("losttales", new String[] {
+                "cfg", "set", "discord", "botToken", "abc.def.ghi"});
+        assertEquals("/losttales cfg set discord botToken ...", alias);
+        assertFalse(alias.contains("abc"));
+        // An unlink keeps its game channel, never the Discord channel's id.
+        String unlink = ChatCommandText.describe("losttales", new String[] {
+                "discord", "unlink", "ooc", "123456789012345678"});
+        assertEquals("/losttales discord unlink ooc ...", unlink);
+        assertFalse(unlink.contains("1234"));
         assertEquals("/say", ChatCommandText.describe("say", null));
         // Cut to a line.
         StringBuilder long_ = new StringBuilder();
@@ -47,48 +50,25 @@ public final class ChatCommandTextTest {
         assertTrue(cut.endsWith("..."));
     }
 
-    /**
-     * A fellowship message keeps the fellowship it names, as a private
-     * message keeps whom it went to, and never its words; binding and
-     * letting go say nothing and are kept whole.
-     */
-    @Test
-    public void aFellowshipMessageKeepsItsFellowshipAndNotItsWords() {
-        assertEquals("/fmsg \"Grey Company\" ...", ChatCommandText.describe("fmsg",
-                new String[] {"\"Grey", "Company\"", "the", "vault", "code"}));
-        assertEquals("/fmsg ...", ChatCommandText.describe("fmsg",
-                new String[] {"the", "vault", "code"}));
-        assertEquals("/fchat ...", ChatCommandText.describe("FChat",
-                new String[] {"meet", "at", "dawn"}));
-        assertEquals("/fmsg bind \"Grey Company\"", ChatCommandText.describe("fmsg",
-                new String[] {"bind", "\"Grey", "Company\""}));
-        assertEquals("/fmsg unbind", ChatCommandText.describe("fmsg",
-                new String[] {"unbind"}));
-        // Words after unbind are words, said to the bound fellowship.
-        assertEquals("/fmsg ...", ChatCommandText.describe("fmsg",
-                new String[] {"unbind", "the", "gate"}));
-        // A bind with no fellowship in quotes is words the command refuses.
-        assertEquals("/fmsg bind ...", ChatCommandText.describe("fmsg",
-                new String[] {"bind", "the", "gate"}));
-        assertEquals("/fmsg", ChatCommandText.describe("fmsg", new String[0]));
-        String typed = ChatCommandText.describeTyped("/fchat \"Rangers\" the vault code is 4417");
-        assertEquals("/fchat \"Rangers\" ...", typed);
-        assertFalse(typed.contains("4417"));
-    }
-
     /** A typed command reads as the console would write it, so its echo holds no secret. */
     @Test
     public void aTypedCommandIsDescribedAsTheConsoleWritesIt() {
-        String typed = "/losttales  discord bind ooc BIDIRECTIONAL "
-                + "webhook=https://discord.com/api/webhooks/1/secret";
-        String shown = ChatCommandText.describeTyped(typed);
-        assertEquals("/losttales discord bind ooc BIDIRECTIONAL webhook=...", shown);
-        assertFalse(shown.contains("secret"));
+        String shown = ChatCommandText.describeTyped(
+                "/losttales  cfg set discord botToken a.b.c");
+        assertEquals("/losttales cfg set discord botToken ...", shown);
+        assertFalse(shown.contains("a.b.c"));
         assertEquals("/losttales config set discord botToken ...",
                 ChatCommandText.describeTyped("/losttales config set discord botToken a.b.c"));
         assertEquals("/time query daytime",
                 ChatCommandText.describeTyped(" /time query daytime "));
         assertEquals("", ChatCommandText.describeTyped("/"));
         assertEquals("", ChatCommandText.describeTyped(null));
+    }
+
+    /** Every name the config sub-command answers to is masked: none is left out. */
+    @Test
+    public void everyNameOfTheConfigCommandIsMasked() {
+        assertEquals(com.ninuna.losttales.command.ELostTalesSubCommand.CONFIG.getNames(),
+                ChatCommandText.CONFIG_NAMES);
     }
 }

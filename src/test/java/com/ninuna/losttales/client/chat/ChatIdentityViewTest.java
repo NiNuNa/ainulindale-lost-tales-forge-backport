@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.After;
+import org.junit.Before;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.ChatPacketFixtures;
@@ -26,10 +27,11 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Reading the chat as one of the player's identities. The identity
- * picked decides which conversations are on screen — a faction's talk
- * and a whisper alike — and never decides which character is being
- * played: that is the character screen's alone.
+ * Reading the chat as the player's identities, each copy of a
+ * conversation its own person. Who a copy speaks as decides which
+ * conversation it shows — a faction's talk and a whisper alike — and
+ * never decides which character is being played: that is the character
+ * screen's alone.
  */
 public final class ChatIdentityViewTest {
 
@@ -40,9 +42,15 @@ public final class ChatIdentityViewTest {
     private static final String GONDOR = "lotr:gondor";
     private static final String ROHAN = "lotr:rohan";
 
+    @Before
+    public void setUp() {
+        tearDown();
+    }
+
     @After
     public void tearDown() {
         ClientChatIdentities.clear();
+        ClientChatIdentitySelection.clear();
         ClientCharacterRosterCache.clear();
         ClientChatChannelViews.clear();
         ClientChatChannelState.clear();
@@ -51,23 +59,25 @@ public final class ChatIdentityViewTest {
         TwoWindowLayout.reset();
     }
 
+    /** The fellowships are the character played's, whoever a copy speaks as. */
     @Test
-    public void fellowshipMembershipFollowsTheChatIdentityAndIgnoresLateReplies() {
+    public void fellowshipMembershipFollowsThePlayedCharacter() {
         roster();
         UUID firstFellowship = new UUID(1L, 1L);
         UUID secondFellowship = new UUID(2L, 2L);
-        ClientChatIdentitySelection.accept(sync(ALDRIC, firstFellowship, 0x123456));
-        assertEquals(firstFellowship.toString(), ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP));
-        ClientChatIdentities.select(identityOf(BEREN));
-        assertEquals("", ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP));
-        assertFalse(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
-        ClientChatIdentitySelection.accept(sync(ALDRIC, firstFellowship, 0x123456));
-        assertEquals("", ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP));
-        ClientChatIdentitySelection.accept(sync(BEREN, secondFellowship, 0xABCDEF));
-        assertEquals(secondFellowship.toString(), ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP));
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ClientChatIdentitySelection.accept(sync(firstFellowship, 0x123456));
+        assertEquals(firstFellowship.toString(),
+                ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP, global));
+        choose(global, BEREN);
+        assertEquals("a copy speaking as Beren changes no fellowship",
+                firstFellowship.toString(),
+                ClientChatChannelState.scopeKeyRead(ChatChannel.FELLOWSHIP, global));
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
+        ClientChatIdentitySelection.accept(sync(secondFellowship, 0xABCDEF));
+        assertEquals(secondFellowship.toString(), ClientChatChannelState.playedScopeKey(ChatChannel.FELLOWSHIP));
         assertEquals(0xABCDEF, ClientChatChannelState.displayColor(
                 ConversationPage.of(ChatChannel.FELLOWSHIP, secondFellowship.toString())));
-        assertTrue(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
         assertFalse(ClientChatChannelState.isAvailable(ConversationPage.of(ChatChannel.FELLOWSHIP, firstFellowship.toString())));
         assertFalse(ClientChatChannelState.canSend(ConversationPage.of(ChatChannel.FELLOWSHIP, firstFellowship.toString())));
         assertTrue(ClientChatChannelState.isAvailable(ConversationPage.of(ChatChannel.FELLOWSHIP, secondFellowship.toString())));
@@ -78,7 +88,7 @@ public final class ChatIdentityViewTest {
     @Test
     public void accountFellowshipIsSeparateAndDisconnectDropsMembership() {
         UUID fellowship = new UUID(3L, 3L);
-        ClientChatIdentitySelection.accept(sync(null, fellowship, 0x123456));
+        ClientChatIdentitySelection.accept(sync(fellowship, 0x123456));
         assertEquals(fellowship.toString(), ClientChatChannelState.scopeOfIdentity(ChatChannel.FELLOWSHIP, ""));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FELLOWSHIP));
         ClientChatIdentitySelection.clear();
@@ -87,8 +97,8 @@ public final class ChatIdentityViewTest {
 
     /**
      * Each fellowship's conversation is named after the fellowship ("The
-     * Grey Company Chat") and shown while its character is read; the
-     * channel itself keeps its plain name.
+     * Grey Company Chat") and shown while the character played is in it;
+     * the channel itself keeps its plain name.
      */
     @Test
     public void eachFellowshipsConversationIsNamedAfterIt() {
@@ -96,69 +106,81 @@ public final class ChatIdentityViewTest {
         String plain = ChatChannel.FELLOWSHIP.getDisplayName();
         UUID grey = new UUID(4L, 4L);
         ConversationPage tab = ConversationPage.of(ChatChannel.FELLOWSHIP, grey.toString());
-        ClientChatIdentitySelection.accept(sync(ALDRIC, grey, 0x123456));
+        ClientChatIdentitySelection.accept(sync(grey, 0x123456));
         assertEquals(plain, ClientChatChannelState.displayName(ChatChannel.FELLOWSHIP));
         assertNotEquals(plain, ClientChatChannelState.displayName(tab));
         assertTrue(ClientChatChannelState.isAvailable(tab));
         assertFalse("the channel has no plain tab",
                 ClientChatChannelState.isAvailable(ConversationPage.of(ChatChannel.FELLOWSHIP)));
-        ClientChatIdentities.select(identityOf(BEREN));
-        assertFalse(ClientChatChannelState.isAvailable(tab));
-        assertEquals(plain, ClientChatChannelState.displayName(tab));
+        choose(ConversationPage.of(ChatChannel.GLOBAL), BEREN);
+        assertTrue(ClientChatChannelState.isAvailable(tab));
     }
 
+    /**
+     * A faction's talk shows for every faction read: the played
+     * character's, and that of each character a copy speaks as, its
+     * typing with it.
+     */
     @Test
-    public void factionMessagesAndTypingOnlyAppearForTheSelectedIdentity() {
+    public void factionMessagesAndTypingAppearForEveryFactionRead() {
         roster();
+        ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
         ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
         ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
         assertTrue(ClientChatChannelState.isAvailable(gondor));
         assertFalse(ClientChatChannelState.isAvailable(rohan));
-        ClientChatIdentities.select(identityOf(BEREN));
-        assertFalse(ClientChatChannelState.isAvailable(gondor));
+        choose(row, BEREN);
+        assertTrue("the character played still reads Gondor",
+                ClientChatChannelState.isAvailable(gondor));
         assertTrue(ClientChatChannelState.isAvailable(rohan));
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "A friend", false, true,
-                        GONDOR, ALDRIC.toString()));
-        assertTrue(ClientChatTypingState.namesTyping(ConversationPage.of(ChatChannel.FACTION)).isEmpty());
+                        GONDOR, ""));
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "Beren's friend", false, true,
-                        ROHAN, BEREN.toString()));
-        assertEquals(java.util.Collections.singletonList("Beren's friend"),
-                ClientChatTypingState.namesTyping(ConversationPage.of(ChatChannel.FACTION)));
+                        ROHAN, ""));
+        assertEquals("the copy speaking as Beren shows Rohan's typing",
+                Collections.singletonList("Beren's friend"),
+                ClientChatTypingState.namesTyping(row));
+        assertEquals(Collections.singletonList("A friend"),
+                ClientChatTypingState.namesTyping(gondor));
     }
 
     /**
-     * One tab per person, as one Faction tab: read as Aldric it shows the
-     * conversation Steve has with Aldric, read as Beren the one with
-     * Beren, and Aldric's lines stay out of Beren's view.
+     * One tab per person, each copy its own person: a copy speaking as
+     * Aldric shows the conversation Steve has with Aldric, one speaking as
+     * Beren the one with Beren, and Aldric's lines stay out of Beren's.
      */
     @Test
-    public void aWhisperTabFollowsTheIdentityBeingRead() {
+    public void aWhisperCopyShowsTheConversationOfWhomItSpeaksAs() {
         roster();
-        ConversationPage row = ConversationPage.whisper("Steve", "Steve");
+        ConversationPage row = ChatLayout.openTab(ConversationPage.whisper("Steve", "Steve"), null);
         ConversationPage withAldric = ConversationPage.whisper("Steve", "Steve", keyOf(ALDRIC));
         ConversationPage withBeren = ConversationPage.whisper("Steve", "Steve", keyOf(BEREN));
         assertEquals(withAldric, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(withAldric));
         assertFalse(ChatLineFilter.of(row).accepts(withBeren));
-        ClientChatIdentities.select(identityOf(BEREN));
+        assertFalse(ClientChatChannelState.isAvailable(withBeren));
+        choose(row, BEREN);
         assertEquals(withBeren, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(withBeren));
         assertFalse(ChatLineFilter.of(row).accepts(withAldric));
-        assertTrue(ClientChatChannelState.isAvailable(row));
-        assertFalse(ClientChatChannelState.isAvailable(withAldric));
+        assertEquals("a second copy follows the character played",
+                withAldric.withInstance(2), ConversationPage.viewed(row.withInstance(2)));
+        assertTrue(ClientChatChannelState.isAvailable(withBeren));
+        assertTrue(ClientChatChannelState.isAvailable(withAldric));
     }
 
     @Test
-    public void whisperTypingBelongsToBothCharactersInThatConversation() {
+    public void whisperTypingShowsWithTheCharacterItIsAddressedTo() {
         roster();
-        ClientChatIdentities.select(identityOf(BEREN));
-        ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
-                "Steve", "Friend", false, true, "", ALDRIC.toString()));
+        ConversationPage row = ChatLayout.openTab(ConversationPage.whisper("Steve", "Friend"), null);
         ConversationPage beren = ConversationPage.whisper("Steve", "Friend", BEREN.toString());
-        assertTrue(ClientChatTypingState.namesTyping(beren).isEmpty());
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
                 "Steve", "Friend", false, true, "", BEREN.toString()));
-        assertEquals(java.util.Collections.singletonList("Friend"),
+        assertTrue("nothing reads as Beren yet", ClientChatTypingState.namesTyping(beren).isEmpty());
+        choose(row, BEREN);
+        ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
+                "Steve", "Friend", false, true, "", BEREN.toString()));
+        assertEquals(Collections.singletonList("Friend"),
                 ClientChatTypingState.namesTyping(beren));
         assertTrue(ClientChatTypingState.namesTyping(
                 ConversationPage.whisper("Steve", "Another character", BEREN.toString())).isEmpty());
@@ -168,13 +190,13 @@ public final class ChatIdentityViewTest {
     @Test
     public void theNarratorTypesUnderThisGamesName() {
         roster();
-        ClientChatIdentities.select(identityOf(BEREN));
+        choose(ChatLayout.openTab(ConversationPage.whisper("Steve", "Steve"), null), BEREN);
         ConversationPage told = ConversationPage.whisper("Steve",
                 com.ninuna.losttales.chat.ChatNarrator.NAME, BEREN.toString());
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
                 "Steve", com.ninuna.losttales.chat.ChatNarrator.NAME, true, true, "",
                 BEREN.toString()));
-        assertEquals(java.util.Collections.singletonList(
+        assertEquals(Collections.singletonList(
                 com.ninuna.losttales.chat.ChatNames.narrator(
                         com.ninuna.losttales.util.LostTalesWords.LANG)),
                 ClientChatTypingState.namesTyping(told));
@@ -185,13 +207,12 @@ public final class ChatIdentityViewTest {
     }
 
     /**
-     * The last channel stays selected across an identity switch: Faction
-     * follows the new identity's faction rather than moving, while the
-     * Fellowship tab, gone when the new identity is in no fellowship, hands the
-     * selection on as a closed tab does.
+     * The channel selected stays selected as its copy speaks as another:
+     * Faction shows the new identity's faction rather than moving, and a
+     * fellowship's conversation, the character played's, stays too.
      */
     @Test
-    public void keepingTheLastChannelDoesNotDependOnMembership() {
+    public void keepingTheLastChannelDoesNotDependOnWhoACopySpeaksAs() {
         roster();
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION}) {
@@ -199,24 +220,23 @@ public final class ChatIdentityViewTest {
             // Opening and resizing the screen both use this availability check.
             ClientChatChannelState.ensureAvailable();
             assertEquals(channel, ClientChatChannelState.getSelected().getChannel());
-            ClientChatIdentities.select(identityOf(BEREN));
+            choose(ClientChatChannelState.getSelected(), BEREN);
             ClientChatChannelState.ensureAvailable();
             assertEquals(channel, ClientChatChannelState.getSelected().getChannel());
-            ClientChatIdentities.select(identityOf(ALDRIC));
+            choose(ClientChatChannelState.getSelected(), ALDRIC);
         }
         UUID fellowship = new UUID(5L, 5L);
-        ClientChatIdentitySelection.accept(sync(ALDRIC, fellowship, 0x123456));
+        ClientChatIdentitySelection.accept(sync(fellowship, 0x123456));
         ConversationPage conversation = ConversationPage.of(ChatChannel.FELLOWSHIP, fellowship.toString());
         ChatLayout.openTab(conversation, null);
         ClientChatChannelState.select(conversation);
-        assertEquals(ChatChannel.FELLOWSHIP, ClientChatChannelState.getSelected().getChannel());
-        ClientChatIdentities.select(identityOf(BEREN));
+        choose(ConversationPage.of(ChatChannel.GLOBAL), BEREN);
         ClientChatChannelState.ensureAvailable();
-        assertNotEquals(ChatChannel.FELLOWSHIP, ClientChatChannelState.getSelected().getChannel());
+        assertEquals(ChatChannel.FELLOWSHIP, ClientChatChannelState.getSelected().getChannel());
     }
 
     @Test
-    public void bubblesRespectTheSelectedFactionAndIgnoreAccountChannels() {
+    public void bubblesRespectTheFactionsReadAndIgnoreAccountChannels() {
         roster();
         UUID speaker = new UUID(10L, 20L);
         LostTalesChatMessagePacket packet =
@@ -224,7 +244,7 @@ public final class ChatIdentityViewTest {
                         .sender(speaker).colors(0, 0).build().withScope(ROHAN);
         ChatSpeechBubbles.receive(packet);
         assertTrue(ChatSpeechBubbles.isEmpty());
-        ClientChatIdentities.select(identityOf(BEREN));
+        choose(ConversationPage.of(ChatChannel.FACTION), BEREN);
         ChatSpeechBubbles.receive(packet);
         assertFalse(ChatSpeechBubbles.isEmpty());
         ChatSpeechBubbles.clear();
@@ -240,7 +260,7 @@ public final class ChatIdentityViewTest {
     public void everyRoleplayingChannelProducesBubblesForItsRecipient() {
         roster();
         UUID fellowship = new UUID(1L, 2L);
-        ClientChatIdentitySelection.accept(sync(ALDRIC, fellowship, 0));
+        ClientChatIdentitySelection.accept(sync(fellowship, 0));
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.FELLOWSHIP, ChatChannel.WHISPER}) {
             ChatSpeechBubbles.clear();
@@ -253,8 +273,9 @@ public final class ChatIdentityViewTest {
             ChatSpeechBubbles.receive(packet);
             assertFalse(channel.getId(), ChatSpeechBubbles.isEmpty());
         }
-        ClientChatIdentities.select(identityOf(BEREN));
-        assertTrue(ChatSpeechBubbles.isEmpty());
+        choose(ConversationPage.of(ChatChannel.GLOBAL), BEREN);
+        assertFalse("a copy speaking as another touches nothing over the heads",
+                ChatSpeechBubbles.isEmpty());
     }
 
     private static final UUID CIRION =
@@ -296,30 +317,33 @@ public final class ChatIdentityViewTest {
         return characterId.toString().toLowerCase(Locale.ROOT);
     }
 
-    private static ClientChatIdentities.Identity identityOf(UUID characterId) {
+    /** Has the copy speak as the character. */
+    private static void choose(ConversationPage copy, UUID characterId) {
         for (ClientChatIdentities.Identity identity
                 : ClientChatIdentities.characterIdentities()) {
             if (characterId.equals(identity.characterId)) {
-                return identity;
+                ClientChatIdentities.select(copy, identity);
+                return;
             }
         }
         throw new IllegalStateException("no such character on the roster");
     }
 
     /**
-     * Reading as another identity leaves the character being played
-     * exactly where it was. This is the whole promise: the chat never
-     * moves anyone in the world.
+     * A copy speaking as another identity leaves the character being
+     * played exactly where it was. This is the whole promise: the chat
+     * never moves anyone in the world.
      */
     @Test
-    public void readingAsAnotherIdentityNeverChangesWhoIsPlayed() {
+    public void speakingAsAnotherIdentityNeverChangesWhoIsPlayed() {
         roster();
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         assertEquals(keyOf(ALDRIC), ClientChatIdentities.activeIdentityKey());
-        assertEquals(keyOf(ALDRIC), ClientChatIdentities.viewIdentityKey());
+        assertEquals(keyOf(ALDRIC), ClientChatIdentities.viewIdentityKey(global));
 
-        ClientChatIdentities.select(identityOf(BEREN));
-        assertEquals("the chat is read as Beren", keyOf(BEREN),
-                ClientChatIdentities.viewIdentityKey());
+        choose(global, BEREN);
+        assertEquals("the copy speaks as Beren", keyOf(BEREN),
+                ClientChatIdentities.viewIdentityKey(global));
         assertEquals("Aldric is still the one being played", keyOf(ALDRIC),
                 ClientChatIdentities.activeIdentityKey());
         assertEquals(ALDRIC, ClientCharacterRosterCache.getSnapshot()
@@ -327,30 +351,32 @@ public final class ChatIdentityViewTest {
     }
 
     /**
-     * A faction's talk is one conversation per identity. The row keeps
-     * one Faction tab, and the lines under it are the ones said to the
-     * faction of the identity being read — never the other's.
+     * A faction's talk is one conversation per faction. The row keeps one
+     * Faction tab, and each copy of it shows the talk of the faction its
+     * identity is in — never another's.
      */
     @Test
-    public void theFactionTabShowsTheFactionOfTheIdentityBeingRead() {
+    public void eachFactionCopyShowsTheFactionOfWhomItSpeaksAs() {
         roster();
         ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
         ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
         ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
         assertNotEquals("the two conversations are two tabs", gondor, rohan);
 
-        // Read as Aldric: the row stands for Gondor's talk.
+        // Speaking as Aldric: the row stands for Gondor's talk.
         assertEquals(gondor, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(gondor));
         assertFalse("Rohan's lines are not shown under it",
                 ChatLineFilter.of(row).accepts(rohan));
 
-        // Read as Beren: the same row stands for Rohan's.
-        ClientChatIdentities.select(identityOf(BEREN));
+        // Speaking as Beren: the same row stands for Rohan's.
+        choose(row, BEREN);
         assertEquals(rohan, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(rohan));
         assertFalse("Gondor's lines are no longer shown under it",
                 ChatLineFilter.of(row).accepts(gondor));
+        assertEquals("a second copy still shows Gondor's",
+                gondor.withInstance(2), ConversationPage.viewed(row.withInstance(2)));
     }
 
     /**
@@ -401,8 +427,8 @@ public final class ChatIdentityViewTest {
     }
 
     /**
-     * Reading as the other identity is reading another conversation, and
-     * its unread state is that conversation's own.
+     * A copy speaking as the other identity reads another conversation,
+     * and its unread state is that conversation's own.
      */
     @Test
     public void eachConversationKeepsItsOwnUnreadState() {
@@ -413,11 +439,11 @@ public final class ChatIdentityViewTest {
                 ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertEquals(1, ClientChatChannelViews.unreadCount(row));
 
-        ClientChatIdentities.select(identityOf(BEREN));
+        choose(row, BEREN);
         assertEquals("Rohan's conversation has heard nothing",
                 0, ClientChatChannelViews.unreadCount(row));
 
-        ClientChatIdentities.select(identityOf(ALDRIC));
+        choose(row, ALDRIC);
         assertEquals("Gondor's is still waiting to be read",
                 1, ClientChatChannelViews.unreadCount(row));
     }
@@ -428,34 +454,34 @@ public final class ChatIdentityViewTest {
         roster();
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         assertEquals(global, ConversationPage.viewed(global));
-        ClientChatIdentities.select(identityOf(BEREN));
+        choose(global, BEREN);
         assertEquals("still the one tab, still its one conversation",
                 global, ConversationPage.viewed(global));
         assertTrue(ChatLineFilter.of(global).accepts(global));
     }
 
     /**
-     * A conversation is shown only while the chat is read as the
-     * identity holding it: what was said as Aldric is not on screen
-     * while the player reads as Beren, and comes back when they read as
-     * Aldric again.
+     * A conversation is shown only while a copy speaks as the identity
+     * holding it, or that identity is the one played: what was said as
+     * Beren is off screen until a copy speaks as Beren again.
      */
     @Test
-    public void aConversationIsShownOnlyToTheIdentityHoldingIt() {
+    public void aConversationIsShownOnlyWhileItsIdentityIsRead() {
         roster();
+        ConversationPage row = ChatLayout.openTab(ConversationPage.whisper("Steve", "Faramir"), null);
         ConversationPage held = ConversationPage.whisper("Steve", "Faramir", keyOf(ALDRIC));
         ConversationPage berens = ConversationPage.whisper("Steve", "Faramir", keyOf(BEREN));
         assertTrue(ClientChatChannelState.isAvailable(held));
         assertFalse(ClientChatChannelState.isAvailable(berens));
 
-        ClientChatIdentities.select(identityOf(BEREN));
-        assertFalse("Aldric's conversation is off screen while Beren reads",
+        choose(row, BEREN);
+        assertTrue("Aldric is played, so his conversation stays",
                 ClientChatChannelState.isAvailable(held));
         assertTrue(ClientChatChannelState.isAvailable(berens));
 
-        ClientChatIdentities.select(identityOf(ALDRIC));
-        assertTrue("and back the moment Aldric is read as again",
-                ClientChatChannelState.isAvailable(held));
+        choose(row, ALDRIC);
+        assertFalse("and Beren's goes once no copy speaks as him",
+                ClientChatChannelState.isAvailable(berens));
     }
 
     /**
@@ -470,12 +496,12 @@ public final class ChatIdentityViewTest {
         ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
         ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
 
-        assertEquals("read as Aldric, the row is Gondor's talk",
+        assertEquals("speaking as Aldric, the row is Gondor's talk",
                 gondor, ConversationPage.viewed(row));
         assertTrue(ChatLineFilter.of(row).accepts(gondor));
 
-        ClientChatIdentities.select(identityOf(CIRION));
-        assertEquals("read as Cirion, the same conversation",
+        choose(row, CIRION);
+        assertEquals("speaking as Cirion, the same conversation",
                 gondor, ConversationPage.viewed(row));
         assertTrue("Gondor's lines are still shown",
                 ChatLineFilter.of(row).accepts(gondor));
@@ -510,20 +536,16 @@ public final class ChatIdentityViewTest {
         ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
         ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
         ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
-        try {
-            ClientChatChannelViews.record(-501, gondor, row, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-            assertEquals("read as Aldric, Gondor's talk is on screen",
-                    0, ClientChatChannelViews.unreadCount(row));
+        ClientChatChannelViews.record(-501, gondor, row, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        assertEquals("speaking as Aldric, Gondor's talk is on screen",
+                0, ClientChatChannelViews.unreadCount(row));
 
-            // The other faction's talk is not on screen and is counted.
-            ClientChatChannelViews.record(-502, rohan, row, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
-            assertEquals(0, ClientChatChannelViews.unreadCount(row));
-            ClientChatIdentities.select(identityOf(BEREN));
-            assertEquals("and is waiting when it is read as",
-                    1, ClientChatChannelViews.unreadCount(row));
-        } finally {
-            ClientChatChannelViews.clear();
-        }
+        // The other faction's talk is not on screen and is counted.
+        ClientChatChannelViews.record(-502, rohan, row, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        assertEquals(0, ClientChatChannelViews.unreadCount(row));
+        choose(row, BEREN);
+        assertEquals("and is waiting when a copy speaks as Beren",
+                1, ClientChatChannelViews.unreadCount(row));
     }
 
     /**
@@ -562,16 +584,29 @@ public final class ChatIdentityViewTest {
                 ConversationPage.fromId("faction|own:" + keyOf(BEREN)));
     }
 
+    /** The closed feed shows what the character played reads, whoever the copies speak as. */
+    @Test
+    public void theFeedShowsWhatTheCharacterPlayedReads() {
+        roster();
+        choose(ConversationPage.of(ChatChannel.FACTION), BEREN);
+        ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
+        ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
+        assertTrue(ChatLayout.feedTabs().contains(gondor));
+        assertFalse(ChatLayout.feedTabs().contains(rohan));
+        assertTrue(ChatLayout.feedFilter().accepts(gondor));
+        assertFalse(ChatLayout.feedFilter().accepts(rohan));
+    }
+
     /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
     private static void scroll(ConversationPage tab, int lines, int totalLines, double roomLines) {
         double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
         ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
     }
 
-    /** The server's answer: the identity, in one fellowship whose name follows its id. */
-    private static LostTalesChatIdentitySyncPacket sync(UUID identity, UUID fellowship, int color) {
-        return new LostTalesChatIdentitySyncPacket(identity, Collections.singletonList(
-                new ChatFellowship(fellowship, "Company " + fellowship.getLeastSignificantBits(),
-                        color)), false);
+    /** The server's answer: the character played in one fellowship whose name follows its id. */
+    private static LostTalesChatIdentitySyncPacket sync(UUID fellowship, int color) {
+        return new LostTalesChatIdentitySyncPacket(Collections.<UUID>emptyList(),
+                Collections.singletonList(new ChatFellowship(fellowship,
+                        "Company " + fellowship.getLeastSignificantBits(), color)));
     }
 }

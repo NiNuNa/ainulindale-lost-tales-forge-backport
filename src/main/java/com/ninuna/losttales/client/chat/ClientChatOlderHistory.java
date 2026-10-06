@@ -66,8 +66,8 @@ final class ClientChatOlderHistory {
         }
         // A whisper names its conversation by the tab's id — the one held
         // as the identity being read; a scoped channel by the conversation.
-        String scope = view.isWhisper() ? ConversationPage.viewed(view).id()
-                : ClientChatContextHistory.scopeOf(ConversationPage.viewed(view));
+        String scope = view.isWhisper() ? ConversationPage.viewedConversation(view).id()
+                : ClientChatContextHistory.scopeOf(ConversationPage.viewedConversation(view));
         if (!view.isWhisper()
                 && view.getChannel().isScoped() == (scope.length() == 0)) {
             return false;
@@ -188,6 +188,6 @@ final class ClientChatOlderHistory {
     }
 
     private static ConversationPage key(ConversationPage tab) {
-        return tab == null ? null : ConversationPage.viewed(tab);
+        return tab == null ? null : ConversationPage.viewedConversation(tab);
     }
 }

@@ -76,6 +76,8 @@ public final class ToolStrip {
         SETTINGS,
         /** The split view button: the pages that can stand beside the tab in front, or its split's rows. */
         SPLIT,
+        /** The duplicate button: another copy of the page in front, right after it. */
+        DUPLICATE,
         /** The full window button: the tab in front filling its window. */
         VIEW,
         MEMBERS_TOGGLE,
@@ -158,6 +160,11 @@ public final class ToolStrip {
             LostTalesUiSheet.FULLSCREEN.getHeight();
     private static final int SPLIT_WIDTH = LostTalesUiSheet.SPLIT.getWidth();
     private static final int SPLIT_HEIGHT = LostTalesUiSheet.SPLIT.getHeight();
+    /** The duplicate button: the copy glyph, until Nils draws its own. */
+    private static final LostTalesUiSheet DUPLICATE_GLYPH = LostTalesUiSheet.COPY;
+    private static final LostTalesUiSheet DUPLICATE_LIT = LostTalesUiSheet.COPY_HOVER;
+    private static final int DUPLICATE_WIDTH = DUPLICATE_GLYPH.getWidth();
+    private static final int DUPLICATE_HEIGHT = DUPLICATE_GLYPH.getHeight();
     /** The overflow button: the chevron a list opens from, until Nils draws its own. */
     private static final LostTalesUiSheet OVERFLOW_GLYPH = LostTalesUiSheet.CHEVRON_1;
     private static final LostTalesUiSheet OVERFLOW_LIT = LostTalesUiSheet.CHEVRON_1_HOVER;
@@ -190,6 +197,7 @@ public final class ToolStrip {
         int overflowX = -1;
         int settingsX;
         int splitX;
+        int duplicateX;
         int viewX;
         int membersX;
         int helpX;
@@ -222,6 +230,8 @@ public final class ToolStrip {
         final LostTalesUiButtonMotion membersMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion splitMotion =
+                new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+        final LostTalesUiButtonMotion duplicateMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion viewMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
@@ -331,8 +341,8 @@ public final class ToolStrip {
      * centred under the tab search; the help button against the strip's
      * right end, {@link #EDGE_MARGIN} in; the well before it, a third of
      * the strip wide; before the well the member list's button where the
-     * strip has one, the full window button, the split view button and
-     * the cog. A
+     * strip has one, the full window button, the duplicate button, the
+     * split view button and the cog. A
      * strip whose third is too narrow for a well, or leaves the buttons no
      * room, keeps none, and the buttons stand before the help button. A
      * {@code count} stands its text, {@code countWidth} wide, inside the
@@ -358,7 +368,7 @@ public final class ToolStrip {
         laid.wellLeft = laid.wellRight
                 - Math.floorDiv(stripRight - stripLeft, 3);
         int buttons = COG_WIDTH + END_GAP + SPLIT_WIDTH + END_GAP
-                + VIEW_WIDTH + END_GAP
+                + DUPLICATE_WIDTH + END_GAP + VIEW_WIDTH + END_GAP
                 + (members ? MEMBERS_WIDTH + END_GAP : 0);
         int floor = panelWidth > 0 ? laid.panelX + panelWidth + END_GAP
                 : searchButtonLeft + searchButtonSize + END_GAP;
@@ -369,7 +379,8 @@ public final class ToolStrip {
         laid.membersX = buttonsRight - MEMBERS_WIDTH;
         laid.viewX = (members ? laid.membersX - END_GAP : buttonsRight)
                 - VIEW_WIDTH;
-        laid.splitX = laid.viewX - END_GAP - SPLIT_WIDTH;
+        laid.duplicateX = laid.viewX - END_GAP - DUPLICATE_WIDTH;
+        laid.splitX = laid.duplicateX - END_GAP - SPLIT_WIDTH;
         laid.settingsX = laid.splitX - END_GAP - COG_WIDTH;
         laid.iconSlotLeft = laid.wellRight - WELL_INSET
                 - LostTalesUiSheet.SEARCH.getWidth();
@@ -558,6 +569,9 @@ public final class ToolStrip {
                 under, Part.SPLIT, LostTalesUiSheet.SPLIT,
                 LostTalesUiSheet.SPLIT_LIT, laid.splitX,
                 glyphTop(laid, SPLIT_HEIGHT), now, ink);
+        drawButton(state.duplicateMotion, front.opensMoreThanOnce(), false,
+                under, Part.DUPLICATE, DUPLICATE_GLYPH, DUPLICATE_LIT,
+                laid.duplicateX, glyphTop(laid, DUPLICATE_HEIGHT), now, ink);
         drawButton(state.viewMotion, true, false, under, Part.VIEW,
                 LostTalesUiSheet.FULLSCREEN, LostTalesUiSheet.FULLSCREEN_HOVER,
                 laid.viewX, glyphTop(laid, VIEW_HEIGHT), now, ink);
@@ -788,6 +802,11 @@ public final class ToolStrip {
                         : StatCollector.translateToLocalFormatted(
                                 "gui.losttales.window.split.nothing",
                                 front.title());
+            case DUPLICATE:
+                return front.opensMoreThanOnce() ? ""
+                        : StatCollector.translateToLocalFormatted(
+                                "gui.losttales.window.tab.duplicate.once",
+                                front.title());
             case FIELD:
             case ICON:
                 return front.searchUnavailable();
@@ -842,6 +861,10 @@ public final class ToolStrip {
         if (glyphBox(laid, laid.splitX, SPLIT_WIDTH, SPLIT_HEIGHT)
                 .contains(x, y)) {
             return Part.SPLIT;
+        }
+        if (glyphBox(laid, laid.duplicateX, DUPLICATE_WIDTH, DUPLICATE_HEIGHT)
+                .contains(x, y)) {
+            return Part.DUPLICATE;
         }
         if (glyphBox(laid, laid.viewX, VIEW_WIDTH, VIEW_HEIGHT).contains(x, y)) {
             return Part.VIEW;
@@ -952,6 +975,9 @@ public final class ToolStrip {
             case SPLIT:
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.split.title");
+            case DUPLICATE:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.window.tab.duplicate");
             case HELP:
                 return StatCollector.translateToLocalFormatted(
                         "gui.losttales.window.help", front.title());

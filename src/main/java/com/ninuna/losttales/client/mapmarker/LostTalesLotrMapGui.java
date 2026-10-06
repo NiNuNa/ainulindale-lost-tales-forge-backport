@@ -8,8 +8,8 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
+import com.ninuna.losttales.client.window.LostTalesMenuPage;
 import com.ninuna.losttales.client.window.WindowScreen;
-import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipPersonalMarkerOwner;
@@ -2967,11 +2967,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         clearSearchSelectionFrame();
-        if (LostTalesKeyBindings.isCharacterMenuKey(keyCode)) {
-            // The menu goes back to the screen it opened over: the window
-            // screen, for the map in a window.
-            this.mc.displayGuiScreen(new LostTalesCharacterMenuGui(
-                    this.page != null ? this.mc.currentScreen : this));
+        if (LostTalesKeyBindings.isMenuKey(keyCode)) {
+            WindowScreen.openPage(LostTalesMenuPage.PAGE_ID);
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {

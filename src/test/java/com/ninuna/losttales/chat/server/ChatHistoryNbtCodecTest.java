@@ -423,10 +423,10 @@ public final class ChatHistoryNbtCodecTest {
         assertTrue(result.getQuarantineEntriesCopy().isEmpty());
         ChatHistory.clear();
         ChatHistory.restore(result.getEntries());
-        assertTrue(ChatHistory.reactionsFor(reacted, BOB).find("smile").mine);
+        assertTrue(ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find("smile").isMine(BOB));
         assertEquals("Nils",
-                ChatHistory.reactionsFor(reacted, BOB).find("joy").names.get(0));
-        assertTrue(ChatHistory.reactionsFor(plain, BOB).isEmpty());
+                ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find("joy").names.get(0));
+        assertTrue(ChatHistory.reactionsFor(plain, Collections.singleton(BOB)).isEmpty());
     }
 
     @Test
@@ -519,10 +519,10 @@ public final class ChatHistoryNbtCodecTest {
         assertTrue(result.getQuarantineEntriesCopy().isEmpty());
         ChatHistory.clear();
         ChatHistory.restore(result.getEntries());
-        assertEquals(1, ChatHistory.reactionsFor(reacted, BOB).find(parrot).count);
-        assertTrue(ChatHistory.reactionsFor(reacted, BOB).find(parrot).mine);
+        assertEquals(1, ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find(parrot).count);
+        assertTrue(ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find(parrot).isMine(BOB));
         assertEquals("Nils",
-                ChatHistory.reactionsFor(reacted, BOB).find(unicorn).names.get(0));
+                ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find(unicorn).names.get(0));
     }
 
     /**
@@ -562,12 +562,12 @@ public final class ChatHistoryNbtCodecTest {
                 result.wasRepaired());
         ChatHistory.clear();
         ChatHistory.restore(result.getEntries());
-        assertEquals(1, ChatHistory.reactionsFor(reacted, BOB)
+        assertEquals(1, ChatHistory.reactionsFor(reacted, Collections.singleton(BOB))
                 .getReactions().size());
-        assertEquals(2, ChatHistory.reactionsFor(reacted, BOB)
+        assertEquals(2, ChatHistory.reactionsFor(reacted, Collections.singleton(BOB))
                 .find("grinning").count);
-        assertTrue(ChatHistory.reactionsFor(reacted, BOB)
-                .find("grinning").mine);
+        assertTrue(ChatHistory.reactionsFor(reacted, Collections.singleton(BOB))
+                .find("grinning").isMine(BOB));
 
         NBTTagCompound again = new NBTTagCompound();
         ChatHistoryNbtCodec.write(again, ChatHistory.snapshot(),

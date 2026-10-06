@@ -2,24 +2,22 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
 /**
  * The window's own menus: a tab's options, behind the three dots on the
  * tab or under a right-click on it; a window's, Window
- * Options, behind the three dots at the end of its row; the {@code +},
- * listing what can be opened again; the tab search over every tab, open
- * or not; and the quick switcher, the tab search with what the pages find
- * besides. What a tab's options hold is the tab's own
+ * Options, behind the three dots at the end of its row; a category's,
+ * under a right-click on its name on the Lost Tales Menu; the tab search
+ * over every tab, open or not; and the quick switcher, the tab search with
+ * what the pages find besides. What a tab's options hold is the tab's own
  * ({@link WindowPage#options}, which its tool strip also shows as
- * buttons) and then its kind's settings; what can be
- * opened is each system's ({@link ScreenPart#addOpenable}) and the pages
- * no window holds; what a page finds is its own ({@link PageContent#find}).
- * The tool strip's cog opens the settings of the tab's kind at once.
+ * buttons) and then its kind's settings; what can be opened is each
+ * system's ({@link ScreenPart#addEveryPage}) and every page registered;
+ * what a page finds is its own ({@link PageContent#find}). The tool
+ * strip's cog opens the settings of the tab's kind at once.
  */
 final class TabMenus {
     /** The switch that pins a window to the HUD, where it stays while playing. */
@@ -28,11 +26,6 @@ final class TabMenus {
     private static final String ENTRY_PIN_GUI = "window:pin_gui";
     /** Marks a search row that jumps to a tab already open. */
     private static final String ENTRY_OPEN_PREFIX = "open:";
-    /** What a category's name in the {@code +} is taken by, before the category. */
-    private static final String ENTRY_FOLD_PREFIX = "fold:";
-    /** The categories folded away in the {@code +}, for the session. */
-    private static final Set<PageCategory> FOLDED =
-            EnumSet.noneOf(PageCategory.class);
     /** Marks a row a page found: this, the page's id, a colon, and the row's own id. */
     private static final String ENTRY_FIND_PREFIX = "find:";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
@@ -61,6 +54,8 @@ final class TabMenus {
     private static final String STRIP_MEMBERS = "strip:members";
     private static final String STRIP_SEARCH = "strip:search";
     private static final String STRIP_HELP = "strip:help";
+    /** The row of a page's options that opens another copy of it right after it. */
+    private static final String TAB_DUPLICATE = "tab:duplicate";
 
     private final WindowScreen screen;
     private final WindowMenus menus;
@@ -73,7 +68,6 @@ final class TabMenus {
         menus.register(SubWindowKind.PICK, new PickSource());
         menus.register(SubWindowKind.SPLIT, new SplitSource());
         menus.register(SubWindowKind.WINDOW, new WindowSource());
-        menus.register(SubWindowKind.OPEN, new OpenSource());
         menus.register(SubWindowKind.CATEGORY, new CategorySource());
         menus.register(SubWindowKind.CATEGORY_PICK, new CategoryPickSource());
         menus.register(SubWindowKind.TAB_SEARCH, new SearchSource(
@@ -129,6 +123,7 @@ final class TabMenus {
         }
         rows.add(settingsRow(tab));
         rows.add(splitViewRow(tab));
+        rows.add(duplicateRow(tab));
         rows.add(new MenuWindow.Entry(STRIP_FULL_WINDOW,
                 StatCollector.translateToLocal("gui.losttales.window.option.full_window"))
                 .withSprite(LostTalesUiSheet.FULLSCREEN,
@@ -161,44 +156,11 @@ final class TabMenus {
     }
 
     /**
-     * Whether the split view does anything for {@code tab}: it stands in a
-     * split, another open page could stand beside it, or something closed
-     * could open beside it. Asked every frame by the split view button.
+     * Whether the split view does anything for {@code tab}: it is open, and
+     * a copy of any page can always come to stand beside it.
      */
     static boolean canSplit(WindowPage tab) {
-        Window window = WindowLayout.windowOf(tab);
-        if (window == null) {
-            return false;
-        }
-        if (window.splitOf(tab) != null) {
-            return true;
-        }
-        for (Window from : WindowLayout.windows()) {
-            for (WindowPage other : from.getTabs()) {
-                if (canSplitWith(window, tab, from, other)) {
-                    return true;
-                }
-            }
-        }
-        return hasClosed();
-    }
-
-    /** Whether the {@code +} has anything to open: a closed channel, someone to whisper to, a page no window holds. */
-    private static boolean hasClosed() {
-        for (WindowPages.Page page : WindowPages.all()) {
-            if (WindowPages.isOffered(page)) {
-                return true;
-            }
-        }
-        WindowScreen screen = WindowScreen.current();
-        if (screen != null) {
-            for (ScreenPart part : screen.parts()) {
-                if (part.hasRestorable()) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return WindowLayout.windowOf(tab) != null;
     }
 
     /**
@@ -281,6 +243,22 @@ final class TabMenus {
     }
 
     /**
+     * The row of a page's options that opens another copy of it, with a
+     * view of its own, right after it, as the strip's duplicate button
+     * does: greyed, saying why, for a page that opens once. A locked
+     * window's copy opens in another window.
+     */
+    private static MenuWindow.Entry duplicateRow(WindowPage tab) {
+        MenuWindow.Entry row = new MenuWindow.Entry(TAB_DUPLICATE,
+                StatCollector.translateToLocal("gui.losttales.window.tab.duplicate"))
+                .withSprite(LostTalesUiSheet.COPY, LostTalesUiSheet.COPY_HOVER,
+                        false);
+        return tab.opensMoreThanOnce() ? row
+                : row.unavailable(StatCollector.translateToLocalFormatted(
+                        "gui.losttales.window.tab.duplicate.once", tab.title()));
+    }
+
+    /**
      * The tab's split view, in a sub-window of its own at {@code place}:
      * a switch, as its button is.
      */
@@ -328,19 +306,16 @@ final class TabMenus {
     }
 
     /**
-     * Opens {@code closed} and shows it beside {@code tab}: it opens where
-     * the {@code +} would put it and comes over into a split, and takes the
-     * keys. Nothing while the padlock holds the window.
+     * Opens a new copy of {@code page} and shows it beside {@code tab}: it
+     * opens where a page opened by hand opens and comes over into a split,
+     * and takes the keys. Nothing while the padlock holds the window.
      */
-    private void openBeside(WindowPage tab, WindowPage closed) {
+    private void openBeside(WindowPage tab, WindowPage page) {
         Window window = WindowLayout.windowOf(tab);
-        if (closed == null || window == null || window.isLocked()) {
+        if (page == null || window == null || window.isLocked()) {
             return;
         }
-        WindowPage opened = WindowLayout.openTab(closed, window.getId());
-        if (opened == null) {
-            opened = WindowLayout.openInNewWindow(closed);
-        }
+        WindowPage opened = WindowLayout.openCopy(page, window.getId());
         if (opened != null && WindowLayout.split(tab, opened)) {
             this.screen.jumpToTab(opened);
         }
@@ -543,19 +518,8 @@ final class TabMenus {
     }
 
     /**
-     * The {@code +} menu for a window, hung from its control, or — from
-     * the keyboard ({@code anchor} null) — from the row of the window, else
-     * from the middle of the bare screen; a switch like its control.
-     * Nothing opens while there is nothing to open.
-     */
-    void toggleOpen(Window window, SubWindowAnchor anchor) {
-        String windowId = window == null ? null : window.getId();
-        this.menus.show(SubWindowKind.OPEN, windowId,
-                placeFor(windowId, anchor), true);
-    }
-
-    /**
-     * The tab search for a window, hung as the {@code +} is. A switch:
+     * The tab search for a window, hung from its control, or from the
+     * keyboard from its row's left end. A switch:
      * out for this window already, it goes away; out for another, it
      * turns to this one and starts afresh.
      */
@@ -566,9 +530,9 @@ final class TabMenus {
     }
 
     /**
-     * Where the {@code +} or the tab search opens: from the control
-     * pressed, else from the left end of the window's row as the keyboard
-     * opens it, else in the middle of the bare screen.
+     * Where the tab search opens: from the control pressed, else from the
+     * left end of the window's row as the keyboard opens it, else in the
+     * middle of the bare screen.
      */
     private WindowMenus.FirstPlace placeFor(String windowId,
                                             SubWindowAnchor anchor) {
@@ -608,49 +572,41 @@ final class TabMenus {
     /* ---- The rows ---- */
 
     /**
-     * What can be opened, by category ({@link PageCategory}): each system's
-     * closed pages, the pages no window holds and, but in the
-     * {@code search}, the pages the view hides, which show where they stand
-     * once picked; narrowed by {@code filter}. The {@code search} lists the
-     * open pages itself, so it leaves out what is open already.
+     * Every page that can be opened, by category ({@link PageCategory}):
+     * each system's ({@link ScreenPart#addEveryPage}) and every page
+     * registered but those standing for a thing in the world, open already
+     * or not, narrowed by {@code filter}. A row opens a new copy.
      */
-    private List<MenuWindow.Entry> openRows(String filter, boolean search) {
+    List<MenuWindow.Entry> pageRows(String filter) {
+        return byCategory(everyPage(this.screen, filter));
+    }
+
+    /** Every page that can be opened, as rows, in no order: the systems' first, then the registered pages. */
+    static List<MenuWindow.Entry> everyPage(WindowScreen screen, String filter) {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
-        for (ScreenPart part : this.screen.parts()) {
-            part.addOpenable(rows, filter, search);
+        if (screen != null) {
+            for (ScreenPart part : screen.parts()) {
+                part.addEveryPage(rows, filter);
+            }
         }
         for (WindowPages.Page page : WindowPages.all()) {
             OtherPage tab = page.tab();
             if (WindowPages.isOffered(page)
+                    && page.category() != PageCategory.MENU
                     && WindowMenus.matchesFilter(page.title(), filter)) {
                 rows.add(new MenuWindow.Entry(tab.id(), page.title(), false,
                         -1, tab));
             }
         }
-        if (!search) {
-            for (Window window : WindowLayout.windows()) {
-                for (WindowPage tab : window.getTabs()) {
-                    if (tab.isAvailable() && !WindowView.shows(tab)
-                            && tab.answers(filter)) {
-                        rows.add(new MenuWindow.Entry(
-                                ENTRY_OPEN_PREFIX + tab.id(), tab.title(),
-                                tab.isMuted(), tab.tone(), tab));
-                    }
-                }
-            }
-        }
-        return byCategory(rows, !search && filter.length() == 0);
+        return rows;
     }
 
     /**
      * The rows under their categories' names, in the categories' order,
      * each subcategory's under its own name after its category's rows; a
-     * category with nothing to offer is left out. With {@code folds} each
-     * name folds its rows away and back, a subcategory's with its
-     * category's; a name with words typed under it folds nothing.
+     * category with nothing to offer is left out.
      */
-    static List<MenuWindow.Entry> byCategory(List<MenuWindow.Entry> rows,
-                                             boolean folds) {
+    static List<MenuWindow.Entry> byCategory(List<MenuWindow.Entry> rows) {
         List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
         for (PageCategory category : PageCategory.values()) {
             if (category.parent() != null) {
@@ -666,26 +622,19 @@ final class TabMenus {
             if (own.isEmpty() && subs.isEmpty()) {
                 continue;
             }
-            boolean folded = folds && FOLDED.contains(category);
-            entries.add(heading(category, folds, folded, 0));
-            if (folded) {
-                continue;
-            }
+            entries.add(MenuWindow.Entry.header(category.title()));
             entries.addAll(own);
             for (PageCategory sub : subs) {
-                boolean subFolded = folds && FOLDED.contains(sub);
-                entries.add(heading(sub, folds, subFolded, 1));
-                if (!subFolded) {
-                    entries.addAll(rowsOf(rows, sub));
-                }
+                entries.add(MenuWindow.Entry.header(sub.title()));
+                entries.addAll(rowsOf(rows, sub));
             }
         }
         return entries;
     }
 
     /** The rows whose page is of {@code category}. */
-    private static List<MenuWindow.Entry> rowsOf(List<MenuWindow.Entry> rows,
-                                                 PageCategory category) {
+    static List<MenuWindow.Entry> rowsOf(List<MenuWindow.Entry> rows,
+                                         PageCategory category) {
         List<MenuWindow.Entry> of = new ArrayList<MenuWindow.Entry>();
         for (MenuWindow.Entry row : rows) {
             if (row.icon != null && row.icon.category() == category) {
@@ -693,28 +642,6 @@ final class TabMenus {
             }
         }
         return of;
-    }
-
-    /** A category's name over its rows: one that folds them, or a plain one. */
-    private static MenuWindow.Entry heading(PageCategory category,
-                                            boolean folds, boolean folded,
-                                            int depth) {
-        return folds ? MenuWindow.Entry.fold(
-                        ENTRY_FOLD_PREFIX + category.name(), category.title(),
-                        folded, depth)
-                : MenuWindow.Entry.header(category.title());
-    }
-
-    /** Folds a category's rows away in the {@code +}, or brings them back. */
-    static void toggleFold(PageCategory category) {
-        if (!FOLDED.remove(category)) {
-            FOLDED.add(category);
-        }
-    }
-
-    /** Leaving the world unfolds every category again. */
-    static void clearFolds() {
-        FOLDED.clear();
     }
 
     /**
@@ -742,7 +669,7 @@ final class TabMenus {
         }
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
                 "gui.losttales.window.search.open"), open);
-        entries.addAll(openRows(filter, true));
+        entries.addAll(pageRows(filter));
         if (findInPages && filter.trim().length() > 0) {
             for (WindowPages.Page page : WindowPages.all()) {
                 addFound(entries, page, filter.trim());
@@ -772,17 +699,14 @@ final class TabMenus {
     }
 
     /**
-     * One row of the {@code +} or of the tab search: the page opens in a
-     * window of its category, the window the menu was opened for when it is
-     * one and takes it, else where its category keeps its pages
-     * ({@link WindowLayout#openInCategory}). The page then takes the keys.
+     * One row of the tab search that opens a page: a new copy of it opens
+     * in a window of its category, the window the search was opened for
+     * when it is one and takes it, else where its category keeps its pages
+     * ({@link WindowLayout#openCopy}). The page then takes the keys.
      */
     private void openFromMenu(String windowId, MenuWindow.Entry entry) {
-        open(windowId, WindowPage.fromId(entry.id));
-    }
-
-    private void open(String windowId, WindowPage tab) {
-        WindowPage opened = WindowLayout.openInCategory(tab, windowId);
+        WindowPage opened = WindowLayout.openCopy(
+                WindowPage.fromId(entry.id), windowId);
         if (opened != null) {
             this.screen.jumpToTab(opened);
         }
@@ -841,6 +765,10 @@ final class TabMenus {
                 TabMenus.this.menus.show(SubWindowKind.HELP, tab,
                         WindowMenus.besideWindow(window), true);
                 return true;
+            }
+            if (TAB_DUPLICATE.equals(entry.id)) {
+                TabMenus.this.screen.duplicate(tab);
+                return false;
             }
             Window held = WindowLayout.windowOf(tab);
             if (STRIP_FULL_WINDOW.equals(entry.id)) {
@@ -1020,14 +948,13 @@ final class TabMenus {
         }
 
         /**
-         * Under *Open Beside*, what the {@code +} would open, each opening
-         * straight beside the page: closed channels, people to whisper
-         * to, pages no window holds. Greyed while the padlock holds the
-         * window.
+         * Under *Open Beside*, every page the Lost Tales Menu offers, a new
+         * copy of each opening straight beside the page. Greyed while the
+         * padlock holds the window.
          */
         private void addOpenBeside(List<MenuWindow.Entry> rows, Window window) {
             List<MenuWindow.Entry> closed = new ArrayList<MenuWindow.Entry>();
-            for (MenuWindow.Entry row : openRows("", true)) {
+            for (MenuWindow.Entry row : pageRows("")) {
                 if (!row.header && !row.separator && !row.passive) {
                     closed.add(heldWhileLocked(
                             row.renamed(SPLIT_OPEN_PREFIX + row.id), window));
@@ -1198,51 +1125,6 @@ final class TabMenus {
         }
     }
 
-    /** The {@code +}: what can be opened again. */
-    private final class OpenSource extends WindowMenus.Source {
-        @Override
-        public void rebuild(MenuWindow menu) {
-            menu.setTitle(null, LostTalesUiSheet.PLUS);
-            menu.setRows(openRows("", false));
-        }
-
-        /** A right-click on a category's name opens what reaches all its pages. */
-        @Override
-        public boolean takesBack() {
-            return true;
-        }
-
-        @Override
-        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
-                           SubWindow window, boolean back) {
-            if (back) {
-                if (entry.id.startsWith(ENTRY_FOLD_PREFIX)) {
-                    TabMenus.this.menus.show(SubWindowKind.CATEGORY,
-                            PageCategory.valueOf(entry.id.substring(
-                                    ENTRY_FOLD_PREFIX.length())),
-                            WindowMenus.besideWindow(window), true);
-                }
-                return true;
-            }
-            if (entry.id.startsWith(ENTRY_FOLD_PREFIX)) {
-                // A category's name folds its rows away, or brings them
-                // back; the menu stays for the next.
-                toggleFold(PageCategory.valueOf(entry.id.substring(
-                        ENTRY_FOLD_PREFIX.length())));
-                menu.setRows(openRows("", false));
-                return true;
-            }
-            if (entry.id.startsWith(ENTRY_OPEN_PREFIX)) {
-                // A tab the view hides: it shows where it stands.
-                TabMenus.this.screen.jumpToTab(WindowPage.fromId(
-                        entry.id.substring(ENTRY_OPEN_PREFIX.length())));
-            } else {
-                openFromMenu((String)menu.about(), entry);
-            }
-            return false;
-        }
-    }
-
     /* ---- A category's own menu ---- */
 
     private static final String CATEGORY_OPEN_ALL = "category:open_all";
@@ -1250,9 +1132,9 @@ final class TabMenus {
 
     /**
      * The pages a category's menu reaches: every open page of it, in any
-     * window and any view, and what the {@code +} lists under it, but for
-     * whispers, which reach only those open: the {@code +} lists every
-     * player online under them.
+     * window and any view, and those of it no window holds, but for
+     * whispers, which reach only those open: the menu lists every player
+     * online under them.
      */
     private List<WindowPage> pagesOf(PageCategory category) {
         List<WindowPage> pages = new ArrayList<WindowPage>(openPagesOf(category));
@@ -1275,11 +1157,11 @@ final class TabMenus {
         return pages;
     }
 
-    /** What the {@code +} lists under a category that no window holds. */
+    /** The pages of a category that no window holds a copy of. */
     private List<WindowPage> closedPagesOf(PageCategory category) {
         List<WindowPage> pages = new ArrayList<WindowPage>();
-        for (MenuWindow.Entry row : openRows("", true)) {
-            if (row.icon != null && !row.header && row.icon.category() == category
+        for (MenuWindow.Entry row : everyPage(this.screen, "")) {
+            if (row.icon != null && row.icon.category() == category
                     && !WindowLayout.isOpen(row.icon)) {
                 pages.add(row.icon);
             }
@@ -1307,7 +1189,7 @@ final class TabMenus {
     }
 
     /**
-     * What a right-click on a category's name in the {@code +} offers for
+     * What a right-click on a category's name on the Lost Tales Menu offers for
      * all its pages: *Open All*, *Close All*, then each option its pages
      * may take all at once — *Mark All as Read*, a conversation's two
      * settings, their words opening beside the menu. A row that cannot be
@@ -1564,9 +1446,9 @@ final class TabMenus {
     }
 
     /**
-     * A row a page found: the page comes forward with the keys — opened
-     * where the menu was, if no window holds it — and shows what was
-     * found.
+     * A row a page found: the copy of the page used last comes forward
+     * with the keys — opened where the menu was, if no window holds one —
+     * and shows what was found.
      */
     private void showFound(String windowId, String pageAndId) {
         int colon = pageAndId.indexOf(':');
@@ -1575,11 +1457,11 @@ final class TabMenus {
         if (tab == null) {
             return;
         }
-        if (WindowLayout.isOpen(tab)) {
-            this.screen.jumpToTab(tab);
-        } else {
-            open(windowId, tab);
+        WindowPage shown = WindowLayout.openInCategory(tab, windowId);
+        if (!(shown instanceof OtherPage)) {
+            return;
         }
-        tab.content().show(pageAndId.substring(colon + 1));
+        this.screen.jumpToTab(shown);
+        ((OtherPage)shown).content().show(pageAndId.substring(colon + 1));
     }
 }

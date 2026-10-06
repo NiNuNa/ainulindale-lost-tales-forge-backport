@@ -13,6 +13,10 @@ import net.minecraft.util.StatCollector;
  * what waits in the icon's corner, and each kind of tab lives with the
  * system it belongs to. Tabs are values: two tabs with the same id are
  * the same tab.
+ *
+ * <p>A page may stand open more than once, each copy a tab of its own
+ * with its own view: its {@link #instance}, 1 for the first. What the
+ * page is (a channel's lines, a setting) the copies share.</p>
  */
 public abstract class WindowPage {
     /** Reads a tab back from the id the layout file keeps it by. */
@@ -20,6 +24,11 @@ public abstract class WindowPage {
         /** The tab {@code id} names; null for an id this reader does not know. */
         WindowPage read(String id);
     }
+
+    /** Between a page's id and its copy's number in a tab's id: {@code page:map#2}. */
+    public static final String INSTANCE_MARK = "#";
+    /** The most copies of one page; more than anyone opens. */
+    public static final int MAX_INSTANCE = 99;
 
     private static final List<Reader> READERS = new CopyOnWriteArrayList<Reader>();
 
@@ -30,22 +39,97 @@ public abstract class WindowPage {
         }
     }
 
-    /** The tab an id names, asked of every kind in turn; null for an unknown one. */
+    /**
+     * The tab an id names, asked of every kind in turn, its copy's number
+     * read off its end; null for an unknown one.
+     */
     public static WindowPage fromId(String id) {
         if (id == null) {
             return null;
         }
+        int instance = instanceIn(id);
         for (Reader reader : READERS) {
-            WindowPage tab = reader.read(id);
+            WindowPage tab = reader.read(pageIdIn(id));
             if (tab != null) {
-                return tab;
+                return instance == 1 ? tab : tab.withInstance(instance);
             }
         }
         return null;
     }
 
-    /** The id the layout file keeps the tab by: {@code global}, {@code page:journal}. */
+    /** Which copy a tab's id names: the number after its mark, else 1. */
+    public static int instanceIn(String id) {
+        int mark = id == null ? -1 : id.lastIndexOf(INSTANCE_MARK);
+        int number = mark > 0
+                ? instanceNumber(id.substring(mark + INSTANCE_MARK.length())) : -1;
+        return number > 1 ? number : 1;
+    }
+
+    /** A tab's id without its copy's number: the page's own id. */
+    public static String pageIdIn(String id) {
+        return instanceIn(id) == 1 ? id
+                : id.substring(0, id.lastIndexOf(INSTANCE_MARK));
+    }
+
+    /** A copy's number as written in a tab's id; -1 for anything else. */
+    private static int instanceNumber(String digits) {
+        if (digits.length() == 0 || digits.length() > 2) {
+            return -1;
+        }
+        for (int index = 0; index < digits.length(); index++) {
+            if (!Character.isDigit(digits.charAt(index))) {
+                return -1;
+            }
+        }
+        int number = Integer.parseInt(digits);
+        return number >= 1 && number <= MAX_INSTANCE ? number : -1;
+    }
+
+    /** A page's id with its copy's number: the first copy's is the page's own. */
+    protected static String instanceId(String pageId, int instance) {
+        return instance <= 1 ? pageId : pageId + INSTANCE_MARK + instance;
+    }
+
+    /** The id the layout file keeps the tab by: {@code global}, {@code page:journal}, {@code page:map#2}. */
     public abstract String id();
+
+    /** Which copy of its page the tab is: 1 for the first, which is the page itself. */
+    public int instance() {
+        return 1;
+    }
+
+    /**
+     * Copy {@code instance} of the same page; null for a page that opens
+     * once, which has only its first.
+     */
+    public WindowPage withInstance(int instance) {
+        return instance == 1 ? this : null;
+    }
+
+    /** Whether the page may stand open more than once. */
+    public boolean opensMoreThanOnce() {
+        return false;
+    }
+
+    /** The page's first copy: the page itself, whichever copy this is. */
+    public final WindowPage firstInstance() {
+        WindowPage first = withInstance(1);
+        return first == null ? this : first;
+    }
+
+    /**
+     * The copy is opening anew, where no window holds it: whatever an
+     * earlier copy of its number kept is forgotten, as the page decides.
+     */
+    public void forgetCopy() {}
+
+    /** The copy was opened as a duplicate of {@code source}: it carries on what the page says a duplicate keeps. */
+    public void duplicatedFrom(WindowPage source) {}
+
+    /** Whether {@code other} is a copy of the same page, this one included. */
+    public final boolean isCopyOf(WindowPage other) {
+        return other != null && firstInstance().equals(other.firstInstance());
+    }
 
     /** The words on the tab. */
     public abstract String title();

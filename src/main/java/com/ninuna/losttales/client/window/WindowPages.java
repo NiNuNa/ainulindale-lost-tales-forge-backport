@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,9 +16,11 @@ import net.minecraft.util.StatCollector;
  * starts, with the words its tab reads, the item its tab wears, its key
  * and how its content is made; nothing in the window system names a
  * page itself.
- * Each page is one tab ({@link OtherPage}), so one window holds it at
- * most, and its content is made the first time it is shown and kept
- * until the player leaves the world.
+ * A page may stand open more than once, each copy a tab
+ * ({@link OtherPage}) and a content of its own, made the first time it is
+ * shown and kept until the player leaves the world; a new copy past the
+ * first starts afresh. A page standing for a thing in the world opens
+ * once.
  */
 public final class WindowPages {
     /** Makes a page's content. */
@@ -25,7 +28,7 @@ public final class WindowPages {
         PageContent create();
     }
 
-    /** One page: its code name, its tab's words and item, its key, its category, and its content once made. */
+    /** One page: its code name, its tab's words and item, its key, its category, and each copy's content once made. */
     public static final class Page {
         public final String id;
         private final String titleKey;
@@ -34,11 +37,16 @@ public final class WindowPages {
         private final PageCategory category;
         private final Factory factory;
         private final boolean fromWorld;
+        /** Whether the page opens once though the player opens it: one whose copies would share everything. */
+        private final boolean once;
         private final OtherPage tab;
-        private PageContent content;
+        /** Each copy's content once made, by the copy's number. */
+        private final Map<Integer, PageContent> contents =
+                new HashMap<Integer, PageContent>();
 
         Page(String id, String titleKey, ItemStack icon, KeyBinding key,
-             PageCategory category, Factory factory, boolean fromWorld) {
+             PageCategory category, Factory factory, boolean fromWorld,
+             boolean once) {
             this.id = id;
             this.titleKey = titleKey;
             this.icon = icon;
@@ -46,7 +54,8 @@ public final class WindowPages {
             this.category = category;
             this.factory = factory;
             this.fromWorld = fromWorld;
-            this.tab = new OtherPage(this);
+            this.once = once;
+            this.tab = new OtherPage(this, 1);
         }
 
         /** What kind of page it is ({@link PageCategory}). */
@@ -62,15 +71,35 @@ public final class WindowPages {
             return this.fromWorld;
         }
 
+        /** Whether the page may stand open more than once: every page but one of the world's or one registered to open once. */
+        boolean opensMoreThanOnce() {
+            return !this.fromWorld && !this.once;
+        }
+
         /** Whether the page's key is bound to the keyboard's {@code keyCode}. */
         boolean hasKey(int keyCode) {
             return this.key != null && keyCode > 0
                     && this.key.getKeyCode() == keyCode;
         }
 
-        /** The page's one tab. */
+        /** The page's first tab: the page itself. */
         public OtherPage tab() {
             return this.tab;
+        }
+
+        /** The tab of copy {@code instance}; the first for a page that opens once. */
+        OtherPage tab(int instance) {
+            return instance <= 1 || !opensMoreThanOnce() ? this.tab
+                    : new OtherPage(this, Math.min(instance, WindowPage.MAX_INSTANCE));
+        }
+
+        /**
+         * The copy a page's news goes to: the one open used last, else the
+         * first ({@link WindowLayout#lastUsed}).
+         */
+        public OtherPage lastUsed() {
+            WindowPage used = WindowLayout.lastUsed(this.tab);
+            return used instanceof OtherPage ? (OtherPage)used : this.tab;
         }
 
         /** The words its tab reads. */
@@ -83,21 +112,37 @@ public final class WindowPages {
             return this.icon;
         }
 
-        /** Its content, made the first time it is asked for. */
-        public synchronized PageContent content() {
-            if (this.content == null) {
-                this.content = this.factory.create();
-            }
-            return this.content;
+        /** The content of the copy used last ({@link #lastUsed}). */
+        public PageContent content() {
+            return lastUsed().content();
         }
 
-        /** Its content if it has been made; null before. */
-        synchronized PageContent madeContent() {
-            return this.content;
+        /** Copy {@code instance}'s content, made the first time it is asked for. */
+        synchronized PageContent content(int instance) {
+            Integer key = Integer.valueOf(instance);
+            PageContent content = this.contents.get(key);
+            if (content == null) {
+                content = this.factory.create();
+                content.attach(tab(instance));
+                this.contents.put(key, content);
+            }
+            return content;
+        }
+
+        /** Every copy's content made so far. */
+        synchronized List<PageContent> madeContents() {
+            return new ArrayList<PageContent>(this.contents.values());
+        }
+
+        /** A new copy past the first starts afresh: whatever an earlier copy of that number held goes. */
+        synchronized void forgetCopy(int instance) {
+            if (instance > 1) {
+                this.contents.remove(Integer.valueOf(instance));
+            }
         }
 
         synchronized void forgetContent() {
-            this.content = null;
+            this.contents.clear();
         }
     }
 
@@ -127,7 +172,19 @@ public final class WindowPages {
                                              ItemStack icon, KeyBinding key,
                                              PageCategory category,
                                              Factory factory) {
-        add(new Page(id, titleKey, icon, key, category, factory, false));
+        add(new Page(id, titleKey, icon, key, category, factory, false, false));
+    }
+
+    /**
+     * Registers a page the player opens that stands open once at most:
+     * one whose copies would share all they hold, as the server's
+     * settings and the changes waiting on them.
+     */
+    public static synchronized void registerOnce(String id, String titleKey,
+                                                 ItemStack icon, KeyBinding key,
+                                                 PageCategory category,
+                                                 Factory factory) {
+        add(new Page(id, titleKey, icon, key, category, factory, false, true));
     }
 
     /**
@@ -142,7 +199,7 @@ public final class WindowPages {
                                                       ItemStack icon,
                                                       PageCategory category,
                                                       Factory factory) {
-        add(new Page(id, titleKey, icon, null, category, factory, true));
+        add(new Page(id, titleKey, icon, null, category, factory, true, true));
     }
 
     private static void add(Page page) {
@@ -156,23 +213,9 @@ public final class WindowPages {
         PAGES.put(page.id, page);
     }
 
-    /**
-     * Whether a page no window holds can be opened again: one the player
-     * opens, not one that opens from a thing in the world.
-     */
-    public static boolean hasClosed() {
-        for (Page page : all()) {
-            if (isOffered(page)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Whether the {@code +} offers the page: opened by the player, closed, and shown now. */
+    /** Whether the page can be opened by hand: one the player opens, not one that opens from a thing in the world, and shown now. */
     static boolean isOffered(Page page) {
-        return !page.opensFromWorld() && !WindowLayout.isOpen(page.tab())
-                && page.tab().isAvailable();
+        return !page.opensFromWorld() && page.tab().isAvailable();
     }
 
     /**
@@ -230,11 +273,11 @@ public final class WindowPages {
             return false;
         }
         for (Page page : all()) {
-            PageContent content = page.madeContent();
-            if (content != null && content.answersLine(key)
-                    && page.tab().isShown()) {
-                content.answerLine(key, words);
-                return true;
+            for (PageContent content : page.madeContents()) {
+                if (content.answersLine(key) && content.tab().isShown()) {
+                    content.answerLine(key, words);
+                    return true;
+                }
             }
         }
         return false;

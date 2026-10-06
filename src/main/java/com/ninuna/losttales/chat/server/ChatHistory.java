@@ -683,8 +683,8 @@ public final class ChatHistory {
         if (!entry.reactions.set(emoji, reactor, name, origin, add)) {
             return null;
         }
-        if (requester != null) {
-            entry.seenBy.add(reactor);
+        if (requester != null && requester.accountId != null) {
+            entry.seenBy.add(requester.accountId);
         }
         changed();
         return new ReactionChange(
@@ -752,12 +752,15 @@ public final class ChatHistory {
         return new ReactionClear(readers, changes);
     }
 
-    /** The reactions on a kept message as {@code viewer} is shown them. */
+    /**
+     * The reactions on a kept message as a reader is shown them, by the
+     * reader's identities ({@link Requester#identityIds}).
+     */
     public static synchronized ChatReactionSummary reactionsFor(
-            long messageId, UUID viewer) {
+            long messageId, Set<UUID> viewerIds) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         return entry == null ? ChatReactionSummary.EMPTY
-                : entry.reactions.summaryFor(viewer);
+                : entry.reactions.summaryFor(viewerIds);
     }
 
     /** The players a kept message names, as the server resolved them; none for none kept. */
@@ -836,7 +839,7 @@ public final class ChatHistory {
         }
         return entry.reactions.isEmpty() ? line
                 : line.withReactions(entry.reactions.summaryFor(
-                        requester.accountId));
+                        requester.identityIds));
     }
 
     /** The copy of a kept line meant for the requester: its author's own, else everyone else's. */
@@ -1210,10 +1213,25 @@ public final class ChatHistory {
         final Set<UUID> fellowshipIds;
         /** The ids of the channels the player may read right now. */
         final Set<String> readableChannels;
+        /**
+         * The player's identities, their account and every character of
+         * theirs: what a reaction of theirs may have been made as.
+         */
+        final Set<UUID> identityIds;
 
         public Requester(UUID accountId, Map<String, Long> ownedFactions,
-                         Collection<UUID> fellowshipIds, Collection<ChatChannel> readable) {
+                         Collection<UUID> fellowshipIds, Collection<ChatChannel> readable,
+                         Collection<UUID> identityIds) {
             this.accountId = accountId;
+            Set<UUID> identities = new HashSet<UUID>();
+            if (accountId != null) {
+                identities.add(accountId);
+            }
+            if (identityIds != null) {
+                identities.addAll(identityIds);
+            }
+            identities.remove(null);
+            this.identityIds = Collections.unmodifiableSet(identities);
             this.ownedFactions = ownedFactions == null
                     ? Collections.<String, Long>emptyMap()
                     : Collections.unmodifiableMap(

@@ -14,7 +14,7 @@ final class ChatHistoryRequesters {
     static ChatHistory.Requester reader(UUID accountId) {
         return new ChatHistory.Requester(accountId,
                 Collections.<String, Long>emptyMap(), null,
-                java.util.Arrays.asList(ChatChannel.values()));
+                java.util.Arrays.asList(ChatChannel.values()), null);
     }
 
     /**
@@ -31,6 +31,6 @@ final class ChatHistoryRequesters {
                         Long.valueOf(characterCreatedAt));
         return new ChatHistory.Requester(accountId, owned, fellowshipId == null
                 ? Collections.<UUID>emptySet() : Collections.singleton(fellowshipId),
-                readable);
+                readable, null);
     }
 }

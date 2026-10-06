@@ -105,12 +105,12 @@ public final class ClientChatMembers {
      * list is due an answer; nothing when one was asked for too recently.
      */
     static void requestIfDue(ConversationPage tab) {
-        ConversationPage viewed = ConversationPage.viewed(tab);
+        ConversationPage viewed = ConversationPage.viewedConversation(tab);
         if (viewed == null || viewed.getChannel() == null) {
             return;
         }
         long now = System.currentTimeMillis();
-        String asAs = ClientChatIdentities.viewIdentityKey();
+        String asAs = ClientChatIdentities.inUseKey();
         String key = viewed.id();
         synchronized (ClientChatMembers.class) {
             if (!isDue(now, ASKED_AT.get(key), ANSWERED_AT.get(key),
@@ -118,7 +118,7 @@ public final class ClientChatMembers {
                 return;
             }
         }
-        ask(viewed, now, asAs);
+        ask(viewed, now, asAs, ClientChatIdentities.viewIdentityKey(tab));
     }
 
     /**
@@ -131,13 +131,13 @@ public final class ClientChatMembers {
             return;
         }
         long now = System.currentTimeMillis();
-        String asAs = ClientChatIdentities.viewIdentityKey();
+        String asAs = ClientChatIdentities.inUseKey();
         int asked = 0;
         for (ConversationPage tab : tabs) {
             if (asked >= MAX_PREFETCH) {
                 return;
             }
-            ConversationPage viewed = ConversationPage.viewed(tab);
+            ConversationPage viewed = ConversationPage.viewedConversation(tab);
             if (viewed == null || viewed.getChannel() == null) {
                 continue;
             }
@@ -146,7 +146,7 @@ public final class ClientChatMembers {
                     continue;
                 }
             }
-            ask(viewed, now, asAs);
+            ask(viewed, now, asAs, ClientChatIdentities.viewIdentityKey(tab));
             asked++;
         }
     }
@@ -160,7 +160,8 @@ public final class ClientChatMembers {
         ASKED_AT.clear();
     }
 
-    private static void ask(ConversationPage viewed, long now, String asAs) {
+    private static void ask(ConversationPage viewed, long now, String asAs,
+                            String copyIdentity) {
         String key = viewed.id();
         long held;
         synchronized (ClientChatMembers.class) {
@@ -176,14 +177,14 @@ public final class ClientChatMembers {
                         player ? viewed.getPartnerIdentity() : "",
                         player ? ClientChatChannelState.partnerCharacterIdOf(viewed)
                                 : null,
-                        viewed.isWhisper() ? heldCharacterOf(viewed, asAs) : null,
+                        viewed.isWhisper() ? heldCharacterOf(viewed, copyIdentity) : null,
                         held));
     }
 
     /**
      * The player's own character a whisper is held as: the one the
      * conversation names, else — for an NPC's, which names none — the one
-     * the chat is read as; null for the account.
+     * the copy asking speaks as; null for the account.
      */
     private static UUID heldCharacterOf(ConversationPage conversation, String readAs) {
         String owner = conversation.getOwnerKey().length() > 0
@@ -200,7 +201,7 @@ public final class ClientChatMembers {
 
     /** The key a tab's conversation is known by. */
     private static String keyOf(ConversationPage tab) {
-        ConversationPage viewed = ConversationPage.viewed(tab);
+        ConversationPage viewed = ConversationPage.viewedConversation(tab);
         return viewed == null ? "" : viewed.id();
     }
 

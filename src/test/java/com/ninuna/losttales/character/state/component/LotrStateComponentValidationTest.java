@@ -169,6 +169,49 @@ public final class LotrStateComponentValidationTest {
         assertRejected(this.details, envelope("Details", payload));
     }
 
+    /**
+     * The travel state, the mount, the faction the alignment bar shows and
+     * LOTR's options and the structure ban are the character's too, each
+     * of LOTR's own type.
+     */
+    @Test
+    public void travelStateMountAndOptionsAreChecked() {
+        NBTTagCompound option = detailsPayload();
+        option.setInteger("FriendlyFire", 1);
+        assertRejected(this.details, envelope("Details", option));
+
+        NBTTagCompound mount = detailsPayload();
+        mount.setString("MountUUID", "not a mount");
+        assertRejected(this.details, envelope("Details", mount));
+
+        NBTTagCompound waypoint = detailsPayload();
+        waypoint.setString("LastWP", new String(new char[65]).replace('\0', 'a'));
+        assertRejected(this.details, envelope("Details", waypoint));
+
+        NBTTagCompound wait = detailsPayload();
+        wait.setInteger("FTSince", -1);
+        assertRejected(this.details, envelope("Details", wait));
+
+        NBTTagCompound biome = detailsPayload();
+        biome.setInteger("LastBiome", 3);
+        assertRejected(this.details, envelope("Details", biome));
+
+        NBTTagCompound ban = detailsPayload();
+        ban.setInteger("StructuresBanned", 1);
+        assertRejected(this.details, envelope("Details", ban));
+    }
+
+    /** An admin's structure ban is the character's, kept as LOTR writes it. */
+    @Test
+    public void theStructureBanIsTheCharacters() {
+        NBTTagCompound fresh = detailsPayload();
+        assertTrue(fresh.hasKey("StructuresBanned", 1));
+        NBTTagCompound banned = detailsPayload();
+        banned.setBoolean("StructuresBanned", true);
+        new com.ninuna.losttales.compat.lotr.LotrCharacterDetailsStateAdapter()
+                .validate(banned);
+    }
+
     /** All four last-death fields travel together or not at all. */
     @Test
     public void partialLastDeathMarkerIsRejected() {
@@ -436,10 +479,10 @@ public final class LotrStateComponentValidationTest {
         return payload;
     }
 
+    /** A new character's details as LOTR writes them: every field it always saves. */
     private static NBTTagCompound detailsPayload() {
-        NBTTagCompound payload = new NBTTagCompound();
-        payload.setInteger("Alcohol", 0);
-        return payload;
+        return new com.ninuna.losttales.compat.lotr.LotrCharacterDetailsStateAdapter()
+                .createDefault();
     }
 
     private static NBTTagCompound deathMarker(int x, int y, int z) {

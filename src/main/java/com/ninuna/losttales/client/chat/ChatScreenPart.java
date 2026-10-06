@@ -136,6 +136,8 @@ public final class ChatScreenPart extends ScreenPart {
     private ChatInputField inputField;
     private URI clickedLinkUri;
     private String composingIdentityKey;
+    /** The copy the reply or edit being composed was started in. */
+    private String composingCopy = "";
     /**
      * The window whose bar is live as this frame's windows began: the
      * search follows it, and every other window wears a resting bar.
@@ -290,7 +292,10 @@ public final class ChatScreenPart extends ScreenPart {
             this.inputField.setText(draft);
             this.inputField.setCursorPositionEnd();
         }
-        this.composingIdentityKey = ClientChatIdentities.viewIdentityKey();
+        ConversationPage composing = ClientChatChannelState.getSelected();
+        this.composingCopy = composing == null ? ""
+                : ConversationPage.row(composing).id();
+        this.composingIdentityKey = ClientChatIdentities.viewIdentityKey(composing);
         this.tabActions.bind(this.mc, styled);
         this.menus.bind(this.mc, styled, this.screen.width,
                 this.screen.height);
@@ -464,20 +469,8 @@ public final class ChatScreenPart extends ScreenPart {
      * and the closed NPC conversations of the session.
      */
     @Override
-    public void addOpenable(List<MenuWindow.Entry> entries, String filter,
-                            boolean search) {
-        ChatMenus.addOpenable(this.mc, entries, filter, search);
-    }
-
-    /**
-     * Closed channels that can be read, people online to whisper to, and
-     * closed NPC conversations.
-     */
-    @Override
-    public boolean hasRestorable() {
-        return !ChatMenus.restorableTabs().isEmpty()
-                || ChatMenus.hasWhisperCandidates(this.mc)
-                || ChatLayout.hasClosedNpcConversation();
+    public void addEveryPage(List<MenuWindow.Entry> entries, String filter) {
+        ChatMenus.addEveryConversation(this.mc, entries, filter);
     }
 
     @Override
@@ -1192,8 +1185,9 @@ public final class ChatScreenPart extends ScreenPart {
         // A reaction the message menu asked for opens the emoji picker
         // on that message, whichever way the menu entry was chosen.
         long reactTo = this.menus.takeReactionTarget();
+        ConversationPage reactFrom = this.menus.takeReactionCopy();
         if (reactTo != ChatMessageIds.NONE) {
-            openReactionPicker(reactTo);
+            openReactionPicker(reactTo, reactFrom);
         }
         // While a window's edge is dragged its history follows the resize
         // rigidly instead of gliding after it.
@@ -1317,7 +1311,8 @@ public final class ChatScreenPart extends ScreenPart {
                 this.screen.subWindows().reopen(open,
                         this.bar.reactionPicker());
                 this.bar.reactionPicker().aimAt(
-                        ((Long)open.state).longValue());
+                        ((Long)open.state).longValue(),
+                        ClientChatChannelState.getSelected());
             }
             return true;
         }
@@ -1565,11 +1560,19 @@ public final class ChatScreenPart extends ScreenPart {
         return fronts;
     }
 
-    /** A reply or edit belongs to the identity that started composing it. */
+    /**
+     * A reply or edit belongs to the identity that started composing it:
+     * the copy it is composed in choosing another ends it.
+     */
     private void syncChatIdentity() {
-        String identity = ClientChatIdentities.viewIdentityKey();
-        if (identity.equals(this.composingIdentityKey)) { return; }
+        ConversationPage selected = ClientChatChannelState.getSelected();
+        String copy = selected == null ? "" : ConversationPage.row(selected).id();
+        String identity = ClientChatIdentities.viewIdentityKey(selected);
+        boolean sameCopy = copy.equals(this.composingCopy);
+        if (sameCopy && identity.equals(this.composingIdentityKey)) { return; }
+        this.composingCopy = copy;
         this.composingIdentityKey = identity;
+        if (!sameCopy) { return; }
         this.outbox.stopTyping();
         this.composer.cancelComposing(this.inputField);
         ClientChatIdentitySelection.update();
@@ -1693,7 +1696,10 @@ public final class ChatScreenPart extends ScreenPart {
      */
     private void sendCommand(String typed) {
         String command = ChatMessageValidator.oneLine(typed).trim();
-        ConversationPage typedIn = ClientChatChannelState.getSelected();
+        // Whichever copy of a conversation it was typed in, the command
+        // and its answer belong to the conversation.
+        ConversationPage selected = ClientChatChannelState.getSelected();
+        ConversationPage typedIn = selected == null ? null : selected.conversation();
         LostTalesChatPresentation.expectCommandOutput(typedIn);
         LostTalesChatPresentation.echoCommand(typedIn, command);
         // The tab goes ahead of the command on the same connection, so
@@ -1937,7 +1943,7 @@ public final class ChatScreenPart extends ScreenPart {
         ChatReactionMarker.Data chip =
                 ChatReactionMarker.decode(hovered.component);
         if (chip != null) {
-            drawReactionTooltip(chip, drawMouseX, drawMouseY);
+            drawReactionTooltip(chip, copyOf(hovered), drawMouseX, drawMouseY);
             return;
         }
         ChatShowcaseMarker.Data share =
@@ -2101,7 +2107,8 @@ public final class ChatScreenPart extends ScreenPart {
             long target = this.bar.reactionPicker().reactionTarget();
             if (target != ChatMessageIds.NONE) {
                 ChatEmoji emoji = (ChatEmoji)entry.value;
-                sendReaction(target, emoji, true);
+                sendReaction(this.bar.reactionPicker().reactionCopy(), target,
+                        emoji, true);
                 ChatEmojiUsageStore.recordUse(emoji);
             }
         } else {
@@ -2166,7 +2173,8 @@ public final class ChatScreenPart extends ScreenPart {
         String copied = null;
         switch (press.toolbarKind) {
             case LostTalesChatOverlayRenderer.TOOLBAR_REACT:
-                openReactionPicker(ClientChatMessageIds.messageIdOf(chatLineId));
+                openReactionPicker(ClientChatMessageIds.messageIdOf(chatLineId),
+                        frame.view);
                 break;
             case LostTalesChatOverlayRenderer.TOOLBAR_REPLY:
                 replyToLine(frame, chatLineId);
@@ -2450,20 +2458,23 @@ public final class ChatScreenPart extends ScreenPart {
                 // belongs to it all the same.
                 return true;
             case REACTION: {
-                // A chip adds the reader's own reaction with its emoji,
-                // or takes it back when it is already theirs; a foreign
-                // emoji's chip as well, by its key. A chip's click is
-                // never counted as a use of the emoji.
+                // A chip adds the reaction of the identity its copy speaks
+                // as, or takes it back when it is already that identity's;
+                // a foreign emoji's chip as well, by its key. A chip's
+                // click is never counted as a use of the emoji.
                 ChatReactionMarker.Data chip = ChatReactionMarker.decode(part);
+                ConversationPage copy = copyOf(hit);
                 if (chip != null) {
-                    sendReaction(chip.messageId, chip.key, !chip.mine);
+                    sendReaction(copy, chip.messageId, chip.key,
+                            !chip.mineFor(copy));
                 }
                 return true;
             }
             case ADD_REACTION:
                 // The button a reaction row ends on: the picker, aimed at
                 // the message, as the toolbar's React opens it.
-                openReactionPicker(ChatReactionMarker.addButtonMessageId(part));
+                openReactionPicker(ChatReactionMarker.addButtonMessageId(part),
+                        copyOf(hit));
                 return true;
             case ACHIEVEMENT:
                 ChatAchievementScreens.open(this.mc, part);
@@ -2564,7 +2575,7 @@ public final class ChatScreenPart extends ScreenPart {
      * reaction to it rather than written into the field. Only while the
      * chat's emoji are on.
      */
-    private void openReactionPicker(long messageId) {
+    private void openReactionPicker(long messageId, ConversationPage copy) {
         if (!ChatMessageIds.isServerId(messageId)
                 || !LostTalesConfig.enableChatEmojis) {
             return;
@@ -2576,26 +2587,39 @@ public final class ChatScreenPart extends ScreenPart {
         this.screen.subWindows().open(ChatSubWindows.REACTIONS, "", picker,
                 at != null ? at : typedWindowId(),
                 this.bar.firstPickerBox(picker));
-        picker.aimAt(messageId);
+        picker.aimAt(messageId, copy != null ? copy
+                : ClientChatChannelState.getSelected());
     }
 
-    /** Asks the server to add a reaction, or take one back; its answer redraws the chips. */
-    private static void sendReaction(long messageId, ChatEmoji emoji,
-                                     boolean add) {
+    /**
+     * Asks the server to add a reaction, or take one back, as the identity
+     * {@code copy} speaks as; its answer redraws the chips.
+     */
+    private static void sendReaction(ConversationPage copy, long messageId,
+                                     ChatEmoji emoji, boolean add) {
         if (emoji != null) {
-            sendReaction(messageId, emoji.getName(), add);
+            sendReaction(copy, messageId, emoji.getName(), add);
         }
     }
 
     /** As above, by the emoji's reaction key. */
-    private static void sendReaction(long messageId, String emoji,
-                                     boolean add) {
+    private static void sendReaction(ConversationPage copy, long messageId,
+                                     String emoji, boolean add) {
         if (!ChatForeignEmoji.isReactionKey(emoji)
                 || !ChatMessageIds.isServerId(messageId)) {
             return;
         }
         LostTalesNetworkHandler.CHANNEL.sendToServer(
-                new LostTalesChatReactPacket(messageId, emoji, add));
+                new LostTalesChatReactPacket(messageId, emoji, add,
+                        ClientChatIdentities.wireKind(copy),
+                        ClientChatIdentities.wireCharacterId(copy)));
+    }
+
+    /** The copy a hit's line stands in, else the one typed in. */
+    private static ConversationPage copyOf(LostTalesChatOverlayRenderer.Hit hit) {
+        ConversationPage copy = hit == null || hit.band == null
+                || hit.band.frame == null ? null : hit.band.frame.view;
+        return copy != null ? copy : ClientChatChannelState.getSelected();
     }
 
     /**
@@ -2604,6 +2628,7 @@ public final class ChatScreenPart extends ScreenPart {
      * registry lacks is named as Discord names it.
      */
     private void drawReactionTooltip(ChatReactionMarker.Data chip,
+                                     ConversationPage copy,
                                      int mouseX, int mouseY) {
         List<String> lines = new ArrayList<String>(3);
         lines.add(chip.label());
@@ -2629,7 +2654,7 @@ public final class ChatScreenPart extends ScreenPart {
                             names.toString()));
         }
         lines.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal(
-                chip.mine ? "gui.losttales.chat.reaction.remove"
+                chip.mineFor(copy) ? "gui.losttales.chat.reaction.remove"
                         : "gui.losttales.chat.reaction.add"));
         LostTalesChatHoverCard.drawTextCard(this.mc, lines, mouseX, mouseY,
                 this.screen.width, this.screen.height);
@@ -2670,23 +2695,22 @@ public final class ChatScreenPart extends ScreenPart {
         }
         if (tab.getChannel() == ChatChannel.FACTION
                 && tab.getOwnerKey().length() > 0
-                && !tab.getOwnerKey().equals(ClientChatChannelState
-                        .scopeKeyRead(ChatChannel.FACTION))) {
-            // Another faction's chat: the Faction tab shows the one the
-            // chat character is in, never this one.
+                && !ClientChatChannelState.isAvailable(tab)) {
+            // Another faction's chat: no copy reads it as a character of
+            // that faction, and the character played is not in it.
             showNotice(StatCollector.translateToLocalFormatted(
                     "gui.losttales.chat.channel.not_yours",
                     "#" + ClientChatChannelState.displayName(tab)));
             return;
         }
-        if (!ChatLayout.isOpen(tab)) {
-            tab = ChatLayout.openHere(tab,
-                    LostTalesChatPresentation.windowIdOfSelection());
-            if (tab == null) {
-                showNotice(StatCollector.translateToLocal(
-                        "gui.losttales.chat.channel.gone"));
-                return;
-            }
+        // The copy showing the conversation comes forward, or one opened
+        // for it, speaking as one of the identities it is held as.
+        tab = ChatLayout.openReader(tab,
+                LostTalesChatPresentation.windowIdOfSelection(), true);
+        if (tab == null) {
+            showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.channel.gone"));
+            return;
         }
         this.tabActions.selectChannel(tab);
         if (chatLineId != 0) {

@@ -6,6 +6,7 @@ import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.chat.server.ChatLinesAwaitingNames;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.fellowship.server.FellowshipSyncManager;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSyncManager;
@@ -43,6 +44,8 @@ public final class CharacterNetworkRequestHandler {
      * Takes the account character's look onto this world's account
      * character. The world decides whether it still has a reading to
      * spend, and every field is checked against this server's own content.
+     * In-character lines that waited for the character's name go out
+     * after, naming it as it now stands.
      */
     public static void handleTemplateAdoptRequest(
             final EntityPlayerMP player, final int requestId,
@@ -53,6 +56,9 @@ public final class CharacterNetworkRequestHandler {
                 return CharacterService.getInstance().adoptTemplate(player, adoption);
             }
         });
+        if (player != null) {
+            ChatLinesAwaitingNames.release(player.getUniqueID());
+        }
     }
 
     /**

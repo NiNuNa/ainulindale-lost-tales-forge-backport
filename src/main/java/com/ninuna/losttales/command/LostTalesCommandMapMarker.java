@@ -35,8 +35,6 @@ import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementService;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import cpw.mods.fml.common.FMLLog;
 /**
- * Legacy Forge companion to the modern map-marker command.
- *
  * Operator tools for player discovery state, bundled marker inspection, and
  * retrying failed waystone generation. Markers are named by their ids and
  * the names their JSON gives them; a placement's reason is its code.
@@ -47,10 +45,6 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
     static final String SAY = "chat.losttales.command.mapmarker.";
 
     private final String commandPath;
-
-    public LostTalesCommandMapMarker() {
-        this(LostTalesMetaData.MOD_ID + "_mapmarker", LostTalesMetaData.MOD_ID + "_mapmarker");
-    }
 
     public LostTalesCommandMapMarker(String commandName, String commandPath) {
         super(commandName);

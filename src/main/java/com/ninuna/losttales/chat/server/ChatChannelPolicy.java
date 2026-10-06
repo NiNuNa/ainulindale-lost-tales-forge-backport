@@ -250,8 +250,7 @@ public final class ChatChannelPolicy {
                     reached = isCurrentOnlineFellowshipMember(candidate, fellowship);
                     break;
                 case FACTION:
-                    reached = factionId != null && factionId.length() > 0
-                            && factionId.equals(factionOf(ChatIdentitySelection.character(candidate)));
+                    reached = ChatIdentitySelection.readsFaction(candidate, factionId);
                     break;
                 default:
                     reached = false;
@@ -377,15 +376,23 @@ public final class ChatChannelPolicy {
     }
 
     /**
-     * The selected identity's faction, with the time its Faction history
-     * starts: when that faction became the character's, by its making or
-     * by its pledge; for the account, its account character's.
+     * The factions the player reads Faction chat in, each with the time
+     * its history starts for them: the earliest any of their identities
+     * reading it came to it, by its making or by its pledge; for the
+     * account, its account character's.
      */
     public static Map<String, Long> selectedFactions(EntityPlayerMP player) {
         Map<String, Long> owned = new HashMap<String, Long>();
-        RoleplayCharacter character = ChatIdentitySelection.character(player);
-        owned.put(factionOf(character), Long.valueOf(character != null
-                ? character.getFactionSince() : accountSince(player)));
+        RoleplayCharacter played = ChatIdentitySelection.played(player);
+        owned.put(factionOf(played), Long.valueOf(played != null
+                ? played.getFactionSince() : accountSince(player)));
+        for (RoleplayCharacter character : ChatIdentitySelection.alsoRead(player)) {
+            String factionId = factionOf(character);
+            Long since = owned.get(factionId);
+            if (since == null || character.getFactionSince() < since.longValue()) {
+                owned.put(factionId, Long.valueOf(character.getFactionSince()));
+            }
+        }
         return owned;
     }
 

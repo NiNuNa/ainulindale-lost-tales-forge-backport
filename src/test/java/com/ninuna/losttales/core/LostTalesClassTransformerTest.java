@@ -597,6 +597,13 @@ public final class LostTalesClassTransformerTest {
         AbstractInsnNode third = nextCode(second);
         assertEquals(Opcodes.ASTORE, third.getOpcode());
         assertEquals(1, ((org.objectweb.asm.tree.VarInsnNode)third).var);
+        // A line handed back as nothing is held: the method returns.
+        AbstractInsnNode fourth = nextCode(third);
+        assertEquals(Opcodes.ALOAD, fourth.getOpcode());
+        assertEquals(1, ((org.objectweb.asm.tree.VarInsnNode)fourth).var);
+        AbstractInsnNode fifth = nextCode(fourth);
+        assertEquals(Opcodes.IFNONNULL, fifth.getOpcode());
+        assertEquals(Opcodes.RETURN, nextCode(fifth).getOpcode());
         // Applying the transformer again changes nothing.
         byte[] once = new LostTalesClassTransformer().transform(
                 "net.minecraft.server.management.ServerConfigurationManager",

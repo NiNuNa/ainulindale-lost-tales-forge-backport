@@ -19,9 +19,10 @@ import java.util.UUID;
  * order it was first used, and under it every reactor in the order
  * they reacted, with the name they reacted as.
  *
- * <p>A reactor is an account, or a Discord member by the sender id the
- * bridge signs them with; one reaction per reactor per emoji, as on
- * Discord. Bounded by {@link #MAX_KINDS} distinct emoji and
+ * <p>A reactor is an identity: a player's account, or one of their
+ * characters a copy of a conversation spoke as, or a Discord member by
+ * the sender id the bridge signs them with; one reaction per reactor per
+ * emoji, as on Discord. Bounded by {@link #MAX_KINDS} distinct emoji and
  * {@link #MAX_REACTORS} reactions in all, past which a new one is
  * refused rather than an old one dropped. Owned by {@link ChatHistory}
  * and touched only under its lock.</p>
@@ -406,8 +407,12 @@ public final class ChatReactions {
         return total;
     }
 
-    /** The reactions as {@code viewer} is shown them. */
-    public ChatReactionSummary summaryFor(UUID viewer) {
+    /**
+     * The reactions as a reader is shown them: {@code viewerIds} are the
+     * reader's identities, their account and their characters, and each
+     * emoji names those of them who reacted.
+     */
+    public ChatReactionSummary summaryFor(Set<UUID> viewerIds) {
         if (this.byEmoji.isEmpty()) {
             return ChatReactionSummary.EMPTY;
         }
@@ -424,10 +429,15 @@ public final class ChatReactions {
                     names.add(name);
                 }
             }
+            List<UUID> mine = new ArrayList<UUID>();
+            for (UUID reactor : kind.getValue().keySet()) {
+                if (viewerIds != null && viewerIds.contains(reactor)
+                        && mine.size() < ChatReactionSummary.MAX_MINE) {
+                    mine.add(reactor);
+                }
+            }
             reactions.add(new ChatReactionSummary.Reaction(kind.getKey(),
-                    kind.getValue().size(),
-                    viewer != null && kind.getValue().containsKey(viewer),
-                    names));
+                    kind.getValue().size(), mine, names));
         }
         return new ChatReactionSummary(reactions);
     }

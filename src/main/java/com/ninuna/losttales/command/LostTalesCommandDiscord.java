@@ -32,9 +32,10 @@ import net.minecraft.util.IChatComponent;
  * into the channel to link ({@code /link}), where the bot makes the
  * channel's webhook itself, so no webhook address is ever typed or
  * shown; {@code unlink} takes a game channel's links away, or one
- * Discord channel's, and deletes their webhooks; {@code reload} restarts
- * the bridge from the file. The links are written through the config
- * service, which saves the file and restarts the bridge on it. Every
+ * Discord channel's, and deletes their webhooks. The links are written
+ * through the config service, which saves the file and restarts the
+ * bridge on it; {@code /losttales config reload} reads a file edited by
+ * hand. Every
  * answer is words the sender's game translates, the channels it names
  * among them; the usage lines are the command's own syntax.
  */
@@ -50,7 +51,7 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/losttales discord <list|link|unlink|reload> ...";
+        return "/losttales discord <list|link|unlink> ...";
     }
 
     @Override
@@ -75,11 +76,6 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             link(sender, args);
         } else if ("unlink".equalsIgnoreCase(action)) {
             unlink(sender, args);
-        } else if ("reload".equalsIgnoreCase(action)) {
-            LostTalesDiscordBridge.getInstance().start();
-            say(sender, EnumChatFormatting.GREEN,
-                    LostTalesDiscordBridge.getInstance().isRunning()
-                            ? SAY + "reloaded" : SAY + "reloaded.idle");
         } else {
             sendUsage(sender);
         }
@@ -242,7 +238,6 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
         usage(sender, "/losttales discord list");
         usage(sender, "/losttales discord link <channel> [direction]");
         usage(sender, "/losttales discord unlink <channel> [<Discord channel id>]");
-        usage(sender, "/losttales discord reload");
     }
 
     @Override
@@ -251,7 +246,7 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             return null;
         }
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "list", "link", "unlink", "reload");
+            return getListOfStringsMatchingLastWord(args, "list", "link", "unlink");
         }
         if (args.length == 2 && ("link".equalsIgnoreCase(args[0])
                 || "unlink".equalsIgnoreCase(args[0]))) {

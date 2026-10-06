@@ -38,6 +38,11 @@ public final class WindowView {
         set(shown == null ? PageCategory.CHANNELS : shown.category().home());
     }
 
+    /** The screen turns to a category's pages, as that category's key would. */
+    public static synchronized void forCategory(PageCategory shown) {
+        set(shown == null ? PageCategory.CHANNELS : shown.home());
+    }
+
     /** The screen closed: every tab counts as shown again. */
     public static synchronized void clear() {
         set(null);

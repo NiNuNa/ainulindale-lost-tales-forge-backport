@@ -147,19 +147,13 @@ public abstract class ScreenPart {
     public void windowsMoved() {}
 
     /**
-     * Adds the part's own rows to the {@code +} and to the tab search: what
-     * it can open, each row's id its tab's and its icon the tab, whose
-     * category the row stands under, narrowed to the names that hold
-     * {@code filter}. The {@code search} lists the open tabs itself, so it
-     * leaves out what is open already.
+     * Adds the part's own pages to the Lost Tales Menu and to Page Search:
+     * every page it can open, open already or not, a row each, its id its
+     * tab's and its icon the tab, whose category the row stands under,
+     * narrowed to the names that hold {@code filter}. A row opens a new
+     * copy.
      */
-    public void addOpenable(List<MenuWindow.Entry> entries, String filter,
-                            boolean search) {}
-
-    /** Whether the part has anything closed to offer again under the {@code +}. */
-    public boolean hasRestorable() {
-        return false;
-    }
+    public void addEveryPage(List<MenuWindow.Entry> entries, String filter) {}
 
     /** What waits in the {@code +}'s corner. */
     public TabMark restorableMark() {

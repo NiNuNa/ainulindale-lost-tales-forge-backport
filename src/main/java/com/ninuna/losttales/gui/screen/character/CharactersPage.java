@@ -1259,13 +1259,13 @@ public final class CharactersPage extends PageContent {
     /* ---- The sub-windows ---- */
 
     private String windowId() {
-        Window window = WindowLayout.windowOf(WindowPages.tab(PAGE_ID));
+        Window window = WindowLayout.windowOf(tab());
         return window == null ? null : window.getId();
     }
 
     private void openEditor(CharacterSummary character) {
         WindowScreen screen = WindowScreen.current();
-        OtherPage tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = tab();
         if (screen == null || tab == null) {
             return;
         }
@@ -1283,7 +1283,7 @@ public final class CharactersPage extends PageContent {
     /** Change Look for the character picked: its skin, arm width and chest. */
     private void openLookEditor(CharacterSummary character) {
         WindowScreen screen = WindowScreen.current();
-        OtherPage tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = tab();
         if (screen == null || tab == null) {
             return;
         }
@@ -1310,7 +1310,7 @@ public final class CharactersPage extends PageContent {
 
     private void openLoreCharacters() {
         WindowScreen screen = WindowScreen.current();
-        OtherPage tab = WindowPages.tab(PAGE_ID);
+        OtherPage tab = tab();
         if (screen == null || tab == null) {
             return;
         }
@@ -1329,7 +1329,7 @@ public final class CharactersPage extends PageContent {
         if (screen == null) {
             return;
         }
-        screen.ask(WindowPages.tab(PAGE_ID),
+        screen.ask(tab(),
                 I18n.format("gui.losttales.character.restore_question",
                         deleted.getName()),
                 I18n.format("gui.losttales.character.restore_detail"),
@@ -1352,7 +1352,7 @@ public final class CharactersPage extends PageContent {
         if (screen == null) {
             return;
         }
-        screen.ask(WindowPages.tab(PAGE_ID),
+        screen.ask(tab(),
                 I18n.format("gui.losttales.character.delete_question",
                         character.getName()),
                 I18n.format("gui.losttales.character.delete_slot_remains"),

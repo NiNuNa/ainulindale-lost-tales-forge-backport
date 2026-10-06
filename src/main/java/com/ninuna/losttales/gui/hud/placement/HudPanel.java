@@ -32,7 +32,7 @@ public enum HudPanel {
     NOTIFICATIONS("notifications"),
     CHAT_FEED("");
 
-    /** The element's name in the client file and in {@code /losttales hud}; none for the feed. */
+    /** The element's name in the client file; none for the feed. */
     private final String element;
 
     HudPanel(String element) {

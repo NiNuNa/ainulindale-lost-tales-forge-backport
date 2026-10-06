@@ -14,10 +14,15 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/** Shared roleplaying identity, independent from gameplay and account channels. */
+/**
+ * Who each copy of a conversation speaks as: its own choice in Global,
+ * Faction and whispers, independent from the other copies, from gameplay
+ * and from the account channels.
+ */
 public final class ClientChatIdentitiesTest {
 
     private static final UUID OWNER = UUID.fromString("a0000000-0000-0000-0000-00000000000a");
@@ -41,25 +46,29 @@ public final class ClientChatIdentitiesTest {
     }
 
     @Test
-    public void theChoiceReachesGlobalFactionAndWhispersAndNeverAccountChannels() {
+    public void eachCopyChoosesForItselfInGlobalFactionAndWhispers() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
-        ClientChatIdentities.select(identityOf(LEGOLAS));
-        for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL,
-                ChatChannel.FACTION, ChatChannel.WHISPER}) {
-            ConversationPage tab = channel == ChatChannel.WHISPER
-                    ? ConversationPage.whisper("Steve", "Steve", LEGOLAS.toString()) : ConversationPage.of(channel);
+        ConversationPage faction = ConversationPage.of(ChatChannel.FACTION);
+        ConversationPage whisper = ConversationPage.whisper("Steve", "Steve");
+        for (ConversationPage tab : new ConversationPage[] {global, faction, whisper}) {
+            ClientChatIdentities.select(tab, identityOf(LEGOLAS));
             assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(tab).characterId);
             assertEquals(LEGOLAS, ClientChatIdentities.wireCharacterId(tab));
+            ConversationPage second = tab.withInstance(2);
+            assertEquals("another copy is another person",
+                    ARAGORN, ClientChatIdentities.effectiveFor(second).characterId);
+            assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT,
+                    ClientChatIdentities.wireKind(second));
         }
         // The world around the player and the fellowship hear the character played.
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.PROXIMITY, ChatChannel.FELLOWSHIP}) {
             ConversationPage tab = ConversationPage.of(channel);
+            ClientChatIdentities.select(tab, identityOf(LEGOLAS));
             assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(tab).characterId);
             assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT,
                     ClientChatIdentities.wireKind(tab));
             assertNull(ClientChatIdentities.wireCharacterId(tab));
         }
-        assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(ConversationPage.npc("Guard")).characterId);
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE}) {
             assertTrue(ClientChatIdentities.effectiveFor(ConversationPage.of(channel)).account);
             assertEquals(LostTalesChatSendPacket.IDENTITY_ACCOUNT,
@@ -70,25 +79,25 @@ public final class ClientChatIdentitiesTest {
     }
 
     @Test
-    public void selectionSurvivesChannelAndGameplayChanges() {
+    public void aChoiceSurvivesChannelAndGameplayChanges() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
-        ClientChatIdentities.select(identityOf(ARAGORN));
+        ClientChatIdentities.select(global, identityOf(ARAGORN));
         roster(LEGOLAS, ARAGORN, LEGOLAS);
         ClientChatChannelState.select(ooc);
         ClientChatChannelState.select(global);
         assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(global).characterId);
         assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(proximity).characterId);
-        assertEquals(ARAGORN.toString(), ClientChatIdentities.viewIdentityKey());
+        assertEquals(ARAGORN.toString(), ClientChatIdentities.viewIdentityKey(global));
     }
 
     @Test
-    public void removedOrUnownedCharactersCannotRemainSelected() {
+    public void removedOrUnownedCharactersCannotRemainChosen() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
-        ClientChatIdentities.select(identityOf(LEGOLAS));
+        ClientChatIdentities.select(global, identityOf(LEGOLAS));
         roster(ARAGORN, ARAGORN);
         assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(global).characterId);
-        ClientChatIdentities.select(identityOf(LEGOLAS));
-        assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(proximity).characterId);
+        ClientChatIdentities.select(global, identityOf(LEGOLAS));
+        assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(global).characterId);
     }
 
     /**
@@ -98,24 +107,53 @@ public final class ClientChatIdentitiesTest {
     @Test
     public void theAccountIsAFallbackAndNeverAChoice() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
-        ClientChatIdentities.select(ClientChatIdentities.accountIdentity());
+        ClientChatIdentities.select(global, ClientChatIdentities.accountIdentity());
         assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(global).characterId);
         assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT, ClientChatIdentities.wireKind(global));
         ClientCharacterRosterCache.clear();
         assertTrue(ClientChatIdentities.effectiveFor(global).account);
         assertTrue(ClientChatIdentities.effectiveFor(proximity).account);
-        assertEquals("", ClientChatIdentities.viewIdentityKey());
+        assertEquals("", ClientChatIdentities.viewIdentityKey(global));
         assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT, ClientChatIdentities.wireKind(global));
     }
 
     @Test
-    public void disconnectDropsTheChatSelectionAndInitiallyFollowsThePlayedCharacter() {
+    public void disconnectDropsEveryChoiceAndCopiesFollowThePlayedCharacter() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
-        ClientChatIdentities.select(identityOf(LEGOLAS));
+        ClientChatIdentities.select(global, identityOf(LEGOLAS));
         ClientChatIdentities.clear();
         assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(global).characterId);
         assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT, ClientChatIdentities.wireKind(global));
         assertNull(ClientChatIdentities.wireCharacterId(global));
+    }
+
+    /** A duplicate speaks as its source; a copy opening anew as the character played. */
+    @Test
+    public void aDuplicateSpeaksAsItsSourceAndANewCopyAsThePlayedCharacter() {
+        roster(ARAGORN, ARAGORN, LEGOLAS);
+        ConversationPage second = global.withInstance(2);
+        ClientChatIdentities.select(global, identityOf(LEGOLAS));
+        ClientChatIdentities.inherit(global, second);
+        assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(second).characterId);
+        ClientChatIdentities.forget(second);
+        assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(second).characterId);
+        assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(global).characterId);
+    }
+
+    /** The Narrator's voice is taken up in one copy, and only in character. */
+    @Test
+    public void theNarratorsVoiceIsTakenUpPerCopy() {
+        roster(ARAGORN, ARAGORN, LEGOLAS);
+        ClientChatIdentities.setNarrating(global, true);
+        assertTrue(ClientChatIdentities.narratesOn(global));
+        assertTrue(ClientChatIdentities.wireNarrating(global));
+        assertFalse(ClientChatIdentities.narratesOn(global.withInstance(2)));
+        ClientChatIdentities.setNarrating(ooc, true);
+        assertFalse("an account channel never narrates",
+                ClientChatIdentities.wireNarrating(ooc));
+        ClientChatIdentities.select(global, identityOf(LEGOLAS));
+        assertFalse("choosing a character puts the voice down",
+                ClientChatIdentities.narratesOn(global));
     }
 
     private static ClientChatIdentities.Identity identityOf(UUID characterId) {

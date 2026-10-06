@@ -1104,16 +1104,16 @@ public final class MotionLabPage extends PageContent {
     /** The Lab's tab closed while it was shown: what was tuned and not saved goes with it. */
     @Override
     public void hidden() {
-        OtherPage tab = WindowPages.tab(PAGE_ID);
-        if (tab == null || !WindowLayout.isOpen(tab)) {
+        if (!WindowLayout.isOpen(tab())) {
             dropPreviews();
         }
     }
 
     /**
      * The part of the window screen that lets unsaved tuning go: as the
-     * screen closes, whichever tab is in front, and as the Lab's tab or
-     * its window closes, shown or not. It takes nothing from the screen.
+     * screen closes, whichever tab is in front, and as the Lab's last copy
+     * or the window holding its last copies closes, shown or not. It takes
+     * nothing from the screen.
      */
     private static final class Closer extends ScreenPart {
         Closer(WindowScreen screen) {
@@ -1127,7 +1127,9 @@ public final class MotionLabPage extends PageContent {
 
         @Override
         public boolean closeTab(WindowPage tab) {
-            if (tab != null && tab.equals(WindowPages.tab(PAGE_ID))) {
+            OtherPage lab = WindowPages.tab(PAGE_ID);
+            if (tab != null && tab.isCopyOf(lab)
+                    && WindowLayout.copiesOf(lab).size() <= 1) {
                 dropPreviews();
             }
             return false;
@@ -1135,12 +1137,17 @@ public final class MotionLabPage extends PageContent {
 
         @Override
         public boolean closeWindow(Window window) {
-            OtherPage tab = WindowPages.tab(PAGE_ID);
-            Window holding = tab == null ? null : WindowLayout.windowOf(tab);
-            if (window != null && holding != null
-                    && holding.getId().equals(window.getId())) {
-                dropPreviews();
+            List<WindowPage> copies = WindowLayout.copiesOf(
+                    WindowPages.tab(PAGE_ID));
+            if (window == null || copies.isEmpty()) {
+                return false;
             }
+            for (WindowPage copy : copies) {
+                if (!window.contains(copy)) {
+                    return false;
+                }
+            }
+            dropPreviews();
             return false;
         }
     }

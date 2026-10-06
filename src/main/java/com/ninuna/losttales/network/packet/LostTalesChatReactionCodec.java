@@ -4,19 +4,21 @@ import com.ninuna.losttales.chat.ChatReactionSummary;
 import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * The wire layout of a {@link ChatReactionSummary}, shared by the line
  * it rides on and the update that replaces it: a count of emoji, then
  * for each its reaction key (a registry name or a foreign key, at most
  * {@link ChatReactionSummary#MAX_EMOJI_BYTES}), how many reacted,
- * whether the reader is one of them, and the names shown. Every part is
+ * which of the reader's identities are among them, and the names shown. Every part is
  * bounded; a summary that breaks a bound does not decode.
  */
 final class LostTalesChatReactionCodec {
     /** The most a summary takes on the wire. */
     static final int MAX_BYTES = 4 + ChatReactionSummary.MAX_KINDS
-            * (2 + ChatReactionSummary.MAX_EMOJI_BYTES + 4 + 1 + 4
+            * (2 + ChatReactionSummary.MAX_EMOJI_BYTES + 4
+                    + 4 + ChatReactionSummary.MAX_MINE * 16 + 4
                     + ChatReactionSummary.MAX_NAMES
                             * (2 + ChatReactionSummary.MAX_NAME_BYTES));
 
@@ -32,7 +34,12 @@ final class LostTalesChatReactionCodec {
             LostTalesPacketCodec.writeUtf8String(buffer, reaction.emoji,
                     ChatReactionSummary.MAX_EMOJI_BYTES);
             buffer.writeInt(reaction.count);
-            buffer.writeBoolean(reaction.mine);
+            LostTalesPacketCodec.writeCount(buffer, reaction.mineAs.size(),
+                    ChatReactionSummary.MAX_MINE, "own reactions");
+            for (UUID id : reaction.mineAs) {
+                buffer.writeLong(id.getMostSignificantBits());
+                buffer.writeLong(id.getLeastSignificantBits());
+            }
             LostTalesPacketCodec.writeCount(buffer, reaction.names.size(),
                     ChatReactionSummary.MAX_NAMES, "reaction names");
             for (String name : reaction.names) {
@@ -55,7 +62,12 @@ final class LostTalesChatReactionCodec {
             String emoji = LostTalesPacketCodec.readUtf8String(buffer,
                     ChatReactionSummary.MAX_EMOJI_BYTES);
             int count = buffer.readInt();
-            boolean mine = buffer.readBoolean();
+            int own = LostTalesPacketCodec.readCount(buffer,
+                    ChatReactionSummary.MAX_MINE, "own reactions");
+            List<UUID> mine = new ArrayList<UUID>(own);
+            for (int mineIndex = 0; mineIndex < own; mineIndex++) {
+                mine.add(new UUID(buffer.readLong(), buffer.readLong()));
+            }
             int named = LostTalesPacketCodec.readCount(buffer,
                     ChatReactionSummary.MAX_NAMES, "reaction names");
             List<String> names = new ArrayList<String>(named);

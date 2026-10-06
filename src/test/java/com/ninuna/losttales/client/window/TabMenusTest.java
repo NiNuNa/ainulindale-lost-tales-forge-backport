@@ -84,7 +84,7 @@ public final class TabMenusTest {
         int lastHairline = ids.lastIndexOf("-");
         assertTrue("its own options stand between the two", lastHairline > 2);
         assertEquals(Arrays.asList("settings:CHAT", "split_view",
-                "strip:full_window", "strip:members", "strip:search",
+                "tab:duplicate", "strip:full_window", "strip:members", "strip:search",
                 "strip:help"), ids.subList(lastHairline + 1, ids.size()));
     }
 
@@ -98,7 +98,8 @@ public final class TabMenusTest {
         assertNull(BARE.settingsPlace());
         List<MenuWindow.Entry> rows = TabMenus.stripRows(BARE);
         assertEquals(Arrays.asList("settings", "split_view",
-                "strip:full_window", "strip:search", "strip:help"), ids(rows));
+                "tab:duplicate", "strip:full_window", "strip:search",
+                "strip:help"), ids(rows));
         assertFalse(rows.get(0).isTakeable());
         assertEquals("gui.losttales.window.cog.nothing", rows.get(0).unavailable);
     }
@@ -109,16 +110,13 @@ public final class TabMenusTest {
                 BARE.optionsTitle());
     }
 
-    /** Each row's id, a hairline as {@code -}. */
     /**
-     * The {@code +} lists what can be opened under its categories' names,
-     * in their order: the channels, the consoles and the whispers under the
-     * channels' name, one sign in, then the other categories. A category's
-     * name folds its rows away, its subcategories with them; with words
-     * typed nothing folds.
+     * What can be opened stands under its categories' names, in their
+     * order: the channels, then the consoles and the whispers under their
+     * own names, then the other categories.
      */
     @Test
-    public void theOpenMenuListsPagesByCategory() {
+    public void pagesStandUnderTheirCategories() {
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
         ConversationPage whisper = ConversationPage.whisper("Steve", "");
@@ -127,24 +125,13 @@ public final class TabMenusTest {
                 new MenuWindow.Entry(whisper.id(), "Steve", false, -1, whisper),
                 new MenuWindow.Entry(console.id(), "Console", false, -1, console),
                 new MenuWindow.Entry(global.id(), "Global", false, -1, global));
-        List<MenuWindow.Entry> listed = TabMenus.byCategory(rows, true);
-        assertEquals(Arrays.asList("fold:CHANNELS", global.id(),
-                "fold:CONSOLES", console.id(), "fold:WHISPERS", whisper.id(),
-                "fold:SETTINGS", BARE.id()), ids(listed));
-        assertEquals(0, listed.get(0).depth);
-        assertEquals(1, listed.get(2).depth);
-        assertTrue(listed.get(0).isTakeable());
-        TabMenus.toggleFold(PageCategory.CHANNELS);
-        try {
-            assertEquals(Arrays.asList("fold:CHANNELS", "fold:SETTINGS",
-                    BARE.id()), ids(TabMenus.byCategory(rows, true)));
-            assertTrue(TabMenus.byCategory(rows, true).get(0).folded);
-            assertEquals("typed words fold nothing", 8,
-                    TabMenus.byCategory(rows, false).size());
-            assertFalse(TabMenus.byCategory(rows, false).get(0).isTakeable());
-        } finally {
-            TabMenus.toggleFold(PageCategory.CHANNELS);
-        }
+        List<MenuWindow.Entry> listed = TabMenus.byCategory(rows);
+        assertEquals(Arrays.asList("", global.id(), "", console.id(), "",
+                whisper.id(), "", BARE.id()), ids(listed));
+        assertEquals(PageCategory.CHANNELS.title(), listed.get(0).label);
+        assertEquals(PageCategory.CONSOLES.title(), listed.get(2).label);
+        assertEquals(PageCategory.SETTINGS.title(), listed.get(6).label);
+        assertFalse(listed.get(0).isTakeable());
     }
 
     /**
@@ -170,6 +157,7 @@ public final class TabMenusTest {
         assertFalse(TabMenus.everyPageReads(pages, "notify", "notify:nothing"));
     }
 
+    /** Each row's id, a hairline as {@code -}. */
     private static List<String> ids(List<MenuWindow.Entry> rows) {
         List<String> ids = new ArrayList<String>();
         for (MenuWindow.Entry row : rows) {

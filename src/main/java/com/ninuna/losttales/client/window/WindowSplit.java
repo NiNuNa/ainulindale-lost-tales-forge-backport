@@ -64,6 +64,13 @@ public final class WindowSplit {
     }
 
     /** The same split with the room shared at {@code share}, held to the least share. */
+    /** The same split with {@code page} standing where {@code old} stood. */
+    public WindowSplit replacing(WindowPage old, WindowPage page) {
+        return new WindowSplit(old.equals(this.first) ? page : this.first,
+                old.equals(this.second) ? page : this.second, this.stacked,
+                this.share);
+    }
+
     public WindowSplit sharedAt(double share) {
         return new WindowSplit(this.first, this.second, this.stacked, share);
     }

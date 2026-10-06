@@ -89,22 +89,6 @@ public final class LostTalesControlBarAnimation {
                         (GuiScreen)screen);
     }
 
-    /** The pointer in the strip's own space, from the content's. */
-    public static int fixedMouseX(GuiScreen screen, int logicalMouseX) {
-        if (ridesContent(screen)) {
-            return logicalMouseX;
-        }
-        return LostTalesGuiAnimations.forwardMouseX(screen, logicalMouseX);
-    }
-
-    public static int fixedMouseY(GuiScreen screen, int logicalMouseY) {
-        if (ridesContent(screen)) {
-            return logicalMouseY;
-        }
-        return Math.round(LostTalesGuiAnimations.forwardMouseY(
-                screen, logicalMouseY) - offsetY(screen));
-    }
-
     /** How far below its place the strip stands now in its own rise; nothing while it has none. */
     public static float offsetY(Object screen) {
         if (screen != null && screen != currentScreen) {

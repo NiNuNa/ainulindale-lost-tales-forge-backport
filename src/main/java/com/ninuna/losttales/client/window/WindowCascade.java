@@ -3,19 +3,18 @@ package com.ninuna.losttales.client.window;
 /**
  * Where a new window lands: one step right and down from the window it
  * opens from, the way desktop windows stack, so the window behind keeps
- * its tab row in view. A step that would carry the new window off the
- * screen starts that axis again at the margin and keeps stepping along
- * the other, and a window too big to fit is held inside the screen. All
- * in GUI pixels.
+ * the top of its tab row in view. A step that would carry the new window
+ * off the screen starts that axis again at the margin and keeps stepping
+ * along the other, and a window too big to fit is held inside the screen.
+ * All in GUI pixels.
  */
 final class WindowCascade {
     /**
-     * The step, right and down alike: one tab row and the room under its
-     * rule, so the window behind shows its whole tab row. Its tabs are how
-     * the player gets back to it.
+     * The step, right and down alike: enough for the window behind to
+     * show its frame and the tops of its tabs, short of their names. A
+     * click there brings it back to the front.
      */
-    static final int STEP = TabRow.ROW_HEIGHT
-            + WindowPlacement.HISTORY_TOP_MARGIN;
+    static final int STEP = 10;
 
     private WindowCascade() {}
 

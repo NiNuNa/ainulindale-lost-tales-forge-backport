@@ -114,6 +114,14 @@ final class ChatSentHistory {
         endBrowse();
     }
 
+    /** Drops one copy's lines: a copy opening anew has sent nothing. */
+    void forget(ConversationPage tab) {
+        this.entries.remove(tab);
+        if (tab != null && tab.equals(this.browsing)) {
+            endBrowse();
+        }
+    }
+
     /** A tab's lines, oldest first. */
     List<String> entries(ConversationPage tab) {
         ArrayList<String> lines = tab == null ? null : this.entries.get(tab);

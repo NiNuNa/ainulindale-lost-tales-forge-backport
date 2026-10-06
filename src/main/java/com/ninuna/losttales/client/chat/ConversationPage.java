@@ -45,9 +45,16 @@ import net.minecraft.util.StatCollector;
  * <p>Every plain channel is one tab; every whisper conversation is one
  * more, all of them on the {@link ChatChannel#WHISPER} channel, NPCs
  * kept apart from players of the same name. Tabs are values — equal when
- * channel, account, identity, own identity and kind agree, names
+ * channel, account, identity, own identity, kind and copy agree, names
  * compared case-insensitively — and are what windows hold, lines are
  * filed under, and the selection points at.</p>
+ *
+ * <p>A conversation may stand open more than once, each copy
+ * ({@link #instance}) its own person, as two people's chats on one
+ * screen: who it speaks as, its scroll, its panels, its draft, what
+ * waits unread in it, its notification and feed settings and what was
+ * sent from it. Only its lines are shared: they are filed under the
+ * conversation itself, its first copy ({@link #conversation}).</p>
  */
 public final class ConversationPage extends WindowPage {
     /** A conversation's options, behind its tab's three dots and on its tool strip. */
@@ -124,9 +131,17 @@ public final class ConversationPage extends WindowPage {
     /** This player's identity the conversation is held as; empty for the account. */
     private final String ownerKey;
     private final boolean npc;
+    /** Which copy of the conversation the tab is: 1 for the conversation itself. */
+    private final int instance;
 
     private ConversationPage(ChatChannel channel, String partner, String identity,
                     String ownerKey, boolean npc) {
+        this(channel, partner, identity, ownerKey, npc, 1);
+    }
+
+    private ConversationPage(ChatChannel channel, String partner, String identity,
+                             String ownerKey, boolean npc, int instance) {
+        this.instance = Math.max(1, Math.min(instance, MAX_INSTANCE));
         this.channel = channel;
         this.partner = partner == null ? "" : partner.trim();
         this.partnerKey = this.partner.toLowerCase(Locale.ROOT);
@@ -178,26 +193,45 @@ public final class ConversationPage extends WindowPage {
     /**
      * The tab whose lines are shown while this one is on screen. A
      * channel that is one conversation is its own; a scoped channel's
-     * row entry stands for whichever of its conversations the chat is
-     * being read as, so the lines shown under it are that identity's;
-     * and a person's row entry stands for the conversation that person
-     * has with the identity being read. The row holds one Faction tab
-     * and one tab per person; which conversation each shows follows
-     * the identity, and nothing else in the layout has to know.
+     * row entry stands for the conversation its copy's identity is in,
+     * so the lines shown under it are that identity's; and a person's
+     * row entry stands for the conversation that person has with the
+     * identity the copy speaks as. The row holds one Faction tab and one
+     * tab per person; which conversation each copy shows follows who it
+     * speaks as, and nothing else in the layout has to know.
      */
     public static ConversationPage viewed(ConversationPage tab) {
         if (tab == null || tab.npc || tab.ownerKey.length() > 0) {
             return tab;
         }
         if (tab.isWhisper()) {
-            return whisper(tab.partner, tab.identity,
-                    ClientChatIdentities.viewIdentityKey());
+            return copy(whisper(tab.partner, tab.identity,
+                    ClientChatIdentities.viewIdentityKey(tab)), tab.instance);
         }
         if (tab.channel == null || !tab.channel.isScoped()) {
             return tab;
         }
-        return of(tab.channel,
-                ClientChatChannelState.scopeKeyRead(tab.channel));
+        return copy(of(tab.channel,
+                ClientChatChannelState.scopeKeyRead(tab)), tab.instance);
+    }
+
+    /**
+     * The conversation a tab stands for as the character played reads
+     * it, whoever its copies speak as: what the closed feed shows, which
+     * always follows the character played.
+     */
+    public static ConversationPage playedConversation(ConversationPage tab) {
+        if (tab == null || tab.npc || tab.ownerKey.length() > 0) {
+            return tab == null ? null : tab.conversation();
+        }
+        if (tab.isWhisper()) {
+            return whisper(tab.partner, tab.identity,
+                    ClientChatIdentities.activeIdentityKey());
+        }
+        if (tab.channel == null || !tab.channel.isScoped()) {
+            return tab.conversation();
+        }
+        return of(tab.channel, ClientChatChannelState.playedScopeKey(tab.channel));
     }
 
     /**
@@ -214,8 +248,22 @@ public final class ConversationPage extends WindowPage {
                 || tab.isFellowship()) {
             return tab;
         }
-        return tab.isWhisper() ? whisper(tab.partner, tab.identity)
-                : of(tab.channel);
+        return copy(tab.isWhisper() ? whisper(tab.partner, tab.identity)
+                : of(tab.channel), tab.instance);
+    }
+
+    /**
+     * The conversation a tab shows ({@link #viewed}), as itself rather than
+     * as one of its copies: what its lines are filed under.
+     */
+    public static ConversationPage viewedConversation(ConversationPage tab) {
+        ConversationPage view = viewed(tab);
+        return view == null ? null : view.conversation();
+    }
+
+    /** Copy {@code instance} of a conversation; null stays null. */
+    private static ConversationPage copy(ConversationPage tab, int instance) {
+        return tab == null ? null : tab.withInstance(instance);
     }
 
     /**
@@ -322,7 +370,7 @@ public final class ConversationPage extends WindowPage {
      */
     public UUID npcSpeakerId() {
         return this.npc ? UUID.nameUUIDFromBytes(
-                id().getBytes(StandardCharsets.UTF_8)) : null;
+                conversationId().getBytes(StandardCharsets.UTF_8)) : null;
     }
 
     /**
@@ -332,6 +380,11 @@ public final class ConversationPage extends WindowPage {
      */
     @Override
     public String id() {
+        return instanceId(conversationId(), this.instance);
+    }
+
+    /** The conversation's own id, the same for every copy. */
+    private String conversationId() {
         if (this.npc) {
             return NPC_ID_PREFIX + this.partner;
         }
@@ -344,11 +397,67 @@ public final class ConversationPage extends WindowPage {
                 this.ownerKey);
     }
 
+    @Override
+    public int instance() {
+        return this.instance;
+    }
+
+    @Override
+    public ConversationPage withInstance(int instance) {
+        return instance == this.instance ? this
+                : instance == 1 && this.ownerKey.length() == 0 && !isWhisper()
+                        ? of(this.channel)
+                        : new ConversationPage(this.channel, this.partner,
+                                this.identity, this.ownerKey, this.npc, instance);
+    }
+
+    /** Every conversation may stand open more than once. */
+    @Override
+    public boolean opensMoreThanOnce() {
+        return true;
+    }
+
+    /**
+     * A copy opening anew is a new person: it speaks as the character
+     * played, and a copy past the first keeps nothing an earlier copy of
+     * its number left: unread lines, settings, a draft, what was sent.
+     */
+    @Override
+    public void forgetCopy() {
+        ClientChatIdentities.forget(this);
+        if (this.instance > 1) {
+            ClientChatChannelViews.forgetCopy(this);
+            ChatLayout.forgetCopy(this);
+            ClientChatChannelState.forgetCopy(this);
+        }
+    }
+
+    /** A duplicated copy speaks as the copy it was made from. */
+    @Override
+    public void duplicatedFrom(WindowPage source) {
+        ClientChatIdentities.inherit(from(source), this);
+    }
+
+    /**
+     * The conversation itself, its first copy: what its lines are filed
+     * under and what its unread marks and settings belong to.
+     */
+    public ConversationPage conversation() {
+        return withInstance(1);
+    }
+
     /** The inverse of {@link #id()}; null for anything unknown. */
     public static ConversationPage fromId(String id) {
         if (id == null) {
             return null;
         }
+        ConversationPage conversation = conversationFromId(pageIdIn(id.trim()));
+        return conversation == null ? null
+                : conversation.withInstance(instanceIn(id.trim()));
+    }
+
+    /** A conversation's own id read back, its first copy; null for anything unknown. */
+    private static ConversationPage conversationFromId(String id) {
         String trimmed = id.trim();
         if (trimmed.toLowerCase(Locale.ROOT).startsWith(WHISPER_ID_PREFIX)) {
             String rest = trimmed.substring(WHISPER_ID_PREFIX.length());
@@ -402,20 +511,21 @@ public final class ConversationPage extends WindowPage {
                 && tab.npc == this.npc
                 && tab.partnerKey.equals(this.partnerKey)
                 && tab.identityKey.equals(this.identityKey)
-                && tab.ownerKey.equals(this.ownerKey);
+                && tab.ownerKey.equals(this.ownerKey)
+                && tab.instance == this.instance;
     }
 
     @Override
     public int hashCode() {
-        return (((this.channel.getId().hashCode() * 31 + this.partnerKey.hashCode())
+        return ((((this.channel.getId().hashCode() * 31 + this.partnerKey.hashCode())
                 * 31 + this.identityKey.hashCode()) * 31 + this.ownerKey.hashCode()) * 2
-                + (this.npc ? 1 : 0);
+                + (this.npc ? 1 : 0)) * 31 + this.instance;
     }
 
-    /** The channel's shown name; for a whisper the partner's. */
+    /** The channel's shown name, for a faction's the faction its copy reads; for a whisper the partner's. */
     @Override
     public String title() {
-        return ClientChatChannelState.displayName(this);
+        return ClientChatChannelState.displayName(viewedConversation(this));
     }
 
     /**
@@ -434,24 +544,24 @@ public final class ConversationPage extends WindowPage {
         String code = ChatCodeNames.of(this.channel,
                 this.channel != ChatChannel.FACTION ? ""
                         : this.ownerKey.length() > 0 ? this.ownerKey
-                        : ClientChatChannelState.scopeKeyRead(this.channel));
+                        : ClientChatChannelState.scopeKeyRead(this));
         return code != null && WindowMenus.matchesFilter(code, filter);
     }
 
     @Override
     public int tone() {
-        return ClientChatChannelState.displayColor(this);
+        return ClientChatChannelState.displayColor(viewedConversation(this));
     }
 
     @Override
     public boolean hasIcon() {
-        return ChatChannelIcons.iconOf(this) != null;
+        return ChatChannelIcons.iconOf(viewedConversation(this)) != null;
     }
 
     @Override
     public void drawIcon(Minecraft minecraft, float x, float y, int alpha,
                          TabMark mark) {
-        ChatChannelIcons.draw(minecraft, this, x, y, alpha, mark);
+        ChatChannelIcons.draw(minecraft, viewedConversation(this), x, y, alpha, mark);
     }
 
     /**
@@ -471,7 +581,10 @@ public final class ConversationPage extends WindowPage {
                 ? TabMark.UNREAD : TabMark.NONE;
     }
 
-    /** Unsent words, unless it is the tab being typed in: those are in the field. */
+    /**
+     * Unsent words in this copy, unless it is the tab being typed in:
+     * those are in the field. Each copy keeps a draft of its own.
+     */
     @Override
     public boolean hasDraft() {
         return !equals(ClientChatChannelState.getSelected())
@@ -486,13 +599,13 @@ public final class ConversationPage extends WindowPage {
 
     @Override
     public boolean isReadOnly() {
-        return !ClientChatChannelState.canSend(this);
+        return !ClientChatChannelState.canSend(viewedConversation(this));
     }
 
     /** A conversation shows while its channel is open to the player. */
     @Override
     public boolean isAvailable() {
-        return ClientChatChannelState.isAvailable(this);
+        return ClientChatChannelState.isAvailable(conversation());
     }
 
     /**
@@ -616,8 +729,9 @@ public final class ConversationPage extends WindowPage {
     @Override
     public List<PageOption> options() {
         List<PageOption> options = new ArrayList<PageOption>(4);
-        boolean divided = ClientChatChannelViews.unreadDividerLine(this) != null;
-        boolean unread = ClientChatChannelViews.hasUnread(this) || divided;
+        ConversationPage conversation = this;
+        boolean divided = ClientChatChannelViews.unreadDividerLine(conversation) != null;
+        boolean unread = ClientChatChannelViews.hasUnread(conversation) || divided;
         options.add(PageOption.action(MENU_MARK_READ,
                 word("gui.losttales.chat.tab.mark_read"), READ_GLYPH)
                 .unavailable(unread ? "" : word("gui.losttales.chat.tab.nothing_unread"))
@@ -630,11 +744,11 @@ public final class ConversationPage extends WindowPage {
         // The feed's own settings, every conversation's, stand under the
         // words that say what of this one reaches it.
         options.add(pick(MENU_FEED, "gui.losttales.chat.tab.feed",
-                ChatLayout.feedChoice(this), FEED_GLYPHS)
+                ChatLayout.feedChoice(conversation), FEED_GLYPHS)
                 .withSettings(Settings.Place.FEED)
                 .reachesEveryPage(word("gui.losttales.chat.tab.feed_all")));
         options.add(pick(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
-                ChatLayout.notification(this), BELL_GLYPHS)
+                ChatLayout.notification(conversation), BELL_GLYPHS)
                 .reachesEveryPage(word("gui.losttales.chat.tab.notify_all")));
         return options;
     }
@@ -675,21 +789,22 @@ public final class ConversationPage extends WindowPage {
      */
     @Override
     public boolean takeOption(String id) {
+        ConversationPage conversation = this;
         ChatLineChoice notify = wordOf(MENU_NOTIFY, id);
         if (notify != null) {
-            ChatLayout.setNotification(this, notify);
+            ChatLayout.setNotification(conversation, notify);
             return true;
         }
         ChatLineChoice feed = wordOf(MENU_FEED, id);
         if (feed != null) {
-            ChatLayout.setFeedChoice(this, feed);
+            ChatLayout.setFeedChoice(conversation, feed);
             return true;
         }
         if (MENU_MARK_READ.equals(id)) {
-            ClientChatChannelViews.markViewed(this);
-            ClientChatChannelViews.dismissDivider(this);
+            ClientChatChannelViews.markViewed(conversation);
+            ClientChatChannelViews.dismissDivider(conversation);
         } else if (MENU_JUMP_UNREAD.equals(id)) {
-            Integer first = ClientChatChannelViews.unreadDividerLine(this);
+            Integer first = ClientChatChannelViews.unreadDividerLine(conversation);
             WindowScreen screen = WindowScreen.current();
             if (screen != null) {
                 screen.jumpToTab(this);

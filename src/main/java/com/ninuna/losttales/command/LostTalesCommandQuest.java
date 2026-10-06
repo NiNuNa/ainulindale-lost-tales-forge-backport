@@ -47,7 +47,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return commandPrefix() + " <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|trackmarker|untrackmarker|reload|world> [id] [player]";
+        return commandPrefix() + " <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|reload|world> [id] [player]";
     }
 
     @Override
@@ -105,16 +105,6 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             return;
         }
 
-        if ("untrackmarker".equalsIgnoreCase(action)) {
-            EntityPlayerMP player = getTargetPlayer(sender, args, 1);
-            if (player != null) {
-                say(sender, WHITE, LostTalesQuestManager.unpinMapMarker(player)
-                        ? SAY + "untrackmarker.done" : SAY + "untrackmarker.nothing",
-                        player.getCommandSenderName());
-            }
-            return;
-        }
-
         if ("starter".equalsIgnoreCase(action)) {
             giveStarterItem(sender, args);
             return;
@@ -159,9 +149,6 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         } else if ("revealmarkers".equalsIgnoreCase(action)) {
             say(sender, WHITE, LostTalesQuestManager.revealQuestMarkers(player, questId)
                     ? SAY + "reveal.done" : SAY + "reveal.nothing", questId, name);
-        } else if ("trackmarker".equalsIgnoreCase(action)) {
-            say(sender, WHITE, LostTalesQuestManager.pinMapMarker(player, questId)
-                    ? SAY + "trackmarker.done" : SAY + "trackmarker.failed", questId, name);
         } else {
             sendUsage(sender);
         }
@@ -394,8 +381,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
                 "starter losttales:tutorial/starter_note",
                 "abandon losttales:tutorial/starter_note",
                 "pin losttales:tutorial/starter_note",
-                "revealmarkers losttales:tutorial/meet_nia",
-                "trackmarker losttales:quest_giver_nia"
+                "revealmarkers losttales:tutorial/meet_nia"
         };
         for (String example : examples) {
             usage(sender, commandPrefix() + " " + example);
@@ -432,7 +418,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     @Override
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "defs", "list", "scan", "starter", "start", "complete", "reset", "abandon", "pin", "unpin", "revealmarkers", "trackmarker", "untrackmarker", "reload", "world");
+            return getListOfStringsMatchingLastWord(args, "defs", "list", "scan", "starter", "start", "complete", "reset", "abandon", "pin", "unpin", "revealmarkers", "reload", "world");
         }
         if (args.length == 2 && "world".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, "start", "stop", "list");

@@ -238,29 +238,6 @@ public final class WindowScreen extends GuiChat
         }
     }
 
-    /**
-     * Opens the Client Settings page: in front on the window screen
-     * already open, else on a new one that goes back to {@code parent} as
-     * it closes, the character menu.
-     */
-    public static void openSettings(GuiScreen parent) {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        OtherPage page = WindowPages.tab(ClientSettingsPage.PAGE_ID);
-        if (minecraft == null || page == null) {
-            return;
-        }
-        WindowScreen open = current();
-        if (open != null) {
-            open.turnTo(page);
-            return;
-        }
-        if (WindowLayout.showPage(page) == null) {
-            return;
-        }
-        pageToFocus = page;
-        minecraft.displayGuiScreen(new WindowScreen("", parent, false));
-    }
-
     /** Closes the screen: back to the screen it was opened from, else to the game. */
     public void closeScreen() {
         this.mc.displayGuiScreen(this.parent);
@@ -1067,14 +1044,13 @@ public final class WindowScreen extends GuiChat
 
     /**
      * The window's own menus from the keyboard, from anywhere on the
-     * screen: Ctrl+Shift+A the tab search and Ctrl+N the {@code +} — both
-     * ways back to a tab, so both mean something with nothing open; a
-     * locked window's {@code +} opens what it offers in another window —
-     * Ctrl+K the quick switcher in the middle of the window the keys are
-     * in, and Ctrl+, the Client Settings page, as a page's key turns the
-     * screen to its page. Each is a switch, as its control is: pressed
-     * again, it puts the window away, or closes the screen turned to the
-     * page.
+     * screen: Ctrl+Shift+A the tab search, Ctrl+N a new page, the Lost
+     * Tales Menu as the {@code +} opens it — both mean something with
+     * nothing open — Ctrl+K the quick switcher in the middle of the window
+     * the keys are in, and Ctrl+, the Client Settings page, as a page's
+     * key turns the screen to its page. The search, the switcher and
+     * Ctrl+, are switches, as their controls are: pressed again, they put
+     * the window away, or close the screen turned to the page.
      */
     private boolean menuShortcut(LostTalesKeyPress press) {
         boolean search = press.isCommand(Keyboard.KEY_A) && press.shift;
@@ -1089,7 +1065,7 @@ public final class WindowScreen extends GuiChat
         if (search) {
             this.tabMenus.toggleSearch(window, null);
         } else if (open) {
-            this.tabMenus.toggleOpen(window, null);
+            openMenuTab(window);
         } else if (switcher) {
             this.tabMenus.toggleSwitcher(window);
         } else {
@@ -1326,6 +1302,9 @@ public final class WindowScreen extends GuiChat
                                 press.frame, press.row, (int)Math.floor(x),
                                 this.width, this.height)));
                 return;
+            case DUPLICATE:
+                duplicate(press.window.getActiveTab());
+                return;
             case HELP:
                 this.tabMenus.toggleHelp(press.window.getActiveTab(),
                         SubWindowAnchor.onToolStrip(press.frame, press.row,
@@ -1361,6 +1340,62 @@ public final class WindowScreen extends GuiChat
             default:
                 return;
         }
+    }
+
+    /**
+     * A new page in {@code window}, as a browser's new tab: a Lost Tales
+     * Menu at its row's end, in front with the keys, where the page picked
+     * on it will stand. A locked window takes no page, so its menu opens in
+     * a new window a step on; with no window, the menu comes as its key
+     * brings it.
+     */
+    void openMenuTab(Window window) {
+        OtherPage menu = WindowPages.tab(LostTalesMenuPage.PAGE_ID);
+        if (menu == null) {
+            return;
+        }
+        WindowPage copy = window == null ? null
+                : WindowLayout.openCopyIn(menu, window.getId());
+        if (copy == null) {
+            turnTo(menu);
+            return;
+        }
+        jumpToTab(copy);
+    }
+
+    /**
+     * Another copy of {@code tab}'s page right after it, in front with the
+     * keys: the strip's duplicate button and its row in the page's options.
+     */
+    void duplicate(WindowPage tab) {
+        WindowPage copy = WindowLayout.duplicate(tab);
+        if (copy != null) {
+            jumpToTab(copy);
+        }
+    }
+
+    /**
+     * A page picked on a Lost Tales Menu tab: a new copy of it takes the
+     * menu's place in its window, whatever the window's kind, as a tab
+     * carried there by hand may. In a locked window nothing can change,
+     * so the page comes forward as its key brings it and the screen turns
+     * to its kind.
+     */
+    public void openFromMenu(OtherPage menu, WindowPage picked) {
+        if (picked == null) {
+            return;
+        }
+        WindowPage copy = WindowLayout.replaceTab(menu, picked);
+        if (copy != null) {
+            jumpToTab(copy);
+            return;
+        }
+        WindowPage shown = WindowLayout.openInCategory(picked, null);
+        if (shown == null) {
+            return;
+        }
+        WindowView.forCategory(shown.category());
+        jumpToTab(shown);
     }
 
     /**
@@ -2218,13 +2253,10 @@ public final class WindowScreen extends GuiChat
         row.gliding = frame.isFillGliding();
         row.closable = WindowLayout.isOpen(row.selected);
         row.fullscreenShare = frame.fullShare();
-        row.showRestore = hasRestorable();
-        row.closedMark = row.showRestore ? restorableMark() : TabMark.NONE;
-        // The controls say whether this row's own tab search or + menu
-        // is out, so a control and its window can never disagree.
+        row.closedMark = restorableMark();
+        // The search control says whether this row's own tab search is
+        // out, so a control and its window can never disagree.
         row.searchOpen = this.menus.isOpenFor(SubWindowKind.TAB_SEARCH,
-                window.getId());
-        row.restoreOpen = this.menus.isOpenFor(SubWindowKind.OPEN,
                 window.getId());
         row.optionsOpen = null;
         for (WindowPage tab : window.getTabs()) {
@@ -2257,19 +2289,6 @@ public final class WindowScreen extends GuiChat
                     this.width) - row.fractionX - tabDrag.grabOffsetX;
         }
         return row;
-    }
-
-    /** Whether the {@code +} has anything to offer again: a closed page, or a part's. */
-    private boolean hasRestorable() {
-        if (WindowPages.hasClosed() || WindowLayout.hasHidden()) {
-            return true;
-        }
-        for (ScreenPart part : this.parts) {
-            if (part.hasRestorable()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** What waits in the {@code +}'s corner: the first part's that has something. */
@@ -3344,14 +3363,10 @@ public final class WindowScreen extends GuiChat
                 WindowLayout.setLocked(window.getId(), !window.isLocked());
                 return;
             case RESTORE:
-                // A switch like the search control beside it: a press
-                // with this window's list already out puts it away, and
-                // one with another window's out turns it to this one. A
-                // locked window takes no page, so what its list opens
-                // opens in another window.
-                this.tabMenus.toggleOpen(window, SubWindowAnchor.onRow(
-                        frame, row, mouseX, this.width, this.height));
-                syncTypingFocus();
+                // A new page, as a browser's new tab: the Lost Tales Menu
+                // at the row's end. A locked window takes no page, so its
+                // menu opens in another window.
+                openMenuTab(window);
                 return;
             case SEARCH:
                 this.tabMenus.toggleSearch(window, SubWindowAnchor.onRow(

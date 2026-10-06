@@ -1,5 +1,8 @@
 package com.ninuna.losttales.chat.server;
 
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Collections;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Arrays;
@@ -36,6 +39,28 @@ public final class ChatReactionsTest {
     private static final String CHANNEL = "900000000000000001";
     private static final String OTHER_CHANNEL = "900000000000000002";
 
+    /**
+     * Each identity reacts on its own: a player's account and a character a
+     * copy speaks as are two reactions, and each copy is shown its own.
+     */
+    @Test
+    public void eachIdentityOfAPlayerReactsOnItsOwn() {
+        UUID beren = UUID.randomUUID();
+        ChatReactions reactions = new ChatReactions();
+        assertTrue(reactions.set("smile", ALICE, "Alice", true));
+        assertTrue(reactions.set("smile", beren, "Beren", true));
+        Set<UUID> hers = new HashSet<UUID>(Arrays.asList(ALICE, beren));
+        ChatReactionSummary.Reaction smile = reactions.summaryFor(hers).find("smile");
+        assertEquals(2, smile.count);
+        assertTrue(smile.isMine(ALICE));
+        assertTrue(smile.isMine(beren));
+        assertFalse("another reader is in none of them",
+                reactions.summaryFor(Collections.singleton(BOB)).find("smile").isMine(BOB));
+        assertTrue(reactions.set("smile", beren, "Beren", false));
+        assertFalse(reactions.summaryFor(hers).find("smile").isMine(beren));
+        assertTrue(reactions.summaryFor(hers).find("smile").isMine(ALICE));
+    }
+
     @Test
     public void aForeignEmojiComesOnlyFromDiscordAndPlayersJoinIt() {
         ChatReactions reactions = new ChatReactions();
@@ -48,9 +73,9 @@ public final class ChatReactionsTest {
 
         assertTrue(reactions.set(PARROT, DISCORD_MEMBER, "", false));
         assertEquals("the player's stays when the member's goes",
-                1, reactions.summaryFor(ALICE).find(PARROT).count);
+                1, reactions.summaryFor(Collections.singleton(ALICE)).find(PARROT).count);
         assertTrue(reactions.set(PARROT, ALICE, "", false));
-        assertNull(reactions.summaryFor(ALICE).find(PARROT));
+        assertNull(reactions.summaryFor(Collections.singleton(ALICE)).find(PARROT));
         assertTrue(reactions.isEmpty());
         assertFalse("gone from the message, a player cannot bring it back",
                 reactions.set(PARROT, ALICE, "Aldric", true));
@@ -78,7 +103,7 @@ public final class ChatReactionsTest {
                 reactions.restore(PARROT, ALICE, "Aldric", ""));
         assertFalse(reactions.restore("not_an_emoji", BOB, "Beren", ""));
         assertTrue(reactions.standOf(PARROT).players());
-        assertTrue(reactions.summaryFor(ALICE).find(PARROT).mine);
+        assertTrue(reactions.summaryFor(Collections.singleton(ALICE)).find(PARROT).isMine(ALICE));
     }
 
     /**
@@ -96,8 +121,8 @@ public final class ChatReactionsTest {
                 reactions.restore("grinning_face:123", ALICE, "Aldric", ""));
         assertTrue(reactions.renamedOnRestore());
         assertEquals(1, reactions.snapshot().size());
-        assertEquals(2, reactions.summaryFor(ALICE).find("grinning").count);
-        assertTrue(reactions.summaryFor(ALICE).find("grinning").mine);
+        assertEquals(2, reactions.summaryFor(Collections.singleton(ALICE)).find("grinning").count);
+        assertTrue(reactions.summaryFor(Collections.singleton(ALICE)).find("grinning").isMine(ALICE));
         assertTrue(reactions.snapshot().containsKey("grinning"));
         // A kind the save wrote under its own name still takes a reactor once.
         assertTrue(reactions.restore("smile", BOB, "Beren", ""));
@@ -138,7 +163,7 @@ public final class ChatReactionsTest {
         assertEquals("one chip, under the name first seen", PARROT, key);
         assertTrue(reactions.set(key, SECOND_MEMBER, "Ana", true));
         assertEquals(Arrays.asList(PARROT), reactions.customKeysOf("556"));
-        assertEquals(2, reactions.summaryFor(ALICE).find(PARROT).count);
+        assertEquals(2, reactions.summaryFor(Collections.singleton(ALICE)).find(PARROT).count);
 
         assertEquals("a member already on it is found there",
                 PARROT, reactions.discordKeyOf(RENAMED, "556", DISCORD_MEMBER, true));
@@ -168,7 +193,7 @@ public final class ChatReactionsTest {
 
         assertTrue(reactions.set(PARROT, DISCORD_MEMBER, "", false));
         assertEquals("the player's stays", 1,
-                reactions.summaryFor(ALICE).find(PARROT).count);
+                reactions.summaryFor(Collections.singleton(ALICE)).find(PARROT).count);
 
         // A custom emoji named as a registry name is kept under that name.
         reactions.set("smile", DISCORD_MEMBER, "Nils", true);
@@ -217,15 +242,15 @@ public final class ChatReactionsTest {
         assertEquals(4, reactions.total());
 
         assertTrue(reactions.clearDiscord("parrot_fellowship:556", "556", CHANNEL));
-        assertNull(reactions.summaryFor(ALICE).find(PARROT));
+        assertNull(reactions.summaryFor(Collections.singleton(ALICE)).find(PARROT));
         assertEquals("the player's stays", 1,
-                reactions.summaryFor(ALICE).find(RENAMED).count);
+                reactions.summaryFor(Collections.singleton(ALICE)).find(RENAMED).count);
         assertEquals("another emoji stays", 1,
-                reactions.summaryFor(ALICE).find(UNICORN).count);
+                reactions.summaryFor(Collections.singleton(ALICE)).find(UNICORN).count);
 
         assertTrue("no emoji and no id is every emoji",
                 reactions.clearDiscord(null, "", CHANNEL));
-        assertNull(reactions.summaryFor(ALICE).find(UNICORN));
+        assertNull(reactions.summaryFor(Collections.singleton(ALICE)).find(UNICORN));
         assertEquals(1, reactions.total());
     }
 
@@ -235,19 +260,18 @@ public final class ChatReactionsTest {
         reactions.set(UNICORN, DISCORD_MEMBER, "Nils", true);
         reactions.set(UNICORN, ALICE, "Aldric", true);
         assertTrue(reactions.clearDiscord(UNICORN, "", CHANNEL));
-        assertEquals(1, reactions.summaryFor(ALICE).find(UNICORN).count);
-        assertTrue(reactions.summaryFor(ALICE).find(UNICORN).mine);
+        assertEquals(1, reactions.summaryFor(Collections.singleton(ALICE)).find(UNICORN).count);
+        assertTrue(reactions.summaryFor(Collections.singleton(ALICE)).find(UNICORN).isMine(ALICE));
     }
 
     @Test
     public void aSummaryCarriesForeignKeysAndRefusesAnythingElse() {
         ChatReactionSummary.Reaction parrot = new ChatReactionSummary.Reaction(
-                PARROT, 1, false, Arrays.asList("Nils"));
+                PARROT, 1, Collections.<UUID>emptyList(), Arrays.asList("Nils"));
         assertEquals(PARROT, parrot.emoji);
-        assertEquals(UNICORN, new ChatReactionSummary.Reaction(UNICORN, 1,
-                false, null).emoji);
+        assertEquals(UNICORN, new ChatReactionSummary.Reaction(UNICORN, 1, Collections.<UUID>emptyList(), null).emoji);
         try {
-            new ChatReactionSummary.Reaction("partyparrot", 1, false, null);
+            new ChatReactionSummary.Reaction("partyparrot", 1, Collections.<UUID>emptyList(), null);
             fail("a bare custom name is no key");
         } catch (IllegalArgumentException expected) {
             // Refused, as an unknown registry name is.
@@ -278,16 +302,16 @@ public final class ChatReactionsTest {
         reactions.set("smile", ALICE, "Aldric", true);
         reactions.set("smile", BOB, "Beren", true);
 
-        ChatReactionSummary forAlice = reactions.summaryFor(ALICE);
+        ChatReactionSummary forAlice = reactions.summaryFor(Collections.singleton(ALICE));
         assertEquals("emoji keep the order they were first used in",
                 "joy", forAlice.getReactions().get(0).emoji);
         ChatReactionSummary.Reaction smile = forAlice.find("smile");
         assertNotNull(smile);
         assertEquals(2, smile.count);
-        assertTrue(smile.mine);
+        assertTrue(smile.isMine(ALICE));
         assertEquals("Aldric", smile.names.get(0));
-        assertFalse(forAlice.find("joy").mine);
-        assertFalse(reactions.summaryFor(null).find("smile").mine);
+        assertFalse(forAlice.find("joy").isMine(ALICE));
+        assertFalse(reactions.summaryFor(Collections.<UUID>emptySet()).find("smile").isMine(ALICE));
         assertNull(forAlice.find("wave"));
     }
 
@@ -298,7 +322,7 @@ public final class ChatReactionsTest {
             reactions.set("smile", UUID.randomUUID(), "Reader " + index, true);
         }
         ChatReactionSummary.Reaction smile =
-                reactions.summaryFor(ALICE).find("smile");
+                reactions.summaryFor(Collections.singleton(ALICE)).find("smile");
         assertEquals(ChatReactionSummary.MAX_NAMES + 3, smile.count);
         assertEquals(ChatReactionSummary.MAX_NAMES, smile.names.size());
         assertEquals(3, smile.others());
@@ -323,7 +347,7 @@ public final class ChatReactionsTest {
         }
         reactions.set("smile", ALICE, name.toString(), true);
         assertEquals(ChatReactionSummary.MAX_NAME_CHARS,
-                reactions.summaryFor(ALICE).find("smile").names.get(0).length());
+                reactions.summaryFor(Collections.singleton(ALICE)).find("smile").names.get(0).length());
     }
 
     @Test
@@ -336,11 +360,11 @@ public final class ChatReactionsTest {
         assertFalse(reactions.standOf("joy").players());
 
         assertTrue(reactions.clearDiscord("joy", "", CHANNEL));
-        assertNull(reactions.summaryFor(ALICE).find("joy"));
-        assertEquals(2, reactions.summaryFor(ALICE).find("smile").count);
+        assertNull(reactions.summaryFor(Collections.singleton(ALICE)).find("joy"));
+        assertEquals(2, reactions.summaryFor(Collections.singleton(ALICE)).find("smile").count);
 
         assertTrue(reactions.clearDiscord(null, "", CHANNEL));
-        assertEquals(1, reactions.summaryFor(ALICE).find("smile").count);
+        assertEquals(1, reactions.summaryFor(Collections.singleton(ALICE)).find("smile").count);
         assertFalse(reactions.clearDiscord(null, "", CHANNEL));
     }
 
@@ -368,7 +392,7 @@ public final class ChatReactionsTest {
 
         assertTrue(reactions.clearDiscord(UNICORN, "", CHANNEL));
         assertEquals("the other channel's reaction stays", 1,
-                reactions.summaryFor(ALICE).find(UNICORN).count);
+                reactions.summaryFor(Collections.singleton(ALICE)).find(UNICORN).count);
         assertFalse(reactions.standOf(UNICORN).standsFor(OTHER_CHANNEL));
         assertTrue(reactions.set(UNICORN, SECOND_MEMBER, "", false));
         assertEquals("", reactions.originOf(UNICORN, SECOND_MEMBER));

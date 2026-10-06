@@ -50,7 +50,7 @@ public final class LostTalesChatTypingPacketTest {
                 java.util.UUID.fromString("00000000-0000-0000-0000-0000000000c1");
         LostTalesChatTypingPacket original = new LostTalesChatTypingPacket(
                 ChatChannel.GLOBAL, "", true,
-                LostTalesChatSendPacket.IDENTITY_CHARACTER, character, "", null);
+                LostTalesChatSendPacket.IDENTITY_CHARACTER, character, true, "", null);
         ByteBuf buffer = Unpooled.buffer();
         try {
             original.toBytes(buffer);
@@ -60,8 +60,16 @@ public final class LostTalesChatTypingPacketTest {
             assertEquals(LostTalesChatSendPacket.IDENTITY_CHARACTER,
                     decoded.getIdentityKind());
             assertEquals(character, decoded.getIdentityCharacterId());
+            assertTrue(decoded.isNarrating());
         } finally {
             buffer.release();
+        }
+        try {
+            new LostTalesChatTypingPacket(ChatChannel.OOC, "", true,
+                    LostTalesChatSendPacket.IDENTITY_ACCOUNT, null, true, "", null);
+            org.junit.Assert.fail("the account never signs as the Narrator");
+        } catch (IllegalArgumentException expected) {
+            // Refused when built, as it is when read.
         }
 
         // Every field is mandatory; no older wire layout is supported.
@@ -166,7 +174,7 @@ public final class LostTalesChatTypingPacketTest {
         java.util.UUID character = new java.util.UUID(1L, 2L);
         ByteBuf wire = Unpooled.buffer();
         new LostTalesChatTypingPacket(ChatChannel.WHISPER, "Steve", true,
-                LostTalesChatSendPacket.IDENTITY_ACCOUNT, null, "Aldric", character).toBytes(wire);
+                LostTalesChatSendPacket.IDENTITY_ACCOUNT, null, false, "Aldric", character).toBytes(wire);
         LostTalesChatTypingPacket decoded = new LostTalesChatTypingPacket();
         decoded.fromBytes(wire.copy());
         assertFalse(decoded.isMalformed());

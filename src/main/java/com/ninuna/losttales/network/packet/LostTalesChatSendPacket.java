@@ -95,6 +95,12 @@ public final class LostTalesChatSendPacket implements IMessage {
     private int identityKind = IDENTITY_DEFAULT;
     private UUID identityCharacterId;
     /**
+     * Whether the line signs as the Narrator over that identity, on its
+     * routing. A request: the server takes it only from a player with the
+     * capability, and only in an in-character channel.
+     */
+    private boolean narrating;
+    /**
      * The message this one replies to, or {@link ChatMessageIds#NONE}.
      * A request like any other: the server checks the message is still
      * within reach and that this sender was one of its recipients, and
@@ -235,6 +241,12 @@ public final class LostTalesChatSendPacket implements IMessage {
                     this.identityKind == IDENTITY_CHARACTER
                             ? new UUID(buffer.readLong(), buffer.readLong())
                             : null;
+            int voice = buffer.readUnsignedByte();
+            if (voice > 1) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid narrator flag");
+            }
+            this.narrating = voice == 1;
             this.replyToMessageId = buffer.readLong();
             this.targetIdentity = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_IDENTITY_BYTES).trim();
@@ -260,6 +272,7 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.references = Collections.emptyList();
             this.identityKind = IDENTITY_DEFAULT;
             this.identityCharacterId = null;
+            this.narrating = false;
             this.replyToMessageId = ChatMessageIds.NONE;
             this.targetIdentity = "";
             this.echoNonce = 0L;
@@ -300,6 +313,7 @@ public final class LostTalesChatSendPacket implements IMessage {
             buffer.writeLong(
                     this.identityCharacterId.getLeastSignificantBits());
         }
+        buffer.writeBoolean(this.narrating);
         buffer.writeLong(this.replyToMessageId);
         LostTalesPacketCodec.writeUtf8String(buffer, this.targetIdentity,
                 MAX_IDENTITY_BYTES);
@@ -324,6 +338,7 @@ public final class LostTalesChatSendPacket implements IMessage {
                 || this.identityKind > IDENTITY_CHARACTER
                 || (this.identityKind == IDENTITY_CHARACTER
                         && this.identityCharacterId == null)
+                || (this.narrating && this.identityKind == IDENTITY_ACCOUNT)
                 || ChatChannel.fromId(this.channelId) == null
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.target, MAX_TARGET_BYTES)
@@ -364,7 +379,14 @@ public final class LostTalesChatSendPacket implements IMessage {
                 && this.message.length() == 0 && this.references.isEmpty()
                 && this.replyToMessageId == ChatMessageIds.NONE
                 && !this.quotesUnkept && this.echoNonce == 0L
-                && !this.action;
+                && !this.action && !this.narrating;
+    }
+
+    /** The same request signing as the Narrator, or not. */
+    public LostTalesChatSendPacket narrating(boolean on) {
+        this.narrating = on;
+        validate();
+        return this;
     }
 
     public ChatChannel getChannel() {
@@ -393,6 +415,8 @@ public final class LostTalesChatSendPacket implements IMessage {
     public UUID getIdentityCharacterId() {
         return this.identityCharacterId;
     }
+    /** Whether the line asks to sign as the Narrator. */
+    public boolean isNarrating() { return this.narrating; }
     /** The message this one asks to reply to; {@code NONE} for none. */
     public long getReplyToMessageId() {
         return this.replyToMessageId;

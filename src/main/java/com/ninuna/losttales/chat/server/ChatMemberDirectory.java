@@ -184,7 +184,7 @@ public final class ChatMemberDirectory {
         boolean inCharacter = ChatRolePresentation.isInCharacter(channel);
         if (channel.getRecipientRule() == ChatRecipientRule.SELF) {
             RoleplayCharacter speaking = inCharacter
-                    ? ChatIdentitySelection.speakerFor(viewer, channel) : null;
+                    ? ChatIdentitySelection.played(viewer) : null;
             List<LostTalesChatMembersPacket.Member> alone =
                     new ArrayList<LostTalesChatMembersPacket.Member>(2);
             alone.add(isShown(viewer, speaking)
@@ -200,8 +200,18 @@ public final class ChatMemberDirectory {
                 && fellowship == null) {
             return Answer.NONE;
         }
+        // A faction's conversation is listed for a viewer who reads it as
+        // one of their identities; the Faction channel's own for the one
+        // played.
         String factionId = ChatChannelPolicy.factionOf(
-                ChatIdentitySelection.character(viewer));
+                ChatIdentitySelection.played(viewer));
+        if (channel.getRecipientRule() == ChatRecipientRule.FACTION
+                && scope != null && scope.length() > 0) {
+            if (!ChatIdentitySelection.readsFaction(viewer, scope)) {
+                return Answer.NONE;
+            }
+            factionId = scope;
+        }
         List<LostTalesChatMembersPacket.Member> present =
                 new ArrayList<LostTalesChatMembersPacket.Member>();
         Set<String> presentKeys = new HashSet<String>();
@@ -215,23 +225,24 @@ public final class ChatMemberDirectory {
             if (member == null || member.getUniqueID() == null) {
                 continue;
             }
-            RoleplayCharacter character = inCharacter
-                    ? ChatIdentitySelection.speakerFor(member, channel) : null;
-            if (!isShown(member, character)) {
-                continue;
+            for (RoleplayCharacter character : identitiesIn(member, channel,
+                    factionId, inCharacter)) {
+                if (isShown(member, character)) {
+                    present.add(present(member, character, channel, inCharacter));
+                    presentKeys.add(keyOf(member, character));
+                }
             }
-            present.add(present(member, character, channel, inCharacter));
-            presentKeys.add(keyOf(member, character));
         }
         // The server speaks in every conversation as a voice of its own,
         // and is online for as long as anybody can read it.
         present.add(serverMember());
         List<Absentee> absent = absenteesOf(viewer, channel, fellowship, factionId,
                 inCharacter);
-        RoleplayCharacter viewerAs = inCharacter
-                ? ChatIdentitySelection.speakerFor(viewer, channel) : null;
-        if (!presentKeys.contains(keyOf(viewer, viewerAs))) {
-            absent = with(absent, absentAs(viewer, viewerAs, channel));
+        for (RoleplayCharacter viewerAs : identitiesIn(viewer, channel,
+                factionId, inCharacter)) {
+            if (!presentKeys.contains(keyOf(viewer, viewerAs))) {
+                absent = with(absent, absentAs(viewer, viewerAs, channel));
+            }
         }
         List<Absentee> discordAbsent = new ArrayList<Absentee>();
         for (DiscordMemberDirectory.Seen seen : LostTalesDiscordBridge.getInstance()
@@ -618,18 +629,49 @@ public final class ChatMemberDirectory {
     }
 
     /**
+     * The identities a player is in a conversation as, each shown apart:
+     * the account out of character; the character played where the
+     * channel speaks as it; in a faction's conversation each of their
+     * identities read in that faction; elsewhere the character played and
+     * every character their copies read as. Null in the list stands for
+     * the account.
+     */
+    private static List<RoleplayCharacter> identitiesIn(EntityPlayerMP player,
+                                                       ChatChannel channel,
+                                                       String factionId,
+                                                       boolean inCharacter) {
+        List<RoleplayCharacter> identities = new ArrayList<RoleplayCharacter>(2);
+        RoleplayCharacter played = ChatIdentitySelection.played(player);
+        if (!inCharacter) {
+            identities.add(null);
+            return identities;
+        }
+        boolean byFaction = channel.getRecipientRule() == ChatRecipientRule.FACTION;
+        if (!byFaction || ChatChannelPolicy.factionOf(played).equals(factionId)) {
+            identities.add(played);
+        }
+        if (ChatRolePresentation.speaksAsPlayedCharacter(channel)) {
+            return identities;
+        }
+        for (RoleplayCharacter character : ChatIdentitySelection.alsoRead(player)) {
+            if (!byFaction || ChatChannelPolicy.factionOf(character).equals(factionId)) {
+                identities.add(character);
+            }
+        }
+        return identities;
+    }
+
+    /**
      * Whether a player here is here as {@code character} — the character
-     * they speak as — or, for null, as their account, and shows that
-     * identity to others.
+     * they play or one their copies read as — or, for null, as their
+     * account, and shows that identity to others.
      */
     private static boolean isHere(EntityPlayerMP player,
                                   RoleplayCharacter character) {
         if (character == null) {
             return isShown(player, null);
         }
-        RoleplayCharacter speaking = ChatIdentitySelection.character(player);
-        return speaking != null && character.getCharacterId() != null
-                && character.getCharacterId().equals(speaking.getCharacterId())
+        return ChatIdentitySelection.reads(player, character.getCharacterId())
                 && isShown(player, character);
     }
 

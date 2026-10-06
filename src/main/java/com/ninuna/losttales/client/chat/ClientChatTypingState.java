@@ -36,8 +36,10 @@ public final class ClientChatTypingState {
         if (packet == null || packet.isMalformed()) {
             return;
         }
-        if (ChatRolePresentation.isInCharacter(packet.getChannel())
-                && !packet.getRecipientIdentity().equals(ClientChatIdentities.viewIdentityKey())) {
+        // A whisper's typing shows with the character it is addressed to,
+        // while a copy reads as it; a channel's goes to whoever reads it.
+        if (packet.getChannel() == ChatChannel.WHISPER
+                && !ClientChatIdentities.isRead(packet.getRecipientIdentity())) {
             return;
         }
         ConversationPage tab = packet.getChannel() == ChatChannel.WHISPER
@@ -85,7 +87,7 @@ public final class ClientChatTypingState {
     }
 
     static synchronized List<String> namesTyping(ConversationPage tab, long nowNanos) {
-        LinkedHashMap<String, Long> names = tab == null ? null : TYPING.get(ConversationPage.viewed(tab));
+        LinkedHashMap<String, Long> names = tab == null ? null : TYPING.get(ConversationPage.viewedConversation(tab));
         if (names == null) {
             return Collections.emptyList();
         }
@@ -96,7 +98,7 @@ public final class ClientChatTypingState {
             }
         }
         if (names.isEmpty()) {
-            TYPING.remove(ConversationPage.viewed(tab));
+            TYPING.remove(ConversationPage.viewedConversation(tab));
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(

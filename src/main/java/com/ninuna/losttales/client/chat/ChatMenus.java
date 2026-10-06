@@ -126,12 +126,15 @@ final class ChatMenus {
         final ConversationPage tab;
         /** The window whose message toolbar opened the menu; null for a right click. */
         final String toolbarWindowId;
+        /** The copy the menu was opened in: what a reaction from it is made as. */
+        final ConversationPage copy;
         /** Whether the menu is asking before the message is taken back. */
         boolean confirmingDelete;
 
         MessageAim(int chatLineId, long messageId, String text, String account,
                    String identity, boolean fromDiscord, UUID senderId,
-                   ConversationPage tab, String toolbarWindowId) {
+                   ConversationPage tab, String toolbarWindowId,
+                   ConversationPage copy) {
             this.chatLineId = chatLineId;
             this.messageId = messageId;
             this.text = text;
@@ -141,6 +144,7 @@ final class ChatMenus {
             this.senderId = senderId;
             this.tab = tab;
             this.toolbarWindowId = toolbarWindowId;
+            this.copy = copy;
         }
 
         @Override
@@ -167,6 +171,8 @@ final class ChatMenus {
     private int screenHeight;
     /** A message the menu was asked to react to, until the screen takes it. */
     private long pendingReactionTarget = ChatMessageIds.NONE;
+    /** The copy the message menu asking for a reaction was opened in. */
+    private ConversationPage pendingReactionCopy;
 
     ChatMenus(WindowMenus menus, SubWindows windows, ChatTabActions tabActions,
               ChatComposer composer, ChatNoticeSink notices, Host host) {
@@ -231,6 +237,13 @@ final class ChatMenus {
         return target;
     }
 
+    /** The copy the reaction waiting was asked for in; read once, with its target. */
+    ConversationPage takeReactionCopy() {
+        ConversationPage copy = this.pendingReactionCopy;
+        this.pendingReactionCopy = null;
+        return copy;
+    }
+
     private static MessageAim messageOf(MenuWindow menu) {
         return menu.about() instanceof MessageAim ? (MessageAim)menu.about()
                 : null;
@@ -255,23 +268,22 @@ final class ChatMenus {
     /* ---- What the chat offers to open ---- */
 
     /**
-     * The chat's part of the {@code +} and of the tab search, each row
-     * under its page's category there ({@link PageCategory}): the closed
-     * channels and consoles, each wearing the icon its tab would wear, its
-     * unread mark included — a closed channel keeps receiving, and the mark
-     * is the one the tab shows once restored; a muted one reads italic,
-     * like its tab would. Then the online players, each opening (or
-     * selecting) the conversation with them, wearing the head its tab
-     * wears and the conversation's mark; the search leaves out a
-     * conversation already open, which it lists among the open tabs. After
-     * them the NPC conversations of the session in no window, the one that
-     * spoke last first, each wearing the NPC's portrait its tab wears.
-     * Every row whose name holds {@code filter}, or a channel's whose code
-     * name does ({@link ConversationPage#answers}).
+     * The chat's part of the Lost Tales Menu and of Page Search, each row
+     * under its page's category there ({@link PageCategory}), a row opening
+     * a new copy of its conversation: every channel and console the player
+     * can read, in their order, a fellowship's conversation for each
+     * fellowship of the character played, each wearing the icon its tab
+     * wears, its unread mark included, a muted one in italics; then the
+     * players online to whisper to, each wearing the head its tab wears;
+     * then the NPC conversations of the session, the one that spoke last
+     * first, each wearing the NPC's portrait. Every row whose name holds
+     * {@code filter}, or a channel's whose code name does
+     * ({@link ConversationPage#answers}).
      */
-    static void addOpenable(Minecraft mc, List<MenuWindow.Entry> entries,
-                            String filter, boolean search) {
-        for (ConversationPage tab : restorableTabs()) {
+    static void addEveryConversation(Minecraft mc,
+                                     List<MenuWindow.Entry> entries,
+                                     String filter) {
+        for (ConversationPage tab : channelTabs(false)) {
             String name = ClientChatChannelState.displayName(tab);
             if (tab.answers(filter)) {
                 entries.add(new MenuWindow.Entry(tab.id(), name,
@@ -282,13 +294,12 @@ final class ChatMenus {
         for (String name : whisperCandidates(mc)) {
             ConversationPage conversation = ConversationPage.whisper(name, "");
             if (conversation != null
-                    && !(search && ChatLayout.isOpen(conversation))
                     && WindowMenus.matchesFilter(name, filter)) {
                 entries.add(new MenuWindow.Entry(conversation.id(), name,
                         ChatLayout.isMuted(conversation), -1, conversation));
             }
         }
-        for (ConversationPage npc : ChatLayout.closedNpcConversations()) {
+        for (ConversationPage npc : ChatLayout.npcConversations(false)) {
             String name = npc.title();
             if (npc.answers(filter)) {
                 entries.add(new MenuWindow.Entry(npc.id(), name,
@@ -298,48 +309,27 @@ final class ChatMenus {
     }
 
     /**
-     * The closed channels the player could see if they were open, each
-     * its tab; the Fellowship channel as a tab for each fellowship of the
-     * character played whose conversation is closed.
+     * The channels the player can read, each its tab, in their order; the
+     * Fellowship channel as a tab for each fellowship of the character
+     * played. With {@code closedOnly}, only those no window holds a copy of.
      */
-    static List<ConversationPage> restorableTabs() {
+    static List<ConversationPage> channelTabs(boolean closedOnly) {
         List<ConversationPage> result = new ArrayList<ConversationPage>();
-        for (ChatChannel channel : ChatLayout.closedChannels()) {
+        for (ChatChannel channel : ChatChannel.presentationOrder()) {
             if (channel == ChatChannel.FELLOWSHIP) {
                 for (ChatFellowship fellowship : ClientChatIdentitySelection.fellowships()) {
                     ConversationPage tab = ConversationPage.of(channel, ConversationPage.ownerKeyOf(fellowship.getId()));
-                    if (ClientChatChannelState.isAvailable(tab) && !ChatLayout.isOpen(tab)) {
+                    if (ClientChatChannelState.isAvailable(tab)
+                            && !(closedOnly && ChatLayout.isOpen(tab))) {
                         result.add(tab);
                     }
                 }
-            } else if (ClientChatChannelState.isAvailable(channel)) {
+            } else if (ClientChatChannelState.isAvailable(channel)
+                    && !(closedOnly && ChatLayout.isOpen(channel))) {
                 result.add(ConversationPage.of(channel));
             }
         }
         return result;
-    }
-
-    /**
-     * Whether any other account is online to open a conversation with.
-     * Asked per frame for the {@code +} control, so it only scans; the
-     * menu itself builds the sorted list.
-     */
-    static boolean hasWhisperCandidates(Minecraft mc) {
-        if (mc == null || mc.thePlayer == null || mc.thePlayer.sendQueue == null
-                || mc.thePlayer.sendQueue.playerInfoList == null) {
-            return false;
-        }
-        String self = mc.thePlayer.getCommandSenderName();
-        for (Object value : mc.thePlayer.sendQueue.playerInfoList) {
-            if (value instanceof GuiPlayerInfo) {
-                String account = ((GuiPlayerInfo)value).name;
-                if (account != null && account.trim().length() > 0
-                        && !account.equalsIgnoreCase(self)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /**
@@ -387,15 +377,15 @@ final class ChatMenus {
     }
 
     /**
-     * The mark after the {@code +}: the closed conversations it would
-     * list, together, their pings on the tile, else the white sphere
-     * while any holds something unread.
+     * The mark after the {@code +}: the conversations no window holds,
+     * together, their pings on the tile, else the white sphere while any
+     * holds something unread.
      */
     static TabMark closedMark() {
         return TabMark.combined(closedConversations());
     }
 
-    /** Sum of the unread counts of the closed conversations the {@code +} would list. */
+    /** Sum of the unread counts of the conversations no window holds. */
     static int closedUnreadCount() {
         int total = 0;
         for (ConversationPage tab : closedConversations()) {
@@ -406,8 +396,8 @@ final class ChatMenus {
 
     /** The closed channels the player could see, then the session's closed NPC conversations. */
     private static List<ConversationPage> closedConversations() {
-        List<ConversationPage> closed = new ArrayList<ConversationPage>(restorableTabs());
-        closed.addAll(ChatLayout.closedNpcConversations());
+        List<ConversationPage> closed = new ArrayList<ConversationPage>(channelTabs(true));
+        closed.addAll(ChatLayout.npcConversations(true));
         return closed;
     }
 
@@ -439,7 +429,7 @@ final class ChatMenus {
         }
         this.menus.show(ChatSubWindows.MESSAGE, messageAim(text,
                         band.lines.get(band.viewIndex).getChatLineID(),
-                        band.lines, band.viewIndex, null),
+                        band.lines, band.viewIndex, null, band.frame.view),
                 WindowMenus.hangingFrom(pointerAnchor(mouseX, mouseY)), false);
         return true;
     }
@@ -461,7 +451,7 @@ final class ChatMenus {
             return false;
         }
         this.menus.show(ChatSubWindows.MESSAGE, messageAim(text, chatLineId,
-                        frame.lines, row, frame.windowId),
+                        frame.lines, row, frame.windowId, frame.view),
                 WindowMenus.hangingFrom(anchor), true);
         return true;
     }
@@ -487,7 +477,8 @@ final class ChatMenus {
      */
     private static MessageAim messageAim(String text, int chatLineId,
                                          List<ChatLine> lines, int viewIndex,
-                                         String toolbarWindowId) {
+                                         String toolbarWindowId,
+                                         ConversationPage copy) {
         long messageId = ClientChatMessageIds.messageIdOf(chatLineId);
         ClientChatMessages.Remembered remembered =
                 ClientChatMessages.get(messageId);
@@ -498,12 +489,13 @@ final class ChatMenus {
                     remembered.packet.getIdentityName(),
                     LostTalesChatMessagePacket.isDiscordSender(
                             remembered.packet.getSenderId()),
-                    remembered.packet.getSenderId(), tab, toolbarWindowId);
+                    remembered.packet.getSenderId(), tab, toolbarWindowId, copy);
         }
         return new MessageAim(chatLineId, messageId, text,
                 messageAccount(lines, viewIndex, chatLineId),
                 messageIdentity(lines, viewIndex, chatLineId),
-                isFromDiscord(lines, chatLineId), null, tab, toolbarWindowId);
+                isFromDiscord(lines, chatLineId), null, tab, toolbarWindowId,
+                copy);
     }
 
     /** A message's actions. */
@@ -625,6 +617,7 @@ final class ChatMenus {
         }
         if (ENTRY_REACT.equals(entry.id)) {
             this.pendingReactionTarget = aim.messageId;
+            this.pendingReactionCopy = aim.copy;
         } else if (ENTRY_REPLY.equals(entry.id)) {
             startReply(aim);
         } else if (ENTRY_EDIT.equals(entry.id)) {
@@ -722,9 +715,13 @@ final class ChatMenus {
     private List<MenuWindow.Entry> forwardRows(String filter) {
         List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
         List<MenuWindow.Entry> open = new ArrayList<MenuWindow.Entry>();
+        java.util.Set<ConversationPage> listed = new java.util.HashSet<ConversationPage>();
         for (WindowPage each : WindowLayout.order()) {
+            // A conversation open twice is forwarded into once.
             ConversationPage tab = ConversationPage.from(each);
-            if (tab != null && forwardsInto(tab) && tab.answers(filter)) {
+            tab = tab == null ? null : tab.conversation();
+            if (tab != null && listed.add(tab) && forwardsInto(tab)
+                    && tab.answers(filter)) {
                 open.add(new MenuWindow.Entry(tab.id(), tab.title(),
                         tab.isMuted(), tab.tone(), tab));
             }
@@ -732,7 +729,7 @@ final class ChatMenus {
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
                 "gui.losttales.window.search.open"), open);
         List<MenuWindow.Entry> channels = new ArrayList<MenuWindow.Entry>();
-        for (ConversationPage tab : restorableTabs()) {
+        for (ConversationPage tab : channelTabs(true)) {
             String name = ClientChatChannelState.displayName(tab);
             if (forwardsInto(tab) && tab.answers(filter)) {
                 channels.add(new MenuWindow.Entry(tab.id(), name,
@@ -1145,7 +1142,8 @@ final class ChatMenus {
             WindowPage subject, String filter, boolean statusOnly) {
         UUID self = this.mc.thePlayer == null ? null
                 : this.mc.thePlayer.getUniqueID();
-        ClientChatIdentities.Identity current = ClientChatIdentities.viewing();
+        ConversationPage copy = ConversationPage.from(subject);
+        ClientChatIdentities.Identity current = ClientChatIdentities.viewing(copy);
         List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
         if (statusOnly) {
             // The identity the tab shows, and what it may say of itself.
@@ -1162,7 +1160,7 @@ final class ChatMenus {
                     roleplayRows(subject));
             return entries;
         }
-        entries.add(MenuWindow.Entry.passive(ClientChatIdentities.isNarrating()
+        entries.add(MenuWindow.Entry.passive(ClientChatIdentities.isNarrating(copy)
                 ? ChatNames.narrator(LostTalesWords.LANG) : current.name)
                 .withPicture(head(self, current.account ? ""
                         : current.skinId)));
@@ -1175,15 +1173,15 @@ final class ChatMenus {
                     false, -1, null)
                     .withSprite(LostTalesUiSheet.SPEECH_BUBBLE,
                             LostTalesUiSheet.SPEECH_BUBBLE_HOVER,
-                            ClientChatIdentities.isNarrating()));
+                            ClientChatIdentities.isNarrating(copy)));
         }
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
                 "gui.losttales.chat.character_selection.characters"),
-                characterRows(ClientChatIdentities.characterIdentities(),
+                characterRows(copy, ClientChatIdentities.characterIdentities(),
                         filter, self));
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
                 "gui.losttales.chat.character_selection.lore"),
-                characterRows(ClientChatIdentities.loreIdentities(),
+                characterRows(copy, ClientChatIdentities.loreIdentities(),
                         filter, self));
         if (entries.size() == 1) {
             entries.add(MenuWindow.Entry.passive(
@@ -1263,13 +1261,13 @@ final class ChatMenus {
     }
 
     /** One section's rows: the identities whose names hold the filter. */
-    private static List<MenuWindow.Entry> characterRows(
+    private static List<MenuWindow.Entry> characterRows(ConversationPage copy,
             List<ClientChatIdentities.Identity> identities,
             String filter, UUID self) {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
         for (ClientChatIdentities.Identity identity : identities) {
             if (WindowMenus.matchesFilter(identity.name, filter)) {
-                rows.add(characterEntry(
+                rows.add(characterEntry(copy,
                         ENTRY_CHARACTER_PREFIX + identity.characterId,
                         identity, self));
             }
@@ -1277,23 +1275,26 @@ final class ChatMenus {
         return rows;
     }
 
-    /** One choosable identity: its head and its name, lit while it is the shared chat identity. */
-    private static MenuWindow.Entry characterEntry(
+    /** One choosable identity: its head and its name, lit while the copy speaks as it. */
+    private static MenuWindow.Entry characterEntry(ConversationPage copy,
             String id, ClientChatIdentities.Identity identity,
             UUID self) {
         return new MenuWindow.Entry(id, identity.name, false, -1, null)
                 .withPicture(head(self, identity.skinId))
-                .chosen(ClientChatIdentities.isSelected(identity));
+                .chosen(ClientChatIdentities.isSelected(copy, identity));
     }
 
     /**
      * A row taken: a status for the identity {@code subject} shows, or a
-     * voice or identity, which applies to every roleplaying conversation.
+     * voice or identity for the copy {@code subject} is, which speaks as
+     * it from then on and no other copy with it.
      */
     private static void chooseIdentityOrStatus(MenuWindow.Entry entry,
                                                WindowPage subject) {
+        ConversationPage copy = ConversationPage.from(subject);
         if (ENTRY_NARRATOR.equals(entry.id)) {
-            ClientChatIdentities.setNarrating(!ClientChatIdentities.isNarrating());
+            ClientChatIdentities.setNarrating(copy,
+                    !ClientChatIdentities.isNarrating(copy));
             return;
         }
         if (entry.id.startsWith(ENTRY_ROLEPLAY_PREFIX)) {
@@ -1331,14 +1332,14 @@ final class ChatMenus {
         for (ClientChatIdentities.Identity identity
                 : ClientChatIdentities.characterIdentities()) {
             if (characterId.equals(identity.characterId)) {
-                ClientChatIdentities.select(identity);
+                ClientChatIdentities.select(copy, identity);
                 return;
             }
         }
         for (ClientChatIdentities.Identity identity
                 : ClientChatIdentities.loreIdentities()) {
             if (characterId.equals(identity.characterId)) {
-                ClientChatIdentities.select(identity);
+                ClientChatIdentities.select(copy, identity);
                 return;
             }
         }

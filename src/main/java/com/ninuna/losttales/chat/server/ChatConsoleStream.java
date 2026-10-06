@@ -154,11 +154,15 @@ public final class ChatConsoleStream {
         return true;
     }
 
-    /** The reactions on a kept entry as {@code viewer} is shown them; none for none kept. */
+    /**
+     * The reactions on a kept entry as {@code viewer} is shown them; none
+     * for none kept. The Server Log is read and reacted to as the account.
+     */
     public static synchronized ChatReactionSummary reactionsFor(long id, UUID viewer) {
         ChatReactions reactions = REACTIONS.get(Long.valueOf(id));
         return reactions == null ? ChatReactionSummary.EMPTY
-                : reactions.summaryFor(viewer);
+                : reactions.summaryFor(viewer == null ? Collections.<UUID>emptySet()
+                        : Collections.singleton(viewer));
     }
 
     private static void trim() {

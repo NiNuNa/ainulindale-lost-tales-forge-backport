@@ -98,9 +98,11 @@ public final class LostTalesServerBroadcastHook {
     /**
      * Sees a line about to be broadcast and hands back the one to send:
      * a join or a leave naming the account, with its id and its named
-     * players appended as empty runs. The relay is told after, with the
-     * id; the runs are empty, so the relay reads the line's words as they
-     * go out.
+     * players appended as empty runs; or nothing, for an in-character
+     * line naming a player whose character is still taking its name
+     * ({@link ChatLinesAwaitingNames}), which goes out in a moment. The
+     * relay is told after, with the id; the runs are empty, so the relay
+     * reads the line's words as they go out.
      */
     public static IChatComponent onBroadcast(IChatComponent message) {
         if (message == null) {
@@ -111,6 +113,9 @@ public final class LostTalesServerBroadcastHook {
         try {
             line = namingTheAccount(message);
             ChatChannel channel = ChatSystemLineClassifier.classify(line);
+            if (ChatLinesAwaitingNames.hold(line, channel)) {
+                return null;
+            }
             if (channel != null) {
                 messageId = stamp(line, channel);
             }
@@ -141,21 +146,60 @@ public final class LostTalesServerBroadcastHook {
                 && kind != ChatSystemLineClassifier.Kind.LEAVE) {
             return message;
         }
+        return swapNames(message, new NameSwap() {
+            @Override
+            public IChatComponent swap(IChatComponent name, String account) {
+                ChatComponentText accountName = new ChatComponentText(account);
+                accountName.setChatStyle(name.getChatStyle().createShallowCopy());
+                return accountName;
+            }
+        });
+    }
+
+    /** Gives a player's name in a line for another way of naming them. */
+    interface NameSwap {
+        /**
+         * What to write in place of {@code name}, which suggests
+         * whispering {@code account}; null keeps the name as it is.
+         */
+        IChatComponent swap(IChatComponent name, String account);
+    }
+
+    /**
+     * The line rebuilt with every player's name among its arguments
+     * swapped: a name is an argument suggesting {@code /msg <account>} on
+     * a click, as vanilla writes every player into a line it builds. A
+     * line that is no translation, or whose names all stay, is handed
+     * back as it came. The rebuilt line keeps the line's style and every
+     * run appended to it.
+     */
+    static IChatComponent swapNames(IChatComponent message, NameSwap swap) {
+        if (!(message instanceof ChatComponentTranslation)) {
+            return message;
+        }
         ChatComponentTranslation translation = (ChatComponentTranslation)message;
         Object[] arguments = translation.getFormatArgs();
-        if (arguments == null || arguments.length == 0
-                || !(arguments[0] instanceof IChatComponent)) {
+        if (arguments == null) {
             return message;
         }
-        IChatComponent name = (IChatComponent)arguments[0];
-        String account = whisperedAccount(name);
-        if (account == null) {
-            return message;
-        }
-        ChatComponentText accountName = new ChatComponentText(account);
-        accountName.setChatStyle(name.getChatStyle().createShallowCopy());
         Object[] renamed = arguments.clone();
-        renamed[0] = accountName;
+        boolean changed = false;
+        for (int index = 0; index < renamed.length; index++) {
+            if (!(renamed[index] instanceof IChatComponent)) {
+                continue;
+            }
+            IChatComponent name = (IChatComponent)renamed[index];
+            String account = whisperedAccount(name);
+            IChatComponent other = account == null ? null
+                    : swap.swap(name, account);
+            if (other != null) {
+                renamed[index] = other;
+                changed = true;
+            }
+        }
+        if (!changed) {
+            return message;
+        }
         ChatComponentTranslation rebuilt =
                 new ChatComponentTranslation(translation.getKey(), renamed);
         rebuilt.setChatStyle(message.getChatStyle().createShallowCopy());
@@ -494,6 +538,26 @@ public final class LostTalesServerBroadcastHook {
         return account != null ? account : name.getUnformattedText().trim();
     }
 
+    /** The accounts of every player named among the line's arguments. */
+    static List<String> namedAccounts(IChatComponent message) {
+        List<String> accounts = new ArrayList<String>();
+        if (!(message instanceof ChatComponentTranslation)) {
+            return accounts;
+        }
+        Object[] arguments = ((ChatComponentTranslation)message).getFormatArgs();
+        if (arguments == null) {
+            return accounts;
+        }
+        for (Object argument : arguments) {
+            String account = argument instanceof IChatComponent
+                    ? whisperedAccount((IChatComponent)argument) : null;
+            if (account != null && !accounts.contains(account)) {
+                accounts.add(account);
+            }
+        }
+        return accounts;
+    }
+
     /**
      * The account a player's name component suggests whispering to —
      * {@code /msg <account> }, which vanilla puts on every name it
@@ -589,6 +653,21 @@ public final class LostTalesServerBroadcastHook {
         return new ChatNamedPlayer(player.getUniqueID(), account,
                 character == null ? null : character.getCharacterId(),
                 identityName,
+                character == null ? "" : character.getSkinId());
+    }
+
+    /**
+     * The player as {@code character} names them, one of their own, or as
+     * their account for null: who a line or a whisper is with when it is
+     * not the character they play.
+     */
+    public static ChatNamedPlayer namedAs(EntityPlayerMP player,
+                                          RoleplayCharacter character) {
+        String account = accountOf(player);
+        return new ChatNamedPlayer(player.getUniqueID(), account,
+                character == null ? null : character.getCharacterId(),
+                character == null ? account
+                        : PlayableIdentity.displayName(character, account),
                 character == null ? "" : character.getSkinId());
     }
 

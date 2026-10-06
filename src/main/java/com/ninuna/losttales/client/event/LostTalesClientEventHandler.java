@@ -64,6 +64,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapDecorationRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainCache;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainRenderer;
+import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapStatics;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapViewMemory;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipIcons;
@@ -186,6 +187,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesMapTerrainCache.clear();
         LostTalesMapTerrainRenderer.clear();
         LostTalesMapViewMemory.clear();
+        LostTalesLotrMapStatics.clear();
         LostTalesClientWaystoneTravelContext.clear();
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();

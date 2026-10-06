@@ -79,6 +79,8 @@ public final class LostTalesMapPage extends PageContent {
     private static final String ZOOM_IN = "zoom_in";
 
     private LostTalesLotrMapGui map;
+    /** The part of LOTR's map it keeps in static fields, this page's own. */
+    private final LostTalesLotrMapStatics statics = new LostTalesLotrMapStatics();
     /** The map fading in with its window as one picture. */
     private final LostTalesUiLayerFade fade = new LostTalesUiLayerFade();
     private boolean hasKeys;
@@ -130,7 +132,7 @@ public final class LostTalesMapPage extends PageContent {
     /** A prompt with a field, the waypoint's or Find Location's, keeps every key. */
     @Override
     public boolean holdsKeys() {
-        return this.map != null && this.map.hasFieldPrompt();
+        return this.map != null && entered().hasFieldPrompt();
     }
 
     /** The map's tab wears seafoam, its water's colour on the palette. */
@@ -148,13 +150,13 @@ public final class LostTalesMapPage extends PageContent {
 
     @Override
     public boolean isPanelOut() {
-        return this.map != null && this.map.isMapLegendOpen();
+        return this.map != null && entered().isMapLegendOpen();
     }
 
     @Override
     public void togglePanel() {
         if (this.map != null) {
-            this.map.toggleMapLegend();
+            entered().toggleMapLegend();
         }
     }
 
@@ -198,7 +200,7 @@ public final class LostTalesMapPage extends PageContent {
     public boolean takeOption(String id) {
         LostTalesMapLegendRegistry.toggleCategory(id);
         if (this.map != null) {
-            this.map.onMapLegendFiltersChanged();
+            entered().onMapLegendFiltersChanged();
         }
         return true;
     }
@@ -250,13 +252,13 @@ public final class LostTalesMapPage extends PageContent {
     @Override
     public void search(String words) {
         if (this.map != null) {
-            this.map.findPlaces(words);
+            entered().findPlaces(words);
         }
     }
 
     @Override
     public int found() {
-        return this.map == null ? -1 : this.map.placesFound();
+        return this.map == null ? -1 : entered().placesFound();
     }
 
     /** The arrows walk the places found, the map going to each; Return gives the map the keys. */
@@ -266,7 +268,7 @@ public final class LostTalesMapPage extends PageContent {
             return false;
         }
         if (keyCode == Keyboard.KEY_UP || keyCode == Keyboard.KEY_DOWN) {
-            this.map.walkPlaces(keyCode == Keyboard.KEY_UP ? -1 : 1);
+            entered().walkPlaces(keyCode == Keyboard.KEY_UP ? -1 : 1);
             return true;
         }
         return keyCode == Keyboard.KEY_RETURN
@@ -284,7 +286,7 @@ public final class LostTalesMapPage extends PageContent {
     @Override
     public List<BarItem> barItems() {
         List<BarItem> items = new ArrayList<BarItem>(9);
-        boolean inMiddleEarth = this.map != null && this.map.isInMiddleEarth();
+        boolean inMiddleEarth = this.map != null && entered().isInMiddleEarth();
         String away = StatCollector.translateToLocal(
                 "gui.losttales.map.control.why.away");
         String location = StatCollector.translateToLocal(
@@ -301,10 +303,10 @@ public final class LostTalesMapPage extends PageContent {
                         "gui.losttales.map.control.waypoint"),
                 LostTalesLotrMapGui.CREATE_WAYPOINT_KEY));
         items.add(inMiddleEarth ? waypointItem : waypointItem.unavailable(away));
-        if (this.map != null && this.map.offersMarks()) {
+        if (this.map != null && entered().offersMarks()) {
             items.add(markItem(inMiddleEarth, away));
         }
-        if (this.map != null && this.map.isPlayerOp) {
+        if (this.map != null && entered().isPlayerOp) {
             String teleport = StatCollector.translateToLocal(
                     "gui.losttales.map.control.teleport");
             items.add(BarItem.button(TELEPORT, teleport,
@@ -312,15 +314,15 @@ public final class LostTalesMapPage extends PageContent {
                     StatCollector.translateToLocal(
                             "gui.losttales.map.control.teleport.tip"),
                     LOTRKeyHandler.keyBindingMapTeleport.getKeyCode()))
-                    .lit(this.map.isTeleportArmed()));
+                    .lit(entered().isTeleportArmed()));
         }
-        if (this.map != null && this.map.isMarkArmed()) {
+        if (this.map != null && entered().isMarkArmed()) {
             items.add(BarItem.words(StatCollector.translateToLocal(
-                    this.map.isMovingMark()
+                    entered().isMovingMark()
                             ? "gui.losttales.map.mark.where_moved"
                             : "gui.losttales.map.mark.where")));
         }
-        String cursor = this.map == null ? "" : this.map.cursorWords();
+        String cursor = this.map == null ? "" : entered().cursorWords();
         if (cursor.length() > 0) {
             items.add(BarItem.words(cursor));
         }
@@ -355,11 +357,11 @@ public final class LostTalesMapPage extends PageContent {
                 "gui.losttales.map.control.mark"), new ItemStack(Blocks.torch))
                 .tip(StatCollector.translateToLocal(
                         "gui.losttales.map.control.mark.tip"))
-                .lit(this.map.isMarkArmed());
+                .lit(entered().isMarkArmed());
         if (!inMiddleEarth) {
             return item.unavailable(away);
         }
-        String refusal = this.map.isMarkArmed() ? null : this.map.markRefusal();
+        String refusal = entered().isMarkArmed() ? null : entered().markRefusal();
         return refusal == null ? item : item.unavailable(refusal);
     }
 
@@ -369,17 +371,17 @@ public final class LostTalesMapPage extends PageContent {
             return;
         }
         if (LOCATION.equals(id)) {
-            this.map.focusCurrentLocation();
+            entered().focusCurrentLocation();
         } else if (WAYPOINT.equals(id)) {
-            this.map.openWaypointPrompt();
+            entered().openWaypointPrompt();
         } else if (MARK.equals(id)) {
-            this.map.toggleMarkPlacing();
+            entered().toggleMarkPlacing();
         } else if (TELEPORT.equals(id)) {
-            this.map.toggleTeleport();
+            entered().toggleTeleport();
         } else if (ZOOM_OUT.equals(id)) {
-            this.map.zoomStep(-1);
+            entered().zoomStep(-1);
         } else if (ZOOM_IN.equals(id)) {
-            this.map.zoomStep(1);
+            entered().zoomStep(1);
         }
     }
 
@@ -396,7 +398,7 @@ public final class LostTalesMapPage extends PageContent {
     void mapKeyPressed() {
         WindowScreen screen = WindowScreen.current();
         if (screen != null) {
-            screen.turnTo(WindowPages.tab(PAGE_ID));
+            screen.turnTo(tab());
         }
     }
 
@@ -453,14 +455,27 @@ public final class LostTalesMapPage extends PageContent {
         if (minecraft == null || width <= 0 || height <= 0) {
             return null;
         }
+        // LOTR's map reads its static fields as it is made and drawn: this
+        // page's stand there first.
+        this.statics.enter();
         if (this.map == null) {
             this.map = new LostTalesLotrMapGui();
-            this.map.embedIn(this);
-            this.map.setWorldAndResolution(minecraft, width, height);
-        } else if (this.map.width != width || this.map.height != height) {
-            this.map.width = width;
-            this.map.height = height;
+            entered().embedIn(this);
+            entered().setWorldAndResolution(minecraft, width, height);
+        } else if (entered().width != width || entered().height != height) {
+            entered().width = width;
+            entered().height = height;
         }
+        return this.map;
+    }
+
+    /**
+     * The map, its own zoom and layout put in LOTR's static fields first:
+     * every call to the map goes through here, so another map page open
+     * beside this one keeps its own.
+     */
+    private LostTalesLotrMapGui entered() {
+        this.statics.enter();
         return this.map;
     }
 
@@ -470,7 +485,7 @@ public final class LostTalesMapPage extends PageContent {
 
     @Override
     public boolean acts(LostTalesUiHitBox box, double x, double y) {
-        return this.map != null && this.map.isPointerOverInteractable(
+        return this.map != null && entered().isPointerOverInteractable(
                 local(x, box.left), local(y, box.top));
     }
 
@@ -482,7 +497,7 @@ public final class LostTalesMapPage extends PageContent {
         }
         this.pressedButtons |= 1 << button;
         this.pressedMillis = Minecraft.getSystemTime();
-        this.map.mouseClicked(local(x, box.left), local(y, box.top), button);
+        entered().mouseClicked(local(x, box.left), local(y, box.top), button);
         return true;
     }
 
@@ -490,7 +505,7 @@ public final class LostTalesMapPage extends PageContent {
     public void mouseDragged(Minecraft minecraft, LostTalesUiHitBox box,
                              double x, double y, int button) {
         if (this.map != null) {
-            this.map.mouseClickMove(local(x, box.left), local(y, box.top),
+            entered().mouseClickMove(local(x, box.left), local(y, box.top),
                     button, Minecraft.getSystemTime() - this.pressedMillis);
         }
     }
@@ -502,7 +517,7 @@ public final class LostTalesMapPage extends PageContent {
             this.pressedButtons &= ~(1 << button);
         }
         if (this.map != null) {
-            this.map.mouseMovedOrUp(local(x, box.left), local(y, box.top),
+            entered().mouseMovedOrUp(local(x, box.left), local(y, box.top),
                     button);
         }
     }
@@ -511,7 +526,7 @@ public final class LostTalesMapPage extends PageContent {
     @Override
     public boolean scroll(LostTalesUiHitBox box, double x, double y,
                           int lines) {
-        return this.map != null && lines != 0 && this.map.wheelAt(
+        return this.map != null && lines != 0 && entered().wheelAt(
                 local(x, box.left), local(y, box.top), lines < 0 ? 120 : -120);
     }
 
@@ -527,18 +542,18 @@ public final class LostTalesMapPage extends PageContent {
         }
         WindowScreen screen = WindowScreen.current();
         if (keyCode == LostTalesLotrMapGui.FIND_LOCATION_KEY
-                && !this.map.hasFieldPrompt() && screen != null) {
-            screen.openSearchFor(WindowPages.tab(PAGE_ID));
+                && !entered().hasFieldPrompt() && screen != null) {
+            screen.openSearchFor(tab());
             return true;
         }
-        this.map.keyTyped(typedChar, keyCode);
+        entered().keyTyped(typedChar, keyCode);
         return true;
     }
 
     @Override
     public void tick() {
         if (this.map != null) {
-            this.map.updateScreen();
+            entered().updateScreen();
         }
     }
 
@@ -571,8 +586,9 @@ public final class LostTalesMapPage extends PageContent {
     @Override
     public void hidden() {
         if (this.map != null) {
-            this.map.onGuiClosed();
+            entered().onGuiClosed();
             this.map = null;
+            this.statics.leave();
         }
         this.fade.release();
         this.pressedButtons = 0;

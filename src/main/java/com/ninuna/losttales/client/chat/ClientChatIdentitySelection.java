@@ -11,16 +11,16 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 
 /**
- * Synchronizes the shared chat selection with the server and holds what
- * the server says of the fellowships of the character played, the one
- * it travels with first: each one's id, name and the colour worn in it,
- * which name and colour its conversation. An answer for another identity
- * than the one selected now is a late one and is ignored.
+ * Tells the server whom the chat's copies read as besides the character
+ * played, so their factions' lines and the whispers sent to them arrive,
+ * and holds what the server says of the fellowships of the character
+ * played, the one it travels with first: each one's id, name and the
+ * colour worn in it, which name and colour its conversation. Told again
+ * every two seconds until the server's answer agrees.
  */
 public final class ClientChatIdentitySelection {
-    private static String requestedKey;
-    private static boolean requestedNarrating;
-    private static String confirmedKey;
+    private static List<UUID> requested;
+    private static List<UUID> confirmed;
     private static List<ChatFellowship> fellowships = Collections.emptyList();
     private static long requestedAt;
 
@@ -30,35 +30,27 @@ public final class ClientChatIdentitySelection {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc == null || mc.thePlayer == null || mc.theWorld == null
                 || ClientCharacterRosterCache.getSnapshot() == null) { return; }
-        String key = ClientChatIdentities.viewIdentityKey();
-        boolean narrating = ClientChatIdentities.isNarrating();
-        long now = System.nanoTime();
-        boolean same = key.equals(requestedKey) && narrating == requestedNarrating;
-        if (same && (key.equals(confirmedKey) || now - requestedAt < 2000000000L)) { return; }
-        if (!key.equals(requestedKey)) {
-            ClientChatTypingState.clear();
-            ChatSpeechBubbles.clear();
+        List<UUID> reading = ClientChatIdentities.readCharacters();
+        if (reading.size() > LostTalesChatIdentityPacket.MAX_READ) {
+            reading = reading.subList(0, LostTalesChatIdentityPacket.MAX_READ);
         }
-        requestedKey = key;
-        requestedNarrating = narrating;
+        long now = System.nanoTime();
+        boolean same = reading.equals(requested);
+        if (same && (reading.equals(confirmed) || now - requestedAt < 2000000000L)) { return; }
+        requested = reading;
         requestedAt = now;
-        LostTalesNetworkHandler.CHANNEL.sendToServer(new LostTalesChatIdentityPacket(
-                key.length() == 0 ? null : UUID.fromString(key), narrating));
+        LostTalesNetworkHandler.CHANNEL.sendToServer(new LostTalesChatIdentityPacket(reading));
     }
 
     public static void accept(LostTalesChatIdentitySyncPacket packet) {
         if (packet == null || packet.isMalformed()) { return; }
-        String key = ConversationPage.ownerKeyOf(packet.getCharacterId());
-        if (!key.equals(ClientChatIdentities.viewIdentityKey())) { return; }
-        confirmedKey = key;
+        confirmed = packet.getCharacterIds();
         fellowships = packet.getFellowships();
-        ClientChatIdentities.confirmNarrating(packet.isNarrating());
     }
 
     /** The fellowships of the character played, the one travelled with first, as the server confirmed them. */
     static List<ChatFellowship> fellowships() {
-        return ClientChatIdentities.viewIdentityKey().equals(confirmedKey)
-                ? fellowships : Collections.<ChatFellowship>emptyList();
+        return fellowships;
     }
 
     /** The fellowship a conversation's key names, of the character played; null for none. */
@@ -78,9 +70,8 @@ public final class ClientChatIdentitySelection {
     }
 
     public static void clear() {
-        requestedKey = null;
-        requestedNarrating = false;
-        confirmedKey = null;
+        requested = null;
+        confirmed = null;
         fellowships = Collections.emptyList();
         requestedAt = 0L;
     }

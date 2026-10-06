@@ -240,8 +240,11 @@ public final class ChatChannelIcons {
             // each drawn as an item's icon in a line is.
             ItemStack item = itemIconOf(tab.getChannel());
             if (item == null && tab.getChannel() == ChatChannel.FACTION) {
+                // A faction's conversation wears its faction's banner; the
+                // Faction channel's own, the character played's.
                 item = LotrFactionBannerResolver.bannerFor(
-                        ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
+                        tab.getOwnerKey().length() > 0 ? tab.getOwnerKey()
+                                : ClientChatChannelState.playedFactionId());
             }
             if (item == null && tab.isFellowship()) {
                 item = ClientFellowshipIcons.stackOf(ChatFellowship.idOf(tab.getOwnerKey()));

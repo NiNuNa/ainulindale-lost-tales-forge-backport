@@ -4,6 +4,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
@@ -12,7 +16,10 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * One reaction chip under a message: the emoji, how many reacted with
- * it, whether the reader is one of them, and the message it belongs to.
+ * it, which of the reader's identities are among them, and the message
+ * it belongs to. The line is shared by every copy of its conversation,
+ * so the chip stands lit in a copy whose identity reacted
+ * ({@link Data#mineFor}); the copy being drawn is {@link #reader}.
  *
  * <p>Carried like every marker, on the click event of an empty run, so
  * it survives vanilla's shallow style copies and adds nothing to a
@@ -68,16 +75,44 @@ final class ChatReactionMarker {
     /** A digit's advance when no font can be asked: the game's own. */
     private static final int DIGIT_WIDTH = 6;
 
+    /** Between two of the reader's identities in the marker. */
+    private static final String MINE_SEPARATOR = ",";
+
+    /** The copy whose lines are being drawn; null for the closed feed. */
+    private static ConversationPage reader;
+
     private ChatReactionMarker() {}
 
-    /** A chip for the emoji with reaction key {@code emoji}. */
-    static ChatComponentText create(String emoji, int count, boolean mine,
+    /** The copy whose lines are drawn from now on, its chips lit for its identity; null for the feed. */
+    static void readAs(ConversationPage copy) {
+        reader = copy;
+    }
+
+    /** The copy whose lines are being drawn; null for the closed feed. */
+    static ConversationPage reader() {
+        return reader;
+    }
+
+    /**
+     * A chip for the emoji with reaction key {@code emoji}, those of the
+     * reader's identities who reacted with it {@code mineAs}.
+     */
+    static ChatComponentText create(String emoji, int count, List<UUID> mineAs,
                                     long messageId, int countWidth) {
         int width = PAD + ICON + GAP + Math.max(0, countWidth) + TRAIL;
+        StringBuilder mine = new StringBuilder();
+        if (mineAs != null) {
+            for (UUID id : mineAs) {
+                if (mine.length() > 0) {
+                    mine.append(MINE_SEPARATOR);
+                }
+                mine.append(id);
+            }
+        }
         ChatComponentText marker = new ChatComponentText("");
         ChatStyle style = marker.getChatStyle().setChatClickEvent(
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                        PREFIX + count + ':' + (mine ? '1' : '0') + ':'
+                        PREFIX + count + ':' + mine + ':'
                                 + messageId + ':' + width + ':' + emoji));
         marker.setChatStyle(style);
         return marker;
@@ -112,9 +147,15 @@ final class ChatReactionMarker {
             if (count < 1 || width < 0 || !ChatMessageIds.isServerId(messageId)) {
                 return null;
             }
-            return new Data(fields[4], count, "1".equals(fields[1]),
-                    messageId, width);
-        } catch (NumberFormatException ignored) {
+            List<UUID> mineAs = new ArrayList<UUID>();
+            if (fields[1].length() > 0) {
+                for (String id : fields[1].split(MINE_SEPARATOR)) {
+                    mineAs.add(UUID.fromString(id));
+                }
+            }
+            return new Data(fields[4], count, mineAs, messageId, width);
+        } catch (IllegalArgumentException ignored) {
+            // A number or an id this build never wrote names no chip.
             return null;
         }
     }
@@ -211,19 +252,29 @@ final class ChatReactionMarker {
         /** The registry emoji drawn; null for a foreign one. */
         final ChatEmoji emoji;
         final int count;
-        /** Whether the reader is one of those who reacted. */
-        final boolean mine;
+        /** The reader's identities among those who reacted. */
+        final List<UUID> mineAs;
         final long messageId;
         final int width;
 
-        private Data(String key, int count, boolean mine, long messageId,
+        private Data(String key, int count, List<UUID> mineAs, long messageId,
                      int width) {
             this.key = key;
             this.emoji = ChatEmoji.fromName(key);
             this.count = count;
-            this.mine = mine;
+            this.mineAs = Collections.unmodifiableList(mineAs);
             this.messageId = messageId;
             this.width = width;
+        }
+
+        /**
+         * Whether the identity {@code copy} reacts as is among those who
+         * reacted: the chip stands lit there, and a click takes the
+         * reaction back. For no copy, the feed, the identity played.
+         */
+        boolean mineFor(ConversationPage copy) {
+            UUID id = ClientChatIdentities.reactorIdOf(copy);
+            return id != null && this.mineAs.contains(id);
         }
 
         String countText() {

@@ -244,13 +244,18 @@ public final class LostTalesChatPresentation {
         // scoped channel is asked about as the row entry it belongs to.
         // Asking with the conversation's own tab would find no window
         // holding it and open a second Faction tab beside the first.
+        // A whisper held as a character no copy speaks as opens a copy
+        // speaking as it, beside the others of that person.
         ConversationPage row = ConversationPage.row(tab);
         if (row != null && !ChatLayout.isOpen(row)) {
             if (ChatLayout.opensByItself(row)) {
-                ChatLayout.openTab(row, windowIdOfSelection());
+                ChatLayout.openReader(tab, windowIdOfSelection(), false);
             } else if (!replayed && row.isPlaceConversation()) {
-                ChatLayout.reopenConversation(row, windowIdOfSelection());
+                ChatLayout.reopenConversation(tab, windowIdOfSelection());
             }
+        } else if (row != null && tab.isWhisper() && !replayed
+                && ChatLayout.readersOf(tab).isEmpty()) {
+            ChatLayout.openReader(tab, windowIdOfSelection(), false);
         }
         if (tab == null) {
             return;
@@ -1951,7 +1956,7 @@ public final class LostTalesChatPresentation {
             }
             first = false;
             root.appendSibling(ChatReactionMarker.create(reaction.emoji,
-                    reaction.count, reaction.mine, packet.getMessageId(),
+                    reaction.count, reaction.mineAs, packet.getMessageId(),
                     ChatReactionMarker.countWidth(font, reaction.count)));
         }
         // The row ends on a button adding another, as Discord's does;
@@ -3408,10 +3413,10 @@ public final class LostTalesChatPresentation {
 
     /**
      * The names that are this player on {@code channel}: on an
-     * in-character channel the character they play and the one they
-     * speak as, never the account behind them, since what a character
-     * does there is that character's; elsewhere the account and the
-     * identity they speak as ({@link #localMentionNames}).
+     * in-character channel the character they play and every one their
+     * copies speak as, never the account behind them, since what a
+     * character does there is that character's; elsewhere the account
+     * and those characters ({@link #localMentionNames}).
      */
     private static List<String> localNamesOn(Minecraft minecraft,
                                              ChatChannel channel) {
@@ -3419,27 +3424,28 @@ public final class LostTalesChatPresentation {
                 == ChatPresentationMode.OUT_OF_CHARACTER) {
             return localMentionNames(minecraft);
         }
-        List<String> names = new ArrayList<String>(2);
-        String played = ClientChatIdentities.played().name;
-        String speaking = ClientChatIdentities.viewing().name;
-        if (played.length() > 0) {
-            names.add(played);
-        }
-        if (speaking.length() > 0 && !speaking.equalsIgnoreCase(played)) {
-            names.add(speaking);
-        }
-        return names;
+        return characterNamesInUse(new ArrayList<String>(2));
     }
 
-    /** Mentions notify the account and the currently selected chat character. */
+    /** Mentions notify the account and every character in use: the one played and those the copies speak as. */
     private static List<String> localMentionNames(Minecraft minecraft) {
         List<String> names = new ArrayList<String>(4);
         if (minecraft != null && minecraft.thePlayer != null) {
             names.add(minecraft.thePlayer.getCommandSenderName());
         }
-        ClientChatIdentities.Identity identity = ClientChatIdentities.viewing();
-        if (!identity.account && identity.name.length() > 0) {
-            names.add(identity.name);
+        return characterNamesInUse(names);
+    }
+
+    /** Adds each character in use's name to {@code names}, each once. */
+    private static List<String> characterNamesInUse(List<String> names) {
+        for (ClientChatIdentities.Identity identity : ClientChatIdentities.inUse()) {
+            boolean known = false;
+            for (String name : names) {
+                known |= name.equalsIgnoreCase(identity.name);
+            }
+            if (!identity.account && identity.name.length() > 0 && !known) {
+                names.add(identity.name);
+            }
         }
         return names;
     }
@@ -3666,16 +3672,20 @@ public final class LostTalesChatPresentation {
     /**
      * Whether {@code named} is this player as {@code channel} knows them:
      * out of character, their account; in character, the character they
-     * play or the one they speak as, so a line about another of their
+     * play or one their copies speak as, so a line about another of their
      * characters, or about the account behind them, pings nobody.
      */
     static boolean isLocalIdentity(ChatNamedPlayer named, ChatChannel channel) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        return namesIdentity(named, channel,
-                minecraft == null || minecraft.thePlayer == null ? null
-                        : minecraft.thePlayer.getUniqueID(),
-                ClientChatIdentities.played().characterId,
-                ClientChatIdentities.viewing().characterId);
+        UUID account = minecraft == null || minecraft.thePlayer == null ? null
+                : minecraft.thePlayer.getUniqueID();
+        UUID played = ClientChatIdentities.played().characterId;
+        for (ClientChatIdentities.Identity identity : ClientChatIdentities.inUse()) {
+            if (namesIdentity(named, channel, account, played, identity.characterId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

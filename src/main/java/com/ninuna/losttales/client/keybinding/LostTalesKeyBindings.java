@@ -5,11 +5,11 @@ import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
 import com.ninuna.losttales.client.character.room.CharacterRoomSession;
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
 import com.ninuna.losttales.client.window.PinnedWindows;
+import com.ninuna.losttales.client.window.LostTalesMenuPage;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.hud.LostTalesHudHelper;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
-import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
 import com.ninuna.losttales.gui.hud.placement.HudPlacementPage;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.gui.screen.fellowship.FellowshipPage;
@@ -32,7 +32,7 @@ public class LostTalesKeyBindings {
     public static final String FULL_NAME_PREFIX = "gui.losttales.keys.full.";
     private static final int MIDDLE_MOUSE_KEY_CODE = -98;
 
-    private static final KeyBinding CHARACTER_MENU = new KeyBinding("key.losttales.characterMenu", Keyboard.KEY_CAPITAL, CATEGORY);
+    private static final KeyBinding MENU = new KeyBinding("key.losttales.menu", Keyboard.KEY_CAPITAL, CATEGORY);
     private static final KeyBinding QUEST_JOURNAL = new KeyBinding("key.losttales.questJournal", Keyboard.KEY_J, CATEGORY);
     /** Unbound until the player gives it a key. */
     private static final KeyBinding FELLOWSHIP = new KeyBinding("key.losttales.fellowship", Keyboard.KEY_NONE, CATEGORY);
@@ -49,7 +49,7 @@ public class LostTalesKeyBindings {
     private static final KeyBinding CYCLE_TARGET_RIGHT = new KeyBinding("key.losttales.cycleTargetRight", Keyboard.KEY_NONE, CATEGORY);
 
     public void register() {
-        ClientRegistry.registerKeyBinding(CHARACTER_MENU);
+        ClientRegistry.registerKeyBinding(MENU);
         ClientRegistry.registerKeyBinding(QUEST_JOURNAL);
         ClientRegistry.registerKeyBinding(FELLOWSHIP);
         ClientRegistry.registerKeyBinding(CHARACTERS);
@@ -108,8 +108,8 @@ public class LostTalesKeyBindings {
     private static void handleBindingPresses() {
         Minecraft minecraft = Minecraft.getMinecraft();
 
-        if (CHARACTER_MENU.isPressed()) {
-            minecraft.displayGuiScreen(new LostTalesCharacterMenuGui(minecraft.currentScreen));
+        if (MENU.isPressed()) {
+            WindowScreen.openPage(LostTalesMenuPage.PAGE_ID);
         }
         if (QUEST_JOURNAL.isPressed()) {
             WindowScreen.openPage(QuestJournalPage.PAGE_ID);
@@ -191,8 +191,8 @@ public class LostTalesKeyBindings {
         return MODIFIER;
     }
 
-    public static KeyBinding getCharacterMenuKeyBinding() {
-        return CHARACTER_MENU;
+    public static KeyBinding getMenuKeyBinding() {
+        return MENU;
     }
 
     public static KeyBinding getQuestJournalKeyBinding() {
@@ -219,8 +219,8 @@ public class LostTalesKeyBindings {
         return getKeyDisplayName(MODIFIER);
     }
 
-    public static boolean isCharacterMenuKey(int keyCode) {
-        return isKeyboardKey(CHARACTER_MENU, keyCode);
+    public static boolean isMenuKey(int keyCode) {
+        return isKeyboardKey(MENU, keyCode);
     }
 
     public static boolean isQuestJournalKey(int keyCode) {

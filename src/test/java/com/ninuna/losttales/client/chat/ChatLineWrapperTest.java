@@ -132,11 +132,11 @@ public final class ChatLineWrapperTest {
         root.appendSibling(text("hello"));
         root.appendSibling(ChatLayoutMarker.rowBreak());
         root.appendSibling(ChatReactionMarker.create(
-                com.ninuna.losttales.chat.emoji.ChatEmoji.SMILE.getName(), 3, true,
+                com.ninuna.losttales.chat.emoji.ChatEmoji.SMILE.getName(), 3, java.util.Collections.singletonList(ChatReactionMarkerTest.READER),
                 12345L, 6));
         root.appendSibling(ChatSpacerMarker.of(ChatReactionMarker.BETWEEN));
         root.appendSibling(ChatReactionMarker.create(
-                com.ninuna.losttales.chat.emoji.ChatEmoji.JOY.getName(), 1, false,
+                com.ninuna.losttales.chat.emoji.ChatEmoji.JOY.getName(), 1, java.util.Collections.<java.util.UUID>emptyList(),
                 12345L, 6));
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root, 200,
                 true, 1.0F, 1.0F, 1.0F, null);
@@ -150,7 +150,7 @@ public final class ChatLineWrapperTest {
                 + ChatReactionMarker.GAP + 6 + ChatReactionMarker.TRAIL,
                 ChatInlineIcons.declaredWidth(ChatReactionMarker.create(
                         com.ninuna.losttales.chat.emoji.ChatEmoji.SMILE.getName(), 3,
-                        true, 12345L, 6)));
+                        java.util.Collections.singletonList(ChatReactionMarkerTest.READER), 12345L, 6)));
     }
 
     @Test

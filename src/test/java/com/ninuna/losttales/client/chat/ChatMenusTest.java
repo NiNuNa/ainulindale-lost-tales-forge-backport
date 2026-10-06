@@ -42,8 +42,11 @@ public final class ChatMenusTest {
     }
 
     @Test
-    public void restorableTabsAreTheClosedOnesThePlayerCouldSee() {
-        for (ConversationPage tab : ChatMenus.restorableTabs()) {
+    public void theChannelTabsAreTheOnesThePlayerCanRead() {
+        for (ConversationPage tab : ChatMenus.channelTabs(false)) {
+            assertTrue(ClientChatChannelState.isAvailable(tab));
+        }
+        for (ConversationPage tab : ChatMenus.channelTabs(true)) {
             assertTrue(ClientChatChannelState.isAvailable(tab));
             assertFalse(ChatLayout.isOpen(tab));
         }
@@ -53,11 +56,11 @@ public final class ChatMenusTest {
     @Test
     public void eachFellowshipIsOfferedByItsOwnTab() {
         UUID grey = new UUID(7L, 7L);
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(null,
-                Collections.singletonList(new ChatFellowship(grey, "Grey Company", 0x123456)),
-                false));
+        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
+                Collections.<UUID>emptyList(),
+                Collections.singletonList(new ChatFellowship(grey, "Grey Company", 0x123456))));
         try {
-            List<ConversationPage> offered = ChatMenus.restorableTabs();
+            List<ConversationPage> offered = ChatMenus.channelTabs(false);
             assertTrue(offered.contains(ConversationPage.of(ChatChannel.FELLOWSHIP, grey.toString())));
             assertFalse(offered.contains(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         } finally {
@@ -68,14 +71,14 @@ public final class ChatMenusTest {
     @Test
     public void closedUnreadCountIsCappedJustPastTheCounterLimit() {
         int total = 0;
-        for (ConversationPage tab : ChatMenus.restorableTabs()) {
+        for (ConversationPage tab : ChatMenus.channelTabs(true)) {
             total += ClientChatChannelViews.unreadCount(tab);
         }
         assertEquals(Math.min(ClientChatChannelViews.MAX_UNREAD + 1, total),
                 ChatMenus.closedUnreadCount());
     }
 
-    /** A closed NPC conversation's unread lines count after the {@code +} too. */
+    /** A closed NPC conversation's unread lines count on the {@code +}'s mark too. */
     @Test
     public void theClosedCountTakesInClosedNpcConversations() {
         ClientChatChannelViews.clear();
@@ -98,38 +101,33 @@ public final class ChatMenusTest {
     }
 
     /**
-     * The chat's part of the {@code +} and the tab search: its closed
-     * channels, each row's id its tab's, and nothing else while no player
-     * list can be read; a filter matching nothing leaves no section.
+     * The chat's part of the Lost Tales Menu and Page Search: every channel
+     * the player can read, open or not, each row's id its tab's, and
+     * nothing else while no player list can be read; a filter matching
+     * nothing leaves no row.
      */
     @Test
-    public void theChatOffersItsClosedChannelsByTheirTabs() {
+    public void theChatOffersEveryChannelByItsTab() {
         List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
-        ChatMenus.addOpenable(null, entries, "", true);
+        ChatMenus.addEveryConversation(null, entries, "");
         int rows = 0;
         for (MenuWindow.Entry entry : entries) {
-            if (entry.header) {
-                continue;
-            }
             rows++;
-            ConversationPage tab = ConversationPage.fromId(entry.id);
-            assertTrue(tab != null);
-            assertFalse(ChatLayout.isOpen(tab));
+            assertTrue(ConversationPage.fromId(entry.id) != null);
         }
-        assertEquals(ChatMenus.restorableTabs().size(), rows);
+        assertEquals(ChatMenus.channelTabs(false).size(), rows);
         List<MenuWindow.Entry> none = new ArrayList<MenuWindow.Entry>();
-        ChatMenus.addOpenable(null, none, "zzzz-nothing", true);
+        ChatMenus.addEveryConversation(null, none, "zzzz-nothing");
         assertTrue(none.isEmpty());
     }
 
     /**
-     * The NPC conversations of the session in no window are offered
-     * after the players, the one that spoke last first, each row's id
-     * its tab's and the tab its icon; one standing open is not, and the
-     * filter narrows them by name.
+     * The NPC conversations of the session are offered after the players,
+     * open or not, the one that spoke last first, each row's id its tab's
+     * and the tab its icon; the filter narrows them by name.
      */
     @Test
-    public void theChatOffersItsClosedNpcConversations() {
+    public void theChatOffersItsNpcConversations() {
         ConversationPage bilbo = ConversationPage.npc("Bilbo");
         ConversationPage frodo = ConversationPage.npc("Frodo");
         ConversationPage sam = ConversationPage.npc("Sam");
@@ -138,7 +136,7 @@ public final class ChatMenusTest {
         ChatLayout.noteNpcSpoke(sam);
         assertTrue(ChatLayout.openTab(sam, null) != null);
         List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
-        ChatMenus.addOpenable(null, entries, "", false);
+        ChatMenus.addEveryConversation(null, entries, "");
         List<String> ids = new ArrayList<String>();
         for (MenuWindow.Entry entry : entries) {
             if (entry.id.startsWith("npc:")) {
@@ -146,10 +144,10 @@ public final class ChatMenusTest {
                 assertEquals(ConversationPage.fromId(entry.id), entry.icon);
             }
         }
-        assertEquals(Arrays.asList(frodo.id(), bilbo.id()), ids);
-        assertTrue(ChatLayout.hasClosedNpcConversation());
+        assertEquals(Arrays.asList(sam.id(), frodo.id(), bilbo.id()), ids);
+        assertEquals(Arrays.asList(frodo, bilbo), ChatLayout.npcConversations(true));
         List<MenuWindow.Entry> narrowed = new ArrayList<MenuWindow.Entry>();
-        ChatMenus.addOpenable(null, narrowed, "bil", true);
+        ChatMenus.addEveryConversation(null, narrowed, "bil");
         int npcRows = 0;
         for (MenuWindow.Entry entry : narrowed) {
             if (entry.id.startsWith("npc:")) {
@@ -196,11 +194,11 @@ public final class ChatMenusTest {
     @Test
     public void aMessageIsTheSameOneByItsLine() {
         ChatMenus.MessageAim one = new ChatMenus.MessageAim(42, 7L, "hello",
-                "Steve", "", false, null, null, null);
+                "Steve", "", false, null, null, null, null);
         ChatMenus.MessageAim again = new ChatMenus.MessageAim(42, 7L,
-                "hello there", "Steve", "Aragorn", false, null, null, "w1");
+                "hello there", "Steve", "Aragorn", false, null, null, "w1", null);
         ChatMenus.MessageAim other = new ChatMenus.MessageAim(43, 8L, "hello",
-                "Steve", "", false, null, null, null);
+                "Steve", "", false, null, null, null, null);
         assertEquals(one, again);
         assertEquals(one.hashCode(), again.hashCode());
         assertFalse(one.equals(other));

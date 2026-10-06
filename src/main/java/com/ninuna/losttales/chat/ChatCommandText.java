@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -10,21 +11,23 @@ import java.util.Locale;
  * what must not be repeated left out. The Server Log writes its
  * entries with it, and the chat shows a typed command's echo with it, so
  * a reply quoting the echo carries no secret either. A private message
- * keeps only whom it went to, and a fellowship message
- * ({@code /fmsg}, {@code /fchat}) only the fellowship it names, or that it
- * binds or lets go; a config change keeps the category and key
- * but not the value, since a value may be a secret; a Discord binding
- * keeps its channel and direction but never a webhook address or a
- * channel id. Everything is cut to a line.
+ * keeps only whom it went to; a config change ({@code /losttales config set} or its
+ * alias {@code cfg}) keeps the category and key but not the value, since a
+ * value may be a secret; a Discord unlink keeps its game channel but never
+ * a Discord channel id. Everything is cut to a line.
  */
 public final class ChatCommandText {
     /** The longest a described command gets. */
     public static final int MAX_LENGTH = 256;
     /** Three full stops rather than an ellipsis: the chat's font has no glyph for one. */
     private static final String ELIDED = "...";
-    /** The words of {@code /fmsg} that bind it to a fellowship and let it go. */
-    private static final String FELLOWSHIP_BIND = "bind";
-    private static final String FELLOWSHIP_UNBIND = "unbind";
+    /**
+     * Every name {@code /losttales config} answers to: a value set under any
+     * of them is masked. {@code ChatCommandTextTest} holds this to the
+     * sub-command's own names.
+     */
+    public static final List<String> CONFIG_NAMES =
+            Collections.unmodifiableList(Arrays.asList("config", "cfg"));
 
     private ChatCommandText() {}
 
@@ -55,10 +58,8 @@ public final class ChatCommandText {
             if (arguments.length > 1) {
                 kept.add(ELIDED);
             }
-        } else if (name.equals("fmsg") || name.equals("fchat")) {
-            keepFellowshipMessage(arguments, kept);
         } else if (name.equals("losttales") && arguments.length > 1
-                && arguments[0].equalsIgnoreCase("config")
+                && CONFIG_NAMES.contains(arguments[0].toLowerCase(Locale.ROOT))
                 && arguments[1].equalsIgnoreCase("set")) {
             for (int index = 0; index < arguments.length && index < 4; index++) {
                 kept.add(arguments[index]);
@@ -66,15 +67,13 @@ public final class ChatCommandText {
             if (arguments.length > 4) {
                 kept.add(ELIDED);
             }
-        } else if (name.equals("losttales") && arguments.length > 0
-                && arguments[0].equalsIgnoreCase("discord")) {
-            for (String argument : arguments) {
-                int equals = argument.indexOf('=');
-                String option = equals < 0 ? "" : argument.substring(0, equals)
-                        .toLowerCase(Locale.ROOT);
-                kept.add(option.equals("webhook") || option.equals("channel")
-                        ? option + "=" + ELIDED : argument);
+        } else if (name.equals("losttales") && arguments.length > 3
+                && arguments[0].equalsIgnoreCase("discord")
+                && arguments[1].equalsIgnoreCase("unlink")) {
+            for (int index = 0; index < 3; index++) {
+                kept.add(arguments[index]);
             }
+            kept.add(ELIDED);
         } else {
             Collections.addAll(kept, arguments);
         }
@@ -87,38 +86,5 @@ public final class ChatCommandText {
             line.append(ELIDED);
         }
         return line.toString();
-    }
-
-    /**
-     * What a fellowship message keeps, read as the command reads it:
-     * {@code unbind}, {@code bind} and the fellowship named in quotes, and
-     * nothing of any other words, which are what it says.
-     */
-    private static void keepFellowshipMessage(String[] arguments, List<String> kept) {
-        StringBuilder joined = new StringBuilder();
-        for (String argument : arguments) {
-            if (joined.length() > 0) {
-                joined.append(' ');
-            }
-            joined.append(argument);
-        }
-        String text = joined.toString().trim();
-        if (text.equalsIgnoreCase(FELLOWSHIP_UNBIND)) {
-            kept.add(text);
-            return;
-        }
-        String rest = text;
-        if (text.toLowerCase(Locale.ROOT).startsWith(FELLOWSHIP_BIND + " ")) {
-            kept.add(text.substring(0, FELLOWSHIP_BIND.length()));
-            rest = text.substring(FELLOWSHIP_BIND.length()).trim();
-        }
-        int close = rest.startsWith("\"") ? rest.indexOf('"', 1) : -1;
-        if (close > 0) {
-            kept.add(rest.substring(0, close + 1));
-            rest = rest.substring(close + 1).trim();
-        }
-        if (rest.length() > 0) {
-            kept.add(ELIDED);
-        }
     }
 }
