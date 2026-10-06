@@ -59,6 +59,43 @@ public final class ChatMentionsTest {
                 Arrays.asList((String)null, "  ")));
     }
 
+    /**
+     * A Discord role's or channel's mention reads {@code @**Moderators**}
+     * and {@code #**general**}: the marks right after the sign keep it
+     * from mentioning a role or a person of that name, and from linking
+     * a game channel of that name, wherever the text is read.
+     */
+    @Test
+    public void aDiscordRolesBoldNameMentionsNobody() {
+        List<String> roles = Arrays.asList("Moderators", "Global");
+        assertFalse(ChatMentions.mentionsAny("ask @**Moderators** now", roles));
+        assertTrue(ChatMentions.mentionsAny("ask @Moderators now", roles));
+        java.util.UUID id = java.util.UUID.randomUUID();
+        List<ChatNamedPlayer> people = Collections.singletonList(
+                new ChatNamedPlayer(id, "Moderators", null, "Moderators", ""));
+        assertEquals(null, ChatMentions.nameAt("@**Moderators**", 0, people));
+        assertTrue(ChatMentions.reached("ask @**Moderators** now", people, 8)
+                .isEmpty());
+        assertEquals(1, ChatMentions.reached("ask @Moderators now", people, 8)
+                .size());
+        assertEquals(null, ChatChannelSuggester.linkAt("#**global**", 0));
+        assertEquals(null, ChatChannelSuggester.linkAt("#**ooc**/12", 0));
+        // Drawn, the sign stands alone and the name is bold words: no run
+        // the mention and channel passes read holds a sign with a name.
+        List<ChatMarkdown.Span> spans = ChatMarkdown.parse("ask @**Moderators** in #**general**");
+        StringBuilder signs = new StringBuilder();
+        for (ChatMarkdown.Span span : spans) {
+            if (span.isBold()) {
+                assertFalse(span.getText(), span.getText().indexOf('@') >= 0
+                        || span.getText().indexOf('#') >= 0);
+            } else {
+                signs.append(span.getText());
+                assertFalse(span.getText(), ChatMentions.mentionsAny(span.getText(), roles));
+            }
+        }
+        assertEquals("ask @ in #", signs.toString());
+    }
+
     @Test
     public void mentionNamesTagsBareNamesAtWordBoundaries() {
         java.util.List<String> names = java.util.Arrays.asList(

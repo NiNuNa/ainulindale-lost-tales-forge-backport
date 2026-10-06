@@ -1,8 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.chat.ChatRolePresentation;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,7 +44,9 @@ public final class ClientChatTypingState {
                 ? ConversationPage.whisper(packet.getPartner(), packet.getIdentityName(), packet.getRecipientIdentity())
                 : ConversationPage.of(packet.getChannel(), packet.getScopeValue());
         if (!tab.isWhisper() && !ClientChatChannelState.isAvailable(tab)) { return; }
-        apply(tab, packet.getIdentityName(), packet.isTyping(),
+        // The Narrator types under the name this game gives it.
+        apply(tab, packet.isNarrator() ? ChatNames.narrator(LostTalesWords.LANG)
+                        : packet.getIdentityName(), packet.isTyping(),
                 System.nanoTime());
     }
 

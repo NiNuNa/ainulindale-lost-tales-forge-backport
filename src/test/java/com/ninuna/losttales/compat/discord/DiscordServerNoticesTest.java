@@ -1,6 +1,8 @@
 package com.ninuna.losttales.compat.discord;
 
+import com.ninuna.losttales.chat.server.ChatServerStatus;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.util.EnglishWords;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -8,10 +10,11 @@ import static org.junit.Assert.assertTrue;
 
 /** The bridge's own posts and the topic are short, fixed, and safe to show. */
 public final class DiscordServerNoticesTest {
+    private static final EnglishWords ENGLISH = EnglishWords.INSTANCE;
 
     @Test
     public void playerNoticesNameThePlayerAsPlainText() {
-        DiscordNotice joined = DiscordServerNotices.playerJoined("Steve",
+        DiscordNotice joined = DiscordServerNotices.playerJoined(ENGLISH, "Steve",
                 "https://heads/Steve");
         assertEquals(DiscordNotice.Kind.PLAYER_JOINED, joined.getKind());
         assertEquals("✅ Steve joined the game", joined.getText());
@@ -19,7 +22,7 @@ public final class DiscordServerNoticesTest {
         assertEquals(LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN),
                 joined.getColor());
 
-        DiscordNotice left = DiscordServerNotices.playerLeft(" Steve ", "");
+        DiscordNotice left = DiscordServerNotices.playerLeft(ENGLISH, " Steve ", "");
         assertEquals(DiscordNotice.Kind.PLAYER_LEFT, left.getKind());
         assertEquals("👋 Steve left the game", left.getText());
         assertEquals("", left.getIconUrl());
@@ -29,15 +32,15 @@ public final class DiscordServerNoticesTest {
         // The author row renders no markdown, so nothing is escaped and
         // a name reads exactly as it is; a team colour code is dropped.
         assertEquals("✅ x_y_z joined the game",
-                DiscordServerNotices.playerJoined("x_y_z", null).getText());
+                DiscordServerNotices.playerJoined(ENGLISH, "x_y_z", null).getText());
         assertEquals("✅ **bold** joined the game",
-                DiscordServerNotices.playerJoined("**bold**", null).getText());
+                DiscordServerNotices.playerJoined(ENGLISH, "**bold**", null).getText());
         assertEquals("✅ @everyone joined the game",
-                DiscordServerNotices.playerJoined("@everyone", null).getText());
+                DiscordServerNotices.playerJoined(ENGLISH, "@everyone", null).getText());
         assertEquals("✅ Steve joined the game",
-                DiscordServerNotices.playerJoined("§aSteve§r", null).getText());
+                DiscordServerNotices.playerJoined(ENGLISH, "§aSteve§r", null).getText());
         assertEquals("✅  joined the game",
-                DiscordServerNotices.playerJoined(null, null).getText());
+                DiscordServerNotices.playerJoined(ENGLISH, null, null).getText());
     }
 
     @Test
@@ -79,19 +82,22 @@ public final class DiscordServerNoticesTest {
     }
 
 
+    /** The topic says the server's status, the parts the game's member lists show. */
     @Test
-    public void topicStatesTheCountAgainstTheCap() {
-        assertEquals("Server online • 14/40 players",
-                DiscordServerNotices.onlineTopic(14, 40));
-        assertEquals("Server online • 0/20 players",
-                DiscordServerNotices.onlineTopic(0, 20));
-        assertEquals("Server online • 1 player",
-                DiscordServerNotices.onlineTopic(1, 0));
-        assertEquals("Server online • 0 players",
-                DiscordServerNotices.onlineTopic(-3, -1));
-        assertEquals("Server offline", DiscordServerNotices.offlineTopic());
+    public void topicStatesTheServersStatus() {
+        assertEquals("Server online • 14/40 players • 20 TPS",
+                DiscordServerNotices.onlineTopic(ENGLISH,
+                        ChatServerStatus.partsOf(ENGLISH, 14, 40, "", 20, 0L)));
+        assertEquals("Server online • 1 player • play.example.org • 18 TPS"
+                + " • up 1h 30m",
+                DiscordServerNotices.onlineTopic(ENGLISH,
+                        ChatServerStatus.partsOf(ENGLISH, 1, 0,
+                                "play.example.org", 18, 90L * 60000L)));
+        assertEquals("Server offline",
+                DiscordServerNotices.offlineTopic(ENGLISH));
         assertEquals("{\"topic\":\"Server offline\"}",
-                DiscordJson.channelTopicBody(DiscordServerNotices.offlineTopic()));
+                DiscordJson.channelTopicBody(
+                        DiscordServerNotices.offlineTopic(ENGLISH)));
         assertEquals("{\"topic\":\"\"}", DiscordJson.channelTopicBody(null));
     }
 }

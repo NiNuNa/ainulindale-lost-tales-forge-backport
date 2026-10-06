@@ -1,7 +1,10 @@
 package com.ninuna.losttales.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import net.minecraft.util.StatCollector;
+import com.ninuna.losttales.util.LostTalesWords;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +37,14 @@ import java.util.Set;
  * channel wears one on its tab: one of the chat's emoji or an item's
  * icon, written as a channel's is ({@link ChatChannelIconSpec}). A role
  * given none wears the face a channel given none wears.</p>
+ *
+ * <p>A role the mod ships — the team mark, and a role a fresh file is
+ * seeded with while its entry names it nothing — is named by its lang line
+ * ({@link #nameKeyOf}), so each game reads it in its own language; a role
+ * an operator named is shown as they wrote it, and one named nothing by
+ * its id. A mention reaches a role by the name this game shows it by or by
+ * its id ({@link #mentionNames}), so {@code @operator} reaches the
+ * operators whatever language each of them reads.</p>
  */
 public final class ChatAccountRole {
 
@@ -41,6 +52,8 @@ public final class ChatAccountRole {
     public static final int MAX_ID_LENGTH = 32;
     public static final int MAX_TEXT_LENGTH = 64;
     public static final int MAX_DESCRIPTION_LENGTH = 256;
+    /** What a role's lang line begins with, before its id. */
+    public static final String NAME_KEY_PREFIX = "chat.losttales.role.";
 
     /** The absence of a role; never a bit. */
     public static final ChatAccountRole NONE = new ChatAccountRole("", -1, "", "", "", 0,
@@ -53,7 +66,7 @@ public final class ChatAccountRole {
      * config or command edits or assigns it.
      */
     public static final ChatAccountRole TEAM = new ChatAccountRole(TEAM_ID, 0,
-            "chat.losttales.role.team", "", "",
+            nameKeyOf(TEAM_ID), "", "",
             LostTalesColors.rgb(LostTalesColors.MULBERRY), false, true, 0,
             Collections.<ChatRoleSource>emptyList(), null,
             ChatChannelIconSpec.parse("emoji:purple_heart"));
@@ -111,6 +124,23 @@ public final class ChatAccountRole {
     }
 
     /**
+     * A config-defined role the mod ships a name for, its entry naming it
+     * nothing: each game names it by its lang line ({@link #nameKeyOf}).
+     */
+    static ChatAccountRole shipped(String id, String description, int color,
+                                   boolean mentionable, int rank,
+                                   List<ChatRoleSource> sources, Set<String> grants,
+                                   ChatChannelIconSpec icon) {
+        return new ChatAccountRole(id, -1, nameKeyOf(id), "", description, color,
+                mentionable, false, rank, sources, grants, icon);
+    }
+
+    /** The lang line a role the mod ships is named by: {@code chat.losttales.role.operator}. */
+    public static String nameKeyOf(String id) {
+        return NAME_KEY_PREFIX + (id == null ? "" : id.trim().toLowerCase(Locale.ROOT));
+    }
+
+    /**
      * A role as the wire describes it, with its bit already given. The
      * wire carries no grants: what a role allows is the server's alone.
      */
@@ -160,12 +190,12 @@ public final class ChatAccountRole {
         return this.rank;
     }
 
-    /** Language key of the plain role name; empty for a config role. */
+    /** The lang line a shipped role is named by; empty for a role its entry names. */
     public String getNameKey() {
         return this.nameKey;
     }
 
-    /** The literal name a config role was given; empty for a built-in. */
+    /** The name a config entry gave the role; empty for one named by its lang line. */
     public String getName() {
         return this.name;
     }
@@ -192,19 +222,81 @@ public final class ChatAccountRole {
     }
 
     /**
-     * The plain role name as shown — the word a player types after an
-     * {@code @} to reach everyone holding the role: the literal name, or
-     * the translated key for a built-in.
+     * The role's name in {@code words}: the name its entry gave it, a
+     * shipped role's lang line, or its id where the lang file has no line.
      */
-    public String getDisplayName() {
+    public String displayName(LostTalesWords words) {
         if (this.name.length() > 0) {
             return this.name;
         }
-        return this.nameKey.length() == 0 ? "" : StatCollector.translateToLocal(this.nameKey);
+        if (this.nameKey.length() == 0) {
+            return this.id;
+        }
+        String said = words.format(this.nameKey);
+        return said == null || said.trim().length() == 0 || said.equals(this.nameKey)
+                ? this.id : said.trim();
     }
 
-    /** The description as shown on the role's card; empty for none. */
-    public String getDisplayDescription() {
+    /** The role's name as this side's game shows it ({@link #displayName}). */
+    public String getDisplayName() {
+        return displayName(LostTalesWords.LANG);
+    }
+
+    /**
+     * The names an {@code @} reaches the role by, in {@code words}: the
+     * name shown, then the id, which reads the same in every game. Matched
+     * whatever their case, so {@code @Operator} is the operator role's id
+     * too.
+     */
+    public List<String> mentionNames(LostTalesWords words) {
+        List<String> names = new ArrayList<String>(2);
+        String shown = displayName(words);
+        if (shown.length() > 0) {
+            names.add(shown);
+        }
+        if (this.id.length() > 0 && !this.id.equalsIgnoreCase(shown)) {
+            names.add(this.id);
+        }
+        return names;
+    }
+
+    /** The names an {@code @} reaches the role by in this side's game. */
+    public List<String> mentionNames() {
+        return mentionNames(LostTalesWords.LANG);
+    }
+
+    /** Whether {@code name} after an {@code @} reaches the role here, whatever its case. */
+    public boolean answersTo(String name) {
+        String wanted = name == null ? "" : name.trim();
+        if (wanted.length() == 0) {
+            return false;
+        }
+        for (String own : mentionNames()) {
+            if (own.equalsIgnoreCase(wanted)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The role's name as words each reader's game names it, for a line the
+     * server sends: a shipped role's lang line, any other as its entry
+     * names it.
+     */
+    public IChatComponent nameComponent() {
+        if (this.name.length() == 0 && this.nameKey.length() > 0) {
+            return new ChatComponentTranslation(this.nameKey);
+        }
+        return new ChatComponentText(this.name.length() > 0 ? this.name : this.id);
+    }
+
+    /**
+     * The description in {@code words}: the one its entry wrote, else the
+     * line under a shipped role's name ({@code chat.losttales.role.operator.description});
+     * empty for none.
+     */
+    public String displayDescription(LostTalesWords words) {
         if (this.description.length() > 0) {
             return this.description;
         }
@@ -212,8 +304,13 @@ public final class ChatAccountRole {
             return "";
         }
         String key = this.nameKey + ".description";
-        String translated = StatCollector.translateToLocal(key);
-        return translated.equals(key) ? "" : translated;
+        String said = words.format(key);
+        return said == null || said.equals(key) ? "" : said;
+    }
+
+    /** The description as shown on the role's card in this side's game; empty for none. */
+    public String getDisplayDescription() {
+        return displayDescription(LostTalesWords.LANG);
     }
 
     /** The role's RGB: the sender's name where it is primary, and a mention of it. */

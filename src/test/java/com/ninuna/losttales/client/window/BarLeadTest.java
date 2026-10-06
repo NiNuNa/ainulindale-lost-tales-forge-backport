@@ -121,5 +121,10 @@ public final class BarLeadTest {
         public boolean isKeptInLayout() {
             return false;
         }
+
+        @Override
+        public PageCategory category() {
+            return PageCategory.CHANNELS;
+        }
     }
 }

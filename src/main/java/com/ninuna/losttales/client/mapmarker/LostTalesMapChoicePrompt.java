@@ -274,7 +274,7 @@ final class LostTalesMapChoicePrompt {
         final int width;
         final int height;
 
-        private Bounds(int x, int y, int width, int height) {
+        Bounds(int x, int y, int width, int height) {
             this.x = x;
             this.y = y;
             this.width = Math.max(0, width);

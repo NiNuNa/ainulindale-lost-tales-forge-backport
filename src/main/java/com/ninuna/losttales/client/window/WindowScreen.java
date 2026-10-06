@@ -294,8 +294,9 @@ public final class WindowScreen extends GuiChat
     /**
      * Opens the screen with a page in front — the journal, the map, a
      * waystone — in the window holding its tab, else in a window of its
-     * own where the page last stood. With the screen already open the page
-     * only comes forward. Nothing opens for a page no system registered.
+     * category ({@link WindowLayout#openInCategory}). With the screen
+     * already open the page only comes forward. Nothing opens for a page
+     * no system registered.
      */
     public static void openPage(String pageId) {
         GuiScreen screen = screenForPage(pageId);
@@ -633,8 +634,8 @@ public final class WindowScreen extends GuiChat
         if (!this.openAnimationStarted) {
             // What the screen shows is decided as it comes up, after the
             // screen it replaced has closed: the command key the consoles,
-            // the chat's key the conversations, a page's key that page;
-            // the windows pinned to the GUI always.
+            // the chat's key the channels and whispers, a page's key that
+            // page's category; the windows pinned to the GUI always.
             if (this.openedForCommand) {
                 WindowView.forConsole();
             } else if (this.openedForChat || pageToFocus == null) {
@@ -1029,11 +1030,11 @@ public final class WindowScreen extends GuiChat
 
     /**
      * A page's key over the page holding the keys, as a game's screens
-     * switch: another page's key turns the screen to that page alone, the
-     * windows pinned to the GUI beside it; the key of the page the screen
-     * is turned to
-     * closes the screen, every tab waiting in its window. False when the
-     * press is no page's key, or its page cannot come forward.
+     * switch: another page's key turns the screen to that page's category,
+     * the windows pinned to the GUI beside it; the key of a page shown in
+     * the category the screen is turned to closes the screen, every page
+     * waiting in its window. False when the press is no page's key, or its
+     * page cannot come forward.
      */
     private boolean pressPageKey(LostTalesKeyPress press) {
         return !press.command && !press.alt
@@ -1041,18 +1042,18 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * Turns the screen to a page, as its key does: the page alone with the
-     * windows pinned to the GUI beside it, or the screen closed when it is
-     * turned to that
-     * page already. Also what a page's key bound to a mouse button does,
-     * pressed on the page. False for no page, or one that cannot come
-     * forward.
+     * Turns the screen to a page, as its key does: the page's category with
+     * the windows pinned to the GUI beside it, the page in front of its
+     * window; or the screen closed when the page stands shown in its
+     * category's view already. Also what a page's key bound to a mouse
+     * button does, pressed on the page. False for no page, or one that
+     * cannot come forward.
      */
     public boolean turnTo(OtherPage page) {
         if (page == null || !page.isAvailable()) {
             return false;
         }
-        if (WindowView.isFor(page)) {
+        if (WindowView.isFor(page) && page.isShown()) {
             closeScreen();
             return true;
         }
@@ -2232,7 +2233,15 @@ public final class WindowScreen extends GuiChat
             }
         }
         WindowGestures.TabDrag tabDrag = this.gestures.activeTabDrag();
-        if (tabDrag != null && window.contains(tabDrag.tab)) {
+        if (tabDrag != null
+                && window.getId().equals(tabDrag.detachedWindowId)) {
+            // The tabs carry the window they are in: its only tab, every
+            // tab marked, or tabs torn off into a window of their own.
+            // The row is that window's handle then, and reads as a window
+            // moved by its grip: no tab rises off it, and none glows as
+            // it is put down.
+            row.moving = true;
+        } else if (tabDrag != null && window.contains(tabDrag.tab)) {
             // The tab keeps its place in the row and leans toward the
             // pointer; the row has already reordered around it, so
             // there is nothing to mark an insertion point for.
@@ -2745,10 +2754,11 @@ public final class WindowScreen extends GuiChat
                 continue;
             }
             TabRow.Hit hit = row.dragging != null || row.resizing
+                    || row.moving
                     ? null : frame.tabBar.hitAt(this.fontRendererObj, row,
                             x, y);
             ToolStrip.Part part = hit != null || row.dragging != null
-                    || row.resizing ? null
+                    || row.resizing || row.moving ? null
                     : this.toolStrip.partAt(frame, row, x, y);
             if (part != null) {
                 WindowHover hover = new WindowHover(WindowHover.Kind.TOOL_STRIP);

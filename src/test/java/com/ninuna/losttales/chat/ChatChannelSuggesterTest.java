@@ -1,5 +1,7 @@
 package com.ninuna.losttales.chat;
 
+import com.ninuna.losttales.util.EnglishWords;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -51,23 +53,41 @@ public final class ChatChannelSuggesterTest {
         List<ChatChannel> named = new java.util.ArrayList<ChatChannel>(all);
         named.remove(ChatChannel.FELLOWSHIP);
         assertEquals("a fellowship is one conversation each, which the word alone names none of",
-                named, ChatChannelSuggester.matches("", all, "lotr:gondor", 20));
+                named, ChatChannelSuggester.matches("", all, "lotr:gondor", 20, EnglishWords.INSTANCE));
         assertEquals(Arrays.asList(ChatChannel.GLOBAL),
-                ChatChannelSuggester.matches("glo", all, "lotr:gondor", 20));
+                ChatChannelSuggester.matches("glo", all, "lotr:gondor", 20, EnglishWords.INSTANCE));
         assertEquals(Arrays.asList(ChatChannel.OOC),
-                ChatChannelSuggester.matches("OO", all, "lotr:gondor", 20));
+                ChatChannelSuggester.matches("OO", all, "lotr:gondor", 20, EnglishWords.INSTANCE));
         assertEquals("the shown name finds a channel too",
                 Arrays.asList(ChatChannel.SERVER_CONSOLE),
-                ChatChannelSuggester.matches("serverl", all, "lotr:gondor", 20));
+                ChatChannelSuggester.matches("serverl", all, "lotr:gondor", 20, EnglishWords.INSTANCE));
         assertEquals(Arrays.asList(ChatChannel.CLIENT_CONSOLE),
-                ChatChannelSuggester.matches("cons", all, "lotr:gondor", 20));
+                ChatChannelSuggester.matches("cons", all, "lotr:gondor", 20, EnglishWords.INSTANCE));
         assertEquals("the Faction channel answers to its faction's name",
                 Arrays.asList(ChatChannel.FACTION),
-                ChatChannelSuggester.matches("gon", all, "lotr:gondor", 20));
-        assertEquals(1, ChatChannelSuggester.matches("", all, "lotr:gondor", 1).size());
-        assertEquals(0, ChatChannelSuggester.matches("zzz", all, "lotr:gondor", 20).size());
+                ChatChannelSuggester.matches("gon", all, "lotr:gondor", 20, EnglishWords.INSTANCE));
+        assertEquals(1, ChatChannelSuggester.matches("", all, "lotr:gondor", 1, EnglishWords.INSTANCE).size());
+        assertEquals(0, ChatChannelSuggester.matches("zzz", all, "lotr:gondor", 20, EnglishWords.INSTANCE).size());
         assertEquals("without a faction the Faction channel has no name",
-                0, ChatChannelSuggester.matches("fac", all, "", 20).size());
+                0, ChatChannelSuggester.matches("fac", all, "", 20, EnglishWords.INSTANCE).size());
+    }
+
+    /** The shown name is the game's own: a channel is found by it there, and always by its code name. */
+    @Test
+    public void matchesGoByTheShownNameInTheGamesLanguage() {
+        List<ChatChannel> all = ChatChannel.presentationOrder();
+        LostTalesWords german = new LostTalesWords() {
+            @Override
+            public String format(String key, Object... arguments) {
+                return ChatChannel.GLOBAL.getNameKey().equals(key) ? "Allgemeiner Chat"
+                        : EnglishWords.INSTANCE.format(key, arguments);
+            }
+        };
+        assertEquals(Arrays.asList(ChatChannel.GLOBAL),
+                ChatChannelSuggester.matches("allgemeiner", all, "lotr:gondor", 20, german));
+        assertEquals("the code name stays",
+                Arrays.asList(ChatChannel.GLOBAL),
+                ChatChannelSuggester.matches("glo", all, "lotr:gondor", 20, german));
     }
 
     @Test

@@ -23,6 +23,7 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
 
 public class LostTalesCompassHudRenderer {
@@ -310,7 +311,9 @@ public class LostTalesCompassHudRenderer {
 
         double distBlocks = Math.sqrt(batch.dx * batch.dx
                 + batch.dy * batch.dy + batch.dz * batch.dz);
-        String distLabel = Math.round(distBlocks) + "m";
+        String distLabel = StatCollector.translateToLocalFormatted(
+                "gui.losttales.compass.distance",
+                Long.valueOf(Math.round(distBlocks)));
         LostTalesCompassHudRenderHelper.drawCenteredString(
                 fontRenderer, distLabel, labelX, distY, color, true);
 

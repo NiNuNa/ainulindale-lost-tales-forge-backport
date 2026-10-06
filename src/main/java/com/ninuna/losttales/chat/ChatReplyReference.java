@@ -40,8 +40,6 @@ public final class ChatReplyReference {
     public static final ChatReplyReference UNKEPT = new ChatReplyReference();
     /** The words an {@link #UNKEPT} quote is shown as. */
     public static final String UNKEPT_KEY = "gui.losttales.chat.message.no_longer_kept";
-    /** Those words where no language file says them: a Discord post's. */
-    public static final String UNKEPT_WORDS = "A message no longer kept";
     /** The quoted sender's name, bounded like any other identity name. */
     public static final int MAX_AUTHOR_BYTES = 256;
     /** The quoted text: one glanceable line, not the message again. */

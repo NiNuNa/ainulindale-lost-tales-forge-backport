@@ -1,9 +1,14 @@
 package com.ninuna.losttales.mapmarker;
 
-/** Server-safe metadata for bundled/static map markers. */
+/**
+ * A map marker as the server knows it and sends it: bundled, a player's
+ * waystone, or a quest's. A name or category left empty is drawn in each
+ * player's language ({@link LostTalesMapMarkerNames}): a marker with no
+ * name of its own by what it is called after
+ * ({@link LostTalesMapMarkerNamedAfter}), one with no category by the
+ * word for its kind.
+ */
 public final class LostTalesMapMarkerDefinition {
-    public static final String CATEGORY_DEFAULT = "Map Marker";
-    public static final String CATEGORY_POINT_OF_INTEREST = "Point of Interest";
     public static final double AUTOMATIC_Y =
             LostTalesMapMarkerHeightResolver.AUTOMATIC_Y;
     public static final int MIN_PRIORITY = -1000000;
@@ -35,9 +40,11 @@ public final class LostTalesMapMarkerDefinition {
     private final String waystoneStructureType;
     /** Screen-space overlap priority; larger values win. */
     private final int priority;
+    /** What the marker is called after while its name is empty ({@link LostTalesMapMarkerNamedAfter}). */
+    private final String namedAfter;
 
     public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, int dimensionId, double x, double y, double z, boolean hiddenUntilDiscovered) {
-        this(id, name, iconName, colorName, CATEGORY_DEFAULT, "", false,
+        this(id, name, iconName, colorName, "", "", false,
                 dimensionId, x, y, z, 128.0D, 8.0D,
                 hiddenUntilDiscovered, hiddenUntilDiscovered, false,
                 LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0);
@@ -59,6 +66,30 @@ public final class LostTalesMapMarkerDefinition {
                                         boolean hasWaystone,
                                         String waystoneStructureType,
                                         int priority) {
+        this(id, name, iconName, colorName, categoryName, description,
+                hasFastTravel, dimensionId, x, y, z, compassFadeInRadius,
+                discoveryRadius, hiddenUntilDiscovered, discoverable,
+                requiresRegionUnlock, source, hasWaystone,
+                waystoneStructureType, priority, "");
+    }
+
+    /** A marker called after {@code namedAfter} while {@code name} is empty. */
+    public LostTalesMapMarkerDefinition(String id, String name,
+                                        String iconName, String colorName,
+                                        String categoryName,
+                                        String description,
+                                        boolean hasFastTravel,
+                                        int dimensionId,
+                                        double x, double y, double z,
+                                        double compassFadeInRadius,
+                                        double discoveryRadius,
+                                        boolean hiddenUntilDiscovered,
+                                        boolean discoverable,
+                                        boolean requiresRegionUnlock,
+                                        LostTalesMapMarkerSource source,
+                                        boolean hasWaystone,
+                                        String waystoneStructureType,
+                                        int priority, String namedAfter) {
         if (priority < MIN_PRIORITY || priority > MAX_PRIORITY) {
             throw new IllegalArgumentException("marker priority is out of range");
         }
@@ -66,7 +97,7 @@ public final class LostTalesMapMarkerDefinition {
         this.name = name;
         this.iconName = iconName;
         this.colorName = colorName;
-        this.categoryName = categoryName == null || categoryName.length() == 0 ? (hasFastTravel ? CATEGORY_POINT_OF_INTEREST : CATEGORY_DEFAULT) : categoryName;
+        this.categoryName = categoryName == null ? "" : categoryName.trim();
         this.description = description == null ? "" : description.trim();
         this.hasFastTravel = hasFastTravel;
         this.dimensionId = dimensionId;
@@ -85,14 +116,22 @@ public final class LostTalesMapMarkerDefinition {
         this.waystoneStructureType = waystoneStructureType == null
                 ? "" : waystoneStructureType.trim().toLowerCase();
         this.priority = priority;
+        this.namedAfter = LostTalesMapMarkerNamedAfter.isValid(namedAfter)
+                && namedAfter != null ? namedAfter : "";
     }
 
     public String getId() {
         return id;
     }
 
+    /** The marker's own name; empty for one called after something ({@link #getNamedAfter}). */
     public String getName() {
         return name;
+    }
+
+    /** What the marker is called after while its name is empty; empty for nothing. */
+    public String getNamedAfter() {
+        return namedAfter;
     }
 
     public String getIconName() {
@@ -103,6 +142,7 @@ public final class LostTalesMapMarkerDefinition {
         return colorName;
     }
 
+    /** The category a player or operator gave it; empty for the word its kind is drawn with. */
     public String getCategoryName() {
         return categoryName;
     }
@@ -175,12 +215,4 @@ public final class LostTalesMapMarkerDefinition {
         return this.priority;
     }
 
-    public String getShortDescription() {
-        return id + " (" + name + ", dim " + dimensionId + " @ " + format(x) + ", " + format(y) + ", " + format(z) + ", discovery " + format(discoveryRadius) + ")";
-    }
-
-    private static String format(double value) {
-        long rounded = Math.round(value);
-        return Math.abs(value - rounded) < 0.01D ? String.valueOf(rounded) : String.valueOf(value);
-    }
 }

@@ -106,7 +106,8 @@ public final class LostTalesQuestObjectiveTypeTest {
                         "entity", "losttales.Nia", "item", "minecraft:stick",
                         "count", "4"), false, false)
                         .replace(" (0/4)", ""));
-        assertEquals("Defeat 3 hostile.", LostTalesQuestObjectiveTextHelper
+        assertEquals("a group reads by its noun line",
+                "Defeat 3 hostile creatures.", LostTalesQuestObjectiveTextHelper
                 .describe(objective("kill", "group", "hostile", "count", "3")));
         assertEquals("Deliver", LostTalesQuestObjectiveTextHelper
                 .typeName("deliver"));

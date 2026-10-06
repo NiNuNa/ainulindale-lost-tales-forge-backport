@@ -2,7 +2,9 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneStateReason;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -14,6 +16,9 @@ import io.netty.buffer.ByteBuf;
  * A waystone's settings as the server holds them, for the waystone's page:
  * sent as the player uses the waystone, which opens the page on it, and as
  * the answer to every request the page sends, saying why ({@link #getReason}).
+ * A name, category or description left empty travels empty, with what the
+ * waystone is called after and whether a player placed it, so the page
+ * shows the words it stands for in its reader's language.
  */
 public final class LostTalesWaystoneStatePacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 16384;
@@ -27,6 +32,8 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     private int y;
     private int z;
     private String markerId = "";
+    private String namedAfter = "";
+    private boolean playerPlaced;
     private long revision;
     private LostTalesMapMarkerEditableSettings settings;
     private int sharedPlayerCount;
@@ -52,6 +59,9 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         this.y = y;
         this.z = z;
         this.markerId = record.getId();
+        this.namedAfter = record.getNamedAfter();
+        this.playerPlaced = record.getSource()
+                == LostTalesMapMarkerSource.PLAYER_CREATED;
         this.revision = record.getRevision();
         this.settings =
                 LostTalesMapMarkerEditableSettings.fromRecord(record);
@@ -79,6 +89,9 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
             this.z = buffer.readInt();
             this.markerId = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_MARKER_ID_BYTES);
+            this.namedAfter = LostTalesPacketCodec.readUtf8String(
+                    buffer, LostTalesMapMarkerNamedAfter.MAX_LENGTH);
+            this.playerPlaced = buffer.readBoolean();
             this.revision = buffer.readLong();
             String name = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_TEXT_BYTES);
@@ -141,6 +154,10 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         buffer.writeInt(this.z);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.markerId, MAX_MARKER_ID_BYTES);
+        LostTalesPacketCodec.writeUtf8String(
+                buffer, this.namedAfter,
+                LostTalesMapMarkerNamedAfter.MAX_LENGTH);
+        buffer.writeBoolean(this.playerPlaced);
         buffer.writeLong(this.revision);
         LostTalesMapMarkerEditableSettings value = this.settings;
         LostTalesPacketCodec.writeUtf8String(
@@ -183,9 +200,12 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.markerId, MAX_MARKER_ID_BYTES)
                 || this.markerId.length() == 0
+                || !LostTalesMapMarkerNamedAfter.isValid(this.namedAfter)
                 || this.reason == null
                 || this.revision < 1L
                 || !isValidSettings(this.settings)
+                || this.settings.getName().trim().length() == 0
+                        && this.namedAfter.length() == 0
                 || this.sharedPlayerCount < 0
                 || this.sharedPlayerCount
                         > LostTalesMapMarkerRecord.MAX_SHARED_PLAYERS
@@ -208,6 +228,10 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         return this.settings;
     }
     public String getName() { return this.settings.getName(); }
+    /** What the waystone is called after while its name is empty. */
+    public String getNamedAfter() { return this.namedAfter; }
+    /** Whether a player placed it: its empty category and description read as a player's waystone's. */
+    public boolean isPlayerPlaced() { return this.playerPlaced; }
     public boolean hasFastTravel() {
         return this.settings.hasFastTravel();
     }
@@ -234,7 +258,6 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     private static boolean isValidSettings(
             LostTalesMapMarkerEditableSettings value) {
         return value != null
-                && value.getName().trim().length() > 0
                 && value.getVisibility() != null
                 && LostTalesPacketCodec.isUtf8WithinLimit(
                         value.getName(), MAX_TEXT_BYTES)

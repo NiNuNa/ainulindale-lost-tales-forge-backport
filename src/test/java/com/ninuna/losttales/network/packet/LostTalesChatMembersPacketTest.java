@@ -59,8 +59,8 @@ public final class LostTalesChatMembersPacketTest {
                 ChatChannel.GLOBAL, "global", Arrays.asList(
                         new LostTalesChatMembersPacket.Member(steve, "Steve",
                                 aldric, "Aldric", 0x4A90D9, "human/male/2",
-                                "the Gondor Farmer", 0x4A90D9, "lotr:gondor",
-                                "Gondor", 0, true),
+                                "lotr.title.farmer", 0x4A90D9, "lotr:gondor",
+                                "", 0, true),
                         new LostTalesChatMembersPacket.Member(UUID.randomUUID(),
                                 "Alex", null, "Alex", 0xFFFFFF, "ignored", "",
                                 0xFFFFFF, "", "", 0, false)), 7);
@@ -79,8 +79,9 @@ public final class LostTalesChatMembersPacketTest {
         assertEquals(steve, first.getPlayerId());
         assertEquals(aldric, first.getCharacterId());
         assertEquals("Aldric", first.getName());
-        assertEquals("the Gondor Farmer", first.getTitle());
-        assertEquals("Gondor", first.getGroupName());
+        assertEquals("lotr.title.farmer", first.getTitle());
+        assertEquals("lotr:gondor", first.getGroupKey());
+        assertEquals("", first.getGroupName());
         assertTrue(first.isOnline());
         LostTalesChatMembersPacket.Member second = read.getMembers().get(1);
         assertNull(second.getCharacterId());
@@ -109,6 +110,97 @@ public final class LostTalesChatMembersPacketTest {
         assertEquals(LostTalesChatMembersPacket.MAX_MEMBERS,
                 new LostTalesChatMembersPacket(ChatChannel.OOC, "ooc", many, 0)
                         .getMembers().size());
+    }
+
+    /**
+     * A group travels by its key alone, for each game to name in its own
+     * language: a member whose faction or role group carries the server's
+     * words is never sent, and an answer carrying one is refused whole.
+     * Only a Discord server's group carries the name Discord gives it.
+     */
+    @Test
+    public void aGroupTravelsByItsKeyAloneButADiscordServersByItsName() {
+        LostTalesChatMembersPacket.Member worded = new LostTalesChatMembersPacket.Member(
+                UUID.randomUUID(), "Steve", null, "Steve", 0, "", "", 0,
+                "lotr:gondor", "Gondor", 0, true);
+        LostTalesChatMembersPacket.Member discord = new LostTalesChatMembersPacket.Member(
+                UUID.randomUUID(), "Sam", null, "Sam", 0, "", "", 0,
+                LostTalesChatMembersPacket.DISCORD_GROUP_PREFIX + "100", "Arda", 0, true);
+        LostTalesChatMembersPacket sent = new LostTalesChatMembersPacket(
+                ChatChannel.GLOBAL, "global", Arrays.asList(worded, discord), 0);
+        assertEquals(Arrays.asList(discord), sent.getMembers());
+        ByteBuf buffer = Unpooled.buffer();
+        sent.toBytes(buffer);
+        LostTalesChatMembersPacket read = new LostTalesChatMembersPacket();
+        read.fromBytes(buffer);
+        assertFalse(read.isMalformed());
+        assertEquals("Arda", read.getMembers().get(0).getGroupName());
+
+        assertTrue(decodeOneMember("operator", "Operator").isMalformed());
+        assertTrue(decodeOneMember("lotr:gondor", "Gondor").isMalformed());
+        assertTrue(decodeOneMember(LostTalesChatMembersPacket.SERVER_GROUP,
+                "Server").isMalformed());
+        assertFalse(decodeOneMember("lotr:gondor", "").isMalformed());
+        assertFalse(decodeOneMember(LostTalesChatMembersPacket.DISCORD_GROUP_PREFIX
+                + "7", "Arda").isMalformed());
+    }
+
+    /**
+     * Factions stand in the order of the names a game gives them, Unaligned
+     * last; the server, which names no group, stands them by their keys.
+     */
+    @Test
+    public void factionsStandInTheOrderOfTheNamesTheyAreGiven() {
+        LostTalesChatMembersPacket.Member gondor = new LostTalesChatMembersPacket.Member(
+                UUID.randomUUID(), "Aldric", null, "Aldric", 0, "", "", 0,
+                "lotr:gondor", "", 0, true);
+        LostTalesChatMembersPacket.Member mordor = new LostTalesChatMembersPacket.Member(
+                UUID.randomUUID(), "Gorbag", null, "Gorbag", 0, "", "", 0,
+                "lotr:mordor", "", 0, true);
+        LostTalesChatMembersPacket.Member unaligned = new LostTalesChatMembersPacket.Member(
+                UUID.randomUUID(), "Bob", null, "Bob", 0, "", "", 0,
+                "lotr:unaligned", "", 0, true);
+        List<LostTalesChatMembersPacket.Member> members =
+                new ArrayList<LostTalesChatMembersPacket.Member>(
+                        Arrays.asList(unaligned, gondor, mordor));
+        Collections.sort(members, LostTalesChatMembersPacket.ORDER);
+        assertEquals(Arrays.asList(gondor, mordor, unaligned), members);
+        Collections.sort(members, LostTalesChatMembersPacket.order(
+                new LostTalesChatMembersPacket.GroupNames() {
+                    @Override
+                    public String of(LostTalesChatMembersPacket.Member member) {
+                        return "lotr:gondor".equals(member.getGroupKey())
+                                ? "Zirakzigil" : "Arnor";
+                    }
+                }));
+        assertEquals(Arrays.asList(mordor, gondor, unaligned), members);
+    }
+
+    /** An answer of one member here, in the group {@code groupKey} named {@code groupName}. */
+    private static LostTalesChatMembersPacket decodeOneMember(String groupKey,
+                                                             String groupName) {
+        ByteBuf buffer = Unpooled.buffer();
+        LostTalesPacketCodec.writeUtf8String(buffer, ChatChannel.GLOBAL.getId(), 64);
+        LostTalesPacketCodec.writeUtf8String(buffer, "global", 256);
+        buffer.writeLong(77L);
+        buffer.writeBoolean(false);
+        buffer.writeInt(0);
+        buffer.writeShort(1);
+        LostTalesPacketCodec.writeUuid(buffer, UUID.randomUUID());
+        LostTalesPacketCodec.writeUtf8String(buffer, "Steve", 64);
+        LostTalesPacketCodec.writeNullableUuid(buffer, null);
+        LostTalesPacketCodec.writeUtf8String(buffer, "Steve", 256);
+        buffer.writeInt(0);
+        LostTalesPacketCodec.writeUtf8String(buffer, "", 128);
+        LostTalesPacketCodec.writeUtf8String(buffer, "", 256);
+        buffer.writeInt(0);
+        LostTalesPacketCodec.writeUtf8String(buffer, groupKey, 128);
+        LostTalesPacketCodec.writeUtf8String(buffer, groupName, 128);
+        buffer.writeShort(0);
+        buffer.writeBoolean(true);
+        LostTalesChatMembersPacket read = new LostTalesChatMembersPacket();
+        read.fromBytes(buffer);
+        return read;
     }
 
     @Test

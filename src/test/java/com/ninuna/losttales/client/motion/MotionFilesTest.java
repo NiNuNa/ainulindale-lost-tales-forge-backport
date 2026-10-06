@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.util.EnglishWords;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,8 +47,10 @@ public final class MotionFilesTest {
                     : result.motions().entrySet()) {
                 assertEquals(motion.getKey() + " stands in its family's file",
                         family, familyOf(motion.getKey()));
+                // What a motion is for is a lang line, in each player's language.
                 assertTrue(motion.getKey() + " says what it is for",
-                        motion.getValue().about().length() > 0);
+                        EnglishWords.INSTANCE.has(
+                                "gui.losttales.motionlab.about." + motion.getKey()));
                 motions.put(motion.getKey(), motion.getValue());
             }
         }

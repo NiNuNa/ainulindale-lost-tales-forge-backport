@@ -1,11 +1,9 @@
 {
   "hud.chat.hide": {
-    "about": "The HUD fading out as one layer while the chat is open, and back in once it closes.",
     "duration": 180,
     "curve": "ease_in_out"
   },
   "hud.feed.rise": {
-    "about": "The chat feed at its default place following the rows over the hotbar up and down as hearts, armour or air come and go: most of the way in this many seconds.",
     "follow": 0.08
   }
 }

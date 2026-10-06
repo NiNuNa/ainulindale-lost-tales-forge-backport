@@ -6,7 +6,9 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.chat.server.ChatPresenceService;
+import com.ninuna.losttales.chat.server.ChatServerStatus;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.util.LostTalesWords;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 
@@ -27,10 +29,12 @@ import java.util.Map;
  * link away; both are offered only to members who may manage webhooks,
  * and the bridge checks that permission again itself. The answers
  * are built on the server thread from the same identity resolution the
- * chat uses, and formatted here so the wording can be checked without
- * a server; a reply is ephemeral, so the channel stays clean. They are
- * answered only in a Discord channel linked to the game: a Discord
- * server that merely has the bot in it learns nothing of who plays.
+ * chat uses; they and the descriptions Discord shows are the lang file's
+ * words in the server's language, put together here so the wording can
+ * be checked without a server. A reply is ephemeral, so the channel
+ * stays clean. They are answered only in a Discord channel linked to the
+ * game: a Discord server that merely has the bot in it learns nothing of
+ * who plays.
  */
 public final class DiscordSlashCommands {
 
@@ -44,23 +48,10 @@ public final class DiscordSlashCommands {
     /** Manage Webhooks as Discord writes a permission: the bitfield in decimal. */
     private static final String MANAGE_WEBHOOKS_PERMISSION =
             String.valueOf(1L << DiscordJson.Interaction.MANAGE_WEBHOOKS);
-
-    public static final String LINK_NEEDS_SERVER =
-            "Use this in a channel of your Discord server.";
-    public static final String LINK_NEEDS_PERMISSION =
-            "You need the Manage Webhooks permission in this channel.";
-    public static final String LINK_UNKNOWN_CODE =
-            "That code is unknown or has run out. Ask for a new one in the game"
-                    + " with `/losttales discord link <channel>`.";
-    public static final String LINK_BOT_NEEDS_PERMISSION =
-            "I need the Manage Webhooks permission in this channel to link it.";
-    public static final String LINK_NOT_SAVED =
-            "The link could not be saved on the game server. Ask for a new code.";
     /** Discord's own bound on a message's content. */
     private static final int MAX_CONTENT_LENGTH = 2000;
-    /** The answer in a Discord channel that is not linked to the game. */
-    public static final String NOT_LINKED =
-            "This channel is not linked to the game.";
+    /** Discord's own bound on a command's or an option's description. */
+    private static final int MAX_DESCRIPTION_LENGTH = 100;
 
     private DiscordSlashCommands() {}
 
@@ -81,53 +72,103 @@ public final class DiscordSlashCommands {
     }
 
     /** The command definitions Discord registers, as the API's JSON array. */
-    public static String definitionsBody() {
+    public static String definitionsBody(LostTalesWords words) {
         JsonArray commands = new JsonArray();
-        commands.add(command(ONLINE, "Who is playing on the server right now"));
-        JsonObject who = command(WHO, "About a player or a character on the server");
+        commands.add(command(ONLINE, description(words,
+                "chat.losttales.discord.command.online")));
+        JsonObject who = command(WHO, description(words,
+                "chat.losttales.discord.command.who"));
         JsonObject name = new JsonObject();
         name.addProperty("type", Integer.valueOf(3));
         name.addProperty("name", "name");
-        name.addProperty("description", "An account or character name");
+        name.addProperty("description", description(words,
+                "chat.losttales.discord.command.who.name"));
         name.addProperty("required", Boolean.TRUE);
         JsonArray options = new JsonArray();
         options.add(name);
         who.add("options", options);
         commands.add(who);
-        commands.add(command(SERVER, "How the server is doing"));
-        JsonObject link = command(LINK, "Link this channel to a game channel");
+        commands.add(command(SERVER, description(words,
+                "chat.losttales.discord.command.server")));
+        JsonObject link = command(LINK, description(words,
+                "chat.losttales.discord.command.link"));
         JsonObject code = new JsonObject();
         code.addProperty("type", Integer.valueOf(3));
         code.addProperty("name", CODE);
-        code.addProperty("description", "The code the game gave you");
+        code.addProperty("description", description(words,
+                "chat.losttales.discord.command.link.code"));
         code.addProperty("required", Boolean.TRUE);
         JsonArray linkOptions = new JsonArray();
         linkOptions.add(code);
         link.add("options", linkOptions);
         link.addProperty("default_member_permissions", MANAGE_WEBHOOKS_PERMISSION);
         commands.add(link);
-        JsonObject unlink = command(UNLINK, "Take this channel's link to the game away");
+        JsonObject unlink = command(UNLINK, description(words,
+                "chat.losttales.discord.command.unlink"));
         unlink.addProperty("default_member_permissions", MANAGE_WEBHOOKS_PERMISSION);
         commands.add(unlink);
         return commands.toString();
     }
 
+    /**
+     * A command's or an option's description, cut to what Discord takes:
+     * one description past it and Discord refuses every command.
+     */
+    private static String description(LostTalesWords words, String key) {
+        return cut(words.format(key), MAX_DESCRIPTION_LENGTH);
+    }
+
+    /** The answer in a Discord channel that is not linked to the game. */
+    public static String notLinked(LostTalesWords words) {
+        return words.format("chat.losttales.discord.not_linked");
+    }
+
+    /** {@code /link} used anywhere but a channel of a Discord server. */
+    public static String linkNeedsServer(LostTalesWords words) {
+        return words.format("chat.losttales.discord.link.needs_server");
+    }
+
+    /** {@code /link} or {@code /unlink} by a member who may not manage the channel's webhooks. */
+    public static String linkNeedsPermission(LostTalesWords words) {
+        return words.format("chat.losttales.discord.link.needs_permission");
+    }
+
+    /** The code is unknown or has run out, and where a new one comes from. */
+    public static String linkUnknownCode(LostTalesWords words) {
+        return sentences(words.format("chat.losttales.discord.link.unknown_code"),
+                words.format("chat.losttales.discord.link.ask_in_game"));
+    }
+
+    /** Discord would not let the bot make the channel's webhook. */
+    public static String linkBotNeedsPermission(LostTalesWords words) {
+        return words.format("chat.losttales.discord.link.bot_needs_permission");
+    }
+
+    /** The game server could not save the link, or the unlink. */
+    public static String linkNotSaved(LostTalesWords words) {
+        return sentences(words.format("chat.losttales.discord.link.not_saved"),
+                words.format("chat.losttales.discord.link.ask_again"));
+    }
+
     /** This channel is linked to another game channel already. */
-    public static String linkTaken(String gameChannel) {
-        return bound("This channel is already linked to **" + escape(gameChannel)
-                + "**. A Discord channel holds one game channel: use `/unlink` first.");
+    public static String linkTaken(LostTalesWords words, String gameChannel) {
+        return bound(sentences(linkAlready(words, gameChannel),
+                words.format("chat.losttales.discord.link.one_channel")));
     }
 
     /** This channel is linked to the very game channel asked for. */
-    public static String linkAlready(String gameChannel) {
-        return bound("This channel is already linked to **" + escape(gameChannel) + "**.");
+    public static String linkAlready(LostTalesWords words, String gameChannel) {
+        return bound(words.format("chat.losttales.discord.link.already",
+                escape(gameChannel)));
     }
 
     /** Discord would not make the webhook; {@code status} 0 for no answer. */
-    public static String linkFailed(int status) {
-        return status > 0
-                ? "Discord did not make the webhook (HTTP " + status + "). Ask for a new code."
-                : "Discord could not be reached. Ask for a new code.";
+    public static String linkFailed(LostTalesWords words, int status) {
+        return sentences(status > 0
+                        ? words.format("chat.losttales.discord.link.failed",
+                                Integer.valueOf(status))
+                        : words.format("chat.losttales.discord.link.unreachable"),
+                words.format("chat.losttales.discord.link.ask_again"));
     }
 
     /**
@@ -135,23 +176,27 @@ public final class DiscordSlashCommands {
      * some players read in the game, that everyone who can see this
      * Discord channel reads it here.
      */
-    public static String linked(String gameChannel, DiscordBridgeDirection direction,
+    public static String linked(LostTalesWords words, String gameChannel,
+                                DiscordBridgeDirection direction,
                                 boolean limitedInGame) {
+        String name = escape(gameChannel);
         String crossing = direction == DiscordBridgeDirection.GAME_TO_DISCORD
-                ? "Lines from the game come here."
+                ? "chat.losttales.discord.link.to_discord"
                 : direction == DiscordBridgeDirection.DISCORD_TO_GAME
-                        ? "Messages here go to the game."
-                        : "Messages cross both ways.";
-        String readers = limitedInGame
-                ? " Only some players read **" + escape(gameChannel) + "** in the game;"
-                        + " here, everyone who can see this channel reads it."
-                : "";
-        return bound("Linked to **" + escape(gameChannel) + "**. " + crossing + readers);
+                        ? "chat.losttales.discord.link.to_game"
+                        : "chat.losttales.discord.link.both_ways";
+        return bound(sentences(
+                words.format("chat.losttales.discord.link.linked", name),
+                words.format(crossing),
+                limitedInGame
+                        ? words.format("chat.losttales.discord.link.limited", name)
+                        : ""));
     }
 
     /** The link is gone. */
-    public static String unlinked(String gameChannel) {
-        return bound("Unlinked from **" + escape(gameChannel) + "**.");
+    public static String unlinked(LostTalesWords words, String gameChannel) {
+        return bound(words.format("chat.losttales.discord.link.unlinked",
+                escape(gameChannel)));
     }
 
     private static JsonObject command(String name, String description) {
@@ -163,30 +208,29 @@ public final class DiscordSlashCommands {
     }
 
     /** The answer to a command, from the live server. Server thread. */
-    public static String answer(String command, Map<String, String> options,
-                                long serverStartedMillis) {
+    public static String answer(LostTalesWords words, String command,
+                                Map<String, String> options) {
         MinecraftServer server = MinecraftServer.getServer();
         List<Player> players = server == null ? Collections.<Player>emptyList()
-                : onlinePlayers(server);
+                : onlinePlayers(words, server);
         String name = command == null ? "" : command.toLowerCase(Locale.ROOT);
         if (ONLINE.equals(name)) {
-            return online(players);
+            return online(words, players);
         }
         if (WHO.equals(name)) {
             String wanted = options == null ? null : options.get("name");
-            return who(players, wanted);
+            return who(words, players, wanted);
         }
         if (SERVER.equals(name)) {
-            return serverStatus(players.size(), server == null ? 0 : server.getMaxPlayers(),
-                    serverStartedMillis, System.currentTimeMillis());
+            return serverStatus(ChatServerStatus.parts());
         }
         return "";
     }
 
     /** {@code **3 online:** Steve (as Aragorn), Alex, Bob (as Boromir)} */
-    public static String online(List<Player> players) {
+    public static String online(LostTalesWords words, List<Player> players) {
         if (players.isEmpty()) {
-            return "**Nobody is online.**";
+            return words.format("chat.losttales.discord.online.nobody");
         }
         List<Player> sorted = new ArrayList<Player>(players);
         Collections.sort(sorted, new Comparator<Player>() {
@@ -195,99 +239,81 @@ public final class DiscordSlashCommands {
                 return left.account.compareToIgnoreCase(right.account);
             }
         });
-        StringBuilder text = new StringBuilder("**").append(sorted.size())
-                .append(" online:** ");
+        StringBuilder list = new StringBuilder();
         for (int index = 0; index < sorted.size(); index++) {
             if (index > 0) {
-                text.append(", ");
+                list.append(", ");
             }
             Player player = sorted.get(index);
-            text.append(escape(player.account));
-            if (player.character.length() > 0) {
-                text.append(" (as ").append(escape(player.character)).append(')');
-            }
+            list.append(player.character.length() > 0
+                    ? words.format("chat.losttales.discord.online.playing_as",
+                            escape(player.account), escape(player.character))
+                    : escape(player.account));
         }
-        return bound(text.toString());
+        return bound(words.format("chat.losttales.discord.online.list",
+                Integer.valueOf(sorted.size()), list.toString()));
     }
 
     /** The one player or character named, or that nobody online is. */
-    public static String who(List<Player> players, String wanted) {
+    public static String who(LostTalesWords words, List<Player> players,
+                             String wanted) {
         String query = wanted == null ? "" : wanted.trim();
         if (query.length() == 0) {
-            return "Say whom: `/who name`.";
+            return words.format("chat.losttales.discord.who.ask");
         }
         for (Player player : players) {
             if (query.equalsIgnoreCase(player.account)
                     || (player.character.length() > 0
                             && query.equalsIgnoreCase(player.character))) {
-                return describe(player);
+                return describe(words, player);
             }
         }
         // The name is the asker's own words, as long as Discord lets an
         // option be, and escaping can double it.
-        return bound("Nobody online is called **" + escape(query) + "**.");
+        return bound(words.format("chat.losttales.discord.who.nobody",
+                escape(query)));
     }
 
-    private static String describe(Player player) {
+    private static String describe(LostTalesWords words, Player player) {
         if (player.character.length() == 0) {
-            return "**" + escape(player.account) + "** is online, playing as themselves.";
+            return bound(words.format("chat.losttales.discord.who.account",
+                    escape(player.account)));
         }
-        StringBuilder text = new StringBuilder("**").append(escape(player.character))
-                .append("** — ").append(escape(player.account)).append("'s character");
-        List<String> details = new ArrayList<String>();
+        StringBuilder details = new StringBuilder();
         if (player.race.length() > 0) {
-            details.add(player.race);
+            details.append(escape(player.race));
         }
         if (player.faction.length() > 0) {
-            details.add("of " + player.faction);
-        }
-        if (!details.isEmpty()) {
-            text.append(": ");
-            for (int index = 0; index < details.size(); index++) {
-                if (index > 0) {
-                    text.append(", ");
-                }
-                text.append(escape(details.get(index)));
+            if (details.length() > 0) {
+                details.append(", ");
             }
+            details.append(words.format("chat.losttales.discord.who.faction",
+                    escape(player.faction)));
         }
-        return bound(text.append('.').toString());
+        return bound(details.length() == 0
+                ? words.format("chat.losttales.discord.who.character",
+                        escape(player.character), escape(player.account))
+                : words.format("chat.losttales.discord.who.character_of",
+                        escape(player.character), escape(player.account),
+                        details.toString()));
     }
 
-    /** {@code Lost Tales 0.1.3 • 3/20 players • up 2h 15m} */
-    public static String serverStatus(int players, int maxPlayers, long startedMillis,
-                                      long nowMillis) {
+    /**
+     * {@code Lost Tales 0.1.3 • 3/20 players • play.example.org • 20 TPS •
+     * up 2h 15m}: the mod and the server's status, as the topic and the
+     * game's member lists say it ({@link ChatServerStatus}).
+     */
+    public static String serverStatus(List<String> status) {
         StringBuilder text = new StringBuilder(LostTalesMetaData.MOD_NAME)
-                .append(" ").append(LostTalesMetaData.MOD_VERSION)
-                .append(" • ").append(players);
-        if (maxPlayers > 0) {
-            text.append('/').append(maxPlayers);
-        }
-        text.append(players == 1 && maxPlayers <= 0 ? " player" : " players");
-        if (startedMillis > 0L && nowMillis >= startedMillis) {
-            text.append(" • up ").append(uptime(nowMillis - startedMillis));
+                .append(" ").append(LostTalesMetaData.MOD_VERSION);
+        for (String part : status) {
+            text.append(" • ").append(escape(part));
         }
         return bound(text.toString());
     }
 
-    /** {@code 2d 3h}, {@code 2h 15m}, {@code 15m}, {@code 40s}. */
-    static String uptime(long millis) {
-        long seconds = millis / 1000L;
-        long days = seconds / 86400L;
-        long hours = (seconds % 86400L) / 3600L;
-        long minutes = (seconds % 3600L) / 60L;
-        if (days > 0) {
-            return days + "d " + hours + "h";
-        }
-        if (hours > 0) {
-            return hours + "h " + minutes + "m";
-        }
-        if (minutes > 0) {
-            return minutes + "m";
-        }
-        return seconds + "s";
-    }
-
-    private static List<Player> onlinePlayers(MinecraftServer server) {
+    private static List<Player> onlinePlayers(LostTalesWords words,
+                                              MinecraftServer server) {
         List<Player> players = new ArrayList<Player>();
         if (server.getConfigurationManager() == null
                 || server.getConfigurationManager().playerEntityList == null) {
@@ -311,23 +337,49 @@ public final class DiscordSlashCommands {
             String faction = LotrCharacterAdapter.getInstance()
                     .getFactionDisplayName(character.getFactionId());
             players.add(new Player(player.getCommandSenderName(), character.getName(),
-                    raceName(character.getRaceId()), faction == null ? "" : faction));
+                    raceName(words, character.getRaceId()),
+                    faction == null ? "" : faction));
         }
         return players;
     }
 
-    /** {@code losttales:half_troll} reads as {@code Half troll}. */
-    static String raceName(String raceId) {
-        if (raceId == null || raceId.length() == 0) {
+    /**
+     * A race by the name the game gives it: {@code losttales:half_troll}
+     * reads as {@code Half-troll}. One the lang file does not name reads
+     * as its id, {@code Half troll}.
+     */
+    static String raceName(LostTalesWords words, String raceId) {
+        String path = raceId == null ? ""
+                : raceId.substring(raceId.indexOf(':') + 1);
+        if (path.length() == 0) {
             return "";
         }
-        String name = raceId.substring(raceId.indexOf(':') + 1).replace('_', ' ');
-        return name.length() == 0 ? "" : Character.toUpperCase(name.charAt(0)) + name.substring(1);
+        String key = "gui.losttales.character.race." + path;
+        String named = words.format(key);
+        if (!key.equals(named)) {
+            return named;
+        }
+        String name = path.replace('_', ' ');
+        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
     }
 
     /** Markdown and mentions rendered inert. */
     static String escape(String text) {
         return DiscordMessageSanitizer.escapeMarkdown(text == null ? "" : text);
+    }
+
+    /** Sentences one after another, a space between each two; an empty one is left out. */
+    private static String sentences(String... said) {
+        StringBuilder text = new StringBuilder();
+        for (String sentence : said) {
+            if (sentence != null && sentence.length() > 0) {
+                if (text.length() > 0) {
+                    text.append(' ');
+                }
+                text.append(sentence);
+            }
+        }
+        return text.toString();
     }
 
     /**
@@ -336,13 +388,18 @@ public final class DiscordSlashCommands {
      * through here.
      */
     static String bound(String text) {
+        return cut(text, MAX_CONTENT_LENGTH);
+    }
+
+    /** {@code text} cut to {@code max} characters, ending on "...", never inside a surrogate pair. */
+    private static String cut(String text, int max) {
         if (text == null) {
             return "";
         }
-        if (text.length() <= MAX_CONTENT_LENGTH) {
+        if (text.length() <= max) {
             return text;
         }
-        int end = MAX_CONTENT_LENGTH - 3;
+        int end = max - 3;
         if (Character.isHighSurrogate(text.charAt(end - 1))) {
             end--;
         }

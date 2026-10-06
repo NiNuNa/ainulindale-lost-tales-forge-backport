@@ -44,6 +44,11 @@ public final class TabMenusTest {
         @Override
         public void drawIcon(Minecraft minecraft, float x, float y,
                              int alpha, TabMark mark) {}
+
+        @Override
+        public PageCategory category() {
+            return PageCategory.SETTINGS;
+        }
     };
 
     @Before
@@ -105,6 +110,66 @@ public final class TabMenusTest {
     }
 
     /** Each row's id, a hairline as {@code -}. */
+    /**
+     * The {@code +} lists what can be opened under its categories' names,
+     * in their order: the channels, the consoles and the whispers under the
+     * channels' name, one sign in, then the other categories. A category's
+     * name folds its rows away, its subcategories with them; with words
+     * typed nothing folds.
+     */
+    @Test
+    public void theOpenMenuListsPagesByCategory() {
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage whisper = ConversationPage.whisper("Steve", "");
+        List<MenuWindow.Entry> rows = Arrays.asList(
+                new MenuWindow.Entry(BARE.id(), "Bare", false, -1, BARE),
+                new MenuWindow.Entry(whisper.id(), "Steve", false, -1, whisper),
+                new MenuWindow.Entry(console.id(), "Console", false, -1, console),
+                new MenuWindow.Entry(global.id(), "Global", false, -1, global));
+        List<MenuWindow.Entry> listed = TabMenus.byCategory(rows, true);
+        assertEquals(Arrays.asList("fold:CHANNELS", global.id(),
+                "fold:CONSOLES", console.id(), "fold:WHISPERS", whisper.id(),
+                "fold:SETTINGS", BARE.id()), ids(listed));
+        assertEquals(0, listed.get(0).depth);
+        assertEquals(1, listed.get(2).depth);
+        assertTrue(listed.get(0).isTakeable());
+        TabMenus.toggleFold(PageCategory.CHANNELS);
+        try {
+            assertEquals(Arrays.asList("fold:CHANNELS", "fold:SETTINGS",
+                    BARE.id()), ids(TabMenus.byCategory(rows, true)));
+            assertTrue(TabMenus.byCategory(rows, true).get(0).folded);
+            assertEquals("typed words fold nothing", 8,
+                    TabMenus.byCategory(rows, false).size());
+            assertFalse(TabMenus.byCategory(rows, false).get(0).isTakeable());
+        } finally {
+            TabMenus.toggleFold(PageCategory.CHANNELS);
+        }
+    }
+
+    /**
+     * A category's menu offers what its pages may take all at once: a
+     * conversation's Mark All as Read and its two settings, once each; a
+     * word is marked only while every page reads it.
+     */
+    @Test
+    public void aCategorysMenuOffersWhatEveryPageMayTake() {
+        ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
+        ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
+        List<WindowPage> pages = Arrays.<WindowPage>asList(global, ooc, BARE);
+        List<String> offered = new ArrayList<String>();
+        for (PageOption option : TabMenus.everyPageOptions(pages)) {
+            offered.add(option.id);
+            assertTrue(option.everyPageLabel().length() > 0);
+        }
+        assertEquals(Arrays.asList("mark_read", "feed", "notify"), offered);
+        assertTrue(TabMenus.everyPageReads(pages, "notify", "notify:mentions"));
+        com.ninuna.losttales.client.chat.ChatLayout.setNotification(ooc,
+                com.ninuna.losttales.client.chat.ChatLineChoice.NOTHING);
+        assertFalse(TabMenus.everyPageReads(pages, "notify", "notify:mentions"));
+        assertFalse(TabMenus.everyPageReads(pages, "notify", "notify:nothing"));
+    }
+
     private static List<String> ids(List<MenuWindow.Entry> rows) {
         List<String> ids = new ArrayList<String>();
         for (MenuWindow.Entry row : rows) {

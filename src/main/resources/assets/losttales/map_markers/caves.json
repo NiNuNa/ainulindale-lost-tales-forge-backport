@@ -2,7 +2,6 @@
   "map_markers": [
     {
       "id": "losttales:mossy_cave",
-      "name": "Mossy Cave",
       "relevance": "very-low",
       "icon": "undiscovered",
       "color": "gray",
@@ -16,8 +15,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "description": "A damp cave mouth hidden beneath moss and roots, easy to miss until you stand nearby."
+      "waystoneStructureType": "losttales:glowstone_house"
     }
   ]
 }

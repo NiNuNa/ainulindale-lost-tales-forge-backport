@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.profanity;
 
+import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import java.util.List;
@@ -183,10 +184,17 @@ public final class ChatProfanityFilter {
         }
     }
 
+    /**
+     * Whether a chunk is a web address, or a mention or channel link: an
+     * {@code @} or {@code #} with a name's own character right after it,
+     * as the chat reads them. {@code @**word**} names nobody, so its word
+     * is filtered.
+     */
     private static boolean isKeptWhole(String chunk) {
         char first = chunk.charAt(0);
         if (first == '@' || first == '#') {
-            return true;
+            return chunk.length() > 1
+                    && ChatMentions.isNameCharacter(chunk.charAt(1));
         }
         String lowered = chunk.toLowerCase(Locale.ROOT);
         return lowered.startsWith("http://") || lowered.startsWith("https://");

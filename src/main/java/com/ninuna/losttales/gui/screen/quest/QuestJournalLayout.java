@@ -1,45 +1,45 @@
 package com.ninuna.losttales.gui.screen.quest;
 
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
  * Where every part of the quest journal stands, worked out from the
  * page's box alone.
  *
- * <p>The page is its body, split by one rule into the quest list and what
- * the chosen quest says. Its name, its filters, its search and its actions
+ * <p>The page is split by one rule into the quest list and what the
+ * chosen quest says. Its name, its filters, its search and its actions
  * are the window's: its tab, its tool strip's options and well, and its input
  * bar. The list is a panel the strip's
  * left button folds away, and a page too narrow for both halves shows
- * one of them over the whole body: the list while it is out, else the
- * details. Each area is a box, and the drawing and the pointer ask the
- * same box, so a control answers on exactly the pixels it was drawn
- * in.</p>
+ * one of them over the whole page: the list while it is out, else the
+ * details. The list stands as a menu's rows do: from the page's left
+ * edge, so a lit row reaches the window's frame, with a menu's padding
+ * over and under its rows and either side of what a row holds. The
+ * details keep a margin of their own. Each area is a box, and the
+ * drawing and the pointer ask the same box, so a control answers on
+ * exactly the pixels it was drawn in.</p>
  *
  * <p>Free of Minecraft: the geometry is arithmetic, and a test can ask
  * it every question the page does.</p>
  */
 public final class QuestJournalLayout {
 
-    /** Clear pixels between the page's edge and anything drawn. */
-    public static final int MARGIN = 8;
-    /** One quest's row: the chat's line stride, so text sits the same. */
-    public static final int ROW_STRIDE = 12;
-    /** A category's row, which carries its rule and a little more air. */
-    public static final int CATEGORY_STRIDE = 15;
+    /** Clear room between the page's edge and what it shows: a menu's, across and down. */
+    public static final int MARGIN_X = MenuWindow.PADDING_X;
+    public static final int MARGIN_Y = MenuWindow.PADDING_Y;
     /** Clear pixels either side of the rule dividing the two halves. */
     public static final int GUTTER = 10;
     /** The narrowest and widest the quest list is allowed to be. */
     public static final int LIST_MIN_WIDTH = 150;
     public static final int LIST_MAX_WIDTH = 220;
-    /** The scrollbar's column, inside the list's right edge. */
-    public static final int SCROLLBAR_WIDTH = 3;
     /**
      * The narrowest page the two halves both fit on. Under it they take
      * turns: the list while it is out, else the details.
      */
     public static final int MIN_SPLIT_WIDTH =
-            2 * MARGIN + LIST_MIN_WIDTH + 2 * GUTTER + 1 + 120;
+            LIST_MIN_WIDTH + 2 * GUTTER + 1 + 120 + MARGIN_X;
 
     private final int pageWidth;
     private final int pageHeight;
@@ -66,19 +66,19 @@ public final class QuestJournalLayout {
         return isWide() && this.listOut;
     }
 
-    /** The first row of the body, and the row past its last. */
+    /** The details' first row, and the row past their last. */
     public int bodyTop() {
-        return MARGIN;
+        return MARGIN_Y;
     }
 
     public int bodyBottom() {
-        return Math.max(MARGIN, this.pageHeight - MARGIN);
+        return Math.max(MARGIN_Y, this.pageHeight - MARGIN_Y);
     }
 
-    /** The whole body between the margins, which one half takes when they take turns. */
+    /** The whole page between the margins, which the details take while the list is folded. */
     private LostTalesUiHitBox body() {
-        return new LostTalesUiHitBox(MARGIN, bodyTop(),
-                Math.max(0, this.pageWidth - 2 * MARGIN),
+        return new LostTalesUiHitBox(MARGIN_X, bodyTop(),
+                Math.max(0, this.pageWidth - 2 * MARGIN_X),
                 Math.max(0, bodyBottom() - bodyTop()));
     }
 
@@ -87,36 +87,42 @@ public final class QuestJournalLayout {
     }
 
     /**
-     * The quest list, scrollbar included: the left of the body beside
-     * the details, the whole body while the halves take turns, and empty
-     * while it is folded away.
+     * The band the quest list's rows show in, its scroll edge included:
+     * from the page's left edge, a menu's padding under the page's top
+     * and over its foot. The left of the page beside the details, the
+     * page's whole width while the halves take turns, and empty while it
+     * is folded away.
      */
     public LostTalesUiHitBox list() {
         if (!this.listOut) {
             return none();
         }
-        if (!isWide()) {
-            return body();
-        }
-        return new LostTalesUiHitBox(MARGIN, bodyTop(), this.listWidth,
-                Math.max(0, bodyBottom() - bodyTop()));
+        return new LostTalesUiHitBox(0, MenuWindow.PADDING_Y,
+                isWide() ? this.listWidth : this.pageWidth,
+                Math.max(0, this.pageHeight - 2 * MenuWindow.PADDING_Y));
     }
 
-    /** The column a list row's text and glyphs may use. */
+    /**
+     * The column a list row's glyph and words stand in: a menu's padding
+     * in from either side of the list.
+     */
     public LostTalesUiHitBox listRows() {
         LostTalesUiHitBox list = list();
-        return new LostTalesUiHitBox(list.left, list.top,
-                Math.max(0, list.width - SCROLLBAR_WIDTH - 2), list.height);
+        return new LostTalesUiHitBox(list.left + MenuWindow.PADDING_X,
+                list.top, Math.max(0, list.width - 2 * MenuWindow.PADDING_X),
+                list.height);
     }
 
-    /** The rule between the halves; empty unless they stand side by side. */
+    /**
+     * The rule between the halves, as tall as the details; empty unless
+     * they stand side by side.
+     */
     public LostTalesUiHitBox divider() {
         if (!isSplit()) {
             return none();
         }
-        LostTalesUiHitBox list = list();
-        return new LostTalesUiHitBox(list.right() + GUTTER, list.top, 1,
-                list.height);
+        return new LostTalesUiHitBox(list().right() + GUTTER, bodyTop(), 1,
+                Math.max(0, bodyBottom() - bodyTop()));
     }
 
     /**
@@ -130,50 +136,16 @@ public final class QuestJournalLayout {
         }
         int left = (int)divider().right() + GUTTER;
         return new LostTalesUiHitBox(left, bodyTop(),
-                Math.max(0, this.pageWidth - MARGIN - left),
+                Math.max(0, this.pageWidth - MARGIN_X - left),
                 Math.max(0, bodyBottom() - bodyTop()));
     }
 
-    /** The column the detail's text may use, its scrollbar left out. */
+    /** The column the detail's text may use, its scroll edge left clear. */
     public LostTalesUiHitBox detailRows() {
         LostTalesUiHitBox detail = detail();
         return new LostTalesUiHitBox(detail.left, detail.top,
-                Math.max(0, detail.width - SCROLLBAR_WIDTH - 2), detail.height);
+                Math.max(0, detail.width - WindowLists.SCROLLBAR_ROOM - 2),
+                detail.height);
     }
 
-    /**
-     * A scrollbar's column inside {@code area}'s right edge, or an empty
-     * box where there is nothing to scroll.
-     */
-    public static LostTalesUiHitBox scrollbar(LostTalesUiHitBox area,
-                                              int contentHeight) {
-        if (area == null || area.width <= 0.0D || area.height <= 0.0D
-                || contentHeight <= area.height) {
-            return none();
-        }
-        return new LostTalesUiHitBox(area.right() - SCROLLBAR_WIDTH, area.top,
-                SCROLLBAR_WIDTH, area.height);
-    }
-
-    /**
-     * The handle inside a scrollbar for a view {@code scroll} pixels down
-     * a {@code contentHeight}-tall run: at least a square, and never past
-     * either end.
-     */
-    public static LostTalesUiHitBox scrollHandle(LostTalesUiHitBox bar,
-                                                 int contentHeight,
-                                                 double scroll) {
-        if (bar == null || bar.height <= 0.0D || contentHeight <= bar.height) {
-            return none();
-        }
-        double visible = bar.height;
-        double handle = Math.max(SCROLLBAR_WIDTH * 2,
-                visible * visible / contentHeight);
-        double travel = visible - handle;
-        double hidden = contentHeight - visible;
-        double at = hidden <= 0.0D ? 0.0D
-                : Math.max(0.0D, Math.min(1.0D, scroll / hidden));
-        return new LostTalesUiHitBox(bar.left, bar.top + travel * at,
-                bar.width, handle);
-    }
 }

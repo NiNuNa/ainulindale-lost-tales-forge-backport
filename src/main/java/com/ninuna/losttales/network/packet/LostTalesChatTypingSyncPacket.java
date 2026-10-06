@@ -10,10 +10,11 @@ import io.netty.buffer.ByteBuf;
 /**
  * Server-to-client: someone is, or has stopped, typing into a channel
  * the receiving player reads. Carries the name the message would show
- * (the character's in role-play channels, the account's otherwise) and,
- * for a whisper, the account name of the partner whose tab it belongs
- * in. Presence is short-lived on the client: a state that is not
- * refreshed expires on its own, so a lost stop never leaves a ghost.
+ * (the character's in role-play channels, the account's otherwise, the
+ * Narrator's while they narrate, which the receiving game names in its
+ * own words) and, for a whisper, the account name of the partner whose
+ * tab it belongs in. Presence is short-lived on the client: a state that
+ * is not refreshed expires on its own, so a lost stop never leaves a ghost.
  */
 public final class LostTalesChatTypingSyncPacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 448;
@@ -27,18 +28,22 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
     private String scopeValue = "";
     private String recipientIdentity = "";
     private boolean typing;
+    /** Whether the typist speaks as the Narrator. */
+    private boolean narrator;
     private boolean malformed;
 
     public LostTalesChatTypingSyncPacket() {}
 
     public LostTalesChatTypingSyncPacket(ChatChannel channel, String partner,
-                                         String identityName, boolean typing,
-                                         String scopeValue, String recipientIdentity) {
+                                         String identityName, boolean narrator,
+                                         boolean typing, String scopeValue,
+                                         String recipientIdentity) {
         this.scopeValue = scopeValue == null ? "" : scopeValue;
         this.recipientIdentity = recipientIdentity == null ? "" : recipientIdentity;
         this.channelId = channel == null ? "" : channel.getId();
         this.partner = partner == null ? "" : partner.trim();
         this.identityName = identityName == null ? "" : identityName.trim();
+        this.narrator = narrator;
         this.typing = typing;
         validate();
     }
@@ -57,6 +62,7 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
                     buffer, MAX_NAME_BYTES).trim();
             this.identityName = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_NAME_BYTES).trim();
+            this.narrator = buffer.readBoolean();
             this.typing = buffer.readBoolean();
             this.scopeValue = LostTalesPacketCodec.readUtf8String(buffer, 128);
             this.recipientIdentity = LostTalesPacketCodec.readUtf8String(buffer, 36);
@@ -67,6 +73,7 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
             this.channelId = "";
             this.partner = "";
             this.identityName = "";
+            this.narrator = false;
             this.typing = false;
             this.scopeValue = "";
             this.recipientIdentity = "";
@@ -83,6 +90,7 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
                 MAX_NAME_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, this.identityName,
                 MAX_NAME_BYTES);
+        buffer.writeBoolean(this.narrator);
         buffer.writeBoolean(this.typing);
         LostTalesPacketCodec.writeUtf8String(buffer, this.scopeValue, 128);
         LostTalesPacketCodec.writeUtf8String(buffer, this.recipientIdentity, 36);
@@ -114,6 +122,8 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
     public String getPartner() { return this.partner; }
     /** The name the typist's messages show in this channel. */
     public String getIdentityName() { return this.identityName; }
+    /** Whether the typist speaks as the Narrator, whose name each game says in its own words. */
+    public boolean isNarrator() { return this.narrator; }
     public String getScopeValue() { return this.scopeValue; }
     public String getRecipientIdentity() { return this.recipientIdentity; }
     public boolean isTyping() { return this.typing; }

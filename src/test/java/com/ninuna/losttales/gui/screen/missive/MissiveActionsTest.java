@@ -28,9 +28,8 @@ public final class MissiveActionsTest {
     private static final String WHY = MissiveActions.WHY;
 
     private static final MissiveNotice READABLE = new MissiveNotice(2, 100L,
-            LostTalesMissiveData.builder("q/road", "kill").title("Road")
-                    .objective(new LostTalesMissiveObjectiveData("o", "kill",
-                            "", false, null))
+            LostTalesMissiveData.builder("q/road", "kill").titleId("trouble_on_the_road")
+                    .objective(new LostTalesMissiveObjectiveData("o", "kill", false, null))
                     .build());
     private static final MissiveNotice UNREADABLE = new MissiveNotice(4, 100L,
             null);

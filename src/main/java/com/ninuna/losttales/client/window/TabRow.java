@@ -382,6 +382,8 @@ public final class TabRow {
     private WindowPage cachedSelected;
     /** The other side of the split the row was laid out for; null for none. */
     private WindowPage cachedPartner;
+    /** The splits the row was laid out for. */
+    private Map<WindowPage, WindowPage> cachedPairs = Collections.emptyMap();
     private final Map<WindowPage, String> cachedLabels =
             new HashMap<WindowPage, String>();
     private final Map<WindowPage, Boolean> cachedDraft =
@@ -471,11 +473,11 @@ public final class TabRow {
     /** The row's own lower cut, handed down to each tab's contents. */
     private double rowClipBottom = Double.NaN;
     /**
-     * The split the row draws as one tab this frame, its left page first;
-     * null for none. The strip and its shade leave the seam between them
-     * to the tab.
+     * The splits the row draws as one tab each this frame, the left page
+     * of each first. The strip and its shade leave the seam between the
+     * two halves to the tab.
      */
-    private Tab[] joinedSeam;
+    private List<Tab[]> joinedPairs = Collections.emptyList();
     /** {@link Row#fractionX} of the row being drawn, for {@link #clipX}. */
     private double clipFractionX;
     /**
@@ -574,6 +576,12 @@ public final class TabRow {
          * one page.
          */
         public WindowPage splitPartner;
+        /**
+         * Every split the row shows, each page mapped to the other: a
+         * split takes one tab's room in the row, half for each page, as
+         * Chrome lays a split out, whether it is in front or not.
+         */
+        public Map<WindowPage, WindowPage> splitPairs = Collections.emptyMap();
         /** Tabs marked in this row; the selected one need not be among them. */
         public List<WindowPage> marked = Collections.emptyList();
         /** Resting left edge of the first tab, screen space. */
@@ -925,7 +933,14 @@ public final class TabRow {
         int centre = runLeft + runWidth / 2;
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
-            if (centre < tab.x + tab.width / 2) {
+            int right = tab.x + tab.width;
+            if (index + 1 < tabs.size()
+                    && isPair(row.splitPairs, tab.tab, tabs.get(index + 1).tab)) {
+                // A split is one tab: the run lands before it or after it.
+                right = tabs.get(index + 1).x + tabs.get(index + 1).width;
+                index++;
+            }
+            if (centre < (tab.x + right) / 2) {
                 return tab.rowIndex;
             }
         }
@@ -971,8 +986,11 @@ public final class TabRow {
         // window's edge is under the hand: the row's band and the top
         // resize border meet at the window's top edge, and a resize
         // glides the band under a pointer that stands still there, so
-        // asking would light and unlight a tab every other frame.
-        Hit hovered = row.dragging != null || row.resizing ? null
+        // asking would light and unlight a tab every other frame. Nor
+        // while the window itself is carried: the row is its handle then,
+        // and the tab under the hand is not lit by it.
+        Hit hovered = row.dragging != null || row.resizing || row.moving
+                ? null
                 : hitAt(font, row, mouseX, mouseY);
         int bottom = row.rowBottom;
         // The window's title strip, ending exactly on the rule row:
@@ -992,9 +1010,15 @@ public final class TabRow {
         int searchTop = (int)search.top;
         this.drawnStripArgb = WindowStyle.surfaceArgb(
                 surfaceShare());
-        // A split's two pages stand as one tab, its seam theirs.
-        Tab[] joined = joinedPair(row, tabs);
-        this.joinedSeam = joined;
+        // Every split's two pages stand as one tab, its seam theirs; the
+        // split in front stands forward with the page in front.
+        this.joinedPairs = joinedPairs(row, tabs);
+        Tab[] joined = null;
+        for (Tab[] pair : this.joinedPairs) {
+            if (isForward(row, pair[0].tab) || isForward(row, pair[1].tab)) {
+                joined = pair;
+            }
+        }
         drawStripAround(row, drawnTabs, row.offsetX + row.left - STRIP_INSET,
                 rowTop(bottom), stripRight, bottom - 1, searchLeft,
                 searchTop, searchLeft + SEARCH_SIZE,
@@ -1067,6 +1091,15 @@ public final class TabRow {
                     continue;
                 }
                 if (isCarried(row, tab.tab)) {
+                    continue;
+                }
+                Tab[] pair = pairOf(tab);
+                if (pair != null) {
+                    // A split not in front rests as one tab.
+                    if (tab == pair[0]) {
+                        drawJoinedTab(font, pair[0], pair[1], row, bottom,
+                                hovered, false);
+                    }
                     continue;
                 }
                 drawTab(font, tab, row, bottom, hovered, false);
@@ -1218,7 +1251,8 @@ public final class TabRow {
             }
             this.rowClipBottom = row.rowBottomExact;
             if (joined != null && !isCarried(row, joined[0].tab)) {
-                drawJoinedTab(font, joined[0], joined[1], row, bottom, hovered);
+                drawJoinedTab(font, joined[0], joined[1], row, bottom, hovered,
+                        true);
             } else if (joined == null) {
                 drawTab(font, selectedTab, row, bottom, hovered, true);
             }
@@ -1234,17 +1268,28 @@ public final class TabRow {
         // The carried run, last of all and in row order, so it slides
         // across everything it passes as one piece; a split carried in it
         // is still one tab.
-        boolean carriedJoined = joined != null && isCarried(row, joined[0].tab);
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
             if (!isCarried(row, tab.tab)) {
                 continue;
             }
-            if (carriedJoined && (tab == joined[0] || tab == joined[1])) {
-                if (tab == joined[0]) {
-                    this.rowClipBottom = row.rowBottomExact;
-                    drawJoinedTab(font, joined[0], joined[1], row, bottom,
-                            hovered);
+            Tab[] pair = pairOf(tab);
+            if (pair != null) {
+                if (tab == pair[0]) {
+                    boolean forward = isForward(row, pair[0].tab)
+                            || isForward(row, pair[1].tab);
+                    this.rowClipBottom = forward ? row.rowBottomExact
+                            : row.rowBottomExact - 1.0D;
+                    boolean cut = !forward
+                            && LostTalesUiClip.beginRows(
+                                    Minecraft.getMinecraft(), Double.NaN,
+                                    this.rowClipBottom, true);
+                    try {
+                        drawJoinedTab(font, pair[0], pair[1], row, bottom,
+                                hovered, forward);
+                    } finally {
+                        LostTalesUiClip.end(cut);
+                    }
                 }
                 continue;
             }
@@ -1373,17 +1418,17 @@ public final class TabRow {
         int edgeCount = 0;
         edges[edgeCount++] = left;
         edges[edgeCount++] = right;
-        Tab[] joined = this.joinedSeam;
         for (int index = 0; index < count; index++) {
             Tab tab = tabs.get(index);
             lefts[index] = row.offsetX + drawnX(row, tab);
             rights[index] = lefts[index] + drawnWidth(row, tab);
-            if (joined != null && (tab == joined[0] || tab == joined[1])) {
+            Tab[] pair = pairOf(tab);
+            if (pair != null) {
                 // The joined tab's one footprint, its seam and its inner
                 // edges included: it is one shape.
-                lefts[index] = row.offsetX + drawnX(row, joined[0]);
-                rights[index] = row.offsetX + drawnX(row, joined[1])
-                        + drawnWidth(row, joined[1]);
+                lefts[index] = row.offsetX + drawnX(row, pair[0]);
+                rights[index] = row.offsetX + drawnX(row, pair[1])
+                        + drawnWidth(row, pair[1]);
             }
             tops[index] = tabTop(row.rowBottom,
                     isForward(row, tab.tab)) - raisedBy(tab);
@@ -1505,15 +1550,18 @@ public final class TabRow {
     }
 
     /**
-     * The two pages of a split shown as one tab standing forward, as
-     * Chrome draws a split: one shape from the first page's left to the
-     * second's right, each page's icon, name, dots and cross in its own
-     * half, both keeping their crosses as the tab in front does, and a
-     * hairline in the seam between the halves. The page in front wears its
-     * colour; the other's name lights only under the pointer.
+     * The two pages of a split shown as one tab, as Chrome draws a split:
+     * one shape from the first page's left to the second's right, in the
+     * room of one tab, each page's icon, name, dots and cross in its own
+     * half, and a hairline in the seam between the halves. Standing
+     * {@code forward}, the split in front: both halves keep their crosses
+     * as the tab in front does, and the page in front wears its colour.
+     * Resting, it lights as a resting tab does, each name in its colour as
+     * far as the tab is lit.
      */
     private void drawJoinedTab(FontRenderer font, Tab first, Tab second,
-                               Row row, int rowBottom, Hit hovered) {
+                               Row row, int rowBottom, Hit hovered,
+                               boolean forward) {
         float firstLeft = row.offsetX + drawnX(row, first);
         float firstRight = firstLeft + drawnWidth(row, first);
         float secondLeft = row.offsetX + drawnX(row, second);
@@ -1521,15 +1569,22 @@ public final class TabRow {
         if (firstRight <= firstLeft || secondRight <= secondLeft) {
             return;
         }
-        Tab front = first.tab.equals(row.selected) ? first : second;
+        Tab front = second.tab.equals(row.selected) ? second : first;
         float firstLit = litShare(row, first, hovered);
         float secondLit = litShare(row, second, hovered);
-        int top = rowBottom - HEIGHT - LIFT;
+        float lit = forward ? 1.0F : Math.max(firstLit, secondLit);
+        int top = rowBottom - HEIGHT - (forward ? LIFT : 0);
         float raised = Math.max(raisedBy(first), raisedBy(second));
-        drawTabShape(firstLeft, secondRight, top, raised, true, 1.0F,
-                front.lift, front.tab.tone(),
+        drawTabShape(firstLeft, secondRight, top, raised, forward, lit,
+                Math.max(first.lift, second.lift), front.tab.tone(),
                 Math.max(first.glow, second.glow) * GLOW_TINT, scaled(0xFF),
                 scaled(TAB_SURFACE_ALPHA));
+        if (!forward && lit < 1.0F) {
+            // Resting, each half sinks into the rule in its own colour.
+            drawTabShade(first, firstLeft, firstRight, rowBottom, 1.0F - lit);
+            drawTabShade(second, secondLeft, secondRight, rowBottom,
+                    1.0F - lit);
+        }
         // The hairline in the seam, a row's divider, drawn off the seam's
         // whole pixel by the fraction it stands on.
         float seam = secondLeft - TAB_GAP;
@@ -1542,30 +1597,40 @@ public final class TabRow {
             GL11.glPopMatrix();
         }
         drawTabInside(font, first, row, hovered, firstLeft, firstRight, top,
-                raised, firstLit, first == front, true);
+                raised, forward ? firstLit : lit, forward && first == front,
+                forward);
         drawTabInside(font, second, row, hovered, secondLeft, secondRight,
-                top, raised, secondLit, second == front, true);
+                top, raised, forward ? secondLit : lit,
+                forward && second == front, forward);
     }
 
     /**
-     * The pair a window's row draws as one tab: the page in front and the
-     * other side of its split, standing side by side in the row, both in
-     * the hand or neither; first the one on the left. Null for none.
+     * The splits a window's row draws as one tab each: two pages of one
+     * split standing side by side in the row, both in the hand or
+     * neither; the one on the left first.
      */
-    private static Tab[] joinedPair(Row row, List<Tab> tabs) {
-        if (row.splitPartner == null || row.selected == null) {
-            return null;
-        }
+    private static List<Tab[]> joinedPairs(Row row, List<Tab> tabs) {
+        List<Tab[]> pairs = null;
         for (int index = 0; index + 1 < tabs.size(); index++) {
             Tab left = tabs.get(index);
             Tab right = tabs.get(index + 1);
-            boolean pair = left.tab.equals(row.selected)
-                    && right.tab.equals(row.splitPartner)
-                    || left.tab.equals(row.splitPartner)
-                    && right.tab.equals(row.selected);
-            if (pair) {
-                return isCarried(row, left.tab) != isCarried(row, right.tab)
-                        ? null : new Tab[] {left, right};
+            if (isPair(row.splitPairs, left.tab, right.tab)
+                    && isCarried(row, left.tab) == isCarried(row, right.tab)) {
+                if (pairs == null) {
+                    pairs = new ArrayList<Tab[]>(2);
+                }
+                pairs.add(new Tab[] {left, right});
+                index++;
+            }
+        }
+        return pairs == null ? Collections.<Tab[]>emptyList() : pairs;
+    }
+
+    /** The split {@code tab} is drawn joined in this frame; null for none. */
+    private Tab[] pairOf(Tab tab) {
+        for (Tab[] pair : this.joinedPairs) {
+            if (pair[0] == tab || pair[1] == tab) {
+                return pair;
             }
         }
         return null;
@@ -1820,7 +1885,6 @@ public final class TabRow {
             }
         });
         float cursor = left;
-        Tab[] joined = this.joinedSeam;
         for (Tab tab : ordered) {
             float tabLeft = row.offsetX + drawnX(row, tab);
             float tabRight = Math.min(right, tabLeft + drawnWidth(row, tab));
@@ -1828,7 +1892,8 @@ public final class TabRow {
                 continue;
             }
             // The seam inside a joined tab is the tab's, not the strip's.
-            if (tabLeft > cursor && !(joined != null && tab == joined[1])) {
+            Tab[] pair = pairOf(tab);
+            if (tabLeft > cursor && !(pair != null && tab == pair[1])) {
                 LostTalesUiRules.drawEdgeFade(left, right, cursor,
                         tabLeft, bottom - 1, rowTop(bottom),
                         WindowStyle.TOP_EDGE_FADE_HEIGHT,
@@ -2028,7 +2093,6 @@ public final class TabRow {
         maskQuad(tessellator, row.offsetX + row.left - STRIP_INSET,
                 rowTop(rowBottom) - LIFT_PIXELS, stripRight, rowBottom,
                 MASK_FAR);
-        Tab[] joined = this.joinedSeam;
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
             if (!isCarried(row, tab.tab)) {
@@ -2037,11 +2101,13 @@ public final class TabRow {
             boolean inFront = isForward(row, tab.tab);
             float left = row.offsetX + drawnX(row, tab);
             float right = left + drawnWidth(row, tab);
-            if (joined != null && tab == joined[0]) {
+            Tab[] pair = pairOf(tab);
+            if (pair != null && tab == pair[0]) {
                 // A carried split is one shape, its seam included.
-                right = row.offsetX + drawnX(row, joined[1])
-                        + drawnWidth(row, joined[1]);
-            } else if (joined != null && tab == joined[1]) {
+                inFront = inFront || isForward(row, pair[1].tab);
+                right = row.offsetX + drawnX(row, pair[1])
+                        + drawnWidth(row, pair[1]);
+            } else if (pair != null) {
                 continue;
             }
             float top = tabTop(rowBottom, inFront) - raisedBy(tab);
@@ -2789,10 +2855,20 @@ public final class TabRow {
         this.draggedRunWidth = offset == 0 ? 0 : offset - TAB_GAP;
     }
 
-    /** How wide the run this row is carrying is drawn, or zero. */
-    int carriedRunWidth(FontRenderer font, Row row) {
-        measureRun(layout(font, row), row);
-        return this.draggedRunWidth;
+    /**
+     * How wide the run of {@code group} is laid out in this row, the seams
+     * between its tabs included, or zero for none of them: what a carried
+     * run measures, whether the row carries it under the hand or the run
+     * carries the row's whole window.
+     */
+    int runWidth(FontRenderer font, Row row, List<WindowPage> group) {
+        int width = -TAB_GAP;
+        for (Tab tab : layout(font, row)) {
+            if (group.contains(tab.tab)) {
+                width += tab.width + TAB_GAP;
+            }
+        }
+        return Math.max(0, width);
     }
 
     /**
@@ -2847,22 +2923,40 @@ public final class TabRow {
             this.reorderLatch.clear();
         }
         // The row with the carried run lifted out: where each remaining
-        // tab would rest, which is also where the run itself would rest
-        // at each place it could take.
+        // place would rest, which is also where the run itself would rest
+        // at each place it could take. A split is one place: nothing is
+        // put down between its two halves.
         int[] restLeft = new int[others];
         int[] widths = new int[others];
+        int[] held = new int[others];
         int cursor = row.left + SEARCH_RUN;
         int at = 0;
+        int runAt = -1;
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
             if (group.contains(tab.tab)) {
+                if (runAt < 0) {
+                    runAt = at;
+                }
                 continue;
             }
+            int width = tab.width;
+            held[at] = 1;
+            if (index + 1 < tabs.size()
+                    && !group.contains(tabs.get(index + 1).tab)
+                    && isPair(row.splitPairs, tab.tab,
+                            tabs.get(index + 1).tab)) {
+                width += TAB_GAP + tabs.get(index + 1).width;
+                held[at] = 2;
+                index++;
+            }
             restLeft[at] = cursor;
-            widths[at] = tab.width;
-            cursor += tab.width + TAB_GAP;
+            widths[at] = width;
+            cursor += width + TAB_GAP;
             at++;
         }
+        restLeft = java.util.Arrays.copyOf(restLeft, at);
+        widths = java.util.Arrays.copyOf(widths, at);
         // The row may lay out fewer tabs than it holds when it cannot
         // fit them all; the place answered is counted among the row's
         // visible tabs, as the layout's caller counts, so the tabs left
@@ -2874,9 +2968,14 @@ public final class TabRow {
                 leading++;
             }
         }
-        return leading + reorderSlot(draggedRunLeft(row),
-                heldBefore(tabs, group), restLeft, widths, TAB_GAP,
-                this.reorderLatch);
+        int place = reorderSlot(draggedRunLeft(row), runAt < 0 ? at : runAt,
+                restLeft, widths, TAB_GAP, this.reorderLatch);
+        // The place counted back into tabs, a split's two.
+        int before = 0;
+        for (int index = 0; index < place; index++) {
+            before += held[index];
+        }
+        return leading + before;
     }
 
     /**
@@ -2974,18 +3073,6 @@ public final class TabRow {
             latch.crossedAt = left;
         }
         return best;
-    }
-
-    /** The place the dragged run holds now: the tabs left before it. */
-    private static int heldBefore(List<Tab> tabs, List<WindowPage> group) {
-        int slot = 0;
-        for (int index = 0; index < tabs.size(); index++) {
-            if (group.contains(tabs.get(index).tab)) {
-                return slot;
-            }
-            slot++;
-        }
-        return slot;
     }
 
     /* The controls are the sheet's sprites, drawn 1:1 and centred in
@@ -3322,26 +3409,33 @@ public final class TabRow {
             labelWidths[index] = font.getStringWidth(
                     this.cachedLabels.get(channels.get(index)));
         }
-        int selectedIndex = 0;
-        for (int index = 0; index < count; index++) {
-            if (channels.get(index).equals(row.selected)) {
-                selectedIndex = index;
+        // A split takes one tab's room in the row, half for each of its
+        // pages, as Chrome lays a split out: the row shares its room
+        // between places, a split one place.
+        List<int[]> places = places(channels, row.splitPairs);
+        int selectedPlace = 0;
+        for (int at = 0; at < places.size(); at++) {
+            int[] place = places.get(at);
+            for (int index = place[0]; index <= place[1]; index++) {
+                if (channels.get(index).equals(row.selected)) {
+                    selectedPlace = at;
+                }
             }
         }
-        // Every tab is one width: the row's default while the row holds
+        // Every place is one width: the row's default while the row holds
         // them all at it, else the widest width they can all share — the
         // tab in front included. Only a row that cannot hold even the
         // narrowest tabs shows fewer of them, and then a run around the
         // tab in front rather than whichever happen to be leftmost, so a
         // tab does not come and go as the selection moves.
         int first = 0;
-        int last = count - 1;
+        int last = places.size() - 1;
         double width = uniformTabWidth(rowRoom, last - first + 1);
-        while (width < narrowestTabWidth(channels, first, last)
+        while (width < narrowestPlaceWidth(channels, places, first, last)
                 && first < last) {
-            if (last > selectedIndex) {
+            if (last > selectedPlace) {
                 last--;
-            } else if (first < selectedIndex) {
+            } else if (first < selectedPlace) {
                 first++;
             } else {
                 break;
@@ -3367,81 +3461,23 @@ public final class TabRow {
         // rounded apart — which could overrun the room by a pixel a tab
         // and push the end controls off their edge.
         double cursor = row.left + SEARCH_RUN;
-        for (int index = first; index <= last; index++) {
-            int x = (int)Math.round(cursor);
-            WindowPage channel = channels.get(index);
-            boolean selected = channel.equals(row.selected);
-            // The whole name, drawn into the room the row gives it and
-            // cut where that room ends: a narrowing tab shows a little
-            // less of its name with every pixel, never a letter less
-            // every few.
-            String label = this.cachedLabels.get(channel);
-            int labelWidth = labelWidths[index];
-            boolean icon = channel.hasIcon();
-            int tabWidth = (int)Math.round(cursor + width) - x;
-            boolean draft = isTrue(this.cachedDraft.get(channel));
-            // The buttons the tab shows once settled, for the hit test,
-            // which answers for the places the tabs settle in: those the
-            // width the row gives its tabs holds, the cross of the tab in
-            // front and of the other side of its split always.
-            float closeShare = !showClose ? 0.0F
-                    : selected || channel.equals(row.splitPartner)
-                            || closeStands(width) ? 1.0F : 0.0F;
-            float optionsShare = !row.bare && optionsStands(width)
-                    ? 1.0F : 0.0F;
-            boolean draftShown = draft && draftStands(width);
-            TabRoom settled = roomFor(tabWidth, iconWidth(channel), labelWidth,
-                    draftShown ? COUNTER_GAP + DRAFT_WIDTH : 0, closeShare,
-                    optionsShare);
-            int closeX = closeShare > 0.0F
-                    ? x + (int)Math.floor(settled.closeLeft) : -1;
-            int optionsX = optionsShare > 0.0F
-                    ? x + (int)Math.floor(settled.optionsLeft) : -1;
-            int draftX = draftShown ? draftLeft(x, icon,
-                    (int)Math.floor(settled.labelRoom)) : -1;
-            Tab built = new Tab(channel, index, icon, label, labelWidth,
-                    draft, x, tabWidth,
-                    closeX, optionsX, draftX,
-                    isTrue(this.cachedMuted.get(channel)));
-            built.toLeft = cursor - row.left;
-            built.exactWidth = width;
-            Tab was = find(this.cachedTabs, channel);
-            if (was == null) {
-                // Opened again while it was still shrinking away: it
-                // turns round where it is rather than growing anew.
-                was = find(this.leavingTabs, channel);
-                this.leavingTabs.remove(was);
-            }
-            if (was != null) {
-                // A tab the row already held carries on from where it is
-                // drawn, on whatever glide it is on; given another place
-                // or width, it sets out for it from there on a glide of
-                // its own, and the tabs the row leaves where they were
-                // keep theirs.
-                built.carryOn(was);
-                if (Math.abs(was.toLeft - built.toLeft) > 1.0E-6D
-                        || Math.abs(was.exactWidth - built.exactWidth)
-                                > 1.0E-6D) {
-                    built.setOut();
-                }
-            } else if (firstSight) {
-                // The row seen for the first time stands where it is laid
-                // out rather than growing in from nothing.
-                built.standAt(built.toLeft, width, displayStep());
-                built.leg.settle(true);
+        for (int at = first; at <= last; at++) {
+            int[] place = places.get(at);
+            if (place[0] == place[1]) {
+                previous = layTab(row, channels.get(place[0]), place[0],
+                        labelWidths[place[0]], cursor, width, width,
+                        showClose, firstSight, previous, tabs);
             } else {
-                // A tab joining grows from nothing where it joins: its
-                // left edge where the tab before it ends as drawn now,
-                // its width a seam short of nothing, so its neighbours
-                // meet it all the way along the glide.
-                double start = previous == null ? SEARCH_RUN
-                        : previous.leftExact + previous.widthExact + TAB_GAP;
-                built.standAt(start, -TAB_GAP, displayStep());
-                built.joining = true;
-                built.leg.settle(false);
+                // A split's two halves, the seam between them a tab's.
+                double half = splitHalf(width);
+                previous = layTab(row, channels.get(place[0]), place[0],
+                        labelWidths[place[0]], cursor, half, width,
+                        showClose, firstSight, previous, tabs);
+                previous = layTab(row, channels.get(place[1]), place[1],
+                        labelWidths[place[1]], cursor + half + TAB_GAP,
+                        width - half - TAB_GAP, width, showClose,
+                        firstSight, previous, tabs);
             }
-            tabs.add(built);
-            previous = built;
             cursor += width + TAB_GAP;
         }
         // A tab closed out of the row shrinks away where it stood, toward
@@ -3511,6 +3547,7 @@ public final class TabRow {
         this.cachedChannels = new ArrayList<WindowPage>(channels);
         this.cachedSelected = row.selected;
         this.cachedPartner = row.splitPartner;
+        this.cachedPairs = row.splitPairs;
         this.cachedFont = font;
         this.cachedLeft = row.left;
         this.cachedRight = row.right;
@@ -3518,6 +3555,124 @@ public final class TabRow {
         this.cachedShowClose = showClose;
         this.cachedShowRestore = row.showRestore;
         return this.cachedTabs;
+    }
+
+    /**
+     * Lays one tab down at {@code left}, {@code tabWidth} wide, in a row
+     * whose places are {@code placeWidth} wide: the buttons it shows are
+     * those a place that wide shows, so a split's half keeps what its
+     * whole tab would. It carries on from where the row drew it last, or
+     * grows in from nothing where it joins. Answers the tab, added to
+     * {@code tabs}.
+     */
+    private Tab layTab(Row row, WindowPage channel, int index,
+                       int labelWidth, double left, double tabWidth,
+                       double placeWidth, boolean showClose,
+                       boolean firstSight, Tab previous, List<Tab> tabs) {
+        int x = (int)Math.round(left);
+        boolean selected = channel.equals(row.selected);
+        // The whole name, drawn into the room the row gives it and cut
+        // where that room ends: a narrowing tab shows a little less of
+        // its name with every pixel, never a letter less every few.
+        String label = this.cachedLabels.get(channel);
+        boolean icon = channel.hasIcon();
+        int wholeWidth = (int)Math.round(left + tabWidth) - x;
+        boolean draft = isTrue(this.cachedDraft.get(channel));
+        // The buttons the tab shows once settled, for the hit test, which
+        // answers for the places the tabs settle in: those the width the
+        // row gives its places holds, the cross of the tab in front and of
+        // the other side of its split always.
+        float closeShare = !showClose ? 0.0F
+                : selected || channel.equals(row.splitPartner)
+                        || closeStands(placeWidth) ? 1.0F : 0.0F;
+        float optionsShare = !row.bare && optionsStands(placeWidth)
+                ? 1.0F : 0.0F;
+        boolean draftShown = draft && draftStands(placeWidth);
+        TabRoom settled = roomFor(wholeWidth, iconWidth(channel), labelWidth,
+                draftShown ? COUNTER_GAP + DRAFT_WIDTH : 0, closeShare,
+                optionsShare);
+        int closeX = closeShare > 0.0F
+                ? x + (int)Math.floor(settled.closeLeft) : -1;
+        int optionsX = optionsShare > 0.0F
+                ? x + (int)Math.floor(settled.optionsLeft) : -1;
+        int draftX = draftShown ? draftLeft(x, icon,
+                (int)Math.floor(settled.labelRoom)) : -1;
+        Tab built = new Tab(channel, index, icon, label, labelWidth,
+                draft, x, wholeWidth, closeX, optionsX, draftX,
+                isTrue(this.cachedMuted.get(channel)));
+        built.toLeft = left - row.left;
+        built.exactWidth = tabWidth;
+        Tab was = find(this.cachedTabs, channel);
+        if (was == null) {
+            // Opened again while it was still shrinking away: it turns
+            // round where it is rather than growing anew.
+            was = find(this.leavingTabs, channel);
+            this.leavingTabs.remove(was);
+        }
+        if (was != null) {
+            // A tab the row already held carries on from where it is
+            // drawn, on whatever glide it is on; given another place or
+            // width, it sets out for it from there on a glide of its own,
+            // and the tabs the row leaves where they were keep theirs.
+            built.carryOn(was);
+            if (Math.abs(was.toLeft - built.toLeft) > 1.0E-6D
+                    || Math.abs(was.exactWidth - built.exactWidth)
+                            > 1.0E-6D) {
+                built.setOut();
+            }
+        } else if (firstSight) {
+            // The row seen for the first time stands where it is laid out
+            // rather than growing in from nothing.
+            built.standAt(built.toLeft, tabWidth, displayStep());
+            built.leg.settle(true);
+        } else {
+            // A tab joining grows from nothing where it joins: its left
+            // edge where the tab before it ends as drawn now, its width a
+            // seam short of nothing, so its neighbours meet it all the
+            // way along the glide.
+            double start = previous == null ? SEARCH_RUN
+                    : previous.leftExact + previous.widthExact + TAB_GAP;
+            built.standAt(start, -TAB_GAP, displayStep());
+            built.joining = true;
+            built.leg.settle(false);
+        }
+        tabs.add(built);
+        return built;
+    }
+
+    /**
+     * The row's places, each the first and the last index of what stands
+     * in it: one tab, or the two pages of a split, the second right after
+     * the first. A split takes one place, as Chrome gives it one tab.
+     */
+    static List<int[]> places(List<WindowPage> tabs,
+                              Map<WindowPage, WindowPage> pairs) {
+        List<int[]> places = new ArrayList<int[]>(tabs.size());
+        for (int index = 0; index < tabs.size(); index++) {
+            if (index + 1 < tabs.size()
+                    && isPair(pairs, tabs.get(index), tabs.get(index + 1))) {
+                places.add(new int[] {index, index + 1});
+                index++;
+            } else {
+                places.add(new int[] {index, index});
+            }
+        }
+        return places;
+    }
+
+    /** Whether {@code second} is the other page of {@code first}'s split. */
+    static boolean isPair(Map<WindowPage, WindowPage> pairs, WindowPage first,
+                          WindowPage second) {
+        return second != null && second.equals(pairs.get(first));
+    }
+
+    /**
+     * The first half of a split standing in a place {@code width} wide:
+     * half of it, the seam between the halves left out. The second half
+     * takes what is left.
+     */
+    static double splitHalf(double width) {
+        return Math.max(0.0D, (width - TAB_GAP) / 2.0D);
     }
 
     /**
@@ -3534,13 +3689,22 @@ public final class TabRow {
                 (rowRoom - TAB_GAP * (shown - 1)) / shown));
     }
 
-    /** The widest {@link #minimumTabWidth} among the run's tabs. */
-    private static int narrowestTabWidth(List<WindowPage> channels, int first,
-                                         int last) {
+    /**
+     * The widest that any of the places from {@code first} to {@code last}
+     * needs at its least: a tab's {@link #minimumTabWidth}, a split's two
+     * with the seam between them.
+     */
+    private static int narrowestPlaceWidth(List<WindowPage> channels,
+                                           List<int[]> places, int first,
+                                           int last) {
         int narrowest = 0;
-        for (int index = first; index <= last; index++) {
-            narrowest = Math.max(narrowest,
-                    minimumTabWidth(channels.get(index)));
+        for (int at = first; at <= last; at++) {
+            int[] place = places.get(at);
+            int least = -TAB_GAP;
+            for (int index = place[0]; index <= place[1]; index++) {
+                least += minimumTabWidth(channels.get(index)) + TAB_GAP;
+            }
+            narrowest = Math.max(narrowest, least);
         }
         return narrowest;
     }
@@ -3753,6 +3917,7 @@ public final class TabRow {
                         : row.selected.equals(this.cachedSelected))
                 && (row.splitPartner == null ? this.cachedPartner == null
                         : row.splitPartner.equals(this.cachedPartner))
+                && row.splitPairs.equals(this.cachedPairs)
                 && showClose == this.cachedShowClose
                 && row.showRestore == this.cachedShowRestore
                 && row.closedMark.equals(this.restoreMark)

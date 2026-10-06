@@ -2,7 +2,6 @@
   "map_markers": [
     {
       "id": "losttales:riverbend_farmstead",
-      "name": "Riverbend Farmstead",
       "relevance": "low",
       "icon": "town",
       "color": "purple",

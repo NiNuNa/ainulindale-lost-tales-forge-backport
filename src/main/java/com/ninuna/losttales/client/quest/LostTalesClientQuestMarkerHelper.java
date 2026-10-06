@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.quest;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
@@ -154,10 +155,9 @@ public final class LostTalesClientQuestMarkerHelper {
                 ? 0 : minecraft.thePlayer.dimension;
     }
 
-    /** A place's label: its quest's title, or the id for a quest without one. */
+    /** A place's label: its quest's title in the game's language, or the id for a quest without one. */
     private static String createQuestLabel(LostTalesQuestDefinition quest) {
-        String title = quest.getTitle();
-        return title == null || title.length() == 0 ? quest.getId() : title;
+        return LostTalesQuestWords.title(quest);
     }
 
     public static final class ActiveCoordinateMarker {

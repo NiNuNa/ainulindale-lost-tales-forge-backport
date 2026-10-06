@@ -7,12 +7,15 @@ import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.window.BarItem;
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.ToolStrip;
+import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
@@ -30,6 +33,7 @@ import com.ninuna.losttales.network.packet.LostTalesMissiveBoardRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesMissiveBoardStatePacket;
 import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import com.ninuna.losttales.quest.missive.MissiveAcceptance;
 import com.ninuna.losttales.quest.missive.MissiveBoardStateReason;
 import com.ninuna.losttales.quest.missive.MissiveNotice;
@@ -98,8 +102,6 @@ public final class MissiveBoardPage extends PageContent
     private static final int PIN_KEY = Keyboard.KEY_P;
     /** Ticks a request waits for its answer before the page stops waiting: five seconds. */
     private static final int ANSWER_TICKS = 100;
-    /** The wheel moves the list half a notice a line. */
-    private static final int WHEEL_STEP = MissiveBoardLayout.ROW_HEIGHT / 2;
 
     private final Minecraft mc = Minecraft.getMinecraft();
     private final MissiveLetterView view = new MissiveLetterView();
@@ -489,7 +491,8 @@ public final class MissiveBoardPage extends PageContent
     /* ---- Drawing ---- */
 
     private MissiveBoardLayout layout() {
-        return new MissiveBoardLayout(this.width, this.height, this.listOut);
+        return new MissiveBoardLayout(this.width, this.height, this.listOut,
+                MenuWindow.rowHeight());
     }
 
     @Override
@@ -521,7 +524,7 @@ public final class MissiveBoardPage extends PageContent
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef((float)box.left, (float)box.top, 0.0F);
-            drawList(font, layout, shown, alpha);
+            drawList(minecraft, font, layout, shown, alpha);
             LostTalesUiHitBox divider = layout.divider();
             if (divider.width > 0) {
                 LostTalesUiInk.fillRect((float)divider.left,
@@ -552,77 +555,96 @@ public final class MissiveBoardPage extends PageContent
                 "gui.losttales.missive_letter.invalid");
     }
 
-    /** The notices, clipped to the list and scrolled as one. */
-    private void drawList(FontRenderer font, MissiveBoardLayout layout,
+    /**
+     * The notices as a menu's rows: the picked notice and the one under
+     * the pointer lit first, cut to the list's band, then every notice's
+     * words, cut to the band and scrolled as one, and where more of the
+     * list waits over the band.
+     */
+    private void drawList(Minecraft minecraft, FontRenderer font,
+                          MissiveBoardLayout layout,
                           List<MissiveNotice> shown, int alpha) {
         LostTalesUiHitBox list = layout.list();
-        if (list.width <= 0 || list.height <= 0) {
+        LostTalesUiHitBox band = layout.band();
+        if (band.width <= 0 || band.height <= 0) {
             return;
         }
         if (shown.isEmpty()) {
             String note = this.query.length() > 0 ? word("search.none")
                     : word("empty");
-            int y = (int)list.top;
+            int lineHeight = layout.lineHeight();
+            int y = (int)band.top;
             for (Object line : font.listFormattedStringToWidth(note,
-                    Math.max(1, (int)list.width))) {
+                    Math.max(1, layout.textRight() - layout.textLeft()))) {
                 LostTalesUiInk.drawText(font, String.valueOf(line),
-                        (int)list.left, y + WindowStyle.ROW_TEXT_TOP,
+                        layout.textLeft(), y + LostTalesUiInk.centredStart(
+                                lineHeight, LostTalesUiInk.CAP_HEIGHT),
                         WindowStyle.asideRgb(), alpha);
-                y += WindowStyle.LINE_HEIGHT;
+                y += lineHeight;
             }
             return;
         }
+        int surfaceAlpha = WindowLists.pageSurfaceAlpha(minecraft, alpha);
+        for (int index = 0; index < shown.size(); index++) {
+            if (index != this.hoveredRow
+                    && shown.get(index).getSlot() != this.pickedSlot) {
+                continue;
+            }
+            LostTalesUiHitBox row = layout.row(index, this.shownListScroll);
+            double litTop = Math.max(band.top, row.top);
+            double litBottom = Math.min(band.bottom(), row.bottom());
+            if (litBottom > litTop) {
+                WindowLists.drawLitRow(0.0D, this.width, list.left, litTop,
+                        list.right(), litBottom, surfaceAlpha);
+            }
+        }
         long now = worldTime();
-        boolean clipped = LostTalesUiClip.beginLocal(this.mc,
-                (float)list.left - MissiveBoardLayout.ROW_BLEED,
-                (float)list.top, (float)list.right(), (float)list.bottom());
+        boolean clipped = LostTalesUiClip.beginLocal(minecraft,
+                (float)band.left, (float)band.top, (float)band.right(),
+                (float)band.bottom());
         GL11.glPushMatrix();
         try {
             int whole = (int)Math.floor(this.shownListScroll);
             GL11.glTranslatef(0.0F, (float)(whole - this.shownListScroll), 0.0F);
             for (int index = 0; index < shown.size(); index++) {
                 LostTalesUiHitBox row = layout.row(index, whole);
-                if (row.bottom() >= list.top - 1 && row.top <= list.bottom() + 1) {
-                    drawRow(font, shown.get(index), row, index == this.hoveredRow,
-                            now, alpha);
+                if (row.bottom() >= band.top - 1 && row.top <= band.bottom() + 1) {
+                    drawRow(font, layout, shown.get(index), (int)row.top, now,
+                            alpha);
                 }
             }
         } finally {
             GL11.glPopMatrix();
             LostTalesUiClip.end(clipped);
         }
+        WindowLists.drawScroll(band.left, 0.0D, band.right(), this.height,
+                band.top, band.bottom(), this.shownListScroll,
+                layout.maxListScroll(shown.size()), alpha);
     }
 
     /**
-     * One notice: its title, and under it who posted it and, at the right,
-     * how long it has left on the board. The picked notice and the one
-     * under the pointer each take one surface of their own.
+     * One notice from {@code top}, two lines a menu row high each, their
+     * words centred in the line: its title, and under it who posted it
+     * and, at the right, how long it has left on the board.
      */
-    private void drawRow(FontRenderer font, MissiveNotice notice,
-                         LostTalesUiHitBox row, boolean hovered, long now,
-                         int alpha) {
-        int left = (int)row.left;
-        int right = (int)row.right();
-        int top = (int)row.top;
+    private void drawRow(FontRenderer font, MissiveBoardLayout layout,
+                         MissiveNotice notice, int top, long now, int alpha) {
+        int left = layout.textLeft();
+        int right = layout.textRight();
+        int lineHeight = layout.lineHeight();
+        int inset = LostTalesUiInk.centredStart(lineHeight,
+                LostTalesUiInk.CAP_HEIGHT);
         boolean isPicked = notice.getSlot() == this.pickedSlot;
-        if (isPicked || hovered) {
-            LostTalesUiInk.fillRect(left - MissiveBoardLayout.ROW_BLEED, top, right,
-                    top + MissiveBoardLayout.ROW_HEIGHT,
-                    MissiveLetterView.faded(isPicked
-                            ? LostTalesColors.withAlpha(LostTalesColors.PLUM_GRAY, 0xB4)
-                            : LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x72),
-                            alpha));
-        }
         LostTalesMissiveData missive = notice.getMissive();
-        String title = missive == null ? word("unreadable") : missive.getTitle();
+        String title = missive == null ? word("unreadable")
+                : MissiveWords.title(missive);
         int titleRgb = missive == null ? WindowStyle.asideRgb()
                 : isPicked ? LostTalesUiInk.IVORY
                 : LostTalesColors.rgb(LostTalesColors.TEXT);
         int width = Math.max(0, right - left);
         LostTalesUiInk.drawText(font, LostTalesSkyrimUiStyle.trimToWidth(font,
-                        title, width), left, top + WindowStyle.ROW_TEXT_TOP,
-                titleRgb, alpha);
-        int second = top + WindowStyle.LINE_HEIGHT + WindowStyle.ROW_TEXT_TOP;
+                        title, width), left, top + inset, titleRgb, alpha);
+        int second = top + lineHeight + inset;
         long remaining = MissiveNoticeList.ticksLeft(notice, this.receivedAt,
                 now);
         String time = remaining < 0L ? ""
@@ -632,7 +654,7 @@ public final class MissiveBoardPage extends PageContent
             LostTalesUiInk.drawText(font, time, right - timeWidth, second,
                     WindowStyle.asideRgb(), alpha);
         }
-        String issuer = missive == null ? "" : missive.getIssuer();
+        String issuer = MissiveWords.issuer(missive);
         if (issuer.length() > 0) {
             LostTalesUiInk.drawText(font, LostTalesSkyrimUiStyle.trimToWidth(
                             font, issuer, Math.max(0, width - timeWidth
@@ -670,7 +692,7 @@ public final class MissiveBoardPage extends PageContent
         return true;
     }
 
-    /** The wheel scrolls the list or the letter, whichever it is turned over. */
+    /** The wheel scrolls the list by whole menu rows, or the letter, whichever it is turned over. */
     @Override
     public boolean scroll(LostTalesUiHitBox box, double x, double y,
                           int lines) {
@@ -681,7 +703,8 @@ public final class MissiveBoardPage extends PageContent
         double pageX = x - box.left;
         double pageY = y - box.top;
         if (layout.list().contains(pageX, pageY)) {
-            this.listScroll += lines * WHEEL_STEP;
+            this.listScroll += WheelStep.pixels(WheelStep.menuRows(lines),
+                    MenuWindow.rowHeight());
             return true;
         }
         LostTalesUiHitBox letter = layout.letter();

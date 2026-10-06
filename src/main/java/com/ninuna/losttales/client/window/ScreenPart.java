@@ -148,9 +148,10 @@ public abstract class ScreenPart {
 
     /**
      * Adds the part's own rows to the {@code +} and to the tab search: what
-     * it can open, in headed sections, each row's id its tab's, narrowed to
-     * the names that hold {@code filter}. The {@code search} lists the
-     * open tabs itself, so it leaves out what is open already.
+     * it can open, each row's id its tab's and its icon the tab, whose
+     * category the row stands under, narrowed to the names that hold
+     * {@code filter}. The {@code search} lists the open tabs itself, so it
+     * leaves out what is open already.
      */
     public void addOpenable(List<MenuWindow.Entry> entries, String filter,
                             boolean search) {}

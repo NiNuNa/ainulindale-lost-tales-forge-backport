@@ -18,6 +18,9 @@ import static org.junit.Assert.fail;
 public final class LostTalesChatRevisionPacketTest {
     /** Any id the server would have handed out. */
     private static final long SERVER_ID = 4096L;
+    /** A Discord member's words with a sticker's mark each game translates. */
+    private static final String BODY = "{\"text\":\"\",\"extra\":[{\"text\":\"look \"},"
+            + "{\"translate\":\"chat.losttales.words.discord_sticker\",\"with\":[\"Wave\"]}]}";
 
     @Test
     public void editRequestRoundTrips() {
@@ -48,13 +51,14 @@ public final class LostTalesChatRevisionPacketTest {
         com.ninuna.losttales.chat.ChatNamedPlayer bob =
                 new com.ninuna.losttales.chat.ChatNamedPlayer(
                         java.util.UUID.randomUUID(), "bob", null, "Beren", "");
-        LostTalesChatUpdatePacket.edited(SERVER_ID, "on reflection, @Beren",
+        LostTalesChatUpdatePacket.edited(SERVER_ID, "on reflection, @Beren", "",
                 java.util.Collections.singletonList(bob)).toBytes(edited);
         LostTalesChatUpdatePacket decodedEdit = new LostTalesChatUpdatePacket();
         decodedEdit.fromBytes(edited);
         assertFalse(decodedEdit.isMalformed());
         assertFalse(decodedEdit.isRemoved());
         assertEquals("on reflection, @Beren", decodedEdit.getMessage());
+        assertEquals("", decodedEdit.getBodyJson());
         assertEquals("an edit names whom its new words name",
                 "Beren", decodedEdit.getNamedPlayers().get(0).getIdentityName());
 
@@ -114,6 +118,75 @@ public final class LostTalesChatRevisionPacketTest {
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
         assertEquals("", decoded.getMessage());
+    }
+
+    /** A Discord member's edit carries its new words' component. */
+    @Test
+    public void anEditCarriesItsWordsToTranslate() {
+        ByteBuf buffer = Unpooled.buffer();
+        LostTalesChatUpdatePacket.edited(SERVER_ID, "look *[Sticker: Wave]*", BODY,
+                null).toBytes(buffer);
+        LostTalesChatUpdatePacket decoded = new LostTalesChatUpdatePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals("look *[Sticker: Wave]*", decoded.getMessage());
+        assertEquals(BODY, decoded.getBodyJson());
+    }
+
+    /**
+     * A component is bounded as a line's is: one past the bound is never
+     * built and never read, and nothing may follow it.
+     */
+    @Test
+    public void anOversizedOrTrailingComponentIsMalformed() {
+        StringBuilder huge = new StringBuilder();
+        while (huge.length() <= LostTalesChatMessagePacket.MAX_BODY_BYTES) {
+            huge.append('x');
+        }
+        try {
+            LostTalesChatUpdatePacket.edited(SERVER_ID, "hello", huge.toString(), null);
+            fail("a component past the bound was accepted");
+        } catch (IllegalArgumentException expected) {
+            // The factory validates, so it can never be sent either.
+        }
+        ByteBuf oversized = Unpooled.buffer();
+        oversized.writeLong(SERVER_ID);
+        oversized.writeBoolean(false);
+        LostTalesPacketCodec.writeUtf8String(oversized, "hello",
+                ChatMessageValidator.MAX_UTF8_BYTES);
+        LostTalesPacketCodec.writeUtf8String(oversized, huge.toString(),
+                huge.length());
+        LostTalesChatNamedPlayerCodec.write(oversized,
+                java.util.Collections.<com.ninuna.losttales.chat.ChatNamedPlayer>emptyList());
+        LostTalesChatUpdatePacket decoded = new LostTalesChatUpdatePacket();
+        decoded.fromBytes(oversized);
+        assertTrue(decoded.isMalformed());
+        assertEquals("", decoded.getBodyJson());
+
+        ByteBuf trailing = Unpooled.buffer();
+        LostTalesChatUpdatePacket.edited(SERVER_ID, "hello", BODY, null).toBytes(trailing);
+        trailing.writeByte(7);
+        LostTalesChatUpdatePacket withTail = new LostTalesChatUpdatePacket();
+        withTail.fromBytes(trailing);
+        assertTrue(withTail.isMalformed());
+        assertEquals("", withTail.getBodyJson());
+    }
+
+    /** A removal carries no component either. */
+    @Test
+    public void aRemovalCarryingAComponentIsMalformed() {
+        ByteBuf buffer = Unpooled.buffer();
+        buffer.writeLong(SERVER_ID);
+        buffer.writeBoolean(true);
+        LostTalesPacketCodec.writeUtf8String(buffer, "",
+                ChatMessageValidator.MAX_UTF8_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, BODY,
+                LostTalesChatMessagePacket.MAX_BODY_BYTES);
+        LostTalesChatNamedPlayerCodec.write(buffer,
+                java.util.Collections.<com.ninuna.losttales.chat.ChatNamedPlayer>emptyList());
+        LostTalesChatUpdatePacket decoded = new LostTalesChatUpdatePacket();
+        decoded.fromBytes(buffer);
+        assertTrue(decoded.isMalformed());
     }
 
     /** A removal says nothing; anything else on it is not a removal. */

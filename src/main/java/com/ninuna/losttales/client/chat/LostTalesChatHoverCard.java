@@ -1,9 +1,13 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatRoleplayStatus;
@@ -11,6 +15,7 @@ import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
@@ -19,6 +24,7 @@ import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,7 +32,6 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
@@ -36,26 +41,30 @@ import java.util.Locale;
  * The bounded player card: opened in a sub-window of its own by a
  * click on the head or name of a chat line, on a mention or on a member,
  * and shown in brief under the pointer for the identity the head button
- * speaks as. A chat line supplies its snapshotted identity; the details —
- * race, starting faction, gender, age, and biography — come from the
- * public appearance the server already synced for that player, and are
- * only shown when they describe the character the line names. An NPC's
- * head and name carry the same card — the portrait, the name in its
- * faction's colour, and the faction its speech was captured with — so an
- * NPC reads as a player that happens not to exist.
+ * speaks as. It is laid out as a menu is: the head beside the name and
+ * the title on two menu rows, then a row for each detail, its label at
+ * the left and its value at the row's right end in the aside tone, a
+ * status line or a description wrapped as a menu's note, and a heading
+ * over a group of rows. A chat line supplies its snapshotted identity;
+ * the details — faction, race, gender, age and glances — come from the
+ * public appearance and profile the server synced for that player, and
+ * are only shown when they describe the character the line names. An
+ * NPC's head and name carry the same card — the portrait, the name in
+ * its faction's colour, and the faction its speech was captured with —
+ * so an NPC reads as a player that happens not to exist.
  */
 final class LostTalesChatHoverCard {
-    /** A status line reads in italics. */
-    private static final String STATUS_STYLE = "§o";
-    static final int PADDING = 6;
+    /** What a status line and a command read in. */
+    private static final String ITALIC = "§o";
     private static final int HEAD_SIZE = 16;
-    /** The gap between the head and the words beside it. */
-    private static final int HEAD_GAP = 6;
+    /** The menu rows the head stands across: the name on the first, the title on the second. */
+    static final int HEAD_ROWS = 2;
     static final int MIN_WIDTH = 118;
     static final int MAX_WIDTH = 210;
-    /** Text width a role's description may push its card out to before wrapping. */
-    private static final int DESCRIPTION_WIDTH = 170;
-    private static final int MAX_DESCRIPTION_LINES = 4;
+    /** Text width a note, a status line or a role's description, may push its card out to before it wraps. */
+    private static final int NOTE_WIDTH = 170;
+    /** The lines a note keeps at most. */
+    private static final int MAX_NOTE_LINES = 4;
     /** A glance's place in the card's row of them: its emoji and a pixel either side. */
     static final int GLANCE_STRIDE = ChatEmojiIcon.SIZE + 2;
     /** Holders a role card lists before folding the rest into a count. */
@@ -102,8 +111,8 @@ final class LostTalesChatHoverCard {
     }
 
     /**
-     * A card laid out and ready to draw: its name row, its detail rows and
-     * which of them are drawn their own way, and the size it takes.
+     * A card laid out and ready to draw: its name, the title beside the
+     * head, the rows under them, and the size it takes.
      */
     static final class Laid {
         final Target target;
@@ -111,22 +120,20 @@ final class LostTalesChatHoverCard {
         String suffix = "";
         int nameWidth;
         int nameColor;
-        final List<String> lines = new ArrayList<String>(8);
-        int titleRow = -1;
-        int statusRow = -1;
-        int commandRow = -1;
-        /** A role card's holders: the rows from here, this many. */
-        int memberStart = -1;
-        int memberRows;
+        /** The title on the head's second row; empty for none. */
+        String title = "";
+        final List<Row> rows = new ArrayList<Row>(8);
         /** The role-play status whose mark stands after the name; null for none. */
         ChatRoleplayStatus roleplay;
-        /** The person's glances, drawn as a row of their emoji on the row {@link #glancesRow}; -1 for none. */
+        /** The person's glances, drawn as a row of their emoji; empty for none. */
         List<CharacterProfile.Glance> glances =
                 Collections.<CharacterProfile.Glance>emptyList();
-        int glancesRow = -1;
+        /** The glances' row's top below the card's top; -1 for none. */
+        int glancesTop = -1;
         boolean head = true;
         int width;
         int height;
+        /** The rows' width: the card's, less the padding either side. */
         int textWidth;
 
         Laid(Target target) {
@@ -134,16 +141,104 @@ final class LostTalesChatHoverCard {
         }
     }
 
+    /** What a row under a card's name is, and so how it is drawn. */
+    private enum Kind {
+        /** A label at the left and its value at the row's right end. */
+        DETAIL,
+        /** Words wrapped over a note's lines. */
+        NOTE,
+        /** A heading over the rows after it. */
+        HEADING,
+        /** Words alone: a role's holder. */
+        ITEM,
+        /** The person's glances, a row of their emoji. */
+        GLANCES
+    }
+
+    /** One row of a card under its name, as a menu lays its rows. */
+    private static final class Row {
+        final Kind kind;
+        /** A detail's label, a note's words before they wrap, or a heading's or an item's words. */
+        final String text;
+        /** A detail's value; empty for every other row. */
+        final String value;
+        /** What a note's words or a detail's value read in: italics, or empty. */
+        final String style;
+        /** Whether a note's words may hold emoji, as a status line's do. */
+        final boolean inline;
+        /** An item's colour; -1 for the aside tone. */
+        final int rgb;
+        /** A note's lines, wrapped to the card's width. */
+        List<String> lines = Collections.<String>emptyList();
+        /** The row's top below the card's top. */
+        int top;
+
+        private Row(Kind kind, String text, String value, String style,
+                    boolean inline, int rgb) {
+            this.kind = kind;
+            this.text = text;
+            this.value = value;
+            this.style = style;
+            this.inline = inline;
+            this.rgb = rgb;
+        }
+
+        static Row detail(String label, String value, String style) {
+            return new Row(Kind.DETAIL, label, value, style, false, -1);
+        }
+
+        static Row note(String text, String style, boolean inline) {
+            return new Row(Kind.NOTE, text, "", style, inline, -1);
+        }
+
+        static Row heading(String text) {
+            return new Row(Kind.HEADING, text, "", "", false, -1);
+        }
+
+        static Row item(String text, int rgb) {
+            return new Row(Kind.ITEM, text, "", "", false, rgb);
+        }
+
+        static Row glances() {
+            return new Row(Kind.GLANCES, "", "", "", false, -1);
+        }
+
+        /** How tall the row stands: a note its lines and the clear room round them, any other a menu's row. */
+        int height() {
+            return this.kind == Kind.NOTE ? MenuWindow.NOTE_PADDING * 2
+                    + this.lines.size() * MenuWindow.NOTE_LINE
+                    : MenuWindow.rowHeight();
+        }
+
+        /** The width the row asks of the card between its padding; a note no more than the note width. */
+        int wants(FontRenderer font, Laid laid) {
+            if (this.kind == Kind.DETAIL) {
+                return font.getStringWidth(this.text) + MenuWindow.VALUE_GAP
+                        + font.getStringWidth(this.value);
+            }
+            if (this.kind == Kind.NOTE) {
+                return Math.min(NOTE_WIDTH, this.inline
+                        ? ChatInlineText.width(font, this.text, this.style)
+                        : font.getStringWidth(this.text));
+            }
+            if (this.kind == Kind.GLANCES) {
+                return laid.glances.size() * GLANCE_STRIDE;
+            }
+            return font.getStringWidth(this.text);
+        }
+    }
+
     /**
-     * Lays the card out: a name row followed by detail rows. The name row
-     * reads {@code Character (Account)} for a character identity and just
-     * {@code Account} otherwise; every detail row is left out rather than
-     * shown empty when the value is unknown. The brief card stops after
-     * the title, the command a Server line answers and the roles held; the
-     * {@code full} card goes on to the character's race, faction, gender,
-     * age and glances. {@code width} fixes the card's width, a window's;
-     * at 0 the card takes the width its rows want, up to
-     * {@code maxWidth}.
+     * Lays the card out: the name and the title beside the head, then a
+     * row for each detail. The name reads {@code Character (Account)} for
+     * a character identity and just {@code Account} otherwise; a detail is
+     * left out rather than shown empty when its value is unknown. The
+     * brief card shows the status line, the command a Server line
+     * answers, the server's own status, the roles held, the status and an
+     * NPC's faction; the {@code full} card goes on to the character's
+     * faction, race, gender, age and glances. {@code width} fixes the
+     * card's width, a window's; at 0 the card takes the width its rows
+     * want, up to {@code maxWidth}.
      */
     static Laid layOut(Minecraft minecraft, Target target, boolean full,
                        int width, int maxWidth) {
@@ -154,8 +249,11 @@ final class LostTalesChatHoverCard {
         FontRenderer font = minecraft.fontRenderer;
         Laid laid = new Laid(target);
         CharacterAppearance details = detailsFor(target);
-        String name = LostTalesChatVisualStyle.removeColorCodes(
-                target.identityName).trim();
+        // The Server, the Client and the Narrator are named in this
+        // client's language.
+        String name = ChatNames.sender(LostTalesWords.LANG, target.playerId,
+                target.skinId,
+                LostTalesChatVisualStyle.removeColorCodes(target.identityName).trim());
         String account = target.accountName.trim();
         // Never "Name ()" or "(Account)": the suffix only exists when both
         // halves do, and an account identity shows the account alone.
@@ -166,22 +264,36 @@ final class LostTalesChatHoverCard {
             name = account;
             suffix = "";
         }
-        String title = cleanBracketed(target.title);
-        List<String> lines = laid.lines;
-        if (title.length() > 0) {
-            laid.titleRow = lines.size();
-            lines.add(title);
-        }
+        laid.name = name;
+        laid.suffix = suffix;
+        laid.nameColor = target.nameColor;
+        laid.title = cleanBracketed(target.title);
+        List<Row> rows = laid.rows;
         // What the identity says of itself, as it says it, under its name.
-        String statusLine = ClientChatProfanity.filter(target.statusLine());
+        String statusLine = ClientChatProfanity.filter(target.statusLine())
+                .trim();
         if (statusLine.length() > 0) {
-            laid.statusRow = lines.size();
-            lines.add(statusLine);
+            rows.add(Row.note(statusLine, ITALIC, true));
         }
         // The Server's card says what it is answering: the command the
         // line under the pointer was the answer to, as inline code.
-        if (addDetail(lines, COMMAND_LABEL_KEY, target.note)) {
-            laid.commandRow = lines.size() - 1;
+        addDetail(rows, COMMAND_LABEL_KEY, target.note, ITALIC);
+        // And how the server stands, each part of its status a row: its
+        // players, its address, its speed, how long it has run, the mod it
+        // runs, and its conversations linked to Discord.
+        if (LostTalesChatMessagePacket.isServerSender(target.playerId)) {
+            addDetail(rows, "gui.losttales.chat.card.server.players",
+                    ClientServerStatus.count());
+            addDetail(rows, "gui.losttales.chat.card.server.address",
+                    ClientServerStatus.address());
+            addDetail(rows, "gui.losttales.chat.card.server.speed",
+                    ClientServerStatus.speed());
+            addDetail(rows, "gui.losttales.chat.card.server.up",
+                    ClientServerStatus.uptime());
+            addDetail(rows, "gui.losttales.chat.card.server.version",
+                    LostTalesMetaData.MOD_VERSION);
+            addDetail(rows, "gui.losttales.chat.card.server.discord",
+                    joined(ClientChatChannelState.discordLinkedNames()));
         }
         // The roles the identity wears, whichever channel the line was
         // said in: an account its own, a character the account's and its
@@ -191,16 +303,16 @@ final class LostTalesChatHoverCard {
                 ? ChatMentionColors.rolesFor(account)
                 : ChatMentionColors.rolesFor(account,
                         details.getCharacterId());
-        addDetail(lines, "gui.losttales.chat.card.roles", target.npcIdentity
+        addDetail(rows, "gui.losttales.chat.card.roles", target.npcIdentity
                 ? "" : roleNames(worn));
         // Away, Do Not Disturb or Offline, for the identity the card
         // is about; Online is no news.
-        addDetail(lines, "gui.losttales.chat.card.status",
+        addDetail(rows, "gui.losttales.chat.card.status",
                 ChatPresenceMark.label(target.presence()));
         // An NPC's faction is what its speech was captured with, and the
         // brief card says it too: without it the card is a name alone.
         if (full || target.npcIdentity) {
-            addDetail(lines, "gui.losttales.chat.card.faction",
+            addDetail(rows, "gui.losttales.chat.card.faction",
                     target.npcIdentity
                             ? ChatChannelIcons.npcFaction(target.playerId)
                             : details == null ? ""
@@ -208,14 +320,14 @@ final class LostTalesChatHoverCard {
                                     details.getFactionId()));
         }
         if (full) {
-            addDetail(lines, "gui.losttales.character.race",
+            addDetail(rows, "gui.losttales.character.race",
                     details == null ? "" : ClientCharacterDisplayNames.race(
                             details.getRaceId()));
-            addDetail(lines, "gui.losttales.character.gender",
+            addDetail(rows, "gui.losttales.character.gender",
                     details == null || details.getGenderId().length() == 0
                             ? "" : ClientCharacterDisplayNames.gender(
                                     details.getGenderId()));
-            addDetail(lines, "gui.losttales.character.age",
+            addDetail(rows, "gui.losttales.character.age",
                     details == null || details.getAge() <= 0
                             ? "" : String.valueOf(details.getAge()));
             // The glances the character shows: asked for as the
@@ -226,62 +338,24 @@ final class LostTalesChatHoverCard {
                         target.characterId);
                 if (profile != null && !profile.glances().isEmpty()) {
                     laid.glances = profile.glances();
-                    laid.glancesRow = lines.size();
-                    lines.add("");
+                    rows.add(Row.glances());
                 }
             }
         }
-
         laid.roleplay = target.presence() == null ? null
                 : ChatRoleplayMark.markedFor(target.playerId,
                         target.accountIdentity ? ChatPresenceIdentity.ACCOUNT
                                 : ChatPresenceIdentity.character(
                                         target.characterId));
-        if (width > 0) {
-            laid.width = width;
-        } else {
-            int contentWidth = font.getStringWidth(name + suffix)
-                    + markWidth(laid);
-            for (int index = 0; index < lines.size(); index++) {
-                contentWidth = Math.max(contentWidth, index == laid.statusRow
-                        ? ChatInlineText.width(font, lines.get(index),
-                                STATUS_STYLE)
-                        : font.getStringWidth(lines.get(index)));
-            }
-            contentWidth = Math.max(contentWidth,
-                    laid.glances.size() * GLANCE_STRIDE);
-            laid.width = Math.min(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH,
-                    PADDING + HEAD_SIZE + HEAD_GAP + contentWidth + PADDING)),
-                    maxWidth);
-        }
-        laid.textWidth = Math.max(0, laid.width - PADDING - HEAD_SIZE
-                - HEAD_GAP - PADDING);
-        int markWidth = markWidth(laid);
-        int nameWidth = font.getStringWidth(name);
-        if (nameWidth + markWidth + font.getStringWidth(suffix)
-                > laid.textWidth) {
-            // The account suffix gives way before the name does.
-            suffix = LostTalesSkyrimUiStyle.trimToWidth(font, suffix,
-                    Math.max(0, laid.textWidth - nameWidth - markWidth));
-            name = LostTalesSkyrimUiStyle.trimToWidth(font, name,
-                    Math.max(0, laid.textWidth - markWidth));
-            nameWidth = font.getStringWidth(name);
-        }
-        laid.name = name;
-        laid.suffix = suffix;
-        laid.nameWidth = nameWidth;
-        laid.nameColor = target.nameColor;
-        laid.height = Math.max(HEAD_SIZE + PADDING * 2,
-                PADDING * 2 + (1 + lines.size()) * font.FONT_HEIGHT);
-        return laid;
+        return finish(font, laid, width, maxWidth);
     }
 
     /**
      * The card of a mentioned role: {@code @Name} in the role's colour,
      * what the role is, and — on the {@code full} card — the online
-     * accounts holding it, the server's own roster, sent with the chat
-     * access, so the list is its word and not a guess from who happened
-     * to speak.
+     * accounts holding it under a heading, the server's own roster, sent
+     * with the chat access, so the list is its word and not a guess from
+     * who happened to speak.
      */
     private static Laid layOutRole(FontRenderer font, Target target,
                                    boolean full, int width, int maxWidth) {
@@ -289,130 +363,257 @@ final class LostTalesChatHoverCard {
         Laid laid = new Laid(target);
         laid.head = false;
         laid.name = "@" + role.getDisplayName();
-        laid.nameWidth = font.getStringWidth(laid.name);
         laid.nameColor = role.getColor();
+        List<Row> rows = laid.rows;
         String description = role.getDisplayDescription();
-        List<String> members = full
-                ? ClientChatChannelState.roleHolders(role)
-                : Collections.<String>emptyList();
-        String membersLabel = StatCollector.translateToLocal(
-                "gui.losttales.chat.card.role.members");
+        if (description.trim().length() > 0) {
+            rows.add(Row.note(description, "", false));
+        }
+        if (full) {
+            rows.add(Row.heading(StatCollector.translateToLocal(
+                    "gui.losttales.chat.card.role.members")));
+            List<String> members = ClientChatChannelState.roleHolders(role);
+            if (members.isEmpty()) {
+                rows.add(Row.item(StatCollector.translateToLocal(
+                        "gui.losttales.chat.card.role.nobody"), -1));
+            } else {
+                // The holders read as the people they are, in the role's
+                // colour; the count of the rest in the aside tone.
+                int shown = Math.min(members.size(), MAX_ROLE_MEMBER_LINES);
+                for (int index = 0; index < shown; index++) {
+                    rows.add(Row.item(members.get(index), role.getColor()));
+                }
+                if (members.size() > shown) {
+                    rows.add(Row.item(StatCollector.translateToLocalFormatted(
+                            "gui.losttales.chat.card.role.more",
+                            Integer.valueOf(members.size() - shown)), -1));
+                }
+            }
+        }
+        return finish(font, laid, width, maxWidth);
+    }
+
+    /**
+     * Sizes a card whose name and rows are in: its width, between
+     * {@link #MIN_WIDTH} and {@link #MAX_WIDTH} unless {@code width} fixes
+     * it; the name cut to the room beside the head, the account suffix
+     * giving way first; the notes wrapped to the rows' width; each row's
+     * place under the name; and the height they take, the padding above
+     * and below them.
+     */
+    private static Laid finish(FontRenderer font, Laid laid, int width,
+                               int maxWidth) {
+        int lead = headLead(laid);
+        int markWidth = markWidth(laid);
         if (width > 0) {
             laid.width = width;
         } else {
-            int contentWidth = laid.nameWidth;
-            if (full) {
-                contentWidth = Math.max(contentWidth,
-                        font.getStringWidth(membersLabel));
+            int contentWidth = lead + Math.max(
+                    font.getStringWidth(laid.name + laid.suffix) + markWidth,
+                    font.getStringWidth(laid.title));
+            for (Row row : laid.rows) {
+                contentWidth = Math.max(contentWidth, row.wants(font, laid));
             }
-            if (description.length() > 0) {
-                contentWidth = Math.max(contentWidth, Math.min(
-                        font.getStringWidth(description), DESCRIPTION_WIDTH));
-            }
-            for (int index = 0; index < members.size()
-                    && index < MAX_ROLE_MEMBER_LINES; index++) {
-                contentWidth = Math.max(contentWidth,
-                        font.getStringWidth("  " + members.get(index)));
-            }
-            laid.width = Math.min(Math.max(MIN_WIDTH,
-                    Math.min(MAX_WIDTH, PADDING * 2 + contentWidth)),
-                    maxWidth);
+            laid.width = Math.min(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH,
+                    MenuWindow.PADDING_X * 2 + contentWidth)), maxWidth);
         }
-        laid.textWidth = Math.max(0, laid.width - PADDING * 2);
-        List<String> lines = laid.lines;
-        if (description.length() > 0) {
-            @SuppressWarnings("unchecked")
-            List<String> wrapped = font.listFormattedStringToWidth(
-                    description, Math.max(20, laid.textWidth));
-            int count = Math.min(wrapped.size(), MAX_DESCRIPTION_LINES);
-            for (int index = 0; index < count; index++) {
-                lines.add(wrapped.get(index).trim());
-            }
+        laid.textWidth = Math.max(0, laid.width - MenuWindow.PADDING_X * 2);
+        int room = Math.max(0, laid.textWidth - lead);
+        String name = laid.name;
+        String suffix = laid.suffix;
+        int nameWidth = font.getStringWidth(name);
+        if (nameWidth + markWidth + font.getStringWidth(suffix) > room) {
+            // The account suffix gives way before the name does.
+            suffix = LostTalesSkyrimUiStyle.trimToWidth(font, suffix,
+                    Math.max(0, room - nameWidth - markWidth));
+            name = LostTalesSkyrimUiStyle.trimToWidth(font, name,
+                    Math.max(0, room - markWidth));
+            nameWidth = font.getStringWidth(name);
         }
-        if (full) {
-            lines.add(membersLabel);
-            if (members.isEmpty()) {
-                lines.add("  " + StatCollector.translateToLocal(
-                        "gui.losttales.chat.card.role.nobody"));
-            } else {
-                laid.memberStart = lines.size();
-                laid.memberRows = Math.min(members.size(),
-                        MAX_ROLE_MEMBER_LINES);
-                for (int index = 0; index < laid.memberRows; index++) {
-                    lines.add("  " + members.get(index));
-                }
-                if (members.size() > laid.memberRows) {
-                    lines.add("  " + StatCollector.translateToLocalFormatted(
-                            "gui.losttales.chat.card.role.more",
-                            Integer.valueOf(members.size() - laid.memberRows)));
-                }
+        laid.name = name;
+        laid.suffix = suffix;
+        laid.nameWidth = nameWidth;
+        int top = MenuWindow.PADDING_Y
+                + (laid.head ? HEAD_ROWS : 1) * MenuWindow.rowHeight();
+        for (Row row : laid.rows) {
+            if (row.kind == Kind.NOTE) {
+                row.lines = row.inline
+                        ? wrapInline(font, row.text, row.style, laid.textWidth)
+                        : wrapPlain(font, row.text, laid.textWidth);
+            } else if (row.kind == Kind.GLANCES) {
+                laid.glancesTop = top;
             }
+            row.top = top;
+            top += row.height();
         }
-        laid.height = PADDING * 2 + (1 + lines.size()) * font.FONT_HEIGHT;
+        laid.height = top + MenuWindow.PADDING_Y;
         return laid;
+    }
+
+    /** Words over the lines they take {@code room} wide, {@link #MAX_NOTE_LINES} at most. */
+    private static List<String> wrapPlain(FontRenderer font, String text,
+                                          int room) {
+        @SuppressWarnings("unchecked")
+        List<String> wrapped = font.listFormattedStringToWidth(text,
+                Math.max(20, room));
+        List<String> lines = new ArrayList<String>(MAX_NOTE_LINES);
+        for (int index = 0; index < wrapped.size()
+                && index < MAX_NOTE_LINES; index++) {
+            lines.add(wrapped.get(index).trim());
+        }
+        return lines;
+    }
+
+    /**
+     * Words that may hold emoji over the lines they take {@code room}
+     * wide, broken between words, {@link #MAX_NOTE_LINES} at most; a word
+     * wider than a line is cut at the line's end.
+     */
+    private static List<String> wrapInline(FontRenderer font, String text,
+                                           String style, int room) {
+        int width = Math.max(20, room);
+        List<String> lines = new ArrayList<String>(MAX_NOTE_LINES);
+        String line = "";
+        for (String word : text.trim().split(" +")) {
+            String joined = line.length() == 0 ? word : line + " " + word;
+            if (line.length() > 0
+                    && ChatInlineText.width(font, joined, style) > width) {
+                lines.add(ChatInlineText.trimToWidth(font, line, style, width));
+                if (lines.size() == MAX_NOTE_LINES) {
+                    return lines;
+                }
+                joined = word;
+            }
+            line = joined;
+        }
+        if (line.length() > 0) {
+            lines.add(ChatInlineText.trimToWidth(font, line, style, width));
+        }
+        return lines;
     }
 
     /**
      * Draws a laid-out card with its top left at {@code x}, {@code y}, on
-     * whatever surface stands under it: the head, the name row, and the
-     * detail rows, each its own way.
+     * whatever surface stands under it: the head on the middle of its two
+     * rows, the name on the first beside it and the title on the second,
+     * and each row under them.
      */
     static void drawLaid(Minecraft minecraft, Laid laid, int x, int y,
                          int alpha) {
         FontRenderer font = minecraft.fontRenderer;
-        int textX = x + PADDING + (laid.head ? HEAD_SIZE + HEAD_GAP : 0);
-        int textY = y + PADDING;
+        int rowHeight = MenuWindow.rowHeight();
+        int left = x + MenuWindow.PADDING_X;
+        int right = left + laid.textWidth;
+        int top = y + MenuWindow.PADDING_Y;
+        int textX = left + headLead(laid);
         if (laid.head) {
-            drawHead(minecraft, laid.target, x + PADDING, y + PADDING);
+            drawHead(minecraft, laid.target, left, top
+                    + LostTalesUiInk.centredStart(HEAD_ROWS * rowHeight,
+                            HEAD_SIZE));
         }
         LostTalesUiInk.beginContent();
-        drawColored(font, laid.name, textX, textY, laid.nameColor, alpha);
+        int nameTop = capTop(top);
+        drawColored(font, laid.name, textX, nameTop, laid.nameColor, alpha);
         if (laid.roleplay != null) {
             ChatRoleplayMark.draw(laid.roleplay, textX + laid.nameWidth
-                    + ChatRoleplayMark.GAP - 1, textY + 1, alpha);
+                    + ChatRoleplayMark.GAP - 1, nameTop + 1, alpha);
         }
         if (laid.suffix.length() > 0) {
             drawColored(font, laid.suffix, textX + laid.nameWidth
-                    + markWidth(laid), textY,
-                    LostTalesSkyrimUiStyle.TEXT_MUTED, alpha);
+                    + markWidth(laid), nameTop, WindowStyle.asideRgb(),
+                    alpha);
         }
-        textY += font.FONT_HEIGHT;
-        for (int index = 0; index < laid.lines.size(); index++) {
-            String line = LostTalesSkyrimUiStyle.trimToWidth(font,
-                    laid.lines.get(index), laid.textWidth);
-            if (index == laid.titleRow) {
-                LostTalesChatVisualStyle.drawPlain(font, line, textX, textY,
-                        alpha);
-            } else if (index == laid.statusRow) {
-                // What the identity says of itself, as it says it: italic
-                // words and their emojis.
-                ChatInlineText.draw(minecraft, font,
-                        ChatInlineText.trimToWidth(font, laid.lines.get(index),
-                                STATUS_STYLE, laid.textWidth),
-                        STATUS_STYLE, textX, textY,
-                        LostTalesChatVisualStyle.asideRgb(), alpha);
-            } else if (index == laid.commandRow) {
-                drawCommandDetail(font, laid.target.note, textX, textY,
-                        laid.textWidth, alpha);
-            } else if (index == laid.glancesRow) {
-                for (int glance = 0; glance < laid.glances.size(); glance++) {
-                    ChatEmojiIcon.draw(minecraft, ChatEmoji.fromName(
-                            laid.glances.get(glance).getEmoji()),
-                            textX + glance * GLANCE_STRIDE + 1, textY - 1,
+        if (laid.title.length() > 0) {
+            drawColored(font, LostTalesSkyrimUiStyle.trimToWidth(font,
+                    laid.title, right - textX), textX, capTop(top + rowHeight),
+                    WindowStyle.asideRgb(), alpha);
+        }
+        for (Row row : laid.rows) {
+            drawRow(minecraft, font, laid, row, left, right, y + row.top,
+                    alpha);
+        }
+    }
+
+    /**
+     * One row under the name, from {@code left} to {@code right} with its
+     * top at {@code rowY}: a detail's label in ivory and its value at the
+     * row's right end in the aside tone, the label cut to keep the gap
+     * before it; a note's lines a note's pitch apart in the aside tone; a
+     * heading over its hairline; an item in its colour; the glances'
+     * emoji, a pixel either side of each.
+     */
+    private static void drawRow(Minecraft minecraft, FontRenderer font,
+                                Laid laid, Row row, int left, int right,
+                                int rowY, int alpha) {
+        int aside = WindowStyle.asideRgb();
+        if (row.kind == Kind.HEADING) {
+            WindowLists.drawHeading(font, row.text, left, left, right, rowY,
+                    MenuWindow.rowHeight(), false, alpha);
+            return;
+        }
+        if (row.kind == Kind.NOTE) {
+            int lineY = rowY + MenuWindow.NOTE_PADDING;
+            for (String line : row.lines) {
+                int lineTop = lineY + LostTalesUiInk.centredStart(
+                        MenuWindow.NOTE_LINE, LostTalesUiInk.CAP_HEIGHT);
+                if (row.inline) {
+                    // What the identity says of itself, as it says it:
+                    // its words and their emojis.
+                    ChatInlineText.draw(minecraft, font, line, row.style,
+                            left, lineTop, aside, alpha);
+                } else {
+                    drawColored(font, row.style + line, left, lineTop, aside,
                             alpha);
                 }
-            } else {
-                // A role card's holders read as the people they are;
-                // everything else stays the card's muted grey.
-                boolean member = laid.memberStart >= 0
-                        && index >= laid.memberStart
-                        && index < laid.memberStart + laid.memberRows;
-                drawColored(font, line, textX, textY, member
-                        ? laid.nameColor : LostTalesSkyrimUiStyle.TEXT_MUTED,
-                        alpha);
+                lineY += MenuWindow.NOTE_LINE;
             }
-            textY += font.FONT_HEIGHT;
+            return;
         }
+        if (row.kind == Kind.GLANCES) {
+            int glanceTop = rowY + LostTalesUiInk.centredStart(
+                    MenuWindow.rowHeight(), ChatEmojiIcon.SIZE);
+            for (int glance = 0; glance < laid.glances.size(); glance++) {
+                ChatEmojiIcon.draw(minecraft, ChatEmoji.fromName(
+                        laid.glances.get(glance).getEmoji()),
+                        left + glance * GLANCE_STRIDE + 1, glanceTop, alpha);
+            }
+            return;
+        }
+        int labelTop = capTop(rowY);
+        if (row.kind == Kind.ITEM) {
+            drawColored(font, LostTalesSkyrimUiStyle.trimToWidth(font,
+                    row.text, right - left), left, labelTop,
+                    row.rgb >= 0 ? row.rgb : aside, alpha);
+            return;
+        }
+        String value = LostTalesSkyrimUiStyle.trimToWidth(font, row.value,
+                valueRoom(font, row, right - left));
+        int valueX = right - font.getStringWidth(value);
+        drawColored(font, row.style + value, valueX, labelTop, aside, alpha);
+        drawColored(font, LostTalesSkyrimUiStyle.trimToWidth(font, row.text,
+                valueX - MenuWindow.VALUE_GAP - left), left, labelTop,
+                LostTalesUiInk.IVORY, alpha);
+    }
+
+    /**
+     * How wide a detail's value may stand in a row {@code room} wide: the
+     * room its label and the gap leave, and never less than half the row,
+     * so a long label gives way to the value down to that half.
+     */
+    private static int valueRoom(FontRenderer font, Row row, int room) {
+        return Math.max(room / 2, room - MenuWindow.VALUE_GAP
+                - font.getStringWidth(row.text));
+    }
+
+    /** Where a menu row's words stand from its top: their capitals on its middle. */
+    private static int capTop(int rowY) {
+        return rowY + LostTalesUiInk.centredStart(MenuWindow.rowHeight(),
+                LostTalesUiInk.CAP_HEIGHT);
+    }
+
+    /** The room before the name and the title: the head and the gap after it; none on a card without one. */
+    private static int headLead(Laid laid) {
+        return laid.head ? HEAD_SIZE + TabIcons.GAP : 0;
     }
 
     /**
@@ -430,38 +631,31 @@ final class LostTalesChatHoverCard {
         return names.toString();
     }
 
-    /** Adds a {@code Label: value} row for a known value; whether it did. */
-    private static boolean addDetail(List<String> lines, String labelKey,
-                                     String value) {
-        String text = value == null ? "" : value.trim();
-        if (text.length() == 0) {
-            return false;
+    /** Names one after another, a comma between each two; empty for none. */
+    private static String joined(List<String> names) {
+        StringBuilder text = new StringBuilder();
+        for (String name : names) {
+            if (text.length() > 0) {
+                text.append(", ");
+            }
+            text.append(name);
         }
-        lines.add(StatCollector.translateToLocal(labelKey) + ": " + text);
-        return true;
+        return text.toString();
     }
 
-    /**
-     * The row naming the command a Server line answers: the label in the
-     * card's muted tone, and the command as the chat's inline code, in
-     * italics and the aside tone, as the chat shows a command wherever
-     * it shows one.
-     */
-    private static void drawCommandDetail(FontRenderer font, String command,
-                                          int x, int y, int width,
-                                          int alpha) {
-        String label = LostTalesSkyrimUiStyle.trimToWidth(font,
-                StatCollector.translateToLocal(COMMAND_LABEL_KEY) + ": ",
-                width);
-        drawColored(font, label, x, y, LostTalesSkyrimUiStyle.TEXT_MUTED,
-                alpha);
-        int labelWidth = font.getStringWidth(label);
-        String code = LostTalesSkyrimUiStyle.trimToWidth(font,
-                command == null ? "" : command.trim(), width - labelWidth);
-        if (code.length() > 0) {
-            drawColored(font, EnumChatFormatting.ITALIC + code,
-                    x + labelWidth, y, LostTalesChatVisualStyle.asideRgb(),
-                    alpha);
+    /** Adds a detail for a known value, its label from {@code labelKey}. */
+    private static void addDetail(List<Row> rows, String labelKey,
+                                  String value) {
+        addDetail(rows, labelKey, value, "");
+    }
+
+    /** As above, the value read in {@code style}: italics for a command, as the chat shows one. */
+    private static void addDetail(List<Row> rows, String labelKey,
+                                  String value, String style) {
+        String text = value == null ? "" : value.trim();
+        if (text.length() > 0) {
+            rows.add(Row.detail(StatCollector.translateToLocal(labelKey),
+                    text, style));
         }
     }
 
@@ -474,20 +668,20 @@ final class LostTalesChatHoverCard {
 
     /**
      * The glance under a point on a card drawn with its top left at
-     * {@code cardX}, {@code cardY}; -1 off them.
+     * {@code cardX}, {@code cardY}: the glances' row, a glance's place
+     * along it from the rows' left; -1 off them.
      */
-    static int glanceAt(Minecraft minecraft, Laid laid, int cardX, int cardY,
-                        double x, double y) {
-        if (laid.glancesRow < 0 || Double.isNaN(x) || Double.isNaN(y)) {
+    static int glanceAt(Laid laid, int cardX, int cardY, double x,
+                        double y) {
+        if (laid.glancesTop < 0 || Double.isNaN(x) || Double.isNaN(y)) {
             return -1;
         }
-        int textX = cardX + PADDING + (laid.head ? HEAD_SIZE + HEAD_GAP : 0);
-        int rowTop = cardY + PADDING + (1 + laid.glancesRow)
-                * minecraft.fontRenderer.FONT_HEIGHT - 1;
-        if (y < rowTop || y >= rowTop + GLANCE_STRIDE || x < textX) {
+        int left = cardX + MenuWindow.PADDING_X;
+        int rowTop = cardY + laid.glancesTop;
+        if (y < rowTop || y >= rowTop + MenuWindow.rowHeight() || x < left) {
             return -1;
         }
-        int index = (int)Math.floor((x - textX) / GLANCE_STRIDE);
+        int index = (int)Math.floor((x - left) / GLANCE_STRIDE);
         return index < laid.glances.size() ? index : -1;
     }
 
@@ -722,7 +916,8 @@ final class LostTalesChatHoverCard {
         }
         return new Target(member.getPlayerId(), accountIdentity,
                 member.getCharacterId(), member.getSkinId(), member.getName(),
-                member.getTitle(), member.getAccount(), member.getNameColor());
+                ChatMemberList.epithetOf(member), member.getAccount(),
+                member.getNameColor());
     }
 
     /** The card of a player as a line recorded them. */
@@ -932,8 +1127,9 @@ final class LostTalesChatHoverCard {
     }
 
     /**
-     * A tooltip of plain lines, drawn as every other popup is: the
-     * chat's popup surface, the chat's shadow, and vanilla's colour
+     * A tooltip of plain lines, laid out and drawn as every other tip is
+     * ({@link WindowStyle#drawPopupLines}): the popup's surface and inset,
+     * its lines a line apart, the chat's shadow, and vanilla's colour
      * codes in the palette's own tones. What the achievement and text hover cards
      * and the shared-marker tooltip draw with, in place of vanilla's
      * hovering text, so nothing hanging off a chat line reads in vanilla's
@@ -952,8 +1148,9 @@ final class LostTalesChatHoverCard {
             contentWidth = Math.max(contentWidth,
                     font.getStringWidth(lines.get(index) == null ? "" : lines.get(index)));
         }
-        int width = Math.min(PADDING * 2 + contentWidth, Math.max(40, screenWidth - 8));
-        int height = PADDING * 2 + lines.size() * font.FONT_HEIGHT;
+        int width = Math.min(contentWidth + WindowStyle.POPUP_INSET * 2,
+                Math.max(40, screenWidth - 8));
+        int height = WindowStyle.popupLinesHeight(lines.size());
         int x = cardX(mouseX, width, screenWidth);
         int y = cardY(mouseY, height, screenHeight);
         GL11.glPushMatrix();
@@ -961,12 +1158,12 @@ final class LostTalesChatHoverCard {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
             WindowStyle.drawPopup(x, y, x + width, y + height,
                     1.0F);
-            int textY = y + PADDING;
+            int textY = y + WindowStyle.POPUP_INSET;
             for (int index = 0; index < lines.size(); index++) {
                 LostTalesChatVisualStyle.drawLegacyFormatted(font,
                         lines.get(index) == null ? "" : lines.get(index),
-                        x + PADDING, textY, 255);
-                textY += font.FONT_HEIGHT;
+                        x + WindowStyle.POPUP_INSET, textY, 255);
+                textY += WindowStyle.LINE_HEIGHT;
             }
         } finally {
             GL11.glPopMatrix();

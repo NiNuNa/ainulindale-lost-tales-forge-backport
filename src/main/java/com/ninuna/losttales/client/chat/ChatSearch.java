@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.client.window.WindowSearch;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,6 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 
@@ -235,7 +238,9 @@ public final class ChatSearch {
     /**
      * What a line says and who said it, read once per version of the
      * line: the message as it was said, the name it was signed with,
-     * and the account behind that name.
+     * and the account behind that name. The Server, the Client and the
+     * Narrator are found by the names this game shows them by, and by the
+     * name their lines are signed with.
      */
     private static Cached read(List<ChatLine> lines, int index, ChatLine line) {
         Integer id = Integer.valueOf(line.getChatLineID());
@@ -255,6 +260,10 @@ public final class ChatSearch {
                 identity = remembered.packet.getIdentityName();
             }
         }
+        UUID senderId = run != null ? run.senderId
+                : remembered != null ? remembered.packet.getSenderId() : null;
+        identity = ChatNames.sender(LostTalesWords.LANG, senderId,
+                remembered != null ? remembered.packet.getSkinId() : "", identity);
         cached = new Cached(line.getUpdatedCounter(), text, identity, account);
         TEXTS.put(id, cached);
         while (TEXTS.size() > ClientChatChannelViews.maxTrackedLines()) {

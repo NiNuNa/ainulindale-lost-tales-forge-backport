@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lotr.common.LOTRDimension;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 /**
  * Server-safe catalog of bundled map marker JSON.
  *
@@ -94,12 +97,19 @@ public final class LostTalesMapMarkerCatalog {
         return MARKERS_BY_ID.containsKey(LostTalesQuestMarkerHelper.normalizeMarkerId(markerId));
     }
 
-    public static String getDisplayName(String markerId) {
+    /**
+     * A bundled marker by its id and its name, {@code losttales:mossy_cave
+     * (Mossy Cave)}, the name in each reader's language; any other id alone.
+     */
+    public static IChatComponent getDisplayName(String markerId) {
         LostTalesMapMarkerDefinition marker = getMarker(markerId);
         if (marker == null) {
-            return LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+            return new ChatComponentText(
+                    LostTalesQuestMarkerHelper.normalizeMarkerId(markerId));
         }
-        return marker.getId() + " (" + marker.getName() + ")";
+        return new ChatComponentTranslation("chat.losttales.marker.with_id",
+                marker.getId(), LostTalesMapMarkerNames.component(
+                        marker.getId(), marker.getName()));
     }
 
     public static boolean isVisibleByDefault(String markerId) {
@@ -186,23 +196,28 @@ public final class LostTalesMapMarkerCatalog {
         if (source == null) {
             source = LostTalesMapMarkerSource.CUSTOM_PRESET;
         }
-        String name = getString(object, "name", null);
-        if (name == null || name.length() == 0) {
-            return null;
-        }
         if (!hasNumber(object, "x") || !hasNumber(object, "z")) {
             return null;
         }
-
+        // A Lost Tales marker's words live in the lang file; a file may
+        // still write its own.
+        String name = getString(object, "name", null);
         String id = LostTalesQuestMarkerHelper.normalizeMarkerId(getString(object, "id", name));
         if (id.length() == 0) {
+            return null;
+        }
+        if (name == null || name.trim().length() == 0) {
+            name = LostTalesMapMarkerNames.englishName(id);
+        }
+        if (name.length() == 0) {
             return null;
         }
         boolean hasFastTravel = getBoolean(object, "hasFastTravel", false);
         String icon = getString(object, "icon", hasFastTravel ? "fort" : "undiscovered");
         String color = getString(object, "color", "white");
-        String category = getString(object, "category", hasFastTravel ? LostTalesMapMarkerDefinition.CATEGORY_POINT_OF_INTEREST : LostTalesMapMarkerDefinition.CATEGORY_DEFAULT);
-        String description = getString(object, "description", "");
+        String category = getString(object, "category", "");
+        String description = getString(object, "description",
+                LostTalesMapMarkerNames.englishDescription(id));
         int dimensionId = LostTalesDimensionHelper.parseDimensionId(getString(object, "dimension", "lotr:middle_earth"), LOTRDimension.MIDDLE_EARTH.dimensionID);
         double x = object.get("x").getAsDouble();
         double y = hasNumber(object, "y")

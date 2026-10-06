@@ -18,8 +18,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.EnumRarity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.EnumHelper;
 import org.lwjgl.input.Keyboard;
 
@@ -29,14 +31,17 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Physical-client-only helpers formerly mixed into LostTalesUtil.
- * Keeping these references in a separate class prevents common LOTR setup from
- * loading Minecraft or LOTR client classes on a dedicated server.
+ * Physical-client-only helpers: item tooltips and the map image. They stand
+ * apart from LostTalesUtil so common LOTR setup never loads Minecraft or LOTR
+ * client classes on a dedicated server.
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesClientUtil {
+    /** What the lang keys of the item tooltips' words begin with. */
+    private static final String TOOLTIP = "item.losttales.tooltip.";
 
     private LostTalesClientUtil() {}
 
@@ -46,7 +51,7 @@ public final class LostTalesClientUtil {
         addItemLore(list, getItemLore(itemStack));
         addItemDetails(list, itemStack, credits, material, itemType);
         if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
-            addArmorSetInformation(itemStack, player, list, "Test Bonus!");
+            addArmorSetInformation(itemStack, player, list);
         }
     }
 
@@ -67,10 +72,40 @@ public final class LostTalesClientUtil {
                 list.add("§7§o" + lore);
             }
         } else {
-            list.add("Hold " + LostTalesTooltipIcons.key(
-                    Keyboard.KEY_LSHIFT, "§f[SHIFT]")
-                    + " §r§7to view item lore.");
+            list.add(hold("lore", LostTalesTooltipIcons.key(
+                    Keyboard.KEY_LSHIFT, "§f[" + word("key.shift") + "]")));
         }
+    }
+
+    /**
+     * A tooltip's word under {@code key}: the line under
+     * {@code item.losttales.tooltip.<key>} in the game's language.
+     */
+    private static String word(String key, Object... arguments) {
+        return I18n.format(TOOLTIP + key, arguments);
+    }
+
+    /**
+     * The line that names a key to hold for more ({@code Hold [SHIFT] to
+     * view item lore.}), grey again after the key.
+     */
+    private static String hold(String what, String key) {
+        return word("hold." + what, key + "§r§7");
+    }
+
+    /** A label and its value, the value white and in italics. */
+    private static String labelled(String key, String value) {
+        return word(key, "§f§o" + value);
+    }
+
+    /**
+     * A rarity's name in the game's language; one the lang file does not
+     * name, as vanilla or the mod that added it calls it.
+     */
+    static String rarityName(EnumRarity rarity) {
+        String key = TOOLTIP + "rarity." + rarity.name().toLowerCase(Locale.ROOT);
+        return StatCollector.canTranslate(key)
+                ? StatCollector.translateToLocal(key) : rarity.rarityName;
     }
 
     public static void addItemDetails(List list, ItemStack itemStack, String credits,
@@ -78,21 +113,20 @@ public final class LostTalesClientUtil {
                                       ELostTalesItem.Type itemType) {
         if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL)) {
             list.add("");
-            list.add("Faction: §f§o" + I18n.format("lotr.faction."
-                    + material.getFaction().codeName() + ".name"));
+            list.add(labelled("faction", I18n.format("lotr.faction."
+                    + material.getFaction().codeName() + ".name")));
             if (material.getMaterial() != null) {
-                list.add("Repair Item: §f§o"
-                        + material.getMaterial().getRepairItem().getDisplayName());
+                list.add(labelled("repair", material.getMaterial()
+                        .getRepairItem().getDisplayName()));
             }
-            list.add("Type: §f§o" + itemType.getName());
+            list.add(labelled("type", itemType.getName()));
             if (credits != null) {
-                list.add("§8Created by: §o" + credits);
+                list.add("§8" + word("created_by", "§o" + credits));
             }
         } else {
             list.add("");
-            list.add("Hold " + LostTalesTooltipIcons.key(
-                    Keyboard.KEY_LCONTROL, "§f[CTRL]")
-                    + " §r§7to view item details.");
+            list.add(hold("details", LostTalesTooltipIcons.key(
+                    Keyboard.KEY_LCONTROL, "§f[" + word("key.ctrl") + "]")));
         }
     }
 
@@ -102,23 +136,27 @@ public final class LostTalesClientUtil {
             list.add("");
             if (block instanceof LostTalesBlockPlushie) {
                 LostTalesBlockPlushie plushie = (LostTalesBlockPlushie)block;
-                list.add("Rarity: " + plushie.getRarity().rarityColor
-                        + "§o" + plushie.getRarity().rarityName);
+                list.add(word("rarity", plushie.getRarity().rarityColor
+                        + "§o" + rarityName(plushie.getRarity())));
             }
-            list.add("Type: §f§o" + ELostTalesItem.Type.BLOCK_BUILDING.getName());
+            list.add(labelled("type", ELostTalesItem.Type.BLOCK_BUILDING.getName()));
             if (credits != ELostTalesUser.NULL) {
-                list.add("§8Created by: §o" + credits.getName());
+                list.add("§8" + word("created_by", "§o" + credits.getName()));
             }
         } else {
             list.add("");
-            list.add("Hold " + LostTalesTooltipIcons.key(
-                    Keyboard.KEY_LCONTROL, "§f[CTRL]")
-                    + " §r§7to view item details.");
+            list.add(hold("details", LostTalesTooltipIcons.key(
+                    Keyboard.KEY_LCONTROL, "§f[" + word("key.ctrl") + "]")));
         }
     }
 
+    /**
+     * Which pieces of the item's armour set the player wears, and the
+     * set's bonus with all four on. No set has a bonus yet, so the line
+     * says there is none.
+     */
     public static void addArmorSetInformation(ItemStack itemStack, EntityPlayer player,
-                                              List list, String setBonusDescription) {
+                                              List list) {
         ItemStack helmet = player.getCurrentArmor(3);
         ItemStack armor = player.getCurrentArmor(2);
         ItemStack leggings = player.getCurrentArmor(1);
@@ -135,24 +173,22 @@ public final class LostTalesClientUtil {
                             == ELostTalesItem.Type.ARMOR_HEAVY;
                     setCounter = displayArmorSetDetails(heavy, names, helmet, armor, leggings, boots);
                     list.add("§e[" + setCounter + "/4] §r§7"
-                            + (heavy ? "Heavy" : "Light") + " Armor Set:");
+                            + word(heavy ? "set.heavy" : "set.light"));
                 }
                 Collections.addAll(list, names);
                 if (setCounter == 4) {
                     list.add("");
                     boolean heavy = ((LostTalesItemArmorBase)itemStack.getItem()).getItemType()
                             == ELostTalesItem.Type.ARMOR_HEAVY;
-                    list.add("§e[4/4] §r§7" + (heavy ? "Heavy" : "Light")
-                            + " Armor Set Bonus:");
-                    list.add(setBonusDescription.isEmpty()
-                            ? "§e§oNo set bonus!" : "§e§o" + setBonusDescription);
+                    list.add("§e[4/4] §r§7"
+                            + word(heavy ? "set.heavy.bonus" : "set.light.bonus"));
+                    list.add("§e§o" + word("set.no_bonus"));
                 }
             } else {
-                list.add("Hold " + LostTalesTooltipIcons.key(
+                list.add(hold("set", LostTalesTooltipIcons.key(
                         LostTalesKeyBindings.getModifierKeyBinding(),
                         "§e[" + LostTalesKeyBindings
-                                .getModifierKeyDisplayName() + "]")
-                        + " §r§7to view armor set information.");
+                                .getModifierKeyDisplayName() + "]")));
             }
         }
     }
@@ -178,7 +214,7 @@ public final class LostTalesClientUtil {
             }
             names[slot] += stack.getDisplayName();
         } else {
-            names[slot] += "Empty";
+            names[slot] += word("set.empty");
         }
         return count;
     }

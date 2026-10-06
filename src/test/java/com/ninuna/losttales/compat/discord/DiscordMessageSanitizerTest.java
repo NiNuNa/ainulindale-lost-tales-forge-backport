@@ -1,12 +1,24 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatTranslatedWords;
+import com.ninuna.losttales.util.EnglishWords;
+import com.ninuna.losttales.util.LostTalesWords;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
+import net.minecraft.util.StringTranslate;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class DiscordMessageSanitizerTest {
@@ -16,14 +28,14 @@ public final class DiscordMessageSanitizerTest {
         Map<String, String> names = new HashMap<String, String>();
         names.put("1234", "Frodo");
         assertEquals("hey @Frodo and @user,\nsee #channel :smile: @role",
-                DiscordMessageSanitizer.inbound(
+                inbound(
                         "hey <@1234> and <@!99>,\nsee <#55> <a:smile:7> <@&8>",
                         names));
         assertEquals("no codes here",
-                DiscordMessageSanitizer.inbound("no §ccodes here",
+                inbound("no §ccodes here",
                         Collections.<String, String>emptyMap()));
-        assertEquals("", DiscordMessageSanitizer.inbound("  \n\t ", null));
-        assertEquals("", DiscordMessageSanitizer.inbound(null, null));
+        assertEquals("", inbound("  \n\t ", null));
+        assertEquals("", inbound(null, null));
     }
 
     /** Discord's block markup folds into the inline marks the chat reads. */
@@ -46,7 +58,7 @@ public final class DiscordMessageSanitizerTest {
         // Through the whole inbound path the line is one the chat
         // accepts, Discord's lines its paragraphs.
         assertEquals("Title\nquoted\n`code`\n*it*",
-                DiscordMessageSanitizer.inbound(
+                inbound(
                         "# Title\n> quoted\n```\ncode\n```\n_it_", null));
     }
 
@@ -56,7 +68,7 @@ public final class DiscordMessageSanitizerTest {
         for (int index = 0; index < 300; index++) {
             text.append("word ");
         }
-        String cut = DiscordMessageSanitizer.inbound(text.toString(), null);
+        String cut = inbound(text.toString(), null);
         assertTrue(cut.length() <= ChatMessageValidator.MAX_CHARACTERS);
         assertTrue(cut.endsWith("..."));
         assertTrue(ChatMessageValidator.isValid(cut));
@@ -65,13 +77,13 @@ public final class DiscordMessageSanitizerTest {
     @Test
     public void unicodeEmojiBecomeCanonicalShortcodes() {
         assertEquals("hi :flushed: there",
-                DiscordMessageSanitizer.inbound(
+                inbound(
                         "hi 😳 there", null));
         // Adjacent emoji, and the heart with and without its selector.
         assertEquals(":joy::slight_smile:",
-                DiscordMessageSanitizer.inbound(
+                inbound(
                         "😂🙂", null));
-        assertEquals(":heart: :heart:", DiscordMessageSanitizer.inbound(
+        assertEquals(":heart: :heart:", inbound(
                 "❤️ ❤", null));
     }
 
@@ -79,26 +91,26 @@ public final class DiscordMessageSanitizerTest {
     public void aliasesResolveAndUnknownEmojiKeepTheirNames() {
         // A literal alias shortcode, and a custom emoji named by one.
         assertEquals("well :flushed: then",
-                DiscordMessageSanitizer.inbound(
+                inbound(
                         "well :flushed_face: then", null));
-        assertEquals(":laughing:", DiscordMessageSanitizer.inbound(
+        assertEquals(":laughing:", inbound(
                 "<:Satisfied:12345>", null));
         // An emoji the registry does not carry reads as its Discord name,
         // never as broken glyphs: a ZWJ sequence whole, even where its
         // base is known, so it never becomes the wrong emoji, and a flag
         // as one name.
-        assertEquals("look :robot: here", DiscordMessageSanitizer.inbound(
+        assertEquals("look :robot: here", inbound(
                 "look 🤖 here", null));
         assertEquals("so :face_with_spiral_eyes: dizzy",
-                DiscordMessageSanitizer.inbound("so 😵‍💫 dizzy", null));
-        assertEquals("from :flag_de:", DiscordMessageSanitizer.inbound(
+                inbound("so 😵‍💫 dizzy", null));
+        assertEquals("from :flag_de:", inbound(
                 "from 🇩🇪", null));
         // A skin tone goes with the emoji the registry has.
         assertEquals(":index_pointing_at_the_viewer:",
-                DiscordMessageSanitizer.inbound("🫵🏽", null));
+                inbound("🫵🏽", null));
         // Signs the chat's font draws stay as they are.
-        assertEquals("© 2026", DiscordMessageSanitizer.inbound("© 2026", null));
-        assertEquals(":pepe:", DiscordMessageSanitizer.inbound("<:pepe:12345>", null));
+        assertEquals("© 2026", inbound("© 2026", null));
+        assertEquals(":pepe:", inbound("<:pepe:12345>", null));
     }
 
     @Test
@@ -177,9 +189,11 @@ public final class DiscordMessageSanitizerTest {
     @Test
     public void aForwardHeaderNamesItsPlaceAndItsAuthor() {
         assertEquals("-# ↪ Forwarded from \\#ooc · **Aldric**\n",
-                DiscordMessageSanitizer.forwardHeader("Aldric", "#ooc/1234"));
+                DiscordMessageSanitizer.forwardHeader(EnglishWords.INSTANCE,
+                        "Aldric", "#ooc/1234"));
         assertEquals("-# ↪ Forwarded from \\#gondor · **x\\_y**\n",
-                DiscordMessageSanitizer.forwardHeader("x_y", "#gondor/9"));
+                DiscordMessageSanitizer.forwardHeader(EnglishWords.INSTANCE,
+                        "x_y", "#gondor/9"));
     }
 
     @Test
@@ -290,18 +304,15 @@ public final class DiscordMessageSanitizerTest {
     public void filesStickersAndForwardsArriveInWords() {
         String link = "https://discord.com/channels/1/2/3";
         assertEquals("look *[Sticker: Wave]* *map.png* " + link,
-                DiscordMessageSanitizer.inboundWithAttachments("look", "",
-                        java.util.Collections.singletonList("Wave"),
-                        java.util.Collections.singletonList("map.png"), link));
+                attached("look", "", Collections.singletonList("Wave"),
+                        Collections.singletonList("map.png"), link).getText());
         assertEquals("*[Forwarded]* the gate is open",
-                DiscordMessageSanitizer.inboundWithAttachments("", "the gate is open",
-                        java.util.Collections.<String>emptyList(),
-                        java.util.Collections.<String>emptyList(), link));
+                attached("", "the gate is open", Collections.<String>emptyList(),
+                        Collections.<String>emptyList(), link).getText());
         // No file, no link; a name loses every mark it could smuggle in.
         assertEquals("*evillink.png*",
-                DiscordMessageSanitizer.inboundWithAttachments("",
-                        "", java.util.Collections.<String>emptyList(),
-                        java.util.Collections.singletonList("**evil**[link].png"), null));
+                attached("", "", Collections.<String>emptyList(),
+                        Collections.singletonList("**evil**[link].png"), null).getText());
     }
 
     @Test
@@ -310,12 +321,290 @@ public final class DiscordMessageSanitizerTest {
         for (int index = 0; index < 1500; index++) {
             long_.append('a');
         }
-        String text = DiscordMessageSanitizer.inboundWithAttachments(long_.toString(), "",
-                java.util.Collections.<String>emptyList(),
-                java.util.Collections.singletonList("map.png"),
-                "https://discord.com/channels/1/2/3");
+        String text = attached(long_.toString(), "",
+                Collections.<String>emptyList(),
+                Collections.singletonList("map.png"),
+                "https://discord.com/channels/1/2/3").getText();
         assertTrue(text.length() <= com.ninuna.losttales.chat.ChatMessageValidator.MAX_CHARACTERS);
         assertTrue(text.endsWith("*map.png* https://discord.com/channels/1/2/3"));
+    }
+
+    /**
+     * A forward's and a sticker's marks are the lang file's: the text has
+     * them in the server's words, and the pieces keep them as marks, in
+     * order, joining to the text exactly. Files, the link and the
+     * member's own words are plain.
+     */
+    @Test
+    public void theMarksArePiecesEachGameTranslates() {
+        String link = "https://discord.com/channels/1/2/3";
+        DiscordInboundLine line = attached("look", "",
+                Arrays.asList("Wave", "Dance"), Collections.singletonList("map.png"), link);
+        assertEquals("look *[Sticker: Wave]* *[Sticker: Dance]* *map.png* " + link,
+                line.getText());
+        assertTrue(line.hasMarks());
+        List<DiscordInboundLine.Piece> pieces = line.getPieces();
+        assertEquals(5, pieces.size());
+        assertPlain("look ", pieces.get(0));
+        assertMark(DiscordMessageSanitizer.STICKER, "*[Sticker: Wave]*", pieces.get(1));
+        assertEquals(Collections.singletonList("Wave"), pieces.get(1).arguments);
+        assertPlain(" ", pieces.get(2));
+        assertMark(DiscordMessageSanitizer.STICKER, "*[Sticker: Dance]*", pieces.get(3));
+        assertPlain(" *map.png* " + link, pieces.get(4));
+        assertJoinsInEnglish(line);
+
+        DiscordInboundLine forward = attached("", "the gate is open",
+                Collections.<String>emptyList(), Collections.<String>emptyList(), link);
+        assertEquals(2, forward.getPieces().size());
+        assertMark(DiscordMessageSanitizer.FORWARDED, "*[Forwarded]*",
+                forward.getPieces().get(0));
+        assertTrue(forward.getPieces().get(0).arguments.isEmpty());
+        assertPlain(" the gate is open", forward.getPieces().get(1));
+        assertJoinsInEnglish(forward);
+
+        // A member's own words win over a forward's, and no mark is made.
+        DiscordInboundLine said = attached("mine", "theirs",
+                Collections.<String>emptyList(), Collections.<String>emptyList(), link);
+        assertEquals("mine", said.getText());
+        assertFalse(said.hasMarks());
+    }
+
+    /** A line without a mark has nothing to translate: no body travels with it. */
+    @Test
+    public void aLineWithoutAMarkHasNoBody() {
+        DiscordInboundLine plain = attached("look", "", Collections.<String>emptyList(),
+                Collections.singletonList("map.png"), "https://discord.com/channels/1/2/3");
+        assertFalse(plain.hasMarks());
+        assertEquals(1, plain.getPieces().size());
+        assertEquals("", DiscordInboundBody.jsonOf(plain));
+        assertEquals("", DiscordInboundBody.jsonOf(DiscordInboundLine.EMPTY));
+        assertEquals("", DiscordInboundBody.jsonOf(null));
+        assertEquals("", attached("", "", Collections.<String>emptyList(),
+                Collections.<String>emptyList(), null).getText());
+    }
+
+    /**
+     * The words are cut on the server's words, and the pieces the same
+     * way: a mark the cut leaves whole stays a mark, the tail's stickers
+     * among them, and the text still joins from the pieces.
+     */
+    @Test
+    public void theCutKeepsThePiecesInStepWithTheText() {
+        StringBuilder long_ = new StringBuilder();
+        for (int index = 0; index < 1500; index++) {
+            long_.append('a');
+        }
+        DiscordInboundLine forward = attached("", long_.toString(),
+                Collections.singletonList("Wave"), Collections.<String>emptyList(), null);
+        String text = forward.getText();
+        assertTrue(text.length() <= ChatMessageValidator.MAX_CHARACTERS);
+        assertTrue(text.startsWith("*[Forwarded]* aaa"));
+        assertTrue(text.endsWith("aaa... *[Sticker: Wave]*"));
+        List<DiscordInboundLine.Piece> pieces = forward.getPieces();
+        assertMark(DiscordMessageSanitizer.FORWARDED, "*[Forwarded]*", pieces.get(0));
+        assertMark(DiscordMessageSanitizer.STICKER, "*[Sticker: Wave]*",
+                pieces.get(pieces.size() - 1));
+        assertJoinsInEnglish(forward);
+    }
+
+    /** A mark the cut runs through keeps the part before the cut as plain words. */
+    @Test
+    public void aMarkTheCutRunsThroughBecomesPlainWords() {
+        List<DiscordInboundLine.Piece> pieces = Arrays.asList(
+                DiscordInboundLine.Piece.plain("  a "),
+                DiscordInboundLine.Piece.mark(EnglishWords.INSTANCE,
+                        DiscordMessageSanitizer.STICKER, "Wave"),
+                DiscordInboundLine.Piece.plain(" b  "));
+        List<DiscordInboundLine.Piece> cut = DiscordInboundLine.slice(pieces, 0, 9);
+        assertEquals("  a *[Sti", DiscordInboundLine.textOf(cut));
+        assertFalse(cut.get(cut.size() - 1).isMark());
+        DiscordInboundLine trimmed = new DiscordInboundLine(DiscordInboundLine.trim(pieces));
+        assertEquals("a *[Sticker: Wave]* b", trimmed.getText());
+        assertEquals("  a *[Sticker: Wave]* b  ".trim(), trimmed.getText());
+        assertTrue(trimmed.getPieces().get(1).isMark());
+    }
+
+    /**
+     * The body is the pieces as one chat component: plain text and the
+     * marks' translations in order, read back by a client as translated
+     * words and nothing else.
+     */
+    @Test
+    public void theBodyIsTheMarksAsTranslatedWords() {
+        DiscordInboundLine line = attached("look", "", Collections.singletonList("Wave"),
+                Collections.<String>emptyList(), null);
+        String json = DiscordInboundBody.jsonOf(line);
+        assertTrue(json, json.length() > 0);
+        IChatComponent read = IChatComponent.Serializer.func_150699_a(json);
+        assertTrue(ChatTranslatedWords.isWordsComponent(read));
+        assertEquals(2, read.getSiblings().size());
+        assertEquals("look ", ((IChatComponent)read.getSiblings().get(0))
+                .getUnformattedTextForChat());
+        ChatComponentTranslation sticker =
+                (ChatComponentTranslation)read.getSiblings().get(1);
+        assertEquals(DiscordMessageSanitizer.STICKER, sticker.getKey());
+        assertEquals("Wave", sticker.getFormatArgs()[0]);
+    }
+
+    /** Read back in the server's language, the body says the line's text exactly. */
+    @Test
+    public void theBodyReadInTheServersLanguageIsTheText() throws Exception {
+        // The two marks' English lines alone: other tests read every other
+        // key untranslated.
+        BufferedReader lang = new BufferedReader(new InputStreamReader(
+                DiscordMessageSanitizerTest.class.getResourceAsStream(
+                        "/assets/losttales/lang/en_US.lang"), "UTF-8"));
+        StringBuilder marks = new StringBuilder();
+        try {
+            String line;
+            while ((line = lang.readLine()) != null) {
+                if (line.startsWith(DiscordMessageSanitizer.FORWARDED + "=")
+                        || line.startsWith(DiscordMessageSanitizer.STICKER + "=")) {
+                    marks.append(line).append('\n');
+                }
+            }
+        } finally {
+            lang.close();
+        }
+        StringTranslate.inject(new ByteArrayInputStream(
+                marks.toString().getBytes("UTF-8")));
+        DiscordInboundLine forward = attached("", "the gate is open",
+                Arrays.asList("Wave", "Dance"), Collections.singletonList("map.png"),
+                "https://discord.com/channels/1/2/3");
+        IChatComponent read = IChatComponent.Serializer.func_150699_a(
+                DiscordInboundBody.jsonOf(forward));
+        assertEquals(forward.getText(), read.getUnformattedText());
+    }
+
+    /** A mention whose name the message does not give reads in the server's words. */
+    @Test
+    public void unnamedMentionsReadInTheServersWords() {
+        LostTalesWords german = new LostTalesWords() {
+            @Override
+            public String format(String key, Object... arguments) {
+                return DiscordMessageSanitizer.UNKNOWN_USER.equals(key) ? "Nutzer"
+                        : DiscordMessageSanitizer.UNKNOWN_ROLE.equals(key) ? "Rolle"
+                        : "Kanal";
+            }
+        };
+        assertEquals("@Nutzer @Rolle #Kanal",
+                DiscordMessageSanitizer.inbound("<@1> <@&2> <#3>", null, null, german));
+    }
+
+    /**
+     * A role's and a channel's mention read as the names their own server
+     * gives them, in bold right behind the sign, so neither reads as a
+     * mention or a game channel's link; one the bridge does not know
+     * there reads as the server's words.
+     */
+    @Test
+    public void rolesAndChannelsReadByTheirNames() {
+        DiscordMessageSanitizer.Places shire = places("Moderators", "general");
+        assertEquals("ask @**Moderators** in #**general**",
+                DiscordMessageSanitizer.inbound("ask <@&8> in <#55>", null, shire,
+                        EnglishWords.INSTANCE));
+        assertEquals("ask @role in #channel",
+                DiscordMessageSanitizer.inbound("ask <@&9> in <#56>", null, shire,
+                        EnglishWords.INSTANCE));
+        assertEquals("ask @role in #channel",
+                DiscordMessageSanitizer.inbound("ask <@&8> in <#55>", null,
+                        DiscordMessageSanitizer.Places.NONE, EnglishWords.INSTANCE));
+        assertEquals("@role #channel",
+                DiscordMessageSanitizer.inbound("<@&8> <#55>", null,
+                        places("  ", "**"), EnglishWords.INSTANCE));
+        // A member's mention stays their name, and a name put in is never
+        // read as a mention again.
+        Map<String, String> names = new HashMap<String, String>();
+        names.put("1", "<#55>");
+        assertEquals("@<#55> #**general**", DiscordMessageSanitizer.inbound(
+                "<@1> <#55>", names, shire, EnglishWords.INSTANCE));
+        // Inside the bold, the chat's marks still pair.
+        assertEquals("**hi @**Moderators** all**",
+                DiscordMessageSanitizer.inbound("**hi <@&8> all**", null, shire,
+                        EnglishWords.INSTANCE));
+    }
+
+    /** A hostile name is plain words: no mark, mention, link, token or code survives in it. */
+    @Test
+    public void aPlacesNameHoldsNothingButWords() {
+        assertEquals("Mods", DiscordMessageSanitizer.placeName("**Mods**"));
+        assertEquals("everyone", DiscordMessageSanitizer.placeName("@everyone"));
+        assertEquals("ix", DiscordMessageSanitizer.placeName("[i:x]"));
+        assertEquals("general", DiscordMessageSanitizer.placeName("#general"));
+        assertEquals("Red", DiscordMessageSanitizer.placeName("§cRed"));
+        assertEquals("no web address", "https//evil.example",
+                DiscordMessageSanitizer.placeName("https://evil.example"));
+        assertEquals("skull", DiscordMessageSanitizer.placeName(":skull:"));
+        assertEquals("&1", DiscordMessageSanitizer.placeName("<@&1>"));
+        assertEquals("Mod Team", DiscordMessageSanitizer.placeName(
+                " Mod ​‮ Team\n"));
+        assertEquals("", DiscordMessageSanitizer.placeName("**__~~||``"));
+        assertEquals("", DiscordMessageSanitizer.placeName(null));
+        StringBuilder long200 = new StringBuilder();
+        for (int index = 0; index < 200; index++) {
+            long200.append(index % 10 == 9 ? ' ' : 'x');
+        }
+        String cut = DiscordMessageSanitizer.placeName(long200.toString());
+        assertTrue(cut, cut.length() <= DiscordMessageSanitizer.MAX_PLACE_NAME);
+        assertEquals(cut, cut.trim());
+        String said = DiscordMessageSanitizer.inbound("<@&8>", null,
+                places("@**x** [i:Sword] #ooc/123 <@&9> §k" + long200, ""),
+                EnglishWords.INSTANCE);
+        assertEquals("@**x iSword ooc/123 &9 xxxxxxxxx xx**", said);
+        assertEquals(said, 2, said.split("\\*\\*", -1).length - 1);
+        assertEquals(said, 1, said.length() - said.replace("@", "").length());
+        assertFalse(said, said.indexOf('#') >= 0 || said.indexOf('[') >= 0
+                || said.indexOf('<') >= 0 || said.indexOf(':') >= 0
+                || said.indexOf('§') >= 0);
+        assertTrue(ChatMessageValidator.isValid(said));
+    }
+
+    private static DiscordMessageSanitizer.Places places(final String role,
+                                                         final String channel) {
+        return new DiscordMessageSanitizer.Places() {
+            @Override
+            public String roleName(String roleId) {
+                return "8".equals(roleId) ? role : "";
+            }
+
+            @Override
+            public String channelName(String channelId) {
+                return "55".equals(channelId) ? channel : "";
+            }
+        };
+    }
+
+    private static String inbound(String content, Map<String, String> names) {
+        return DiscordMessageSanitizer.inbound(content, names, null,
+                EnglishWords.INSTANCE);
+    }
+
+    private static DiscordInboundLine attached(String said, String forwarded,
+                                               List<String> stickers, List<String> files,
+                                               String link) {
+        return DiscordMessageSanitizer.inboundWithAttachments(EnglishWords.INSTANCE,
+                said, forwarded, stickers, files, link);
+    }
+
+    private static void assertPlain(String words, DiscordInboundLine.Piece piece) {
+        assertFalse(piece.isMark());
+        assertEquals(words, piece.words);
+    }
+
+    private static void assertMark(String key, String words, DiscordInboundLine.Piece piece) {
+        assertTrue(piece.isMark());
+        assertEquals(key, piece.key);
+        assertEquals(words, piece.words);
+    }
+
+    /** Each piece read again in English joins to the line's text. */
+    private static void assertJoinsInEnglish(DiscordInboundLine line) {
+        StringBuilder joined = new StringBuilder();
+        for (DiscordInboundLine.Piece piece : line.getPieces()) {
+            joined.append(piece.isMark() ? EnglishWords.INSTANCE.format(piece.key,
+                    piece.arguments.toArray()) : piece.words);
+        }
+        assertEquals(line.getText(), joined.toString());
     }
 
     /**
@@ -330,8 +619,8 @@ public final class DiscordMessageSanitizerTest {
                 DiscordMessageSanitizer.outboundAction("Aldric", "bows.\nHe waits."));
         assertEquals("one\ntwo", DiscordMessageSanitizer.outbound("one\ntwo"));
         assertEquals("a\nb\nc\nd\ne\nf\ng\nh i",
-                DiscordMessageSanitizer.inbound("a\n\nb\nc\nd\ne\nf\ng\nh\ni", null));
-        assertEquals("see `x = 1; y = 2`", DiscordMessageSanitizer.inbound(
+                inbound("a\n\nb\nc\nd\ne\nf\ng\nh\ni", null));
+        assertEquals("see `x = 1; y = 2`", inbound(
                 "see ```\nx = 1;\ny = 2\n```", null));
     }
 

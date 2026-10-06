@@ -21,8 +21,12 @@ public final class QuestionWindow extends SubWindowContent {
     private static final String CONFIRM = "confirm";
     private static final String CANCEL = "cancel";
     private static final int WIDTH = 200;
-    private static final int PADDING = 6;
-    private static final int LINE_STRIDE = 10;
+    /** The menus' clear room round the words and the buttons, across and down. */
+    private static final int PADDING_X = MenuWindow.PADDING_X;
+    private static final int PADDING_Y = MenuWindow.PADDING_Y;
+    /** The words' room: a menu note's, its lines and the clear above and under them. */
+    private static final int NOTE_LINE = MenuWindow.NOTE_LINE;
+    private static final int NOTE_PADDING = MenuWindow.NOTE_PADDING;
 
     private String title = "";
     private String detail = "";
@@ -64,10 +68,15 @@ public final class QuestionWindow extends SubWindowContent {
         return WIDTH;
     }
 
+    /** The words as a menu's note, then the buttons, the menus' padding round both. */
     @Override
     public int naturalHeight(int width) {
-        return PADDING + lines(width).size() * LINE_STRIDE + PADDING
-                + LostTalesUiFramedButton.HEIGHT + PADDING;
+        return PADDING_Y + noteHeight(lines(width).size())
+                + LostTalesUiFramedButton.HEIGHT + PADDING_Y;
+    }
+
+    private static int noteHeight(int lines) {
+        return NOTE_PADDING + lines * NOTE_LINE + NOTE_PADDING;
     }
 
     @Override
@@ -77,14 +86,14 @@ public final class QuestionWindow extends SubWindowContent {
 
     @Override
     public int minHeight() {
-        return PADDING * 3 + LINE_STRIDE + LostTalesUiFramedButton.HEIGHT;
+        return PADDING_Y * 2 + noteHeight(1) + LostTalesUiFramedButton.HEIGHT;
     }
 
     private List<String> lines(int width) {
         FontRenderer font = Minecraft.getMinecraft().fontRenderer;
         @SuppressWarnings("unchecked")
         List<String> lines = font.listFormattedStringToWidth(this.detail,
-                Math.max(1, width - 2 * PADDING));
+                Math.max(1, width - 2 * PADDING_X));
         return lines;
     }
 
@@ -93,11 +102,13 @@ public final class QuestionWindow extends SubWindowContent {
                      double clipY, double pointerX, double pointerY,
                      int alpha, int surfaceAlpha) {
         FontRenderer font = minecraft.fontRenderer;
-        int y = (int)box.top + PADDING;
+        int y = (int)box.top + PADDING_Y + NOTE_PADDING;
         for (String line : lines((int)box.width)) {
-            LostTalesUiInk.drawText(font, line, (int)box.left + PADDING, y,
+            LostTalesUiInk.drawText(font, line, (int)box.left + PADDING_X,
+                    y + LostTalesUiInk.centredStart(NOTE_LINE,
+                            LostTalesUiInk.CAP_HEIGHT),
                     LostTalesUiInk.IVORY, alpha);
-            y += LINE_STRIDE;
+            y += NOTE_LINE;
         }
         String part = partAt(font, box, pointerX, pointerY);
         WordButton.draw(font, buttonBox(font, box, CANCEL), cancelLabel(),
@@ -117,9 +128,9 @@ public final class QuestionWindow extends SubWindowContent {
                                         String part) {
         int confirmWidth = WordButton.width(font, this.confirmLabel);
         int cancelWidth = WordButton.width(font, cancelLabel());
-        double top = box.top + box.height - PADDING
+        double top = box.top + box.height - PADDING_Y
                 - LostTalesUiFramedButton.HEIGHT;
-        double confirmLeft = box.left + box.width - PADDING - confirmWidth;
+        double confirmLeft = box.left + box.width - PADDING_X - confirmWidth;
         if (CONFIRM.equals(part)) {
             return new LostTalesUiHitBox(confirmLeft, top, confirmWidth,
                     LostTalesUiFramedButton.HEIGHT);

@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet.fellowship;
 import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.model.FellowshipIcon;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
 import com.ninuna.losttales.fellowship.sync.FellowshipInvitationSnapshot;
@@ -42,6 +43,7 @@ public final class FellowshipStateSyncPacketTest {
             UUID.fromString("20000000-0000-0000-0000-000000000004");
     private static final UUID FELLOWSHIP =
             UUID.fromString("30000000-0000-0000-0000-000000000008");
+    private static final UUID MARK = new UUID(9L, 9L);
 
     @Test
     public void theStateCarriesEveryFellowshipWhole() {
@@ -119,6 +121,24 @@ public final class FellowshipStateSyncPacketTest {
         }
     }
 
+    /** A fellowship's marks travel with it, each as its guide placed it. */
+    @Test
+    public void aFellowshipsMarksTravelWithIt() {
+        FellowshipStateSnapshot decoded = roundTrip(state(10,
+                Collections.<FellowshipInviteTargetSnapshot>emptyList()));
+        List<FellowshipMark> marks = decoded.getFellowships().get(0).getMarks();
+        assertEquals(1, marks.size());
+        FellowshipMark mark = marks.get(0);
+        assertEquals(MARK, mark.getMarkId());
+        assertEquals(FELLOWSHIP, mark.getFellowshipId());
+        assertEquals("Weathertop", mark.getName());
+        assertEquals(FRIEND, mark.getPlacedBy());
+        assertEquals(100, mark.getDimensionId());
+        assertEquals(1200.25D, mark.getX(), 0.0D);
+        assertEquals(-340.5D, mark.getZ(), 0.0D);
+        assertEquals(9L, mark.getPlacedAt());
+    }
+
     private static FellowshipStateSnapshot state(int limit,
                                                  List<FellowshipInviteTargetSnapshot> targets) {
         List<FellowshipMemberSnapshot> members = new ArrayList<FellowshipMemberSnapshot>();
@@ -129,7 +149,9 @@ public final class FellowshipStateSyncPacketTest {
         FellowshipSnapshot fellowship = new FellowshipSnapshot(FELLOWSHIP, LEADER,
                 "The Grey Company", new FellowshipIcon("minecraft:compass", 0),
                 EnumSet.of(FellowshipSwitch.NO_FIGHTING, FellowshipSwitch.NO_HIRED_HARM),
-                Collections.singletonList(FRIEND), 1L, 4L, 2, members);
+                Collections.singletonList(FRIEND), 1L, 4L, 2, members,
+                Collections.singletonList(new FellowshipMark(MARK, FELLOWSHIP,
+                        "Weathertop", FRIEND, 100, 1200.25D, -340.5D, 9L)));
         return new FellowshipStateSnapshot(OWNER, 2L, FellowshipErrorId.NONE, limit,
                 LEADER, Collections.singletonList(fellowship), FELLOWSHIP,
                 FellowshipErrorId.NONE,

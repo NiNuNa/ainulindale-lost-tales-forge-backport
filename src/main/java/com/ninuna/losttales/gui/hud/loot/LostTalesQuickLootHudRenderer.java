@@ -211,7 +211,8 @@ public final class LostTalesQuickLootHudRenderer {
 
         drawQuickLootTexture(minecraft, TEXTURE, panelX, panelY, 0, 0, TEXTURE_WIDTH, TOP_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         String title = font.trimStringToWidth(
-                snapshot.title == null ? "Container" : snapshot.title,
+                snapshot.title == null ? StatCollector.translateToLocal(
+                        LostTalesClientQuickLootCache.CONTAINER_KEY) : snapshot.title,
                 TEXTURE_WIDTH - 12);
         renderHorizontalOrnament(minecraft, font, panelX, panelY, title);
         font.drawStringWithShadow(title, panelX + 3,

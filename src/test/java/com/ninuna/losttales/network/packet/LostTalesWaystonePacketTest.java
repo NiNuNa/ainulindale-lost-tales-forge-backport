@@ -76,7 +76,7 @@ public final class LostTalesWaystonePacketTest {
     public void statePacketRoundTripsAuthorityFlags() {
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/state", "State Waystone",
+                        "losttales:player/state", "Aldric",
                         UUID.randomUUID(), 0, 4, 65, 9,
                         UUID.randomUUID()).toBuilder()
                         .sharedFellowshipIds(Collections.singleton(
@@ -95,6 +95,10 @@ public final class LostTalesWaystonePacketTest {
 
         assertFalse(decoded.isMalformed());
         assertEquals(record.getId(), decoded.getMarkerId());
+        assertEquals("an unnamed waystone travels unnamed", "",
+                decoded.getName());
+        assertEquals("player:Aldric", decoded.getNamedAfter());
+        assertTrue(decoded.isPlayerPlaced());
         assertEquals(record.getRevision(), decoded.getRevision());
         assertTrue(decoded.canEdit());
         assertFalse(decoded.canMakePublic());
@@ -181,7 +185,7 @@ public final class LostTalesWaystonePacketTest {
             LostTalesWaystoneStateReason reason) {
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/reason", "Reason Waystone",
+                        "losttales:player/reason", "Aldric",
                         UUID.randomUUID(), 0, 4, 65, 9,
                         UUID.randomUUID());
         return new LostTalesWaystoneStatePacket(0, 4, 65, 9, record, true,

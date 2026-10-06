@@ -1,9 +1,13 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.compat.lotr.LotrNpcNames;
 import com.ninuna.losttales.compat.lotr.LotrQuestReference;
 import com.ninuna.losttales.compat.lotr.LotrQuestJournalAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
@@ -28,11 +32,13 @@ import java.util.UUID;
 import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
+import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IChatComponent;
 /** Server-side helper methods for basic quest state changes and objective progress. */
@@ -157,7 +163,7 @@ public final class LostTalesQuestManager {
         if (quest.isWorldQuest()) {
             // The whole server works on it together; nobody takes it alone.
             sendQuestChat(player, "chat.losttales.quest.world.not_personal",
-                    quest.getTitle());
+                    LostTalesQuestWords.titleComponent(quest));
             return StartResult.START_NOT_ALLOWED;
         }
 
@@ -167,18 +173,19 @@ public final class LostTalesQuestManager {
             return StartResult.NO_PLAYER_DATA;
         }
         if (data.isQuestActive(questId)) {
-            sendQuestChat(player, "chat.losttales.quest.already_active", quest.getTitle());
+            sendQuestChat(player, "chat.losttales.quest.already_active",
+                    LostTalesQuestWords.titleComponent(quest));
             return StartResult.ALREADY_ACTIVE;
         }
         LostTalesQuestHistoryEntry history = data.getQuestHistoryEntry(questId);
         if (!quest.mayTakeAgain(history)) {
             if (history != null && history.isCompleted()) {
                 sendQuestChat(player, "chat.losttales.quest.already_completed",
-                        quest.getTitle());
+                        LostTalesQuestWords.titleComponent(quest));
                 return StartResult.ALREADY_COMPLETED;
             }
             sendQuestChat(player, "chat.losttales.quest.not_restartable",
-                    quest.getTitle());
+                    LostTalesQuestWords.titleComponent(quest));
             return StartResult.RESTART_NOT_ALLOWED;
         }
         if (!canStartFromSource(quest, source)) {
@@ -575,24 +582,24 @@ public final class LostTalesQuestManager {
             return false;
         }
 
+        String name = getEntityMarkerName(target);
+        String namedAfter = name.length() > 0 ? ""
+                : LostTalesMapMarkerNamedAfter.entity(EntityList.getEntityString(target));
+        if (name.length() == 0 && namedAfter.length() == 0) {
+            name = LostTalesQuestWords.title(quest);
+        }
         boolean changed = false;
         for (String markerId : markerIds) {
-            LostTalesMapMarkerDefinition marker = new LostTalesMapMarkerDefinition(
-                    markerId,
-                    getEntityMarkerName(target, quest),
-                    "quest",
-                    "blue",
+            LostTalesMapMarkerDefinition marker = giverMarker(markerId, name,
+                    namedAfter, "blue",
                     target.worldObj == null ? player.worldObj.provider.dimensionId : target.worldObj.provider.dimensionId,
-                    target.posX,
-                    target.posY,
-                    target.posZ,
-                    true
-            );
+                    target.posX, target.posY, target.posZ);
             changed |= data.discoverDynamicMarker(marker);
         }
         if (changed) {
             sendQuestChat(player, "chat.losttales.quest.note.marked",
-                    getEntityMarkerName(target, quest));
+                    LostTalesMapMarkerNames.component(markerIds.get(0), name,
+                            namedAfter));
             if (sync) {
                 syncToClient(player);
             }
@@ -614,24 +621,21 @@ public final class LostTalesQuestManager {
             return false;
         }
 
-        String name = getBlockMarkerName(block, quest);
+        Object registeredName = Block.blockRegistry.getNameForObject(block);
+        String namedAfter = registeredName == null ? ""
+                : LostTalesMapMarkerNamedAfter.block(registeredName.toString());
+        String name = namedAfter.length() > 0 ? "" : LostTalesQuestWords.title(quest);
         boolean changed = false;
         for (String markerId : markerIds) {
-            LostTalesMapMarkerDefinition marker = new LostTalesMapMarkerDefinition(
-                    markerId,
-                    name,
-                    "quest",
-                    "yellow",
-                    player.worldObj.provider.dimensionId,
-                    x + 0.5D,
-                    y + 0.5D,
-                    z + 0.5D,
-                    true
-            );
+            LostTalesMapMarkerDefinition marker = giverMarker(markerId, name,
+                    namedAfter, "yellow", player.worldObj.provider.dimensionId,
+                    x + 0.5D, y + 0.5D, z + 0.5D);
             changed |= data.discoverDynamicMarker(marker);
         }
         if (changed) {
-            sendQuestChat(player, "chat.losttales.quest.note.marked", name);
+            sendQuestChat(player, "chat.losttales.quest.note.marked",
+                    LostTalesMapMarkerNames.component(markerIds.get(0), name,
+                            namedAfter));
             if (sync) {
                 syncToClient(player);
             }
@@ -885,7 +889,7 @@ public final class LostTalesQuestManager {
                 int wanted = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
                 if (countMatchingInventoryItems(player, objective) < wanted) {
                     sendQuestChat(player, "chat.losttales.quest.missing_items",
-                            quest.getTitle());
+                            LostTalesQuestWords.titleComponent(quest));
                     continue;
                 }
                 if (removeMatchingInventoryItems(player, objective, wanted)) {
@@ -1256,7 +1260,7 @@ public final class LostTalesQuestManager {
         }
 
         boolean changed = false;
-        StringBuilder revealed = new StringBuilder();
+        IChatComponent revealed = new ChatComponentText("");
         for (String markerId : LostTalesQuestMarkerHelper.collectStaticQuestMarkerIds(quest)) {
             if (data.discoverMarker(markerId)) {
                 addLotrWaypointForDiscoveredMarker(player, markerId);
@@ -1274,53 +1278,53 @@ public final class LostTalesQuestManager {
         }
 
         if (changed && notify) {
-            sendQuestChat(player, "chat.losttales.quest.note.hints", revealed.toString());
+            sendQuestChat(player, "chat.losttales.quest.note.hints", revealed);
         }
         return changed;
     }
 
 
-    private static void appendMarkerDisplay(StringBuilder builder, String markerId) {
-        if (builder == null) {
+    /** Adds a marker by its id and name, each reader's game wording the name. */
+    private static void appendMarkerDisplay(IChatComponent revealed, String markerId) {
+        if (revealed == null) {
             return;
         }
-        if (builder.length() > 0) {
-            builder.append(", ");
+        if (!revealed.getSiblings().isEmpty()) {
+            revealed.appendSibling(new ChatComponentText(", "));
         }
-        builder.append(LostTalesMapMarkerCatalog.getDisplayName(markerId));
+        revealed.appendSibling(LostTalesMapMarkerCatalog.getDisplayName(markerId));
     }
 
-    /** What a giver's marker is called: the giver's name, else its kind, else the quest's title. */
-    private static String getEntityMarkerName(Entity entity, LostTalesQuestDefinition quest) {
-        String name;
-        try {
-            name = entity.getCommandSenderName();
-        } catch (RuntimeException otherModsName) {
-            // Another mod's creature may fail to name itself; its kind stands in.
-            name = null;
+    /**
+     * A giver's own name: the name tag someone gave it, else the personal
+     * name LOTR gave an NPC; empty for a giver known only by its kind,
+     * which its marker is called after so each game names it.
+     */
+    private static String getEntityMarkerName(Entity entity) {
+        if (entity instanceof EntityLiving) {
+            try {
+                EntityLiving living = (EntityLiving)entity;
+                if (living.hasCustomNameTag()) {
+                    return living.getCustomNameTag().trim();
+                }
+            } catch (RuntimeException otherModsName) {
+                // Another mod's creature may fail to say its name tag.
+            }
         }
-        if (name != null && name.length() > 0) {
-            return name;
-        }
-        String entityName = EntityList.getEntityString(entity);
-        return entityName != null && entityName.length() > 0
-                ? entityName : quest.getTitle();
+        return LotrNpcNames.personalName(entity);
     }
 
-    /** What a block giver's marker is called: the block's name, else its registry name, else the quest's title. */
-    private static String getBlockMarkerName(Block block, LostTalesQuestDefinition quest) {
-        String name;
-        try {
-            name = block.getLocalizedName();
-        } catch (RuntimeException otherModsName) {
-            // Another mod's block may fail to name itself; its registry name stands in.
-            name = null;
-        }
-        if (name != null && name.length() > 0) {
-            return name;
-        }
-        Object registeredName = Block.blockRegistry.getNameForObject(block);
-        return registeredName != null ? registeredName.toString() : quest.getTitle();
+    /**
+     * A quest giver's marker: called by {@code name} where the giver has
+     * one of its own, else after its kind or its block ({@code namedAfter}).
+     */
+    private static LostTalesMapMarkerDefinition giverMarker(String markerId,
+            String name, String namedAfter, String color, int dimensionId,
+            double x, double y, double z) {
+        return new LostTalesMapMarkerDefinition(markerId, name, "quest", color,
+                "", "", false, dimensionId, x, y, z, 128.0D, 8.0D, true, true,
+                false, LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0,
+                namedAfter);
     }
 
     private static boolean canStartFromSource(LostTalesQuestDefinition quest, LostTalesQuestStartSource source) {
@@ -1559,14 +1563,18 @@ public final class LostTalesQuestManager {
         return dx * dx + dy * dy + dz * dz <= radius * radius;
     }
 
-    /** A quest as a chat line names it: its title, or "a Middle-earth quest" for one of LOTR's. */
+    /**
+     * A quest as a chat line names it: its title, each reader's game
+     * wording a bundled quest's and a missive's, or "a Middle-earth quest"
+     * for one of LOTR's.
+     */
     private static Object questTitle(String questId) {
         if (LotrQuestReference.isLotrQuest(questId)) {
             return new ChatComponentTranslation(
                     "chat.losttales.quest.middle_earth_quest");
         }
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
-        return quest == null ? questId : quest.getTitle();
+        return quest == null ? questId : LostTalesQuestWords.titleComponent(quest);
     }
 
     private static void addLotrWaypointForDiscoveredMarker(EntityPlayer player, String markerId) {

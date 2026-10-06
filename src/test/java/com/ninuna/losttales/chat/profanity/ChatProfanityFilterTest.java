@@ -109,6 +109,10 @@ public final class ChatProfanityFilterTest {
                         ChatProfanityMode.SILLY, WORDS));
         assertEquals("flip", ChatProfanityFilter.filterMessage("fuck",
                 ChatProfanityMode.SILLY, WORDS));
+        // A sign with no name behind it is no mention or channel: a
+        // Discord role's or channel's bold name is filtered.
+        assertEquals("@**flip** #**poop**", ChatProfanityFilter.filterMessage(
+                "@**fuck** #**shit**", ChatProfanityMode.SILLY, WORDS));
     }
 
     @Test

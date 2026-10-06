@@ -16,6 +16,7 @@ import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageOrigin;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatRecipientRule;
@@ -59,6 +60,7 @@ import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.permission.LostTalesPermissions;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
+import com.ninuna.losttales.util.LostTalesWords;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.ChatNarrator;
@@ -72,9 +74,11 @@ import java.util.UUID;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 
 /** Authoritative recipient resolution and presentation snapshot for player chat. */
 public final class LostTalesChatService {
@@ -263,7 +267,7 @@ public final class LostTalesChatService {
         String skinId = narrator ? ChatNarrator.SKIN_ID
                 : accountLine ? "" : worn.getSkinId();
         String title = accountLine || narrator ? "" : presentation.title;
-        String factionName = accountLine || narrator ? "" : presentation.factionName;
+        String titleFaction = accountLine || narrator ? "" : presentation.factionId;
         // A forward shares what its message shared; a line of the
         // sender's own shares what the server finds on them now.
         List<ChatShowcase> showcases = forward != null ? forward.showcases
@@ -325,7 +329,7 @@ public final class LostTalesChatService {
                 message, System.currentTimeMillis(),
                 skinId,
                 showcases,
-                factionName,
+                titleFaction,
                 // A whisper names its partner from the start: the packet
                 // refuses a partner-less whisper, so the sender's copy is
                 // built with the target's name and the target's copy is
@@ -444,10 +448,9 @@ public final class LostTalesChatService {
             boolean told = narrator || (packet.isAction() && !forwarded);
             LostTalesDiscordBridge.getInstance().relayToDiscord(channel,
                     factionId,
-                    told ? ChatNarrator.NAME
-                            : accountLine ? identityName : ChatEpithet.titledName(
-                                    identityName, presentation.factionName,
-                                    presentation.title),
+                    told ? ChatNames.narrator(LostTalesWords.LANG)
+                            : accountLine ? identityName
+                            : presentation.titledName(identityName),
                     // The Narrator is nobody's account: its post, an action
                     // among them, wears the webhook's own picture, never
                     // the narrator's head.
@@ -484,13 +487,17 @@ public final class LostTalesChatService {
      * back as its author. The member's own edit or deletion on Discord
      * follows it here ({@link #editFromDiscord}, {@link #deleteFromDiscord}),
      * and a moderator who may read it can remove it ({@link #delete}).
-     * Answers with the id the message was distributed under, or
-     * {@link ChatMessageIds#NONE} when nothing went out, so the bridge
+     * {@code message} is the line in the server's words, what the
+     * history, the logs and the audit keep; {@code bodyJson} is the same
+     * line with its marks as words each game translates, empty for a line
+     * without one. Answers with the id the message was distributed under,
+     * or {@link ChatMessageIds#NONE} when nothing went out, so the bridge
      * can link the line to the Discord message it came from.
      */
     public static long sendFromDiscord(ChatChannel channel, String factionScope,
                                        String displayName, String guildName,
                                        String discordUserId, String message,
+                                       String bodyJson,
                                        ChatReplyReference reply) {
         MinecraftServer server = MinecraftServer.getServer();
         if (!LostTalesConfig.discordEnabled
@@ -529,7 +536,7 @@ public final class LostTalesChatService {
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, reply)
                 .withScope(factionScope == null ? "" : factionScope)
-                .withNamedPlayers(ChatMentionTargets.ofDiscordLine(channel,
+                .withServerBody(bodyJson, ChatMentionTargets.ofDiscordLine(channel,
                         factionScope, routing.recipients, message));
         FMLLog.info("[losttales/chat/%s] <%s (discord)> %s",
                 logName(channel, factionScope), displayName,
@@ -541,6 +548,47 @@ public final class LostTalesChatService {
         // who a Discord line is from.
         ChatAuditLog.logDiscordMessage(messageId, logName(channel, factionScope),
                 senderId, displayName, message);
+        return messageId;
+    }
+
+    /**
+     * Says a line as the Server in a fellowship's conversation: to the
+     * members playing now, and kept for the members as their own lines are.
+     * It names nobody, so it pings nobody. {@code bodyJson} is the line as
+     * words each game translates, empty for none, {@code message} the
+     * server's own words for it; {@code showcases} are the server's own
+     * links under the line's tokens.
+     */
+    public static long sayToFellowship(Fellowship fellowship, String message,
+                                       String bodyJson,
+                                       List<ChatShowcase> showcases) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (fellowship == null || !ChatMessageValidator.isValid(message)
+                || server == null || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return ChatMessageIds.NONE;
+        }
+        String scope = fellowship.getFellowshipId().toString();
+        long messageId = ChatMessageIdAllocator.next();
+        ChatChannelPolicy.Routing routing = ChatChannelPolicy.route(null,
+                ChatChannel.FELLOWSHIP, fellowship, "");
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.FELLOWSHIP, LostTalesChatMessagePacket.SERVER_SENDER_ID,
+                LostTalesServerBroadcastHook.SERVER_NAME,
+                LostTalesServerBroadcastHook.SERVER_NAME, "",
+                LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
+                ChatChannel.CLIENT_CONSOLE.getDisplayColor(), message,
+                System.currentTimeMillis(), "", showcases, "", "", 0, true,
+                messageId, ChatReplyReference.NONE)
+                .withScope(scope)
+                .withServerBody(bodyJson,
+                        Collections.<ChatNamedPlayer>emptyList());
+        FMLLog.info("[losttales/chat/%s] <%s> %s",
+                logName(ChatChannel.FELLOWSHIP, scope),
+                LostTalesServerBroadcastHook.SERVER_NAME,
+                ChatMessageValidator.logged(message));
+        deliver(packet, null, routing, LostTalesChatMessagePacket.SERVER_SENDER_ID,
+                LostTalesServerBroadcastHook.SERVER_NAME);
         return messageId;
     }
 
@@ -567,7 +615,7 @@ public final class LostTalesChatService {
         String scopeValue = ChatChannelPolicy.scopeValueOf(channel, null, scope);
         for (EntityPlayerMP recipient : routing.recipients) {
             LostTalesNetworkHandler.CHANNEL.sendTo(new LostTalesChatTypingSyncPacket(
-                    channel, "", displayName, typing, scopeValue,
+                    channel, "", displayName, false, typing, scopeValue,
                     ChatIdentitySelection.key(recipient)), recipient);
         }
     }
@@ -745,8 +793,7 @@ public final class LostTalesChatService {
             return reply;
         }
         return ChatReplyReference.unanchored(ChatEpithet.translate(
-                ChatReplyReference.UNKEPT_KEY, ChatReplyReference.UNKEPT_WORDS),
-                "", ChatReplyReference.NO_COLOR);
+                ChatReplyReference.UNKEPT_KEY), "", ChatReplyReference.NO_COLOR);
     }
 
     /** Cleared with the rest of the server's chat state. */
@@ -763,8 +810,11 @@ public final class LostTalesChatService {
      * signed the line with its own author id when it was recorded, which
      * is what allows the rewrite here and what stops any player from
      * making one. The member's own message is theirs and is not touched.
+     * {@code message} and {@code bodyJson} are the new words as
+     * {@link #sendFromDiscord} takes them.
      */
-    public static void editFromDiscord(long messageId, String message) {
+    public static void editFromDiscord(long messageId, String message,
+                                       String bodyJson) {
         if (!ChatMessageValidator.isValid(message)) {
             return;
         }
@@ -773,11 +823,15 @@ public final class LostTalesChatService {
         List<ChatNamedPlayer> named = ChatMentionTargets.ofDiscordLine(channel,
                 ChatHistory.factionScopeOf(messageId),
                 onlineOf(ChatHistory.recipientsOf(messageId)), message);
+        String body = bodyJson == null ? "" : bodyJson;
         Set<UUID> recipients = ChatHistory.applyEdit(messageId,
-                LostTalesChatMessagePacket.DISCORD_SENDER_ID, message, named);
+                LostTalesChatMessagePacket.DISCORD_SENDER_ID, message, body, named);
         if (recipients == null) {
             return;
         }
+        // The readers are told the component the kept line holds now,
+        // which is none where the history could not keep the one given.
+        body = ChatHistory.bodyOf(messageId);
         FMLLog.info("[losttales/chat/discord] edited message %d: %s",
                 Long.valueOf(messageId), ChatMessageValidator.logged(message));
         if (author != null) {
@@ -785,7 +839,7 @@ public final class LostTalesChatService {
                     author.getAccount(), message);
         }
         tellReaders(messageId, recipients,
-                LostTalesChatUpdatePacket.edited(messageId, message, named));
+                LostTalesChatUpdatePacket.edited(messageId, message, body, named));
         LostTalesDiscordBridge.getInstance().relayEdit(messageId, message);
     }
 
@@ -848,8 +902,8 @@ public final class LostTalesChatService {
         String accountName = sender.getGameProfile() == null
                 ? sender.getCommandSenderName()
                 : sender.getGameProfile().getName();
-        String identityName = roleplaying && ChatIdentitySelection.isNarrating(sender)
-                ? ChatNarrator.NAME
+        boolean narrating = roleplaying && ChatIdentitySelection.isNarrating(sender);
+        String identityName = narrating ? ChatNarrator.NAME
                 : worn == null ? accountName
                 : characterNameOrFallback(worn, accountName);
         if (channel.getRecipientRule() == ChatRecipientRule.WHISPER) {
@@ -865,7 +919,8 @@ public final class LostTalesChatService {
                 if (recipientKey.equals(ChatIdentitySelection.key(whisperTarget))) {
                     LostTalesNetworkHandler.CHANNEL.sendTo(
                             new LostTalesChatTypingSyncPacket(channel, accountName,
-                                    identityName, typing, "", recipientKey), whisperTarget);
+                                    identityName, narrating, typing, "", recipientKey),
+                            whisperTarget);
                 }
             }
             return;
@@ -890,7 +945,8 @@ public final class LostTalesChatService {
             if (recipient != sender) {
                 LostTalesNetworkHandler.CHANNEL.sendTo(
                         new LostTalesChatTypingSyncPacket(channel, "", identityName,
-                                typing, ChatChannelPolicy.scopeValueOf(channel, fellowship, factionId),
+                                narrating, typing,
+                                ChatChannelPolicy.scopeValueOf(channel, fellowship, factionId),
                                 ChatIdentitySelection.key(recipient)), recipient);
             }
         }
@@ -1006,7 +1062,7 @@ public final class LostTalesChatService {
                         ? partnerIn(ChatHistory.recipientsOf(messageId), editor) : null,
                 message);
         Set<UUID> recipients = ChatHistory.applyEdit(messageId,
-                editor.getUniqueID(), message, named);
+                editor.getUniqueID(), message, "", named);
         if (recipients == null) {
             return;
         }
@@ -1016,7 +1072,7 @@ public final class LostTalesChatService {
         ChatAuditLog.logEdit(messageId, editor.getUniqueID(),
                 editor.getCommandSenderName(), message);
         tellReaders(messageId, recipients,
-                LostTalesChatUpdatePacket.edited(messageId, message, named));
+                LostTalesChatUpdatePacket.edited(messageId, message, "", named));
         // A line carried to Discord is corrected there too: the bridge
         // rewrites its own webhook post by the id it kept. A message of
         // any other channel resolves to no post and nothing happens.
@@ -1584,8 +1640,9 @@ public final class LostTalesChatService {
                     : new ChatComponentTranslation("chat.losttales.muted"));
             return;
         }
-        String remaining = ChatMuteDurations.formatRemaining(
-                mute.getExpiresAtMillis() - System.currentTimeMillis());
+        IChatComponent remaining = ChatMuteDurations.remaining(
+                mute.getExpiresAtMillis() - System.currentTimeMillis())
+                .component();
         player.addChatMessage(hasReason
                 ? new ChatComponentTranslation(
                         "chat.losttales.muted.timed.because", remaining,
@@ -1823,7 +1880,7 @@ public final class LostTalesChatService {
 
     /**
      * Pairs tokens with references by position and keeps only the things
-     * that exist, match the typed name, and fit the wire bound — each on
+     * that exist, are the sender's to share, and fit the wire bound — each on
      * its own, and all of them together against
      * {@link ChatShowcase#MAX_TOTAL_BYTES}, since the whole set is what
      * every recipient of the line is sent. What does not fit stays the
@@ -1862,7 +1919,7 @@ public final class LostTalesChatService {
                 continue;
             }
             if (token.kind == ChatShareKind.ITEM) {
-                ItemStack stack = resolveItem(sender, reference, token);
+                ItemStack stack = itemInSlot(sender.inventory, reference);
                 if (stack == null) {
                     itemUnavailable = true;
                     continue;
@@ -1880,8 +1937,7 @@ public final class LostTalesChatService {
                 budget -= item.serializedBytes();
                 result.add(item);
             } else if (token.kind == ChatShareKind.MARKER) {
-                ChatShowcase marker = resolveMarker(
-                        sender, reference, token, index);
+                ChatShowcase marker = resolveMarker(sender, reference, index);
                 if (marker == null) {
                     markerUnavailable = true;
                     continue;
@@ -1894,8 +1950,7 @@ public final class LostTalesChatService {
                 result.add(marker);
             } else {
                 ChatShowcase quest = LostTalesQuestShareResolver.resolve(
-                        sender, reference.getQuestReference(),
-                        token.normalizedName(), index);
+                        sender, reference.getQuestReference(), index);
                 if (quest == null) {
                     questUnavailable = true;
                     continue;
@@ -1931,17 +1986,22 @@ public final class LostTalesChatService {
         return result;
     }
 
-    private static ItemStack resolveItem(EntityPlayerMP sender,
-                                         ChatShareReference reference,
-                                         ChatShareTokenParser.Token token) {
-        if (sender.inventory == null || !reference.isResolved()) {
+    /**
+     * The stack in the slot the sender's client named; null for an empty
+     * or unnamed slot. The name typed in the token is the label the
+     * sender's own game showed, in its own language, so it never decides
+     * what is shared; every reader sees the stack's own name
+     * ({@link ChatShowcase}).
+     */
+    static ItemStack itemInSlot(InventoryPlayer inventory,
+                                ChatShareReference reference) {
+        if (inventory == null || reference == null
+                || reference.getKind() != ChatShareKind.ITEM
+                || !reference.isResolved()) {
             return null;
         }
-        ItemStack stack = sender.inventory.getStackInSlot(reference.getSlot());
-        if (stack == null || stack.getItem() == null || stack.stackSize <= 0
-                || !token.normalizedName().equals(
-                        ChatShareTokenParser.normalizeName(
-                                stack.getDisplayName()))) {
+        ItemStack stack = inventory.getStackInSlot(reference.getSlot());
+        if (stack == null || stack.getItem() == null || stack.stackSize <= 0) {
             return null;
         }
         return stack;
@@ -2192,13 +2252,13 @@ public final class LostTalesChatService {
     }
 
     /**
-     * A marker the sender may actually see, by the id the client supplied,
-     * with the typed name checked against the record. The public fields go
-     * out; ownership, sharing lists, and settings never do.
+     * A marker the sender may actually see and has visited, by the id the
+     * client supplied; the typed name is only the sender's label. The
+     * public fields go out, with what an unnamed marker is called after;
+     * ownership, sharing lists, and settings never do.
      */
     private static ChatShowcase resolveMarker(EntityPlayerMP sender,
                                               ChatShareReference reference,
-                                              ChatShareTokenParser.Token token,
                                               int tokenIndex) {
         if (!reference.isResolved()) {
             return null;
@@ -2206,12 +2266,12 @@ public final class LostTalesChatService {
         try {
             LostTalesMapMarkerRecord record = LostTalesMapMarkerStorage
                     .get(sender.worldObj).getRecord(reference.getMarkerId());
+            // The marker is the one the sender's client named by its id;
+            // the typed name is the label the sender's game showed, and
+            // every reader's game names the marker itself.
             if (record == null
                     || !LostTalesMapMarkerVisibilityPolicy.canView(
-                            record, sender)
-                    || !token.normalizedName().equals(
-                            ChatShareTokenParser.normalizeName(
-                                    record.getName()))) {
+                            record, sender)) {
                 return null;
             }
             if (!LostTalesWaypointFastTravelPolicy.hasVisited(sender, record)) {
@@ -2220,9 +2280,9 @@ public final class LostTalesChatService {
                 return null;
             }
             return ChatShowcase.marker(tokenIndex, record.getId(),
-                    record.getName(), record.getIconName(),
-                    record.getColorName(), record.getDimensionId(),
-                    record.getX(), record.getZ());
+                    record.getName(), record.getNamedAfter(),
+                    record.getIconName(), record.getColorName(),
+                    record.getDimensionId(), record.getX(), record.getZ());
         } catch (RuntimeException exception) {
             FMLLog.warning("[losttales/chat] Could not resolve shared marker "
                     + "%s for %s: %s", reference.getMarkerId(),
@@ -2231,12 +2291,13 @@ public final class LostTalesChatService {
         }
     }
 
+    /**
+     * The name a line is signed with: the character's, else the account's.
+     * An account with no name signs nothing, and the line packet refuses a
+     * line signed by nobody, so no word stands in for it.
+     */
     private static String characterNameOrFallback(
             RoleplayCharacter character, String accountName) {
-        String name = PlayableIdentity.displayName(character, accountName);
-        // A line has to be signed with something, and an account with no
-        // name at all is the one case the shared rule leaves to its
-        // caller.
-        return name.length() == 0 ? "Unknown" : name;
+        return PlayableIdentity.displayName(character, accountName);
     }
 }

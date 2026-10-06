@@ -88,7 +88,8 @@ public final class FellowshipStateSnapshotTest {
                 FellowshipColor.BLUE, FellowshipMemberPresence.AWAY, ""));
         return new FellowshipSnapshot(id, leader, "Company " + id.getLeastSignificantBits(),
                 null, EnumSet.allOf(FellowshipSwitch.class),
-                Collections.<UUID>emptyList(), 1L, 1L, 2, members);
+                Collections.<UUID>emptyList(), 1L, 1L, 2, members,
+                Collections.<com.ninuna.losttales.fellowship.model.FellowshipMark>emptyList());
     }
 
     private static FellowshipInvitationSnapshot invitation(UUID fellowshipId) {

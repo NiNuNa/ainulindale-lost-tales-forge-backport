@@ -129,7 +129,7 @@ public final class LostTalesChatServiceNarratorTest {
         assertEquals(ChatNarrator.SENDER_ID, forward.reference.getSenderId());
 
         // The narrator may still rewrite it, and the rewrite names nobody.
-        assertNotNull(ChatHistory.applyEdit(id, STEVE, "The gates hold.", NOBODY));
+        assertNotNull(ChatHistory.applyEdit(id, STEVE, "The gates hold.", "", NOBODY));
         LostTalesChatMessagePacket edited = ChatHistory.replayFor(
                 ChatHistoryRequesters.reader(BOB), 0L).get(0);
         assertEquals("The gates hold.", edited.getMessage());
@@ -173,7 +173,7 @@ public final class LostTalesChatServiceNarratorTest {
         assertNull(line.getIdentityCharacterId());
         assertEquals(0, line.getRoles());
         assertEquals("", line.getTitle());
-        assertEquals("", line.getFactionName());
+        assertEquals("", line.getFactionId());
     }
 
     private static byte[] bytesOf(UUID id) {

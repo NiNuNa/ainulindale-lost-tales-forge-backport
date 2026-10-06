@@ -8,16 +8,15 @@ import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 
 /**
- * Asked before an existing "go here" marker is disturbed.
+ * Asked before a marker the fellowship sees is disturbed: the "go here"
+ * marker, or one of a fellowship's marks.
  *
- * <p>The marker is shared with the fellowship and is often the only thing telling
- * everyone where they are headed, so moving it is a decision rather than a
- * side effect of clicking the map. The first placement asks nothing; every
- * later click on empty map comes through here.</p>
- *
- * <p>Clicking the marker itself opens the same question without a destination
- * to move to, which is how removing it is asked for explicitly instead of
- * happening the moment the marker is touched.</p>
+ * <p>The "go here" marker is often the only thing telling everyone where
+ * they are headed, so moving it is a decision rather than a side effect of
+ * clicking the map. Its first placement asks nothing; every later click on
+ * empty map comes through here, and clicking the marker itself asks the
+ * same without a place to move to. A mark is asked about when it is
+ * clicked, and Move It picks its new place on the map.</p>
  */
 @SideOnly(Side.CLIENT)
 final class LostTalesMapMoveMarkerPrompt {
@@ -28,11 +27,13 @@ final class LostTalesMapMoveMarkerPrompt {
         REMOVE
     }
 
-    /** Whether a new position was picked, which is what Move would apply. */
-    private final boolean hasDestination;
+    private final String question;
+    /** Whether Move It does something: a place was picked, or one is picked next. */
+    private final boolean canMove;
 
-    LostTalesMapMoveMarkerPrompt(boolean hasDestination) {
-        this.hasDestination = hasDestination;
+    LostTalesMapMoveMarkerPrompt(String question, boolean canMove) {
+        this.question = question == null ? "" : question;
+        this.canMove = canMove;
     }
 
     void render(int screenWidth, int screenHeight,
@@ -57,12 +58,11 @@ final class LostTalesMapMoveMarkerPrompt {
         LostTalesMapPopupAnimation.push(this, pivotX, pivotY);
         try {
             LostTalesMapChoicePrompt.renderPanelContents(font, layout,
-                    I18n.format("gui.losttales.map.move_marker.prompt"),
-                    null);
+                    this.question, null);
             LostTalesMapChoicePrompt.drawButton(font, layout.first,
                     I18n.format("gui.losttales.map.move_marker.move"),
                     layout.first.contains(localMouseX, localMouseY),
-                    this.hasDestination);
+                    this.canMove);
             LostTalesMapChoicePrompt.drawButton(font, layout.second,
                     I18n.format("gui.losttales.map.move_marker.leave"),
                     layout.second.contains(localMouseX, localMouseY), true);
@@ -89,7 +89,7 @@ final class LostTalesMapMoveMarkerPrompt {
         mouseY = LostTalesMapPopupAnimation.inverseMouseY(
                 this, mouseY, pivotY);
         if (layout.first.contains(mouseX, mouseY)) {
-            return this.hasDestination ? Action.MOVE : Action.NONE;
+            return this.canMove ? Action.MOVE : Action.NONE;
         }
         if (layout.second.contains(mouseX, mouseY)) {
             return Action.LEAVE;
@@ -115,7 +115,7 @@ final class LostTalesMapMoveMarkerPrompt {
                 || keyCode == Keyboard.KEY_NUMPADENTER) {
             // Enter confirms what the popup was opened for; with nothing to
             // move to there is nothing to confirm.
-            return this.hasDestination ? Action.MOVE : Action.NONE;
+            return this.canMove ? Action.MOVE : Action.NONE;
         }
         return Action.NONE;
     }

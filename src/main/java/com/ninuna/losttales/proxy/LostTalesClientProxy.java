@@ -30,6 +30,7 @@ import com.ninuna.losttales.client.chat.ChatEmojiUsageStore;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.window.ClientSettingsPage;
 import com.ninuna.losttales.client.window.PageContent;
+import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
@@ -219,7 +220,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         WindowPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",
                 new ItemStack(Items.writable_book),
                 LostTalesKeyBindings.getQuestJournalKeyBinding(),
-                new WindowPages.Factory() {
+                PageCategory.QUEST_JOURNAL, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new QuestJournalPage();
@@ -228,7 +229,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         WindowPages.register(FellowshipPage.PAGE_ID, "gui.losttales.page.fellowship",
                 new ItemStack(Items.iron_helmet),
                 LostTalesKeyBindings.getFellowshipKeyBinding(),
-                new WindowPages.Factory() {
+                PageCategory.FELLOWSHIPS, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new FellowshipPage();
@@ -237,7 +238,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         WindowPages.register(LostTalesMapPage.PAGE_ID, "gui.losttales.page.map",
                 new ItemStack(Items.map),
                 LostTalesKeyBindings.getMapKeyBinding(),
-                new WindowPages.Factory() {
+                PageCategory.MAP, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new LostTalesMapPage();
@@ -246,7 +247,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         WindowPages.register(CharactersPage.PAGE_ID,
                 "gui.losttales.page.characters", CharactersPage.ICON,
                 LostTalesKeyBindings.getCharactersKeyBinding(),
-                new WindowPages.Factory() {
+                PageCategory.PROFILE, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new CharactersPage();
@@ -255,7 +256,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         CharacterSubWindows.install();
         WindowPages.register(MotionLabPage.PAGE_ID,
                 "gui.losttales.page.motion_lab", MotionLabPage.ICON, null,
-                new WindowPages.Factory() {
+                PageCategory.SETTINGS, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new MotionLabPage();
@@ -264,7 +265,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         MotionLabPage.install();
         WindowPages.register(ClientSettingsPage.PAGE_ID,
                 "gui.losttales.page.client_settings", ClientSettingsPage.ICON,
-                null, new WindowPages.Factory() {
+                null, PageCategory.SETTINGS, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new ClientSettingsPage();
@@ -272,7 +273,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 });
         WindowPages.register(HudPlacementPage.PAGE_ID,
                 "gui.losttales.page.hud_placement", HudPlacementPage.ICON,
-                null, new WindowPages.Factory() {
+                null, PageCategory.SETTINGS, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new HudPlacementPage();
@@ -280,7 +281,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 });
         WindowPages.register(ServerSettingsPage.PAGE_ID,
                 "gui.losttales.page.server_settings", ServerSettingsPage.ICON,
-                null, new WindowPages.Factory() {
+                null, PageCategory.SETTINGS, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new ServerSettingsPage();
@@ -288,9 +289,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 });
         // A waystone's page opens only from the waystone: no key, never
         // offered under the +, and gone as the player leaves the world.
+        // It travels on the map, and stands with it; a missive board and
+        // a letter hand out quests, and stand with the journal.
         WindowPages.registerWorldPage(WaystonePage.PAGE_ID,
                 "gui.losttales.page.waystone", WaystonePage.ICON,
-                new WindowPages.Factory() {
+                PageCategory.MAP, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new WaystonePage();
@@ -298,7 +301,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 });
         WindowPages.registerWorldPage(MissiveBoardPage.PAGE_ID,
                 "gui.losttales.page.missive_board", MissiveBoardPage.ICON,
-                new WindowPages.Factory() {
+                PageCategory.QUEST_JOURNAL, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new MissiveBoardPage();
@@ -306,7 +309,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 });
         WindowPages.registerWorldPage(MissiveLetterPage.PAGE_ID,
                 "gui.losttales.page.missive_letter", MissiveLetterPage.ICON,
-                new WindowPages.Factory() {
+                PageCategory.QUEST_JOURNAL, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new MissiveLetterPage();
@@ -635,6 +638,12 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatPresence(LostTalesChatPresenceSyncPacket packet) {
         ClientChatPresence.accept(packet);
+    }
+
+    @Override
+    public void handleServerStatus(
+            com.ninuna.losttales.network.packet.LostTalesServerStatusPacket packet) {
+        com.ninuna.losttales.client.chat.ClientServerStatus.accept(packet);
     }
 
     @Override

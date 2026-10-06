@@ -1,7 +1,11 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.WindowLists;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import org.lwjgl.input.Keyboard;
@@ -17,7 +21,9 @@ import org.lwjgl.input.Keyboard;
  * id alone. The full figure on the stage shows the rest.</p>
  *
  * <p>A grid made without a label draws the tiles alone, for a window that
- * names the chosen skin above a grid it scrolls.</p>
+ * names the chosen skin above a grid it scrolls. In a window's rows the
+ * heads stand on the window's surface, the chosen tile and the one under
+ * the pointer lit as a menu's rows are, and a label is a heading.</p>
  */
 public final class CreatorTileGrid extends CreatorControl {
 
@@ -53,15 +59,28 @@ public final class CreatorTileGrid extends CreatorControl {
         return count == 0 ? 0 : (count + columns() - 1) / columns();
     }
 
+    /** How tall {@code rows} rows of tiles stand, the gap after the last left out. */
+    public static int rowsHeight(int rows) {
+        return rows * ROW_PITCH - TILE_GAP;
+    }
+
     @Override
     public int height() {
         int rows = rows();
+        if (inRows()) {
+            return titleHeight() + (rows == 0 ? CreatorRows.height()
+                    : rowsHeight(rows));
+        }
         return titleHeight() + (rows == 0
                 ? LABEL_HEIGHT : rows * (TILE + TILE_GAP) - TILE_GAP) + 2;
     }
 
     private int titleHeight() {
-        return this.label == null ? 0 : TITLE_HEIGHT;
+        if (this.label == null) {
+            return 0;
+        }
+        return inRows() ? CreatorRows.height() + MenuWindow.PADDING_Y
+                : TITLE_HEIGHT;
     }
 
     private int gridTop() {
@@ -76,17 +95,26 @@ public final class CreatorTileGrid extends CreatorControl {
         return gridTop() + (index / columns()) * (TILE + TILE_GAP);
     }
 
+    /** The label and the chosen skin's name, as the title reads them. */
+    private String title() {
+        int count = this.choice.count();
+        int selected = this.choice.index();
+        return count > 0 && selected >= 0 && selected < count
+                ? this.label + ": " + this.choice.label(selected) : this.label;
+    }
+
     @Override
     public void draw(int mouseX, int mouseY) {
+        if (inRows()) {
+            drawRows(mouseX, mouseY);
+            return;
+        }
         FontRenderer font = this.context.getFont();
         int count = this.choice.count();
         int selected = this.choice.index();
         if (this.label != null) {
-            String title = this.label;
-            if (count > 0 && selected >= 0 && selected < count) {
-                title = this.label + ": " + this.choice.label(selected);
-            }
-            drawLabel(LostTalesSkyrimUiStyle.trimToWidth(font, title, this.width));
+            drawLabel(LostTalesSkyrimUiStyle.trimToWidth(font, title(),
+                    this.width));
         }
         if (count == 0) {
             font.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(font,
@@ -120,6 +148,46 @@ public final class CreatorTileGrid extends CreatorControl {
                                 : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
                 LostTalesSkyrimUiStyle.beginContent();
             }
+        }
+    }
+
+    /**
+     * As a window's rows: the title a heading over its hairline; each head
+     * on the window's surface, the chosen tile and the one under the
+     * pointer lit before the head lands on it; with nothing to choose,
+     * why, in the aside tone.
+     */
+    private void drawRows(int mouseX, int mouseY) {
+        FontRenderer font = this.context.getFont();
+        int alpha = this.context.alpha();
+        int count = this.choice.count();
+        if (this.label != null) {
+            WindowLists.drawHeading(font, title(), this.x, this.x,
+                    this.x + this.width, this.y, CreatorRows.height(), false,
+                    alpha);
+        }
+        if (count == 0) {
+            LostTalesUiInk.drawText(font, CreatorRows.trimmed(font,
+                    this.choice.emptyLabel(), this.width), this.x,
+                    CreatorRows.textTop(gridTop()), WindowStyle.asideRgb(),
+                    alpha);
+            return;
+        }
+        int selected = this.choice.index();
+        int hovered = tileAt(mouseX, mouseY);
+        for (int index = 0; index < count; index++) {
+            int tileX = tileX(index);
+            int tileY = tileY(index);
+            if (index == selected || index == hovered) {
+                CreatorRows.light(this.context, tileX, tileY, tileX + TILE,
+                        tileY + TILE);
+            }
+            LostTalesUiInk.beginContent();
+            LostTalesCharacterHeadIconRenderer.drawSnapshotHead(
+                    this.context.getMinecraft(), this.context.getAccountId(),
+                    this.choice.id(index), tileX + HEAD_INSET,
+                    tileY + HEAD_INSET, TILE - HEAD_INSET * 2, 1.0F,
+                    alpha / 255.0F);
         }
     }
 

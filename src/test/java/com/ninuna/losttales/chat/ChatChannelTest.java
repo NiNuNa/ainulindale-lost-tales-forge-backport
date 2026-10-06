@@ -45,7 +45,7 @@ public final class ChatChannelTest {
                     channel.getId());
         }
         assertEquals("Global Chat", ChatChannel.GLOBAL.getDisplayName());
-        assertEquals("Gondor Chat", ChatChannel.factionChatName("Gondor"));
+        assertEquals("chat.losttales.channel.global", ChatChannel.GLOBAL.getNameKey());
         assertEquals("global", ChatChannel.GLOBAL.getId());
         assertEquals("proximity", ChatChannel.PROXIMITY.getId());
         assertEquals("fellowship", ChatChannel.FELLOWSHIP.getId());

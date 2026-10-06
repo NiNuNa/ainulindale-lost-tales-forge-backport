@@ -10,13 +10,18 @@ import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.List;
 
-/** What became of an operator's changes, back to the client that sent them. */
+/**
+ * What became of an operator's changes, back to the client that sent them.
+ * Its words travel as lang keys and their arguments, so the page reads them
+ * in its player's language; a key outside the config's words is malformed.
+ */
 public final class LostTalesServerConfigResultPacket implements IMessage {
 
     private static final int MAX_NAMES = ServerConfigPacketCodec.MAX_ENTRIES;
     private static final int MAX_NAME_BYTES = 256;
-    private static final int MAX_REASON_BYTES = 512;
-    private static final int MAX_MESSAGE_BYTES = 1024;
+    private static final int MAX_KEY_BYTES = 128;
+    private static final int MAX_ARGUMENTS = 4;
+    private static final int MAX_ARGUMENT_BYTES = 512;
 
     private ServerConfigApplyResult result;
     private boolean malformed;
@@ -39,12 +44,27 @@ public final class LostTalesServerConfigResultPacket implements IMessage {
             List<ServerConfigApplyResult.Refusal> refused =
                     new ArrayList<ServerConfigApplyResult.Refusal>(refusedCount);
             for (int index = 0; index < refusedCount; index++) {
-                refused.add(new ServerConfigApplyResult.Refusal(
-                        LostTalesPacketCodec.readUtf8String(buffer, MAX_NAME_BYTES),
-                        LostTalesPacketCodec.readUtf8String(buffer, MAX_REASON_BYTES)));
+                String name = LostTalesPacketCodec.readUtf8String(buffer, MAX_NAME_BYTES);
+                String reason = readKey(buffer);
+                int argumentCount = LostTalesPacketCodec.readCount(buffer, MAX_ARGUMENTS,
+                        "arguments");
+                String[] arguments = new String[argumentCount];
+                for (int argument = 0; argument < argumentCount; argument++) {
+                    arguments[argument] = LostTalesPacketCodec.readUtf8String(buffer,
+                            MAX_ARGUMENT_BYTES);
+                }
+                refused.add(new ServerConfigApplyResult.Refusal(name, reason, arguments));
             }
-            List<String> restarted = readNames(buffer, "restarted");
-            String message = LostTalesPacketCodec.readUtf8String(buffer, MAX_MESSAGE_BYTES);
+            int restartedCount = LostTalesPacketCodec.readCount(buffer, MAX_NAMES,
+                    "restarted");
+            List<String> restarted = new ArrayList<String>(restartedCount);
+            for (int index = 0; index < restartedCount; index++) {
+                restarted.add(readKey(buffer));
+            }
+            String message = LostTalesPacketCodec.readUtf8String(buffer, MAX_KEY_BYTES);
+            if (message.length() > 0) {
+                requireWords(message);
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             this.result = new ServerConfigApplyResult(applied, refused, restarted, message);
         } catch (RuntimeException exception) {
@@ -61,10 +81,33 @@ public final class LostTalesServerConfigResultPacket implements IMessage {
         LostTalesPacketCodec.writeCount(buffer, refused.size(), MAX_NAMES, "refused");
         for (ServerConfigApplyResult.Refusal refusal : refused) {
             LostTalesPacketCodec.writeUtf8String(buffer, refusal.getName(), MAX_NAME_BYTES);
-            LostTalesPacketCodec.writeUtf8String(buffer, refusal.getReason(), MAX_REASON_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, refusal.getReasonKey(), MAX_KEY_BYTES);
+            List<String> arguments = refusal.getReasonArguments();
+            LostTalesPacketCodec.writeCount(buffer, arguments.size(), MAX_ARGUMENTS,
+                    "arguments");
+            for (String argument : arguments) {
+                LostTalesPacketCodec.writeUtf8String(buffer, argument, MAX_ARGUMENT_BYTES);
+            }
         }
-        writeNames(buffer, this.result.getRestarted(), "restarted");
-        LostTalesPacketCodec.writeUtf8String(buffer, this.result.getMessage(), MAX_MESSAGE_BYTES);
+        List<String> restarted = this.result.getRestarted();
+        LostTalesPacketCodec.writeCount(buffer, restarted.size(), MAX_NAMES, "restarted");
+        for (String key : restarted) {
+            LostTalesPacketCodec.writeUtf8String(buffer, key, MAX_KEY_BYTES);
+        }
+        LostTalesPacketCodec.writeUtf8String(buffer, this.result.getMessage(), MAX_KEY_BYTES);
+    }
+
+    /** A lang key of the config's words; anything else makes the payload malformed. */
+    private static String readKey(ByteBuf buffer) {
+        return requireWords(LostTalesPacketCodec.readUtf8String(buffer, MAX_KEY_BYTES));
+    }
+
+    private static String requireWords(String key) {
+        if (!key.startsWith(ServerConfigApplyResult.WORDS)
+                || key.length() == ServerConfigApplyResult.WORDS.length()) {
+            throw new IllegalArgumentException("not a config word: " + key);
+        }
+        return key;
     }
 
     private static void writeNames(ByteBuf buffer, List<String> names, String field) {

@@ -1,7 +1,8 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
 /**
- * One row of the creator's column: a stepper, a slider, a field, a grid.
+ * One row of the creator's column, or of a window's form: a stepper, a
+ * slider, a field, a grid.
  *
  * <p>A control is placed by the column every frame — the column scrolls,
  * so where a control is drawn is not where it was last frame — and asked
@@ -9,6 +10,10 @@ package com.ninuna.losttales.gui.screen.character.creator;
  * control only when the pointer is on it, or, for keys, when it holds the
  * focus. Everything a control answers with is a boolean saying whether it
  * took the input, so the screen can fall through to its own handling.</p>
+ *
+ * <p>Its context says how it stands: boxed in the creator's column, a
+ * label over its value, or as a window's row ({@link CreatorRows}). It
+ * lays itself out, draws and answers the pointer in that one way.</p>
  */
 public abstract class CreatorControl {
 
@@ -92,6 +97,11 @@ public abstract class CreatorControl {
     public boolean contains(int mouseX, int mouseY) {
         return CreatorWidgets.within(mouseX, mouseY, this.x, this.y,
                 this.width, height());
+    }
+
+    /** Whether the control stands as a window's row rather than boxed in the creator's column. */
+    protected final boolean inRows() {
+        return this.context.inRows();
     }
 
     /** Where a row's value sits, under its label. */

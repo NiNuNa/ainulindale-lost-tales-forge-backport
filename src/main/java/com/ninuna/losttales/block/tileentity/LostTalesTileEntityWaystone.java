@@ -32,7 +32,8 @@ public final class LostTalesTileEntityWaystone
     private String markerId = "";
     private UUID linkToken;
     private UUID ownerPlayerId;
-    private String displayName = "Waystone";
+    /** The waystone's own name; empty for one called after its placer. */
+    private String displayName = "";
     private LostTalesMapMarkerVisibility visibility =
             LostTalesMapMarkerVisibility.PRIVATE;
     private long markerRevision;
@@ -89,7 +90,7 @@ public final class LostTalesTileEntityWaystone
         this.markerId = "";
         this.linkToken = null;
         this.ownerPlayerId = null;
-        this.displayName = "Waystone";
+        this.displayName = "";
         this.visibility = LostTalesMapMarkerVisibility.PRIVATE;
         this.markerRevision = 0L;
         this.sharedPlayerCount = 0;
@@ -137,7 +138,7 @@ public final class LostTalesTileEntityWaystone
         this.linkToken = NbtTags.readUuid(tag, "LinkToken");
         this.ownerPlayerId = NbtTags.readUuid(tag, "Owner");
         this.displayName = bounded(
-                tag.getString("DisplayName"), 256, "Waystone");
+                tag.getString("DisplayName"), 256, "");
         this.visibility =
                 LostTalesMapMarkerVisibility.forSerializedName(
                         tag.getString("Visibility"),
@@ -172,7 +173,7 @@ public final class LostTalesTileEntityWaystone
         NBTTagCompound tag = packet.func_148857_g();
         this.markerId = bounded(tag.getString("MarkerId"), 256, "");
         this.displayName = bounded(
-                tag.getString("DisplayName"), 256, "Waystone");
+                tag.getString("DisplayName"), 256, "");
         this.visibility =
                 LostTalesMapMarkerVisibility.forSerializedName(
                         tag.getString("Visibility"),

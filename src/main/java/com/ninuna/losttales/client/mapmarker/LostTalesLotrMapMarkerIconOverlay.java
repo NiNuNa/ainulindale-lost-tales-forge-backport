@@ -1386,7 +1386,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 name,
                 LostTalesCompassMarkerIcon.PERSONAL.name(),
                 LostTalesCustomWaypointStyle.getColor(name, shared),
-                LostTalesMapMarkerData.CATEGORY_POINT_OF_INTEREST,
+                "",
                 LostTalesCustomWaypointStyle.getNote(name),
                 true,
                 LOTRDimension.MIDDLE_EARTH.dimensionID,
@@ -3443,10 +3443,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     /**
-     * The bundled marker's own name, falling back to LOTR's only for a
-     * waypoint Lost Tales does not name itself — a player's own waypoint, for
-     * one. The marker definitions are the single source of what a place is
-     * called, so the map and the compass always agree.
+     * The marker's own name in the game's language, falling back to LOTR's
+     * only for a waypoint Lost Tales does not name itself — a player's own
+     * waypoint, for one. Every screen reads the marker's name, so the map and
+     * the compass always agree.
      */
     private static String discoveredWaypointName(
             LOTRAbstractWaypoint waypoint, LostTalesMapMarkerData marker) {
@@ -3870,7 +3870,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                                     double x, double z) {
             this.entityId = entityId;
             this.name = name == null || name.length() == 0
-                    ? "Enemy" : name;
+                    ? LostTalesClientMobAggroCache.enemyWord() : name;
             this.x = x;
             this.z = z;
         }

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.character;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+import com.ninuna.losttales.character.lore.sync.LoreCharacterSummary;
 import com.ninuna.losttales.character.cape.CharacterCapeDefinition;
 import com.ninuna.losttales.character.registry.CharacterBodyModelDefinition;
 import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
@@ -16,7 +17,9 @@ import com.ninuna.losttales.character.sync.CharacterCreationCatalog;
 import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.util.LostTalesDuration;
 import net.minecraft.client.resources.I18n;
+import net.minecraft.util.StatCollector;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,6 +30,7 @@ import java.util.List;
 public final class ClientCharacterDisplayNames {
 
     private static final LotrCharacterAdapter LOTR_ADAPTER = LotrCharacterAdapter.getInstance();
+    private static final String LOST_TALES_NAMESPACE = "losttales:";
 
     private ClientCharacterDisplayNames() {}
 
@@ -231,15 +235,55 @@ public final class ClientCharacterDisplayNames {
         long totalSeconds = (remainingMillis + 999L) / 1000L;
         long minutes = totalSeconds / 60L;
         long seconds = totalSeconds % 60L;
-        return base + " " + (minutes > 0L
-                ? minutes + "m " + seconds + "s"
-                : seconds + "s");
+        LostTalesDuration wait = minutes > 0L
+                ? LostTalesDuration.of(minutes, LostTalesDuration.Unit.MINUTES)
+                        .and(seconds, LostTalesDuration.Unit.SECONDS)
+                : LostTalesDuration.of(seconds, LostTalesDuration.Unit.SECONDS);
+        return I18n.format("gui.losttales.character.error.wait", base,
+                wait.write());
     }
 
     public static String operationSuccess(String operationId) {
         String key = "gui.losttales.character.success." + operationId;
         String translated = I18n.format(key);
         return key.equals(translated) ? I18n.format("gui.losttales.character.success.generic") : translated;
+    }
+
+    /**
+     * A lore character's description in the game's language: the lang
+     * line under its id where one exists, else the words its file gives it.
+     */
+    public static String loreDescription(LoreCharacterSummary character) {
+        if (character == null) {
+            return "";
+        }
+        String key = loreKey(character, "description");
+        return StatCollector.canTranslate(key)
+                ? StatCollector.translateToLocal(key) : character.getDescription();
+    }
+
+    /**
+     * A lore character's name as the lore window's card shows it: a titled
+     * one (Arthur, Mayor of Bree) in the game's language, its title worded
+     * by the lang line under its id; any other as its file gives it.
+     * Everywhere else the name is the character's identity and reads alike
+     * for everyone.
+     */
+    public static String loreCardName(LoreCharacterSummary character) {
+        if (character == null) {
+            return "";
+        }
+        String key = loreKey(character, "name");
+        return StatCollector.canTranslate(key)
+                ? StatCollector.translateToLocal(key) : character.getName();
+    }
+
+    private static String loreKey(LoreCharacterSummary character, String field) {
+        String id = character.getId();
+        return "gui.losttales.character.lore."
+                + (id.startsWith(LOST_TALES_NAMESPACE)
+                        ? id.substring(LOST_TALES_NAMESPACE.length()) : id)
+                + "." + field;
     }
 
     private static String translatedIdentifier(String prefix, String id, String namespace) {

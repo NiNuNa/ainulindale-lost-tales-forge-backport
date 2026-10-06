@@ -146,14 +146,15 @@ final class ChatMentionColors {
 
     /**
      * The mentionable role the name addresses, or null — in every
-     * channel, the same rule {@link #colorOf} colours them by.
+     * channel, the same rule {@link #colorOf} colours them by: the name
+     * this game shows the role by, or its id.
      */
     static ChatAccountRole roleFor(String name) {
         if (name == null || name.length() == 0) {
             return null;
         }
         for (ChatAccountRole role : ChatAccountRole.mentionable()) {
-            if (name.equalsIgnoreCase(role.getDisplayName())) {
+            if (role.answersTo(name)) {
                 return role;
             }
         }

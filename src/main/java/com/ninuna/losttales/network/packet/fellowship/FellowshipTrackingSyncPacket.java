@@ -68,8 +68,9 @@ public final class FellowshipTrackingSyncPacket implements IMessage {
                         throw new FellowshipPacketCodec.DecodeException(
                                 "duplicate tracked member identity");
                     }
-                    String name = LostTalesPacketCodec.readUtf8String(
-                            buffer, FellowshipPacketCodec.MAX_NAME_BYTES);
+                    String name = FellowshipPacketCodec.shownName(
+                            LostTalesPacketCodec.readUtf8String(
+                                    buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
                     FellowshipColor color = FellowshipColor.fromNetworkId(
                             buffer.readUnsignedByte());
                     if (color == null) {
@@ -101,8 +102,9 @@ public final class FellowshipTrackingSyncPacket implements IMessage {
                     throw new FellowshipPacketCodec.DecodeException(
                             "duplicate marker owner identity");
                 }
-                String name = LostTalesPacketCodec.readUtf8String(
-                        buffer, FellowshipPacketCodec.MAX_NAME_BYTES);
+                String name = FellowshipPacketCodec.shownName(
+                        LostTalesPacketCodec.readUtf8String(
+                                buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
                 FellowshipColor color = FellowshipColor.fromNetworkId(
                         buffer.readUnsignedByte());
                 if (color == null) {

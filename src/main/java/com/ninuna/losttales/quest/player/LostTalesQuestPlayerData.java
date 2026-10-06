@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.compat.lotr.LotrQuestReference;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionNbt;
@@ -41,7 +42,7 @@ import net.minecraftforge.common.util.Constants;
  */
 public final class LostTalesQuestPlayerData implements IExtendedEntityProperties {
     public static final String PROPERTY_ID = "LostTalesQuestData";
-    public static final int CURRENT_DATA_VERSION = 2;
+    public static final int CURRENT_DATA_VERSION = 3;
     static final int MAX_ACTIVE_QUESTS = 1024;
     static final int MAX_QUEST_ID_HISTORY = 8192;
     static final int MAX_DYNAMIC_QUESTS = 512;
@@ -159,10 +160,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
             NBTTagCompound markerTag = new NBTTagCompound();
             markerTag.setString("MarkerId", marker.getId());
-            markerTag.setString("Name", marker.getName() == null ? marker.getId() : marker.getName());
+            markerTag.setString("Name", marker.getName() == null ? "" : marker.getName());
+            markerTag.setString("NamedAfter", marker.getNamedAfter());
             markerTag.setString("Icon", marker.getIconName() == null ? "quest" : marker.getIconName());
             markerTag.setString("Color", marker.getColorName() == null ? "white" : marker.getColorName());
-            markerTag.setString("Category", marker.getCategoryName() == null ? LostTalesMapMarkerDefinition.CATEGORY_DEFAULT : marker.getCategoryName());
+            markerTag.setString("Category", marker.getCategoryName() == null ? "" : marker.getCategoryName());
             markerTag.setBoolean("HasFastTravel", marker.hasFastTravel());
             markerTag.setInteger("DimensionId", marker.getDimensionId());
             markerTag.setDouble("X", marker.getX());
@@ -950,11 +952,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             String persistedMarkerId) {
         return new LostTalesMapMarkerDefinition(
                 persistedMarkerId,
-                safe(marker.getName(), persistedMarkerId),
+                marker.getNamedAfter().length() > 0
+                        ? safe(marker.getName(), "")
+                        : safe(marker.getName(), persistedMarkerId),
                 safe(marker.getIconName(), "quest"),
                 safe(marker.getColorName(), "white"),
-                safe(marker.getCategoryName(),
-                        LostTalesMapMarkerDefinition.CATEGORY_DEFAULT),
+                safe(marker.getCategoryName(), ""),
                 "",
                 marker.hasFastTravel(), marker.getDimensionId(),
                 marker.getX(), marker.getY(), marker.getZ(),
@@ -964,7 +967,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 marker.isDiscoverable(),
                 marker.requiresRegionUnlock(),
                 LostTalesMapMarkerSource.QUEST_DYNAMIC,
-                false, "", marker.getPriority());
+                false, "", marker.getPriority(), marker.getNamedAfter());
     }
 
     private static boolean isValidDynamicMarker(
@@ -996,12 +999,14 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (markerId.length() == 0) {
             return null;
         }
+        String namedAfter = markerTag.getString("NamedAfter");
         return new LostTalesMapMarkerDefinition(
                 markerId,
-                safe(markerTag.getString("Name"), markerId),
+                namedAfter.length() > 0 ? markerTag.getString("Name")
+                        : safe(markerTag.getString("Name"), markerId),
                 safe(markerTag.getString("Icon"), "quest"),
                 safe(markerTag.getString("Color"), "white"),
-                safe(markerTag.getString("Category"), LostTalesMapMarkerDefinition.CATEGORY_DEFAULT),
+                markerTag.getString("Category"),
                 "",
                 markerTag.getBoolean("HasFastTravel"),
                 markerTag.getInteger("DimensionId"),
@@ -1016,7 +1021,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                         && markerTag.getBoolean("RequiresRegionUnlock"),
                 LostTalesMapMarkerSource.QUEST_DYNAMIC,
                 false, "", markerTag.hasKey("Priority")
-                        ? markerTag.getInteger("Priority") : 0
+                        ? markerTag.getInteger("Priority") : 0,
+                namedAfter
         );
     }
 
@@ -1029,6 +1035,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         return safe(left.getId(), "").equals(safe(right.getId(), ""))
                 && safe(left.getName(), "").equals(safe(right.getName(), ""))
+                && left.getNamedAfter().equals(right.getNamedAfter())
                 && safe(left.getIconName(), "").equals(safe(right.getIconName(), ""))
                 && safe(left.getColorName(), "").equals(safe(right.getColorName(), ""))
                 && safe(left.getCategoryName(), "").equals(safe(right.getCategoryName(), ""))
@@ -1165,7 +1172,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 || !hasReasonableOptionalString(
                 marker, "Color", MAX_IDENTIFIER_CHARACTERS)
                 || !hasReasonableOptionalString(
-                marker, "Category", MAX_NAME_CHARACTERS)) {
+                marker, "Category", MAX_NAME_CHARACTERS)
+                || !hasReasonableOptionalString(marker, "NamedAfter",
+                LostTalesMapMarkerNamedAfter.MAX_LENGTH)
+                || !LostTalesMapMarkerNamedAfter.isValid(
+                        marker.getString("NamedAfter"))) {
             return false;
         }
         double x = marker.getDouble("X");

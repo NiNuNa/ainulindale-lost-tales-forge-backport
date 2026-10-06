@@ -23,10 +23,11 @@ public final class FellowshipInvitationNotice {
 
     /**
      * The line for the invited player: who invites them into which
-     * fellowship, then the two answers. The words are the Server's own, in
+     * fellowship ({@code inviterName} a name or a component each reader's
+     * game words), then the two answers. The words are the Server's own, in
      * the yellow of a join or a leave; the answers keep their green and red.
      */
-    public static IChatComponent line(String inviterName, String fellowshipName,
+    public static IChatComponent line(Object inviterName, String fellowshipName,
                                       UUID invitationId) {
         ChatComponentTranslation line = new ChatComponentTranslation(KEY,
                 inviterName, fellowshipName, answer(true, invitationId),

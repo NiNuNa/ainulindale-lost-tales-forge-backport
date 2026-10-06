@@ -5,8 +5,6 @@ import java.util.Arrays;
 import java.util.List;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommandSender;
-import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumChatFormatting;
 
 /**
@@ -18,6 +16,9 @@ import net.minecraft.util.EnumChatFormatting;
  * root opening never opens more than the sub-commands do.
  */
 public class LostTalesCommandRoot extends LostTalesCommandBase {
+
+    /** What the lang key of each of the root's answers begins with. */
+    static final String SAY = "chat.losttales.command.root.";
 
     public LostTalesCommandRoot() {
         super(LostTalesMetaData.MOD_ID);
@@ -62,7 +63,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
 
         ELostTalesSubCommand subCommand = ELostTalesSubCommand.byName(args[0]);
         if (subCommand == null) {
-            send(sender, EnumChatFormatting.RED + "Unknown Lost Tales sub-command: " + args[0]);
+            say(sender, EnumChatFormatting.RED, SAY + "unknown", args[0]);
             sendUsage(sender);
             return;
         }
@@ -71,10 +72,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
         // the sub-command, so one may ask for more than the root does.
         CommandBase command = subCommand.getCommand();
         if (!command.canCommandSenderUseCommand(sender)) {
-            ChatComponentTranslation refusal = new ChatComponentTranslation(
-                    "commands.generic.permission");
-            refusal.getChatStyle().setColor(EnumChatFormatting.RED);
-            sender.addChatMessage(refusal);
+            say(sender, EnumChatFormatting.RED, "commands.generic.permission");
             return;
         }
 
@@ -90,17 +88,12 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
 
     /** Lists only what the sender may run; the rest would be refused anyway. */
     private void sendUsage(ICommandSender sender) {
-        send(sender, EnumChatFormatting.GOLD + "Lost Tales commands:");
+        say(sender, EnumChatFormatting.GOLD, SAY + "header");
         for (ELostTalesSubCommand subCommand : ELostTalesSubCommand.values()) {
             if (subCommand.getCommand().canCommandSenderUseCommand(sender)) {
-                send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " "
-                        + subCommand.getUsage());
+                usage(sender, "/" + getCommandName() + " " + subCommand.getUsage());
             }
         }
-    }
-
-    private void send(ICommandSender sender, String message) {
-        sender.addChatMessage(new ChatComponentText(message));
     }
 
     @Override

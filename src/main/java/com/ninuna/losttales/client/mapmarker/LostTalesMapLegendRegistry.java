@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import cpw.mods.fml.relauncher.Side;
@@ -111,6 +112,7 @@ public final class LostTalesMapLegendRegistry {
         }
         String id = marker.getId() == null ? "" : marker.getId();
         if (id.startsWith("fellowship_go_here:")
+                || id.startsWith(FellowshipMark.MARKER_ID_PREFIX)
                 || "Go Here".equalsIgnoreCase(marker.getCategoryName())) {
             return FELLOWSHIP;
         }

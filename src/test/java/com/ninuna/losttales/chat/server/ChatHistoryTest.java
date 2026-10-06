@@ -197,9 +197,9 @@ public final class ChatHistoryTest {
     public void onlyTheAuthorMayChangeAMessage() {
         long id = record(ChatChannel.GLOBAL, ALICE, "meet me at the gate",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-        assertNull(ChatHistory.applyEdit(id, BOB, "meet me at the tower", NOBODY));
+        assertNull(ChatHistory.applyEdit(id, BOB, "meet me at the tower", "", NOBODY));
         assertNull(ChatHistory.remove(id, BOB));
-        assertNull(ChatHistory.applyEdit(id, null, "nobody at all", NOBODY));
+        assertNull(ChatHistory.applyEdit(id, null, "nobody at all", "", NOBODY));
         assertEquals("meet me at the gate", ChatHistory.quoteFor(
                 id, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "").getExcerpt());
     }
@@ -209,7 +209,7 @@ public final class ChatHistoryTest {
     public void anEditIsToldToEveryoneWhoWasSentTheMessageAndReplaysEdited() {
         long id = record(ChatChannel.GLOBAL, ALICE, "meet me at the gate",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-        Set<UUID> told = ChatHistory.applyEdit(id, ALICE, "meet me at the tower", NOBODY);
+        Set<UUID> told = ChatHistory.applyEdit(id, ALICE, "meet me at the tower", "", NOBODY);
         assertNotNull(told);
         assertTrue(told.contains(ALICE));
         assertTrue(told.contains(BOB));
@@ -230,7 +230,7 @@ public final class ChatHistoryTest {
         assertNotNull(told);
         assertTrue(told.contains(BOB));
         assertFalse(ChatHistory.quoteFor(id, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "").exists());
-        assertNull(ChatHistory.applyEdit(id, ALICE, "or that", NOBODY));
+        assertNull(ChatHistory.applyEdit(id, ALICE, "or that", "", NOBODY));
         assertTrue(ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE).isEmpty());
         // A moderator's removal likewise, and it says whose the message was.
         long other = record(ChatChannel.GLOBAL, BOB, "and that", Arrays.asList(ALICE, BOB),
@@ -292,7 +292,7 @@ public final class ChatHistoryTest {
         }
         assertFalse(ChatHistory.quoteFor(
                 oldestGlobal, ChatHistoryRequesters.reader(ALICE), ChatChannel.GLOBAL, "").exists());
-        assertNull(ChatHistory.applyEdit(oldestGlobal, ALICE, "on reflection", NOBODY));
+        assertNull(ChatHistory.applyEdit(oldestGlobal, ALICE, "on reflection", "", NOBODY));
         // The other channel's line was not the one to go.
         assertTrue(ChatHistory.quoteFor(
                 oldestOoc, ChatHistoryRequesters.reader(ALICE), ChatChannel.OOC, "").exists());
@@ -900,8 +900,60 @@ public final class ChatHistoryTest {
         long id = record(ChatChannel.OOC, ALICE, "https://example.com/gif",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         assertNull("nobody is told of an edit that changes nothing",
-                ChatHistory.applyEdit(id, ALICE, "https://example.com/gif", NOBODY));
-        assertNotNull(ChatHistory.applyEdit(id, ALICE, "a real edit", NOBODY));
+                ChatHistory.applyEdit(id, ALICE, "https://example.com/gif", "", NOBODY));
+        assertNotNull(ChatHistory.applyEdit(id, ALICE, "a real edit", "", NOBODY));
+    }
+
+    /**
+     * An edit replaces a Discord line's component with the one its new
+     * words came with, or with none: the old one said the old words. The
+     * same words with another component are an edit too; a player's line
+     * keeps none, whatever an edit hands it.
+     */
+    @Test
+    public void anEditReplacesTheLinesComponent() {
+        String sticker = "{\"text\":\"\",\"extra\":[{\"text\":\"look \"},{\"translate\":"
+                + "\"chat.losttales.words.discord_sticker\",\"with\":[\"Wave\"]}]}";
+        String forward = "{\"text\":\"\",\"extra\":[{\"translate\":"
+                + "\"chat.losttales.words.discord_forwarded\"},{\"text\":\" hi\"}]}";
+        long id = ChatMessageIdAllocator.next();
+        LostTalesChatMessagePacket line = new LostTalesChatMessagePacket(
+                ChatChannel.GLOBAL, LostTalesChatMessagePacket.discordSenderId("42"),
+                "Sam", "Sam", "The Shire", 0, 0, "look *[Sticker: Wave]*", SENT_AT, "",
+                null, "", "", 0, true, id, ChatReplyReference.NONE)
+                .withServerBody(sticker, NOBODY);
+        ChatHistory.record(id, LostTalesChatMessagePacket.DISCORD_SENDER_ID, "Sam", null,
+                line, Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        assertEquals(sticker, ChatHistory.bodyOf(id));
+
+        assertNull("the same words and component are no edit", ChatHistory.applyEdit(id,
+                LostTalesChatMessagePacket.DISCORD_SENDER_ID, "look *[Sticker: Wave]*",
+                sticker, NOBODY));
+        assertNotNull(ChatHistory.applyEdit(id, LostTalesChatMessagePacket.DISCORD_SENDER_ID,
+                "just words", "", NOBODY));
+        assertEquals("the old component never stays", "", ChatHistory.bodyOf(id));
+        assertEquals("", replayedBody());
+        assertNotNull(ChatHistory.applyEdit(id, LostTalesChatMessagePacket.DISCORD_SENDER_ID,
+                "*[Forwarded]* hi", forward, NOBODY));
+        assertEquals(forward, ChatHistory.bodyOf(id));
+        assertEquals(forward, replayedBody());
+        assertNotNull("another component on the same words is an edit",
+                ChatHistory.applyEdit(id, LostTalesChatMessagePacket.DISCORD_SENDER_ID,
+                        "*[Forwarded]* hi", "", NOBODY));
+        assertEquals("", ChatHistory.bodyOf(id));
+
+        long own = record(ChatChannel.GLOBAL, ALICE, "hello", Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.everyone());
+        assertNotNull(ChatHistory.applyEdit(own, ALICE, "hello again", sticker, NOBODY));
+        assertEquals("a player's line keeps none", "", ChatHistory.bodyOf(own));
+    }
+
+    /** The component of the one line a late reader is replayed. */
+    private static String replayedBody() {
+        List<LostTalesChatMessagePacket> replay = ChatHistory.replayFor(
+                requester(CAROL), ChatMessageIds.NONE);
+        assertEquals(1, replay.size());
+        return replay.get(0).getBodyJson();
     }
 
     /* ---- reactions ---- */
@@ -947,7 +999,7 @@ public final class ChatHistoryTest {
         long id = record(ChatChannel.GLOBAL, ALICE, "hail",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true);
-        assertNotNull(ChatHistory.applyEdit(id, ALICE, "hail, friends", NOBODY));
+        assertNotNull(ChatHistory.applyEdit(id, ALICE, "hail, friends", "", NOBODY));
         assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("smile").count);
     }
 
@@ -1257,7 +1309,7 @@ public final class ChatHistoryTest {
         assertTrue(forward.action);
         assertFalse("the forward's quote names its author, not an action",
                 forward.reference.isAction());
-        assertNotNull(ChatHistory.applyEdit(id, ALICE, "sheathes it.", NOBODY));
+        assertNotNull(ChatHistory.applyEdit(id, ALICE, "sheathes it.", "", NOBODY));
         assertTrue(ChatHistory.isAction(id));
         assertTrue(ChatHistory.quoteFor(id, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "")
                 .isAction());

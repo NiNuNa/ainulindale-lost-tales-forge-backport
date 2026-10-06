@@ -12,7 +12,7 @@ public final class LostTalesMapMoveMarkerPromptTest {
     @Test
     public void eachActionAnswersItsOwnButton() {
         LostTalesMapMoveMarkerPrompt prompt =
-                new LostTalesMapMoveMarkerPrompt(true);
+                new LostTalesMapMoveMarkerPrompt("", true);
 
         assertEquals(LostTalesMapMoveMarkerPrompt.Action.MOVE,
                 click(prompt, first()));
@@ -29,7 +29,7 @@ public final class LostTalesMapMoveMarkerPromptTest {
     @Test
     public void withoutADestinationMovingIsNotOffered() {
         LostTalesMapMoveMarkerPrompt prompt =
-                new LostTalesMapMoveMarkerPrompt(false);
+                new LostTalesMapMoveMarkerPrompt("", false);
 
         assertEquals(LostTalesMapMoveMarkerPrompt.Action.NONE,
                 click(prompt, first()));
@@ -42,7 +42,7 @@ public final class LostTalesMapMoveMarkerPromptTest {
     @Test
     public void clickingThePanelBesideTheButtonsChangesNothing() {
         LostTalesMapMoveMarkerPrompt prompt =
-                new LostTalesMapMoveMarkerPrompt(true);
+                new LostTalesMapMoveMarkerPrompt("", true);
         LostTalesMapChoicePrompt.Layout layout =
                 LostTalesMapChoicePrompt.calculateLayout(WIDTH, HEIGHT);
 
@@ -59,10 +59,10 @@ public final class LostTalesMapMoveMarkerPromptTest {
     @Test
     public void escapeLeavesTheMarkerWhereItIs() {
         assertEquals(LostTalesMapMoveMarkerPrompt.Action.LEAVE,
-                new LostTalesMapMoveMarkerPrompt(true)
+                new LostTalesMapMoveMarkerPrompt("", true)
                         .keyTyped(Keyboard.KEY_ESCAPE));
         assertEquals(LostTalesMapMoveMarkerPrompt.Action.LEAVE,
-                new LostTalesMapMoveMarkerPrompt(false)
+                new LostTalesMapMoveMarkerPrompt("", false)
                         .keyTyped(Keyboard.KEY_ESCAPE));
     }
 

@@ -21,9 +21,11 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A key shows its own tabs and hides the rest in their windows; a window
- * pinned to the GUI shows in every view, one pinned to the HUD stays while
- * playing; closing a window closes what the view shows of it.
+ * A key shows its category's pages and hides the rest in their windows; a
+ * page opens in a window of its category, else in its category's first
+ * window; a window pinned to the GUI shows in every view, one pinned to the
+ * HUD stays while playing; closing a window closes what the view shows of
+ * it.
  */
 public final class WindowViewTest {
     private static final String PAGE = "view_page";
@@ -43,15 +45,16 @@ public final class WindowViewTest {
         };
         if (WindowPages.byId(PAGE) == null) {
             WindowPages.register(PAGE, "gui.test.view.page",
-                    new ItemStack(Items.book), null, empty);
+                    new ItemStack(Items.book), null,
+                    PageCategory.QUEST_JOURNAL, empty);
         }
         if (WindowPages.byId(OTHER) == null) {
             WindowPages.register(OTHER, "gui.test.view.other",
-                    new ItemStack(Items.map), null, empty);
+                    new ItemStack(Items.map), null, PageCategory.MAP, empty);
         }
         if (WindowPages.byId(WORLD) == null) {
             WindowPages.registerWorldPage(WORLD, "gui.test.view.world",
-                    new ItemStack(Items.compass), empty);
+                    new ItemStack(Items.compass), PageCategory.MAP, empty);
         }
     }
 
@@ -73,7 +76,7 @@ public final class WindowViewTest {
     public void withNoScreenOpenEveryTabCountsAsShown() {
         OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
-        assertEquals(WindowView.Kind.NONE, WindowView.kind());
+        assertNull(WindowView.category());
         assertTrue(WindowView.shows(GLOBAL));
         assertTrue(WindowView.shows(page));
         assertFalse(WindowLayout.hasHidden());
@@ -110,18 +113,25 @@ public final class WindowViewTest {
         assertFalse(WindowView.shows(WindowPages.tab(PAGE)));
     }
 
+    /** A page's key shows its category: its pages, and no other's. */
     @Test
-    public void aPagesKeyShowsThatPageAlone() {
+    public void aPagesKeyShowsItsCategory() {
         OtherPage page = WindowPages.tab(PAGE);
         OtherPage other = WindowPages.tab(OTHER);
+        OtherPage world = WindowPages.tab(WORLD);
         WindowLayout.showPage(page);
         WindowLayout.showPage(other);
+        WindowLayout.showPage(world);
         WindowView.forPage(page);
         assertTrue(WindowView.isFor(page));
         assertFalse(WindowView.isFor(other));
         assertTrue(WindowView.shows(page));
         assertFalse(WindowView.shows(other));
         assertFalse(WindowView.shows(GLOBAL));
+        WindowView.forPage(other);
+        assertTrue("one key for the whole category", WindowView.isFor(world));
+        assertTrue(WindowView.shows(world));
+        assertFalse(WindowView.shows(page));
     }
 
     @Test
@@ -132,7 +142,7 @@ public final class WindowViewTest {
         WindowView.show(page);
         assertTrue(WindowView.shows(page));
         assertEquals("the view is still the chat's",
-                WindowView.Kind.CHAT, WindowView.kind());
+                PageCategory.CHANNELS, WindowView.category());
         WindowView.clear();
         WindowView.forChat();
         assertFalse("its own key shows it alone next time",
@@ -273,19 +283,60 @@ public final class WindowViewTest {
         assertEquals(described, WindowLayoutStore.describe());
     }
 
+    /**
+     * A category with no window opens its first window, locked: the map
+     * filling the screen, the rest at the default place; the next page of
+     * a category whose window is locked opens a step on from it, unlocked.
+     * A page closed comes back in its category's first window, its old
+     * window's pins gone with it.
+     */
     @Test
-    public void aPageComesBackWithTheWindowsPinsItLeft() {
+    public void aCategoryOpensItsFirstWindowLocked() {
         OtherPage page = WindowPages.tab(PAGE);
-        Window window = WindowLayout.showPage(page);
-        WindowLayout.setPinnedToHud(window.getId(), true);
+        OtherPage other = WindowPages.tab(OTHER);
+        OtherPage world = WindowPages.tab(WORLD);
+        Window journal = WindowLayout.showPage(page);
+        assertTrue(journal.isLocked());
+        assertEquals(Window.ScreenFill.NONE, journal.getFill());
+        Window map = WindowLayout.showPage(other);
+        assertTrue(map.isLocked());
+        assertEquals(Window.ScreenFill.FULL, map.getFill());
+        Window beside = WindowLayout.showPage(world);
+        assertFalse("the map's own window is locked", beside == map);
+        assertFalse(beside.isLocked());
+        journal.setLocked(false);
+        WindowLayout.setPinnedToHud(journal.getId(), true);
         assertTrue(WindowLayout.close(page));
-        List<String> described = WindowLayoutStore.describe();
-        assertTrue(described.toString(), described.toString().contains(
-                "place " + page.id() + " hud=true x="));
-        TwoWindowLayout.reset();
-        WindowLayoutStore.load(described);
-        assertTrue(WindowLayout.showPage(page).isPinnedToHud());
-        assertFalse(WindowLayout.windowOf(page).isPinnedToGui());
+        Window again = WindowLayout.showPage(page);
+        assertTrue(again.isLocked());
+        assertFalse(again.isPinnedToHud());
+        assertFalse(described().contains("place "));
+    }
+
+    /**
+     * A page picked from another category's window opens in a window of its
+     * own category, never in the window it was picked in.
+     */
+    @Test
+    public void aPageOpensInItsOwnCategorysWindow() {
+        OtherPage page = WindowPages.tab(PAGE);
+        Window chat = WindowLayout.windowOf(GLOBAL);
+        chat.setLocked(false);
+        assertEquals(page, WindowLayout.openInCategory(page, chat.getId()));
+        assertFalse(chat.contains(page));
+        Window journal = WindowLayout.windowOf(page);
+        journal.setLocked(false);
+        OtherPage world = WindowPages.tab(WORLD);
+        assertEquals(world, WindowLayout.openInCategory(world, journal.getId()));
+        assertFalse("a waystone is the map's", journal.contains(world));
+        ConversationPage whisper = ConversationPage.whisper("Steve", "");
+        assertEquals("a whisper stands with the channels", whisper,
+                WindowLayout.openInCategory(whisper, chat.getId()));
+        assertTrue(chat.contains(whisper));
+    }
+
+    private static String described() {
+        return WindowLayoutStore.describe().toString();
     }
 
     /** A page with nothing on it. */

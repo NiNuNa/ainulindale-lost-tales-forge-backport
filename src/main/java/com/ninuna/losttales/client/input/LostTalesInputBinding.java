@@ -4,6 +4,7 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
 /**
@@ -16,6 +17,10 @@ import org.lwjgl.input.Keyboard;
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesInputBinding {
+    /** What the lang keys of the keys' short names begin with. */
+    public static final String NAME_PREFIX = "gui.losttales.keys.name.";
+    /** The mouse wheel's name, the same word the page help uses. */
+    public static final String WHEEL_KEY = "gui.losttales.keys.mouse.wheel";
     private static final int MOUSE_KEY_CODE_OFFSET = 100;
     private static final int MAX_KEYBOARD_KEY_CODE = 255;
 
@@ -42,6 +47,11 @@ public final class LostTalesInputBinding {
         return keyCode + MOUSE_KEY_CODE_OFFSET;
     }
 
+    /**
+     * The key's short name, as a key icon writes it, in the game's
+     * language: the keys with a name of their own from the lang file,
+     * every other key by LWJGL's name for it ({@code F5}, {@code A}).
+     */
     public static String getFallbackLabel(Type type, int keyCode) {
         if (type == null) {
             return "?";
@@ -52,11 +62,11 @@ public final class LostTalesInputBinding {
                 return getKeyboardLabel(keyCode);
             case MOUSE_BUTTON:
                 int button = getMouseButtonIndex(keyCode);
-                return button < 0 ? "?" : "M" + (button + 1);
+                return button < 0 ? "?" : word("mouse", Integer.valueOf(button + 1));
             case MOUSE_WHEEL:
-                return "Wheel";
+                return StatCollector.translateToLocal(WHEEL_KEY);
             case UNBOUND:
-                return "None";
+                return word("none");
             case INVALID:
             default:
                 return "?";
@@ -64,46 +74,64 @@ public final class LostTalesInputBinding {
     }
 
     private static String getKeyboardLabel(int keyCode) {
+        String named = namedKey(keyCode);
+        if (named != null) {
+            return word(named);
+        }
+        String name = Keyboard.getKeyName(keyCode);
+        return name == null || name.length() == 0
+                ? word("code", Integer.valueOf(keyCode)) : name;
+    }
+
+    /**
+     * The id of a key that has a name of its own in the lang file
+     * ({@code left_shift}), or null for one LWJGL names.
+     */
+    static String namedKey(int keyCode) {
         switch (keyCode) {
             case Keyboard.KEY_CAPITAL:
-                return "Caps";
+                return "caps";
             case Keyboard.KEY_LMENU:
-                return "L Alt";
+                return "left_alt";
             case Keyboard.KEY_RMENU:
-                return "R Alt";
+                return "right_alt";
             case Keyboard.KEY_LSHIFT:
-                return "L Shift";
+                return "left_shift";
             case Keyboard.KEY_RSHIFT:
-                return "R Shift";
+                return "right_shift";
             case Keyboard.KEY_LCONTROL:
-                return "L Ctrl";
+                return "left_ctrl";
             case Keyboard.KEY_RCONTROL:
-                return "R Ctrl";
+                return "right_ctrl";
             case Keyboard.KEY_LMETA:
             case Keyboard.KEY_RMETA:
                 // Cmd on a Mac, where it gives the shortcuts Ctrl gives
                 // elsewhere; the system key anywhere else.
-                return Minecraft.isRunningOnMac ? "Cmd" : "Meta";
+                return Minecraft.isRunningOnMac ? "cmd" : "meta";
             case Keyboard.KEY_RETURN:
-                return "Enter";
+                return "enter";
             case Keyboard.KEY_BACK:
-                return "Backspace";
+                return "backspace";
             case Keyboard.KEY_HOME:
-                return "Home";
+                return "home";
             case Keyboard.KEY_END:
-                return "End";
+                return "end";
             case Keyboard.KEY_PRIOR:
-                return "PgUp";
+                return "page_up";
             case Keyboard.KEY_NEXT:
-                return "PgDn";
+                return "page_down";
             case Keyboard.KEY_ESCAPE:
-                return "Esc";
+                return "escape";
             case Keyboard.KEY_SPACE:
-                return "Space";
+                return "space";
             default:
-                String name = Keyboard.getKeyName(keyCode);
-                return name == null || name.length() == 0 ? "Key " + keyCode : name;
+                return null;
         }
+    }
+
+    /** The short-name line under {@code id}, in the game's language. */
+    public static String word(String id, Object... arguments) {
+        return StatCollector.translateToLocalFormatted(NAME_PREFIX + id, arguments);
     }
 
     public enum Type {

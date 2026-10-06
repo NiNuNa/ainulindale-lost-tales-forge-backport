@@ -16,12 +16,15 @@ import com.ninuna.losttales.compat.lotr.LotrFellowshipRules;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.model.FellowshipGoHereMarker;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipIcon;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.fellowship.model.FellowshipPersonalMarkerOwner;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.storage.FellowshipGoHereMarkerStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipGoHereMarkerWorldData;
+import com.ninuna.losttales.fellowship.storage.FellowshipMarkStorage;
+import com.ninuna.losttales.fellowship.storage.FellowshipMarkWorldData;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationWorldData;
 import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
@@ -34,6 +37,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.DimensionManager;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -160,6 +164,7 @@ public final class FellowshipService {
         if (fellowship.getMemberCount() == 1) {
             invitationData.removeInvitationsForFellowship(fellowship.getFellowshipId());
             context.fellowshipData.removeFellowship(fellowship.getFellowshipId());
+            forgetMarks(player.worldObj, fellowship.getFellowshipId());
             return FellowshipOperationResult.disbanded(fellowship, leaving);
         }
         fellowship.removeMember(leavingIdentityId);
@@ -230,6 +235,7 @@ public final class FellowshipService {
         }
         invitationData.removeInvitationsForFellowship(fellowship.getFellowshipId());
         context.fellowshipData.removeFellowship(fellowship.getFellowshipId());
+        forgetMarks(player.worldObj, fellowship.getFellowshipId());
         return FellowshipOperationResult.disbanded(fellowship, fellowship.getLeader());
     }
 
@@ -367,6 +373,176 @@ public final class FellowshipService {
         }
         context.fellowshipData.saveFellowship(fellowship);
         return FellowshipOperationResult.success(true, fellowship, leader);
+    }
+
+    /**
+     * The leader or a guide marks a place on the map for every member,
+     * named: a meeting point, a target. A fellowship holds
+     * {@link FellowshipMark#MAX_PER_FELLOWSHIP} at most, and the place must
+     * lie in the world the player stands in. The name is held to the rules
+     * a fellowship's own name keeps.
+     */
+    public synchronized FellowshipOperationResult placeMark(
+            EntityPlayerMP player, UUID fellowshipId, long expectedFellowshipRevision,
+            String requestedName, int dimensionId, double x, double z) {
+        MarkContext context = resolveMarkContext(player, fellowshipId,
+                expectedFellowshipRevision, dimensionId, x, z);
+        if (context.errorId != FellowshipErrorId.NONE) {
+            return FellowshipOperationResult.failure(context.errorId,
+                    context.fellowship);
+        }
+        String name = requestedName == null ? "" : requestedName.trim();
+        FellowshipErrorId nameError = checkMarkName(name,
+                ChatProfanityCatalog.effective());
+        if (nameError != FellowshipErrorId.NONE) {
+            return FellowshipOperationResult.failure(nameError, context.fellowship);
+        }
+        if (context.marks.getMarks(fellowshipId).size()
+                >= FellowshipMark.MAX_PER_FELLOWSHIP) {
+            return FellowshipOperationResult.failure(
+                    FellowshipErrorId.TOO_MANY_MARKS, context.fellowship);
+        }
+        UUID markId = UUID.randomUUID();
+        while (context.marks.getMark(markId) != null) {
+            markId = UUID.randomUUID();
+        }
+        FellowshipMark placed = new FellowshipMark(markId, fellowshipId, name,
+                context.placer, dimensionId, quantizeTrackingCoordinate(x),
+                quantizeTrackingCoordinate(z), System.currentTimeMillis());
+        context.marks.saveMark(placed);
+        return FellowshipOperationResult.markChanged(context.fellowship,
+                context.fellowship.getMember(context.placer), placed);
+    }
+
+    /** The leader or a guide moves one of the fellowship's marks, its name kept. */
+    public synchronized FellowshipOperationResult moveMark(
+            EntityPlayerMP player, UUID fellowshipId, long expectedFellowshipRevision,
+            UUID markId, int dimensionId, double x, double z) {
+        MarkContext context = resolveMarkContext(player, fellowshipId,
+                expectedFellowshipRevision, dimensionId, x, z);
+        if (context.errorId != FellowshipErrorId.NONE) {
+            return FellowshipOperationResult.failure(context.errorId,
+                    context.fellowship);
+        }
+        FellowshipMark mark = context.marks.getMark(markId);
+        if (mark == null || !mark.getFellowshipId().equals(fellowshipId)) {
+            return FellowshipOperationResult.failure(
+                    FellowshipErrorId.MARK_NOT_FOUND, context.fellowship);
+        }
+        FellowshipMark moved = mark.movedTo(dimensionId,
+                quantizeTrackingCoordinate(x), quantizeTrackingCoordinate(z),
+                context.placer, System.currentTimeMillis());
+        context.marks.saveMark(moved);
+        return FellowshipOperationResult.markChanged(context.fellowship,
+                context.fellowship.getMember(context.placer), moved);
+    }
+
+    /** The leader or a guide takes one of the fellowship's marks away. */
+    public synchronized FellowshipOperationResult removeMark(
+            EntityPlayerMP player, UUID fellowshipId, long expectedFellowshipRevision,
+            UUID markId) {
+        FellowshipContext context = resolveFellowshipContext(player, fellowshipId,
+                expectedFellowshipRevision);
+        if (!context.isValid()) {
+            return FellowshipOperationResult.failure(context.errorId, context.fellowship);
+        }
+        Fellowship fellowship = context.fellowship;
+        if (!fellowship.canManage(context.gameplayId())) {
+            return FellowshipOperationResult.failure(
+                    FellowshipErrorId.NOT_LEADER_OR_GUIDE, fellowship);
+        }
+        FellowshipMarkWorldData marks = getWritableMarkData(player.worldObj);
+        if (marks == null) {
+            return FellowshipOperationResult.failure(
+                    FellowshipErrorId.MARKER_STORAGE_READ_ONLY, fellowship);
+        }
+        FellowshipMark mark = marks.getMark(markId);
+        if (mark == null || !mark.getFellowshipId().equals(fellowshipId)) {
+            return FellowshipOperationResult.failure(
+                    FellowshipErrorId.MARK_NOT_FOUND, fellowship);
+        }
+        marks.removeMark(markId);
+        return FellowshipOperationResult.markChanged(fellowship,
+                fellowship.getMember(context.gameplayId()), mark);
+    }
+
+    /**
+     * What placing or moving a mark needs: the fellowship, with the player
+     * its leader or a guide; a store that can be written; and a place in
+     * the world the player stands in.
+     */
+    private MarkContext resolveMarkContext(EntityPlayerMP player, UUID fellowshipId,
+                                           long expectedFellowshipRevision,
+                                           int dimensionId, double x, double z) {
+        FellowshipContext context = resolveFellowshipContext(player, fellowshipId,
+                expectedFellowshipRevision);
+        if (!context.isValid()) {
+            return new MarkContext(context.errorId, context.fellowship, null, null);
+        }
+        Fellowship fellowship = context.fellowship;
+        if (!fellowship.canManage(context.gameplayId())) {
+            return new MarkContext(FellowshipErrorId.NOT_LEADER_OR_GUIDE, fellowship,
+                    null, null);
+        }
+        if (dimensionId != player.dimension
+                || !DimensionManager.isDimensionRegistered(dimensionId)
+                || !FellowshipMark.isValidPosition(x, z)) {
+            return new MarkContext(FellowshipErrorId.INVALID_MARKER_POSITION,
+                    fellowship, null, null);
+        }
+        FellowshipMarkWorldData marks = getWritableMarkData(player.worldObj);
+        if (marks == null) {
+            return new MarkContext(FellowshipErrorId.MARKER_STORAGE_READ_ONLY,
+                    fellowship, null, null);
+        }
+        return new MarkContext(FellowshipErrorId.NONE, fellowship, marks,
+                context.gameplayId());
+    }
+
+    private static final class MarkContext {
+        final FellowshipErrorId errorId;
+        final Fellowship fellowship;
+        final FellowshipMarkWorldData marks;
+        final UUID placer;
+
+        MarkContext(FellowshipErrorId errorId, Fellowship fellowship,
+                    FellowshipMarkWorldData marks, UUID placer) {
+            this.errorId = errorId;
+            this.fellowship = fellowship;
+            this.marks = marks;
+            this.placer = placer;
+        }
+    }
+
+    /** Why a mark's name is refused; {@link FellowshipErrorId#NONE} for one that stands. */
+    static FellowshipErrorId checkMarkName(String name, ChatProfanityWords words) {
+        if (name == null || name.length() == 0) {
+            return FellowshipErrorId.NAME_MISSING;
+        }
+        if (name.length() > FellowshipMark.MAX_NAME_LENGTH) {
+            return FellowshipErrorId.NAME_TOO_LONG;
+        }
+        if (!FellowshipMark.isValidName(name)
+                || ChatProfanityFilter.hasListedWord(name, words)) {
+            return FellowshipErrorId.NAME_NOT_ALLOWED;
+        }
+        return FellowshipErrorId.NONE;
+    }
+
+    /** A fellowship's marks; empty while the store cannot be read. */
+    public synchronized List<FellowshipMark> marksOf(World world, UUID fellowshipId) {
+        FellowshipMarkWorldData data = getMarkData(world);
+        return data == null || data.isReadOnlyForNewerVersion()
+                ? Collections.<FellowshipMark>emptyList()
+                : data.getMarks(fellowshipId);
+    }
+
+    /** A fellowship that ends takes its marks with it. */
+    private void forgetMarks(World world, UUID fellowshipId) {
+        FellowshipMarkWorldData data = getWritableMarkData(world);
+        if (data != null) {
+            data.removeMarksOf(fellowshipId);
+        }
     }
 
     /**
@@ -932,7 +1108,8 @@ public final class FellowshipService {
         int removedInvitations = this.invitationCoordinator.pruneInvalidInvitations(
                 fellowshipData, invitationData, characterData, System.currentTimeMillis());
         int removedMarkers = pruneInvalidGoHereMarkers(characterData, markerData);
-        return removedInvitations + removedMarkers;
+        return removedInvitations + removedMarkers
+                + pruneInvalidMarks(fellowshipData, getWritableMarkData(world));
     }
 
     boolean ensureFellowshipIntegrity(World world, FellowshipWorldData fellowshipData,
@@ -1113,6 +1290,46 @@ public final class FellowshipService {
             }
         }
         return null;
+    }
+
+    FellowshipMarkWorldData getMarkData(World world) {
+        try {
+            return FellowshipMarkStorage.get(world);
+        } catch (RuntimeException exception) {
+            FMLLog.warning("[%s] Failed to access fellowship mark storage: %s",
+                    LostTalesMetaData.MOD_ID, exception.toString());
+            return null;
+        }
+    }
+
+    private FellowshipMarkWorldData getWritableMarkData(World world) {
+        FellowshipMarkWorldData data = getMarkData(world);
+        return data == null || data.isReadOnlyForNewerVersion() ? null : data;
+    }
+
+    /**
+     * Takes away, into the quarantine, every mark whose fellowship ended
+     * where nothing took its marks with it — a character deleted, a member
+     * list mended — or whose world is gone. Answers how many went.
+     */
+    private static int pruneInvalidMarks(FellowshipWorldData fellowshipData,
+                                         FellowshipMarkWorldData marks) {
+        if (marks == null) {
+            return 0;
+        }
+        int removed = 0;
+        for (FellowshipMark mark : new ArrayList<FellowshipMark>(marks.getAllMarks())) {
+            String reason = fellowshipData.getFellowship(mark.getFellowshipId()) == null
+                    ? "missing_fellowship"
+                    : !DimensionManager.isDimensionRegistered(mark.getDimensionId())
+                            ? "unregistered_dimension" : null;
+            if (reason != null) {
+                marks.quarantine(reason, mark);
+                marks.removeMark(mark.getMarkId());
+                removed++;
+            }
+        }
+        return removed;
     }
 
     FellowshipGoHereMarkerWorldData getGoHereMarkerData(World world) {

@@ -10,6 +10,7 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatCodeNames;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannelGates;
@@ -23,6 +24,8 @@ import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.compat.lotr.LotrFactionColors;
+import com.ninuna.losttales.faction.FactionDemonyms;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -76,9 +79,11 @@ public final class ClientChatChannelState {
     private static final LinkedHashMap<ConversationPage, UUID> PARTNER_CHARACTER_IDS =
             new LinkedHashMap<ConversationPage, UUID>();
     /**
-     * LOTR's name for each faction asked about, by faction id. An empty
-     * name is one LOTR could not give; it is asked again after a while
-     * ({@link #FACTION_NAMES_ASKED}) rather than every frame.
+     * The lang key LOTR names each faction asked about by, by faction id,
+     * read in this game's language at every ask, so a language chosen
+     * now names the factions at once. An empty key is one LOTR could not
+     * give; it is asked again after a while ({@link #FACTION_NAMES_ASKED})
+     * rather than every frame.
      */
     private static final HashMap<String, String> FACTION_NAMES =
             new HashMap<String, String>();
@@ -590,15 +595,16 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * The name of one conversation: for a faction's chat that faction's
-     * chat ("Gondor Chat"), whichever faction is read now; for a
-     * fellowship's its name ("The Grey Company Chat"); the channel's name
-     * ({@link #displayName(ChatChannel)}) for every other.
+     * The name of one conversation, in this game's language: for a
+     * faction's chat that faction's chat ("Gondor Chat"), whichever
+     * faction is read now; for a fellowship's its name ("The Grey Company
+     * Chat"); the channel's name ({@link #displayName(ChatChannel)}) for
+     * every other.
      */
     public static synchronized String displayName(ChatChannel channel,
                                                   String scope) {
         if (isFaction(channel, scope)) {
-            return factionChatName(scope, channel.getDisplayName());
+            return factionChatName(scope, channel);
         }
         ChatFellowship fellowship = fellowshipOf(channel, scope);
         return fellowship != null ? StatCollector.translateToLocalFormatted(
@@ -607,7 +613,8 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Visible label for a channel. Faction shows the chat of the LOTR
+     * Visible label for a channel, in this game's language
+     * ({@link ChatNames#channel}). Faction shows the chat of the LOTR
      * faction ("Gondor Chat") the identity its tab speaks as belongs to,
      * so the tab, indicator and message prefix all agree and follow the
      * chat identity. A fellowship's conversation is named by its own
@@ -618,26 +625,26 @@ public final class ClientChatChannelState {
             return "";
         }
         if (channel != ChatChannel.FACTION) {
-            return channel.getDisplayName();
+            return ChatNames.channel(LostTalesWords.LANG, channel);
         }
-        return factionChatName(wornFactionId(channel),
-                channel.getDisplayName());
+        return factionChatName(wornFactionId(channel), channel);
     }
 
     /**
-     * A faction's chat by its faction ("Gondor Chat"), or {@code fallback}
-     * while LOTR cannot name the faction.
+     * A faction's chat by its faction ("Gondor Chat"), LOTR naming the
+     * faction in this game's language; the Faction channel's own name
+     * while LOTR cannot name it.
      */
-    private static String factionChatName(String factionId, String fallback) {
+    private static String factionChatName(String factionId, ChatChannel channel) {
         String faction = factionName(factionId, "");
-        return faction.length() == 0 ? fallback
-                : ChatChannel.factionChatName(faction);
+        return faction.length() == 0 ? ChatNames.channel(LostTalesWords.LANG, channel)
+                : ChatNames.factionChat(LostTalesWords.LANG, faction);
     }
 
     /**
-     * A faction's name as LOTR gives it ("Gondor"), or {@code fallback}
-     * while LOTR cannot say. Unaligned's name is this mod's own lang
-     * entry, since LOTR ships none.
+     * A faction's name as LOTR gives it, in this game's language
+     * ("Gondor"), or {@code fallback} while LOTR cannot say. Unaligned's
+     * name is this mod's own lang entry, since LOTR ships none.
      */
     public static synchronized String factionName(String factionId,
                                                   String fallback) {
@@ -648,19 +655,37 @@ public final class ClientChatChannelState {
             return StatCollector.translateToLocal("lotr.faction.UNALIGNED.name");
         }
         long now = System.nanoTime();
-        String known = FACTION_NAMES.get(factionId);
+        String key = FACTION_NAMES.get(factionId);
         Long asked = FACTION_NAMES_ASKED.get(factionId);
-        if (known == null || (known.length() == 0 && asked != null
+        if (key == null || (key.length() == 0 && asked != null
                 && now - asked.longValue() > FACTION_NAME_RETRY_NANOS)) {
-            String name = LotrCharacterAdapter.getInstance()
-                    .getFactionDisplayName(factionId);
-            String plain = name == null ? null
-                    : EnumChatFormatting.getTextWithoutFormattingCodes(name);
-            known = plain == null ? "" : plain.trim();
-            FACTION_NAMES.put(factionId, known);
+            String named = LotrCharacterAdapter.getInstance()
+                    .getFactionNameKey(factionId);
+            key = named == null ? "" : named.trim();
+            FACTION_NAMES.put(factionId, key);
             FACTION_NAMES_ASKED.put(factionId, Long.valueOf(now));
         }
-        return known.length() == 0 ? fallback : known;
+        if (key.length() == 0) {
+            return fallback;
+        }
+        String plain = EnumChatFormatting.getTextWithoutFormattingCodes(
+                StatCollector.translateToLocal(key));
+        return plain == null || plain.trim().length() == 0 ? fallback
+                : plain.trim();
+    }
+
+    /**
+     * The people of a faction as a title names them, in this game's
+     * language: a Lothlórien character is a Galadhrim Miner
+     * ({@link FactionDemonyms}). Empty for no faction, and while LOTR
+     * cannot name it.
+     */
+    public static String factionPeople(String factionId) {
+        String normalized = LotrCharacterAdapter.normalizeFactionId(factionId);
+        if (normalized.length() == 0) {
+            return "";
+        }
+        return FactionDemonyms.of(normalized, factionName(normalized, ""));
     }
 
     /**
@@ -730,6 +755,22 @@ public final class ClientChatChannelState {
         if (keys != null) {
             DISCORD_LINKS.addAll(keys);
         }
+    }
+
+    /**
+     * The conversations the server links to Discord, by the names their
+     * tabs read ({@code Global Chat}, {@code Gondor Chat}), in the order
+     * the server stated them; empty for none.
+     */
+    public static synchronized List<String> discordLinkedNames() {
+        List<String> names = new ArrayList<String>();
+        for (String key : DISCORD_LINKS) {
+            ChatCodeNames.Named named = ChatCodeNames.parse(key);
+            if (named != null) {
+                names.add(displayName(named.channel, named.scope));
+            }
+        }
+        return names;
     }
 
     /**

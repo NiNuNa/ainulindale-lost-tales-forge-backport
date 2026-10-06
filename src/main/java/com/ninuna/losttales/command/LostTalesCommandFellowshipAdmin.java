@@ -14,8 +14,8 @@ import com.ninuna.losttales.permission.LostTalesCapability;
 import java.util.List;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
 import net.minecraft.world.World;
 
 /**
@@ -25,6 +25,9 @@ import net.minecraft.world.World;
  * markers.
  */
 public final class LostTalesCommandFellowshipAdmin extends LostTalesCommandBase {
+
+    /** What the lang key of each of the command's answers begins with. */
+    static final String SAY = "chat.losttales.command.fellowship.";
 
     public LostTalesCommandFellowshipAdmin() {
         super("fellowship");
@@ -48,7 +51,7 @@ public final class LostTalesCommandFellowshipAdmin extends LostTalesCommandBase 
         }
         World world = resolveWorld(sender);
         if (world == null || world.isRemote) {
-            send(sender, EnumChatFormatting.RED + "Fellowship diagnostics require a running logical server world.");
+            say(sender, EnumChatFormatting.RED, SAY + "no_world");
             return;
         }
         String action = args[0];
@@ -58,22 +61,20 @@ public final class LostTalesCommandFellowshipAdmin extends LostTalesCommandBase 
             FellowshipIntegrityReport report =
                     FellowshipService.getInstance().inspectIntegrity(world);
             if (report == null) {
-                send(sender, EnumChatFormatting.RED + "Fellowship stores cannot be checked: one is unavailable or read-only.");
+                say(sender, EnumChatFormatting.RED, SAY + "validate.unavailable");
             } else if (report.isClean()) {
-                send(sender, EnumChatFormatting.GREEN + "Fellowship stores are sound; nothing to repair.");
+                say(sender, EnumChatFormatting.GREEN, SAY + "validate.sound");
             } else {
-                send(sender, EnumChatFormatting.GOLD + "Repair would remove " + describe(report)
-                        + ". Run /losttales fellowship repair to remove them.");
+                say(sender, EnumChatFormatting.GOLD, SAY + "validate.found", describe(report));
             }
             reportStatus(sender, world);
         } else if ("repair".equalsIgnoreCase(action)) {
             FellowshipIntegrityReport report =
                     FellowshipService.getInstance().repairIntegrity(world);
             if (report == null) {
-                send(sender, EnumChatFormatting.RED + "Fellowship repair refused: a store is unavailable or read-only.");
+                say(sender, EnumChatFormatting.RED, SAY + "repair.refused");
             } else {
-                send(sender, EnumChatFormatting.GREEN + "Fellowship repair removed " + describe(report)
-                        + ". Removed members are kept in the quarantine.");
+                say(sender, EnumChatFormatting.GREEN, SAY + "repair.done", describe(report));
                 if (!report.isClean()) {
                     FellowshipSyncManager.sendStateToEveryone();
                 }
@@ -81,16 +82,16 @@ public final class LostTalesCommandFellowshipAdmin extends LostTalesCommandBase 
             reportStatus(sender, world);
         } else if ("clearcombat".equalsIgnoreCase(action)) {
             LostTalesMobAggroEventHandler.clearAll();
-            send(sender, EnumChatFormatting.GREEN + "Cleared transient server combat-marker state.");
+            say(sender, EnumChatFormatting.GREEN, SAY + "clearcombat");
         } else {
             sendUsage(sender);
         }
     }
 
-    private static String describe(FellowshipIntegrityReport report) {
-        return report.getMembers() + " member(s), "
-                + report.getInvitations() + " invitation(s) and "
-                + report.getMarkers() + " go-here marker(s)";
+    private static IChatComponent describe(FellowshipIntegrityReport report) {
+        return words(SAY + "counts", Integer.valueOf(report.getMembers()),
+                Integer.valueOf(report.getInvitations()),
+                Integer.valueOf(report.getMarkers()));
     }
 
     private void reportStatus(ICommandSender sender, World world) {
@@ -98,19 +99,22 @@ public final class LostTalesCommandFellowshipAdmin extends LostTalesCommandBase 
             FellowshipWorldData fellowships = FellowshipStorage.get(world);
             FellowshipInvitationWorldData invitations = FellowshipInvitationStorage.get(world);
             FellowshipGoHereMarkerWorldData markers = FellowshipGoHereMarkerStorage.get(world);
-            send(sender, EnumChatFormatting.GOLD + "Fellowship storage status:");
-            send(sender, EnumChatFormatting.GRAY + "fellowships=" + fellowships.getFellowshipCount()
-                    + ", invitations=" + invitations.getInvitationCount()
-                    + ", go_here_markers=" + markers.getMarkers().size());
-            send(sender, EnumChatFormatting.GRAY + "quarantine: fellowships=" + fellowships.getQuarantinedEntryCount()
-                    + ", invitations=" + invitations.getQuarantinedEntryCount()
-                    + ", markers=" + markers.getQuarantinedEntryCount());
-            send(sender, EnumChatFormatting.GRAY + "read_only_newer_version: fellowships="
-                    + fellowships.isReadOnlyForNewerVersion() + ", invitations="
-                    + invitations.isReadOnlyForNewerVersion() + ", markers="
-                    + markers.isReadOnlyForNewerVersion());
+            say(sender, EnumChatFormatting.GOLD, SAY + "status.header");
+            say(sender, EnumChatFormatting.GRAY, SAY + "status.counts",
+                    Integer.valueOf(fellowships.getFellowshipCount()),
+                    Integer.valueOf(invitations.getInvitationCount()),
+                    Integer.valueOf(markers.getMarkers().size()));
+            say(sender, EnumChatFormatting.GRAY, SAY + "status.quarantine",
+                    Integer.valueOf(fellowships.getQuarantinedEntryCount()),
+                    Integer.valueOf(invitations.getQuarantinedEntryCount()),
+                    Integer.valueOf(markers.getQuarantinedEntryCount()));
+            say(sender, EnumChatFormatting.GRAY, SAY + "status.read_only",
+                    Boolean.valueOf(fellowships.isReadOnlyForNewerVersion()),
+                    Boolean.valueOf(invitations.isReadOnlyForNewerVersion()),
+                    Boolean.valueOf(markers.isReadOnlyForNewerVersion()));
         } catch (RuntimeException exception) {
-            send(sender, EnumChatFormatting.RED + "Unable to inspect fellowship storage: " + exception.getClass().getSimpleName());
+            say(sender, EnumChatFormatting.RED, SAY + "status.failed",
+                    exception.getClass().getSimpleName());
         }
     }
 
@@ -122,13 +126,7 @@ public final class LostTalesCommandFellowshipAdmin extends LostTalesCommandBase 
     }
 
     private void sendUsage(ICommandSender sender) {
-        send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
-    }
-
-    private void send(ICommandSender sender, String message) {
-        if (sender != null) {
-            sender.addChatMessage(new ChatComponentText(message));
-        }
+        usage(sender, getCommandUsage(sender));
     }
 
     @Override

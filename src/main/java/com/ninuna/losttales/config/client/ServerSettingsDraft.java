@@ -224,8 +224,7 @@ final class ServerSettingsDraft {
                 entry.getType(), entry.isList(), entry.isSecret()
                         ? Collections.singletonList("") : values,
                 entry.getDefaults(), entry.getMinValue(), entry.getMaxValue(),
-                entry.getComment(), entry.getLangKey(), entry.isSecret(),
-                entry.getValidValues());
+                entry.isSecret(), entry.getValidValues());
     }
 
     private static String nameOf(ServerConfigEntry entry) {

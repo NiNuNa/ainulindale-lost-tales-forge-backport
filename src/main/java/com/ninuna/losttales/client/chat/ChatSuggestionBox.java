@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PointerRegions;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -16,10 +17,8 @@ import net.minecraft.client.gui.FontRenderer;
 abstract class ChatSuggestionBox {
     /** Rows shown at most. */
     static final int MAX_ROWS = 8;
-    /** A row of words, or of words behind a face. */
-    static final int ROW_HEIGHT = 11;
-    /** A row led by an emoji or an item's glyph, which stands a pixel taller. */
-    static final int GLYPH_ROW_HEIGHT = 12;
+    /** A row, a menu's: words, or words behind a face or a glyph. */
+    static final int ROW_HEIGHT = MenuWindow.ROW_HEIGHT;
     /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
     static final int PADDING = WindowStyle.POPUP_INSET;
     /**
@@ -43,14 +42,11 @@ abstract class ChatSuggestionBox {
         return shownRows();
     }
 
-    /** {@link #ROW_HEIGHT}, or {@link #GLYPH_ROW_HEIGHT} for rows led by a glyph. */
-    abstract int rowHeight();
-
     /** The box's width, its padding included. */
     abstract int boxWidth(FontRenderer font);
 
     final int boxTop(int screenHeight) {
-        return screenHeight - BOTTOM_MARGIN - shownRows() * rowHeight()
+        return screenHeight - BOTTOM_MARGIN - shownRows() * ROW_HEIGHT
                 - PADDING * 2;
     }
 
@@ -76,7 +72,7 @@ abstract class ChatSuggestionBox {
             return -1;
         }
         int row = (int)Math.floor((mouseY - boxTop(screenHeight) - PADDING)
-                / (double)rowHeight());
+                / (double)ROW_HEIGHT);
         return row >= 0 && row < pickableRows() ? row : -1;
     }
 
@@ -92,7 +88,7 @@ abstract class ChatSuggestionBox {
         int bottom = screenHeight - BOTTOM_MARGIN;
         regions.add(inputX, top, inputX + width, bottom);
         WindowStyle.drawPopupList(inputX, top, inputX + width,
-                bottom, top + PADDING, rowHeight(), litRow);
+                bottom, top + PADDING, ROW_HEIGHT, litRow);
         return top;
     }
 }

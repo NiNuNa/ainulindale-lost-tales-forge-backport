@@ -7,31 +7,37 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The names of the Discord servers the bot is in and of their channels,
- * as the gateway tells them: a server arrives with its channels when the
- * session starts or the bot is invited, and each rename, new channel and
- * removal follows as an event of its own. What a Discord member's line is
- * titled by in the game ({@code Nils, of The Shire}) and what a link is
- * reported by ({@code #general of The Shire}). It also remembers the
+ * The names of the Discord servers the bot is in, of their channels and
+ * of their roles, as the gateway tells them: a server arrives with its
+ * channels and roles when the session starts or the bot is invited, and
+ * each rename, new channel or role and removal follows as an event of its
+ * own. What a Discord member's line is titled by in the game
+ * ({@code Nils, of The Shire}), what a link is reported by
+ * ({@code #general of The Shire}) and what a member's mention of a role or
+ * a channel reads as. It also remembers the
  * nicknames the members it hears of go by in each server, so a message
  * read while the gateway is down, which Discord sends without them, is
  * still named as the server shows its author. Written on the gateway's
  * thread and read on any; a name is cleaned and bounded as it is kept,
  * and the directory never holds more than {@link #MAX_GUILDS} servers,
- * {@link #MAX_CHANNELS} channels and {@link #MAX_NICKNAMES} nicknames,
- * the longest unused going first, so a bot in very many servers cannot
- * grow it without end.
+ * {@link #MAX_CHANNELS} channels, {@link #MAX_ROLES} roles and
+ * {@link #MAX_NICKNAMES} nicknames, the longest unused going first, so a
+ * bot in very many servers cannot grow it without end.
  */
 final class DiscordGuildDirectory {
     static final int MAX_GUILDS = 256;
     static final int MAX_CHANNELS = 8192;
-    /** The longest server or channel name kept; Discord allows 100. */
+    static final int MAX_ROLES = 8192;
+    /** The longest server, channel or role name kept; Discord allows 100. */
     static final int MAX_NAME_LENGTH = 32;
     static final int MAX_NICKNAMES = 4096;
 
     private final Map<String, String> guildNames = new ConcurrentHashMap<String, String>();
     private final Map<String, String> channelGuilds = new ConcurrentHashMap<String, String>();
     private final Map<String, String> channelNames = new ConcurrentHashMap<String, String>();
+    /** The server each known role is in, by role id. */
+    private final Map<String, String> roleGuilds = new ConcurrentHashMap<String, String>();
+    private final Map<String, String> roleNames = new ConcurrentHashMap<String, String>();
     /** Each member's nickname in a server, by server and member id; the least used goes first. */
     private final Map<String, String> nicknames =
             new LinkedHashMap<String, String>(64, 0.75F, true) {
@@ -43,8 +49,8 @@ final class DiscordGuildDirectory {
 
     /**
      * A gateway event, taken for what it says of names: a server with
-     * its channels, a server renamed or left, a channel made, renamed or
-     * removed. Any other event is ignored.
+     * its channels and roles, a server renamed or left, a channel or a
+     * role made, renamed or removed. Any other event is ignored.
      */
     void onEvent(String name, JsonObject data) {
         if (name == null || data == null) {
@@ -66,6 +72,16 @@ final class DiscordGuildDirectory {
                     }
                 }
             }
+            if (data.has("roles") && data.get("roles").isJsonArray()) {
+                // The list is the server's whole set: a role it no longer
+                // names was removed while nobody listened.
+                forgetRoles(guildId);
+                for (JsonElement role : data.getAsJsonArray("roles")) {
+                    if (role.isJsonObject()) {
+                        putRole(guildId, role.getAsJsonObject());
+                    }
+                }
+            }
         } else if ("GUILD_DELETE".equals(name)) {
             forgetGuild(string(data, "id"));
         } else if ("CHANNEL_CREATE".equals(name) || "CHANNEL_UPDATE".equals(name)) {
@@ -74,6 +90,14 @@ final class DiscordGuildDirectory {
             String channelId = string(data, "id");
             this.channelGuilds.remove(channelId);
             this.channelNames.remove(channelId);
+        } else if ("GUILD_ROLE_CREATE".equals(name) || "GUILD_ROLE_UPDATE".equals(name)) {
+            putRole(string(data, "guild_id"), object(data, "role"));
+        } else if ("GUILD_ROLE_DELETE".equals(name)) {
+            String roleId = string(data, "role_id");
+            if (string(data, "guild_id").equals(this.roleGuilds.get(roleId))) {
+                this.roleGuilds.remove(roleId);
+                this.roleNames.remove(roleId);
+            }
         }
         noteNicknames(name, data);
     }
@@ -173,10 +197,44 @@ final class DiscordGuildDirectory {
         return name == null ? "" : name;
     }
 
+    /**
+     * What a message in the server {@code guildId} calls its roles and
+     * channels by id: only that server's, empty for any other, so a
+     * mention never names what another server holds.
+     */
+    DiscordMessageSanitizer.Places placesIn(final String guildId) {
+        if (guildId == null || guildId.length() == 0) {
+            return DiscordMessageSanitizer.Places.NONE;
+        }
+        return new DiscordMessageSanitizer.Places() {
+            @Override
+            public String roleName(String roleId) {
+                return roleNameIn(guildId, roleId);
+            }
+
+            @Override
+            public String channelName(String channelId) {
+                return guildId.equals(guildIdOfChannel(channelId))
+                        ? DiscordGuildDirectory.this.channelName(channelId) : "";
+            }
+        };
+    }
+
+    /** A role's name in the server {@code guildId}; empty when not known there. */
+    String roleNameIn(String guildId, String roleId) {
+        if (guildId == null || roleId == null || !guildId.equals(this.roleGuilds.get(roleId))) {
+            return "";
+        }
+        String name = this.roleNames.get(roleId);
+        return name == null ? "" : name;
+    }
+
     void clear() {
         this.guildNames.clear();
         this.channelGuilds.clear();
         this.channelNames.clear();
+        this.roleGuilds.clear();
+        this.roleNames.clear();
         synchronized (this.nicknames) {
             this.nicknames.clear();
         }
@@ -203,6 +261,29 @@ final class DiscordGuildDirectory {
         }
     }
 
+    /** Keeps a role's name, the server's {@code @everyone} among them. */
+    private void putRole(String guildId, JsonObject role) {
+        String roleId = string(role, "id");
+        if (guildId.length() == 0 || roleId.length() == 0) {
+            return;
+        }
+        String name = clean(string(role, "name"));
+        if (name.length() > 0 && (this.roleNames.containsKey(roleId)
+                || this.roleNames.size() < MAX_ROLES)) {
+            this.roleGuilds.put(roleId, guildId);
+            this.roleNames.put(roleId, name);
+        }
+    }
+
+    private void forgetRoles(String guildId) {
+        for (Map.Entry<String, String> entry : this.roleGuilds.entrySet()) {
+            if (guildId.equals(entry.getValue())) {
+                this.roleGuilds.remove(entry.getKey());
+                this.roleNames.remove(entry.getKey());
+            }
+        }
+    }
+
     private void forgetGuild(String guildId) {
         if (guildId.length() == 0) {
             return;
@@ -214,6 +295,7 @@ final class DiscordGuildDirectory {
                 this.channelNames.remove(entry.getKey());
             }
         }
+        forgetRoles(guildId);
     }
 
     /**

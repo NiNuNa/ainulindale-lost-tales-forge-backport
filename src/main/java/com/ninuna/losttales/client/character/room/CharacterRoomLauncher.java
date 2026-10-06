@@ -9,6 +9,7 @@ import net.minecraft.client.gui.GuiMultiplayer;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiSelectWorld;
 import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.util.StatCollector;
 import net.minecraft.world.WorldSettings;
 import net.minecraft.world.storage.ISaveFormat;
 
@@ -36,8 +37,8 @@ public final class CharacterRoomLauncher {
 
     /** The save folder; never listed for long, since it is deleted on leaving. */
     static final String FOLDER = "losttales_character_room";
-    /** What the level file calls the world. */
-    static final String WORLD_NAME = "Character Room";
+    /** What the level file calls the world: the room's name, read in the game's language as the world is made. */
+    static final String WORLD_NAME_KEY = "gui.losttales.character.room.menu.title";
     /** The room is the same whatever the seed; a fixed one keeps it so. */
     static final long SEED = 0x1057A1E5L;
 
@@ -67,7 +68,8 @@ public final class CharacterRoomLauncher {
                 ? -1 : minecraft.gameSettings.thirdPersonView;
         CharacterRoomSession.begin();
         try {
-            minecraft.launchIntegratedServer(FOLDER, WORLD_NAME, settings);
+            minecraft.launchIntegratedServer(FOLDER,
+                    StatCollector.translateToLocal(WORLD_NAME_KEY), settings);
         } catch (RuntimeException exception) {
             abandon(minecraft, exception.toString());
             return false;

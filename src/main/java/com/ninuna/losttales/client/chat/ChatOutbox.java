@@ -5,17 +5,21 @@ import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
+import com.ninuna.losttales.chat.share.ChatQuestCard;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareReference;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
+import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatEditPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingPacket;
+import com.ninuna.losttales.quest.LostTalesQuestShareResolver;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
@@ -223,10 +227,10 @@ final class ChatOutbox {
     }
 
     /**
-     * The things a message shares, resolved from this client alone: the
-     * stack in the slot the token names and the marker the token names,
-     * both checked against the typed name exactly as the server checks
-     * them.
+     * The things a message shares, resolved from this client alone for its
+     * own echo: the stack, marker or quest each token names in this game's
+     * words, as the references sent with the message name them by slot
+     * and id.
      */
     private List<ChatShowcase> resolveLocalShowcases(String message) {
         List<ChatShareTokenParser.Token> tokens =
@@ -268,8 +272,12 @@ final class ChatOutbox {
                         continue;
                     }
                     LostTalesMapMarkerData marker = entry.marker;
+                    // The words the marker was given travel; each reader's
+                    // game names a bundled marker in its own language, and
+                    // one with no name of its own after what it is called after.
                     ChatShowcase showcase = ChatShowcase.marker(index,
-                            marker.getId(), marker.getName(),
+                            marker.getId(), marker.getGivenName(),
+                            marker.getNamedAfter(),
                             marker.getIconName(), marker.getColorName(),
                             marker.getDimensionId(), marker.getX(),
                             marker.getZ());
@@ -281,15 +289,13 @@ final class ChatOutbox {
             } else {
                 for (ChatShareCandidates.QuestEntry entry : quests) {
                     if (!entry.matchesToken(token)) continue;
-                    com.ninuna.losttales.client.quest.ClientQuestEntry quest =
-                            entry.quest;
-                    String objective = quest.getObjectives().isEmpty() ? ""
-                            : quest.getObjectives().get(0).getText();
-                    String reward = join(quest.getRewards());
-                    showcases.add(ChatShowcase.quest(index,
-                            quest.getReference(), quest.getTitle(),
-                            quest.getCategory(), objective, reward,
-                            quest.getSource() == com.ninuna.losttales.client.quest.ClientQuestEntry.Source.LOST_TALES));
+                    ChatQuestCard card = localCard(entry.quest);
+                    if (card != null) {
+                        showcases.add(ChatShowcase.quest(index,
+                                entry.quest.getReference(), card,
+                                entry.quest.getSource()
+                                        == ClientQuestEntry.Source.LOST_TALES));
+                    }
                     break;
                 }
             }
@@ -298,16 +304,37 @@ final class ChatOutbox {
         return showcases.isEmpty() ? null : showcases;
     }
 
-    private static String join(List<String> values) {
-        StringBuilder text = new StringBuilder();
-        if (values != null) {
-            for (String value : values) {
-                if (value == null || value.length() == 0) continue;
-                if (text.length() > 0) text.append("; ");
-                text.append(value);
+    /**
+     * The card a quest of this client's own journal stands for until the
+     * server's line replaces the echo: a Lost Tales quest's as the server
+     * makes it, a LOTR quest's from the words its journal entry shows.
+     */
+    private static ChatQuestCard localCard(ClientQuestEntry quest) {
+        try {
+            if (quest.getSource() == ClientQuestEntry.Source.LOST_TALES
+                    && quest.getLostTalesDefinition() != null) {
+                return LostTalesQuestShareResolver.card(
+                        quest.getLostTalesDefinition(),
+                        quest.getLostTalesProgress());
             }
+            String line = quest.getObjectives().isEmpty() ? ""
+                    : quest.getObjectives().get(0).getText();
+            List<ChatQuestCard.Objective> objectives = line.length() == 0
+                    ? Collections.<ChatQuestCard.Objective>emptyList()
+                    : Collections.singletonList(new ChatQuestCard.Objective(
+                            "", "", Collections.<String, String>emptyMap(), 0, 0,
+                            false, LostTalesQuestShareResolver.fitBytes(line,
+                                    ChatQuestCard.MAX_OBJECTIVE_TEXT_BYTES)));
+            return new ChatQuestCard(ChatQuestCard.Source.LOTR,
+                    LostTalesQuestShareResolver.fitBytes(quest.getTitle(),
+                            ChatQuestCard.MAX_TITLE_BYTES),
+                    LostTalesQuestShareResolver.fitBytes(quest.getCategory(),
+                            ChatQuestCard.MAX_CATEGORY_BYTES),
+                    objectives, Collections.singletonMap(
+                            ChatQuestCard.LOTR_PAYMENT, ""));
+        } catch (IllegalArgumentException unfit) {
+            return null;
         }
-        return text.toString();
     }
 
     /**

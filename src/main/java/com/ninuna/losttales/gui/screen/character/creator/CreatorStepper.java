@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.FontRenderer;
@@ -7,9 +9,11 @@ import org.lwjgl.input.Keyboard;
 
 /**
  * A row that steps through a short list: its name above, the chosen
- * option between two arrows below. The arrows, the wheel over the row and
- * the left and right keys while it holds the focus all step it, and the
- * list wraps at either end.
+ * option between two arrows below; in a window's rows, as a number's row
+ * in Settings, its name at the left and the option between a menu's
+ * stepper chevrons at the right end. The arrows, the wheel over the row
+ * and the left and right keys while it holds the focus all step it, and
+ * the list wraps at either end.
  */
 public final class CreatorStepper extends CreatorControl {
 
@@ -36,7 +40,7 @@ public final class CreatorStepper extends CreatorControl {
 
     @Override
     public int height() {
-        return ROW_HEIGHT;
+        return inRows() ? CreatorRows.height() : ROW_HEIGHT;
     }
 
     @Override
@@ -54,6 +58,10 @@ public final class CreatorStepper extends CreatorControl {
 
     @Override
     public void draw(int mouseX, int mouseY) {
+        if (inRows()) {
+            drawRow(mouseX, mouseY);
+            return;
+        }
         FontRenderer font = this.context.getFont();
         drawLabel(this.label);
         int top = valueTop();
@@ -84,6 +92,47 @@ public final class CreatorStepper extends CreatorControl {
                 color);
     }
 
+    /**
+     * As a window's row: lit under the pointer and while it holds the
+     * keys, its name at the left in ivory, the option at the right end
+     * between the chevrons, in the room the widest option takes; the
+     * chevrons stand flat while the option cannot be stepped.
+     */
+    private void drawRow(int mouseX, int mouseY) {
+        FontRenderer font = this.context.getFont();
+        if (contains(mouseX, mouseY) || isFocused()) {
+            CreatorRows.light(this.context, this.y, this.y + height());
+        }
+        boolean steps = canStep();
+        int arrow = steps ? arrowAt(mouseX, mouseY) : 0;
+        int room = valueRoom(font);
+        int right = this.x + this.width;
+        MenuWindow.drawStepper(font, CreatorRows.trimmed(font,
+                        currentLabel(), room), room, right,
+                CreatorRows.textTop(this.y), arrow < 0 ? MenuWindow.PART_LESS
+                        : arrow > 0 ? MenuWindow.PART_MORE : null,
+                steps ? this.leftMotion : null, steps ? this.rightMotion : null,
+                WindowStyle.asideRgb(), this.context.alpha());
+        CreatorRows.drawLabel(this.context, this.label, this.x, this.y,
+                right - room - 2 * MenuWindow.STEPPER_CELL
+                        - MenuWindow.VALUE_GAP);
+    }
+
+    /**
+     * In a window's rows, the room the option takes between the chevrons:
+     * the widest it can read, so the chevrons stand still as it steps, and
+     * no wider than the row leaves them.
+     */
+    private int valueRoom(FontRenderer font) {
+        int widest = font.getStringWidth(currentLabel());
+        for (int index = 0; index < this.choice.count(); index++) {
+            widest = Math.max(widest,
+                    font.getStringWidth(this.choice.label(index)));
+        }
+        return Math.max(0, Math.min(widest,
+                this.width - 2 * MenuWindow.STEPPER_CELL));
+    }
+
     private String currentLabel() {
         if (this.choice.isFixed()) {
             return this.choice.fixedLabel();
@@ -111,6 +160,15 @@ public final class CreatorStepper extends CreatorControl {
 
     /** -1 over the left arrow, 1 over the right one, 0 anywhere else. */
     private int arrowAt(int mouseX, int mouseY) {
+        if (inRows()) {
+            String part = contains(mouseX, mouseY)
+                    ? MenuWindow.stepperPartAt(mouseX, mouseY,
+                            this.x + this.width, this.y, height(),
+                            valueRoom(this.context.getFont()))
+                    : null;
+            return MenuWindow.PART_LESS.equals(part) ? -1
+                    : MenuWindow.PART_MORE.equals(part) ? 1 : 0;
+        }
         int top = valueTop();
         if (CreatorWidgets.within(mouseX, mouseY, this.x, top,
                 CreatorWidgets.ARROW_BOX, CreatorWidgets.ARROW_BOX)) {

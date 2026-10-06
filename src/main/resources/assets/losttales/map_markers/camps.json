@@ -2,7 +2,6 @@
   "map_markers": [
     {
       "id": "losttales:ranger_camp",
-      "name": "Ranger Camp",
       "relevance": "low",
       "icon": "town",
       "color": "blue",
@@ -20,7 +19,6 @@
     },
     {
       "id": "losttales:old_oak_camp",
-      "name": "Old Oak Camp",
       "relevance": "low",
       "icon": "town",
       "color": "green",

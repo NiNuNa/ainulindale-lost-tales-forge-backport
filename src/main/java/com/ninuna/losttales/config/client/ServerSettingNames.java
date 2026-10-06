@@ -8,10 +8,11 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * The words a server setting is shown by, made from its code name: a
- * key split at its capitals and underscores into Title Case words
- * ({@code historyPerChannel} reads "History per Channel"), a run of
- * capitals kept whole as the key writes it. Free of Minecraft.
+ * The words a server setting or category is shown by where the lang file
+ * has none for it, made from its code name: a key split at its capitals
+ * and underscores into Title Case words ({@code historyPerChannel} reads
+ * "History per Channel"), a run of capitals kept whole as the key writes
+ * it. Free of Minecraft.
  */
 final class ServerSettingNames {
     /** Words Title Case leaves in lower case after the first. */

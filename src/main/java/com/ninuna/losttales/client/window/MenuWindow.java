@@ -6,6 +6,7 @@ import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
@@ -26,6 +27,7 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.GL11;
 
 /**
  * A menu in a sub-window of its own: the rows a control or the pointer
@@ -37,7 +39,8 @@ import org.lwjgl.input.Mouse;
  * what the rows are, what they are about and what they do is its
  * owner's business ({@link WindowMenus}), which hands the menu new rows
  * whenever what they say has changed. A list may carry <em>header</em>
- * rows — a section label over a hairline, never taken — and
+ * rows — a section label over a hairline, taken only by one that folds its
+ * section away, as the pickers' sections fold — and
  * <em>separators</em>, a lone hairline between two groups of rows that
  * belong together; a list longer than its window scrolls by the wheel, a
  * honey hairline on an edge saying more lies past it.
@@ -56,44 +59,35 @@ import org.lwjgl.input.Mouse;
  * no kind, drawn in the page's box on the page's surface.</p>
  */
 public final class MenuWindow extends SubWindowContent {
+    /** Every menu's row, a plain row of words that holds a key icon too. */
     public static final int ROW_HEIGHT = 11;
-    private static final int PADDING_X = 6;
-    private static final int PADDING_Y = 3;
+    /** Clear room round a menu's field and rows, across and down; every list in a sub-window keeps it. */
+    public static final int PADDING_X = 6;
+    public static final int PADDING_Y = 3;
     private static final int MIN_WIDTH = 56;
-    /**
-     * A row tall enough for the mod's key icons at their own size, as the
-     * settings' rows are, since some of them show a shortcut's keys.
-     */
-    public static final int TALL_ROW_HEIGHT =
-            LostTalesInputIconRenderer.BASE_ICON_HEIGHT + 2;
     /** Rows a window opens with at most; a longer list scrolls behind them. */
     public static final int MAX_VISIBLE_ROWS = 12;
-    /** A separator's room: two clear pixels, its hairline, two clear pixels. */
-    static final int SEPARATOR_HEIGHT = 5;
+    /** A separator's room; see {@link WindowLists#SEPARATOR_HEIGHT}. */
+    static final int SEPARATOR_HEIGHT = WindowLists.SEPARATOR_HEIGHT;
     /** The widest a note makes its menu; a wider menu's notes take its width. */
     private static final int NOTE_WIDTH = 220;
     /** A note's lines, from one line's top to the next's. */
-    private static final int NOTE_LINE = 10;
+    public static final int NOTE_LINE = 10;
     /** Clear room above a note's first line and under its last. */
-    private static final int NOTE_PADDING = 2;
+    public static final int NOTE_PADDING = 2;
     /** Longest thing a field takes unless told otherwise; far past any tab's name. */
     public static final int MAX_FILTER_LENGTH = 48;
     /** Seam between a shortcut's key icons and the + joining them. */
     private static final int KEY_GAP = 2;
     private static final int[] NO_KEYS = new int[0];
     private static final Object[] NO_PARTS = new Object[0];
-    /** Clear room between a row's label and its value at the least. */
-    private static final int VALUE_GAP = 8;
+    /** Clear room between a row's label and its value at the least; every list keeps it. */
+    public static final int VALUE_GAP = 8;
     /** Width of the upright colour bar before a channel's name, and its gap. */
     private static final int SWATCH_WIDTH = 1;
     private static final int SWATCH_GAP = 4;
     /** Width of the colour chip before a palette entry's name. */
     private static final int CHIP_WIDTH = 7;
-    /** The hairline that says the list continues past an edge. */
-    private static final int MORE_RGB =
-            LostTalesColors.rgb(LostTalesColors.HONEY);
-    /** The hairline under a section's name: nearly opaque, a firmer line than the field's. */
-    private static final int HEADER_RULE_ALPHA = 0xE0;
     /** A stepper's parts, as a press on a number's row names them. */
     public static final String PART_LESS = "less";
     public static final String PART_VALUE = "value";
@@ -103,12 +97,14 @@ public final class MenuWindow extends SubWindowContent {
      * with three clear on either side, the clear space between the
      * chevron and the number included.
      */
-    static final int STEPPER_CELL = 9;
+    public static final int STEPPER_CELL = 9;
     private static final LostTalesUiSheet LESS = LostTalesUiSheet.TOGGLE_5;
     private static final LostTalesUiSheet LESS_LIT = LostTalesUiSheet.TOGGLE_5_HOVER;
     private static final LostTalesUiSheet MORE = LostTalesUiSheet.TOGGLE_1;
     private static final LostTalesUiSheet MORE_LIT = LostTalesUiSheet.TOGGLE_1_HOVER;
     private static final String[] NO_WORDS = new String[0];
+    /** A folding header's sign while its section shows; a subsection stands in by its width. */
+    private static final String OPEN_SIGN = "- ";
 
     /**
      * A picture standing in a row's icon column: a person's head. It is
@@ -148,8 +144,18 @@ public final class MenuWindow extends SubWindowContent {
     public static final class Entry {
         public final String id;
         public final String label;
-        /** A section label over a hairline; never hovered, never taken. */
+        /** A section label over a hairline; never hovered, never taken unless it folds. */
         public final boolean header;
+        /**
+         * Whether the header folds its section away and back, a press at a
+         * time, as the pickers' sections do: {@code -} before its name
+         * while the section shows, {@code +} while it is folded.
+         */
+        boolean foldable;
+        /** Whether a folding header's section is folded away. */
+        boolean folded;
+        /** How deep a header stands: a subsection's under its section's name, one sign in. */
+        int depth;
         /** A display row that cannot be taken. */
         public final boolean passive;
         /** Drawn italic: a muted channel, like its tab. */
@@ -174,7 +180,10 @@ public final class MenuWindow extends SubWindowContent {
          * the row is {@link #chosen}.
          */
         LostTalesUiSheet litSprite;
-        /** Whether the row is the one chosen, which keeps its sprite lit. */
+        /**
+         * Whether the row is the one chosen: it stays lit as the row under
+         * the pointer is, its sprite with it.
+         */
         boolean chosen;
         /** How the label is drawn where it is not plain words; null for plain words. */
         Label labelStyle;
@@ -357,6 +366,19 @@ public final class MenuWindow extends SubWindowContent {
             return new Entry("", label, true, false, false, -1, null);
         }
 
+        /**
+         * A section label that folds its section away and back, taken as
+         * {@code id}; {@code depth} 1 for a subsection.
+         */
+        public static Entry fold(String id, String label, boolean folded,
+                                 int depth) {
+            Entry entry = new Entry(id, label, true, false, false, -1, null);
+            entry.foldable = true;
+            entry.folded = folded;
+            entry.depth = Math.max(0, depth);
+            return entry;
+        }
+
         /** A display row that cannot be taken. */
         public static Entry passive(String label) {
             return new Entry("", label, false, true, false, -1, null);
@@ -382,6 +404,12 @@ public final class MenuWindow extends SubWindowContent {
             entry.group = true;
             entry.labelColor = rgb;
             return entry;
+        }
+
+        /** The same entry, chosen or not: a chosen row stays lit. */
+        public Entry chosen(boolean on) {
+            this.chosen = on;
+            return this;
         }
 
         /** The same entry with a picture before its name. */
@@ -430,13 +458,26 @@ public final class MenuWindow extends SubWindowContent {
             copy.stepperWidest = this.stepperWidest;
             copy.tip = this.tip;
             copy.valueColor = this.valueColor;
+            copy.foldable = this.foldable;
+            copy.folded = this.folded;
+            copy.depth = this.depth;
             return copy;
         }
 
         /** Whether a press on the row does something. */
         public boolean isTakeable() {
-            return !this.header && !this.passive && !this.held
-                    && this.unavailable.length() == 0;
+            return (!this.header || this.foldable) && !this.passive
+                    && !this.held && this.unavailable.length() == 0;
+        }
+
+        /** What a header writes before its name: a folding one's sign. */
+        String headerPrefix() {
+            return !this.foldable ? "" : this.folded ? "+ " : OPEN_SIGN;
+        }
+
+        /** How far a header stands in: a subsection's sign under its section's name. */
+        int headerIndent(FontRenderer font) {
+            return this.depth * font.getStringWidth(OPEN_SIGN);
         }
     }
 
@@ -449,9 +490,8 @@ public final class MenuWindow extends SubWindowContent {
         final int height;
         final int rowsTop;
         final int rowsBottom;
-        final int rowHeight;
 
-        Layout(LostTalesUiHitBox box, int fieldHeight, int rowHeight) {
+        Layout(LostTalesUiHitBox box, int fieldHeight) {
             this.left = (int)Math.floor(box.left);
             this.top = (int)Math.floor(box.top);
             this.width = (int)Math.floor(box.width);
@@ -459,7 +499,6 @@ public final class MenuWindow extends SubWindowContent {
             this.rowsTop = this.top + PADDING_Y + fieldHeight;
             this.rowsBottom = Math.max(this.rowsTop,
                     this.top + this.height - PADDING_Y);
-            this.rowHeight = rowHeight;
         }
 
         /** How tall the band the rows glide in is. */
@@ -481,8 +520,6 @@ public final class MenuWindow extends SubWindowContent {
     private String title = "";
     private LostTalesUiSheet icon;
     private List<Entry> entries = Collections.emptyList();
-    /** How tall a row is: a menu's own, or {@link #TALL_ROW_HEIGHT}. */
-    private int rowHeight = ROW_HEIGHT;
     /** Rows the window opens with at most: {@link #MAX_VISIBLE_ROWS}, or a menu's own. */
     private int visibleRows = MAX_VISIBLE_ROWS;
     /** The width the notes are wrapped to: the rows' room in the box last laid out. */
@@ -569,9 +606,14 @@ public final class MenuWindow extends SubWindowContent {
         this.icon = icon;
     }
 
-    /** How tall every row is: a menu's own, or taller to hold key icons. */
-    public void setRowHeight(int height) {
-        this.rowHeight = Math.max(ROW_HEIGHT, height);
+    /**
+     * How tall every row of every menu is: {@link #ROW_HEIGHT}, which holds
+     * a key icon at the windows' size; taller, for every menu alike, only
+     * where the GUI's scale leaves the keys taller than a row (GUI scale 1).
+     */
+    public static int rowHeight() {
+        return Math.max(ROW_HEIGHT, (int)Math.ceil(
+                LostTalesInputIconRenderer.windowHeight()));
     }
 
     /** How many rows the window opens with at most; a page's help opens taller than a menu. */
@@ -848,7 +890,8 @@ public final class MenuWindow extends SubWindowContent {
             widest = Math.max(widest, PADDING_X + fieldIconRun()
                     + LostTalesUiCaret.WIDTH + 1
                     + font.getStringWidth(this.filterPrompt)
-                    + SWATCH_GAP + hintWidth(minecraft) + PADDING_X);
+                    + SWATCH_GAP + (int)Math.ceil(hintWidth(minecraft))
+                    + PADDING_X);
         }
         String name = stripTitle();
         if (name == null && this.kind != null) {
@@ -872,14 +915,16 @@ public final class MenuWindow extends SubWindowContent {
                 ? entry.labelStyle.width(font, entry.label)
                 : font.getStringWidth(entry.label);
         if (entry.header) {
-            return PADDING_X + label + PADDING_X;
+            return PADDING_X + entry.headerIndent(font)
+                    + font.getStringWidth(entry.headerPrefix())
+                    + label + PADDING_X;
         }
         if (entry.group) {
             return PADDING_X + (entry.icon != null
                     ? TabIcons.SLOT + TabIcons.GAP : 0)
                     + label + PADDING_X;
         }
-        int value = valueWidth(minecraft, font, entry);
+        int value = (int)Math.ceil(valueWidth(minecraft, font, entry));
         return this.labelX + label + (value > 0 ? VALUE_GAP + value : 0)
                 + PADDING_X;
     }
@@ -909,8 +954,8 @@ public final class MenuWindow extends SubWindowContent {
         if (entry.separator) {
             return 0;
         }
-        return entry.note ? Math.max(1, (heightOf(entry) + this.rowHeight - 1)
-                / this.rowHeight) : 1;
+        return entry.note ? Math.max(1, (heightOf(entry) + rowHeight() - 1)
+                / rowHeight()) : 1;
     }
 
     /**
@@ -922,7 +967,7 @@ public final class MenuWindow extends SubWindowContent {
             return SEPARATOR_HEIGHT;
         }
         return entry.note ? NOTE_PADDING * 2
-                + linesOf(entry).size() * NOTE_LINE : this.rowHeight;
+                + linesOf(entry).size() * NOTE_LINE : rowHeight();
     }
 
     /**
@@ -940,10 +985,10 @@ public final class MenuWindow extends SubWindowContent {
             }
             int of = rowsOf(entry);
             height += counted + of <= rows ? heightOf(entry)
-                    : (rows - counted) * this.rowHeight;
+                    : (rows - counted) * rowHeight();
             counted += of;
         }
-        return Math.max(this.rowHeight, height);
+        return Math.max(rowHeight(), height);
     }
 
     /** The notes wrapped to a content box {@code width} wide from now on. */
@@ -989,7 +1034,7 @@ public final class MenuWindow extends SubWindowContent {
     /** One row under the field. */
     @Override
     public int minHeight() {
-        return PADDING_Y * 2 + fieldHeight() + this.rowHeight;
+        return PADDING_Y * 2 + fieldHeight() + rowHeight();
     }
 
     /**
@@ -1091,18 +1136,12 @@ public final class MenuWindow extends SubWindowContent {
 
     /** Whole rows in {@code pixels}. */
     private int rowsIn(int pixels) {
-        return Math.max(0, pixels / this.rowHeight);
+        return Math.max(0, pixels / rowHeight());
     }
 
-    /**
-     * Room the field takes above the rows; none without one. As tall as
-     * the key icons it carries, so they are drawn at their own size
-     * rather than shrunk into a text row.
-     */
+    /** Room the field takes above the rows; none without one: a row and its hairline. */
     private int fieldHeight() {
-        return this.field == null ? 0
-                : Math.max(ROW_HEIGHT,
-                        LostTalesInputIconRenderer.BASE_ICON_HEIGHT) + 1;
+        return this.field == null ? 0 : WindowLists.fieldHeight();
     }
 
     /** The field's icon and the gap after it. */
@@ -1130,7 +1169,7 @@ public final class MenuWindow extends SubWindowContent {
             // the draw measures them.
             hover.part = stepperPartAt(x, y, at.left + at.width - PADDING_X,
                     listTop(at) + rowTops()[index],
-                    this.rowHeight, stepperTextWidth(
+                    rowHeight(), stepperTextWidth(
                             Minecraft.getMinecraft().fontRenderer, row));
             if (PART_VALUE.equals(hover.part)) {
                 hover.tip = row.stepperTip;
@@ -1146,7 +1185,7 @@ public final class MenuWindow extends SubWindowContent {
     @Override
     public void scrollBy(int lines) {
         this.scrollPixels += WheelStep.pixels(WheelStep.menuRows(lines),
-                this.rowHeight);
+                rowHeight());
     }
 
     @Override
@@ -1207,20 +1246,18 @@ public final class MenuWindow extends SubWindowContent {
         // they glide in; only those the band shows are drawn.
         int[] tops = rowTops();
         int listTop = listTop(at);
-        // The hovered row is the window's surface recoloured, cut to the
-        // band, before anything lands on it.
-        if (hoveredIndex >= 0) {
-            int litTop = Math.max(at.rowsTop, listTop + tops[hoveredIndex]);
-            int litBottom = Math.min(at.rowsBottom,
-                    listTop + tops[hoveredIndex + 1]);
-            WindowStyle.recolourFlat(at.left, litTop, at.left + at.width,
-                    litBottom, surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
-                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
-            // The frame beside the row takes its colour with it.
-            WindowStyle.recolourRingBeside(at.left, at.left + at.width,
-                    at.left, litTop, at.left + at.width, litBottom,
-                    surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
-                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+        // The chosen rows and the hovered one, cut to the band, before
+        // anything lands on them: each lit alike.
+        for (int index = 0; index < this.entries.size(); index++) {
+            if (index != hoveredIndex && !this.entries.get(index).chosen) {
+                continue;
+            }
+            int litTop = Math.max(at.rowsTop, listTop + tops[index]);
+            int litBottom = Math.min(at.rowsBottom, listTop + tops[index + 1]);
+            if (litBottom > litTop) {
+                WindowLists.drawLitRow(at.left, at.left + at.width, at.left,
+                        litTop, at.left + at.width, litBottom, surfaceAlpha);
+            }
         }
         drawField(minecraft, font, at, alpha);
         boolean clipped = beginClip(minecraft, clipX + (at.left - box.left),
@@ -1241,16 +1278,12 @@ public final class MenuWindow extends SubWindowContent {
         } finally {
             endClip(clipped);
         }
-        // A hairline on an edge the list continues past.
-        int more = LostTalesUiInk.argb(MORE_RGB, alpha);
-        if (this.scrollPixels > 0.0D) {
-            Gui.drawRect(at.left + 1, at.top + 1, at.left + at.width - 1,
-                    at.top + 2, more);
-        }
-        if (this.scrollPixels < maxScroll(at) - 0.5D) {
-            Gui.drawRect(at.left + 1, at.top + at.height - 2,
-                    at.left + at.width - 1, at.top + at.height - 1, more);
-        }
+        // The fades hang from the frame, or from the field's hairline the
+        // rows pass under.
+        WindowLists.drawScroll(at.left, this.field == null ? at.top
+                        : at.rowsTop, at.left + at.width, at.top + at.height,
+                at.rowsTop, at.rowsBottom, this.renderedScrollPixels,
+                maxScroll(at), alpha);
     }
 
     /**
@@ -1265,10 +1298,8 @@ public final class MenuWindow extends SubWindowContent {
                          double pointerX, double pointerY, double elapsed,
                          int alpha) {
         if (entry.separator) {
-            // A quiet hairline, the tab row's dividers laid on their side.
-            LostTalesUiRules.drawRule(at.left + PADDING_X,
-                    at.left + at.width - PADDING_X, rowY + 2, rowY + 3,
-                    Math.round(WindowStyle.DIVIDER_ALPHA * alpha / 255.0F));
+            WindowLists.drawSeparator(at.left + PADDING_X,
+                    at.left + at.width - PADDING_X, rowY, alpha);
             return;
         }
         if (entry.note) {
@@ -1285,20 +1316,18 @@ public final class MenuWindow extends SubWindowContent {
             }
             return;
         }
-        int labelTop = rowY + LostTalesUiInk.centredStart(this.rowHeight,
+        int labelTop = rowY + LostTalesUiInk.centredStart(rowHeight(),
                 LostTalesUiInk.CAP_HEIGHT);
         if (entry.header) {
             // The section's name over a hairline, in the sand the
-            // timestamps wear, so it reads as a label, not a row.
-            LostTalesUiInk.drawText(font, trimmed(font,
-                            entry.label, at.width - PADDING_X * 2),
-                    at.left + PADDING_X, rowY + this.rowHeight - 10,
-                    LostTalesColors.rgb(LostTalesColors.SAND), alpha);
-            Gui.drawRect(at.left + PADDING_X, rowY + this.rowHeight - 1,
-                    at.left + at.width - PADDING_X, rowY + this.rowHeight,
-                    LostTalesUiInk.argb(
-                            LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
-                            Math.round(HEADER_RULE_ALPHA * alpha / 255.0F)));
+            // timestamps wear, so it reads as a label, not a row; one that
+            // folds wears its sign before it, and lights to ivory under
+            // the pointer as a row's name does.
+            WindowLists.drawHeading(font, entry.headerPrefix() + entry.label,
+                    at.left + PADDING_X,
+                    at.left + PADDING_X + entry.headerIndent(font),
+                    at.left + at.width - PADDING_X, rowY, rowHeight(),
+                    hovered, alpha);
             return;
         }
         if (entry.group) {
@@ -1312,7 +1341,7 @@ public final class MenuWindow extends SubWindowContent {
             Gui.drawRect(at.left + PADDING_X, rowY + 1,
                     at.left + PADDING_X
                             + (entry.chip ? this.swatchWidth : SWATCH_WIDTH),
-                    rowY + this.rowHeight - 1,
+                    rowY + rowHeight() - 1,
                     LostTalesUiInk.argb(entry.color, alpha));
         }
         drawRowIcon(minecraft, at, entry, labelTop, hovered, elapsed, alpha);
@@ -1327,17 +1356,17 @@ public final class MenuWindow extends SubWindowContent {
         }
         int labelLeft = at.left + this.labelX;
         int right = at.left + at.width - PADDING_X;
-        int value = valueWidth(minecraft, font, entry);
+        float value = valueWidth(minecraft, font, entry);
         if (entry.stepper) {
             drawStepper(font, entry, right, labelTop, hovered
                     ? stepperPartAt(pointerX, pointerY, right, rowY,
-                            this.rowHeight, stepperTextWidth(font, entry))
+                            rowHeight(), stepperTextWidth(font, entry))
                     : null, alpha);
-            right -= value + VALUE_GAP;
-        } else if (value > 0) {
+            right = (int)Math.floor(right - value) - VALUE_GAP;
+        } else if (value > 0.0F) {
             drawValue(minecraft, font, entry, right - value, rowY, labelTop,
                     alpha);
-            right -= value + VALUE_GAP;
+            right = (int)Math.floor(right - value) - VALUE_GAP;
         }
         if (entry.labelStyle != null) {
             // A styled label cannot be cut by the letter; the clip cuts a
@@ -1373,15 +1402,16 @@ public final class MenuWindow extends SubWindowContent {
     }
 
     /**
-     * How wide a row's value is: its chip, its words and its keys; a
-     * stepper's, its chevrons and the room its number takes.
+     * How wide a row's value is: its chip, its words and its keys, which
+     * may end between the GUI's pixels; a stepper's, its chevrons and the
+     * room its number takes.
      */
-    private static int valueWidth(Minecraft minecraft, FontRenderer font,
-                                  Entry entry) {
+    private static float valueWidth(Minecraft minecraft, FontRenderer font,
+                                    Entry entry) {
         if (entry.stepper) {
             return STEPPER_CELL * 2 + stepperTextWidth(font, entry);
         }
-        int width = 0;
+        float width = 0.0F;
         if (entry.valuePicture != null) {
             width += entry.valuePictureWidth
                     + (entry.value.length() > 0 ? SWATCH_GAP : 0);
@@ -1392,9 +1422,8 @@ public final class MenuWindow extends SubWindowContent {
         width += font.getStringWidth(entry.value);
         for (Object part : entry.keys) {
             width += part instanceof Integer
-                    ? LostTalesInputIconRenderer.measureInput(minecraft,
-                            LostTalesInputBinding.Type.KEYBOARD,
-                            ((Integer)part).intValue(), 1.0F)
+                    ? LostTalesInputIconRenderer.windowWidth(minecraft,
+                            ((Integer)part).intValue())
                     : KEY_GAP + font.getStringWidth(String.valueOf(part))
                             + KEY_GAP;
         }
@@ -1402,14 +1431,29 @@ public final class MenuWindow extends SubWindowContent {
     }
 
     /**
-     * A row's value from {@code x}: its picture, a colour's chip, a
+     * A row's value from {@code start}: its picture, a colour's chip, a
      * square on the words' capitals, then the words in the aside tone,
-     * then a shortcut's keys in the mod's own key icons on the row's
-     * middle, words between them a seam's width clear.
+     * then a shortcut's keys in the mod's own key icons a size smaller
+     * than the GUI's on the row's middle, words between them a seam's
+     * width clear. The keys end on display pixels, so the run may start
+     * between the GUI's pixels.
      */
     private void drawValue(Minecraft minecraft, FontRenderer font,
-                           Entry entry, int x, int rowY, int labelTop,
+                           Entry entry, float start, int rowY, int labelTop,
                            int alpha) {
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(start, 0.0F, 0.0F);
+            drawValueRun(minecraft, font, entry, rowY, labelTop, alpha);
+        } finally {
+            GL11.glPopMatrix();
+        }
+    }
+
+    private void drawValueRun(Minecraft minecraft, FontRenderer font,
+                              Entry entry, int rowY, int labelTop,
+                              int alpha) {
+        int x = 0;
         int aside = WindowStyle.asideRgb();
         int valueRgb = entry.valueColor >= 0 ? entry.valueColor : aside;
         if (entry.valuePicture != null) {
@@ -1428,22 +1472,37 @@ public final class MenuWindow extends SubWindowContent {
                     labelTop, valueRgb, alpha);
             x += font.getStringWidth(entry.value);
         }
-        int keyY = rowY + LostTalesUiInk.centredStart(this.rowHeight,
-                LostTalesInputIconRenderer.BASE_ICON_HEIGHT);
+        float keyX = x;
+        float keyY = LostTalesInputIconRenderer.windowTop(rowY,
+                rowHeight());
         for (Object part : entry.keys) {
             if (part instanceof Integer) {
+                int keyCode = ((Integer)part).intValue();
                 LostTalesUiInk.beginContent();
-                x += LostTalesInputIconRenderer.drawInput(minecraft,
-                        LostTalesInputBinding.Type.KEYBOARD,
-                        ((Integer)part).intValue(), x, keyY, 1.0F,
+                LostTalesInputIconRenderer.drawInput(minecraft,
+                        LostTalesInputBinding.Type.KEYBOARD, keyCode, keyX,
+                        keyY, LostTalesInputIconRenderer.windowScale(),
                         alpha / 255.0F);
+                keyX += LostTalesInputIconRenderer.windowWidth(minecraft,
+                        keyCode);
             } else {
                 String word = String.valueOf(part);
-                x += KEY_GAP;
-                LostTalesUiInk.drawText(font, word, x, labelTop,
-                        aside, alpha);
-                x += font.getStringWidth(word) + KEY_GAP;
+                keyX += KEY_GAP;
+                drawTextAt(font, word, keyX, labelTop, aside, alpha);
+                keyX += font.getStringWidth(word) + KEY_GAP;
             }
+        }
+    }
+
+    /** Words at a place that may lie between the GUI's pixels, on a display pixel, as a key's edge does. */
+    private static void drawTextAt(FontRenderer font, String text, float x,
+                                   float y, int rgb, int alpha) {
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(x, y, 0.0F);
+            LostTalesUiInk.drawText(font, text, 0, 0, rgb, alpha);
+        } finally {
+            GL11.glPopMatrix();
         }
     }
 
@@ -1463,8 +1522,9 @@ public final class MenuWindow extends SubWindowContent {
      * answers across the row's height, the number across the room its
      * widest value takes.
      */
-    static String stepperPartAt(double x, double y, int right, int rowTop,
-                                int rowHeight, int textWidth) {
+    public static String stepperPartAt(double x, double y, int right,
+                                       int rowTop, int rowHeight,
+                                       int textWidth) {
         int moreLeft = right - STEPPER_CELL;
         int textLeft = moreLeft - textWidth;
         int lessLeft = textLeft - STEPPER_CELL;
@@ -1483,53 +1543,78 @@ public final class MenuWindow extends SubWindowContent {
         return null;
     }
 
-    /**
-     * A number's value between its chevrons, the whole ending at
-     * {@code right}: the number centred in the room its widest value
-     * takes, in the aside tone and in ivory under the pointer; each
-     * chevron a glyph button, and at the bound it cannot pass a flat
-     * shape in the aside tone that nothing moves.
-     */
+    /** A number's row's stepper, its chevrons moved by the motions the menu keeps for the row. */
     private void drawStepper(FontRenderer font, Entry entry, int right,
                              int labelTop, String pointed, int alpha) {
-        int textWidth = stepperTextWidth(font, entry);
+        drawStepper(font, entry.value, stepperTextWidth(font, entry), right,
+                labelTop, pointed, chevronMotion(entry, LESS, entry.canLess),
+                chevronMotion(entry, MORE, entry.canMore),
+                entry.valueColor >= 0 ? entry.valueColor
+                        : WindowStyle.asideRgb(), alpha);
+    }
+
+    /**
+     * A stepper's value between its chevrons, the whole ending at
+     * {@code right}: the value centred in {@code textWidth}, the room its
+     * widest value takes, in {@code valueRgb} and in ivory while
+     * {@code pointed} names it; each chevron a glyph button moved by its
+     * motion, and at the bound it cannot pass, a null motion, a flat shape
+     * in the aside tone that nothing moves. Every list's stepper is drawn
+     * here, and {@link #stepperPartAt} answers for it.
+     */
+    public static void drawStepper(FontRenderer font, String value,
+                                   int textWidth, int right, int labelTop,
+                                   String pointed,
+                                   LostTalesUiButtonMotion less,
+                                   LostTalesUiButtonMotion more,
+                                   int valueRgb, int alpha) {
         int moreLeft = right - STEPPER_CELL;
         int textLeft = moreLeft - textWidth;
         int lessLeft = textLeft - STEPPER_CELL;
         int chevronY = labelTop + Math.floorDiv(
                 LostTalesUiInk.CAP_HEIGHT - LESS.getHeight(), 2);
-        drawChevron(entry, LESS, LESS_LIT, entry.canLess,
-                PART_LESS.equals(pointed), lessLeft, chevronY, alpha);
-        drawChevron(entry, MORE, MORE_LIT, entry.canMore,
-                PART_MORE.equals(pointed), moreLeft, chevronY, alpha);
-        LostTalesUiInk.drawText(font, entry.value,
+        drawChevron(LESS, LESS_LIT, less, PART_LESS.equals(pointed),
+                lessLeft, chevronY, alpha);
+        drawChevron(MORE, MORE_LIT, more, PART_MORE.equals(pointed),
+                moreLeft, chevronY, alpha);
+        LostTalesUiInk.drawText(font, value,
                 textLeft + LostTalesUiInk.centredStart(textWidth,
-                        font.getStringWidth(entry.value)),
+                        font.getStringWidth(value)),
                 labelTop, PART_VALUE.equals(pointed) ? LostTalesUiInk.IVORY
-                        : entry.valueColor >= 0 ? entry.valueColor
-                        : WindowStyle.asideRgb(), alpha);
+                        : valueRgb, alpha);
+    }
+
+    /** The motion a row's chevron keeps while it can move; null at its bound. */
+    private LostTalesUiButtonMotion chevronMotion(Entry entry,
+                                                  LostTalesUiSheet sprite,
+                                                  boolean moves) {
+        if (!moves) {
+            return null;
+        }
+        String key = entry.id + ":" + sprite.name();
+        LostTalesUiButtonMotion motion = this.chevrons.get(key);
+        if (motion == null) {
+            motion = new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+            this.chevrons.put(key, motion);
+        }
+        return motion;
     }
 
     /**
      * One of a stepper's chevrons, centred in its cell, rising and
      * lighting under the pointer and dropping as it is pressed, as every
-     * glyph button does.
+     * glyph button does; with no motion, at its bound, a flat shape.
      */
-    private void drawChevron(Entry entry, final LostTalesUiSheet sprite,
-                             LostTalesUiSheet lit, boolean moves,
-                             boolean pointed, int cellLeft, final int top,
-                             final int alpha) {
+    private static void drawChevron(final LostTalesUiSheet sprite,
+                                    LostTalesUiSheet lit,
+                                    LostTalesUiButtonMotion motion,
+                                    boolean pointed, int cellLeft,
+                                    final int top, final int alpha) {
         final int x = cellLeft + LostTalesUiInk.centredStart(STEPPER_CELL,
                 sprite.getWidth());
         LostTalesUiInk.beginContent();
-        if (moves) {
-            String key = entry.id + ":" + sprite.name();
-            LostTalesUiButtonMotion motion = this.chevrons.get(key);
-            if (motion == null) {
-                motion = new LostTalesUiButtonMotion(
-                        LostTalesUiButtonMotion.Character.LIFT);
-                this.chevrons.put(key, motion);
-            }
+        if (motion != null) {
             motion.advance(System.nanoTime(), pointed, pointed, pointed
                     && (Mouse.isButtonDown(0) || Mouse.isButtonDown(1)));
             LostTalesUiButton.drawGlyph(sprite, lit, motion, x, top, alpha);
@@ -1604,89 +1689,69 @@ public final class MenuWindow extends SubWindowContent {
             return;
         }
         int top = at.top + PADDING_Y;
-        int height = fieldHeight();
         int right = at.left + at.width - PADDING_X;
         this.fieldRowLeft = at.left + PADDING_X;
         this.fieldRowTop = top;
-        int textY = top + LostTalesUiInk.centredStart(height - 1,
-                LostTalesUiInk.CAP_HEIGHT);
-        // The icon stands on the capitals of what is typed beside it, as
-        // every icon in a message row does.
-        LostTalesUiInk.beginContent();
-        this.fieldIcon.drawWithShadow(at.left + PADDING_X,
-                textY + WindowStyle.centredBoxTop(
-                        this.fieldIcon.getHeight()), alpha);
-        int textX = at.left + PADDING_X + fieldIconRun();
-        boolean empty = this.field.getText().length() == 0;
-        int hintWidth = empty ? hintWidth(minecraft) : 0;
-        int promptX = textX + LostTalesUiCaret.WIDTH + 1;
-        boolean hinted = hintWidth > 0
+        int promptX = at.left + PADDING_X + fieldIconRun()
+                + LostTalesUiCaret.WIDTH + 1;
+        float hintWidth = this.field.getText().length() == 0
+                ? hintWidth(minecraft) : 0.0F;
+        boolean hinted = hintWidth > 0.0F
                 && right - hintWidth - SWATCH_GAP > promptX;
-        if (empty) {
-            // A pixel clear of the caret waiting at the field's start.
-            String prompt = trimmed(font, this.filterPrompt, right - promptX
-                    - (hinted ? hintWidth + SWATCH_GAP : 0));
-            LostTalesUiInk.drawText(font, "§o" + prompt,
-                    promptX, textY, WindowStyle.asideRgb(), alpha);
-        }
+        WindowLists.drawField(font, this.field, this.fieldIcon,
+                this.filterPrompt, at.left + PADDING_X, top, right,
+                hinted ? right - (int)Math.ceil(hintWidth) - SWATCH_GAP
+                        : right, alpha);
         if (hinted) {
-            drawHint(minecraft, font, right - hintWidth, top, height, alpha);
+            drawHint(minecraft, font, right - hintWidth, top, fieldHeight(),
+                    alpha);
         }
-        // The field itself, the windows' own, at the window's fade: it
-        // scrolls to its caret as a bar's does.
-        this.field.xPosition = textX;
-        this.field.yPosition = textY;
-        this.field.width = Math.max(1, right - textX - LostTalesUiCaret.WIDTH);
-        WindowFields.draw(this.field, alpha);
-        Gui.drawRect(at.left + PADDING_X, top + height - 1, right,
-                top + height, LostTalesUiInk.argb(
-                        LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
-                        Math.min(alpha, 0xA0)));
     }
 
     /**
-     * The shortcut as the keys themselves, in the mod's own key icons,
-     * which press and spring back as the keys are held, a {@code +}
-     * between each pair.
+     * The shortcut as the keys themselves, in the mod's own key icons a
+     * size smaller than the GUI's, which press and spring back as the keys
+     * are held, a {@code +} between each pair on the keys' middle.
      */
-    private void drawHint(Minecraft minecraft, FontRenderer font, int keyX,
+    private void drawHint(Minecraft minecraft, FontRenderer font, float keyX,
                           int top, int height, int alpha) {
-        int keyY = top + (height - 1
-                - LostTalesInputIconRenderer.BASE_ICON_HEIGHT) / 2;
+        float keyY = LostTalesInputIconRenderer.windowTop(top, height - 1);
         String joiner = keyJoiner();
-        int joinerY = keyY + LostTalesUiInk.centredStart(
-                LostTalesInputIconRenderer.BASE_ICON_HEIGHT,
-                LostTalesUiInk.CAP_HEIGHT);
+        int factor = LostTalesDisplayPixels.scaleFactor();
+        float joinerY = keyY + LostTalesUiInk.centredStart(
+                Math.round(LostTalesInputIconRenderer.windowHeight() * factor),
+                LostTalesUiInk.CAP_HEIGHT * factor) / (float)factor;
         int quiet = LostTalesColors.rgb(LostTalesColors.SAND);
         LostTalesUiInk.beginContent();
         for (int index = 0; index < this.filterHint.length; index++) {
             if (index > 0) {
                 keyX += KEY_GAP;
-                LostTalesUiInk.drawText(font, joiner, keyX,
-                        joinerY, quiet, alpha);
+                drawTextAt(font, joiner, keyX, joinerY, quiet, alpha);
                 keyX += font.getStringWidth(joiner) + KEY_GAP;
                 LostTalesUiInk.beginContent();
             }
-            keyX += LostTalesInputIconRenderer.drawInput(minecraft,
+            LostTalesInputIconRenderer.drawInput(minecraft,
                     LostTalesInputBinding.Type.KEYBOARD,
-                    this.filterHint[index], keyX, keyY, 1.0F, alpha / 255.0F);
+                    this.filterHint[index], keyX, keyY,
+                    LostTalesInputIconRenderer.windowScale(), alpha / 255.0F);
+            keyX += LostTalesInputIconRenderer.windowWidth(minecraft,
+                    this.filterHint[index]);
         }
     }
 
     /**
-     * Room the shortcut takes: its key icons at their own size, with a
-     * {@code +} between each pair of them.
+     * Room the shortcut takes: its key icons a size smaller than the
+     * GUI's, unrounded, with a {@code +} between each pair of them.
      */
-    private int hintWidth(Minecraft minecraft) {
-        int width = 0;
+    private float hintWidth(Minecraft minecraft) {
+        float width = 0.0F;
         for (int index = 0; index < this.filterHint.length; index++) {
             if (index > 0) {
                 width += KEY_GAP + minecraft.fontRenderer.getStringWidth(
                         keyJoiner()) + KEY_GAP;
             }
-            width += LostTalesInputIconRenderer.measureInput(minecraft,
-                    LostTalesInputBinding.Type.KEYBOARD,
-                    this.filterHint[index], 1.0F);
+            width += LostTalesInputIconRenderer.windowWidth(minecraft,
+                    this.filterHint[index]);
         }
         return width;
     }
@@ -1744,7 +1809,7 @@ public final class MenuWindow extends SubWindowContent {
      * its notes wrapped to the box.
      */
     private Layout layOut(LostTalesUiHitBox box) {
-        Layout at = new Layout(box, fieldHeight(), this.rowHeight);
+        Layout at = new Layout(box, fieldHeight());
         wrapNotesTo(at.width);
         return at;
     }

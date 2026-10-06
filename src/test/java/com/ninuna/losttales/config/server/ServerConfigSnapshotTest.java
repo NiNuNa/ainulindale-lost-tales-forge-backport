@@ -17,8 +17,9 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The snapshot lists every server category with its types, bounds and
- * comments, leaves the client's out, and blanks the secrets, saying only
- * whether each is set.
+ * words, leaves the client's out, and blanks the secrets, saying only
+ * whether each is set. Names and tips are the client's lang file's, so
+ * no comment travels.
  */
 public final class ServerConfigSnapshotTest {
 
@@ -49,7 +50,6 @@ public final class ServerConfigSnapshotTest {
         assertEquals("3", poll.getDefault());
         assertEquals("2", poll.getMinValue());
         assertEquals("60", poll.getMaxValue());
-        assertEquals("How often.", poll.getComment());
         ServerConfigEntry radius = ServerConfigSnapshot.find(entries, "chat", "proximityRadius");
         assertEquals(ServerConfigEntry.Type.DOUBLE, radius.getType());
         assertEquals("24.5", radius.getValue());

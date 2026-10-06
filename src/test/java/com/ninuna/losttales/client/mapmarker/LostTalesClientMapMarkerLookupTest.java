@@ -2,9 +2,18 @@ package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import lotr.common.LOTRDimension;
+import net.minecraft.client.resources.IResource;
+import net.minecraft.client.resources.IResourceManager;
+import net.minecraft.client.resources.data.IMetadataSection;
+import net.minecraft.util.ResourceLocation;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -51,18 +60,74 @@ public final class LostTalesClientMapMarkerLookupTest {
                 lookup("BREE", "", 0, 0).getId());
     }
 
+    /**
+     * The bundled Town at 15, 15, read from the marker files, still
+     * claims its waypoint's icon once the server has deleted the marker.
+     */
     @Test
     public void deletedMarkerKeepsOnlyItsDecorativeSuppressionMapping() {
-        LostTalesClientMapMarkerStore.setServerMarkers(
-                Collections
-                        .<LostTalesMapMarkerDefinition>emptyList());
+        LostTalesClientMapMarkerStore.reloadFromResources(new BundledFiles(true));
+        try {
+            LostTalesClientMapMarkerStore.setServerMarkers(
+                    Collections
+                            .<LostTalesMapMarkerDefinition>emptyList());
 
-        assertNull(LostTalesClientMapMarkerStore
-                .findMappedWaypointMarker(
-                        "", "", 15, 15));
-        assertTrue(LostTalesClientMapMarkerStore
-                .hasDecorativeWaypointMapping(
-                        "", "", 15, 15));
+            assertNull(LostTalesClientMapMarkerStore
+                    .findMappedWaypointMarker(
+                            "", "", 15, 15));
+            assertTrue(LostTalesClientMapMarkerStore
+                    .hasDecorativeWaypointMapping(
+                            "", "", 15, 15));
+        } finally {
+            LostTalesClientMapMarkerStore.reloadFromResources(new BundledFiles(false));
+        }
+    }
+
+    /** The mod's own files off the test classpath, or none at all. */
+    private static final class BundledFiles implements IResourceManager {
+        private final boolean present;
+
+        BundledFiles(boolean present) {
+            this.present = present;
+        }
+
+        @Override
+        public Set getResourceDomains() {
+            return Collections.singleton("losttales");
+        }
+
+        @Override
+        public IResource getResource(ResourceLocation location) throws IOException {
+            final InputStream stream = this.present
+                    ? LostTalesClientMapMarkerLookupTest.class.getResourceAsStream(
+                            "/assets/" + location.getResourceDomain() + "/"
+                                    + location.getResourcePath())
+                    : null;
+            if (stream == null) {
+                throw new FileNotFoundException(location.toString());
+            }
+            return new IResource() {
+                @Override
+                public InputStream getInputStream() {
+                    return stream;
+                }
+
+                @Override
+                public boolean hasMetadata() {
+                    return false;
+                }
+
+                @Override
+                public IMetadataSection getMetadata(String section) {
+                    return null;
+                }
+            };
+        }
+
+        @Override
+        public List getAllResources(ResourceLocation location) throws IOException {
+            return Collections.singletonList(getResource(location));
+        }
     }
 
     @Test

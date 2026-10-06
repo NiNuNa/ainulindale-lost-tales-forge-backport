@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.StatCollector;
 
 public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMarkerProvider {
     @Override
@@ -52,7 +53,8 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
             String name = activeQuestMarker
                     ? activeQuestLabel : entry.getName();
             if (pinned) {
-                name = "Tracked: " + name;
+                name = StatCollector.translateToLocalFormatted(
+                        "gui.losttales.compass.tracked", name);
             }
 
             LostTalesCompassMarkerIcon icon = LostTalesCompassMarkerIcon.fromName(pinned ? "quest" : entry.getIconName());

@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.screen.waystone;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.Settings;
 import java.util.ArrayList;
@@ -35,6 +37,7 @@ public final class WaystoneRowsTest {
         boolean fellowship;
         String target = "";
         String lore = "";
+        String defaultName = "";
         boolean stands = true;
 
         @Override public WaystoneDraft draft() { return this.draft; }
@@ -47,6 +50,9 @@ public final class WaystoneRowsTest {
         @Override public String shareTarget() { return this.target; }
         @Override public void setShareTarget(String name) { this.target = name; }
         @Override public String nativeLore() { return this.lore; }
+        @Override public String defaultName() { return this.defaultName; }
+        @Override public String defaultCategory() { return "Waystone"; }
+        @Override public String defaultDescription() { return this.lore; }
         @Override public List<String> offers(String typed) {
             return Arrays.asList("Nils", "Ninuna");
         }
@@ -122,6 +128,28 @@ public final class WaystoneRowsTest {
         assertEquals("An old gate of Bree.", description.value);
         assertFalse("the lore is shown, not written into the draft",
                 host.draft.isChanged());
+    }
+
+    /**
+     * A waystone its placer has not named reads the name it is called
+     * after, and may be emptied to go back to it; its empty category reads
+     * the word for its kind. Neither is typed into the draft.
+     */
+    @Test
+    public void anUnnamedWaystoneReadsTheWordsItStandsFor() {
+        FakeHost host = new FakeHost();
+        host.draft = new WaystoneDraft(new LostTalesMapMarkerEditableSettings(
+                "", "fort", "white", "", "", true, 100, 12.0D, 64.0D, -8.0D,
+                128.0D, 8.0D, true, true, false, true,
+                "losttales:player_placed", 0,
+                LostTalesMapMarkerVisibility.PRIVATE));
+        host.defaultName = "Nils's Waystone";
+        WaystoneRows rows = new WaystoneRows(host, 13);
+        List<MenuWindow.Entry> built = rows.build("");
+        assertEquals("Nils's Waystone", row(built, LANG + "name").value);
+        assertEquals("", host.draft.name());
+        assertEquals("Waystone", row(built, LANG + "category").value);
+        assertFalse(host.draft.isChanged());
     }
 
     @Test

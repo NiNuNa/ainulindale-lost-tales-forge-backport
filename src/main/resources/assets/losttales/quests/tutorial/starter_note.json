@@ -1,16 +1,11 @@
 {
   "id": "losttales:tutorial/starter_note",
-  "title": "The Sealed Note",
-  "description": "A sealed note carries a simple warning for the road: make light before dusk finds you unprepared.",
   "repeatable": true,
   "restartable": true,
   "startMode": "item",
   "rewards": {
     "experience": "12",
     "items": "minecraft:paper*1"
-  },
-  "journalLog": {
-    "10": "The note asks me to craft a torch before nightfall."
   },
   "stages": [
     {
@@ -19,7 +14,6 @@
         {
           "id": "craft_torches",
           "type": "craft",
-          "description": "Craft 4 torches.",
           "optional": false,
           "params": {
             "item": "minecraft:torch",

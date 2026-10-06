@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.character;
 
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
@@ -18,8 +19,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
  * every question the page does.</p>
  */
 public final class CharactersLayout {
-    /** Clear pixels between the page's edge and anything drawn. */
-    public static final int MARGIN = 8;
+    /** Clear room between the page's edge and what it shows: a menu's, across and down. */
+    public static final int MARGIN_X = MenuWindow.PADDING_X;
+    public static final int MARGIN_Y = MenuWindow.PADDING_Y;
     /** Clear pixels either side of the rule between the roster and the profile. */
     public static final int GUTTER = 10;
     /** The narrowest and widest the roster is allowed to be. */
@@ -32,7 +34,7 @@ public final class CharactersLayout {
     public static final int FIGURE_HEIGHT = 120;
     /** The narrowest page the roster and the profile both fit on. */
     public static final int MIN_SPLIT_WIDTH =
-            2 * MARGIN + ROSTER_MIN_WIDTH + 2 * GUTTER + 1 + PROFILE_MIN_WIDTH;
+            2 * MARGIN_X + ROSTER_MIN_WIDTH + 2 * GUTTER + 1 + PROFILE_MIN_WIDTH;
 
     private final int pageWidth;
     private final int pageHeight;
@@ -59,9 +61,9 @@ public final class CharactersLayout {
     }
 
     private LostTalesUiHitBox body() {
-        return new LostTalesUiHitBox(MARGIN, MARGIN,
-                Math.max(0, this.pageWidth - 2 * MARGIN),
-                Math.max(0, this.pageHeight - 2 * MARGIN));
+        return new LostTalesUiHitBox(MARGIN_X, MARGIN_Y,
+                Math.max(0, this.pageWidth - 2 * MARGIN_X),
+                Math.max(0, this.pageHeight - 2 * MARGIN_Y));
     }
 
     private static LostTalesUiHitBox none() {
@@ -80,7 +82,7 @@ public final class CharactersLayout {
             return body();
         }
         LostTalesUiHitBox body = body();
-        return new LostTalesUiHitBox(MARGIN, MARGIN, this.rosterWidth,
+        return new LostTalesUiHitBox(MARGIN_X, MARGIN_Y, this.rosterWidth,
                 body.height);
     }
 
@@ -104,9 +106,9 @@ public final class CharactersLayout {
             return this.rosterOut ? none() : body();
         }
         int left = (int)divider().right() + GUTTER;
-        return new LostTalesUiHitBox(left, MARGIN,
-                Math.max(0, this.pageWidth - MARGIN - left),
-                Math.max(0, this.pageHeight - 2 * MARGIN));
+        return new LostTalesUiHitBox(left, MARGIN_Y,
+                Math.max(0, this.pageWidth - MARGIN_X - left),
+                Math.max(0, this.pageHeight - 2 * MARGIN_Y));
     }
 
     /** Whether the figure stands at the profile's left, the words beside it. */

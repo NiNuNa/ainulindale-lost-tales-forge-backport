@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat;
 
+import com.ninuna.losttales.util.LostTalesLangFile;
 import net.minecraft.util.StatCollector;
 
 /**
@@ -8,12 +9,27 @@ import net.minecraft.util.StatCollector;
  * title, the bare title when the faction is unknown, and nothing at all
  * for an untitled sender. The client composes the same pieces as
  * separate coloured runs; the Discord bridge needs them as one string,
- * so the words are decided here once and both read them. Localised
- * through the same keys with an English fallback, on whichever side
- * asks.
+ * so the words are decided here once and both read them, from the lang
+ * file in the language of the side that asks. The title travels and is
+ * kept as LOTR's lang key, and the faction as its id: each side names them
+ * in its own words ({@link #titleName}).
  */
 public final class ChatEpithet {
     private ChatEpithet() {}
+
+    /**
+     * A LOTR title in the words of the side that asks, from the lang key
+     * it travels as: {@code lotr.title.farmer} is {@code Farmer}. A key
+     * the lang file has no line for reads as it is.
+     */
+    public static String titleName(String titleKey) {
+        String key = titleKey == null ? "" : titleKey.trim();
+        if (key.length() == 0) {
+            return "";
+        }
+        String said = StatCollector.translateToLocal(key);
+        return said == null || said.trim().length() == 0 ? key : said.trim();
+    }
 
     /**
      * {@code Gondor Farmer}: the faction name before the title, or the
@@ -25,8 +41,7 @@ public final class ChatEpithet {
         if (faction.length() == 0) {
             return bare;
         }
-        return translate("chat.losttales.title.epithet", "%s %s",
-                faction, bare);
+        return translate("chat.losttales.title.epithet", faction, bare);
     }
 
     /**
@@ -39,7 +54,7 @@ public final class ChatEpithet {
         if (title == null || title.trim().length() == 0) {
             return plain;
         }
-        return plain + translate("chat.losttales.title.suffix", ", the %s",
+        return plain + translate("chat.losttales.title.suffix",
                 epithet(factionName, title));
     }
 
@@ -50,8 +65,8 @@ public final class ChatEpithet {
      */
     public static String titleSuffix(boolean discordMember, String epithet) {
         return discordMember
-                ? translate("chat.losttales.title.discord", ", of %s", epithet)
-                : translate("chat.losttales.title.suffix", ", the %s", epithet);
+                ? translate("chat.losttales.title.discord", epithet)
+                : translate("chat.losttales.title.suffix", epithet);
     }
 
     /**
@@ -65,19 +80,23 @@ public final class ChatEpithet {
     }
 
     /**
-     * A localized format with an English fallback, so the line is still
-     * right when the language file does not carry the key.
+     * The line under {@code key} with its arguments, in the language of the
+     * side that asks; the mod's English line where that language has none,
+     * as before the game has read its lang files; the key where neither
+     * has one. One source for every word: the lang file.
      */
-    public static String translate(String key, String fallback,
-                                   Object... arguments) {
-        String format = StatCollector.translateToLocal(key);
-        if (format == null || format.length() == 0 || format.equals(key)) {
-            format = fallback;
+    public static String translate(String key, Object... arguments) {
+        String format = StatCollector.canTranslate(key)
+                ? StatCollector.translateToLocal(key)
+                : LostTalesLangFile.english().get(key);
+        if (format == null || format.length() == 0) {
+            return key;
         }
         try {
             return String.format(format, arguments);
-        } catch (IllegalArgumentException ignored) {
-            return String.format(fallback, arguments);
+        } catch (IllegalArgumentException unformattable) {
+            // A translation whose pattern does not fit the arguments reads as written.
+            return format;
         }
     }
 }

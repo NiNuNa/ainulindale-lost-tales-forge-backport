@@ -1,6 +1,8 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.chat.share.ChatQuestCard;
 import com.ninuna.losttales.chat.share.ChatShowcase;
+import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.io.UnsupportedEncodingException;
 import java.util.Collections;
 import java.util.UUID;
@@ -68,26 +70,34 @@ public final class LostTalesQuestShareTest {
             title.append("€");
         }
         String fitted = LostTalesQuestShareResolver.fitBytes(title.toString(),
-                ChatShowcase.MAX_QUEST_TITLE_BYTES);
-        assertTrue(utf8(fitted) <= ChatShowcase.MAX_QUEST_TITLE_BYTES);
-        assertTrue(utf8(fitted) > ChatShowcase.MAX_QUEST_TITLE_BYTES - 3);
+                ChatQuestCard.MAX_TITLE_BYTES);
+        assertTrue(utf8(fitted) <= ChatQuestCard.MAX_TITLE_BYTES);
+        assertTrue(utf8(fitted) > ChatQuestCard.MAX_TITLE_BYTES - 3);
     }
 
-    /** A server file's long title and objective still make a card. */
+    /** A server file's long title and objective still make a card, cut to its bounds. */
     @Test
     public void aLongQuestStillMakesACard() throws Exception {
         StringBuilder words = new StringBuilder();
         for (int index = 0; index < 400; index++) {
             words.append("ß");
         }
-        String title = LostTalesQuestShareResolver.fitBytes(words.toString(),
-                ChatShowcase.MAX_QUEST_TITLE_BYTES);
-        String objective = LostTalesQuestShareResolver.fitBytes(words.toString(),
-                ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES);
-        ChatShowcase card = ChatShowcase.quest(0, "losttales:long", title,
-                LostTalesQuestCategory.MISC, objective, "", true);
-        assertEquals(title, card.getQuestTitle());
-        assertEquals(ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES, utf8(card.getQuestObjective()));
+        LostTalesQuestDefinition quest = new LostTalesQuestDefinition(
+                "losttales:long", words.toString(), "", false, false,
+                LostTalesQuestDefinition.START_MODE_ITEM, null, null, null,
+                null, null, null, null,
+                Collections.singletonList(new LostTalesQuestStageDefinition("10",
+                        Collections.singletonList(new LostTalesQuestObjectiveDefinition(
+                                "long", "goto", words.toString(), false,
+                                Collections.<String, String>emptyMap())))));
+        ChatQuestCard card = LostTalesQuestShareResolver.card(quest,
+                new LostTalesQuestProgress("losttales:long", 0, "10",
+                        Collections.<String, Integer>emptyMap(), 0L, 0L));
+        assertEquals(ChatQuestCard.Source.SERVER, card.getSource());
+        assertEquals(ChatQuestCard.MAX_TITLE_BYTES, utf8(card.getTitle()));
+        assertEquals(ChatQuestCard.MAX_OBJECTIVE_TEXT_BYTES,
+                utf8(card.getObjectives().get(0).getText()));
+        ChatShowcase.quest(0, "losttales:long", card, true);
     }
 
     private static int utf8(String value) throws UnsupportedEncodingException {

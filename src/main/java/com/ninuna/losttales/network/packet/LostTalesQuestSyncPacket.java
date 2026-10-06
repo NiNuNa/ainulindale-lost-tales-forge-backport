@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestIds;
@@ -193,6 +194,8 @@ public class LostTalesQuestSyncPacket implements IMessage {
             for (int i = 0; i < dynamicMarkerCount; i++) {
                 String markerId = readIdentifier(buf);
                 String name = readName(buf);
+                String namedAfter = LostTalesPacketCodec.readUtf8String(buf,
+                        LostTalesMapMarkerNamedAfter.MAX_LENGTH);
                 String icon = readIdentifier(buf);
                 String color = readIdentifier(buf);
                 String category = readName(buf);
@@ -208,6 +211,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 boolean requiresRegionUnlock = buf.readBoolean();
                 int priority = buf.readInt();
                 if (markerId.length() == 0
+                        || !LostTalesMapMarkerNamedAfter.isValid(namedAfter)
                         || !Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
                         || !Double.isFinite(compassFadeInRadius)
                         || !Double.isFinite(discoveryRadius)
@@ -223,7 +227,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
                                 compassFadeInRadius, discoveryRadius, hidden,
                                 discoverable, requiresRegionUnlock,
                                 LostTalesMapMarkerSource.QUEST_DYNAMIC,
-                                false, "", priority));
+                                false, "", priority, namedAfter));
             }
 
             int dynamicQuestCount = LostTalesPacketCodec.readCount(
@@ -311,6 +315,8 @@ public class LostTalesQuestSyncPacket implements IMessage {
             }
             writeIdentifier(buf, marker.getId());
             writeName(buf, marker.getName());
+            LostTalesPacketCodec.writeUtf8String(buf, marker.getNamedAfter(),
+                    LostTalesMapMarkerNamedAfter.MAX_LENGTH);
             writeIdentifier(buf, marker.getIconName());
             writeIdentifier(buf, marker.getColorName());
             writeName(buf, marker.getCategoryName());

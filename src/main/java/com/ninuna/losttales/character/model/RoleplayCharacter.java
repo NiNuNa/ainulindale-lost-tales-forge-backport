@@ -40,7 +40,7 @@ public class RoleplayCharacter {
     private String pledgedFactionId;
     /** When the character's faction became its faction: its making, or its latest pledge. */
     private long factionSince;
-    /** The LOTR title the character wore when it was last played; empty for none. */
+    /** The LOTR title the character wore when it was last played, by its lang key; empty for none. */
     private String lotrTitle;
 
     /** A builder for a character with these ids; everything else defaults. */
@@ -380,18 +380,20 @@ public class RoleplayCharacter {
     }
 
     /**
-     * The LOTR title the character wore when it was last played, as its
-     * lines and the member lists show it after the name: {@code Gondor
-     * Farmer}. Empty for none. The title of the character being played
-     * is LOTR's live one; this is what the others show.
+     * The LOTR title the character wore when it was last played, as the
+     * lang key LOTR names it by ({@code lotr.title.farmer}): each game
+     * shows it after the name in its own language. Empty for none. The
+     * title of the character being played is LOTR's live one; this is
+     * what the others show.
      */
     public String getLotrTitle() {
         return this.lotrTitle;
     }
 
     /**
-     * Keeps the title LOTR reports for this character, read from the
-     * player data of the one being played. Answers whether it changed.
+     * Keeps the title LOTR reports for this character, by its lang key,
+     * read from the player data of the one being played. Answers whether
+     * it changed.
      */
     public boolean setLotrTitle(String lotrTitle) {
         String normalized = normalizeTitle(lotrTitle);
@@ -403,8 +405,8 @@ public class RoleplayCharacter {
     }
 
     /**
-     * A title as a record keeps it: its words without colour codes or
-     * control characters, trimmed, cut to {@link #MAX_LOTR_TITLE_LENGTH}.
+     * A title as a record keeps it: without colour codes or control
+     * characters, trimmed, cut to {@link #MAX_LOTR_TITLE_LENGTH}.
      */
     public static String normalizeTitle(String title) {
         if (title == null) {

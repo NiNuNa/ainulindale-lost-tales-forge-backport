@@ -12,7 +12,8 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
  * Keeps what LOTR says of the played character on its record: its pledge
- * and its title, so a character's faction answers and its title shows
+ * and its title — the title as LOTR's lang key, which each game names in
+ * its own language — so a character's faction answers and its title shows
  * while it is not played too. Both are read from the player data of the
  * character being played: at login, around a switch, at the periodic
  * checkpoint and as the player leaves.
@@ -67,7 +68,7 @@ public final class CharacterLotrRecord {
         try {
             LotrCharacterAdapter lotr = LotrCharacterAdapter.getInstance();
             String pledged = lotr.getPledgedFactionId(player);
-            String title = lotr.getTitleName(player);
+            String title = lotr.getTitleKey(player);
             boolean changed = pledged != null && character.setPledgedFactionId(
                     pledged, System.currentTimeMillis());
             changed |= title != null && character.setLotrTitle(title);

@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.window.PageSearch;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveObjectiveData;
 import com.ninuna.losttales.quest.missive.MissiveNotice;
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -12,17 +13,18 @@ import java.util.List;
  * The missive board page's list of notices, worked out from the board's
  * notices alone: which a search keeps, which is picked as the notices
  * change under it, the walk from one to the next, and how long each has
- * left on the board. Free of Minecraft, so a test can ask it everything
- * the page does.
+ * left on the board. Free of the game itself, so a test can ask it
+ * everything the page does.
  */
 final class MissiveNoticeList {
     private MissiveNoticeList() {}
 
     /**
      * The notices a search keeps, in slot order: all of them while nothing
-     * is typed, else each whose title, issuer, words or objectives hold
-     * every word typed, in any order and whatever the case. A notice that
-     * cannot be read says nothing, so only an empty search keeps it.
+     * is typed, else each whose title, issuer, words or objectives, in the
+     * game's language, hold every word typed, in any order and whatever the
+     * case. A notice that cannot be read says nothing, so only an empty
+     * search keeps it.
      */
     static List<MissiveNotice> of(List<MissiveNotice> notices, String query) {
         if (notices == null || notices.isEmpty()) {
@@ -44,12 +46,12 @@ final class MissiveNoticeList {
             return false;
         }
         List<String> parts = new ArrayList<String>();
-        parts.add(missive.getTitle());
-        parts.add(missive.getIssuer());
-        parts.add(missive.getDescription());
-        parts.add(missive.getFlavorText());
+        parts.add(MissiveWords.title(missive));
+        parts.add(MissiveWords.issuer(missive));
+        parts.add(MissiveWords.description(missive));
+        parts.add(MissiveWords.flavor(missive));
         for (LostTalesMissiveObjectiveData objective : missive.getObjectives()) {
-            parts.add(objective.getDescription());
+            parts.add(MissiveWords.objective(objective));
         }
         return search.matches(parts.toArray(new String[parts.size()]));
     }

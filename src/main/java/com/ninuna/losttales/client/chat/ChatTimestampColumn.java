@@ -175,16 +175,26 @@ final class ChatTimestampColumn {
 
     /**
      * The ink of the widest time of day the font can write, in its own
-     * pixels: two digits of hour and two of minute, each the widest
-     * digit, the colon, a space and the wider half of the day. A glyph's
+     * pixels: the clock line's widest times, before noon and after
+     * ({@link ChatTimestampFormatter#widestTimes}), each digit counted as
+     * the widest digit and every other glyph as itself, so the half of
+     * the day is measured only where the language writes one. A glyph's
      * width carries a column of spacing after it; the last of them is
      * past the ink.
      */
     static int widestTime(FontRenderer font) {
-        int half = Math.max(font.getStringWidth("AM"),
-                font.getStringWidth("PM"));
-        return LostTalesChatVisualStyle.widestDigitWidth(font) * 4
-                + font.getCharWidth(':') + font.getCharWidth(' ') + half - 1;
+        int digit = LostTalesChatVisualStyle.widestDigitWidth(font);
+        int widest = 0;
+        for (String time : ChatTimestampFormatter.widestTimes()) {
+            int width = 0;
+            for (int index = 0; index < time.length(); index++) {
+                char glyph = time.charAt(index);
+                width += glyph >= '0' && glyph <= '9'
+                        ? digit : font.getCharWidth(glyph);
+            }
+            widest = Math.max(widest, width);
+        }
+        return widest - 1;
     }
 
     /** Where the avatar's square starts: centred in the area, sphere and all. */

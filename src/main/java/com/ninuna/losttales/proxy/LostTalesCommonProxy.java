@@ -197,6 +197,8 @@ public class LostTalesCommonProxy {
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatIdentitySelection());
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatPresenceService());
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(
+                new com.ninuna.losttales.chat.server.ChatServerStatus());
+        cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(
                 new com.ninuna.losttales.chat.server.ChatMemberWatches());
         LostTalesChatRoleRosterWatcher chatRoleRosterWatcher =
                 new LostTalesChatRoleRosterWatcher();
@@ -363,6 +365,9 @@ public class LostTalesCommonProxy {
 
     public void handleChatPresence(LostTalesChatPresenceSyncPacket packet) {}
 
+    public void handleServerStatus(
+            com.ninuna.losttales.network.packet.LostTalesServerStatusPacket packet) {}
+
     public void handleChatMembers(LostTalesChatMembersPacket packet) {}
 
     public void handleChatMessage(LostTalesChatMessagePacket packet) {}
@@ -442,6 +447,7 @@ public class LostTalesCommonProxy {
         LostTalesChatService.clear();
         ChatIdentitySelection.clear();
         ChatPresenceService.clear();
+        com.ninuna.losttales.chat.server.ChatServerStatus.clear();
         // Generated quests belong to the world that made them; each
         // player's saved data registers its own again as it loads.
         LostTalesQuestRegistry.clearRuntimeQuests();
@@ -501,9 +507,10 @@ public class LostTalesCommonProxy {
 
     /**
      * The server accepts players from here on: the Server Log's
-     * entry saying so, and the bridge's clock. The server's coming and
-     * going is said in the Server Log alone; Discord reads it in the
-     * linked channels' topics.
+     * entry saying so, and the clock its status counts its time up by.
+     * The server's coming and going is said in the Server Log alone;
+     * Discord reads it in the linked channels' topics, which its status
+     * fills from its first look.
      */
     public void onServerStarted(FMLServerStartedEvent event) {
         if (CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())) {
@@ -512,7 +519,7 @@ public class LostTalesCommonProxy {
         LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
                 ChatConsoleEvent.Severity.INFO,
                 LostTalesServerBroadcastHook.SERVER_NAME, "Server started");
-        LostTalesDiscordBridge.getInstance().onServerStarted();
+        com.ninuna.losttales.chat.server.ChatServerStatus.started();
     }
 
     public void onServerStopping(FMLServerStoppingEvent event) {
@@ -575,6 +582,7 @@ public class LostTalesCommonProxy {
         LostTalesChatService.clear();
         ChatIdentitySelection.clear();
         ChatPresenceService.clear();
+        com.ninuna.losttales.chat.server.ChatServerStatus.clear();
         // Generated quests belong to the world that made them; each
         // player's saved data registers its own again as it loads.
         LostTalesQuestRegistry.clearRuntimeQuests();

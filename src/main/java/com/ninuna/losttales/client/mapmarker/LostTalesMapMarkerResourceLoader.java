@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
@@ -95,23 +96,28 @@ final class LostTalesMapMarkerResourceLoader {
 
     private static LostTalesMapMarkerData parseMarker(
             JsonObject object, LostTalesMapMarkerSource source) {
-        String name = getString(object, "name", null);
-        if (name == null || name.length() == 0) {
-            return null;
-        }
         if (!hasNumber(object, "x") || !hasNumber(object, "z")) {
             return null;
         }
-
+        // A Lost Tales marker's words live in the lang file; a file may
+        // still write its own, which stand in where no line names it.
+        String name = getString(object, "name", null);
         String id = LostTalesQuestMarkerHelper.normalizeMarkerId(getString(object, "id", name));
         if (id.length() == 0) {
+            return null;
+        }
+        if (name == null || name.trim().length() == 0) {
+            name = LostTalesMapMarkerNames.englishName(id);
+        }
+        if (name.length() == 0) {
             return null;
         }
         boolean hasFastTravel = getBoolean(object, "hasFastTravel", false);
         String icon = getString(object, "icon", hasFastTravel ? "fort" : "undiscovered");
         String color = getString(object, "color", "white");
-        String category = getString(object, "category", hasFastTravel ? LostTalesMapMarkerData.CATEGORY_POINT_OF_INTEREST : LostTalesMapMarkerData.CATEGORY_DEFAULT);
-        String description = getString(object, "description", "");
+        String category = getString(object, "category", "");
+        String description = getString(object, "description",
+                LostTalesMapMarkerNames.englishDescription(id));
         int dimensionId = parseDimensionId(getString(object, "dimension", "lotr:middle_earth"));
         double x = object.get("x").getAsDouble();
         double y = hasNumber(object, "y")

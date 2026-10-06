@@ -1,10 +1,12 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatNarrator;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.ChatPacketFixtures;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.event.ClickEvent;
@@ -565,7 +567,7 @@ public final class ChatLineWrapperTest {
             IChatComponent header = lines.get(0);
             assertTrue(ChatLayoutMarker.isHeaderRow(header));
             assertTrue(words(header), words(header).contains(
-                    ChatNarrator.NAME));
+                    ChatNames.narrator(LostTalesWords.LANG)));
             assertFalse(words(header), words(header).contains("Aldric"));
             ChatHeadMarker.Data head = ChatHeadMarker.of(header);
             assertNotNull(head);

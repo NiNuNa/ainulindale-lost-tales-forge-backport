@@ -14,7 +14,8 @@ import static org.junit.Assert.assertTrue;
  * narrow one, where it scrolls with them.
  */
 public final class CharactersLayoutTest {
-    private static final int MARGIN = CharactersLayout.MARGIN;
+    private static final int MARGIN_X = CharactersLayout.MARGIN_X;
+    private static final int MARGIN_Y = CharactersLayout.MARGIN_Y;
 
     @Test
     public void aWidePageShowsTheRosterBesideTheProfile() {
@@ -22,12 +23,12 @@ public final class CharactersLayoutTest {
         assertTrue(layout.isSplit());
         LostTalesUiHitBox roster = layout.roster();
         LostTalesUiHitBox profile = layout.profile();
-        assertEquals(MARGIN, roster.left, 1.0E-9D);
+        assertEquals(MARGIN_X, roster.left, 1.0E-9D);
         assertEquals(160, roster.width, 1.0E-9D);
         assertEquals(roster.right() + 2 * CharactersLayout.GUTTER + 1,
                 profile.left, 1.0E-9D);
-        assertEquals(480 - MARGIN, profile.right(), 1.0E-9D);
-        assertEquals(240 - 2 * MARGIN, profile.height, 1.0E-9D);
+        assertEquals(480 - MARGIN_X, profile.right(), 1.0E-9D);
+        assertEquals(240 - 2 * MARGIN_Y, profile.height, 1.0E-9D);
     }
 
     @Test
@@ -36,7 +37,7 @@ public final class CharactersLayoutTest {
         assertFalse(layout.isSplit());
         assertEquals(0, layout.roster().width, 1.0E-9D);
         assertEquals(0, layout.divider().width, 1.0E-9D);
-        assertEquals(480 - 2 * MARGIN, layout.profile().width, 1.0E-9D);
+        assertEquals(480 - 2 * MARGIN_X, layout.profile().width, 1.0E-9D);
     }
 
     @Test
@@ -44,11 +45,11 @@ public final class CharactersLayoutTest {
         int narrow = CharactersLayout.MIN_SPLIT_WIDTH - 1;
         CharactersLayout out = new CharactersLayout(narrow, 240, true);
         assertFalse(out.isSplit());
-        assertEquals(narrow - 2 * MARGIN, out.roster().width, 1.0E-9D);
+        assertEquals(narrow - 2 * MARGIN_X, out.roster().width, 1.0E-9D);
         assertEquals("the profile waits while the roster is out", 0,
                 out.profile().width, 1.0E-9D);
         CharactersLayout folded = new CharactersLayout(narrow, 240, false);
-        assertEquals(narrow - 2 * MARGIN, folded.profile().width, 1.0E-9D);
+        assertEquals(narrow - 2 * MARGIN_X, folded.profile().width, 1.0E-9D);
     }
 
     @Test
@@ -56,7 +57,7 @@ public final class CharactersLayoutTest {
         CharactersLayout wide = new CharactersLayout(480, 240, false);
         assertTrue(wide.figureBeside());
         LostTalesUiHitBox figure = wide.figure(40);
-        assertEquals("the figure stands still as the words scroll", MARGIN,
+        assertEquals("the figure stands still as the words scroll", MARGIN_Y,
                 figure.top, 1.0E-9D);
         assertEquals(CharactersLayout.FIGURE_WIDTH, figure.width, 1.0E-9D);
         assertEquals(figure.right() + CharactersLayout.GUTTER,
@@ -69,7 +70,7 @@ public final class CharactersLayoutTest {
         CharactersLayout narrow = new CharactersLayout(250, 240, false);
         assertFalse(narrow.figureBeside());
         LostTalesUiHitBox figure = narrow.figure(30);
-        assertEquals(MARGIN - 30, figure.top, 1.0E-9D);
+        assertEquals(MARGIN_Y - 30, figure.top, 1.0E-9D);
         assertEquals(CharactersLayout.FIGURE_HEIGHT, figure.height, 1.0E-9D);
         assertEquals(narrow.profile().width, narrow.words().width, 1.0E-9D);
         assertEquals(CharactersLayout.FIGURE_HEIGHT + CharactersLayout.GUTTER,

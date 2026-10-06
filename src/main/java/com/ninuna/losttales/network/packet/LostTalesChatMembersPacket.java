@@ -26,6 +26,11 @@ import java.util.UUID;
  * {@link LostTalesChatMembersRequestPacket}, naming the conversation by
  * the key the request gave it; the server decides every other field.
  *
+ * <p>Nothing in it is in the server's words: a title travels as LOTR's
+ * lang key and a group as its key — the faction's id, the role's id —
+ * so each game names them in its own language. Only a Discord server's
+ * group carries a name, the one Discord gives it.</p>
+ *
  * <p>Every answer carries its {@link #getFingerprint fingerprint}, which
  * the client sends back with its next request: where the answer would be
  * the same, the server sends only the word that it is ({@link
@@ -51,6 +56,11 @@ public final class LostTalesChatMembersPacket implements IMessage {
      * emoji and stands it after the game's own groups.
      */
     public static final String DISCORD_GROUP_PREFIX = "discord:";
+    /**
+     * The group the Server stands in, alone, over every other group of
+     * every list: no role's or faction's id can be written so.
+     */
+    public static final String SERVER_GROUP = "server:";
     public static final int MAX_GROUP_NAME_BYTES = 128;
     private static final int MAX_MEMBER_BYTES = 16 + 5 + MAX_ACCOUNT_BYTES
             + 17 + 5 + MAX_NAME_BYTES + 4 + 5 + MAX_SKIN_ID_BYTES
@@ -80,9 +90,12 @@ public final class LostTalesChatMembersPacket implements IMessage {
 
         /**
          * {@code characterId} is null, and {@code skinId} empty, for a
-         * member shown as the account. {@code groupKey} empty stands the
+         * member shown as the account. {@code title} is the LOTR title's
+         * lang key, empty for none. {@code groupKey} empty stands the
          * member in the list's plain group; the group is not asked of a
          * member who is absent, whose group is the absent one.
+         * {@code groupName} is the name of a group no game can name by its
+         * key — a Discord server's — and empty for every other.
          */
         public Member(UUID playerId, String account, UUID characterId,
                       String name, int nameColor, String skinId, String title,
@@ -115,8 +128,9 @@ public final class LostTalesChatMembersPacket implements IMessage {
 
         /**
          * An NPC as the list of a conversation with it shows it, here and
-         * with {@code portrait} for its head: the client lists it itself,
-         * since the server knows nothing of NPCs, and never sends it.
+         * with {@code portrait} for its head, in a group the client names
+         * {@code groupName}: the client lists it itself, since the server
+         * knows nothing of NPCs, and never sends it.
          */
         public static Member npc(UUID npcId, String name, int nameColor,
                                  String portrait, String groupKey,
@@ -132,9 +146,11 @@ public final class LostTalesChatMembersPacket implements IMessage {
         public int getNameColor() { return this.nameColor; }
         /** The character's skin snapshot, or an NPC's portrait; empty for an account. */
         public String getSkinId() { return this.skinId; }
+        /** The LOTR title's lang key; empty for none. */
         public String getTitle() { return this.title; }
         public int getTitleColor() { return this.titleColor; }
         public String getGroupKey() { return this.groupKey; }
+        /** A Discord server's name, or an NPC's group as this client names it; empty for every other group. */
         public String getGroupName() { return this.groupName; }
         public int getGroupOrder() { return this.groupOrder; }
         public boolean isOnline() { return this.online; }
@@ -144,6 +160,7 @@ public final class LostTalesChatMembersPacket implements IMessage {
         /** Whether every field is within what the wire carries; an NPC never is. */
         boolean fits() {
             return !this.npc && this.playerId != null && this.name.length() > 0
+                    && namesOnlyADiscordGroup(this.groupKey, this.groupName)
                     && LostTalesPacketCodec.isUtf8WithinLimit(this.account,
                             MAX_ACCOUNT_BYTES)
                     && LostTalesPacketCodec.isUtf8WithinLimit(this.name,
@@ -176,28 +193,59 @@ public final class LostTalesChatMembersPacket implements IMessage {
         }
     }
 
+    /** What a list calls the group a member stands in, for the order the groups stand in. */
+    public interface GroupNames {
+        String of(Member member);
+    }
+
     /**
-     * The order a list stands its members in: those here first, by
-     * group — a role's place, or a faction's name with Unaligned last, the
-     * ungrouped after every group, and each Discord server's members after
-     * all of the game's — then by name; the absent after them, by name.
+     * Groups by the names the answer gives them, else by their keys: the
+     * server's order, which knows no game's words. Each game stands the
+     * groups again by the names it shows.
      */
-    public static final Comparator<Member> ORDER = new Comparator<Member>() {
+    public static final GroupNames NAMES_SENT = new GroupNames() {
         @Override
-        public int compare(Member one, Member other) {
-            if (one.isOnline() != other.isOnline()) {
-                return one.isOnline() ? -1 : 1;
-            }
-            int byGroup = compareGroups(one, other);
-            if (byGroup != 0) {
-                return byGroup;
-            }
-            return one.getName().toLowerCase(Locale.ROOT).compareTo(
-                    other.getName().toLowerCase(Locale.ROOT));
+        public String of(Member member) {
+            return member.getGroupName();
         }
     };
 
-    private static int compareGroups(Member one, Member other) {
+    /**
+     * The order a list stands its members in: those here first, by
+     * group — the Server's own first, then a role's place, or a faction's
+     * name with Unaligned last, the ungrouped after every group, and each
+     * Discord server's members after all of the game's — then by name;
+     * the absent after them, by name. A faction is ordered by the name
+     * {@code names} gives its group.
+     */
+    public static Comparator<Member> order(final GroupNames names) {
+        return new Comparator<Member>() {
+            @Override
+            public int compare(Member one, Member other) {
+                if (one.isOnline() != other.isOnline()) {
+                    return one.isOnline() ? -1 : 1;
+                }
+                int byGroup = compareGroups(one, other, names);
+                if (byGroup != 0) {
+                    return byGroup;
+                }
+                return one.getName().toLowerCase(Locale.ROOT).compareTo(
+                        other.getName().toLowerCase(Locale.ROOT));
+            }
+        };
+    }
+
+    /** The order as the server stands an answer ({@link #NAMES_SENT}). */
+    public static final Comparator<Member> ORDER = order(NAMES_SENT);
+
+    private static int compareGroups(Member one, Member other, GroupNames names) {
+        if (one.getGroupKey().equals(other.getGroupKey())) {
+            return 0;
+        }
+        boolean oneServer = SERVER_GROUP.equals(one.getGroupKey());
+        if (oneServer != SERVER_GROUP.equals(other.getGroupKey())) {
+            return oneServer ? -1 : 1;
+        }
         boolean oneDiscord = isDiscordGroup(one.getGroupKey());
         if (oneDiscord != isDiscordGroup(other.getGroupKey())) {
             return oneDiscord ? 1 : -1;
@@ -217,15 +265,25 @@ public final class LostTalesChatMembersPacket implements IMessage {
         if (oneUnaligned != otherUnaligned) {
             return oneUnaligned ? 1 : -1;
         }
-        int byName = one.getGroupName().toLowerCase(Locale.ROOT).compareTo(
-                other.getGroupName().toLowerCase(Locale.ROOT));
+        int byName = nameOf(one, names).compareTo(nameOf(other, names));
         return byName != 0 ? byName
                 : one.getGroupKey().compareTo(other.getGroupKey());
+    }
+
+    private static String nameOf(Member member, GroupNames names) {
+        String name = names.of(member);
+        return name == null ? "" : name.toLowerCase(Locale.ROOT);
     }
 
     /** Whether a group key names a Discord server's online members. */
     public static boolean isDiscordGroup(String groupKey) {
         return groupKey != null && groupKey.startsWith(DISCORD_GROUP_PREFIX);
+    }
+
+    /** Whether a member's group carries a name only where no game can name it: a Discord server's. */
+    static boolean namesOnlyADiscordGroup(String groupKey, String groupName) {
+        return groupName == null || groupName.length() == 0
+                || isDiscordGroup(groupKey);
     }
 
     private String channelId = "";
@@ -374,6 +432,10 @@ public final class LostTalesChatMembersPacket implements IMessage {
         if (name.length() == 0) {
             throw new LostTalesPacketCodec.DecodeException(
                     "a member without a name");
+        }
+        if (!namesOnlyADiscordGroup(groupKey, groupName)) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "a group named in the server's words");
         }
         return new Member(playerId, account, characterId, name, nameColor,
                 skinId, title, titleColor, groupKey, groupName, groupOrder,

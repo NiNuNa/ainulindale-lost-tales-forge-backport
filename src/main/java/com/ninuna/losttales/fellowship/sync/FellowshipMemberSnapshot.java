@@ -33,12 +33,13 @@ public final class FellowshipMemberSnapshot {
         }
         this.identityId = identityId;
         this.ownerId = ownerId;
-        this.characterName = normalizeName(characterName, "Unknown");
+        // Empty where the member has no name; the client words it.
+        this.characterName = normalizeName(characterName);
         this.joinedAt = Math.max(0L, joinedAt);
         this.color = color;
         this.presence = presence;
         this.elsewhereName = presence == FellowshipMemberPresence.ELSEWHERE
-                ? normalizeName(elsewhereName, "") : "";
+                ? normalizeName(elsewhereName) : "";
     }
 
     /** A member with where they stand, as the server sees it. */
@@ -82,11 +83,8 @@ public final class FellowshipMemberSnapshot {
         return this.elsewhereName;
     }
 
-    private static String normalizeName(String name, String fallback) {
+    private static String normalizeName(String name) {
         String normalized = name == null ? "" : name.trim();
-        if (normalized.length() == 0) {
-            return fallback;
-        }
         return normalized.length() <= MAX_NAME_LENGTH
                 ? normalized : normalized.substring(0, MAX_NAME_LENGTH);
     }

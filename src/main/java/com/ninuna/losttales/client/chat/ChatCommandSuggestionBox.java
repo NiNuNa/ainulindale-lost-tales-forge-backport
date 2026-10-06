@@ -81,11 +81,6 @@ final class ChatCommandSuggestionBox extends ChatSuggestionBox {
         return Math.min(this.candidates.size(), MAX_ROWS);
     }
 
-    @Override
-    int rowHeight() {
-        return ROW_HEIGHT;
-    }
-
     void draw(FontRenderer font, PointerRegions regions,
               int screenHeight, int inputX, double mouseX, double mouseY) {
         if (!isActive()) {

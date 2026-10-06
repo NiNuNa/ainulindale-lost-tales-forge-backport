@@ -10,6 +10,7 @@ import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveNbt;
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -81,10 +82,10 @@ final class MissivePinMenu {
                 ItemStack stack = player.inventory.getStackInSlot(slot.intValue());
                 LostTalesMissiveData missive =
                         LostTalesMissiveNbt.readFromItemStack(stack);
-                String title = missive == null || missive.getTitle().length() == 0
+                String title = missive == null
                         ? StatCollector.translateToLocal(
                                 "gui.losttales.missive_board.unreadable")
-                        : missive.getTitle();
+                        : MissiveWords.title(missive);
                 rows.add(new MenuWindow.Entry(SLOT_PREFIX + slot, title)
                         .withValue(where(slot.intValue(),
                                 player.inventory.currentItem)));

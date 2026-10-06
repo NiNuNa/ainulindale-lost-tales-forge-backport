@@ -149,13 +149,15 @@ public final class ChatLayoutTest {
         assertEquals(Collections.singletonList(ChatChannel.OPERATOR),
                 ChatLayout.closedChannels());
         assertEquals(1, this.changes);
-        // Closing again is a no-op; restoring lands in the first window.
+        // Closing again is a no-op; restoring lands in a window of the
+        // channels, never among the consoles.
         assertFalse(ChatLayout.close(ConversationPage.of(ChatChannel.OPERATOR)));
         assertTrue(ChatLayoutViews.reopen(ChatChannel.OPERATOR));
-        List<ChatChannel> tabs = ChatLayoutViews.channelsOf(WindowLayout.firstWindow());
+        Window channels = WindowLayout.windows().get(1);
+        List<ChatChannel> tabs = ChatLayoutViews.channelsOf(channels);
         assertEquals(ChatChannel.OPERATOR, tabs.get(tabs.size() - 1));
-        assertEquals("the front tab is left alone", ChatChannel.CLIENT_CONSOLE,
-                ChatLayoutViews.frontChannelOf(WindowLayout.firstWindow()));
+        assertEquals("the front tab is left alone", ChatChannel.GLOBAL,
+                ChatLayoutViews.frontChannelOf(channels));
         assertFalse(ChatLayoutViews.reopen(ChatChannel.OPERATOR));
         assertEquals(2, this.changes);
 

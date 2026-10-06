@@ -25,26 +25,33 @@ public final class WindowPages {
         PageContent create();
     }
 
-    /** One page: its code name, its tab's words and item, its key, and its content once made. */
+    /** One page: its code name, its tab's words and item, its key, its category, and its content once made. */
     public static final class Page {
         public final String id;
         private final String titleKey;
         private final ItemStack icon;
         private final KeyBinding key;
+        private final PageCategory category;
         private final Factory factory;
         private final boolean fromWorld;
         private final OtherPage tab;
         private PageContent content;
 
         Page(String id, String titleKey, ItemStack icon, KeyBinding key,
-             Factory factory, boolean fromWorld) {
+             PageCategory category, Factory factory, boolean fromWorld) {
             this.id = id;
             this.titleKey = titleKey;
             this.icon = icon;
             this.key = key;
+            this.category = category;
             this.factory = factory;
             this.fromWorld = fromWorld;
             this.tab = new OtherPage(this);
+        }
+
+        /** What kind of page it is ({@link PageCategory}). */
+        public PageCategory category() {
+            return this.category;
         }
 
         /**
@@ -111,15 +118,16 @@ public final class WindowPages {
 
     /**
      * Registers a page under {@code id}, a code name as a channel's is:
-     * lower-case letters, digits and underscores. A second page under an
-     * id already taken is refused. Its window opens as every window does,
-     * in the middle and unlocked, and its {@code key}, when it has one, opens it from another page and
-     * closes it from itself.
+     * lower-case letters, digits and underscores, of a {@code category}. A
+     * second page under an id already taken is refused. It opens in a
+     * window of its category, and its {@code key}, when it has one, turns
+     * the screen to its category's view and closes it from there.
      */
     public static synchronized void register(String id, String titleKey,
                                              ItemStack icon, KeyBinding key,
+                                             PageCategory category,
                                              Factory factory) {
-        add(new Page(id, titleKey, icon, key, factory, false));
+        add(new Page(id, titleKey, icon, key, category, factory, false));
     }
 
     /**
@@ -132,14 +140,15 @@ public final class WindowPages {
     public static synchronized void registerWorldPage(String id,
                                                       String titleKey,
                                                       ItemStack icon,
+                                                      PageCategory category,
                                                       Factory factory) {
-        add(new Page(id, titleKey, icon, null, factory, true));
+        add(new Page(id, titleKey, icon, null, category, factory, true));
     }
 
     private static void add(Page page) {
         if (page.id == null || !page.id.matches("[a-z0-9_]{1,24}")
                 || page.titleKey == null || page.icon == null
-                || page.factory == null
+                || page.category == null || page.factory == null
                 || PAGES.containsKey(page.id)) {
             throw new IllegalArgumentException("Not a page, or one twice: "
                     + page.id);

@@ -22,10 +22,9 @@ public final class LostTalesMapMarkerRepository {
         UUID markerUuid = UUID.randomUUID();
         String id = "losttales:player/"
                 + markerUuid.toString().replace("-", "");
-        String name = owner.getCommandSenderName() + "'s Waystone";
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        id, name, owner.getUniqueID(),
+                        id, owner.getCommandSenderName(), owner.getUniqueID(),
                         owner.dimension, x, y, z, linkToken);
         LostTalesMapMarkerWorldData data = get(owner.worldObj);
         if (data.getRecord(id) != null) {

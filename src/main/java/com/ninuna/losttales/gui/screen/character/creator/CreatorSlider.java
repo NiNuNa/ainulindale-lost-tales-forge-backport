@@ -1,6 +1,11 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -18,6 +23,10 @@ import org.lwjgl.input.Keyboard;
  * opens it for typing, and enter or clicking away closes it again — a
  * typed number past the slider's reach is kept as typed, up to what the
  * server accepts.</p>
+ *
+ * <p>In a window's rows it is one row: its name at the left, the track a
+ * hairline after it with an ivory thumb, and the number at the right end,
+ * which a click opens for typing in its place.</p>
  */
 public final class CreatorSlider extends CreatorControl {
 
@@ -35,6 +44,10 @@ public final class CreatorSlider extends CreatorControl {
     private static final int READOUT_WIDTH = 40;
     private static final int READOUT_GAP = 6;
     private static final int TICKS = 6;
+    /** In a window's rows, the thumb's width; it stands the capitals' height. */
+    private static final int ROW_THUMB_WIDTH = 3;
+    /** In a window's rows, how far the knee's mark reaches above and under the track. */
+    private static final int ROW_KNEE_REACH = 1;
 
     private final String label;
     private final IntValue value;
@@ -56,7 +69,8 @@ public final class CreatorSlider extends CreatorControl {
 
     @Override
     public int height() {
-        return LABEL_HEIGHT + CreatorWidgets.FIELD_HEIGHT + 6;
+        return inRows() ? CreatorRows.height()
+                : LABEL_HEIGHT + CreatorWidgets.FIELD_HEIGHT + 6;
     }
 
     @Override
@@ -78,15 +92,39 @@ public final class CreatorSlider extends CreatorControl {
     }
 
     private int readoutX() {
-        return this.x + this.width - READOUT_WIDTH;
+        return this.x + this.width - readoutWidth();
+    }
+
+    /** The readout's room; in a window's rows the widest number it may read, with the caret's room. */
+    private int readoutWidth() {
+        if (!inRows()) {
+            return READOUT_WIDTH;
+        }
+        return this.context.getFont().getStringWidth(String.valueOf(
+                Math.max(this.value.typedMax(), Math.max(1, this.value.get()))))
+                + LostTalesUiCaret.WIDTH;
     }
 
     private int trackLeft() {
-        return this.x + THUMB_WIDTH / 2;
+        return inRows() ? rowTrackStart() + ROW_THUMB_WIDTH / 2
+                : this.x + THUMB_WIDTH / 2;
     }
 
     private int trackRight() {
-        return readoutX() - READOUT_GAP - THUMB_WIDTH / 2;
+        return inRows() ? rowTrackEnd() - ROW_THUMB_WIDTH / 2 - 1
+                : readoutX() - READOUT_GAP - THUMB_WIDTH / 2;
+    }
+
+    /** In a window's rows, where the track's room starts: past the name. */
+    private int rowTrackStart() {
+        return Math.min(this.x + this.width, this.x
+                + this.context.getFont().getStringWidth(this.label)
+                + MenuWindow.VALUE_GAP);
+    }
+
+    /** In a window's rows, where the track's room ends: short of the number. */
+    private int rowTrackEnd() {
+        return readoutX() - MenuWindow.VALUE_GAP;
     }
 
     private int trackY() {
@@ -95,6 +133,10 @@ public final class CreatorSlider extends CreatorControl {
 
     @Override
     public void draw(int mouseX, int mouseY) {
+        if (inRows()) {
+            drawRow(mouseX, mouseY);
+            return;
+        }
         FontRenderer font = this.context.getFont();
         drawLabel(this.label);
         int left = trackLeft();
@@ -161,6 +203,58 @@ public final class CreatorSlider extends CreatorControl {
         }
     }
 
+    /**
+     * As a window's row: lit under the pointer, while it holds the keys
+     * and while the thumb is dragged; the name at the left in ivory; the
+     * track a hairline in the aside tone, honey up to the thumb, the knee
+     * marked in sand, and the thumb in ivory the capitals' height; the
+     * number at the right end in the aside tone, ivory under the pointer,
+     * or the field standing in for it.
+     */
+    private void drawRow(int mouseX, int mouseY) {
+        FontRenderer font = this.context.getFont();
+        int alpha = this.context.alpha();
+        if (contains(mouseX, mouseY) || isFocused() || this.dragging) {
+            CreatorRows.light(this.context, this.y, this.y + height());
+        }
+        CreatorRows.drawLabel(this.context, this.label, this.x, this.y,
+                this.x + this.width);
+        int textTop = CreatorRows.textTop(this.y);
+        int left = trackLeft();
+        int right = trackRight();
+        if (right > left) {
+            int lineY = textTop + LostTalesUiInk.CAP_HEIGHT / 2;
+            int thumbX = left + Math.round((right - left)
+                    * AgeSliderScale.positionOf(AgeSliderScale.clamp(
+                            this.value.get())));
+            LostTalesUiInk.fillRect(thumbX, lineY, right + 1, lineY + 1,
+                    LostTalesUiInk.argb(WindowStyle.asideRgb(), alpha));
+            LostTalesUiInk.fillRect(left, lineY, thumbX, lineY + 1,
+                    LostTalesUiInk.argb(LostTalesColors.rgb(
+                            LostTalesColors.HONEY), alpha));
+            int kneeX = left + Math.round((right - left)
+                    * AgeSliderScale.KNEE_POSITION);
+            LostTalesUiInk.fillRect(kneeX, lineY - ROW_KNEE_REACH, kneeX + 1,
+                    lineY + 1 + ROW_KNEE_REACH, LostTalesUiInk.argb(
+                            LostTalesColors.rgb(LostTalesColors.SAND), alpha));
+            int thumbLeft = thumbX - ROW_THUMB_WIDTH / 2;
+            LostTalesUiInk.fillRect(thumbLeft, textTop,
+                    thumbLeft + ROW_THUMB_WIDTH,
+                    textTop + LostTalesUiInk.CAP_HEIGHT,
+                    LostTalesUiInk.argb(LostTalesUiInk.IVORY, alpha));
+        }
+        if (this.typingOpen) {
+            CreatorRows.placeField(this.typing, font, readoutX(),
+                    this.x + this.width, this.y);
+            this.typing.drawTextBox(alpha);
+        } else {
+            CreatorRows.drawValue(this.context,
+                    String.valueOf(Math.max(1, this.value.get())), readoutX(),
+                    this.x + this.width, this.y,
+                    isOverReadout(mouseX, mouseY));
+        }
+    }
+
     @Override
     public boolean mouseClicked(int mouseX, int mouseY, int button) {
         if (button != 0 || !contains(mouseX, mouseY)) {
@@ -179,12 +273,23 @@ public final class CreatorSlider extends CreatorControl {
     }
 
     private boolean isOverReadout(int mouseX, int mouseY) {
+        if (inRows()) {
+            return CreatorWidgets.within(mouseX, mouseY, readoutX(), this.y,
+                    readoutWidth(), height());
+        }
         return CreatorWidgets.within(mouseX, mouseY, readoutX(), valueTop(),
                 READOUT_WIDTH, CreatorWidgets.FIELD_HEIGHT);
     }
 
-    /** The band left of the readout, where a click or a drag sets the age. */
+    /**
+     * The band left of the readout, where a click or a drag sets the age;
+     * in a window's rows, the track's room between the name and the number.
+     */
     private boolean isOverTrack(int mouseX, int mouseY) {
+        if (inRows()) {
+            return contains(mouseX, mouseY) && mouseX >= rowTrackStart()
+                    && mouseX < rowTrackEnd();
+        }
         return contains(mouseX, mouseY)
                 && mouseY >= valueTop()
                 && mouseY < valueTop() + CreatorWidgets.FIELD_HEIGHT

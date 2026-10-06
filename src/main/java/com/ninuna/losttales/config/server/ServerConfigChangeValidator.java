@@ -7,101 +7,115 @@ import java.util.Locale;
  * Whether a change fits the entry it names: the right shape (single or
  * list), a value of the entry's type inside its bounds, one of the valid
  * values where the entry lists them, and within the size the transport
- * allows. Answers the reason a change is refused, or null when it fits.
+ * allows. Answers why a change is refused, as a lang key under
+ * {@link #REASON} and its arguments, or null when it fits.
  */
 public final class ServerConfigChangeValidator {
 
     public static final int MAX_LIST_ITEMS = 256;
     public static final int MAX_VALUE_LENGTH = 4096;
 
+    /** What the lang key of every reason a change is refused begins with. */
+    public static final String REASON = ServerConfigApplyResult.WORDS + "refusal.";
+
     private ServerConfigChangeValidator() {}
 
-    public static String refusal(ServerConfigEntry entry, ServerConfigChange change) {
+    public static ServerConfigApplyResult.Refusal refusal(ServerConfigEntry entry,
+                                                          ServerConfigChange change) {
+        String name = change.qualifiedName();
         if (entry == null) {
-            return "no such key";
+            return refused(name, "no_such_key");
         }
         if (change.isList() != entry.isList()) {
-            return entry.isList() ? "expects a list" : "expects a single value";
+            return refused(name, entry.isList() ? "expects_list" : "expects_single");
         }
         if (change.getValues().size() > MAX_LIST_ITEMS) {
-            return "more than " + MAX_LIST_ITEMS + " items";
+            return refused(name, "too_many_items", String.valueOf(MAX_LIST_ITEMS));
         }
         if (!entry.isList() && change.getValues().size() != 1) {
-            return "expects exactly one value";
+            return refused(name, "expects_one");
         }
         for (String value : change.getValues()) {
-            String reason = refusal(entry, value);
-            if (reason != null) {
-                return reason;
+            ServerConfigApplyResult.Refusal refusal = refusal(name, entry, value);
+            if (refusal != null) {
+                return refusal;
             }
         }
         return null;
     }
 
-    private static String refusal(ServerConfigEntry entry, String value) {
+    private static ServerConfigApplyResult.Refusal refusal(String name,
+                                                           ServerConfigEntry entry,
+                                                           String value) {
         if (value == null) {
-            return "missing value";
+            return refused(name, "missing_value");
         }
         if (value.length() > MAX_VALUE_LENGTH) {
-            return "longer than " + MAX_VALUE_LENGTH + " characters";
+            return refused(name, "too_long", String.valueOf(MAX_VALUE_LENGTH));
         }
         switch (entry.getType()) {
             case INTEGER:
-                return integerRefusal(entry, value);
+                return integerRefusal(name, entry, value);
             case DOUBLE:
-                return doubleRefusal(entry, value);
+                return doubleRefusal(name, entry, value);
             case BOOLEAN:
                 String lower = value.trim().toLowerCase(Locale.ROOT);
                 return "true".equals(lower) || "false".equals(lower)
-                        ? null : "expects true or false";
+                        ? null : refused(name, "expects_boolean");
             default:
-                return validValueRefusal(entry.getValidValues(), value);
+                return validValueRefusal(name, entry.getValidValues(), value);
         }
     }
 
-    private static String integerRefusal(ServerConfigEntry entry, String value) {
+    private static ServerConfigApplyResult.Refusal integerRefusal(String name,
+                                                                  ServerConfigEntry entry,
+                                                                  String value) {
         long parsed;
         try {
             parsed = Long.parseLong(value.trim());
         } catch (NumberFormatException malformed) {
-            return "expects a whole number";
+            return refused(name, "expects_whole_number");
         }
         if (parsed < Integer.MIN_VALUE || parsed > Integer.MAX_VALUE) {
-            return "outside the whole-number range";
+            return refused(name, "whole_number_range");
         }
         Long minimum = parseLong(entry.getMinValue());
         Long maximum = parseLong(entry.getMaxValue());
         if (minimum != null && parsed < minimum.longValue()) {
-            return "below the minimum " + minimum;
+            return refused(name, "below_minimum", String.valueOf(minimum));
         }
         if (maximum != null && parsed > maximum.longValue()) {
-            return "above the maximum " + maximum;
+            return refused(name, "above_maximum", String.valueOf(maximum));
         }
         return null;
     }
 
-    private static String doubleRefusal(ServerConfigEntry entry, String value) {
+    private static ServerConfigApplyResult.Refusal doubleRefusal(String name,
+                                                                 ServerConfigEntry entry,
+                                                                 String value) {
         double parsed;
         try {
             parsed = Double.parseDouble(value.trim());
         } catch (NumberFormatException malformed) {
-            return "expects a number";
+            return refused(name, "expects_number");
         }
         if (Double.isNaN(parsed) || Double.isInfinite(parsed)) {
-            return "expects a finite number";
+            return refused(name, "expects_finite_number");
         }
         Double minimum = parseDouble(entry.getMinValue());
         Double maximum = parseDouble(entry.getMaxValue());
         if (minimum != null && parsed < minimum.doubleValue()) {
-            return "below the minimum " + minimum;
+            return refused(name, "below_minimum", String.valueOf(minimum));
         }
         if (maximum != null && parsed > maximum.doubleValue()) {
-            return "above the maximum " + maximum;
+            return refused(name, "above_maximum", String.valueOf(maximum));
         }
         return null;
     }
 
-    private static String validValueRefusal(List<String> validValues, String value) {
+    private static ServerConfigApplyResult.Refusal validValueRefusal(String name,
+                                                                     List<String> validValues,
+                                                                     String value) {
         if (validValues == null || validValues.isEmpty()) {
             return null;
         }
@@ -110,7 +124,13 @@ public final class ServerConfigChangeValidator {
                 return null;
             }
         }
-        return "expects one of " + validValues;
+        return refused(name, "expects_one_of", validValues.toString());
+    }
+
+    /** A refusal of the change named {@code name}, its reason the line under {@link #REASON}. */
+    static ServerConfigApplyResult.Refusal refused(String name, String reason,
+                                                   String... arguments) {
+        return new ServerConfigApplyResult.Refusal(name, REASON + reason, arguments);
     }
 
     private static Long parseLong(String value) {

@@ -111,7 +111,7 @@ public final class ChatSettingsSections {
         public List<Settings.Setting> settings() {
             List<Settings.Setting> look = new ArrayList<Settings.Setting>();
             look.add(new Settings.Colour("chatSelectedLineColor",
-                    "gui.losttales.chat.settings.color.selected") {
+                    Settings.optionName("chatSelectedLineColor")) {
                 @Override
                 protected String current() {
                     return LostTalesConfig.chatSelectedLineColor;
@@ -123,7 +123,7 @@ public final class ChatSettingsSections {
                 }
             });
             look.add(new Settings.Colour("chatMentionLineColor",
-                    "gui.losttales.chat.settings.color.mention") {
+                    Settings.optionName("chatMentionLineColor")) {
                 @Override
                 protected String current() {
                     return LostTalesConfig.chatMentionLineColor;
@@ -137,7 +137,7 @@ public final class ChatSettingsSections {
             // Automatic, the mention colour a shade lighter, is its
             // default; its chip is the colour that comes to now.
             look.add(new Settings.Colour("chatSelectedMentionColor",
-                    "gui.losttales.chat.settings.color.selected_mention") {
+                    Settings.optionName("chatSelectedMentionColor")) {
                 @Override
                 protected String current() {
                     return LostTalesConfig.chatSelectedMentionColor;
@@ -160,7 +160,7 @@ public final class ChatSettingsSections {
                 }
             });
             look.add(new Settings.Colour("chatReplyHighlightColor",
-                    "gui.losttales.chat.settings.color.reply") {
+                    Settings.optionName("chatReplyHighlightColor")) {
                 @Override
                 protected String current() {
                     return LostTalesConfig.chatReplyHighlightColor;
@@ -172,7 +172,7 @@ public final class ChatSettingsSections {
                 }
             });
             look.add(new Settings.Colour("chatServerTextColor",
-                    "gui.losttales.chat.settings.color.server") {
+                    Settings.optionName("chatServerTextColor")) {
                 @Override
                 protected String current() {
                     return LostTalesConfig.chatServerTextColor;
@@ -204,12 +204,10 @@ public final class ChatSettingsSections {
                     }
                 }
             });
-            look.add(size("chatSpeakerSize",
-                    "gui.losttales.chat.settings.speaker_size"));
-            look.add(size("chatQuoteSize",
-                    "gui.losttales.chat.settings.quote_size"));
+            look.add(size("chatSpeakerSize"));
+            look.add(size("chatQuoteSize"));
             look.add(new Settings.ModSwitch("enableChatMessageGrouping",
-                    "gui.losttales.chat.settings.grouping") {
+                    Settings.optionName("enableChatMessageGrouping")) {
                 @Override
                 protected boolean get() {
                     return LostTalesConfig.enableChatMessageGrouping;
@@ -235,7 +233,7 @@ public final class ChatSettingsSections {
     private static List<Settings.Setting> messages() {
         List<Settings.Setting> messages = new ArrayList<Settings.Setting>();
         messages.add(new Settings.ModSwitch("enableChatEmojis",
-                "gui.losttales.chat.settings.emoji") {
+                Settings.optionName("enableChatEmojis")) {
             @Override
             protected boolean get() {
                 return LostTalesConfig.enableChatEmojis;
@@ -247,7 +245,7 @@ public final class ChatSettingsSections {
             }
         });
         messages.add(new Settings.ModSwitch("convertChatEmoticons",
-                "gui.losttales.chat.settings.emoticons") {
+                Settings.optionName("convertChatEmoticons")) {
             @Override
             protected boolean get() {
                 return LostTalesConfig.convertChatEmoticons;
@@ -259,7 +257,7 @@ public final class ChatSettingsSections {
             }
         });
         messages.add(new Settings.ModChoice("chatProfanityFilter",
-                "gui.losttales.chat.settings.profanity",
+                Settings.optionName("chatProfanityFilter"),
                 ChatProfanityMode.names(),
                 "gui.losttales.chat.settings.profanity.") {
             @Override
@@ -357,7 +355,7 @@ public final class ChatSettingsSections {
             }
         });
         messages.add(new Settings.ModSwitch("enableNpcChatStyling",
-                "gui.losttales.chat.settings.npc") {
+                Settings.optionName("enableNpcChatStyling")) {
             @Override
             protected boolean get() {
                 return LostTalesConfig.enableNpcChatStyling;
@@ -369,7 +367,7 @@ public final class ChatSettingsSections {
             }
         });
         messages.add(new Settings.Numeric("npcConversationsOpen",
-                "gui.losttales.chat.settings.npc_conversations", 1.0D, 0) {
+                Settings.optionName("npcConversationsOpen"), 1.0D, 0) {
             @Override
             protected double get() {
                 return LostTalesConfig.npcConversationsOpen;
@@ -381,7 +379,7 @@ public final class ChatSettingsSections {
             }
         });
         messages.add(new Settings.ModSwitch("showChatSpeechBubbles",
-                "gui.losttales.chat.settings.bubbles") {
+                Settings.optionName("showChatSpeechBubbles")) {
             @Override
             protected boolean get() {
                 return LostTalesConfig.showChatSpeechBubbles;
@@ -395,7 +393,7 @@ public final class ChatSettingsSections {
         // How many messages the history keeps, within the bounds its
         // option is defined with: a safety bound, stepped by fifty.
         messages.add(new Settings.Numeric("chatHistoryLines",
-                "gui.losttales.chat.settings.history_lines", 50.0D, 0) {
+                Settings.optionName("chatHistoryLines"), 50.0D, 0) {
             @Override
             protected double get() {
                 return LostTalesConfig.chatHistoryLines;
@@ -412,7 +410,7 @@ public final class ChatSettingsSections {
     private static List<Settings.Setting> mentions() {
         List<Settings.Setting> mentions = new ArrayList<Settings.Setting>();
         mentions.add(new Settings.ModSwitch("enableChatPings",
-                "gui.losttales.chat.settings.pings") {
+                Settings.optionName("enableChatPings")) {
             @Override
             protected boolean get() {
                 return LostTalesConfig.enableChatPings;
@@ -426,7 +424,7 @@ public final class ChatSettingsSections {
         // The cue is a sound's name in the file; here it is heard or not,
         // and heard it is the one the mod ships.
         mentions.add(new Settings.ModSwitch("chatPingSound",
-                "gui.losttales.chat.settings.ping_sound") {
+                Settings.optionName("chatPingSound")) {
             @Override
             protected boolean get() {
                 return LostTalesConfig.chatPingSound.trim().length() > 0;
@@ -448,7 +446,7 @@ public final class ChatSettingsSections {
     private static List<Settings.Setting> typing() {
         List<Settings.Setting> typing = new ArrayList<Settings.Setting>();
         typing.add(new Settings.ModSwitch("sendChatTypingStatus",
-                "gui.losttales.chat.settings.typing_send") {
+                Settings.optionName("sendChatTypingStatus")) {
             @Override
             protected boolean get() {
                 return LostTalesConfig.sendChatTypingStatus;
@@ -460,7 +458,7 @@ public final class ChatSettingsSections {
             }
         });
         typing.add(new Settings.ModSwitch("showChatTypingIndicators",
-                "gui.losttales.chat.settings.typing_show") {
+                Settings.optionName("showChatTypingIndicators")) {
             @Override
             protected boolean get() {
                 return LostTalesConfig.showChatTypingIndicators;
@@ -485,7 +483,7 @@ public final class ChatSettingsSections {
     private static final class FeedSection extends Settings.GroupedSection {
         FeedSection() {
             add(new Settings.Numeric("chatFeedWidth",
-                    "gui.losttales.chat.settings.feed_width", 10.0D, 0) {
+                    Settings.optionName("chatFeedWidth"), 10.0D, 0) {
                 @Override
                 protected double get() {
                     return LostTalesConfig.chatFeedWidth;
@@ -497,7 +495,7 @@ public final class ChatSettingsSections {
                 }
             });
             add(new Settings.Numeric("chatFeedLines",
-                    "gui.losttales.chat.settings.feed_lines", 1.0D, 0) {
+                    Settings.optionName("chatFeedLines"), 1.0D, 0) {
                 @Override
                 protected double get() {
                     return LostTalesConfig.chatFeedLines;
@@ -509,7 +507,7 @@ public final class ChatSettingsSections {
                 }
             });
             add(new Settings.Numeric("chatFeedSeconds",
-                    "gui.losttales.chat.settings.feed_seconds", 1.0D, 0) {
+                    Settings.optionName("chatFeedSeconds"), 1.0D, 0) {
                 @Override
                 protected double get() {
                     return LostTalesConfig.chatFeedSeconds;
@@ -521,7 +519,7 @@ public final class ChatSettingsSections {
                 }
             });
             add(new Settings.ModChoice("chatFeedAlignment",
-                    "gui.losttales.chat.settings.feed_alignment",
+                    Settings.optionName("chatFeedAlignment"),
                     new String[] {"LEFT", "CENTRE", "RIGHT"},
                     "gui.losttales.chat.settings.alignment.") {
                 @Override
@@ -534,12 +532,9 @@ public final class ChatSettingsSections {
                     LostTalesConfig.chatFeedAlignment = word;
                 }
             });
-            add(size("chatFeedSpeakerSize",
-                    "gui.losttales.chat.settings.feed_speaker_size"));
-            add(size("chatFeedMessageSize",
-                    "gui.losttales.chat.settings.feed_message_size"));
-            add(size("chatFeedQuoteSize",
-                    "gui.losttales.chat.settings.feed_quote_size"));
+            add(size("chatFeedSpeakerSize"));
+            add(size("chatFeedMessageSize"));
+            add(size("chatFeedQuoteSize"));
             group("gui.losttales.chat.settings.feed_place");
             add(new Settings.Action("feed_arrange",
                     "gui.losttales.chat.settings.feed_arrange") {
@@ -571,8 +566,8 @@ public final class ChatSettingsSections {
     }
 
     /** One of the chat's row sizes: smaller, the same or larger than the words. */
-    private static Settings.Setting size(final String key, String labelKey) {
-        return new Settings.ModChoice(key, labelKey, new String[] {
+    private static Settings.Setting size(final String key) {
+        return new Settings.ModChoice(key, Settings.optionName(key), new String[] {
                 LostTalesConfig.CHAT_SIZE_SMALLER, LostTalesConfig.CHAT_SIZE_SAME,
                 LostTalesConfig.CHAT_SIZE_LARGER},
                 "gui.losttales.chat.settings.size.") {

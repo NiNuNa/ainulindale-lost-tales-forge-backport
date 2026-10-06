@@ -5,6 +5,7 @@ import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.model.FellowshipIcon;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
 import com.ninuna.losttales.fellowship.sync.FellowshipInvitationSnapshot;
@@ -245,8 +246,9 @@ public final class FellowshipStateSyncPacket implements IMessage {
         for (int index = 0; index < memberCount; index++) {
             UUID identityId = LostTalesPacketCodec.readUuid(buffer);
             UUID ownerId = LostTalesPacketCodec.readUuid(buffer);
-            String characterName = LostTalesPacketCodec.readUtf8String(
-                    buffer, FellowshipPacketCodec.MAX_NAME_BYTES);
+            String characterName = FellowshipPacketCodec.shownName(
+                    LostTalesPacketCodec.readUtf8String(
+                            buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
             long joinedAt = buffer.readLong();
             FellowshipColor color = FellowshipColor.fromNetworkId(
                     buffer.readUnsignedByte());
@@ -275,8 +277,30 @@ public final class FellowshipStateSyncPacket implements IMessage {
                 throw new FellowshipPacketCodec.DecodeException("invalid fellowship guide");
             }
         }
+        int markCount = buffer.readUnsignedByte();
+        if (markCount > FellowshipMark.MAX_PER_FELLOWSHIP) {
+            throw new FellowshipPacketCodec.DecodeException("too many fellowship marks");
+        }
+        List<FellowshipMark> marks = new ArrayList<FellowshipMark>(markCount);
+        Set<UUID> markIds = new HashSet<UUID>();
+        for (int index = 0; index < markCount; index++) {
+            UUID markId = LostTalesPacketCodec.readUuid(buffer);
+            String markName = LostTalesPacketCodec.readUtf8String(buffer,
+                    FellowshipPacketCodec.MAX_FELLOWSHIP_NAME_BYTES);
+            UUID placedBy = LostTalesPacketCodec.readUuid(buffer);
+            int dimensionId = buffer.readInt();
+            double x = buffer.readDouble();
+            double z = buffer.readDouble();
+            long placedAt = buffer.readLong();
+            if (!markIds.add(markId) || !FellowshipMark.isValidName(markName)
+                    || !FellowshipMark.isValidPosition(x, z) || placedAt < 0L) {
+                throw new FellowshipPacketCodec.DecodeException("invalid fellowship mark");
+            }
+            marks.add(new FellowshipMark(markId, fellowshipId, markName, placedBy,
+                    dimensionId, x, z, placedAt));
+        }
         return new FellowshipSnapshot(fellowshipId, leaderIdentityId, name, icon,
-                switchesOn, guides, createdAt, revision, dataVersion, members);
+                switchesOn, guides, createdAt, revision, dataVersion, members, marks);
     }
 
     private static void writeFellowship(ByteBuf buffer, FellowshipSnapshot fellowship) {
@@ -315,6 +339,17 @@ public final class FellowshipStateSyncPacket implements IMessage {
         for (UUID guide : fellowship.getGuides()) {
             LostTalesPacketCodec.writeUuid(buffer, guide);
         }
+        buffer.writeByte(fellowship.getMarks().size());
+        for (FellowshipMark mark : fellowship.getMarks()) {
+            LostTalesPacketCodec.writeUuid(buffer, mark.getMarkId());
+            LostTalesPacketCodec.writeUtf8String(buffer, mark.getName(),
+                    FellowshipPacketCodec.MAX_FELLOWSHIP_NAME_BYTES);
+            LostTalesPacketCodec.writeUuid(buffer, mark.getPlacedBy());
+            buffer.writeInt(mark.getDimensionId());
+            buffer.writeDouble(mark.getX());
+            buffer.writeDouble(mark.getZ());
+            buffer.writeLong(mark.getPlacedAt());
+        }
     }
 
     /** One bit per switch that is on, at its network id. */
@@ -338,12 +373,14 @@ public final class FellowshipStateSyncPacket implements IMessage {
                     buffer, FellowshipPacketCodec.MAX_FELLOWSHIP_NAME_BYTES);
             UUID invitingIdentityId = LostTalesPacketCodec.readUuid(buffer);
             UUID invitingOwnerId = LostTalesPacketCodec.readUuid(buffer);
-            String invitingCharacterName = LostTalesPacketCodec.readUtf8String(
-                    buffer, FellowshipPacketCodec.MAX_NAME_BYTES);
+            String invitingCharacterName = FellowshipPacketCodec.shownName(
+                    LostTalesPacketCodec.readUtf8String(
+                            buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
             UUID targetIdentityId = LostTalesPacketCodec.readUuid(buffer);
             UUID targetOwnerId = LostTalesPacketCodec.readUuid(buffer);
-            String targetCharacterName = LostTalesPacketCodec.readUtf8String(
-                    buffer, FellowshipPacketCodec.MAX_NAME_BYTES);
+            String targetCharacterName = FellowshipPacketCodec.shownName(
+                    LostTalesPacketCodec.readUtf8String(
+                            buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
             long createdAt = buffer.readLong();
             long expiresAt = buffer.readLong();
             if (!invitationIds.add(invitationId)
@@ -401,8 +438,9 @@ public final class FellowshipStateSyncPacket implements IMessage {
             UUID identityId = LostTalesPacketCodec.readUuid(buffer);
             String playerName = LostTalesPacketCodec.readUtf8String(
                     buffer, FellowshipPacketCodec.MAX_NAME_BYTES);
-            String characterName = LostTalesPacketCodec.readUtf8String(
-                    buffer, FellowshipPacketCodec.MAX_NAME_BYTES);
+            String characterName = FellowshipPacketCodec.shownName(
+                    LostTalesPacketCodec.readUtf8String(
+                            buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
             if (!ownerIds.add(ownerId) || !identityIds.add(identityId)) {
                 throw new FellowshipPacketCodec.DecodeException(
                         "duplicate invite target identity");

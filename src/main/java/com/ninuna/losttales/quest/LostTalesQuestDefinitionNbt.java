@@ -1,7 +1,9 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import com.ninuna.losttales.storage.NbtTags;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,8 +12,10 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
 /**
- * A quest the game made, a missive's, as the player's quest log saves it.
- * Quest files load from JSON; only a quest that has no file is kept here.
+ * A quest the game made, a missive's, as the player's quest log saves it:
+ * its words as the template ids it is read by ({@code Words},
+ * {@link MissiveWords}), never as sentences. Quest files load from JSON;
+ * only a quest that has no file is kept here.
  */
 public final class LostTalesQuestDefinitionNbt {
     public static final int MAX_STAGES = 256;
@@ -34,6 +38,7 @@ public final class LostTalesQuestDefinitionNbt {
     private static final String KEY_MARKERS = "Markers";
     private static final String KEY_JOURNAL_LOG = "JournalLog";
     private static final String KEY_DIALOGUE = "Dialogue";
+    private static final String KEY_WORDS = "Words";
     private static final String KEY_STAGES = "Stages";
     private static final String KEY_STAGE_ID = "StageId";
     private static final String KEY_OBJECTIVES = "Objectives";
@@ -65,6 +70,7 @@ public final class LostTalesQuestDefinitionNbt {
         tag.setTag(KEY_MARKERS, writeStringMap(quest.getMarkers()));
         tag.setTag(KEY_JOURNAL_LOG, writeStringMap(quest.getJournalLog()));
         tag.setTag(KEY_DIALOGUE, writeStringMap(quest.getDialogue()));
+        tag.setTag(KEY_WORDS, writeStringMap(quest.getWords()));
 
         NBTTagList stages = new NBTTagList();
         for (LostTalesQuestStageDefinition stage : quest.getStages()) {
@@ -143,7 +149,10 @@ public final class LostTalesQuestDefinitionNbt {
                 readStringMap(tag.getTagList(KEY_MARKERS, Constants.NBT.TAG_COMPOUND)),
                 readStringMap(tag.getTagList(KEY_JOURNAL_LOG, Constants.NBT.TAG_COMPOUND)),
                 readStringMap(tag.getTagList(KEY_DIALOGUE, Constants.NBT.TAG_COMPOUND)),
-                stages
+                Collections.<String, String>emptyMap(),
+                stages,
+                false,
+                readStringMap(tag.getTagList(KEY_WORDS, Constants.NBT.TAG_COMPOUND))
         );
     }
 
@@ -162,6 +171,10 @@ public final class LostTalesQuestDefinitionNbt {
                 || !isStringMapReasonable(tag, KEY_INTERACTION)
                 || !isStringMapReasonable(tag, KEY_MARKERS)
                 || !isStringMapReasonable(tag, KEY_JOURNAL_LOG)
+                || !isStringMapReasonable(tag, KEY_DIALOGUE)
+                || !isStringMapReasonable(tag, KEY_WORDS)
+                || !MissiveWords.isWellFormed(readStringMap(tag.getTagList(
+                        KEY_WORDS, Constants.NBT.TAG_COMPOUND)))
                 || !NbtTags.hasCompoundListWithinLimit(tag, KEY_STAGES,
                 MAX_STAGES)) {
             return false;

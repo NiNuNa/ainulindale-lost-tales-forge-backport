@@ -20,6 +20,9 @@ public enum FellowshipOperationType {
     SET_ICON(15, "set_icon"),
     SET_SWITCH(16, "set_switch"),
     SET_TRAVELLING(17, "set_travelling"),
+    PLACE_MARK(18, "place_mark"),
+    MOVE_MARK(19, "move_mark"),
+    REMOVE_MARK(20, "remove_mark"),
     UNKNOWN(255, "unknown");
 
     private final int networkId;
@@ -51,7 +54,10 @@ public enum FellowshipOperationType {
                 || this == SET_GUIDE
                 || this == SET_ICON
                 || this == SET_SWITCH
-                || this == SET_TRAVELLING;
+                || this == SET_TRAVELLING
+                || this == PLACE_MARK
+                || this == MOVE_MARK
+                || this == REMOVE_MARK;
     }
 
     public boolean requiresTargetId() {
@@ -61,16 +67,24 @@ public enum FellowshipOperationType {
                 || this == INVITE_PLAYER
                 || this == ACCEPT_INVITATION
                 || this == DECLINE_INVITATION
-                || this == CANCEL_INVITATION;
+                || this == CANCEL_INVITATION
+                || this == MOVE_MARK
+                || this == REMOVE_MARK;
+    }
+
+    /** Whether the request carries a place on the map: a go-here marker set, a mark placed or moved. */
+    public boolean requiresMapPosition() {
+        return this == SET_GO_HERE_MARKER || this == PLACE_MARK
+                || this == MOVE_MARK;
     }
 
     public boolean requiresColor() {
         return this == SET_COLOR;
     }
 
-    /** A new fellowship and a rename carry a name. */
+    /** A new fellowship, a rename and a mark placed carry a name. */
     public boolean requiresName() {
-        return this == RENAME || this == CREATE;
+        return this == RENAME || this == CREATE || this == PLACE_MARK;
     }
 
     /**

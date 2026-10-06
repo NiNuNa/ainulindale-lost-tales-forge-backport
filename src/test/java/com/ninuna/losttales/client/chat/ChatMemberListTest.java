@@ -6,6 +6,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import net.minecraft.util.StatCollector;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -56,6 +57,18 @@ public final class ChatMemberListTest {
         assertEquals(rows.get(6).top + ChatMemberList.ROW_HEIGHT
                 + ChatMemberList.PAD, ChatMemberList.heightOf(rows));
         assertTrue(ChatMemberList.layOut(null, 0).isEmpty());
+    }
+
+    /** The Server's group is headed as every other, its name and its count: Server - 1. */
+    @Test
+    public void theServersGroupIsHeadedAsEveryOther() {
+        LostTalesChatMembersPacket.Member server = member("Server",
+                LostTalesChatMembersPacket.SERVER_GROUP, true);
+        LostTalesChatMembersPacket.Member alike = member("Aldric",
+                StatCollector.translateToLocal("chat.losttales.server.name"),
+                true);
+        assertEquals(ChatMemberList.headingOf(alike, 1),
+                ChatMemberList.headingOf(server, 1));
     }
 
     @Test
@@ -190,7 +203,7 @@ public final class ChatMemberListTest {
             assertTrue(ChatMemberList.headOf(npc).npcIdentity);
             // Anywhere else, the answer is the list.
             List<LostTalesChatMembersPacket.Member> answered = Arrays.asList(me);
-            assertTrue(answered == ChatMemberList.membersOf(
+            assertEquals(answered, ChatMemberList.membersOf(
                     ConversationPage.of(ChatChannel.GLOBAL), answered));
         } finally {
             ChatChannelIcons.forgetPortraits();

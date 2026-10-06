@@ -9,10 +9,13 @@ import com.ninuna.losttales.client.window.PageSearch;
 import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.ScreenPart;
 import com.ninuna.losttales.client.window.Settings;
+import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.ToolStrip;
+import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
@@ -87,15 +90,15 @@ public final class MotionLabPage extends PageContent {
     private static final LostTalesUiSheet MORE_GLYPH_LIT =
             LostTalesUiSheet.TOGGLE_1_HOVER;
 
-    /** The part of the page a hover names. */
-    private enum Part { LINE, LESS, VALUE, MORE }
+    /** The part of the page a hover names: a list line, or a stepper's row, on a chevron, on the value or elsewhere on it. */
+    private enum Part { LINE, LESS, VALUE, MORE, ROW }
 
     /** What the pointer is on: asked once a frame, read by every draw, asked again where a press lands. */
     private static final class Hover {
         final Part part;
         /** The motion of a list line. */
         final String id;
-        /** The row a stepper stands on. */
+        /** The index of a stepper's row. */
         final int row;
 
         Hover(Part part, String id, int row) {
@@ -106,6 +109,10 @@ public final class MotionLabPage extends PageContent {
 
         boolean isStepper(int row) {
             return this.part != Part.LINE && this.row == row;
+        }
+
+        boolean isLine(String id) {
+            return this.part == Part.LINE && id.equals(this.id);
         }
     }
 
@@ -124,7 +131,7 @@ public final class MotionLabPage extends PageContent {
 
                 @Override
                 public String about(String id) {
-                    return Motions.get(id).about();
+                    return aboutOf(id);
                 }
             };
 
@@ -199,6 +206,16 @@ public final class MotionLabPage extends PageContent {
 
     private static String word(String key, Object... args) {
         return StatCollector.translateToLocalFormatted(LANG + key, args);
+    }
+
+    /**
+     * What a motion is for, in the game's language: its lang line, else
+     * the words a motion file gives it.
+     */
+    static String aboutOf(String id) {
+        String key = LANG + "about." + id;
+        return StatCollector.canTranslate(key)
+                ? StatCollector.translateToLocal(key) : Motions.get(id).about();
     }
 
     /** A family's heading: its lang words, or its code name where it has none. */
@@ -314,10 +331,11 @@ public final class MotionLabPage extends PageContent {
         double x = Double.isNaN(pointerX) ? Double.NaN : pointerX - box.left;
         double y = Double.isNaN(pointerY) ? Double.NaN : pointerY - box.top;
         this.hovered = hoverAt(layout, lines, x, y);
+        int surfaceAlpha = WindowLists.pageSurfaceAlpha(minecraft, alpha);
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef((float)box.left, (float)box.top, 0.0F);
-            drawList(layout, lines, alpha, now);
+            drawList(layout, lines, alpha, surfaceAlpha);
             LostTalesUiHitBox divider = layout.divider();
             if (divider.width > 0) {
                 LostTalesUiInk.fillRect((float)divider.left,
@@ -325,7 +343,7 @@ public final class MotionLabPage extends PageContent {
                         (float)divider.bottom(),
                         faded(LostTalesColors.BORDER_DIM, alpha));
             }
-            drawContent(layout, about, alpha, now);
+            drawContent(layout, about, alpha, surfaceAlpha, now);
         } finally {
             GL11.glPopMatrix();
         }
@@ -336,21 +354,21 @@ public final class MotionLabPage extends PageContent {
         if (this.font == null || this.picked == null) {
             return Collections.emptyList();
         }
-        int width = (int)layout(0).content().width;
+        int width = (int)layout(0).column().width;
         if (width <= 0) {
             return Collections.emptyList();
         }
         List<String> lines = new ArrayList<String>();
         for (Object line : this.font.listFormattedStringToWidth(
-                Motions.get(this.picked).about(), width)) {
+                aboutOf(this.picked), width)) {
             lines.add(String.valueOf(line));
         }
         return lines;
     }
 
     private MotionLabLayout layout(int aboutLines) {
-        return new MotionLabLayout(this.width, this.height, this.listOut,
-                aboutLines);
+        return new MotionLabLayout(this.width, this.height,
+                MenuWindow.rowHeight(), this.listOut, aboutLines);
     }
 
     /** The layout as the page stands; before its first draw, one with no room. */
@@ -358,32 +376,47 @@ public final class MotionLabPage extends PageContent {
         return layout(aboutLines().size());
     }
 
-    private static int lineHeight(MotionLabList.Line line) {
-        return line.isMotion() ? MotionLabLayout.LINE_HEIGHT
-                : MotionLabLayout.HEADING_HEIGHT;
+    /** The furthest the list scrolls: its last line whole at the band's foot. */
+    private static int listMost(MotionLabLayout layout,
+                                List<MotionLabList.Line> lines) {
+        return Math.max(0, lines.size() * layout.rowHeight()
+                - (int)layout.list().height);
     }
 
-    private static int contentHeight(List<MotionLabList.Line> lines) {
-        int total = 0;
-        for (MotionLabList.Line line : lines) {
-            total += lineHeight(line);
-        }
-        return total;
+    /** The furthest the rows scroll: the last whole at the band's foot. */
+    private int rowsMost(MotionLabLayout layout) {
+        return Math.max(0, this.editor.rows().size() * layout.rowHeight()
+                - (int)layout.rows().height);
     }
 
     /** Keeps both scrolls within what there is, and glides the drawn ones after them. */
     private void clampScrolls(MotionLabLayout layout,
                               List<MotionLabList.Line> lines) {
-        int listMost = Math.max(0, contentHeight(lines)
-                - (int)layout.list().height);
-        this.listScroll = Math.max(0, Math.min(this.listScroll, listMost));
-        int rowsMost = Math.max(0, this.editor.rows().size()
-                * MotionLabLayout.ROW_HEIGHT - (int)layout.rows().height);
-        this.rowsScroll = Math.max(0, Math.min(this.rowsScroll, rowsMost));
+        this.listScroll = Math.max(0, Math.min(this.listScroll,
+                listMost(layout, lines)));
+        this.rowsScroll = Math.max(0, Math.min(this.rowsScroll,
+                rowsMost(layout)));
         this.shownListScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
                 this.shownListScroll, this.listScroll, this.frameSeconds);
         this.shownRowsScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
                 this.shownRowsScroll, this.rowsScroll, this.frameSeconds);
+    }
+
+    /** The row whose drawn top is {@code top}, cut to its band, lit as a menu's row is. */
+    private void drawLit(LostTalesUiHitBox band, double top, int rowHeight,
+                         int surfaceAlpha) {
+        double litTop = Math.max(band.top, top);
+        double litBottom = Math.min(band.bottom(), top + rowHeight);
+        if (litBottom > litTop) {
+            WindowLists.drawLitRow(0.0D, this.width, band.left, litTop,
+                    band.right(), litBottom, surfaceAlpha);
+        }
+    }
+
+    /** The index of the row under {@code y} in a band scrolled by {@code scroll}. */
+    private static int rowAt(LostTalesUiHitBox band, double y, double scroll,
+                             int rowHeight) {
+        return (int)Math.floor((y - band.top + scroll) / rowHeight);
     }
 
     /** The whole pixels a scroll stands at; its fraction is drawn through the matrix. */
@@ -399,20 +432,40 @@ public final class MotionLabPage extends PageContent {
 
     /* ---- The list ---- */
 
+    /**
+     * The list as a menu's rows: each line one row high, its words a
+     * menu's padding in from the band's edges, the picked motion and the
+     * line under the pointer lit, and where more of it waits at the edges
+     * and the right.
+     */
     private void drawList(MotionLabLayout layout,
                           List<MotionLabList.Line> lines, int alpha,
-                          long now) {
+                          int surfaceAlpha) {
         LostTalesUiHitBox list = layout.list();
         if (list.width <= 0 || list.height <= 0) {
             return;
         }
+        int rowHeight = layout.rowHeight();
+        int left = (int)list.left + MenuWindow.PADDING_X;
+        int right = (int)list.right() - MenuWindow.PADDING_X;
         if (lines.isEmpty()) {
-            drawNote(list, word(this.query.length() > 0 ? "search.none"
-                    : "none"), alpha);
+            drawNote(left, (int)list.top, right - left, rowHeight,
+                    word(this.query.length() > 0 ? "search.none" : "none"),
+                    alpha);
             return;
         }
+        // The picked line and the one under the pointer, cut to the band,
+        // before anything lands on them: each lit alike.
+        for (int index = 0; index < lines.size(); index++) {
+            MotionLabList.Line line = lines.get(index);
+            if (line.isMotion() && (line.id.equals(this.picked)
+                    || this.hovered != null && this.hovered.isLine(line.id))) {
+                drawLit(list, list.top + index * rowHeight
+                        - this.shownListScroll, rowHeight, surfaceAlpha);
+            }
+        }
         boolean clipped = LostTalesUiClip.beginLocal(this.mc,
-                (float)list.left - 2, (float)list.top, (float)list.right(),
+                (float)list.left, (float)list.top, (float)list.right(),
                 (float)list.bottom());
         GL11.glPushMatrix();
         try {
@@ -420,73 +473,46 @@ public final class MotionLabPage extends PageContent {
                     - this.shownListScroll), 0.0F);
             int y = (int)list.top - whole(this.shownListScroll);
             for (MotionLabList.Line line : lines) {
-                int lineHeight = lineHeight(line);
-                if (y + lineHeight >= list.top - 1 && y <= list.bottom() + 1) {
+                if (y + rowHeight >= list.top - 1 && y <= list.bottom() + 1) {
                     if (line.isMotion()) {
-                        drawMotionLine(line.id, list, y, alpha);
+                        drawMotionLine(line.id, left, right, y, rowHeight,
+                                alpha);
                     } else {
-                        drawHeading(familyName(line.family), (int)list.left,
-                                (int)list.right(), y,
-                                MotionLabLayout.HEADING_HEIGHT, alpha);
+                        WindowLists.drawHeading(this.font,
+                                familyName(line.family), left, left, right, y,
+                                rowHeight, false, alpha);
                     }
                 }
-                y += lineHeight;
+                y += rowHeight;
             }
         } finally {
             GL11.glPopMatrix();
             LostTalesUiClip.end(clipped);
         }
-    }
-
-    /** A heading: its words in capitals, and a rule filling what they leave. */
-    private void drawHeading(String words, int left, int right, int y,
-                             int lineHeight, int alpha) {
-        String name = LostTalesSkyrimUiStyle.uppercase(words);
-        int textTop = y + LostTalesUiInk.centredStart(lineHeight,
-                LostTalesUiInk.CAP_HEIGHT);
-        LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(name,
-                        Math.max(0, right - left)), left, textTop,
-                LostTalesColors.rgb(LostTalesColors.TEXT), alpha);
-        int ruleLeft = left + this.font.getStringWidth(name) + 5;
-        if (ruleLeft < right) {
-            LostTalesUiInk.fillRect(ruleLeft, textTop + 3, right, textTop + 4,
-                    faded(LostTalesColors.BORDER_DIM, alpha));
-        }
+        WindowLists.drawScroll(list.left, 0.0D, list.right(), this.height,
+                list.top, list.bottom(), this.shownListScroll,
+                listMost(layout, lines), alpha);
     }
 
     /**
-     * A motion's line: the name after its family, honey while the Lab's
-     * saved version plays, and the draft pen at the right while it is
-     * tuned and not saved. The picked line and the line under the pointer
-     * each take one surface of their own.
+     * A motion's line: the name after its family, in honey while the
+     * Lab's saved version plays, and the draft pen ending at the right
+     * while it is tuned and not saved.
      */
-    private void drawMotionLine(String id, LostTalesUiHitBox list, int y,
-                                int alpha) {
-        int left = (int)list.left;
-        int right = (int)list.right();
-        boolean isPicked = id.equals(this.picked);
-        boolean isHovered = !isPicked && this.hovered != null
-                && this.hovered.part == Part.LINE && id.equals(this.hovered.id);
-        if (isPicked || isHovered) {
-            LostTalesUiInk.fillRect(left - 2, y, right,
-                    y + MotionLabLayout.LINE_HEIGHT, faded(isPicked
-                            ? LostTalesColors.withAlpha(LostTalesColors.PLUM_GRAY, 0xB4)
-                            : LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x72),
-                            alpha));
-        }
-        int textTop = y + LostTalesUiInk.centredStart(
-                MotionLabLayout.LINE_HEIGHT, LostTalesUiInk.CAP_HEIGHT);
+    private void drawMotionLine(String id, int left, int right, int y,
+                                int rowHeight, int alpha) {
+        int textTop = y + LostTalesUiInk.centredStart(rowHeight,
+                LostTalesUiInk.CAP_HEIGHT);
         boolean unsaved = Motions.isPreviewed(id);
-        int markRoom = unsaved ? LostTalesUiSheet.DRAFT.getWidth() + 3 : 0;
+        LostTalesUiSheet mark = LostTalesUiSheet.DRAFT;
+        int markRoom = unsaved ? mark.getWidth() + TabIcons.GAP : 0;
         int rgb = Motions.isSaved(id) ? LostTalesColors.rgb(LostTalesColors.HONEY)
-                : isPicked ? LostTalesUiInk.IVORY
-                : LostTalesColors.rgb(LostTalesColors.TEXT);
+                : LostTalesUiInk.IVORY;
         LostTalesUiInk.drawText(this.font, LostTalesSkyrimUiStyle.trimToWidth(
                         this.font, MotionLabList.shortName(id),
                         Math.max(0, right - left - markRoom)), left, textTop,
                 rgb, alpha);
         if (unsaved) {
-            LostTalesUiSheet mark = LostTalesUiSheet.DRAFT;
             LostTalesUiInk.beginContent();
             mark.drawWithShadow(right - mark.getWidth(), textTop
                     + LostTalesUiInk.centredStart(LostTalesUiInk.CAP_HEIGHT,
@@ -494,12 +520,15 @@ public final class MotionLabPage extends PageContent {
         }
     }
 
-    private void drawNote(LostTalesUiHitBox box, String text, int alpha) {
-        int y = (int)box.top;
+    /** A note in the aside tone from {@code left}, its first line's words where a row's at {@code top} stand. */
+    private void drawNote(int left, int top, int width, int rowHeight,
+                          String text, int alpha) {
+        int y = top + LostTalesUiInk.centredStart(rowHeight,
+                LostTalesUiInk.CAP_HEIGHT);
         for (Object line : this.font.listFormattedStringToWidth(text,
-                Math.max(1, (int)box.width))) {
-            LostTalesUiInk.drawText(this.font, String.valueOf(line),
-                    (int)box.left, y, WindowStyle.asideRgb(), alpha);
+                Math.max(1, width))) {
+            LostTalesUiInk.drawText(this.font, String.valueOf(line), left, y,
+                    WindowStyle.asideRgb(), alpha);
             y += MotionLabLayout.ABOUT_LINE;
         }
     }
@@ -507,13 +536,15 @@ public final class MotionLabPage extends PageContent {
     /* ---- The motion ---- */
 
     private void drawContent(MotionLabLayout layout, List<String> about,
-                             int alpha, long now) {
+                             int alpha, int surfaceAlpha, long now) {
         LostTalesUiHitBox content = layout.content();
         if (content.width <= 0 || content.height <= 0) {
             return;
         }
+        LostTalesUiHitBox column = layout.column();
         if (this.picked == null) {
-            drawNote(content, word("pick"), alpha);
+            drawNote((int)column.left, (int)column.top, (int)column.width,
+                    layout.rowHeight(), word("pick"), alpha);
             return;
         }
         Motion motion = Motions.get(this.picked);
@@ -521,11 +552,11 @@ public final class MotionLabPage extends PageContent {
         LostTalesUiInk.drawText(this.font, LostTalesSkyrimUiStyle.trimToWidth(
                         this.font, this.picked, (int)name.width),
                 (int)name.left, (int)name.top + LostTalesUiInk.centredStart(
-                        MotionLabLayout.NAME_HEIGHT, LostTalesUiInk.CAP_HEIGHT),
+                        (int)name.height, LostTalesUiInk.CAP_HEIGHT),
                 LostTalesUiInk.IVORY, alpha);
         drawAbout(layout, about, alpha);
         drawSample(layout, motion, alpha, now);
-        drawRows(layout, alpha, now);
+        drawRows(layout, alpha, surfaceAlpha, now);
     }
 
     /** What the motion is for, as many lines as the column gives it, the last cut short where more is left. */
@@ -575,12 +606,22 @@ public final class MotionLabPage extends PageContent {
         }
     }
 
-    /** The rows under the sample, clipped to their box and scrolled as one. */
-    private void drawRows(MotionLabLayout layout, int alpha, long now) {
+    /**
+     * The rows under the sample as a menu's rows: the stepper's row under
+     * the pointer lit, the rows clipped to their band and scrolled as
+     * one, and where more of them waits at the edges and the right.
+     */
+    private void drawRows(MotionLabLayout layout, int alpha, int surfaceAlpha,
+                          long now) {
         LostTalesUiHitBox box = layout.rows();
         List<MotionLabEditor.Row> rows = this.editor.rows();
         if (box.width <= 0 || box.height <= 0 || rows.isEmpty()) {
             return;
+        }
+        int rowHeight = layout.rowHeight();
+        if (this.hovered != null && this.hovered.part != Part.LINE) {
+            drawLit(box, box.top + this.hovered.row * rowHeight
+                    - this.shownRowsScroll, rowHeight, surfaceAlpha);
         }
         boolean clipped = LostTalesUiClip.beginLocal(this.mc,
                 (float)box.left, (float)box.top, (float)box.right(),
@@ -591,60 +632,74 @@ public final class MotionLabPage extends PageContent {
                     - this.shownRowsScroll), 0.0F);
             int y = (int)box.top - whole(this.shownRowsScroll);
             for (int index = 0; index < rows.size(); index++) {
-                if (y + MotionLabLayout.ROW_HEIGHT >= box.top - 1
-                        && y <= box.bottom() + 1) {
+                if (y + rowHeight >= box.top - 1 && y <= box.bottom() + 1) {
                     drawRow(layout, rows.get(index), index, y, alpha, now);
                 }
-                y += MotionLabLayout.ROW_HEIGHT;
+                y += rowHeight;
             }
         } finally {
             GL11.glPopMatrix();
             LostTalesUiClip.end(clipped);
         }
+        WindowLists.drawScroll(box.left, box.top, box.right(), this.height,
+                box.top, box.bottom(), this.shownRowsScroll, rowsMost(layout),
+                alpha);
     }
 
+    /**
+     * One row as a menu's: a header over its hairline, a note in the
+     * aside tone, or a label in ivory and a stepper ending at the row's
+     * right, its value in the aside tone and in ivory under the pointer.
+     */
     private void drawRow(MotionLabLayout layout, MotionLabEditor.Row row,
                          int index, int y, int alpha, long now) {
-        LostTalesUiHitBox rows = layout.rows();
-        int left = (int)rows.left;
-        int textTop = y + LostTalesUiInk.centredStart(
-                MotionLabLayout.ROW_HEIGHT, LostTalesUiInk.CAP_HEIGHT);
+        int rowHeight = layout.rowHeight();
+        int left = layout.rowLeft();
+        int right = layout.rowRight();
+        int textTop = y + LostTalesUiInk.centredStart(rowHeight,
+                LostTalesUiInk.CAP_HEIGHT);
         if (!row.editable()) {
             if (row.header()) {
-                drawHeading(row.label, left, (int)rows.right(), y,
-                        MotionLabLayout.ROW_HEIGHT, alpha);
+                WindowLists.drawHeading(this.font, row.label, left, left,
+                        right, y, rowHeight, false, alpha);
             } else {
                 LostTalesUiInk.drawText(this.font,
                         LostTalesSkyrimUiStyle.trimToWidth(this.font,
-                                row.label, (int)rows.width), left, textTop,
+                                row.label, right - left), left, textTop,
                         WindowStyle.asideRgb(), alpha);
             }
             return;
         }
         LostTalesUiInk.drawText(this.font, LostTalesSkyrimUiStyle.trimToWidth(
                         this.font, row.label, layout.labelWidth()), left,
-                textTop, WindowStyle.asideRgb(), alpha);
+                textTop, LostTalesUiInk.IVORY, alpha);
         boolean onRow = this.hovered != null && this.hovered.isStepper(index);
-        LostTalesUiHitBox less = layout.less(y);
         LostTalesUiHitBox value = layout.value(y);
-        LostTalesUiHitBox more = layout.more(y);
-        drawChevron(LESS_GLYPH, LESS_GLYPH_LIT, index + ":less", less,
+        int chevronTop = textTop + Math.floorDiv(LostTalesUiInk.CAP_HEIGHT
+                - LESS_GLYPH.getHeight(), 2);
+        drawChevron(LESS_GLYPH, LESS_GLYPH_LIT, index + ":less",
+                (int)layout.less(y).left, chevronTop,
                 onRow && this.hovered.part == Part.LESS, alpha, now);
-        drawChevron(MORE_GLYPH, MORE_GLYPH_LIT, index + ":more", more,
+        drawChevron(MORE_GLYPH, MORE_GLYPH_LIT, index + ":more",
+                (int)layout.more(y).left, chevronTop,
                 onRow && this.hovered.part == Part.MORE, alpha, now);
         String text = LostTalesSkyrimUiStyle.trimToWidth(this.font,
-                row.value(), (int)value.width - 2);
-        int ink = Math.max(0, this.font.getStringWidth(text) - 1);
+                row.value(), (int)value.width);
         LostTalesUiInk.drawText(this.font, text, (int)value.left
-                        + LostTalesUiInk.centredStart((int)value.width, ink),
+                        + LostTalesUiInk.centredStart((int)value.width,
+                                this.font.getStringWidth(text)),
                 textTop, onRow && this.hovered.part == Part.VALUE
-                        ? LostTalesUiInk.IVORY
-                        : LostTalesColors.rgb(LostTalesColors.TEXT), alpha);
+                        ? LostTalesUiInk.IVORY : WindowStyle.asideRgb(),
+                alpha);
     }
 
-    /** A stepper's chevron, centred on its square, rising and lighting under the pointer as every glyph button does. */
+    /**
+     * A stepper's chevron, centred across its cell from {@code cellLeft}
+     * and standing at {@code top}, rising and lighting under the pointer
+     * as every glyph button does.
+     */
     private void drawChevron(LostTalesUiSheet glyph, LostTalesUiSheet lit,
-                             String key, LostTalesUiHitBox box,
+                             String key, int cellLeft, int top,
                              boolean under, int alpha, long now) {
         LostTalesUiButtonMotion motion = this.chevrons.get(key);
         if (motion == null) {
@@ -656,61 +711,55 @@ public final class MotionLabPage extends PageContent {
                 || Mouse.isButtonDown(1)));
         LostTalesUiInk.beginContent();
         LostTalesUiButton.drawGlyph(glyph, lit, motion,
-                (float)box.left + LostTalesUiInk.centredStart((int)box.width,
-                        glyph.getWidth()),
-                (float)box.top + LostTalesUiInk.centredStart((int)box.height,
-                        glyph.getHeight()), alpha);
+                cellLeft + LostTalesUiInk.centredStart(
+                        MenuWindow.STEPPER_CELL, glyph.getWidth()),
+                top, alpha);
     }
 
     /* ---- The pointer ---- */
 
     /**
      * What is under a point in the page's own space: a motion's line in
-     * the list, or a part of a row's stepper; null for nothing a press
-     * does anything on. Read from the same boxes and the same drawn
-     * scrolls the draw uses.
+     * the list, or a stepper's row and the part of it; null for nothing a
+     * press does anything on. Read from the same bands, the same row
+     * height and the same drawn scrolls the draw uses.
      */
     private Hover hoverAt(MotionLabLayout layout,
                           List<MotionLabList.Line> lines, double x, double y) {
         if (Double.isNaN(x) || Double.isNaN(y) || this.width < 0) {
             return null;
         }
+        int rowHeight = layout.rowHeight();
         LostTalesUiHitBox list = layout.list();
-        if (list.width > 0 && LostTalesUiHitBox.contains(x, y, list.left - 2,
-                list.top, list.width + 2, list.height)) {
-            double top = list.top - this.shownListScroll;
-            for (MotionLabList.Line line : lines) {
-                int lineHeight = lineHeight(line);
-                if (line.isMotion() && LostTalesUiHitBox.contains(x, y,
-                        list.left - 2, top, list.width + 2, lineHeight)) {
-                    return new Hover(Part.LINE, line.id, -1);
-                }
-                top += lineHeight;
+        if (list.contains(x, y)) {
+            int index = rowAt(list, y, this.shownListScroll, rowHeight);
+            if (index >= 0 && index < lines.size()
+                    && lines.get(index).isMotion()) {
+                return new Hover(Part.LINE, lines.get(index).id, -1);
             }
             return null;
         }
         LostTalesUiHitBox box = layout.rows();
-        if (box.width <= 0 || !box.contains(x, y)) {
+        if (!box.contains(x, y)) {
             return null;
         }
         List<MotionLabEditor.Row> rows = this.editor.rows();
-        double top = box.top - this.shownRowsScroll;
-        for (int index = 0; index < rows.size(); index++) {
-            double rowTop = top + index * MotionLabLayout.ROW_HEIGHT;
-            if (!rows.get(index).editable()) {
-                continue;
-            }
-            if (layout.less(rowTop).contains(x, y)) {
-                return new Hover(Part.LESS, null, index);
-            }
-            if (layout.value(rowTop).contains(x, y)) {
-                return new Hover(Part.VALUE, null, index);
-            }
-            if (layout.more(rowTop).contains(x, y)) {
-                return new Hover(Part.MORE, null, index);
-            }
+        int index = rowAt(box, y, this.shownRowsScroll, rowHeight);
+        if (index < 0 || index >= rows.size()
+                || !rows.get(index).editable()) {
+            return null;
         }
-        return null;
+        double rowTop = box.top + index * rowHeight - this.shownRowsScroll;
+        if (layout.less(rowTop).contains(x, y)) {
+            return new Hover(Part.LESS, null, index);
+        }
+        if (layout.value(rowTop).contains(x, y)) {
+            return new Hover(Part.VALUE, null, index);
+        }
+        if (layout.more(rowTop).contains(x, y)) {
+            return new Hover(Part.MORE, null, index);
+        }
+        return new Hover(Part.ROW, null, index);
     }
 
     private Hover hoverAt(LostTalesUiHitBox box, double x, double y) {
@@ -722,9 +771,9 @@ public final class MotionLabPage extends PageContent {
 
     /**
      * A press: a line picks its motion, and a narrow page folds the list
-     * to show it; a stepper steps its row, on from the value and the
-     * right chevron and back from the left one, the other way with the
-     * right button, ten steps with Shift.
+     * to show it; a stepper's row steps, on from the right chevron and
+     * anywhere else on the row and back from the left chevron, the other
+     * way with the right button, ten steps with Shift.
      */
     @Override
     public boolean mousePressed(Minecraft minecraft, LostTalesUiHitBox box,
@@ -777,7 +826,7 @@ public final class MotionLabPage extends PageContent {
         return word("step.tip");
     }
 
-    /** The wheel scrolls the list or the rows, whichever it is turned over. */
+    /** The wheel scrolls the list or the rows by whole rows, whichever it is turned over. */
     @Override
     public boolean scroll(LostTalesUiHitBox box, double x, double y,
                           int lines) {
@@ -787,12 +836,14 @@ public final class MotionLabPage extends PageContent {
         MotionLabLayout layout = layout();
         double pageX = x - box.left;
         double pageY = y - box.top;
+        int pixels = WheelStep.pixels(WheelStep.menuRows(lines),
+                layout.rowHeight());
         if (layout.list().contains(pageX, pageY)) {
-            this.listScroll += lines * MotionLabLayout.LINE_HEIGHT;
+            this.listScroll += pixels;
             return true;
         }
         if (layout.content().contains(pageX, pageY)) {
-            this.rowsScroll += lines * MotionLabLayout.ROW_HEIGHT;
+            this.rowsScroll += pixels;
             return true;
         }
         return false;
@@ -831,8 +882,10 @@ public final class MotionLabPage extends PageContent {
             return true;
         }
         if (keyCode == Keyboard.KEY_PRIOR || keyCode == Keyboard.KEY_NEXT) {
-            int page = Math.max(MotionLabLayout.ROW_HEIGHT,
-                    (int)layout().rows().height - MotionLabLayout.ROW_HEIGHT);
+            MotionLabLayout layout = layout();
+            int rowHeight = layout.rowHeight();
+            int page = Math.max(1, (int)layout.rows().height / rowHeight - 1)
+                    * rowHeight;
             this.rowsScroll += keyCode == Keyboard.KEY_PRIOR ? -page : page;
             return true;
         }

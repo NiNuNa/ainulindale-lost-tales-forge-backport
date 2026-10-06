@@ -25,6 +25,41 @@ import static org.junit.Assert.assertTrue;
 public final class TabRowTest {
 
     private static final double EPSILON = 1.0E-6D;
+
+    /**
+     * A split takes one place in the row, as Chrome gives a split one tab:
+     * its two pages share the place, the seam between them a tab's, and a
+     * page standing beside a page it is not split with keeps a place of
+     * its own.
+     */
+    @Test
+    public void aSplitTakesOneTabsRoom() {
+        WindowPage first = new BarLeadTest.Tab("first", true);
+        WindowPage left = new BarLeadTest.Tab("left", true);
+        WindowPage right = new BarLeadTest.Tab("right", true);
+        WindowPage last = new BarLeadTest.Tab("last", true);
+        java.util.Map<WindowPage, WindowPage> pairs =
+                new java.util.HashMap<WindowPage, WindowPage>();
+        pairs.put(left, right);
+        pairs.put(right, left);
+        java.util.List<int[]> places = TabRow.places(
+                java.util.Arrays.asList(first, left, right, last), pairs);
+        assertEquals(3, places.size());
+        assertEquals(0, places.get(0)[0]);
+        assertEquals(0, places.get(0)[1]);
+        assertEquals(1, places.get(1)[0]);
+        assertEquals(2, places.get(1)[1]);
+        assertEquals(3, places.get(2)[0]);
+        assertEquals("apart in the row, a split is two places", 4,
+                TabRow.places(java.util.Arrays.asList(left, first, right,
+                        last), pairs).size());
+        double half = TabRow.splitHalf(TabRow.DEFAULT_TAB_WIDTH);
+        assertEquals(TabRow.DEFAULT_TAB_WIDTH, half + TabRow.TAB_GAP
+                + (TabRow.DEFAULT_TAB_WIDTH - half - TabRow.TAB_GAP), EPSILON);
+        assertEquals(half, TabRow.DEFAULT_TAB_WIDTH - half - TabRow.TAB_GAP,
+                EPSILON);
+        assertEquals(0.0D, TabRow.splitHalf(0.0D), EPSILON);
+    }
     private static final int CONTROL =
             TabRow.CONTROL_GAP + TabRow.CONTROL_SIZE;
 

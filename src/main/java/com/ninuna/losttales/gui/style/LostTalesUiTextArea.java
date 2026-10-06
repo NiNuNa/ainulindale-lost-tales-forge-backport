@@ -168,10 +168,12 @@ public final class LostTalesUiTextArea {
         this.caretNanos = System.nanoTime();
     }
 
-    /** The wheel over the field scrolls its lines. */
-    public void scrollBy(int lines) {
+    /** The wheel over the field scrolls its lines; answers whether they moved. */
+    public boolean scrollBy(int lines) {
+        int was = this.scroll;
         this.scroll = Math.max(0, Math.min(this.scroll + lines,
                 Math.max(0, lines().size() - visibleLines())));
+        return this.scroll != was;
     }
 
     /**

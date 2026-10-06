@@ -409,15 +409,7 @@ public final class ChatHistory {
         List<ChatShowcase> carried =
                 new ArrayList<ChatShowcase>(showcases.size());
         for (ChatShowcase showcase : showcases) {
-            carried.add(showcase.getKind() == ChatShareKind.QUEST
-                    && showcase.isQuestJoinable()
-                    ? ChatShowcase.quest(showcase.getTokenIndex(),
-                            showcase.getQuestReference(),
-                            showcase.getQuestTitle(),
-                            showcase.getQuestCategory(),
-                            showcase.getQuestObjective(),
-                            showcase.getQuestReward(), false)
-                    : showcase);
+            carried.add(showcase.withoutJoin());
         }
         return carried;
     }
@@ -546,25 +538,34 @@ public final class ChatHistory {
      * nobody is told of one, whichever side it came from. The excerpt is
      * recut, so a reply made after the edit quotes what the message says
      * now, and the kept lines say it too, so a replay shows the edited
-     * words. The reactions stay with the message.
+     * words. {@code bodyJson} is the new words' component, empty for
+     * none: a player's edit has none, a Discord member's has one when its
+     * words hold a mark, and the old one never stays, since it said the
+     * old words. The reactions stay with the message.
      */
     public static synchronized Set<UUID> applyEdit(long messageId,
                                                    UUID editor,
                                                    String message,
+                                                   String bodyJson,
                                                    List<ChatNamedPlayer> named) {
         Entry entry = authored(messageId, editor);
-        if (entry == null || message == null
-                || message.equals(entry.forOthers.getMessage())) {
+        if (entry == null || message == null) {
             return null;
         }
         LostTalesChatMessagePacket forSender;
         LostTalesChatMessagePacket forOthers;
         try {
-            forSender = entry.forSender.withMessage(message).withNamedPlayers(named);
-            forOthers = entry.forOthers.withMessage(message).withNamedPlayers(named);
+            forSender = entry.forSender.withMessage(message)
+                    .withServerBody(bodyJson, named);
+            forOthers = entry.forOthers.withMessage(message)
+                    .withServerBody(bodyJson, named);
         } catch (RuntimeException refused) {
             // The caller validated the text; a line that still cannot be
             // rebuilt is left as it was rather than half-changed.
+            return null;
+        }
+        if (message.equals(entry.forOthers.getMessage())
+                && forOthers.getBodyJson().equals(entry.forOthers.getBodyJson())) {
             return null;
         }
         ENTRIES.put(Long.valueOf(messageId), new Entry(entry.authorId,
@@ -779,6 +780,12 @@ public final class ChatHistory {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         return entry == null || entry.authorId == null ? null
                 : ChatNamedPlayer.account(entry.authorId, entry.author);
+    }
+
+    /** The component a kept line carries as chat JSON; empty for none, and for none kept. */
+    public static synchronized String bodyOf(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry == null ? "" : entry.forOthers.getBodyJson();
     }
 
     /** The channel a kept message was said in, or null for none kept. */

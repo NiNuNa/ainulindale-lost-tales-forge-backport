@@ -339,11 +339,12 @@ public class LostTalesMobAggroEventHandler {
         return Math.rint(value * 2.0D) / 2.0D;
     }
 
+    /**
+     * The entity's name as the server knows it, cut to the packet's bound;
+     * empty where it has none, which the client words in its language.
+     */
     private static String boundedEntityName(String value) {
-        String name = value == null ? "Enemy" : value.trim();
-        if (name.length() == 0) {
-            name = "Enemy";
-        }
+        String name = value == null ? "" : value.trim();
         while (name.getBytes(StandardCharsets.UTF_8).length
                 > LostTalesMobAggroSyncPacket.MAX_ENTITY_NAME_BYTES
                 && name.length() > 1) {

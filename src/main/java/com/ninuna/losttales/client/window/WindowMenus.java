@@ -303,7 +303,7 @@ public final class WindowMenus implements MenuWindow.Owner {
             return null;
         }
         for (MenuWindow.Entry entry : menu.entries()) {
-            if (entry.isTakeable()) {
+            if (entry.isTakeable() && !entry.header) {
                 return entry;
             }
         }

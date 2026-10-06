@@ -42,14 +42,9 @@ public final class FellowshipInviteTargetSnapshot {
         return this.characterName;
     }
 
+    /** The name trimmed and bounded; empty where there is none, which the client words. */
     private static String normalizeName(String name) {
-        if (name == null) {
-            return "Unknown";
-        }
-        String normalized = name.trim();
-        if (normalized.length() == 0) {
-            return "Unknown";
-        }
+        String normalized = name == null ? "" : name.trim();
         return normalized.length() <= 64
                 ? normalized : normalized.substring(0, 64);
     }

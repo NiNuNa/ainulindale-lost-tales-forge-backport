@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.config.LostTalesConfigWords;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -128,6 +129,14 @@ public final class Settings {
 
     /* ---- The kinds of setting ---- */
 
+    /**
+     * The lang key of a client option's name, the label of a row that
+     * stands for that one option ({@link LostTalesConfigWords}).
+     */
+    public static String optionName(String key) {
+        return LostTalesConfigWords.nameKey(LostTalesConfig.CATEGORY_CLIENT, key);
+    }
+
     /** One setting: its name, what it reads now, and what a press does to it. */
     public abstract static class Setting {
         public final String key;
@@ -140,6 +149,11 @@ public final class Settings {
 
         public String label() {
             return StatCollector.translateToLocal(this.labelKey);
+        }
+
+        /** The lang key of its name. */
+        String labelKey() {
+            return this.labelKey;
         }
 
         /** The words the row reads for the value now. */
@@ -426,13 +440,28 @@ public final class Settings {
             return Collections.emptyList();
         }
 
+        /**
+         * What its field reads while nothing is typed: its name, unless
+         * it stands for words of its own while empty.
+         */
+        protected String prompt() {
+            return label();
+        }
+
+        /** What its row reads while it is empty: None, unless it stands for words of its own. */
+        protected String emptyValue() {
+            return StatCollector.translateToLocal(
+                    "gui.losttales.window.settings.value.none");
+        }
+
         @Override
         public String value() {
             String text = get() == null ? "" : get().trim();
-            if (text.length() == 0) {
-                return StatCollector.translateToLocal(
-                        "gui.losttales.window.settings.value.none");
-            }
+            return text.length() == 0 ? emptyValue() : shown(text);
+        }
+
+        /** Words as a row reads them: their end, cut short where they are long. */
+        protected static String shown(String text) {
             return text.length() <= LINE_SHOWN_LENGTH ? text
                     : "..." + text.substring(text.length()
                             - (LINE_SHOWN_LENGTH - 3));
@@ -892,7 +921,7 @@ public final class Settings {
         public List<Setting> settings() {
             List<Setting> windows = new ArrayList<Setting>();
             windows.add(new Colour("windowBackgroundColor",
-                    "gui.losttales.window.settings.color.background") {
+                    optionName("windowBackgroundColor")) {
                 @Override
                 protected String current() {
                     return LostTalesConfig.windowBackgroundColor;
@@ -919,7 +948,7 @@ public final class Settings {
                 }
             });
             windows.add(new ModSwitch("windowBackgroundBlur",
-                    "gui.losttales.window.settings.blur") {
+                    optionName("windowBackgroundBlur")) {
                 @Override
                 protected boolean get() {
                     return LostTalesConfig.windowBackgroundBlur;
@@ -931,7 +960,7 @@ public final class Settings {
                 }
             });
             windows.add(new ModSwitch("hideHudWithWindows",
-                    "gui.losttales.window.settings.hide_hud") {
+                    optionName("hideHudWithWindows")) {
                 @Override
                 protected boolean get() {
                     return LostTalesConfig.hideHudWithWindows;
@@ -943,7 +972,7 @@ public final class Settings {
                 }
             });
             windows.add(new Numeric("pinnedWindowOpacity",
-                    "gui.losttales.window.settings.pinned_opacity", 5.0D, 0) {
+                    optionName("pinnedWindowOpacity"), 5.0D, 0) {
                 @Override
                 protected double get() {
                     return LostTalesConfig.pinnedWindowOpacity;
@@ -955,8 +984,7 @@ public final class Settings {
                             (int)Math.round(value);
                 }
             });
-            windows.add(new ModChoice("tipDelay",
-                    "gui.losttales.window.settings.tip_delay",
+            windows.add(new ModChoice("tipDelay", optionName("tipDelay"),
                     new String[] {"INSTANT", "SHORT", "MEDIUM", "LONG"},
                     "gui.losttales.window.settings.tip_delay.") {
                 @Override
@@ -1238,10 +1266,7 @@ public final class Settings {
                     defaultLabel(StatCollector.translateToLocal(
                             "gui.losttales.window.settings.color.automatic")),
                     false, colour.automaticRgb(), null).asChip();
-            if (colour.isAutomatic()) {
-                automatic.withLabelColor(
-                        LostTalesColors.rgb(LostTalesColors.HONEY));
-            }
+            automatic.chosen(colour.isAutomatic());
             entries.add(automatic);
         }
         for (String name : names) {
@@ -1252,9 +1277,7 @@ public final class Settings {
                     false, LostTalesColors.rgb(LostTalesColors.paletteColor(
                             name, LostTalesColors.PLUM_BLACK)),
                     null).asChip();
-            if (name.equalsIgnoreCase(current)) {
-                entry.withLabelColor(LostTalesColors.rgb(LostTalesColors.HONEY));
-            }
+            entry.chosen(name.equalsIgnoreCase(current));
             entries.add(entry);
         }
         return entries;
@@ -1303,7 +1326,6 @@ public final class Settings {
             Place place = (Place)menu.about();
             menu.setTitle(StatCollector.translateToLocal(place.titleKey),
                     LostTalesUiSheet.COG);
-            menu.setRowHeight(MenuWindow.TALL_ROW_HEIGHT);
             menu.setRows(rows(place, menu.filter()));
         }
 
@@ -1396,8 +1418,7 @@ public final class Settings {
                         ? defaultLabel(words.get(index)) : words.get(index);
                 MenuWindow.Entry row = new MenuWindow.Entry(
                         WORD_PREFIX + index, label);
-                rows.add(index == setting.wordIndex() ? row.withLabelColor(
-                        LostTalesColors.rgb(LostTalesColors.HONEY)) : row);
+                rows.add(row.chosen(index == setting.wordIndex()));
             }
             menu.setRows(rows);
         }
@@ -1456,7 +1477,7 @@ public final class Settings {
                 menu.setFilter(stepper.format(((Numeric)setting).get()));
             } else if (setting instanceof Line) {
                 Line line = (Line)setting;
-                menu.openField(line.label(), null, LostTalesUiSheet.DRAFT,
+                menu.openField(line.prompt(), null, LostTalesUiSheet.DRAFT,
                         line.maxLength(), false);
                 menu.setFilter(line.get());
             }

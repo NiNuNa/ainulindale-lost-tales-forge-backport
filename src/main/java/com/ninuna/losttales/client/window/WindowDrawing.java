@@ -8,6 +8,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiLayerFade;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
+import java.util.HashMap;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
@@ -135,6 +136,16 @@ public final class WindowDrawing {
         // with the one in front.
         row.splitPartner = frame.splitOther != null && tabs.contains(frame.splitOther)
                 ? frame.splitOther : null;
+        // Every split the row shows takes one tab's room, in front or not.
+        for (WindowSplit split : window.splits()) {
+            if (tabs.contains(split.first()) && tabs.contains(split.second())) {
+                if (row.splitPairs.isEmpty()) {
+                    row.splitPairs = new HashMap<WindowPage, WindowPage>();
+                }
+                row.splitPairs.put(split.first(), split.second());
+                row.splitPairs.put(split.second(), split.first());
+            }
+        }
         row.rowBottom = (int)Math.floor(frame.tabRowBottom());
         row.rowBottomExact = frame.tabRowBottom();
         row.fractionX = (float)(frame.drawnLeft()
@@ -168,6 +179,7 @@ public final class WindowDrawing {
                          boolean depthTest) {
         drawPageSurface(minecraft, frame, shown);
         drawPageIn(minecraft, WindowPages.contentOf(frame.page), pageBox(frame),
+                contentBox(frame),
                 shown, pointerX, pointerY, partialTicks, depthTest);
         drawSplitPage(minecraft, frame, shown, splitPointerX, splitPointerY,
                 partialTicks, depthTest);
@@ -196,7 +208,7 @@ public final class WindowDrawing {
                                 * WindowStyle.opacity(minecraft)));
             }
             drawPageIn(minecraft, WindowPages.contentOf(frame.splitPage),
-                    splitPageBox(frame), shown, pointerX, pointerY,
+                    splitPageBox(frame), contentBox(frame), shown, pointerX, pointerY,
                     partialTicks, depthTest);
         }
         drawDivider(minecraft, frame, shown);
@@ -205,6 +217,7 @@ public final class WindowDrawing {
     /** One page in its box, on whole pixels moved by the fraction the box stands on. */
     private static void drawPageIn(Minecraft minecraft, PageContent content,
                                    LostTalesUiHitBox exact,
+                                   LostTalesUiHitBox room,
                                    LostTalesGuiAnimationSample shown,
                                    double pointerX, double pointerY,
                                    float partialTicks, boolean depthTest) {
@@ -219,6 +232,9 @@ public final class WindowDrawing {
         if (depth) {
             GL11.glEnable(GL11.GL_DEPTH_TEST);
         }
+        // A side of a split that meets the divider has no ring to light.
+        WindowLists.framedSides(exact.left <= room.left + 0.5D,
+                exact.left + exact.width >= room.left + room.width - 0.5D);
         try {
             GL11.glTranslatef(fractionX, fractionY, 0.0F);
             content.draw(minecraft, whole, exact.left, exact.top,
@@ -226,6 +242,7 @@ public final class WindowDrawing {
                     Double.isNaN(pointerY) ? pointerY : pointerY - fractionY,
                     partialTicks, Math.round(255.0F * shown.getOpacity()));
         } finally {
+            WindowLists.framedSides(true, true);
             if (depth) {
                 GL11.glDisable(GL11.GL_DEPTH_TEST);
             }

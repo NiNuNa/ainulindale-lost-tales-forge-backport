@@ -14,6 +14,7 @@ import lotr.common.item.LOTRItemDagger;
 import lotr.common.item.LOTRWeaponStats;
 import net.minecraft.item.Item;
 import net.minecraft.util.IIcon;
+import net.minecraft.util.StatCollector;
 
 public enum ELostTalesItem {
     // Armors - Arnor.
@@ -340,35 +341,42 @@ public enum ELostTalesItem {
         this.largeIcon = icon;
     }
 
+    /** What kind of thing an item is, as its tooltip names it. */
     public enum Type {
-        WEAPON_SWORD("Sword"),
-        WEAPON_LONGSWORD("Longsword"),
-        WEAPON_POLEARM("Polearm"),
-        WEAPON_PIKE("Pike"),
-        WEAPON_DAGGER("Dagger"),
-        WEAPON_SPEAR("Spear"),
-        WEAPON_BATTLEAXE("Battleaxe"),
-        WEAPON_WARHAMMER("Warhammer"),
-        ARMOR_HEAVY("Heavy Armor"),
-        ARMOR_LIGHT("Light Armor"),
-        BLOCK_BUILDING("Building Block"),
-        BLOCK_DECORATION("Decoration Block"),
-        BLOCK_PLUSHIE("Plushie"),
-        CONSUMABLE_POTION("Potion"),
-        CONSUMABLE_FOOD("Food"),
-        CONSUMABLE_DRINK("Drink"),
-        ACCESSORY("Accessory"),
-        TOOL("Tool"),
-        INSTRUMENT("Instrument");
+        WEAPON_SWORD("sword"),
+        WEAPON_LONGSWORD("longsword"),
+        WEAPON_POLEARM("polearm"),
+        WEAPON_PIKE("pike"),
+        WEAPON_DAGGER("dagger"),
+        WEAPON_SPEAR("spear"),
+        WEAPON_BATTLEAXE("battleaxe"),
+        WEAPON_WARHAMMER("warhammer"),
+        ARMOR_HEAVY("heavy_armor"),
+        ARMOR_LIGHT("light_armor"),
+        BLOCK_BUILDING("building_block"),
+        BLOCK_DECORATION("decoration_block"),
+        BLOCK_PLUSHIE("plushie"),
+        CONSUMABLE_POTION("potion"),
+        CONSUMABLE_FOOD("food"),
+        CONSUMABLE_DRINK("drink"),
+        ACCESSORY("accessory"),
+        TOOL("tool"),
+        INSTRUMENT("instrument");
 
-        private final String name;
+        private final String nameKey;
 
-        Type(String name) {
-            this.name = name;
+        Type(String id) {
+            this.nameKey = "item.losttales.type." + id;
         }
 
+        /** The lang key of the type's name. */
+        public String getNameKey() {
+            return this.nameKey;
+        }
+
+        /** The type's name in the language of the side that asks. */
         public String getName() {
-            return name;
+            return StatCollector.translateToLocal(this.nameKey);
         }
     }
 }

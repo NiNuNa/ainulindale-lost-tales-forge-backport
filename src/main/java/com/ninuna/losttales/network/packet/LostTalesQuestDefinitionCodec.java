@@ -4,6 +4,7 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
@@ -13,8 +14,9 @@ import java.util.Map;
 
 /**
  * A whole quest definition on the wire, as the server hands one to a
- * client that has no file for it: a missive a player took, or a quest a
- * server wrote in its own folder. Every string, count and map is bounded;
+ * client that has no file for it: a missive a player took, worded by its
+ * template ids, or a quest a server wrote in its own folder, in its
+ * operator's words. Every string, count and map is bounded;
  * a read that finds anything out of bounds throws a
  * {@link LostTalesPacketCodec.DecodeException}, which the packet reading
  * it turns into a malformed payload.
@@ -66,6 +68,10 @@ public final class LostTalesQuestDefinitionCodec {
         writeStringMap(buf, quest.getJournalLog(), "journal log");
         writeStringMap(buf, quest.getDialogue(), "dialogue");
         writeStringMap(buf, quest.getWorld(), "world");
+        if (!MissiveWords.isWellFormed(quest.getWords())) {
+            throw new IllegalStateException("invalid quest words");
+        }
+        writeStringMap(buf, quest.getWords(), "words");
 
         List<LostTalesQuestStageDefinition> stages = quest.getStages();
         LostTalesPacketCodec.writeCount(buf, stages.size(),
@@ -116,6 +122,11 @@ public final class LostTalesQuestDefinitionCodec {
         Map<String, String> journalLog = readStringMap(buf, "journal log");
         Map<String, String> dialogue = readStringMap(buf, "dialogue");
         Map<String, String> world = readStringMap(buf, "world");
+        Map<String, String> words = readStringMap(buf, "words");
+        if (!MissiveWords.isWellFormed(words)) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "invalid quest words");
+        }
 
         List<LostTalesQuestStageDefinition> stages =
                 new ArrayList<LostTalesQuestStageDefinition>();
@@ -157,7 +168,8 @@ public final class LostTalesQuestDefinitionCodec {
         }
         return new LostTalesQuestDefinition(id, title, description,
                 repeatable, restartable, startMode, prerequisites, rewards,
-                interaction, markers, journalLog, dialogue, world, stages);
+                interaction, markers, journalLog, dialogue, world, stages,
+                false, words);
     }
 
     private static void writeString(ByteBuf buf, String value, int maxBytes) {

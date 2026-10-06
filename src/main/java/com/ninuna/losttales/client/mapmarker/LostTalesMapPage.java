@@ -25,6 +25,7 @@ import lotr.common.network.LOTRPacketClientMQEvent;
 import lotr.common.network.LOTRPacketHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
@@ -72,6 +73,7 @@ public final class LostTalesMapPage extends PageContent {
     /** The bar's items: their ids, which the page is told when one is pressed. */
     private static final String LOCATION = "location";
     private static final String WAYPOINT = "waypoint";
+    private static final String MARK = "mark";
     private static final String TELEPORT = "teleport";
     private static final String ZOOM_OUT = "zoom_out";
     private static final String ZOOM_IN = "zoom_in";
@@ -224,6 +226,8 @@ public final class LostTalesMapPage extends PageContent {
                         Keyboard.KEY_ESCAPE, PageKeys.OR, Keyboard.KEY_N),
                 PageKeys.pageKey(PAGE_ID, "destinations",
                         Keyboard.KEY_LEFT, PageKeys.OR, Keyboard.KEY_RIGHT),
+                PageKeys.pageKey(PAGE_ID, "mark", PageKeys.CLICK),
+                PageKeys.pageKey(PAGE_ID, "mark_change", PageKeys.CLICK),
                 PageKeys.pageKey(PAGE_ID, "teleport", PageKeys.CLICK));
     }
 
@@ -272,13 +276,14 @@ public final class LostTalesMapPage extends PageContent {
     /* ---- The window's bar ---- */
 
     /**
-     * Current Location and Create Waypoint, an operator's Teleport, then
-     * the place under the pointer and the date as quiet words, and the
-     * zoom's two glyphs at the right end. Close Map is the tab's cross.
+     * Current Location and Create Waypoint, Mark for a character in a
+     * fellowship, an operator's Teleport, then the place under the pointer
+     * and the date as quiet words, and the zoom's two glyphs at the right
+     * end. Close Map is the tab's cross.
      */
     @Override
     public List<BarItem> barItems() {
-        List<BarItem> items = new ArrayList<BarItem>(7);
+        List<BarItem> items = new ArrayList<BarItem>(9);
         boolean inMiddleEarth = this.map != null && this.map.isInMiddleEarth();
         String away = StatCollector.translateToLocal(
                 "gui.losttales.map.control.why.away");
@@ -296,6 +301,9 @@ public final class LostTalesMapPage extends PageContent {
                         "gui.losttales.map.control.waypoint"),
                 LostTalesLotrMapGui.CREATE_WAYPOINT_KEY));
         items.add(inMiddleEarth ? waypointItem : waypointItem.unavailable(away));
+        if (this.map != null && this.map.offersMarks()) {
+            items.add(markItem(inMiddleEarth, away));
+        }
         if (this.map != null && this.map.isPlayerOp) {
             String teleport = StatCollector.translateToLocal(
                     "gui.losttales.map.control.teleport");
@@ -305,6 +313,12 @@ public final class LostTalesMapPage extends PageContent {
                             "gui.losttales.map.control.teleport.tip"),
                     LOTRKeyHandler.keyBindingMapTeleport.getKeyCode()))
                     .lit(this.map.isTeleportArmed()));
+        }
+        if (this.map != null && this.map.isMarkArmed()) {
+            items.add(BarItem.words(StatCollector.translateToLocal(
+                    this.map.isMovingMark()
+                            ? "gui.losttales.map.mark.where_moved"
+                            : "gui.losttales.map.mark.where")));
         }
         String cursor = this.map == null ? "" : this.map.cursorWords();
         if (cursor.length() > 0) {
@@ -331,6 +345,24 @@ public final class LostTalesMapPage extends PageContent {
         return items;
     }
 
+    /**
+     * Mark: lit while the next press on the map places or moves a mark,
+     * greyed with the reason while the fellowship travelled with takes no
+     * mark from this character.
+     */
+    private BarItem markItem(boolean inMiddleEarth, String away) {
+        BarItem item = BarItem.button(MARK, StatCollector.translateToLocal(
+                "gui.losttales.map.control.mark"), new ItemStack(Blocks.torch))
+                .tip(StatCollector.translateToLocal(
+                        "gui.losttales.map.control.mark.tip"))
+                .lit(this.map.isMarkArmed());
+        if (!inMiddleEarth) {
+            return item.unavailable(away);
+        }
+        String refusal = this.map.isMarkArmed() ? null : this.map.markRefusal();
+        return refusal == null ? item : item.unavailable(refusal);
+    }
+
     @Override
     public void barPressed(String id, int offer) {
         if (this.map == null) {
@@ -340,6 +372,8 @@ public final class LostTalesMapPage extends PageContent {
             this.map.focusCurrentLocation();
         } else if (WAYPOINT.equals(id)) {
             this.map.openWaypointPrompt();
+        } else if (MARK.equals(id)) {
+            this.map.toggleMarkPlacing();
         } else if (TELEPORT.equals(id)) {
             this.map.toggleTeleport();
         } else if (ZOOM_OUT.equals(id)) {

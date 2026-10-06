@@ -2,10 +2,13 @@ package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatStatusLine;
+import com.ninuna.losttales.chat.ChatTranslatedWords;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.emoji.ChatEmojiShortcodes;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -16,8 +19,10 @@ import java.util.regex.Pattern;
  * Turns a Discord message into something the chat accepts, and a chat
  * message into something Discord shows faithfully, both through the one
  * emoji registry. Inbound, Discord's markup is spelled out — {@code <@id>}
- * becomes {@code @name} from the message's own mention list, {@code <#id>}
- * a {@code #channel}, a custom {@code <:name:id>} its {@code :name:} —
+ * becomes {@code @name} from the message's own mention list, a role's
+ * {@code <@&id>} {@code @**Moderators**} and a channel's {@code <#id>}
+ * {@code #**general**} by the names their server gives them
+ * ({@link #inbound}), a custom {@code <:name:id>} its {@code :name:} —
  * registered Unicode emoji and alias shortcodes become their canonical
  * {@code :name:}, any other Unicode emoji its Discord name between colons,
  * Discord's block markup is folded into the inline marks the chat reads
@@ -33,9 +38,8 @@ import java.util.regex.Pattern;
  * ({@link DiscordMentions}).
  */
 public final class DiscordMessageSanitizer {
-    private static final Pattern USER_MENTION = Pattern.compile("<@!?(\\d+)>");
-    private static final Pattern ROLE_MENTION = Pattern.compile("<@&(\\d+)>");
-    private static final Pattern CHANNEL_MENTION = Pattern.compile("<#(\\d+)>");
+    /** A mention of a member ({@code <@id>}, {@code <@!id>}), a role ({@code <@&id>}) or a channel ({@code <#id>}). */
+    private static final Pattern MENTION = Pattern.compile("<(@!?|@&|#)(\\d+)>");
     private static final Pattern CUSTOM_EMOJI =
             Pattern.compile("<a?:([A-Za-z0-9_]+):\\d+>");
     /** A custom emoji's name as Discord allows it. */
@@ -68,17 +72,93 @@ public final class DiscordMessageSanitizer {
 
     private DiscordMessageSanitizer() {}
 
+    /** The lang key of the word a mention of a member stands for when the message does not name them. */
+    static final String UNKNOWN_USER = "chat.losttales.discord.unknown_user";
+    /** The lang key of the word a mention of a role stands for. */
+    static final String UNKNOWN_ROLE = "chat.losttales.discord.unknown_role";
+    /** The lang key of the word a mention of a channel stands for. */
+    static final String UNKNOWN_CHANNEL = "chat.losttales.discord.unknown_channel";
+    /** The lang key of the mark a forward's words follow, which each game translates. */
+    static final String FORWARDED = ChatTranslatedWords.PREFIX + "discord_forwarded";
+    /** The lang key of a sticker's mark, its name the argument, which each game translates. */
+    static final String STICKER = ChatTranslatedWords.PREFIX + "discord_sticker";
+
+    /**
+     * What the bridge knows of the names in the Discord server a message
+     * was said in, by id: the server's own roles and channels only, empty
+     * for one it has not heard of or one in another server.
+     */
+    public interface Places {
+        /** Knows no names. */
+        Places NONE = new Places() {
+            @Override
+            public String roleName(String roleId) {
+                return "";
+            }
+
+            @Override
+            public String channelName(String channelId) {
+                return "";
+            }
+        };
+
+        String roleName(String roleId);
+
+        String channelName(String channelId);
+    }
+
+    /** The longest role or channel name a mention shows. */
+    static final int MAX_PLACE_NAME = 32;
+    /**
+     * What a role's or channel's name loses: the chat's marks, and the
+     * signs that open a mention, a channel link, a Discord code, a shared
+     * thing's token, an emoji's shortcode or a web address.
+     */
+    private static final String PLACE_NAME_SIGNS = "*_~|`\\[]@#<>:";
+
     /**
      * The chat text for a Discord message, or empty when nothing
-     * sayable is left (an attachment-only post, an empty line).
+     * sayable is left (an attachment-only post, an empty line). A member's
+     * mention reads as their name, {@code @Frodo}. A role's or a channel's
+     * reads as the name {@code places} gives it, in bold behind its
+     * {@code @} or {@code #}: {@code @**Moderators**}, {@code #**general**}.
+     * The marks right after the sign keep it from reading as a mention of
+     * anyone in the game or a link to a game channel, both of which need
+     * a name's own character there, and the name is plain words
+     * ({@link #placeName}). A mention whose name is not known reads as
+     * {@code @user}, {@code @role} or {@code #channel} in {@code words},
+     * the server's: it stands inside the member's own words. Each mention
+     * is read once, so a name put in is never read as a mention again.
      */
-    public static String inbound(String content, Map<String, String> mentionNames) {
+    public static String inbound(String content, Map<String, String> mentionNames,
+                                 Places places, LostTalesWords words) {
         if (content == null) {
             return "";
         }
-        String text = replaceAll(USER_MENTION, content, "@", mentionNames, "user");
-        text = replaceAll(ROLE_MENTION, text, "@", null, "role");
-        text = replaceAll(CHANNEL_MENTION, text, "#", null, "channel");
+        Places named = places == null ? Places.NONE : places;
+        Matcher mention = MENTION.matcher(content);
+        StringBuffer mentioned = new StringBuffer();
+        while (mention.find()) {
+            String kind = mention.group(1);
+            String id = mention.group(2);
+            String said;
+            if ("@&".equals(kind)) {
+                String name = placeName(named.roleName(id));
+                said = name.length() > 0 ? "@**" + name + "**"
+                        : "@" + words.format(UNKNOWN_ROLE);
+            } else if ("#".equals(kind)) {
+                String name = placeName(named.channelName(id));
+                said = name.length() > 0 ? "#**" + name + "**"
+                        : "#" + words.format(UNKNOWN_CHANNEL);
+            } else {
+                String name = mentionNames == null ? null : mentionNames.get(id);
+                said = "@" + (name == null || name.length() == 0
+                        ? words.format(UNKNOWN_USER) : name);
+            }
+            mention.appendReplacement(mentioned, Matcher.quoteReplacement(said));
+        }
+        mention.appendTail(mentioned);
+        String text = mentioned.toString();
         // A custom emoji whose name the registry knows — canonically or
         // as an alias — becomes that emoji; any other stays its name.
         Matcher emoji = CUSTOM_EMOJI.matcher(text);
@@ -110,48 +190,67 @@ public final class DiscordMessageSanitizer {
 
     /**
      * A member's message as the chat shows it, with what it carries
-     * besides its words: a forward's words behind
-     * *[Forwarded]*, each sticker as *[Sticker: name]*, and each file by
-     * its name in italics, followed by the message's own link on Discord,
-     * where the file is. The address stays in sight: no word stands in for
-     * a link. {@code words} and {@code forwarded} are already
-     * {@link #inbound}'s; the words give way first when all of it is longer
-     * than a chat line, and the link goes before a file name does.
+     * besides its words: a forward's words behind *[Forwarded]*, each
+     * sticker as *[Sticker: name]*, and each file by its name in italics,
+     * followed by the message's own link on Discord, where the file is.
+     * The address stays in sight: no word stands in for a link.
+     * {@code said} and {@code forwarded} are already {@link #inbound}'s;
+     * the words give way first when all of it is longer than a chat line,
+     * and the link goes before a file name does. The two marks are the
+     * lang file's: the line's text has them in {@code words}, the
+     * server's, and its pieces keep them as marks each game translates.
      */
-    static String inboundWithAttachments(String words, String forwarded,
-                                         List<String> stickers, List<String> files,
-                                         String messageLink) {
-        StringBuilder extras = new StringBuilder();
-        if ((words == null || words.length() == 0) && forwarded != null
+    static DiscordInboundLine inboundWithAttachments(LostTalesWords words,
+                                                     String said, String forwarded,
+                                                     List<String> stickers,
+                                                     List<String> files,
+                                                     String messageLink) {
+        List<DiscordInboundLine.Piece> body = new ArrayList<DiscordInboundLine.Piece>();
+        if ((said == null || said.length() == 0) && forwarded != null
                 && forwarded.length() > 0) {
-            words = "*[Forwarded]* " + forwarded;
+            body.add(DiscordInboundLine.Piece.mark(words, FORWARDED));
+            body.add(DiscordInboundLine.Piece.plain(" " + forwarded));
+        } else if (said != null) {
+            body.add(DiscordInboundLine.Piece.plain(said));
         }
+        List<DiscordInboundLine.Piece> extras = new ArrayList<DiscordInboundLine.Piece>();
         for (String sticker : stickers) {
             String name = attachedName(sticker);
             if (name.length() > 0) {
-                extras.append(" *[Sticker: ").append(name).append("]*");
+                extras.add(DiscordInboundLine.Piece.plain(" "));
+                extras.add(DiscordInboundLine.Piece.mark(words, STICKER, name));
             }
         }
         boolean anyFile = false;
         for (String file : files) {
             String name = attachedName(file);
             if (name.length() > 0) {
-                extras.append(" *").append(name).append('*');
+                extras.add(DiscordInboundLine.Piece.plain(" *" + name + "*"));
                 anyFile = true;
             }
         }
-        String link = anyFile && messageLink != null ? " " + messageLink : "";
-        String tail = extras.toString() + link;
-        if (tail.length() > ChatMessageValidator.MAX_CHARACTERS / 2) {
-            tail = extras.toString();
+        List<DiscordInboundLine.Piece> tail =
+                new ArrayList<DiscordInboundLine.Piece>(extras);
+        if (anyFile && messageLink != null) {
+            tail.add(DiscordInboundLine.Piece.plain(" " + messageLink));
         }
-        String body = words == null ? "" : words;
-        int room = ChatMessageValidator.MAX_CHARACTERS - tail.length();
-        if (body.length() > room) {
-            body = room > 3 ? body.substring(0, room - 3).trim() + "..." : "";
+        if (DiscordInboundLine.length(tail) > ChatMessageValidator.MAX_CHARACTERS / 2) {
+            tail = extras;
         }
-        String text = (body + tail).trim();
-        return ChatMessageValidator.isValid(text) ? text : "";
+        int room = ChatMessageValidator.MAX_CHARACTERS - DiscordInboundLine.length(tail);
+        if (DiscordInboundLine.length(body) > room) {
+            List<DiscordInboundLine.Piece> cut = new ArrayList<DiscordInboundLine.Piece>();
+            if (room > 3) {
+                cut.addAll(DiscordInboundLine.trim(
+                        DiscordInboundLine.slice(body, 0, room - 3)));
+                cut.add(DiscordInboundLine.Piece.plain("..."));
+            }
+            body = cut;
+        }
+        body.addAll(tail);
+        DiscordInboundLine line = new DiscordInboundLine(DiscordInboundLine.trim(body));
+        return ChatMessageValidator.isValid(line.getText()) ? line
+                : DiscordInboundLine.EMPTY;
     }
 
     /** A file or sticker name as plain words: no marks, no codes, cut short. */
@@ -485,19 +584,20 @@ public final class DiscordMessageSanitizer {
 
     /**
      * The line a webhook post opens with when the game message is a
-     * forward: Discord's small subtext, a forward arrow, the conversation
-     * the message was said in by its code name, and its author in bold.
-     * {@code link} is the game's {@code #code/id}; the id means nothing on
-     * Discord and is left off.
+     * forward: Discord's small subtext, a forward arrow, and in the
+     * server's words the conversation the message was said in by its code
+     * name and its author in bold. {@code link} is the game's
+     * {@code #code/id}; the id means nothing on Discord and is left off.
      */
-    public static String forwardHeader(String author, String link) {
+    public static String forwardHeader(LostTalesWords words, String author,
+                                       String link) {
         String place = link == null ? "" : link.trim();
         int slash = place.indexOf('/');
         if (slash >= 0) {
             place = place.substring(0, slash);
         }
-        return "-# ↪ Forwarded from " + escapeMarkdown(place) + " · **"
-                + escapeMarkdown(outbound(author)) + "**\n";
+        return "-# ↪ " + words.format("chat.losttales.discord.forwarded",
+                escapeMarkdown(place), escapeMarkdown(outbound(author))) + "\n";
     }
 
     /**
@@ -543,19 +643,37 @@ public final class DiscordMessageSanitizer {
         return clean.trim();
     }
 
-    private static String replaceAll(Pattern pattern, String text,
-                                     String prefix, Map<String, String> names,
-                                     String fallback) {
-        Matcher matcher = pattern.matcher(text);
-        StringBuffer result = new StringBuffer();
-        while (matcher.find()) {
-            String name = names == null ? null : names.get(matcher.group(1));
-            matcher.appendReplacement(result, Matcher.quoteReplacement(
-                    prefix + (name == null || name.length() == 0
-                            ? fallback : name)));
+    /**
+     * A role's or channel's name as a mention of it shows it: plain words,
+     * as a file's name is ({@link #attachedName}), and besides without a
+     * sign that opens a mention, a channel link, a code, a token, an emoji
+     * or a web address ({@link #PLACE_NAME_SIGNS}), so it holds none of
+     * them. Spaces of every kind become one space, and the name is cut to
+     * {@link #MAX_PLACE_NAME} characters; empty for nothing left.
+     */
+    static String placeName(String name) {
+        if (name == null) {
+            return "";
         }
-        matcher.appendTail(result);
-        return result.toString();
+        String kept = stripUnsendable(name);
+        StringBuilder plain = new StringBuilder(kept.length());
+        for (int index = 0; index < kept.length(); index++) {
+            char character = kept.charAt(index);
+            if (PLACE_NAME_SIGNS.indexOf(character) >= 0
+                    || Character.getType(character) == Character.FORMAT) {
+                continue;
+            }
+            if (isSpace(character)) {
+                if (plain.length() > 0 && plain.charAt(plain.length() - 1) != ' ') {
+                    plain.append(' ');
+                }
+                continue;
+            }
+            plain.append(character);
+        }
+        String words = plain.toString().trim();
+        return words.length() > MAX_PLACE_NAME
+                ? words.substring(0, MAX_PLACE_NAME).trim() : words;
     }
 
     /**

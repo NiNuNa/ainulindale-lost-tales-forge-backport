@@ -153,7 +153,7 @@ public final class LostTalesChatAccessPacketTest {
         ChatRoleCatalog catalog = ChatRoleCatalog.of(Arrays.asList(
                 ChatAccountRole.fromWire(ChatRoleFixtures.OPERATOR_ID,
                         Integer.numberOfTrailingZeros(ChatRoleFixtures.OPERATOR.bit()),
-                        ChatRoleFixtures.OPERATOR.getNameKey(), "Staff", "", 0x00FF00,
+                        "", "Staff", "", 0x00FF00,
                         true, ChatRoleFixtures.OPERATOR.isLocked(), 10,
                         ChatRoleFixtures.OPERATOR.getIcon()),
                 moderator), null, null);
@@ -191,6 +191,35 @@ public final class LostTalesChatAccessPacketTest {
         assertEquals(sendable, decoded.getSendableChannels());
         assertFalse(decoded.canModerate());
         assertFalse(decoded.canEditServerConfig());
+    }
+
+    /**
+     * The seeded operator role arrives named by its lang line alone, which
+     * each game reads in its own language; a role naming any other line,
+     * or a line and a name both, is refused whole.
+     */
+    @Test
+    public void aRoleIsNamedByItsOwnLangLineOrByItsName() {
+        LostTalesChatAccessPacket decoded = roundTrip(ChatPacketFixtures.access(0)
+                .catalog(ChatRoleFixtures.catalogue().roles()).build());
+        assertFalse(decoded.isMalformed());
+        ChatAccountRole operator = ChatRoleCatalog.fromWire(decoded.getCatalog())
+                .byId(ChatRoleFixtures.OPERATOR_ID);
+        assertEquals("chat.losttales.role.operator", operator.getNameKey());
+        assertEquals("", operator.getName());
+        int bit = Integer.numberOfTrailingZeros(ChatRoleFixtures.OPERATOR.bit());
+        for (ChatAccountRole forged : Arrays.asList(
+                ChatAccountRole.fromWire("operator", bit, "chat.losttales.role.team",
+                        "", "", 0, true, false, 10, null),
+                ChatAccountRole.fromWire("operator", bit, "gui.losttales.anything",
+                        "", "", 0, true, false, 10, null),
+                ChatAccountRole.fromWire("operator", bit, "chat.losttales.role.operator",
+                        "Staff", "", 0, true, false, 10, null))) {
+            LostTalesChatAccessPacket refused = roundTrip(ChatPacketFixtures.access(0)
+                    .catalog(Arrays.asList(ChatAccountRole.TEAM, forged)).build());
+            assertTrue(forged.getNameKey() + "/" + forged.getName(),
+                    refused.isMalformed());
+        }
     }
 
     @Test

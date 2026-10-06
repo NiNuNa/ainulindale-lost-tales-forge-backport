@@ -47,11 +47,13 @@ public final class WindowSplitTest {
         };
         if (WindowPages.byId(PAGE) == null) {
             WindowPages.register(PAGE, "gui.test.split.page",
-                    new ItemStack(Items.book), null, empty);
+                    new ItemStack(Items.book), null,
+                    PageCategory.QUEST_JOURNAL, empty);
         }
         if (WindowPages.byId(OTHER_PAGE) == null) {
             WindowPages.register(OTHER_PAGE, "gui.test.split.other",
-                    new ItemStack(Items.map), null, empty);
+                    new ItemStack(Items.map), null,
+                    PageCategory.QUEST_JOURNAL, empty);
         }
     }
 
@@ -267,6 +269,11 @@ public final class WindowSplitTest {
         @Override
         public boolean isKeptInLayout() {
             return false;
+        }
+
+        @Override
+        public PageCategory category() {
+            return PageCategory.CHANNELS;
         }
     }
 }

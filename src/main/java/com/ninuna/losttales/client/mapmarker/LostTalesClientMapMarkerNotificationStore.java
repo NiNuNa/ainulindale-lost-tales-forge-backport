@@ -3,12 +3,14 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import java.util.LinkedHashSet;
 import java.util.Random;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.StatCollector;
 
 /**
  * Client-only map marker notification state.
@@ -44,8 +46,18 @@ public final class LostTalesClientMapMarkerNotificationStore {
         if (normalizedId.length() == 0) {
             return;
         }
+        // The server names the marker in its own words; this game names it
+        // in its language where the marker is one the lang file names.
         LostTalesMapMarkerData marker = LostTalesClientMapMarkerStore.getSharedMarker(normalizedId);
-        String name = markerName == null || markerName.length() == 0 ? (marker == null ? normalizedId : marker.getName()) : markerName;
+        String given = markerName == null || markerName.length() == 0
+                ? (marker == null ? "" : marker.getGivenName()) : markerName;
+        // A marker with no name of its own is named by what it is called after.
+        String name = given.trim().length() == 0 && marker != null
+                ? marker.getName()
+                : LostTalesMapMarkerNames.shownName(normalizedId, given);
+        if (name.length() == 0) {
+            name = normalizedId;
+        }
         long now = System.currentTimeMillis();
         discoveryNotice = new DiscoveryNotice(normalizedId, name, now, DISCOVERY_DURATION_MS);
         areaNotice = null;
@@ -167,7 +179,9 @@ public final class LostTalesClientMapMarkerNotificationStore {
 
         protected TimedNotice(String markerId, String name, long startedMs, long durationMs) {
             this.markerId = markerId == null ? "" : markerId;
-            this.name = name == null || name.length() == 0 ? "Map Marker" : name;
+            this.name = name == null || name.length() == 0
+                    ? StatCollector.translateToLocal("map.losttales.marker.unnamed")
+                    : name;
             this.startedMs = startedMs;
             this.durationMs = durationMs;
         }

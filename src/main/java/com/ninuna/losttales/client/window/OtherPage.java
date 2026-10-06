@@ -1,8 +1,6 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
-import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
@@ -56,6 +54,11 @@ public final class OtherPage extends WindowPage {
     @Override
     public boolean isAvailable() {
         return content().isAvailable();
+    }
+
+    @Override
+    public PageCategory category() {
+        return this.page.category();
     }
 
     /** Whether the page is on screen: the window screen open, and the page in front of its window. */

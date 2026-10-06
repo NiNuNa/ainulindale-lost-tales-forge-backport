@@ -18,7 +18,7 @@ import net.minecraftforge.common.util.Constants;
 
 /** Versioned, defensive NBT codec for authoritative marker records. */
 public final class LostTalesMapMarkerNbtCodec {
-    public static final int CURRENT_DATA_VERSION = 4;
+    public static final int CURRENT_DATA_VERSION = 5;
     private static final int MAX_RECORDS = 16384;
     private static final int MAX_QUARANTINE = 4096;
 
@@ -134,6 +134,7 @@ public final class LostTalesMapMarkerNbtCodec {
         tag.setString("Id", record.getId());
         tag.setString("Source", record.getSource().getSerializedName());
         tag.setString("Name", record.getName());
+        tag.setString("NamedAfter", record.getNamedAfter());
         tag.setString("Icon", record.getIconName());
         tag.setString("Color", record.getColorName());
         tag.setString("Category", record.getCategoryName());
@@ -210,6 +211,7 @@ public final class LostTalesMapMarkerNbtCodec {
                     LostTalesMapMarkerRecord.builder(
                                     tag.getString("Id"), source)
                             .name(tag.getString("Name"))
+                            .namedAfter(tag.getString("NamedAfter"))
                             .iconName(tag.getString("Icon"))
                             .colorName(tag.getString("Color"))
                             .categoryName(tag.getString("Category"))

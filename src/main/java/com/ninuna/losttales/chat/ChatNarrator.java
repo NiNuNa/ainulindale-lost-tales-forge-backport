@@ -20,6 +20,10 @@ import java.util.UUID;
  * the readers of the Server Log.</p>
  */
 public final class ChatNarrator {
+    /**
+     * The name a Narrator line is signed with; each game shows its own
+     * word for it ({@link ChatNames#narrator}).
+     */
     public static final String NAME = "Narrator";
     /**
      * The skin id a Narrator line carries in a character's place: what

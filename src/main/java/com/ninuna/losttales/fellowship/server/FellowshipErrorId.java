@@ -44,6 +44,8 @@ public enum FellowshipErrorId {
     NAME_NOT_ALLOWED("name_not_allowed"),
     NAME_IN_USE("name_in_use"),
     INVALID_MARKER_POSITION("invalid_marker_position"),
+    TOO_MANY_MARKS("too_many_marks"),
+    MARK_NOT_FOUND("mark_not_found"),
     RATE_LIMITED("rate_limited"),
     MALFORMED_REQUEST("malformed_request"),
     INTERNAL_ERROR("internal_error");

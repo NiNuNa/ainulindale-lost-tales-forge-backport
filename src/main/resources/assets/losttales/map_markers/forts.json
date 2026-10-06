@@ -2,7 +2,6 @@
   "map_markers": [
     {
       "id": "losttales:cheese_fort",
-      "name": "Cheese's Fort",
       "relevance": "high",
       "icon": "town",
       "color": "white",
@@ -16,12 +15,10 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "description": "A fortified test outpost claimed by Cheese, useful for checking discovered fort markers and public waypoint rendering."
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "losttales:watchtower_ruins",
-      "name": "Watchtower Ruins",
       "relevance": "medium",
       "icon": "town",
       "color": "orange",
@@ -35,8 +32,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "description": "A ruined watchtower overlooking the road, still useful as a landmark for wandering travellers."
+      "waystoneStructureType": "losttales:glowstone_house"
     }
   ]
 }

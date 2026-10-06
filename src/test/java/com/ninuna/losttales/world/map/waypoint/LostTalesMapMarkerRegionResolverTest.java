@@ -61,7 +61,7 @@ public final class LostTalesMapMarkerRegionResolverTest {
                 "Region policy test",
                 "fort",
                 "white",
-                LostTalesMapMarkerDefinition.CATEGORY_POINT_OF_INTEREST,
+                "",
                 "Test marker",
                 true,
                 LOTRDimension.MIDDLE_EARTH.dimensionID,

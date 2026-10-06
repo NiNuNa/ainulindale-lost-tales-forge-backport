@@ -222,6 +222,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // Who shows what is this connection's news; the next server says
         // it afresh. This player's own choices stay on file.
         ClientChatPresence.clear();
+        com.ninuna.losttales.client.chat.ClientServerStatus.clear();
         ClientChatMembers.clear();
         // What the server said about this session's Discord posts is not
         // said again on the next join.

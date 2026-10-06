@@ -11,8 +11,9 @@ import java.util.Map;
 
 /**
  * The chat's channels, shared by packet validation and the client. Each
- * constant is one built-in {@link ChatChannelDescriptor}: the id, how its
- * lines present their sender, the routing rule, the access a player needs,
+ * constant is one built-in {@link ChatChannelDescriptor}: the id, the lang
+ * line that names it in each game's language ({@link ChatNames#channel}),
+ * how its lines present their sender, the routing rule, the access a player needs,
  * the colour, and whether the Discord bridge may carry it (Fellowship, the
  * consoles and whispers are private and never leave the game). The id is
  * the channel's code name ({@link ChatCodeNames}): packets, saves, the
@@ -21,6 +22,9 @@ import java.util.Map;
  * {@link #presentationOrder()}.
  */
 public final class ChatChannel {
+
+    /** What a built-in channel's lang key begins with; its id ends it. */
+    private static final String NAME_KEY_PREFIX = "chat.losttales.channel.";
 
     /**
      * Every channel in force, by id, in the order they were registered.
@@ -129,14 +133,20 @@ public final class ChatChannel {
                 displayColor, bridgeable, ChatChannelScope.NONE);
     }
 
+    /**
+     * A built-in channel, named in each game's language by its lang line,
+     * {@code chat.losttales.channel.} and its id; {@code displayName} is
+     * the English the logs use.
+     */
     private static ChatChannel register(String id, String displayName,
                                         ChatPresentationMode presentation,
                                         ChatRecipientRule recipientRule,
                                         ChatChannelAccess access,
                                         int displayColor, boolean bridgeable,
                                         ChatChannelScope scope) {
-        return register(new ChatChannelDescriptor(id, displayName, presentation,
-                recipientRule, access, displayColor, bridgeable, scope));
+        return register(new ChatChannelDescriptor(id, NAME_KEY_PREFIX + id,
+                displayName, presentation, recipientRule, access, displayColor,
+                bridgeable, scope));
     }
 
     /**
@@ -235,16 +245,11 @@ public final class ChatChannel {
     }
 
     public String getId() { return this.descriptor.getId(); }
+    /** See {@link ChatChannelDescriptor#getNameKey}. */
+    public String getNameKey() { return this.descriptor.getNameKey(); }
+    /** See {@link ChatChannelDescriptor#getDisplayName}; what a game shows is {@link ChatNames#channel}. */
     public String getDisplayName() { return this.descriptor.getDisplayName(); }
 
-    /**
-     * One faction's chat as it is named everywhere, the game and Discord
-     * alike: the faction's name and the word every conversation channel's
-     * name ends on ("Gondor Chat").
-     */
-    public static String factionChatName(String factionName) {
-        return factionName + " Chat";
-    }
     /** How the channel's lines present their sender; see {@link ChatRolePresentation}. */
     public ChatPresentationMode getPresentation() {
         return this.descriptor.getPresentation();

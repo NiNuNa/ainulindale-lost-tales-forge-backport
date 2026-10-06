@@ -3,7 +3,6 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
-import net.minecraft.util.StatCollector;
 import org.junit.After;
 import org.junit.Test;
 
@@ -31,7 +30,7 @@ public final class LostTalesChatHoverCardTest {
                 java.util.Arrays.asList(ChatRoleFixtures.OPERATOR, moderator), null, null));
         int held = ChatRoleCatalog.current().byId("moderator").bit()
                 | ChatRoleFixtures.OPERATOR.bit() | ChatAccountRole.TEAM.bit();
-        String team = StatCollector.translateToLocal(ChatAccountRole.TEAM.getNameKey());
+        String team = ChatAccountRole.TEAM.getDisplayName();
         String operator = ChatRoleFixtures.OPERATOR.getDisplayName();
         assertEquals(team + ", " + operator + ", Moderator",
                 LostTalesChatHoverCard.roleNames(held));

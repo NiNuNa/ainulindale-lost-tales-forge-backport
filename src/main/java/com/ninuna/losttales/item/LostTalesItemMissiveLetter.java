@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveNbt;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveObjectiveData;
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import java.util.List;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
@@ -12,7 +13,6 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 import com.ninuna.losttales.quest.LostTalesQuestRewardText;
-import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import net.minecraft.util.StatCollector;
 
@@ -36,8 +36,8 @@ public class LostTalesItemMissiveLetter extends Item {
     @Override
     public String getItemStackDisplayName(ItemStack stack) {
         LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
-        if (missive != null && missive.getTitle().length() > 0) {
-            return missive.getTitle();
+        if (missive != null) {
+            return MissiveWords.title(missive);
         }
         return super.getItemStackDisplayName(stack);
     }
@@ -52,10 +52,11 @@ public class LostTalesItemMissiveLetter extends Item {
             return;
         }
 
-        if (missive.getIssuer().length() > 0) {
+        String issuer = MissiveWords.issuer(missive);
+        if (issuer.length() > 0) {
             list.add(EnumChatFormatting.GRAY + StatCollector.translateToLocalFormatted(
                     "gui.losttales.missive_letter.issued_by",
-                    EnumChatFormatting.WHITE + missive.getIssuer()));
+                    EnumChatFormatting.WHITE + issuer));
         }
         list.add(EnumChatFormatting.GRAY + StatCollector.translateToLocalFormatted(
                 "gui.losttales.missive_letter.type", EnumChatFormatting.WHITE
@@ -69,7 +70,7 @@ public class LostTalesItemMissiveLetter extends Item {
                 if (objective == null || !objective.isValid()) {
                     continue;
                 }
-                list.add(EnumChatFormatting.GRAY + "- " + buildObjectiveSummary(objective));
+                list.add(EnumChatFormatting.GRAY + "- " + MissiveWords.objective(objective));
                 shown++;
                 if (shown >= 3 && missive.getObjectives().size() > shown) {
                     list.add(EnumChatFormatting.DARK_GRAY + "- ...");
@@ -99,13 +100,6 @@ public class LostTalesItemMissiveLetter extends Item {
             LostTalesMod.proxy.openMissiveLetterPage(player.inventory.currentItem);
         }
         return stack;
-    }
-
-    /** A missive objective in the words the journal gives the same objective. */
-    public static String buildObjectiveSummary(LostTalesMissiveObjectiveData objective) {
-        return LostTalesQuestObjectiveTextHelper.describe(new LostTalesQuestObjectiveDefinition(
-                objective.getId(), objective.getType(), objective.getDescription().trim(),
-                objective.isOptional(), objective.getParams()));
     }
 
     public static String buildRewardSummary(LostTalesMissiveData missive) {

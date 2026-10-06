@@ -17,6 +17,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesMissiveAcceptPacket;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveNbt;
 import com.ninuna.losttales.quest.missive.MissiveAcceptance;
 import java.util.ArrayList;
@@ -209,9 +210,9 @@ public final class MissiveLetterPage extends PageContent
     }
 
     private String title() {
-        return this.missive == null || this.missive.getTitle().length() == 0
+        return this.missive == null
                 ? StatCollector.translateToLocal("item.missive_letter.name")
-                : this.missive.getTitle();
+                : MissiveWords.title(this.missive);
     }
 
     /** The tab closed, by hand or by itself: the letter goes with it. */

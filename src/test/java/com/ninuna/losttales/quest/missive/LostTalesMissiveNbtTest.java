@@ -16,12 +16,12 @@ public final class LostTalesMissiveNbtTest {
     private static LostTalesMissiveData letter() {
         return LostTalesMissiveData.builder(
                 "losttales:missive/generated/test", "kill")
-                .title("Test missive")
+                .titleId("clear_the_paths")
                 .repeatable(false)
                 .firstComeFirstServed(true)
                 .generationWorldTime(1200L)
                 .objective(new LostTalesMissiveObjectiveData("kill_wolves",
-                        "kill", "Defeat 3 wolves.", false,
+                        "kill", false,
                         Collections.singletonMap("count", "3")))
                 .rewardData(LostTalesMissiveRewardData.experienceAndItems(10, ""))
                 .build();
@@ -53,7 +53,7 @@ public final class LostTalesMissiveNbtTest {
         NBTTagCompound missive = new NBTTagCompound();
         missive.setString("QuestId", "losttales:missive/generated/test");
         missive.setString("QuestType", "gather");
-        missive.setString("Title", "Test missive");
+        missive.setString("TitleId", "clear_the_paths");
         NBTTagList objectives = new NBTTagList();
         for (int i = 0; i < LostTalesMissiveNbt.MAX_OBJECTIVES + 1; i++) {
             objectives.appendTag(new NBTTagCompound());
@@ -68,7 +68,7 @@ public final class LostTalesMissiveNbtTest {
         NBTTagCompound missive = new NBTTagCompound();
         missive.setString("QuestId", "losttales:missive/generated/test");
         missive.setString("QuestType", "gather");
-        missive.setString("Title", "Test missive");
+        missive.setString("TitleId", "clear_the_paths");
         NBTTagList objectives = new NBTTagList();
         objectives.appendTag(new NBTTagString("not-an-objective"));
         missive.setTag("Objectives", objectives);

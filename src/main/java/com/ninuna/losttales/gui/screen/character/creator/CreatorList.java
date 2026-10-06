@@ -1,13 +1,17 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.gui.FontRenderer;
 import org.lwjgl.input.Keyboard;
 
 /**
  * A short list to choose one of, every option on its own row: the races.
- * The chosen row wears the selection mark the journal's rows wear; a
- * click chooses, and up and down walk it while it holds the focus.
+ * The chosen row wears the selection mark the journal's rows wear; in a
+ * window's rows it is lit, as a menu's chosen row is, and so is the row
+ * under the pointer. A click chooses, and up and down walk it while it
+ * holds the focus.
  */
 public final class CreatorList extends CreatorControl {
 
@@ -26,13 +30,22 @@ public final class CreatorList extends CreatorControl {
         return true;
     }
 
+    /** From one option's row to the next. */
+    private int rowPitch() {
+        return inRows() ? CreatorRows.height() : ROW;
+    }
+
     @Override
     public int height() {
-        return Math.max(ROW, this.choice.count() * ROW);
+        return Math.max(rowPitch(), this.choice.count() * rowPitch());
     }
 
     @Override
     public void draw(int mouseX, int mouseY) {
+        if (inRows()) {
+            drawRows(mouseX, mouseY);
+            return;
+        }
         FontRenderer font = this.context.getFont();
         int count = this.choice.count();
         if (count == 0) {
@@ -62,11 +75,38 @@ public final class CreatorList extends CreatorControl {
         }
     }
 
+    /**
+     * As a window's rows: each option a row, its name in ivory, the chosen
+     * one and the one under the pointer lit; with nothing to choose, why,
+     * in the aside tone.
+     */
+    private void drawRows(int mouseX, int mouseY) {
+        int count = this.choice.count();
+        if (count == 0) {
+            LostTalesUiInk.drawText(this.context.getFont(),
+                    CreatorRows.trimmed(this.context.getFont(),
+                            this.choice.emptyLabel(), this.width), this.x,
+                    CreatorRows.textTop(this.y), WindowStyle.asideRgb(),
+                    this.context.alpha());
+            return;
+        }
+        int selected = this.choice.index();
+        int hovered = rowAt(mouseX, mouseY);
+        for (int index = 0; index < count; index++) {
+            int rowY = this.y + index * rowPitch();
+            if (index == selected || index == hovered) {
+                CreatorRows.light(this.context, rowY, rowY + rowPitch());
+            }
+            CreatorRows.drawLabel(this.context, this.choice.label(index),
+                    this.x, rowY, this.x + this.width);
+        }
+    }
+
     private int rowAt(int mouseX, int mouseY) {
         if (!contains(mouseX, mouseY)) {
             return -1;
         }
-        int index = (mouseY - this.y) / ROW;
+        int index = (mouseY - this.y) / rowPitch();
         return index >= 0 && index < this.choice.count() ? index : -1;
     }
 

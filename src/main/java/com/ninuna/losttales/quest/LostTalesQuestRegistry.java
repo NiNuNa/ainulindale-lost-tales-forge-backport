@@ -193,8 +193,8 @@ public final class LostTalesQuestRegistry {
         Collections.sort(sorted, new Comparator<LostTalesQuestDefinition>() {
             @Override
             public int compare(LostTalesQuestDefinition left, LostTalesQuestDefinition right) {
-                String leftTitle = left == null || left.getTitle() == null ? "" : left.getTitle();
-                String rightTitle = right == null || right.getTitle() == null ? "" : right.getTitle();
+                String leftTitle = LostTalesQuestWords.title(left);
+                String rightTitle = LostTalesQuestWords.title(right);
                 int titleCompare = leftTitle.compareToIgnoreCase(rightTitle);
                 if (titleCompare != 0) {
                     return titleCompare;

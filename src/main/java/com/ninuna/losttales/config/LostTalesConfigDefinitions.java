@@ -7,7 +7,8 @@ import net.minecraftforge.common.config.Property;
 
 /**
  * What a config file cannot hold about an option: its default, the
- * comment written above it, its bounds and its words. A configuration
+ * comment written above it (its English tip, {@link LostTalesConfigWords}),
+ * its language key, its bounds and its words. A configuration
  * read from a file knows only what each option is set to — Forge takes
  * the value it reads as the default as well — so a screen built on one
  * can only restore what was saved last, and a value written back through
@@ -23,7 +24,7 @@ public final class LostTalesConfigDefinitions {
     /**
      * Gives every option of {@code target} that {@code definitions}
      * holds — the same category, key, type and shape — the default,
-     * comment, bounds and words it is defined with. What each is set to
+     * comment, language key, bounds and words it is defined with. What each is set to
      * is untouched, and so is an option the definitions do not hold or
      * hold in another shape, which its own load converts.
      */
@@ -84,6 +85,7 @@ public final class LostTalesConfigDefinitions {
         if (definition.comment != null && definition.comment.length() > 0) {
             property.comment = definition.comment;
         }
+        property.setLanguageKey(definition.getLanguageKey());
         String[] words = definition.getValidValues();
         if (words != null && words.length > 0) {
             property.setValidValues(words);

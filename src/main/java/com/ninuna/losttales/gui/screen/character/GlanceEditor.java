@@ -3,11 +3,14 @@ package com.ninuna.losttales.gui.screen.character;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.chat.ChatEmojiIcon;
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.WindowLists;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WordButton;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorContext;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorControl;
+import com.ninuna.losttales.gui.screen.character.creator.CreatorRows;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorTextControl;
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -23,14 +26,16 @@ import org.lwjgl.input.Keyboard;
  * The profile editor's Glances section, editing one glance at a time as Total RP 3 does: the
  * five places a glance can stand, as framed buttons wearing each glance's
  * emoji and a {@code +} in the first empty one; under them the chosen
- * glance's title and line, every one of the chat's emoji to give it, and
- * Remove. A glance needs a title before the profile saves. Its height
- * never changes, so the window stands still while glances come and go.
+ * glance's title and line as a window's field rows, every one of the
+ * chat's emoji under a heading to give it, and Remove. A glance needs a
+ * title before the profile saves. Its height never changes, so the window
+ * stands still while glances come and go.
  */
 final class GlanceEditor extends CreatorControl {
     private static final int SLOT = LostTalesUiFramedButton.HEIGHT;
     private static final int SLOT_GAP = 3;
-    private static final int GAP = 6;
+    /** Between the slots, the rows, the emoji and Remove. */
+    private static final int GAP = MenuWindow.PADDING_Y;
     /** An emoji's place in the grid: its box and a pixel either side. */
     private static final int GRID_STRIDE = ChatEmojiIcon.SIZE + 2;
     private static final int GRID_ROWS = 3;
@@ -120,7 +125,7 @@ final class GlanceEditor extends CreatorControl {
     /* ---- Where things stand ---- */
 
     private int slotsTop() {
-        return valueTop();
+        return this.y;
     }
 
     private int slotLeft(int index) {
@@ -131,12 +136,19 @@ final class GlanceEditor extends CreatorControl {
         return slotsTop() + SLOT + GAP;
     }
 
-    private int gridLabelTop() {
+    /** The emoji's heading, under the two field rows. */
+    private int headingTop() {
         return fieldsTop() + this.title.height() + this.line.height();
     }
 
     private int gridTop() {
-        return gridLabelTop() + LABEL_HEIGHT;
+        return headingTop() + CreatorRows.height() + GAP;
+    }
+
+    /** The title's and the line's rows, under the slots. */
+    private void placeFields() {
+        this.title.place(this.x, fieldsTop(), this.width);
+        this.line.place(this.x, fieldsTop() + this.title.height(), this.width);
     }
 
     private int gridColumns() {
@@ -155,8 +167,8 @@ final class GlanceEditor extends CreatorControl {
 
     @Override
     public int height() {
-        return LABEL_HEIGHT + SLOT + GAP + 2 * (LABEL_HEIGHT + 16 + 6)
-                + LABEL_HEIGHT + GRID_ROWS * GRID_STRIDE + GAP
+        return SLOT + GAP + this.title.height() + this.line.height()
+                + CreatorRows.height() + GAP + GRID_ROWS * GRID_STRIDE + GAP
                 + LostTalesUiFramedButton.HEIGHT;
     }
 
@@ -197,57 +209,61 @@ final class GlanceEditor extends CreatorControl {
     @Override
     public void draw(int mouseX, int mouseY) {
         FontRenderer font = this.context.getFont();
-        drawLabel(I18n.format("gui.losttales.character.profile.glances"));
+        int alpha = this.context.alpha();
         int shown = Math.min(CharacterProfile.MAX_GLANCES,
                 this.drafts.size() + 1);
         int hoveredSlot = slotAt(mouseX, mouseY);
         for (int index = 0; index < shown; index++) {
             drawSlot(index, index == this.selected || index == hoveredSlot);
         }
-        this.title.place(this.x, fieldsTop(), this.width);
-        this.line.place(this.x, fieldsTop() + this.title.height(), this.width);
+        placeFields();
         if (this.selected < 0) {
             LostTalesUiInk.drawText(font, font.trimStringToWidth(I18n.format(
                     "gui.losttales.character.profile.glance.none"),
-                    this.width), this.x, fieldsTop(),
-                    LostTalesColors.rgb(LostTalesColors.TEXT_DIM), 255);
+                    this.width), this.x, CreatorRows.textTop(fieldsTop()),
+                    WindowStyle.asideRgb(), alpha);
             return;
         }
         this.title.draw(mouseX, mouseY);
         this.line.draw(mouseX, mouseY);
-        LostTalesUiInk.drawText(font, I18n.format(
+        WindowLists.drawHeading(font, I18n.format(
                 "gui.losttales.character.profile.glance.emoji"), this.x,
-                gridLabelTop(), LostTalesColors.rgb(LostTalesColors.TEXT_DIM),
-                255);
+                this.x, this.x + this.width, headingTop(),
+                CreatorRows.height(), false, alpha);
         drawGrid(mouseX, mouseY);
         LostTalesUiHitBox remove = removeBox(font);
         WordButton.draw(font, remove, removeLabel(), true, true,
-                remove.contains(mouseX, mouseY), this.removeMotion, 255, 255);
+                remove.contains(mouseX, mouseY), this.removeMotion, alpha,
+                this.context.surfaceAlpha());
     }
 
     private void drawSlot(int index, boolean lit) {
+        int alpha = this.context.alpha();
         float left = slotLeft(index);
         float top = slotsTop();
         LostTalesUiFramedButton.drawSurface(left, top, SLOT, SLOT,
-                lit ? 1.0F : 0.0F, 255);
+                lit ? 1.0F : 0.0F, this.context.surfaceAlpha());
         LostTalesUiInk.beginContent();
         if (index < this.drafts.size()) {
             ChatEmoji emoji = ChatEmoji.fromName(this.drafts.get(index).emoji);
             int inset = LostTalesUiInk.centredStart(SLOT, ChatEmojiIcon.SIZE);
             ChatEmojiIcon.draw(this.context.getMinecraft(), emoji,
-                    (int)left + inset, (int)top + inset, 255);
+                    (int)left + inset, (int)top + inset, alpha);
         } else {
             LostTalesUiSheet plus = lit ? LostTalesUiSheet.PLUS_ADD
                     : LostTalesUiSheet.PLUS;
             plus.drawWithShadow(left + LostTalesUiInk.centredStart(SLOT,
                     plus.getWidth()), top + LostTalesUiInk.centredStart(SLOT,
-                    plus.getHeight()), 255);
+                    plus.getHeight()), alpha);
         }
         LostTalesUiFramedButton.drawInk(left, top, SLOT, SLOT,
-                lit ? 1.0F : 0.0F, 255);
+                lit ? 1.0F : 0.0F, alpha);
     }
 
-    /** Every emoji of the chat, the chosen one's place lit and the one under the pointer lighter. */
+    /**
+     * Every emoji of the chat, the chosen one's place and the one under
+     * the pointer lit as a menu's rows are, before the emoji lands on it.
+     */
     private void drawGrid(int mouseX, int mouseY) {
         ChatEmoji[] all = ChatEmoji.values();
         int columns = gridColumns();
@@ -258,15 +274,12 @@ final class GlanceEditor extends CreatorControl {
             int left = this.x + (index % columns) * GRID_STRIDE;
             int top = gridTop() + (index / columns) * GRID_STRIDE;
             if (all[index].getName().equals(chosen) || all[index] == hovered) {
-                LostTalesUiInk.fillRect(left, top, left + GRID_STRIDE,
-                        top + GRID_STRIDE, LostTalesUiInk.argb(
-                                LostTalesColors.rgb(all[index] == hovered
-                                        ? LostTalesColors.PLUM_GRAY
-                                        : LostTalesColors.HONEY), 0xB4));
-                LostTalesUiInk.beginContent();
+                CreatorRows.light(this.context, left, top, left + GRID_STRIDE,
+                        top + GRID_STRIDE);
             }
+            LostTalesUiInk.beginContent();
             ChatEmojiIcon.draw(this.context.getMinecraft(), all[index],
-                    left + 1, top + 1, 255);
+                    left + 1, top + 1, this.context.alpha());
         }
     }
 
@@ -311,6 +324,7 @@ final class GlanceEditor extends CreatorControl {
             return true;
         }
         if (this.selected >= 0) {
+            placeFields();
             for (CreatorTextControl field : new CreatorTextControl[] {
                     this.title, this.line}) {
                 if (field.contains(mouseX, mouseY)) {

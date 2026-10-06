@@ -39,6 +39,12 @@ public final class SubWindowKind {
     /** The closed tabs to open, behind the {@code +}. */
     public static final SubWindowKind OPEN = register("open",
             "gui.losttales.window.sub.open");
+    /** What a right-click on a category's name in the {@code +} offers for all its pages. */
+    public static final SubWindowKind CATEGORY = register("category",
+            "gui.losttales.window.sub.category");
+    /** The words of an option taken for every page of a category at once. */
+    public static final SubWindowKind CATEGORY_PICK = register("category_pick",
+            "gui.losttales.window.sub.category_pick");
     /** The tab search. */
     public static final SubWindowKind TAB_SEARCH = register("tab_search",
             "gui.losttales.window.sub.tab_search");

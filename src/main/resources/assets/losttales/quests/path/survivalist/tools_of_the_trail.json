@@ -1,16 +1,10 @@
 {
   "id": "losttales:path/survivalist/tools_of_the_trail",
-  "title": "Path of the Survivalist: Tools of the Trail",
-  "description": "Good tools are quiet companions. The axe, the pick, and the blade each answer a different danger on the road.",
   "repeatable": false,
   "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/food_for_the_road"
-  },
-  "journalLog": {
-    "10": "The road is easier with tools made for the task. I should prepare the essentials before I travel farther.",
-    "20": "With stone tools and coal in my pack, I am better prepared for hard ground, dark places, and sudden trouble."
   },
   "stages": [
     {
@@ -19,7 +13,6 @@
         {
           "id": "craft_stone_axe",
           "type": "craft",
-          "description": "Craft a stone axe.",
           "optional": false,
           "params": {
             "item": "minecraft:stone_axe",
@@ -29,7 +22,6 @@
         {
           "id": "craft_stone_pickaxe",
           "type": "craft",
-          "description": "Craft a stone pickaxe.",
           "optional": false,
           "params": {
             "item": "minecraft:stone_pickaxe",
@@ -39,7 +31,6 @@
         {
           "id": "craft_stone_sword",
           "type": "craft",
-          "description": "Craft a stone sword.",
           "optional": false,
           "params": {
             "item": "minecraft:stone_sword",
@@ -54,7 +45,6 @@
         {
           "id": "gather_coal",
           "type": "gather",
-          "description": "Gather 8 coal.",
           "optional": false,
           "params": {
             "item": "minecraft:coal@0",

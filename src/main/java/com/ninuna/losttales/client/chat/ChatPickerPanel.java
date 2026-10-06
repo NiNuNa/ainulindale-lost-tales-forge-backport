@@ -7,6 +7,7 @@ import com.ninuna.losttales.client.window.SubWindowContent;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.WindowHover;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
@@ -51,30 +52,43 @@ abstract class ChatPickerPanel extends SubWindowContent {
     private final LostTalesUiButtonMotion buttonMotion =
             new LostTalesUiButtonMotion(
                     LostTalesUiButtonMotion.Character.LIFT);
-    /** The search row's magnifier, which turns on its handle. */
-    private final LostTalesUiButtonMotion magnifierMotion =
-            new LostTalesUiButtonMotion(
-                    LostTalesUiButtonMotion.Character.TURN);
     static final int BUTTON_SIZE = 12;
     static final int BUTTON_MARGIN = 2;
     /** The buttons stand this far below the anchor the caller passes. */
     static final int BUTTON_ANCHOR_OFFSET = 14;
-    static final int PADDING = 4;
-    static final int SEARCH_HEIGHT = 12;
+    /** The menus' clear room round the search and the rows, across and down. */
+    private static final int PADDING_X = MenuWindow.PADDING_X;
+    private static final int PADDING_Y = MenuWindow.PADDING_Y;
+    /** The search's press box: a line of text tall. */
+    private static final int SEARCH_LINE = 9;
     /**
      * Room the search row's magnifier takes before the field: the glyph
-     * and the gap an icon keeps from its label in the chat's lists.
+     * and the gap an icon keeps from its label in the menus.
      */
     private static final int SEARCH_ICON_RUN =
             LostTalesUiSheet.SEARCH.getWidth() + TabIcons.GAP;
-    static final int LABEL_HEIGHT = 10;
+    /** A list picker's row icon: the menus' icon column and the label after it. */
+    static final int ICON_LEFT = PADDING_X;
+    static final int LABEL_LEFT = PADDING_X + TabIcons.SLOT + TabIcons.GAP;
     /**
      * Anchor-to-window-bottom distance where a picker first opens: just
      * above the bar the buttons stand in.
      */
     static final int PANEL_BOTTOM_MARGIN = BUTTON_ANCHOR_OFFSET + 3;
+    /** The search row, a menu's field: a row and the hairline under it. */
+    private static int searchHeight() {
+        return MenuWindow.rowHeight() + 1;
+    }
+
+    /** A section's heading: a menu's row. */
+    private static int labelHeight() {
+        return MenuWindow.rowHeight();
+    }
+
     /** The search row and the padding round it and the list. */
-    private static final int FRAME_HEIGHT = PADDING + SEARCH_HEIGHT + PADDING;
+    private static int frameHeight() {
+        return PADDING_Y + searchHeight() + PADDING_Y;
+    }
     /** Folded sections persist for the session, per picker and label. */
     private static final Set<String> COLLAPSED = new HashSet<String>();
 
@@ -188,7 +202,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
     @Override
     public void scrollBy(int lines) {
         this.scroll = Math.max(0,
-                this.scroll + WheelStep.pixels(lines, MenuWindow.ROW_HEIGHT));
+                this.scroll + WheelStep.pixels(lines, MenuWindow.rowHeight()));
     }
 
     /**
@@ -294,7 +308,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
 
     @Override
     public int naturalWidth() {
-        return naturalColumns() * cellWidth() + PADDING * 2;
+        return naturalColumns() * cellWidth() + PADDING_X * 2;
     }
 
     /**
@@ -308,7 +322,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
         int body = 0;
         for (Section section : buildSections(searchQuery())) {
             if (section.label != null) {
-                body += LABEL_HEIGHT;
+                body += labelHeight();
                 if (section.collapsible
                         && isCollapsed(collapseKey(section.label))) {
                     continue;
@@ -316,19 +330,19 @@ abstract class ChatPickerPanel extends SubWindowContent {
             }
             body += rowsOf(section, columns) * cellHeight();
         }
-        return Math.max(minHeight(), Math.min(FRAME_HEIGHT + body,
+        return Math.max(minHeight(), Math.min(frameHeight() + body,
                 screenCapHeight()));
     }
 
     @Override
     public int minWidth() {
         return stretchesCells() ? MIN_LIST_WIDTH
-                : MIN_GRID_COLUMNS * cellWidth() + PADDING * 2;
+                : MIN_GRID_COLUMNS * cellWidth() + PADDING_X * 2;
     }
 
     @Override
     public int minHeight() {
-        return FRAME_HEIGHT + LABEL_HEIGHT + cellHeight();
+        return frameHeight() + labelHeight() + cellHeight();
     }
 
     /** A list's narrowest window: room for a short name beside its icon. */
@@ -339,13 +353,15 @@ abstract class ChatPickerPanel extends SubWindowContent {
     /** Cells a row holds in a box {@code width} wide. */
     private int columnsFor(int width) {
         return stretchesCells() ? 1
-                : Math.max(1, (width - PADDING * 2) / cellWidth());
+                : Math.max(1, (width - PADDING_X * 2) / cellWidth());
     }
 
-    /** A cell's width in a box {@code width} wide: a list's rows stretch. */
+    /**
+     * A cell's width in a box {@code width} wide: a list's rows stretch
+     * the whole width, as a menu's do, and keep the padding inside them.
+     */
     private int cellWidthFor(int width) {
-        return stretchesCells() ? Math.max(1, width - PADDING * 2)
-                : cellWidth();
+        return stretchesCells() ? Math.max(1, width) : cellWidth();
     }
 
     @Override
@@ -388,8 +404,8 @@ abstract class ChatPickerPanel extends SubWindowContent {
         for (Label label : layout.labels) {
             if (label.collapsible && x >= layout.left
                     && x < layout.left + layout.width
-                    && y >= label.y && y < label.y + LABEL_HEIGHT
-                    && layout.showsRow(label.y, LABEL_HEIGHT)) {
+                    && y >= label.y && y < label.y + labelHeight()
+                    && layout.showsRow(label.y, labelHeight())) {
                 return label.key;
             }
         }
@@ -437,20 +453,20 @@ abstract class ChatPickerPanel extends SubWindowContent {
         advanceScrollEasing();
         Layout layout = buildLayout(box);
         positionSearchField(layout);
-        // The hovered cell is the window's surface recoloured, cut to
-        // the body the list is clipped to, before anything lands on it.
+        // The hovered cell, cut to the body the list is clipped to, before
+        // anything lands on it: a list's row as a menu's is, the frame's
+        // ring beside it with it; a grid's cell alone.
         Cell lit = cellAt(layout, pointerX, pointerY);
         this.hoveredEntry = lit == null ? null : lit.entry;
         if (lit != null) {
-            LostTalesChatOverlayRenderer.recolourSurface(lit.x,
-                    Math.max(layout.bodyTop, lit.y), lit.x + layout.cellWidth,
+            WindowLists.drawLitRow(layout.left, layout.left + layout.width,
+                    lit.x, Math.max(layout.bodyTop, lit.y),
+                    lit.x + layout.cellWidth,
                     Math.min(layout.bodyBottom, lit.y + cellHeight()),
-                    surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
-                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+                    surfaceAlpha);
         }
-        drawSearchRow(font, layout, alpha, this.searchField != null
-                && (this.searchField.isFocused()
-                        || searchFieldBox().contains(pointerX, pointerY)));
+        String litLabel = labelAt(layout, pointerX, pointerY);
+        drawSearchRow(font, layout, alpha);
         // Rows are clipped to the body so a scrolled list never paints
         // over the search row or past the window's bottom edge.
         boolean clipped = beginClip(minecraft,
@@ -460,13 +476,16 @@ abstract class ChatPickerPanel extends SubWindowContent {
         try {
             LostTalesUiInk.beginContent();
             for (Label label : layout.labels) {
-                if (!layout.showsRow(label.y, LABEL_HEIGHT)) {
+                if (!layout.showsRow(label.y, labelHeight())) {
                     continue;
                 }
                 String glyph = label.collapsible
                         ? (isCollapsed(label.key) ? "+ " : "- ") : "";
-                LostTalesChatVisualStyle.drawPlain(font, glyph + label.text,
-                        label.x, label.y, alpha);
+                WindowLists.drawHeading(font, glyph + label.text, label.x,
+                        label.x, layout.left + layout.width - PADDING_X,
+                        label.y, labelHeight(),
+                        label.collapsible && label.key.equals(litLabel),
+                        alpha);
             }
             for (Cell cell : layout.cells) {
                 if (!layout.showsRow(cell.y, cellHeight())) {
@@ -478,60 +497,27 @@ abstract class ChatPickerPanel extends SubWindowContent {
         } finally {
             endClip(clipped);
         }
-        drawScrollbar(layout, alpha);
+        WindowLists.drawScroll(layout.left, layout.bodyTop,
+                layout.left + layout.width, layout.top + layout.height,
+                layout.bodyTop, layout.bodyBottom, this.renderedScroll,
+                layout.maxScroll, alpha);
     }
 
     /**
-     * A thin track at the right edge while the list is longer than the
-     * body, the thumb standing in it rather than over it.
+     * The search row as a menu's field is: the magnifier it opens with,
+     * standing on the capitals of what is typed beside it; what has been
+     * typed, in the chat's own text field; while it is empty, the prompt
+     * in the aside tone and italics, a pixel clear of the caret; and a
+     * hairline under it that parts it from the list.
      */
-    private void drawScrollbar(Layout layout, int alpha) {
-        if (layout.maxScroll <= 0) {
-            return;
-        }
-        int bodyHeight = layout.bodyBottom - layout.bodyTop;
-        int contentHeight = bodyHeight + layout.maxScroll;
-        int thumbHeight = Math.max(4, bodyHeight * bodyHeight / contentHeight);
-        // The thumb follows the drawn offset, so it glides with the rows.
-        int thumbTop = layout.bodyTop
-                + (bodyHeight - thumbHeight)
-                        * (int)Math.round(this.renderedScroll)
-                        / layout.maxScroll;
-        int thumbBottom = thumbTop + thumbHeight;
-        int x = layout.left + layout.width - 2;
-        int track = LostTalesUiInk.argb(
-                LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
-                Math.min(alpha, 120));
-        Gui.drawRect(x, layout.bodyTop, x + 1, thumbTop, track);
-        Gui.drawRect(x, thumbBottom, x + 1, layout.bodyBottom, track);
-        Gui.drawRect(x, thumbTop, x + 1, thumbBottom,
-                LostTalesUiInk.argb(
-                        LostTalesUiInk.IVORY, Math.min(alpha, 200)));
-    }
-
-    /**
-     * The search row as the chat's menus draw theirs: the magnifier it
-     * opens with, crossing to its lit artwork while {@code lit}; what has
-     * been typed, in the chat's own text field; while it is empty, the
-     * prompt in the chat's aside tone and italics, as the input bar's
-     * hint is, a pixel clear of the caret; and a hairline under it that
-     * parts it from the list.
-     */
-    private void drawSearchRow(FontRenderer font, Layout layout, int alpha,
-                               boolean lit) {
-        Gui.drawRect(layout.left + PADDING, layout.bodyTop - 1,
-                layout.left + layout.width - PADDING, layout.bodyTop,
+    private void drawSearchRow(FontRenderer font, Layout layout, int alpha) {
+        Gui.drawRect(layout.left + PADDING_X, layout.bodyTop - 1,
+                layout.left + layout.width - PADDING_X, layout.bodyTop,
                 LostTalesUiInk.argb(
                         LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
                         Math.min(alpha, 0xA0)));
-        this.magnifierMotion.advance(System.nanoTime(), lit, false, false);
-        // The magnifier stands on the capitals of what is typed beside
-        // it, as every icon in a chat row does. It is not a button of
-        // its own, so it lights with the field and never travels.
         LostTalesUiInk.beginContent();
-        LostTalesUiButton.drawGlyph(LostTalesUiSheet.SEARCH,
-                LostTalesUiSheet.SEARCH_HOVER, this.magnifierMotion,
-                layout.left + PADDING + 1,
+        LostTalesUiSheet.SEARCH.drawWithShadow(layout.left + PADDING_X,
                 layout.searchY + WindowStyle.centredBoxTop(
                         LostTalesUiSheet.SEARCH.getHeight()), alpha);
         if (this.searchField == null) {
@@ -585,7 +571,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
     private void ensureSearchField(FontRenderer font) {
         if (this.searchField == null && font != null) {
             this.searchField = new ChatInputField(font, 0, 0, 10,
-                    SEARCH_HEIGHT).plainText();
+                    SEARCH_LINE).plainText();
             this.searchField.setMaxStringLength(32);
             this.searchField.setEnableBackgroundDrawing(false);
             this.searchField.setTextColor(LostTalesUiInk.IVORY);
@@ -605,18 +591,17 @@ abstract class ChatPickerPanel extends SubWindowContent {
     }
 
     /**
-     * The field after the magnifier, which stands in line with the
-     * section labels under it, leaving the caret its column at the far
-     * end.
+     * The field after the magnifier, as a menu's field stands, leaving
+     * the caret its column at the far end.
      */
     private void positionSearchField(Layout layout) {
         if (this.searchField != null) {
-            this.searchField.xPosition = layout.left + PADDING + 1
+            this.searchField.xPosition = layout.left + PADDING_X
                     + SEARCH_ICON_RUN;
             this.searchField.yPosition = layout.searchY;
-            this.searchField.width = layout.width - PADDING * 2 - 2
-                    - LostTalesUiCaret.WIDTH - SEARCH_ICON_RUN;
-            this.searchField.height = SEARCH_HEIGHT - 3;
+            this.searchField.width = Math.max(1, layout.width - PADDING_X * 2
+                    - LostTalesUiCaret.WIDTH - SEARCH_ICON_RUN);
+            this.searchField.height = SEARCH_LINE;
         }
     }
 
@@ -658,7 +643,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
         int bodyHeight = 0;
         for (Section section : sections) {
             if (section.label != null) {
-                bodyHeight += LABEL_HEIGHT;
+                bodyHeight += labelHeight();
                 if (section.collapsible
                         && isCollapsed(collapseKey(section.label))) {
                     continue;
@@ -666,9 +651,10 @@ abstract class ChatPickerPanel extends SubWindowContent {
             }
             bodyHeight += rowsOf(section, columns) * cellHeight();
         }
-        layout.searchY = layout.top + PADDING + 1;
-        layout.bodyTop = layout.top + PADDING + SEARCH_HEIGHT;
-        layout.bodyBottom = layout.top + layout.height - PADDING;
+        layout.searchY = layout.top + PADDING_Y + LostTalesUiInk.centredStart(
+                searchHeight() - 1, LostTalesUiInk.CAP_HEIGHT);
+        layout.bodyTop = layout.top + PADDING_Y + searchHeight();
+        layout.bodyBottom = layout.top + layout.height - PADDING_Y;
         layout.maxScroll = Math.max(0,
                 bodyHeight - (layout.bodyBottom - layout.bodyTop));
         this.scroll = Math.max(0, Math.min(layout.maxScroll, this.scroll));
@@ -683,8 +669,8 @@ abstract class ChatPickerPanel extends SubWindowContent {
             if (section.label != null) {
                 layout.labels.add(new Label(section.label,
                         collapseKey(section.label), section.collapsible,
-                        layout.left + PADDING + 1, cursorY));
-                cursorY += LABEL_HEIGHT;
+                        layout.left + PADDING_X, cursorY));
+                cursorY += labelHeight();
                 if (section.collapsible
                         && isCollapsed(collapseKey(section.label))) {
                     continue;
@@ -692,7 +678,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
             }
             for (int index = 0; index < section.entries.size(); index++) {
                 layout.cells.add(new Cell(section.entries.get(index),
-                        layout.left + PADDING
+                        layout.left + (stretchesCells() ? 0 : PADDING_X)
                                 + (index % columns) * layout.cellWidth,
                         cursorY + (index / columns) * cellHeight()));
             }

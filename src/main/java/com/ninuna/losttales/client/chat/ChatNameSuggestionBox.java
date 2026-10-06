@@ -117,11 +117,6 @@ final class ChatNameSuggestionBox extends ChatSuggestionBox {
         return this.matches.size();
     }
 
-    @Override
-    int rowHeight() {
-        return ROW_HEIGHT;
-    }
-
     /** The suggestion on a row, or null. */
     ChatMentionCandidate at(int row) {
         return row >= 0 && row < this.matches.size()

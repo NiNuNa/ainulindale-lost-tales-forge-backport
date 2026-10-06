@@ -13,13 +13,11 @@ import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelGates;
-import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.compat.discord.DiscordMemberDirectory;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
-import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
@@ -54,7 +52,9 @@ import net.minecraft.world.storage.IPlayerFileData;
  * in-character channel shows the character they speak as, in its
  * faction's colour, with the LOTR title their lines carry, grouped by that
  * faction; an out-of-character one shows the account, in the colour of
- * its highest role, grouped by that role, the rest together.</p>
+ * its highest role, grouped by that role, the rest together. A group goes
+ * by its key alone — the faction's id, the role's id — and a title by
+ * LOTR's lang key, so each game names them in its own language.</p>
  *
  * <p>Every other identity that may read the channel is absent, and the
  * absent stand together after everyone here, by name. On an
@@ -190,7 +190,7 @@ public final class ChatMemberDirectory {
             alone.add(isShown(viewer, speaking)
                     ? present(viewer, speaking, channel, inCharacter)
                     : absentAs(viewer, speaking, channel).member);
-            alone.add(serverMember(inCharacter));
+            alone.add(serverMember());
             Collections.sort(alone, LostTalesChatMembersPacket.ORDER);
             return new Answer(alone, 0);
         }
@@ -225,7 +225,7 @@ public final class ChatMemberDirectory {
         }
         // The server speaks in every conversation as a voice of its own,
         // and is online for as long as anybody can read it.
-        present.add(serverMember(inCharacter));
+        present.add(serverMember());
         List<Absentee> absent = absenteesOf(viewer, channel, fellowship, factionId,
                 inCharacter);
         RoleplayCharacter viewerAs = inCharacter
@@ -294,7 +294,7 @@ public final class ChatMemberDirectory {
         } else {
             absent.add(absentAs(viewer, held, channel));
         }
-        present.add(serverMember(true));
+        present.add(serverMember());
         String named = partnerAccount == null ? "" : partnerAccount.trim();
         if (named.length() > 0) {
             EntityPlayerMP online = server.getConfigurationManager()
@@ -676,33 +676,30 @@ public final class ChatMemberDirectory {
                     name, nameColor, character == null ? ""
                             : character.getSkinId(),
                     presentation.title, presentation.titleColor, factionId,
-                    factionName(factionId), 0, true);
+                    "", 0, true);
         }
         ChatAccountRole role = ChatAccountRole.primary(
                 ChatRolePresentation.rolesShown(channel, roles));
         return new LostTalesChatMembersPacket.Member(member.getUniqueID(),
                 account, null, name, nameColor, "", "", nameColor,
-                role.isNone() ? "" : role.getId(),
-                role.isNone() ? "" : role.getDisplayName(),
+                role.isNone() ? "" : role.getId(), "",
                 role.isNone() ? 0 : rolePlace(role), true);
     }
 
     /**
      * The Server as a member of a conversation: online, in the consoles'
-     * grey, named as its lines are named. The client writes the name in
-     * its own language; this one sorts it. In character it stands where a
-     * character of no faction does, among the Unaligned; out of character
-     * with those of no role.
+     * grey, named as its lines are named, in a group of its own over every
+     * other ({@link LostTalesChatMembersPacket#SERVER_GROUP}); its status
+     * line is the server's status ({@link ChatServerStatus}). The client
+     * writes the name and the group's in its own language.
      */
-    private static LostTalesChatMembersPacket.Member serverMember(boolean inCharacter) {
+    private static LostTalesChatMembersPacket.Member serverMember() {
         int color = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
-        String group = inCharacter ? ChatChannelPolicy.factionOf(null) : "";
         return new LostTalesChatMembersPacket.Member(
                 LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 LostTalesServerBroadcastHook.SERVER_NAME, null,
                 LostTalesServerBroadcastHook.SERVER_NAME, color, "", "", color,
-                group,
-                inCharacter ? factionName(group) : "", 0, true);
+                LostTalesChatMembersPacket.SERVER_GROUP, "", 0, true);
     }
 
     /**
@@ -723,7 +720,7 @@ public final class ChatMemberDirectory {
 
     /**
      * An absent character, in its faction's colour, with the title it wore
-     * when it was last played: a title is part of the name.
+     * when it was last played, by its lang key: a title is part of the name.
      */
     private static LostTalesChatMembersPacket.Member characterMember(
             UUID owner, String account, RoleplayCharacter character) {
@@ -743,20 +740,6 @@ public final class ChatMemberDirectory {
                 ChatRolePresentation.rolesShown(channel, roles), true, 0);
         return new LostTalesChatMembersPacket.Member(owner, account, null,
                 account, color, "", "", color, ABSENT_GROUP, "", 0, false);
-    }
-
-    /** A faction's name as the list heads its group: its own, not its people's. */
-    private static String factionName(String factionId) {
-        try {
-            String name = LotrCharacterAdapter.getInstance()
-                    .getFactionDisplayName(factionId);
-            String plain = ChatFormattingCodes.stripSectionCodes(name).trim();
-            return plain.length() > 0 ? plain : factionId;
-        } catch (RuntimeException unavailable) {
-            return factionId;
-        } catch (LinkageError unavailable) {
-            return factionId;
-        }
     }
 
     /** A role's place among the roles, highest first, which the groups keep. */

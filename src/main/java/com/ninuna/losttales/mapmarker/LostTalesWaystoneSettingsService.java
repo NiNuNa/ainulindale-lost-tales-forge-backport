@@ -231,14 +231,15 @@ public final class LostTalesWaystoneSettingsService {
         double discoveryRadius = requested.getDiscoveryRadius();
         LostTalesMapMarkerVisibility visibility =
                 requested.getVisibility();
-        if (name.length() == 0
+        // An empty name gives a waystone back to what it is called after;
+        // one called after nothing must keep a name.
+        if (name.length() == 0 && record.getNamedAfter().length() == 0
                 || name.length()
                         > LostTalesMapMarkerRecord.MAX_NAME_LENGTH
                 || icon.length() == 0
                 || icon.length()
                         > LostTalesMapMarkerRecord.MAX_NAME_LENGTH
                 || color == null
-                || category.length() == 0
                 || category.length()
                         > LostTalesMapMarkerRecord.MAX_NAME_LENGTH
                 || description.length()

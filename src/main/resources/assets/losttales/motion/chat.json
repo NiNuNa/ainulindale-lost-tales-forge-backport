@@ -1,6 +1,5 @@
 {
   "chat.line.hover": {
-    "about": "A chat line under the pointer. The chevron lights toward a lighter shade of its speaker's colour, then steps a pixel right; the words follow three pixels as one block. A stagger on the words' on beat sends them one after another instead, spread over stagger_span, and a gap bump stretches the row by its gaps while they travel (gap: pixels across the row). Leaving is quicker: the words go back first and the chevron follows.",
     "parts": {
       "chevron": {
         "poses": {
@@ -39,49 +38,40 @@
     "params": { "stagger_span": 50 }
   },
   "chat.line.appear": {
-    "about": "The newest message: the stack rises into place while the line slides in from the side, past its place and back, fading in a little ahead of the motion.",
     "duration": 180,
     "curve": "ease_in_out",
     "params": { "rise": 7, "slide": 14, "follow_through": 6, "fade_lead": 0.58 }
   },
   "chat.row.move": {
-    "about": "A row of the history gliding to its place when the lines are laid out again.",
     "duration": 180,
     "curve": "back_out"
   },
   "chat.row.appear": {
-    "about": "A row new to the history's layout fading in where it lands.",
     "duration": 180,
     "curve": "ease_out"
   },
   "chat.window.area": {
-    "about": "A window's timestamp area driven out and back in.",
     "duration": 180,
     "curve": "ease_in_out"
   },
   "chat.window.members": {
-    "about": "A window's member list coming out and going back in.",
     "duration": 180,
     "curve": "ease_in_out"
   },
   "chat.jump.show": {
-    "about": "The jump-to-present button flying in while a history is scrolled back, and out again.",
     "duration": 180,
     "curve": "ease_in_out"
   },
   "chat.toolbar.show": {
-    "about": "A message's toolbar coming up after a scroll: it stays away while the history moves, waits until the pointer has rested on one message for 'rest' milliseconds, then fades in. The rest is the pointer's, so the Animations settings leave it as it is.",
     "duration": 120,
     "curve": "ease_out",
     "params": { "rest": 150 }
   },
   "chat.feed.typing": {
-    "about": "The chat feed's lines rising a row for its typing row, and settling back.",
     "duration": 180,
     "curve": "ease_out"
   },
   "chat.scrollbar.fade": {
-    "about": "The scrollbar coming and going.",
     "follow": 0.12
   }
 }

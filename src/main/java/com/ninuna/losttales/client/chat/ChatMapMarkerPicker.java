@@ -4,6 +4,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerUsageStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
@@ -31,7 +34,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 final class ChatMapMarkerPicker extends ChatPickerPanel {
     /** A row's width where the window first opens; it stretches with the window. */
     private static final int ROW_WIDTH = 116;
-    private static final int ROW_HEIGHT = 12;
     /** Marker lists are refreshed at most this often while open. */
     private static final long REFRESH_INTERVAL_NANOS = 500L * 1000000L;
     private static final String TYPE_KEY_PREFIX =
@@ -69,9 +71,10 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
         return ROW_WIDTH;
     }
 
+    /** A menu's row. */
     @Override
     int cellHeight() {
-        return ROW_HEIGHT;
+        return MenuWindow.rowHeight();
     }
 
     @Override
@@ -80,8 +83,7 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
         if (lowered.length() > 0) {
             List<Entry> filtered = new ArrayList<Entry>();
             for (ChatShareCandidates.MarkerEntry marker : this.markers) {
-                if (ChatShareTokenParser.normalizeName(marker.name)
-                        .contains(lowered)) {
+                if (marker.answers(lowered)) {
                     filtered.add(new Entry(marker));
                 }
             }
@@ -183,28 +185,32 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
         ChatShareCandidates.MarkerEntry marker =
                 (ChatShareCandidates.MarkerEntry)entry.value;
         LostTalesMapMarkerData data = marker.marker;
+        // A menu's icon row: the marker in the icon column, the name where
+        // a menu's label stands, both on the row's capitals.
+        int labelTop = y + LostTalesUiInk.centredStart(cellHeight(),
+                LostTalesUiInk.CAP_HEIGHT);
         ChatInlineIcons.drawMarker(minecraft, data.getIconName(),
                 ChatInlineIcons.markerRgb(data.getColorName()),
-                ChatInlineIcons.boxLeft(x + 1, ChatInlineIcons.SLOT_WIDTH),
-                ChatInlineIcons.boxTop(y + 2, ChatInlineIcons.SLOT_WIDTH),
+                x + ICON_LEFT, labelTop + ChatInlineIcons.CONTENT_TOP_OFFSET,
                 ChatInlineIcons.CONTENT_SIZE, alpha);
-        int labelWidth = width - ChatInlineIcons.SLOT_WIDTH - 10;
-        String label = LostTalesSkyrimUiStyle.trimToWidth(
-                minecraft.fontRenderer, marker.label(), labelWidth);
-        LostTalesChatVisualStyle.drawPlain(minecraft.fontRenderer, label,
-                x + 1 + ChatInlineIcons.SLOT_WIDTH + 4, y + 2,
-                hovered ? alpha : Math.min(alpha, 220));
-        // The favourite heart at the row's end, exactly as the emoji
-        // picker marks its cells: filled while the marker is one, plain
-        // under the pointer as the control a right-click toggles.
-        if (LostTalesClientMapMarkerUsageStore.isFavorite(data.getId())) {
-            LostTalesUiSheet.HEART_FAVORITE.drawWithShadow(x + width
-                    - LostTalesUiSheet.HEART_FAVORITE.getWidth() - 2, y + 3,
-                    alpha);
-        } else if (hovered) {
-            LostTalesUiSheet.HEART.drawWithShadow(x + width
-                    - LostTalesUiSheet.HEART.getWidth() - 2, y + 3, alpha);
+        // The favourite heart at the row's end, where a menu's value
+        // stands, exactly as the emoji picker marks its cells: filled
+        // while the marker is one, plain under the pointer as the control
+        // a right-click toggles.
+        LostTalesUiSheet heart = LostTalesClientMapMarkerUsageStore
+                .isFavorite(data.getId()) ? LostTalesUiSheet.HEART_FAVORITE
+                : hovered ? LostTalesUiSheet.HEART : null;
+        int heartX = x + width - MenuWindow.PADDING_X
+                - LostTalesUiSheet.HEART.getWidth();
+        if (heart != null) {
+            heart.drawWithShadow(heartX, labelTop + Math.floorDiv(
+                    LostTalesUiInk.CAP_HEIGHT - heart.getHeight(), 2), alpha);
         }
+        String label = LostTalesSkyrimUiStyle.trimToWidth(
+                minecraft.fontRenderer, marker.label(),
+                heartX - TabIcons.GAP - (x + LABEL_LEFT));
+        LostTalesChatVisualStyle.drawPlain(minecraft.fontRenderer, label,
+                x + LABEL_LEFT, labelTop, alpha);
     }
 
     @Override

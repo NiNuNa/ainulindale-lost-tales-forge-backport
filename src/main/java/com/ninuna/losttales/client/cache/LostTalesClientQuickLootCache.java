@@ -7,6 +7,10 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 
 public final class LostTalesClientQuickLootCache {
+    /** The word for a container the server names nothing. */
+    public static final String CONTAINER_KEY = "quickLootHud.losttales.container";
+    /** A sealed container's title: {@code %s (Sealed)}. */
+    public static final String SEALED_KEY = "quickLootHud.losttales.sealed_title";
     private static volatile Snapshot snapshot;
 
     private LostTalesClientQuickLootCache() {}
@@ -38,21 +42,25 @@ public final class LostTalesClientQuickLootCache {
             this.x = x;
             this.y = y;
             this.z = z;
-            this.title = localizeTitle(title);
+            this.title = localizeTitle(title, sealed);
             this.sealed = sealed;
             this.items = items == null ? new ItemStack[0] : copy(items);
         }
 
-        private static String localizeTitle(String title) {
-            if (title == null || title.length() == 0) {
-                return "Container";
+        /**
+         * The container's title in the game's language: a key translated, a
+         * name of its own as it is, none as the word for a container; a
+         * sealed one says so.
+         */
+        private static String localizeTitle(String title, boolean sealed) {
+            String translated = title == null || title.length() == 0
+                    ? StatCollector.translateToLocal(CONTAINER_KEY)
+                    : StatCollector.translateToLocal(title);
+            if (translated == null || translated.length() == 0) {
+                translated = title;
             }
-
-            String translated = StatCollector.translateToLocal(title);
-            if (translated != null && translated.length() > 0) {
-                return translated;
-            }
-            return title;
+            return sealed ? StatCollector.translateToLocalFormatted(
+                    SEALED_KEY, translated) : translated;
         }
 
         public List<Integer> getNonEmptySlots() {

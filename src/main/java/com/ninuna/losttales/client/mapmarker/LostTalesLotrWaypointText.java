@@ -18,9 +18,10 @@ import net.minecraft.util.StatCollector;
  * question mark on the map, its card says only that it has not been found, and
  * its description is not read at all.</p>
  *
- * <p>What a discovered location is <em>called</em> is not decided here. The
- * bundled marker definitions carry the names, and every screen reads them, so
- * the map and the compass cannot disagree about a place.</p>
+ * <p>What a discovered location is <em>called</em> is not decided here. Every
+ * screen reads the marker's own name ({@link LostTalesMapMarkerData#getName},
+ * in the game's language), so the map and the compass cannot disagree about a
+ * place.</p>
  */
 public final class LostTalesLotrWaypointText {
     /** The label an undiscovered location carries on the map itself. */

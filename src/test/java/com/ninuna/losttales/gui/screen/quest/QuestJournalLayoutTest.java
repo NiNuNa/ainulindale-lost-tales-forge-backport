@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.quest;
 
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import org.junit.Test;
 
@@ -22,9 +23,9 @@ public final class QuestJournalLayoutTest {
         QuestJournalLayout layout = new QuestJournalLayout(WIDE, TALL, true);
 
         assertEquals("the body starts a margin under the window's strip",
-                QuestJournalLayout.MARGIN, layout.bodyTop());
+                QuestJournalLayout.MARGIN_Y, layout.bodyTop());
         assertEquals("and ends a margin over the window's bar",
-                TALL - QuestJournalLayout.MARGIN, layout.bodyBottom());
+                TALL - QuestJournalLayout.MARGIN_Y, layout.bodyBottom());
     }
 
     @Test
@@ -35,20 +36,35 @@ public final class QuestJournalLayoutTest {
         LostTalesUiHitBox detail = layout.detail();
 
         assertTrue(layout.isSplit());
-        assertEquals(QuestJournalLayout.MARGIN, (int)list.left);
+        assertEquals("the list stands at the page's edge, so a lit row"
+                + " reaches the frame", 0, (int)list.left);
         assertEquals("one rule, one pixel wide", 1.0D, divider.width, 0.0D);
         assertEquals(list.right() + QuestJournalLayout.GUTTER, divider.left,
                 0.0D);
         assertEquals(divider.right() + QuestJournalLayout.GUTTER, detail.left,
                 0.0D);
         assertEquals("the detail reaches the far margin",
-                WIDE - QuestJournalLayout.MARGIN, (int)detail.right());
-        assertEquals("both halves share the body's rows", list.top,
-                detail.top, 0.0D);
-        assertEquals(list.height, detail.height, 0.0D);
-        // The rows leave room for the scrollbar without moving the box.
-        assertEquals(list.width - QuestJournalLayout.SCROLLBAR_WIDTH - 2,
-                layout.listRows().width, 0.0D);
+                WIDE - QuestJournalLayout.MARGIN_X, (int)detail.right());
+        assertEquals("the rule runs the detail's height", detail.top,
+                divider.top, 0.0D);
+        assertEquals(detail.height, divider.height, 0.0D);
+    }
+
+    @Test
+    public void theListsRowsStandAsAMenusDo() {
+        QuestJournalLayout layout = new QuestJournalLayout(WIDE, TALL, true);
+        LostTalesUiHitBox list = layout.list();
+        LostTalesUiHitBox rows = layout.listRows();
+
+        assertEquals("a menu's padding over the rows", MenuWindow.PADDING_Y,
+                (int)list.top);
+        assertEquals("and under them", TALL - MenuWindow.PADDING_Y,
+                (int)list.bottom());
+        assertEquals("what a row holds stands a menu's padding in",
+                list.left + MenuWindow.PADDING_X, rows.left, 0.0D);
+        assertEquals(list.right() - MenuWindow.PADDING_X, rows.right(), 0.0D);
+        assertEquals("on the list's own rows", list.top, rows.top, 0.0D);
+        assertEquals(list.height, rows.height, 0.0D);
     }
 
     @Test
@@ -61,13 +77,13 @@ public final class QuestJournalLayoutTest {
                 0.0D);
         assertEquals("and so is the rule", 0.0D, folded.divider().width,
                 0.0D);
-        assertEquals(QuestJournalLayout.MARGIN, (int)folded.detail().left);
-        assertEquals(WIDE - QuestJournalLayout.MARGIN,
+        assertEquals(QuestJournalLayout.MARGIN_X, (int)folded.detail().left);
+        assertEquals(WIDE - QuestJournalLayout.MARGIN_X,
                 (int)folded.detail().right());
     }
 
     @Test
-    public void aNarrowPageShowsTheListOrTheDetailOverTheWholeBody() {
+    public void aNarrowPageShowsTheListOrTheDetailOverTheWholePage() {
         int narrow = QuestJournalLayout.MIN_SPLIT_WIDTH - 1;
         QuestJournalLayout folded = new QuestJournalLayout(narrow, TALL, false);
         QuestJournalLayout out = new QuestJournalLayout(narrow, TALL, true);
@@ -76,17 +92,18 @@ public final class QuestJournalLayoutTest {
         assertFalse("too narrow to stand side by side", out.isSplit());
         assertEquals(0.0D, out.divider().width, 0.0D);
         assertEquals("folded, the detail takes the whole body",
-                QuestJournalLayout.MARGIN, (int)folded.detail().left);
-        assertEquals(narrow - QuestJournalLayout.MARGIN,
+                QuestJournalLayout.MARGIN_X, (int)folded.detail().left);
+        assertEquals(narrow - QuestJournalLayout.MARGIN_X,
                 (int)folded.detail().right());
 
         assertEquals("out, the detail is gone", 0.0D, out.detail().width,
                 0.0D);
-        assertEquals("and the list takes the very same box",
-                folded.detail().left, out.list().left, 0.0D);
-        assertEquals(folded.detail().width, out.list().width, 0.0D);
-        assertEquals(folded.detail().top, out.list().top, 0.0D);
-        assertEquals(folded.detail().height, out.list().height, 0.0D);
+        assertEquals("and the list takes the page's whole width", 0.0D,
+                out.list().left, 0.0D);
+        assertEquals(narrow, (int)out.list().width);
+        assertEquals("between a menu's padding at the top and the foot",
+                MenuWindow.PADDING_Y, (int)out.list().top);
+        assertEquals(TALL - MenuWindow.PADDING_Y, (int)out.list().bottom());
     }
 
     @Test
@@ -96,26 +113,5 @@ public final class QuestJournalLayoutTest {
         assertEquals(QuestJournalLayout.LIST_MIN_WIDTH,
                 (int)new QuestJournalLayout(QuestJournalLayout.MIN_SPLIT_WIDTH,
                         TALL, true).list().width);
-    }
-
-    @Test
-    public void aScrollbarAppearsOnlyWhereThereIsSomethingToScroll() {
-        LostTalesUiHitBox area = new LostTalesUiHitBox(10, 20, 100, 60);
-        assertEquals(0.0D,
-                QuestJournalLayout.scrollbar(area, 60).width, 0.0D);
-        LostTalesUiHitBox bar = QuestJournalLayout.scrollbar(area, 240);
-        assertEquals(QuestJournalLayout.SCROLLBAR_WIDTH, (int)bar.width);
-        assertEquals("inside the area's right edge", area.right(),
-                bar.right(), 0.0D);
-
-        LostTalesUiHitBox top = QuestJournalLayout.scrollHandle(bar, 240, 0.0D);
-        assertEquals("at the top with nothing scrolled", bar.top, top.top,
-                0.0D);
-        LostTalesUiHitBox bottom =
-                QuestJournalLayout.scrollHandle(bar, 240, 180.0D);
-        assertEquals("at the bottom once scrolled all the way",
-                bar.bottom(), bottom.bottom(), 0.001D);
-        assertTrue("and never smaller than a square",
-                bottom.height >= QuestJournalLayout.SCROLLBAR_WIDTH * 2);
     }
 }

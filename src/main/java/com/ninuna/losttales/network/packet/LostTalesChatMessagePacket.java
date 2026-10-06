@@ -9,6 +9,7 @@ import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.share.ChatQuestCard;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
@@ -19,7 +20,9 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -123,10 +126,19 @@ public final class LostTalesChatMessagePacket implements IMessage {
     }
 
     /**
-     * The most a server line's own component takes, as the JSON the
-     * game itself sends chat in: an achievement with its hover, a
-     * death naming a weapon with its item, a join. A line past it
-     * travels as its words alone.
+     * Whether a line may carry its own component: the Server's and the
+     * Client's lines, and a Discord member's line, whose words the server
+     * built with marks each game translates. A player's line never may.
+     */
+    public static boolean mayCarryBody(UUID senderId) {
+        return isSystemSender(senderId) || isDiscordSender(senderId);
+    }
+
+    /**
+     * The most a line's own component takes, as the JSON the game itself
+     * sends chat in: an achievement with its hover, a death naming a
+     * weapon with its item, a join, a Discord member's line in pieces. A
+     * line past it travels as its words alone.
      */
     public static final int MAX_BODY_BYTES = 8192;
     /** The most one line takes on the wire; the history batch reads it too. */
@@ -143,7 +155,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             + 1 + 16 + 1 + 4 + ChatReplyReference.MAX_SKIN_ID_BYTES
             // A forward's link to where its message was said.
             + 4 + ChatReplyReference.MAX_LINK_BYTES
-            // A server line's own component, and the players it names.
+            // The line's own component, and the players it names.
             + 4 + MAX_BODY_BYTES
             + LostTalesChatNamedPlayerCodec.MAX_BYTES
             // The reactions on the line as this reader is shown them.
@@ -153,7 +165,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private static final int MAX_ACCOUNT_NAME_BYTES = 64;
     private static final int MAX_TITLE_BYTES = 256;
     private static final int MAX_SKIN_ID_BYTES = 128;
-    private static final int MAX_FACTION_NAME_BYTES = 128;
+    private static final int MAX_FACTION_ID_BYTES = 128;
     /** A scope value is a normalized faction id; well past any of them. */
     private static final int MAX_SCOPE_VALUE_BYTES = 128;
     /** The most bytes a tab id may take: the console's own bound on a context. */
@@ -163,6 +175,11 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private UUID senderId;
     private String identityName = "";
     private String accountName = "";
+    /**
+     * The title after the sender's name: a character's LOTR title by its
+     * lang key, which each game names in its own words; a Discord member's
+     * Discord server by the name Discord gives it. Empty for none.
+     */
     private String title = "";
     private int titleColor;
     private int nameColor;
@@ -176,8 +193,11 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private long timestampMillis;
     private String skinId = "";
     private List<ChatShowcase> showcases = Collections.emptyList();
-    /** Sender's faction display name for the title; empty when untitled. */
-    private String factionName = "";
+    /**
+     * The sender's faction by its id, whose people each game names before
+     * the title in its own words; empty when untitled.
+     */
+    private String factionId = "";
     /** For a whisper, the other party's account name as this recipient sees it. */
     private String partner = "";
     /**
@@ -261,10 +281,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
      */
     private ChatReplyReference reply = ChatReplyReference.NONE;
     /**
-     * A server line's own component as the game's chat JSON — its
-     * hover, its colours, its links — so a replay from the history
-     * shows an achievement or a death exactly as the live line was
-     * shown; empty for every line of a player's, and for a server line
+     * The line's own component as the game's chat JSON. A server line's
+     * keeps its hover, its colours, its links, so a replay from the
+     * history shows an achievement or a death exactly as the live line
+     * was shown; a Discord member's line holds its words with the marks
+     * the server wrote in them as words each game translates, which a
+     * client reads as plain words and nothing else. Empty for every line
+     * of a player's, for a Discord line without a mark, and for a line
      * whose component would not fit.
      */
     private String bodyJson = "";
@@ -289,12 +312,12 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String accountName, String title,
             int titleColor, int nameColor,
             String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
+            List<ChatShowcase> showcases, String factionId,
             String partner, int roles, boolean accountLine,
             long messageId, ChatReplyReference reply) {
         this(channel, senderId, identityName, accountName, title, titleColor,
                 nameColor, message, timestampMillis, skinId, showcases,
-                factionName, partner, roles, accountLine, messageId, reply,
+                factionId, partner, roles, accountLine, messageId, reply,
                 "", 0L, null, null, null, "");
     }
 
@@ -303,13 +326,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String accountName, String title,
             int titleColor, int nameColor,
             String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
+            List<ChatShowcase> showcases, String factionId,
             String partner, int roles, boolean accountLine,
             long messageId, ChatReplyReference reply,
             String partnerIdentity) {
         this(channel, senderId, identityName, accountName, title, titleColor,
                 nameColor, message, timestampMillis, skinId, showcases,
-                factionName, partner, roles, accountLine, messageId, reply,
+                factionId, partner, roles, accountLine, messageId, reply,
                 partnerIdentity, 0L, null, null, null, "");
     }
 
@@ -318,14 +341,14 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String accountName, String title,
             int titleColor, int nameColor,
             String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
+            List<ChatShowcase> showcases, String factionId,
             String partner, int roles, boolean accountLine,
             long messageId, ChatReplyReference reply,
             String partnerIdentity, long echoNonce,
             UUID identityCharacterId) {
         this(channel, senderId, identityName, accountName, title, titleColor,
                 nameColor, message, timestampMillis, skinId, showcases,
-                factionName, partner, roles, accountLine, messageId, reply,
+                factionId, partner, roles, accountLine, messageId, reply,
                 partnerIdentity, echoNonce, identityCharacterId, null, null,
                 "");
     }
@@ -335,7 +358,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String accountName, String title,
             int titleColor, int nameColor,
             String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
+            List<ChatShowcase> showcases, String factionId,
             String partner, int roles, boolean accountLine,
             long messageId, ChatReplyReference reply,
             String partnerIdentity, long echoNonce,
@@ -369,7 +392,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 ? Collections.<ChatShowcase>emptyList()
                 : Collections.unmodifiableList(
                         new ArrayList<ChatShowcase>(showcases));
-        this.factionName = factionName == null ? "" : factionName;
+        this.factionId = factionId == null ? "" : factionId;
         validate();
     }
 
@@ -409,8 +432,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 decoded.add(readShowcase(buffer));
             }
             this.showcases = Collections.unmodifiableList(decoded);
-            this.factionName = LostTalesPacketCodec.readUtf8String(
-                    buffer, MAX_FACTION_NAME_BYTES);
+            this.factionId = LostTalesPacketCodec.readUtf8String(
+                    buffer, MAX_FACTION_ID_BYTES);
             this.partner = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_ACCOUNT_NAME_BYTES).trim();
             this.accountLine = buffer.readBoolean();
@@ -481,8 +504,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
                         : ChatReplyReference.NONE;
             }
             // The head the quote wears — a sender id, whether the line
-            // wore the account, its skin — then a server line's own
-            // component and the players it names.
+            // wore the account, its skin — then the line's own component
+            // and the players it names.
             UUID quotedSender = readOptionalUuid(buffer);
             boolean quotedAccountLine = buffer.readBoolean();
             String quotedSkin = LostTalesPacketCodec.readUtf8String(
@@ -523,9 +546,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
             }
             String body = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_BODY_BYTES);
-            if (body.length() > 0 && !isSystemSender(this.senderId)) {
+            if (body.length() > 0 && !mayCarryBody(this.senderId)) {
                 throw new LostTalesPacketCodec.DecodeException(
-                        "a component on a line that is not the server's");
+                        "a component on a player's line");
             }
             this.bodyJson = body;
             this.namedPlayers = LostTalesChatNamedPlayerCodec.read(buffer);
@@ -543,7 +566,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.namedPlayers = Collections.emptyList();
             this.reactions = ChatReactionSummary.EMPTY;
             this.showcases = Collections.emptyList();
-            this.factionName = "";
+            this.factionId = "";
             this.partner = "";
             this.roles = 0;
             this.accountLine = false;
@@ -573,6 +596,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
                     buffer, ChatShowcase.MAX_MARKER_ID_BYTES);
             String name = LostTalesPacketCodec.readUtf8String(
                     buffer, ChatShowcase.MAX_MARKER_NAME_BYTES);
+            String namedAfter = LostTalesPacketCodec.readUtf8String(
+                    buffer, ChatShowcase.MAX_MARKER_NAMED_AFTER_BYTES);
             String icon = LostTalesPacketCodec.readUtf8String(
                     buffer, ChatShowcase.MAX_MARKER_STYLE_BYTES);
             String color = LostTalesPacketCodec.readUtf8String(
@@ -580,24 +605,144 @@ public final class LostTalesChatMessagePacket implements IMessage {
             int dimension = buffer.readInt();
             double x = buffer.readDouble();
             double z = buffer.readDouble();
-            return ChatShowcase.marker(tokenIndex, id, name, icon, color,
-                    dimension, x, z);
+            return ChatShowcase.marker(tokenIndex, id, name, namedAfter, icon,
+                    color, dimension, x, z);
         }
         if (kind == ChatShareKind.QUEST) {
             String reference = LostTalesPacketCodec.readUtf8String(buffer,
                     ChatShowcase.MAX_QUEST_REFERENCE_BYTES);
-            String title = LostTalesPacketCodec.readUtf8String(buffer,
-                    ChatShowcase.MAX_QUEST_TITLE_BYTES);
-            String category = LostTalesPacketCodec.readUtf8String(buffer,
-                    ChatShowcase.MAX_QUEST_CATEGORY_BYTES);
-            String objective = LostTalesPacketCodec.readUtf8String(buffer,
-                    ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES);
-            String reward = LostTalesPacketCodec.readUtf8String(buffer,
-                    ChatShowcase.MAX_QUEST_REWARD_BYTES);
-            return ChatShowcase.quest(tokenIndex, reference, title, category,
-                    objective, reward, buffer.readBoolean());
+            ChatQuestCard card = readQuestCard(buffer);
+            return ChatShowcase.quest(tokenIndex, reference, card,
+                    readStrictBoolean(buffer));
         }
         throw new LostTalesPacketCodec.DecodeException("unknown showcase kind");
+    }
+
+    /** A quest card, every field within its bound and every code one the card knows. */
+    static ChatQuestCard readQuestCard(ByteBuf buffer) {
+        ChatQuestCard.Source source = ChatQuestCard.Source.fromCode(
+                readUnsignedByte(buffer));
+        if (source == null) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "unknown quest card source");
+        }
+        String title = LostTalesPacketCodec.readUtf8String(buffer,
+                ChatQuestCard.MAX_TITLE_BYTES);
+        String category = LostTalesPacketCodec.readUtf8String(buffer,
+                ChatQuestCard.MAX_CATEGORY_BYTES);
+        int objectiveCount = readUnsignedByte(buffer);
+        if (objectiveCount > ChatQuestCard.MAX_OBJECTIVES) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "too many quest card objectives");
+        }
+        List<ChatQuestCard.Objective> objectives =
+                new ArrayList<ChatQuestCard.Objective>(objectiveCount);
+        for (int index = 0; index < objectiveCount; index++) {
+            String id = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatQuestCard.MAX_OBJECTIVE_ID_BYTES);
+            String type = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatQuestCard.MAX_OBJECTIVE_TYPE_BYTES);
+            int targetCount = readUnsignedByte(buffer);
+            if (targetCount > ChatQuestCard.TARGET_PARAMS.size()) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many quest card targets");
+            }
+            Map<String, String> targets = new LinkedHashMap<String, String>();
+            for (int target = 0; target < targetCount; target++) {
+                String param = LostTalesPacketCodec.readUtf8String(buffer,
+                        ChatQuestCard.MAX_REWARD_KEY_BYTES);
+                String value = LostTalesPacketCodec.readUtf8String(buffer,
+                        ChatQuestCard.MAX_TARGET_BYTES);
+                if (targets.containsKey(param)) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "repeated quest card target");
+                }
+                targets.put(param, value);
+            }
+            int count = readInt(buffer);
+            int progress = readInt(buffer);
+            boolean optional = readStrictBoolean(buffer);
+            String text = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatQuestCard.MAX_OBJECTIVE_TEXT_BYTES);
+            objectives.add(new ChatQuestCard.Objective(id, type, targets,
+                    count, progress, optional, text));
+        }
+        int rewardCount = readUnsignedByte(buffer);
+        if (rewardCount > ChatQuestCard.MAX_REWARDS) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "too many quest card rewards");
+        }
+        Map<String, String> rewards = new LinkedHashMap<String, String>();
+        for (int index = 0; index < rewardCount; index++) {
+            String key = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatQuestCard.MAX_REWARD_KEY_BYTES);
+            String value = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatQuestCard.MAX_REWARD_VALUE_BYTES);
+            if (key.length() == 0 || rewards.containsKey(key)) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid quest card reward");
+            }
+            rewards.put(key, value);
+        }
+        return new ChatQuestCard(source, title, category, objectives, rewards);
+    }
+
+    static void writeQuestCard(ByteBuf buffer, ChatQuestCard card) {
+        buffer.writeByte(card.getSource().getCode());
+        LostTalesPacketCodec.writeUtf8String(buffer, card.getTitle(),
+                ChatQuestCard.MAX_TITLE_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, card.getCategory(),
+                ChatQuestCard.MAX_CATEGORY_BYTES);
+        buffer.writeByte(card.getObjectives().size());
+        for (ChatQuestCard.Objective objective : card.getObjectives()) {
+            LostTalesPacketCodec.writeUtf8String(buffer, objective.getId(),
+                    ChatQuestCard.MAX_OBJECTIVE_ID_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, objective.getType(),
+                    ChatQuestCard.MAX_OBJECTIVE_TYPE_BYTES);
+            buffer.writeByte(objective.getTargets().size());
+            for (Map.Entry<String, String> target
+                    : objective.getTargets().entrySet()) {
+                LostTalesPacketCodec.writeUtf8String(buffer, target.getKey(),
+                        ChatQuestCard.MAX_REWARD_KEY_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer, target.getValue(),
+                        ChatQuestCard.MAX_TARGET_BYTES);
+            }
+            buffer.writeInt(objective.getCount());
+            buffer.writeInt(objective.getProgress());
+            buffer.writeBoolean(objective.isOptional());
+            LostTalesPacketCodec.writeUtf8String(buffer, objective.getText(),
+                    ChatQuestCard.MAX_OBJECTIVE_TEXT_BYTES);
+        }
+        buffer.writeByte(card.getRewards().size());
+        for (Map.Entry<String, String> entry : card.getRewards().entrySet()) {
+            LostTalesPacketCodec.writeUtf8String(buffer, entry.getKey(),
+                    ChatQuestCard.MAX_REWARD_KEY_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, entry.getValue(),
+                    ChatQuestCard.MAX_REWARD_VALUE_BYTES);
+        }
+    }
+
+    private static int readUnsignedByte(ByteBuf buffer) {
+        if (buffer == null || !buffer.isReadable()) {
+            throw new LostTalesPacketCodec.DecodeException("truncated packet");
+        }
+        return buffer.readUnsignedByte();
+    }
+
+    private static int readInt(ByteBuf buffer) {
+        if (buffer == null || buffer.readableBytes() < 4) {
+            throw new LostTalesPacketCodec.DecodeException("truncated packet");
+        }
+        return buffer.readInt();
+    }
+
+    /** A boolean written as 0 or 1; any other byte is malformed. */
+    private static boolean readStrictBoolean(ByteBuf buffer) {
+        int value = readUnsignedByte(buffer);
+        if (value > 1) {
+            throw new LostTalesPacketCodec.DecodeException("invalid boolean");
+        }
+        return value == 1;
     }
 
     @Override
@@ -637,6 +782,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
                         showcase.getMarkerName(),
                         ChatShowcase.MAX_MARKER_NAME_BYTES);
                 LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getMarkerNamedAfter(),
+                        ChatShowcase.MAX_MARKER_NAMED_AFTER_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer,
                         showcase.getMarkerIcon(),
                         ChatShowcase.MAX_MARKER_STYLE_BYTES);
                 LostTalesPacketCodec.writeUtf8String(buffer,
@@ -649,23 +797,12 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 LostTalesPacketCodec.writeUtf8String(buffer,
                         showcase.getQuestReference(),
                         ChatShowcase.MAX_QUEST_REFERENCE_BYTES);
-                LostTalesPacketCodec.writeUtf8String(buffer,
-                        showcase.getQuestTitle(),
-                        ChatShowcase.MAX_QUEST_TITLE_BYTES);
-                LostTalesPacketCodec.writeUtf8String(buffer,
-                        showcase.getQuestCategory(),
-                        ChatShowcase.MAX_QUEST_CATEGORY_BYTES);
-                LostTalesPacketCodec.writeUtf8String(buffer,
-                        showcase.getQuestObjective(),
-                        ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES);
-                LostTalesPacketCodec.writeUtf8String(buffer,
-                        showcase.getQuestReward(),
-                        ChatShowcase.MAX_QUEST_REWARD_BYTES);
+                writeQuestCard(buffer, showcase.getQuestCard());
                 buffer.writeBoolean(showcase.isQuestJoinable());
             }
         }
         LostTalesPacketCodec.writeUtf8String(
-                buffer, this.factionName, MAX_FACTION_NAME_BYTES);
+                buffer, this.factionId, MAX_FACTION_ID_BYTES);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.partner, MAX_ACCOUNT_NAME_BYTES);
         buffer.writeBoolean(this.accountLine);
@@ -697,8 +834,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
             // whose author and words only a client's own screen holds.
             buffer.writeBoolean(this.reply.exists());
         }
-        // The quote's head, the server line's component, the players it
-        // names: see fromBytes. Only a quote naming its message wears a
+        // The quote's head, the line's component, the players it names:
+        // see fromBytes. Only a quote naming its message wears a
         // head or reads as an action.
         writeOptionalUuid(buffer, anchored ? this.reply.getSenderId() : null);
         buffer.writeBoolean(anchored && this.reply.isAccountLine());
@@ -775,7 +912,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.skinId, MAX_SKIN_ID_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
-                        this.factionName, MAX_FACTION_NAME_BYTES)
+                        this.factionId, MAX_FACTION_ID_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.partner, MAX_ACCOUNT_NAME_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
@@ -787,7 +924,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.bodyJson, MAX_BODY_BYTES)
                 || (this.bodyJson.length() > 0
-                        && !isSystemSender(this.senderId))
+                        && !mayCarryBody(this.senderId))
                 // The Server and the Client say things; they do none.
                 || (this.action && isSystemSender(this.senderId))
                 // The Narrator's own id signs a Narrator line and nothing
@@ -829,11 +966,15 @@ public final class LostTalesChatMessagePacket implements IMessage {
     /**
      * The same message saying something else: what an edit hands the
      * client so the line can be built again exactly as it was, down to
-     * the colours and the head, with only the words replaced.
+     * the colours and the head, with only the words replaced. The line's
+     * component said the old words, so the copy carries none; an edit
+     * that has one for the new words gives it with {@link #withServerBody}.
      */
     public LostTalesChatMessagePacket withMessage(String message) {
-        return rebuild(message, this.partner, this.partnerIdentity, this.reply,
-                this.echoNonce);
+        LostTalesChatMessagePacket copy = rebuild(message, this.partner,
+                this.partnerIdentity, this.reply, this.echoNonce);
+        copy.bodyJson = "";
+        return copy;
     }
 
     /**
@@ -884,7 +1025,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.identityName, this.accountName, this.title,
                 this.titleColor, this.nameColor, message,
                 this.timestampMillis, this.skinId, this.showcases,
-                this.factionName, partner, this.roles,
+                this.factionId, partner, this.roles,
                 this.accountLine, this.messageId, reply,
                 partnerIdentity, echoNonce, this.identityCharacterId,
                 ownCharacterId, partnerCharacterId, this.scopeValue));
@@ -951,15 +1092,17 @@ public final class LostTalesChatMessagePacket implements IMessage {
     /**
      * The same line carrying its own component as the game's chat
      * JSON, and the players it names as the server knew them. Only a
-     * line of the server's own may carry a component; anything else
-     * keeps none, whatever it is handed.
+     * line of the server's own or a Discord member's may carry a
+     * component ({@link #mayCarryBody}); a player's keeps none, whatever
+     * it is handed, and so does a line handed one past
+     * {@link #MAX_BODY_BYTES}.
      */
     public LostTalesChatMessagePacket withServerBody(
             String componentJson, List<ChatNamedPlayer> named) {
         LostTalesChatMessagePacket copy = carrying(withNameColor(
                 this.nameColor));
         String body = componentJson == null ? "" : componentJson;
-        copy.bodyJson = isSystemSender(this.senderId)
+        copy.bodyJson = mayCarryBody(this.senderId)
                 && LostTalesPacketCodec.isUtf8WithinLimit(body,
                         MAX_BODY_BYTES) ? body : "";
         List<ChatNamedPlayer> players = new ArrayList<ChatNamedPlayer>();
@@ -996,7 +1139,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         return withServerBody(this.bodyJson, named);
     }
 
-    /** The server line's own component as chat JSON; empty for none. */
+    /** The line's own component as chat JSON; empty for none. */
     public String getBodyJson() { return this.bodyJson; }
 
     /**
@@ -1015,7 +1158,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.identityName, this.accountName, this.title,
                 this.titleColor, this.nameColor, this.message,
                 this.timestampMillis, this.skinId, this.showcases,
-                this.factionName, this.partner, this.roles,
+                this.factionId, this.partner, this.roles,
                 this.accountLine, this.messageId, this.reply,
                 this.partnerIdentity, this.echoNonce, this.identityCharacterId,
                 this.ownCharacterId, this.partnerCharacterId, scopeValue));
@@ -1027,7 +1170,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.identityName, this.accountName, this.title,
                 this.titleColor, color, this.message,
                 this.timestampMillis, this.skinId, this.showcases,
-                this.factionName, this.partner, this.roles,
+                this.factionId, this.partner, this.roles,
                 this.accountLine, this.messageId, this.reply,
                 this.partnerIdentity, this.echoNonce, this.identityCharacterId,
                 this.ownCharacterId, this.partnerCharacterId, this.scopeValue));
@@ -1070,14 +1213,15 @@ public final class LostTalesChatMessagePacket implements IMessage {
     public UUID getSenderId() { return this.senderId; }
     public String getIdentityName() { return this.identityName; }
     public String getAccountName() { return this.accountName; }
+    /** A character's LOTR title by its lang key, a Discord member's Discord server's name; empty for none. */
     public String getTitle() { return this.title; }
     public int getTitleColor() { return this.titleColor & 0xFFFFFF; }
     public int getNameColor() { return this.nameColor & 0xFFFFFF; }
     public String getMessage() { return this.message; }
     public long getTimestampMillis() { return this.timestampMillis; }
     public String getSkinId() { return this.skinId; }
-    /** The sender's faction display name, or empty. */
-    public String getFactionName() { return this.factionName; }
+    /** The sender's faction id, or empty. */
+    public String getFactionId() { return this.factionId; }
     /** For a whisper, the other party's account name; empty otherwise. */
     public String getPartner() { return this.partner; }
     /**

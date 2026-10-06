@@ -6,6 +6,8 @@ import com.ninuna.losttales.chat.ChatConsoleFixtures;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReportReason;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.share.ChatQuestCard;
+import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Arrays;
 import java.util.Collections;
@@ -600,6 +602,42 @@ public final class ChatHistoryNbtCodecTest {
                 result.getUnsupportedVersion());
         assertTrue(result.getEntries().isEmpty());
         assertEquals(written, result.getOriginalDataCopy());
+    }
+
+    /**
+     * A quest card is kept as the data each reader's game words, the way
+     * the line was sent: a bundled quest's card carries no words at all.
+     */
+    @Test
+    public void aQuestCardIsKeptAsData() {
+        long id = ChatMessageIdAllocator.next();
+        ChatQuestCard card = new ChatQuestCard(ChatQuestCard.Source.BUNDLED,
+                "", "tutorials", Collections.singletonList(
+                        new ChatQuestCard.Objective("gather_sticks", "gather",
+                                Collections.singletonMap("item", "minecraft:stick"),
+                                4, 2, false, "")),
+                Collections.singletonMap("experience", "20"));
+        LostTalesChatMessagePacket shared = new LostTalesChatMessagePacket(
+                ChatChannel.GLOBAL, ALICE, "Aldric", "alice", "", 0, 0,
+                "see [q:Nia]", 1000000L, "", Collections.singletonList(
+                        ChatShowcase.quest(0, "losttales:tutorial/meet_nia",
+                                card, true)),
+                "", "", 0, false, id, ChatReplyReference.NONE, "");
+        ChatHistory.record(id, ALICE, "Aldric", null, shared,
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone());
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                ChatConsoleStream.snapshot(),
+                ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertFalse(result.wasRepaired());
+        ChatQuestCard read = result.getEntries().get(0).forOthers
+                .getShowcases().get(0).getQuestCard();
+        assertEquals(ChatQuestCard.Source.BUNDLED, read.getSource());
+        assertEquals("", read.getTitle());
+        assertEquals(2, read.getObjectives().get(0).getProgress());
+        assertEquals("minecraft:stick",
+                read.getObjectives().get(0).getTargets().get("item"));
     }
 
     private static LostTalesChatMessagePacket line(long id, ChatChannel channel,

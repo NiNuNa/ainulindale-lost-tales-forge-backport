@@ -23,7 +23,6 @@ final class ServerConfigPacketCodec {
     /** Four bytes per character is the UTF-8 worst case of the value length. */
     static final int MAX_VALUE_BYTES = ServerConfigChangeValidator.MAX_VALUE_LENGTH * 4;
     static final int MAX_BOUND_BYTES = 32;
-    static final int MAX_COMMENT_BYTES = 4096;
     static final int MAX_VALID_VALUES = 64;
 
     private ServerConfigPacketCodec() {}
@@ -37,9 +36,6 @@ final class ServerConfigPacketCodec {
         writeValues(buffer, entry.getDefaults());
         LostTalesPacketCodec.writeUtf8String(buffer, entry.getMinValue(), MAX_BOUND_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, entry.getMaxValue(), MAX_BOUND_BYTES);
-        LostTalesPacketCodec.writeUtf8String(buffer, clip(entry.getComment(),
-                MAX_COMMENT_BYTES / 4), MAX_COMMENT_BYTES);
-        LostTalesPacketCodec.writeUtf8String(buffer, entry.getLangKey(), MAX_KEY_BYTES);
         buffer.writeBoolean(entry.isSecret());
         List<String> valid = entry.getValidValues();
         LostTalesPacketCodec.writeCount(buffer, Math.min(valid.size(), MAX_VALID_VALUES),
@@ -61,8 +57,6 @@ final class ServerConfigPacketCodec {
         List<String> defaults = readValues(buffer);
         String minimum = LostTalesPacketCodec.readUtf8String(buffer, MAX_BOUND_BYTES);
         String maximum = LostTalesPacketCodec.readUtf8String(buffer, MAX_BOUND_BYTES);
-        String comment = LostTalesPacketCodec.readUtf8String(buffer, MAX_COMMENT_BYTES);
-        String langKey = LostTalesPacketCodec.readUtf8String(buffer, MAX_KEY_BYTES);
         boolean secret = buffer.readBoolean();
         int validCount = LostTalesPacketCodec.readCount(buffer, MAX_VALID_VALUES, "valid value");
         List<String> valid = new ArrayList<String>(validCount);
@@ -73,7 +67,7 @@ final class ServerConfigPacketCodec {
             throw new LostTalesPacketCodec.DecodeException("blank config key");
         }
         return new ServerConfigEntry(category, key, type, list, values, defaults,
-                minimum, maximum, comment, langKey, secret, valid);
+                minimum, maximum, secret, valid);
     }
 
     static void writeChange(ByteBuf buffer, ServerConfigChange change) {
@@ -109,10 +103,5 @@ final class ServerConfigPacketCodec {
             values.add(LostTalesPacketCodec.readUtf8String(buffer, MAX_VALUE_BYTES));
         }
         return values;
-    }
-
-    private static String clip(String value, int maximumCharacters) {
-        return value.length() <= maximumCharacters ? value
-                : value.substring(0, maximumCharacters);
     }
 }

@@ -1,6 +1,5 @@
 {
   "ui.button.lift": {
-    "about": "A glyph button under the pointer: it dips, rises a pixel past its mark and settles; pressed it drops onto the surface; let go it springs back in three shrinking lobes; left it returns quicker than it rose.",
     "parts": {
       "glyph": {
         "poses": {
@@ -41,7 +40,6 @@
     "params": { "turn": 0, "min_press": 90 }
   },
   "ui.button.turn": {
-    "about": "The lift with a turn, for a glyph big and lopsided enough to show one: it turns while it travels and is square wherever it rests.",
     "parts": {
       "glyph": {
         "poses": {
@@ -82,7 +80,6 @@
     "params": { "turn": 5, "min_press": 90 }
   },
   "ui.button.snap": {
-    "about": "The lift further and quicker, for a decisive control such as a cross, which answers like a switch.",
     "parts": {
       "glyph": {
         "poses": {
@@ -123,11 +120,9 @@
     "params": { "turn": 0, "min_press": 61 }
   },
   "ui.button.lit": {
-    "about": "A control crossing to its lit artwork and back: most of the way in this many seconds.",
     "follow": 0.05
   },
   "ui.tip.show": {
-    "about": "A tip beside the pointer fading in, once the pointer has rested for the Tip Delay setting's 'short', 'medium' or 'long' milliseconds (none for Instant). For 'warm' milliseconds after a tip went, the next one stands at once. The rests are the pointer's, so the Animations settings leave them as they are.",
     "duration": 140,
     "curve": "ease_out",
     "params": { "short": 350, "medium": 650, "long": 1100, "warm": 800 }

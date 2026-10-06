@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.quest;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
@@ -221,7 +222,9 @@ public final class LostTalesClientQuestNotificationStore {
             }
 
             int target = getObjectiveTargetCount(objective);
-            String description = objective.getDescription() == null || objective.getDescription().length() == 0 ? objective.getId() : objective.getDescription();
+            // In the journal's words: a bundled quest's line in this game's
+            // language, else the words written, else words made from its kind.
+            String description = LostTalesQuestObjectiveTextHelper.describe(objective);
             if (before < target && after >= target) {
                 addComplete(StatCollector.translateToLocalFormatted(
                         "gui.losttales.quest.banner.objective_done", description));
@@ -272,7 +275,7 @@ public final class LostTalesClientQuestNotificationStore {
 
     private static String questTitle(String questId) {
         LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore.getQuest(questId);
-        return quest == null ? questId : quest.getTitle();
+        return quest == null ? questId : LostTalesQuestWords.title(quest);
     }
 
     private static int getObjectiveTargetCount(LostTalesQuestObjectiveDefinition objective) {

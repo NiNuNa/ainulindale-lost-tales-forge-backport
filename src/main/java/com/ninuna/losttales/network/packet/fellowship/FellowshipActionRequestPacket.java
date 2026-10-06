@@ -193,8 +193,7 @@ public final class FellowshipActionRequestPacket implements IMessage {
         if (this.operationType.requiresColor() != (this.color != null)) {
             throw new FellowshipPacketCodec.DecodeException("invalid color payload");
         }
-        if ((this.operationType == FellowshipOperationType.SET_GO_HERE_MARKER)
-                != this.hasMarkerPosition) {
+        if (this.operationType.requiresMapPosition() != this.hasMarkerPosition) {
             throw new FellowshipPacketCodec.DecodeException(
                     "invalid map marker position payload");
         }

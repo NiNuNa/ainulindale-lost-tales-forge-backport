@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
+import com.ninuna.losttales.chat.share.ChatQuestCard;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareReference;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
@@ -15,6 +16,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.Test;
@@ -179,8 +181,17 @@ public final class LostTalesChatPacketTest {
                                 "Bree", "town", "orange", 100,
                                 512.5D, -384.0D),
                         ChatShowcase.quest(2, "losttales:road_work",
-                                "Road Work", "Regional",
-                                "Defeat 4 orcs", "Experience: 20",
+                                new ChatQuestCard(ChatQuestCard.Source.SERVER,
+                                        "Road Work", "regional",
+                                        Collections.singletonList(
+                                                new ChatQuestCard.Objective(
+                                                        "kill_orcs", "kill",
+                                                        Collections.singletonMap(
+                                                                "group", "hostile"),
+                                                        4, 1, false,
+                                                        "Defeat 4 orcs")),
+                                        Collections.singletonMap(
+                                                "experience", "20")),
                                 true)))
                 .build();
         ByteBuf buffer = Unpooled.buffer();
@@ -205,8 +216,17 @@ public final class LostTalesChatPacketTest {
         ChatShowcase quest = decoded.getShowcases().get(2);
         assertEquals(ChatShareKind.QUEST, quest.getKind());
         assertEquals("losttales:road_work", quest.getQuestReference());
-        assertEquals("Road Work", quest.getQuestTitle());
-        assertEquals("Defeat 4 orcs", quest.getQuestObjective());
+        assertEquals(ChatQuestCard.Source.SERVER,
+                quest.getQuestCard().getSource());
+        assertEquals("Road Work", quest.getQuestCard().getTitle());
+        assertEquals("regional", quest.getQuestCard().getCategory());
+        ChatQuestCard.Objective objective =
+                quest.getQuestCard().getObjectives().get(0);
+        assertEquals("Defeat 4 orcs", objective.getText());
+        assertEquals("hostile", objective.getTargets().get("group"));
+        assertEquals(4, objective.getCount());
+        assertEquals(1, objective.getProgress());
+        assertEquals("20", quest.getQuestCard().getRewards().get("experience"));
         assertTrue(quest.isQuestJoinable());
 
         LostTalesQuestShareJoinPacket join =
@@ -489,7 +509,7 @@ public final class LostTalesChatPacketTest {
                 decoded.getTitle(), decoded.getTitleColor(),
                 decoded.getNameColor(), decoded.getMessage(),
                 decoded.getTimestampMillis(), decoded.getSkinId(),
-                decoded.getShowcases(), decoded.getFactionName(), "Steve",
+                decoded.getShowcases(), decoded.getFactionId(), "Steve",
                 decoded.getRoles(), decoded.isAccountLine(),
                 decoded.getMessageId(), decoded.getReply());
         assertEquals(id, other.getMessageId());

@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
+import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowFrame;
@@ -238,16 +239,16 @@ public final class ChatLayout {
         return false;
     }
 
-    /** Whether any window holds a conversation. */
+    /** Whether any window holds a channel or a whisper; the consoles keep windows of their own. */
     public static synchronized boolean hasConversationWindow() {
         return firstConversationWindow() != null;
     }
 
-    /** The first window, in layout order, holding a conversation; null for none. */
+    /** The first window, in layout order, holding a channel or a whisper; null for none. */
     private static Window firstConversationWindow() {
         for (Window window : WindowLayout.windows()) {
             for (WindowPage tab : window.getTabs()) {
-                if (ConversationPage.from(tab) != null) {
+                if (tab.category().home() == PageCategory.CHANNELS) {
                     return window;
                 }
             }
@@ -570,10 +571,16 @@ public final class ChatLayout {
      * jump to a line — as {@link #openTab} does; when no window holds a
      * conversation, the chat's first window opens with it, the
      * conversation in a window of its own beside it, since the first
-     * window opens locked.
+     * window opens locked. A console opens among the consoles, in a window
+     * of theirs or their own first window
+     * ({@link WindowLayout#openInCategory}).
      */
     public static synchronized ConversationPage openHere(ConversationPage tab,
                                                 String preferredWindowId) {
+        if (tab != null && tab.isConsole()) {
+            return ConversationPage.from(WindowLayout.openInCategory(
+                    ConversationPage.row(tab), preferredWindowId));
+        }
         ConversationPage opened = openTab(tab, preferredWindowId);
         if (opened != null || tab == null) {
             return opened;

@@ -27,7 +27,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatPresence;
+import com.ninuna.losttales.util.LostTalesWords;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
@@ -676,7 +678,7 @@ public final class LostTalesChatOverlayRenderer {
         int used = 0;
         for (ChatFeedTyping.Segment segment : segments) {
             String prefix = (segment.tab.isWhisper()
-                    ? ChatChannel.WHISPER.getDisplayName()
+                    ? ChatNames.channel(LostTalesWords.LANG, ChatChannel.WHISPER)
                     : ClientChatChannelState.displayName(segment.tab)) + ": ";
             String said = ChatTypingLine.words(segment.names);
             int width = font.getStringWidth(prefix) + bubble.getWidth()

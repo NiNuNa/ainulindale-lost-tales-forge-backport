@@ -7,15 +7,21 @@ import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatConsoleFixtures;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatEpithet;
+import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.ChatPacketFixtures;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatNarrator;
+import com.ninuna.losttales.util.LostTalesWords;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.Charset;
 import java.util.UUID;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
+import net.minecraft.util.StringTranslate;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -233,9 +239,16 @@ public final class LostTalesChatPresentationTest {
 
     @Test
     public void titledNamesFollowLotrNpcNamingAndUntitledNamesAreBare() {
+        // The title travels as LOTR's lang key and the faction as its id,
+        // read here in this game's words.
+        StringTranslate.inject(new ByteArrayInputStream((
+                "lotr.title.farmer=Farmer\n"
+                + "lotr.faction.UNALIGNED.name=Unaligned\n").getBytes(
+                        Charset.forName("UTF-8"))));
         LostTalesChatMessagePacket titled =
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Aldric", "Aldric123", "Good harvest.")
-                        .title("Farmer").colors(0x55AA55, 0x336633).at(123456789L).faction("Gondor")
+                        .title("lotr.title.farmer").colors(0x55AA55, 0x336633).at(123456789L)
+                        .faction(LotrCharacterAdapter.UNALIGNED_FACTION_ID)
                         .build();
         ChatTitleMarker.Data marker = null;
         StringBuilder plainText = new StringBuilder();
@@ -247,15 +260,16 @@ public final class LostTalesChatPresentationTest {
                 marker = decoded;
             }
         }
-        assertEquals("Global Chat: <  Aldric, the Gondor Farmer> Good harvest.",
+        assertEquals("Global Chat: <  Aldric, the Unaligned Farmer> Good harvest.",
                 plainText.toString());
         assertNotNull(marker);
-        assertEquals("Gondor Farmer", marker.epithet);
+        assertEquals("Unaligned Farmer", marker.epithet);
         assertEquals(0x55AA55, marker.color);
 
         LostTalesChatMessagePacket untitled =
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Aldric", "Aldric123", "Good harvest.")
-                        .colors(0x55AA55, 0x336633).at(123456789L).faction("Gondor").build();
+                        .colors(0x55AA55, 0x336633).at(123456789L)
+                        .faction(LotrCharacterAdapter.UNALIGNED_FACTION_ID).build();
         plainText.setLength(0);
         for (Object value : build(untitled)) {
             IChatComponent part = (IChatComponent)value;
@@ -791,7 +805,8 @@ public final class LostTalesChatPresentationTest {
         IChatComponent server = LostTalesChatPresentation.actorMention(
                 java.util.Collections.<String>emptyList(), "Server", null,
                 new boolean[1]);
-        assertEquals("Server", server.getUnformattedTextForChat());
+        assertEquals("the Server in this game's words",
+                ChatNames.server(LostTalesWords.LANG), server.getUnformattedTextForChat());
         assertNull(ChatMentionMarker.decode(server));
     }
 
@@ -843,6 +858,39 @@ public final class LostTalesChatPresentationTest {
         assertEquals("@Aragorn", LostTalesChatPresentation.asMentionName("Steve",
                 ChatChannel.GLOBAL, java.util.Collections.<String>emptyList(),
                 new boolean[1], named).getUnformattedTextForChat());
+    }
+
+    /**
+     * A line pings the identity its channel knows: in character, the
+     * character played or spoken as, never the account behind it nor
+     * another of the account's characters; out of character, the account,
+     * whichever character the record names.
+     */
+    @Test
+    public void anAchievementPingsTheCharacterNotTheAccount() {
+        UUID account = UUID.randomUUID();
+        UUID aragorn = UUID.randomUUID();
+        UUID boromir = UUID.randomUUID();
+        com.ninuna.losttales.chat.ChatNamedPlayer asAragorn =
+                new com.ninuna.losttales.chat.ChatNamedPlayer(account,
+                        "Steve", aragorn, "Aragorn", "");
+        com.ninuna.losttales.chat.ChatNamedPlayer asAccount =
+                com.ninuna.losttales.chat.ChatNamedPlayer.account(account,
+                        "Steve");
+        assertTrue(LostTalesChatPresentation.namesIdentity(asAragorn,
+                ChatChannel.GLOBAL, account, aragorn, aragorn));
+        assertTrue(LostTalesChatPresentation.namesIdentity(asAragorn,
+                ChatChannel.GLOBAL, account, boromir, aragorn));
+        assertFalse(LostTalesChatPresentation.namesIdentity(asAragorn,
+                ChatChannel.GLOBAL, account, boromir, boromir));
+        assertFalse(LostTalesChatPresentation.namesIdentity(asAccount,
+                ChatChannel.GLOBAL, account, aragorn, aragorn));
+        assertTrue(LostTalesChatPresentation.namesIdentity(asAccount,
+                ChatChannel.GLOBAL, account, null, null));
+        assertTrue(LostTalesChatPresentation.namesIdentity(asAragorn,
+                ChatChannel.OOC, account, boromir, boromir));
+        assertFalse(LostTalesChatPresentation.namesIdentity(asAragorn,
+                ChatChannel.GLOBAL, UUID.randomUUID(), aragorn, aragorn));
     }
 
     /**

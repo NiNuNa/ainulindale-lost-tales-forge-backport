@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.NumberStepper;
 import com.ninuna.losttales.client.window.PageRows;
 import com.ninuna.losttales.client.window.Settings;
+import com.ninuna.losttales.config.LostTalesConfigWords;
 import com.ninuna.losttales.config.server.ServerConfigChangeValidator;
 import com.ninuna.losttales.config.server.ServerConfigEntry;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -20,9 +21,10 @@ import net.minecraft.util.StatCollector;
  * typed line, a secret that says only whether it is set — and each list
  * last in its category, its lines as a group with Add a Line under them.
  * A setting whose change waits shows its new value in honey, a list its
- * name and its new lines, and every row's tip is the setting's comment.
- * Numbers and lines are typed in Settings' own value window and kept by
- * the page ({@link Settings.Store#NONE}).
+ * name and its new lines. Every setting is named, explained in its row's
+ * tip and given its words by the lang file, in the player's language
+ * ({@link LostTalesConfigWords}). Numbers and lines are typed in Settings'
+ * own value window and kept by the page ({@link Settings.Store#NONE}).
  */
 final class ServerSettingsRows {
     private static final String LANG = "gui.losttales.server_settings.";
@@ -132,25 +134,55 @@ final class ServerSettingsRows {
         return ServerSettingNames.name(category);
     }
 
+    /**
+     * A setting's name: its lang line in the player's language, else its
+     * key in words, as for a setting this game's lang file does not know.
+     */
+    static String settingName(String category, String key) {
+        String langKey = LostTalesConfigWords.nameKey(category, key);
+        return StatCollector.canTranslate(langKey)
+                ? StatCollector.translateToLocal(langKey)
+                : ServerSettingNames.name(key);
+    }
+
+    private static String settingName(ServerConfigEntry entry) {
+        return settingName(entry.getCategory(), entry.getKey());
+    }
+
+    /** What a setting does, its tip line in the player's language; none where the lang file has none. */
+    static String settingTip(ServerConfigEntry entry) {
+        String langKey = LostTalesConfigWords.tipKey(entry.getCategory(),
+                entry.getKey());
+        return StatCollector.canTranslate(langKey)
+                ? StatCollector.translateToLocal(langKey) : "";
+    }
+
+    /** One of a few-word setting's words in the player's language, else as the file writes it. */
+    static String settingWord(ServerConfigEntry entry, String word) {
+        String langKey = LostTalesConfigWords.wordKey(entry.getCategory(),
+                entry.getKey(), word);
+        return StatCollector.canTranslate(langKey)
+                ? StatCollector.translateToLocal(langKey) : word;
+    }
+
     /** A single value's row, by its kind. */
     private MenuWindow.Entry row(ServerConfigEntry entry) {
         String name = entry.qualifiedName();
         MenuWindow.Entry row;
         if (entry.getType() == ServerConfigEntry.Type.BOOLEAN) {
             row = new MenuWindow.Entry(OWN_ROW + name,
-                    ServerSettingNames.name(entry.getKey())).withValue(
+                    settingName(entry)).withValue(
                             Settings.onOff(isOn(draft().value(entry))));
         } else if (!entry.getValidValues().isEmpty() && !entry.isSecret()) {
             if (!this.typed.containsKey(OWN_ROW + name)) {
                 this.typed.put(OWN_ROW + name, new WordsValue(name));
             }
-            row = new MenuWindow.Entry(OWN_ROW + name,
-                    ServerSettingNames.name(entry.getKey()))
-                    .withValue(draft().value(entry));
+            row = new MenuWindow.Entry(OWN_ROW + name, settingName(entry))
+                    .withValue(settingWord(entry, draft().value(entry)));
         } else {
             row = typedRow(entry);
         }
-        MenuWindow.Entry tipped = row.withTip(entry.getComment());
+        MenuWindow.Entry tipped = row.withTip(settingTip(entry));
         return draft().isChanged(entry) ? tipped.withValueColor(honey())
                 : tipped;
     }
@@ -162,8 +194,8 @@ final class ServerSettingsRows {
      */
     private void addList(List<MenuWindow.Entry> rows, ServerConfigEntry entry) {
         String name = entry.qualifiedName();
-        String comment = entry.getComment();
-        rows.add(MenuWindow.Entry.group(ServerSettingNames.name(entry.getKey()),
+        String tip = settingTip(entry);
+        rows.add(MenuWindow.Entry.group(settingName(entry),
                 null, draft().isChanged(entry) ? honey() : -1));
         List<String> items = draft().values(entry);
         for (int index = 0; index < items.size(); index++) {
@@ -172,7 +204,7 @@ final class ServerSettingsRows {
                 this.typed.put(id, new Item(name, index));
             }
             MenuWindow.Entry item = new MenuWindow.Entry(id,
-                    items.get(index)).withTip(comment);
+                    items.get(index)).withTip(tip);
             // A line is its own value: one the server does not hold yet
             // stands in honey whole.
             rows.add(entry.getValues().contains(items.get(index)) ? item
@@ -182,7 +214,7 @@ final class ServerSettingsRows {
         if (!this.typed.containsKey(id)) {
             this.typed.put(id, new Addition(name));
         }
-        rows.add(new MenuWindow.Entry(id, word("add_line")).withTip(comment)
+        rows.add(new MenuWindow.Entry(id, word("add_line")).withTip(tip)
                 .unavailable(draft().canAdd(entry) ? ""
                         : StatCollector.translateToLocalFormatted(
                                 LANG + "add_line.full", Integer.valueOf(
@@ -246,7 +278,7 @@ final class ServerSettingsRows {
         @Override
         public String label() {
             ServerConfigEntry entry = entry(this.name);
-            return entry == null ? "" : ServerSettingNames.name(entry.getKey());
+            return entry == null ? "" : settingName(entry);
         }
 
         @Override
@@ -309,7 +341,7 @@ final class ServerSettingsRows {
         @Override
         public String label() {
             ServerConfigEntry entry = entry(this.name);
-            return entry == null ? "" : ServerSettingNames.name(entry.getKey());
+            return entry == null ? "" : settingName(entry);
         }
 
         @Override
@@ -356,7 +388,7 @@ final class ServerSettingsRows {
         @Override
         public String label() {
             ServerConfigEntry entry = entry(this.name);
-            return entry == null ? "" : ServerSettingNames.name(entry.getKey());
+            return entry == null ? "" : settingName(entry);
         }
 
         @Override
@@ -413,37 +445,48 @@ final class ServerSettingsRows {
         @Override
         public String label() {
             ServerConfigEntry entry = entry(this.name);
-            return entry == null ? "" : ServerSettingNames.name(entry.getKey());
+            return entry == null ? "" : settingName(entry);
         }
 
         @Override
         public String value() {
             ServerConfigEntry entry = entry(this.name);
-            return entry == null ? "" : draft().value(entry);
+            return entry == null ? "" : settingWord(entry, draft().value(entry));
         }
 
+        /** Its words as the player reads them, in the order the server names them. */
         @Override
         public List<String> words() {
             ServerConfigEntry entry = entry(this.name);
-            return entry == null ? java.util.Collections.<String>emptyList()
-                    : entry.getValidValues();
+            List<String> read = new ArrayList<String>();
+            if (entry != null) {
+                for (String word : entry.getValidValues()) {
+                    read.add(settingWord(entry, word));
+                }
+            }
+            return read;
         }
 
         @Override
         public int wordIndex() {
-            return words().indexOf(value());
+            ServerConfigEntry entry = entry(this.name);
+            return entry == null ? -1
+                    : entry.getValidValues().indexOf(draft().value(entry));
         }
 
         @Override
         public int shippedWordIndex() {
             ServerConfigEntry entry = entry(this.name);
-            return entry == null ? -1 : words().indexOf(entry.getDefault());
+            return entry == null ? -1
+                    : entry.getValidValues().indexOf(entry.getDefault());
         }
 
         @Override
         public void pickWord(int index) {
             ServerConfigEntry entry = entry(this.name);
-            List<String> words = words();
+            List<String> words = entry == null
+                    ? java.util.Collections.<String>emptyList()
+                    : entry.getValidValues();
             if (entry != null && index >= 0 && index < words.size()) {
                 draft().set(entry, words.get(index));
             }
@@ -481,7 +524,7 @@ final class ServerSettingsRows {
         @Override
         public String label() {
             ServerConfigEntry entry = entry(this.name);
-            return entry == null ? "" : ServerSettingNames.name(entry.getKey());
+            return entry == null ? "" : settingName(entry);
         }
 
         @Override

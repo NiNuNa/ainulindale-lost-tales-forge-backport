@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.camera;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
 import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.util.LostTalesLangFile;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -21,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import net.minecraft.util.StatCollector;
 
 /** Loads editable client camera presets from config/losttales. */
 public final class CameraPresetFileStore {
@@ -38,6 +40,9 @@ public final class CameraPresetFileStore {
     private static final Set<String> RETIRED_BUILT_IN_IDS =
             Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
                     "wide_exploration", "vanilla_plus")));
+    /** What the lang keys of the built-in presets' names begin with. */
+    static final String NAME_KEY_PREFIX =
+            "losttales.config.third_person_camera.cameraPreset.";
     private static final Pattern SAFE_FILE_NAME = Pattern.compile(
             "[a-z0-9_.-]{1,80}\\.json", Pattern.CASE_INSENSITIVE);
 
@@ -94,6 +99,22 @@ public final class CameraPresetFileStore {
 
     public static CameraPresetDefinition getDefinition(String id) {
         return presets.get(normalizeId(id));
+    }
+
+    /**
+     * A preset's name in the game's language: a built-in preset still
+     * named as the mod ships it reads its lang line, and a preset a player
+     * wrote or renamed keeps the name its file gives it.
+     */
+    public static String displayName(CameraPresetDefinition definition) {
+        if (definition == null) {
+            return "";
+        }
+        String key = NAME_KEY_PREFIX + definition.getId();
+        String shipped = LostTalesLangFile.english().get(key);
+        return shipped != null && shipped.equals(definition.getName())
+                && StatCollector.canTranslate(key)
+                ? StatCollector.translateToLocal(key) : definition.getName();
     }
 
     public static String[] getConfigValues() {
@@ -308,14 +329,18 @@ public final class CameraPresetFileStore {
     createFallbackDefinitions() {
         Map<String, CameraPresetDefinition> fallbacks =
                 new LinkedHashMap<String, CameraPresetDefinition>();
-        addFallback(fallbacks, CameraPresetId.MODERN_ACTION_RPG,
-                "Modern Action RPG");
+        addFallback(fallbacks, CameraPresetId.MODERN_ACTION_RPG);
         return fallbacks;
     }
 
+    /** A built-in preset as the code holds it, named by its English lang line. */
     private static void addFallback(
-            Map<String, CameraPresetDefinition> target,
-            CameraPresetId id, String name) {
+            Map<String, CameraPresetDefinition> target, CameraPresetId id) {
+        String name = LostTalesLangFile.english().get(
+                NAME_KEY_PREFIX + id.getConfigValue());
+        if (name == null) {
+            name = id.getConfigValue();
+        }
         target.put(id.getConfigValue(), new CameraPresetDefinition(
                 CameraPresetDefinition.CURRENT_DATA_VERSION,
                 id.getConfigValue(), name, CameraPreset.forId(id)));

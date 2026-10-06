@@ -2,7 +2,9 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.config.server.ServerConfigApplyResult;
 import com.ninuna.losttales.config.server.ServerConfigChange;
+import com.ninuna.losttales.config.server.ServerConfigChangeValidator;
 import com.ninuna.losttales.config.server.ServerConfigEntry;
+import com.ninuna.losttales.util.EnglishWords;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.Test;
@@ -23,19 +25,17 @@ public final class LostTalesServerConfigPacketsTest {
                 ServerConfigEntry.Type.STRING, true,
                 Arrays.asList("ooc=BIDIRECTIONAL;channel=1;webhook=x", "global=DISABLED;webhook="),
                 Collections.singletonList("ooc=DISABLED;channel=;webhook="),
-                "", "", "One entry per bound game channel.", "channelBindings", false,
-                Collections.<String>emptyList());
+                "", "", false, Collections.<String>emptyList());
     }
 
     @Test
     public void theSnapshotRoundTripsEveryField() {
         ServerConfigEntry secret = new ServerConfigEntry("discord", "botToken",
                 ServerConfigEntry.Type.STRING, false, Collections.singletonList(""),
-                Collections.singletonList(""), "", "", "Secret.", "botToken", true, null);
+                Collections.singletonList(""), "", "", true, null);
         ServerConfigEntry number = new ServerConfigEntry("discord", "pollIntervalSeconds",
                 ServerConfigEntry.Type.INTEGER, false, Collections.singletonList("3"),
-                Collections.singletonList("3"), "2", "60", "How often.", "pollIntervalSeconds",
-                false, Arrays.asList("2", "3"));
+                Collections.singletonList("3"), "2", "60", false, Arrays.asList("2", "3"));
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesServerConfigSyncPacket(Arrays.asList(entry(), secret, number))
                 .toBytes(buffer);
@@ -46,7 +46,6 @@ public final class LostTalesServerConfigPacketsTest {
         assertEquals(3, entries.size());
         assertTrue(entries.get(0).isList());
         assertEquals(entry().getValues(), entries.get(0).getValues());
-        assertEquals("One entry per bound game channel.", entries.get(0).getComment());
         assertTrue(entries.get(1).isSecret());
         assertEquals("", entries.get(1).getValue());
         assertEquals(ServerConfigEntry.Type.INTEGER, entries.get(2).getType());
@@ -91,8 +90,9 @@ public final class LostTalesServerConfigPacketsTest {
         ServerConfigApplyResult result = new ServerConfigApplyResult(
                 Arrays.asList("discord.pollIntervalSeconds"),
                 Collections.singletonList(new ServerConfigApplyResult.Refusal(
-                        "chat.proximityRadius", "above the maximum 512")),
-                Arrays.asList("Discord bridge"), "");
+                        "chat.proximityRadius",
+                        ServerConfigChangeValidator.REASON + "above_maximum", "512")),
+                Arrays.asList(ServerConfigApplyResult.RESTARTED_DISCORD), "");
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesServerConfigResultPacket(result).toBytes(buffer);
         LostTalesServerConfigResultPacket decoded = new LostTalesServerConfigResultPacket();
@@ -100,9 +100,42 @@ public final class LostTalesServerConfigPacketsTest {
         assertFalse(decoded.isMalformed());
         assertEquals(Arrays.asList("discord.pollIntervalSeconds"),
                 decoded.getResult().getApplied());
-        assertEquals("above the maximum 512",
-                decoded.getResult().getRefused().get(0).getReason());
-        assertEquals(Arrays.asList("Discord bridge"), decoded.getResult().getRestarted());
+        ServerConfigApplyResult.Refusal refusal = decoded.getResult().getRefused().get(0);
+        assertEquals("chat.proximityRadius", refusal.getName());
+        assertEquals("above the maximum 512", refusal.reason(EnglishWords.INSTANCE));
+        assertEquals(Arrays.asList(ServerConfigApplyResult.RESTARTED_DISCORD),
+                decoded.getResult().getRestarted());
+        assertEquals("Discord bridge",
+                decoded.getResult().restartedIn(EnglishWords.INSTANCE));
+
+        ByteBuf refused = Unpooled.buffer();
+        new LostTalesServerConfigResultPacket(ServerConfigApplyResult.refusedOutright(
+                ServerConfigApplyResult.NO_FILE)).toBytes(refused);
+        LostTalesServerConfigResultPacket outright = new LostTalesServerConfigResultPacket();
+        outright.fromBytes(refused);
+        assertFalse(outright.isMalformed());
+        assertEquals("The server has no config file loaded.", EnglishWords.INSTANCE.format(
+                outright.getResult().getMessage()));
+    }
+
+    /** Its words are the config's lang keys; any other key is malformed, not shown. */
+    @Test
+    public void aResultNamingAnotherKeyIsMalformed() {
+        ServerConfigApplyResult result = new ServerConfigApplyResult(null,
+                Collections.singletonList(new ServerConfigApplyResult.Refusal(
+                        "chat.proximityRadius", "chat.losttales.muted")), null, "");
+        ByteBuf buffer = Unpooled.buffer();
+        new LostTalesServerConfigResultPacket(result).toBytes(buffer);
+        LostTalesServerConfigResultPacket decoded = new LostTalesServerConfigResultPacket();
+        decoded.fromBytes(buffer);
+        assertTrue(decoded.isMalformed());
+
+        ByteBuf restarted = Unpooled.buffer();
+        new LostTalesServerConfigResultPacket(new ServerConfigApplyResult(null, null,
+                Arrays.asList("Discord bridge"), "")).toBytes(restarted);
+        LostTalesServerConfigResultPacket plain = new LostTalesServerConfigResultPacket();
+        plain.fromBytes(restarted);
+        assertTrue(plain.isMalformed());
     }
 
     @Test

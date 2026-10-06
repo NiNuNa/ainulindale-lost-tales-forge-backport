@@ -8,16 +8,20 @@ import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageSearch;
 import com.ninuna.losttales.client.window.SubWindowContent;
+import com.ninuna.losttales.client.window.WheelStep;
+import com.ninuna.losttales.client.window.WindowFields;
 import com.ninuna.losttales.client.window.WindowHover;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.screen.character.creator.CreatorContext;
-import com.ninuna.losttales.gui.screen.character.creator.CreatorTextControl;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -25,7 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.resources.I18n;
 
 /**
@@ -34,17 +38,18 @@ import net.minecraft.client.resources.I18n;
  * claim, into the empty slot picked in the roster or else the first empty
  * one; and those another player has. Each figure's description stands
  * under its name, cut to two lines, and the row's card holds the whole
- * text. The field at the top finds a figure by name.
+ * text. The field at the top finds a figure by name. It is laid out and
+ * drawn as a menu is: its field, headings, lit row and scroll edge.
  */
 final class LoreCharactersWindow extends SubWindowContent {
     private static final int WIDTH = 280;
-    private static final int PADDING = 6;
-    private static final int NAME_LINE = 11;
+    private static final int PADDING_X = MenuWindow.PADDING_X;
+    private static final int PADDING_Y = MenuWindow.PADDING_Y;
     private static final int DESCRIPTION_LINE = 10;
     private static final int DESCRIPTION_LINES = 2;
     private static final int ROW_GAP = 3;
-    private static final int HEADER_HEIGHT = 15;
     private static final int NOTE_LINE = 10;
+    private static final int FIND_LIMIT = 32;
     /** The most the list stands open at before it scrolls. */
     private static final int MAX_LIST_HEIGHT = 220;
     /** The widest the row's card grows before it wraps. */
@@ -53,6 +58,8 @@ final class LoreCharactersWindow extends SubWindowContent {
     private static final String ROW_PREFIX = "lore:";
     /** How often the field keeps time, as a screen's ticks would. */
     private static final long TICK_NANOS = 50L * 1000000L;
+    /** Closer than this to the target and the drawn scroll arrives. */
+    private static final double SCROLL_SNAP_PIXELS = 0.5D;
 
     /** One line of the list: a section's name, or a figure. */
     private static final class Line {
@@ -69,23 +76,31 @@ final class LoreCharactersWindow extends SubWindowContent {
         }
     }
 
-    private final CreatorTextControl find;
+    private final GuiTextField find;
+    /** Pixels the list is asked to be scrolled by; the drawn offset glides after it, as a menu's does. */
     private int scroll;
+    private double renderedScroll;
+    private long scrollNanos;
     private boolean fieldFocused;
     /** The figure under the pointer this frame; null for none. */
     private Line hovered;
     private long tickedNanos;
 
     LoreCharactersWindow() {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        this.find = new CreatorTextControl(new CreatorContext(minecraft,
-                minecraft.fontRenderer, null), I18n.format(
-                        "gui.losttales.lore.find"), "", 32, false);
+        this.find = WindowFields.make(LostTalesUiCaret.HEIGHT, FIND_LIMIT,
+                false);
+        this.find.setFocused(false);
     }
 
-    /** Opens afresh: the field empty, the list from its top. */
+    /** Opens afresh: the list from its top. */
     void restart() {
         this.scroll = 0;
+        this.renderedScroll = 0.0D;
+    }
+
+    /** A figure's name: a menu's row. */
+    private static int nameLine() {
+        return MenuWindow.rowHeight();
     }
 
     /* ---- The lines ---- */
@@ -197,10 +212,11 @@ final class LoreCharactersWindow extends SubWindowContent {
 
     private static int lineHeight(FontRenderer font, Line line, int width) {
         if (line.header != null) {
-            return HEADER_HEIGHT;
+            return MenuWindow.rowHeight();
         }
-        return NAME_LINE + DESCRIPTION_LINE * shortDescription(font,
-                line.character.getDescription(), width).size() + ROW_GAP;
+        return nameLine() + DESCRIPTION_LINE * shortDescription(font,
+                ClientCharacterDisplayNames.loreDescription(line.character),
+                width).size() + ROW_GAP;
     }
 
     private static int listHeight(FontRenderer font, List<Line> lines,
@@ -215,24 +231,32 @@ final class LoreCharactersWindow extends SubWindowContent {
     /* ---- Where things stand ---- */
 
     private int listTop(LostTalesUiHitBox box) {
-        return (int)box.top + PADDING + this.find.height() + NOTE_LINE;
+        return (int)box.top + PADDING_Y + WindowLists.fieldHeight()
+                + NOTE_LINE;
     }
 
     private int listBoxHeight(LostTalesUiHitBox box) {
-        return Math.max(0, (int)(box.top + box.height) - PADDING
+        return Math.max(0, (int)(box.top + box.height) - PADDING_Y
                 - listTop(box));
+    }
+
+    /** Whether a point is on the field, its whole row from the padding in. */
+    private static boolean onField(LostTalesUiHitBox box, double x, double y) {
+        return LostTalesUiHitBox.contains(x, y, box.left + PADDING_X,
+                box.top + PADDING_Y, box.width - 2 * PADDING_X,
+                WindowLists.fieldHeight());
     }
 
     /** The figure's row under a point, in the box's own space; null off every row. */
     private Line lineAt(FontRenderer font, LostTalesUiHitBox box, double x,
                         double y) {
-        int width = (int)box.width - 2 * PADDING;
+        int width = (int)box.width - 2 * PADDING_X;
         if (Double.isNaN(x) || Double.isNaN(y)
-                || !LostTalesUiHitBox.contains(x, y, box.left + PADDING,
-                        listTop(box), width, listBoxHeight(box))) {
+                || !LostTalesUiHitBox.contains(x, y, box.left, listTop(box),
+                        box.width, listBoxHeight(box))) {
             return null;
         }
-        int top = listTop(box) - this.scroll;
+        int top = listTop(box) - (int)Math.round(this.renderedScroll);
         for (Line line : lines()) {
             int height = lineHeight(font, line, width);
             if (y >= top && y < top + height) {
@@ -263,10 +287,10 @@ final class LoreCharactersWindow extends SubWindowContent {
     @Override
     public int naturalHeight(int width) {
         FontRenderer font = Minecraft.getMinecraft().fontRenderer;
-        int list = listHeight(font, lines(), width - 2 * PADDING);
-        return PADDING + this.find.height() + NOTE_LINE
+        int list = listHeight(font, lines(), width - 2 * PADDING_X);
+        return PADDING_Y + WindowLists.fieldHeight() + NOTE_LINE
                 + Math.max(NOTE_LINE, Math.min(MAX_LIST_HEIGHT, list))
-                + PADDING;
+                + PADDING_Y;
     }
 
     @Override
@@ -276,8 +300,8 @@ final class LoreCharactersWindow extends SubWindowContent {
 
     @Override
     public int minHeight() {
-        return PADDING + this.find.height() + NOTE_LINE + 3 * NAME_LINE
-                + PADDING;
+        return PADDING_Y + WindowLists.fieldHeight() + NOTE_LINE
+                + 3 * nameLine() + PADDING_Y;
     }
 
     @Override
@@ -286,12 +310,28 @@ final class LoreCharactersWindow extends SubWindowContent {
                      int alpha, int surfaceAlpha) {
         keepTime();
         FontRenderer font = minecraft.fontRenderer;
-        int left = (int)box.left + PADDING;
-        int width = (int)box.width - 2 * PADDING;
-        this.find.place(left, (int)box.top + PADDING, width);
-        this.find.draw(Integer.MIN_VALUE / 2, Integer.MIN_VALUE / 2);
-        LostTalesUiInk.beginContent();
+        int left = (int)box.left + PADDING_X;
+        int width = (int)box.width - 2 * PADDING_X;
         List<Line> lines = lines();
+        int boxHeight = listBoxHeight(box);
+        int maxScroll = Math.max(0, listHeight(font, lines, width) - boxHeight);
+        this.scroll = Math.max(0, Math.min(this.scroll, maxScroll));
+        glideScroll(maxScroll);
+        this.hovered = lineAt(font, box, pointerX, pointerY);
+        // The hovered row, cut to the list's band, before anything lands
+        // on it, as a menu's is.
+        if (this.hovered != null && this.hovered.unavailable.length() == 0) {
+            int top = rowTop(font, box, this.hovered, width);
+            WindowLists.drawLitRow(box.left, box.left + box.width, box.left,
+                    Math.max(listTop(box), top), box.left + box.width,
+                    Math.min(listTop(box) + boxHeight,
+                            top + lineHeight(font, this.hovered, width)),
+                    surfaceAlpha);
+        }
+        WindowLists.drawField(font, this.find, LostTalesUiSheet.SEARCH,
+                I18n.format("gui.losttales.lore.find"), left,
+                (int)box.top + PADDING_Y, left + width, left + width, alpha);
+        LostTalesUiInk.beginContent();
         String note = ClientLoreCharacterCache.getSnapshot() == null
                 || ClientCharacterRosterCache.getSnapshot() == null
                 ? I18n.format("gui.losttales.lore.loading")
@@ -301,15 +341,11 @@ final class LoreCharactersWindow extends SubWindowContent {
                 : target(CharactersPage.current());
         LostTalesUiInk.drawText(font, font.trimStringToWidth(note, width),
                 left, listTop(box) - NOTE_LINE, WindowStyle.asideRgb(), alpha);
-        int boxHeight = listBoxHeight(box);
-        this.scroll = Math.max(0, Math.min(this.scroll,
-                listHeight(font, lines, width) - boxHeight));
-        this.hovered = lineAt(font, box, pointerX, pointerY);
         boolean clipped = SubWindowContent.beginClip(minecraft,
-                clipX + PADDING, clipY + (listTop(box) - box.top), width,
+                clipX, clipY + (listTop(box) - box.top), box.width,
                 boxHeight);
         try {
-            int y = listTop(box) - this.scroll;
+            int y = listTop(box) - (int)Math.round(this.renderedScroll);
             for (Line line : lines) {
                 int height = lineHeight(font, line, width);
                 if (y + height >= listTop(box)
@@ -321,41 +357,67 @@ final class LoreCharactersWindow extends SubWindowContent {
         } finally {
             SubWindowContent.endClip(clipped);
         }
+        WindowLists.drawScroll(box.left, listTop(box), box.left + box.width,
+                box.top + box.height, listTop(box), listTop(box) + boxHeight,
+                this.renderedScroll, maxScroll, alpha);
+    }
+
+    /** Where a line stands this frame, the drawn scroll taken in. */
+    private int rowTop(FontRenderer font, LostTalesUiHitBox box, Line wanted,
+                       int width) {
+        int top = listTop(box) - (int)Math.round(this.renderedScroll);
+        for (Line line : lines()) {
+            if (line == wanted || line.character != null
+                    && wanted.character != null && line.character.getId()
+                            .equals(wanted.character.getId())) {
+                return top;
+            }
+            top += lineHeight(font, line, width);
+        }
+        return top;
+    }
+
+    /** The drawn scroll glides after the asked one with the windows' shared scroll motion, as a menu's does. */
+    private void glideScroll(int maxScroll) {
+        long now = System.nanoTime();
+        double elapsed = this.scrollNanos == 0L ? 0.0D
+                : (now - this.scrollNanos) / 1.0E9D;
+        this.scrollNanos = now;
+        this.renderedScroll = Math.max(0.0D, Math.min(maxScroll,
+                this.renderedScroll));
+        if (Math.abs(this.scroll - this.renderedScroll) <= SCROLL_SNAP_PIXELS) {
+            this.renderedScroll = this.scroll;
+            return;
+        }
+        this.renderedScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
+                this.renderedScroll, this.scroll, elapsed);
     }
 
     private void drawLine(FontRenderer font, Line line, int left, int y,
                           int width, int height, int alpha) {
         if (line.header != null) {
-            String name = LostTalesSkyrimUiStyle.uppercase(line.header);
-            int textTop = y + LostTalesUiInk.centredStart(HEADER_HEIGHT, 7);
-            LostTalesUiInk.drawText(font, name, left, textTop,
-                    LostTalesColors.rgb(LostTalesColors.TEXT), alpha);
-            int ruleLeft = left + font.getStringWidth(name) + 5;
-            if (ruleLeft < left + width) {
-                Gui.drawRect(ruleLeft, textTop + 3, left + width, textTop + 4,
-                        LostTalesColors.BORDER_DIM);
-            }
+            WindowLists.drawHeading(font, line.header, left, left,
+                    left + width, y, MenuWindow.rowHeight(), false, alpha);
             return;
         }
         boolean takeable = line.unavailable.length() == 0;
-        if (line == this.hovered && takeable) {
-            Gui.drawRect(left - 2, y, left + width, y + height - 1,
-                    LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x72));
-        }
         LostTalesUiInk.beginContent();
         String race = ClientCharacterDisplayNames.race(
                 line.character.getRaceId());
         int raceWidth = font.getStringWidth(race);
+        int nameTop = y + LostTalesUiInk.centredStart(nameLine(),
+                LostTalesUiInk.CAP_HEIGHT);
         LostTalesUiInk.drawText(font, font.trimStringToWidth(
                         line.character.getName(), Math.max(0,
-                                width - raceWidth - 6)), left, y + 1,
+                                width - raceWidth - 6)), left, nameTop,
                 takeable ? LostTalesUiInk.IVORY : WindowStyle.asideRgb(),
                 alpha);
-        LostTalesUiInk.drawText(font, race, left + width - raceWidth, y + 1,
+        LostTalesUiInk.drawText(font, race, left + width - raceWidth, nameTop,
                 WindowStyle.asideRgb(), alpha);
-        int lineY = y + NAME_LINE;
+        int lineY = y + nameLine();
         for (String shown : shortDescription(font,
-                line.character.getDescription(), width)) {
+                ClientCharacterDisplayNames.loreDescription(line.character),
+                width)) {
             LostTalesUiInk.drawText(font, shown, left, lineY,
                     WindowStyle.asideRgb(), alpha);
             lineY += DESCRIPTION_LINE;
@@ -379,14 +441,15 @@ final class LoreCharactersWindow extends SubWindowContent {
         if (line == null || line.character == null) {
             return;
         }
-        String description = line.character.getDescription().trim();
+        String description = ClientCharacterDisplayNames.loreDescription(
+                line.character).trim();
         if (description.length() == 0 && line.unavailable.length() == 0) {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
         List<String> text = new ArrayList<String>();
         List<Integer> colours = new ArrayList<Integer>();
-        text.add(line.character.getName());
+        text.add(ClientCharacterDisplayNames.loreCardName(line.character));
         colours.add(Integer.valueOf(LostTalesColors.rgb(LostTalesColors.HONEY)));
         for (Object wrapped : font.listFormattedStringToWidth(description,
                 CARD_WIDTH)) {
@@ -432,7 +495,7 @@ final class LoreCharactersWindow extends SubWindowContent {
         long now = System.nanoTime();
         if (now - this.tickedNanos >= TICK_NANOS) {
             this.tickedNanos = now;
-            this.find.tick();
+            this.find.updateCursorCounter();
         }
     }
 
@@ -440,7 +503,7 @@ final class LoreCharactersWindow extends SubWindowContent {
     public WindowHover hoverAt(LostTalesUiHitBox box, double x, double y) {
         FontRenderer font = Minecraft.getMinecraft().fontRenderer;
         WindowHover hover = new WindowHover(WindowHover.Kind.SUB_WINDOW);
-        if (this.find.contains((int)Math.floor(x), (int)Math.floor(y))) {
+        if (onField(box, x, y)) {
             hover.part = FIELD;
             hover.acts = true;
             return hover;
@@ -519,10 +582,11 @@ final class LoreCharactersWindow extends SubWindowContent {
         }
     }
 
-    /** The wheel scrolls the list by lines of text. */
+    /** The wheel scrolls the list by whole rows, as a menu's does. */
     @Override
     public void scrollBy(int lines) {
-        this.scroll = Math.max(0, this.scroll + lines * NAME_LINE);
+        this.scroll = Math.max(0, this.scroll + WheelStep.pixels(
+                WheelStep.menuRows(lines), MenuWindow.rowHeight()));
     }
 
     @Override
@@ -555,10 +619,10 @@ final class LoreCharactersWindow extends SubWindowContent {
             return false;
         }
         String before = this.find.getText();
-        boolean taken = this.find.keyTyped(typedChar, keyCode);
+        this.find.textboxKeyTyped(typedChar, keyCode);
         if (!before.equals(this.find.getText())) {
             this.scroll = 0;
         }
-        return taken;
+        return true;
     }
 }

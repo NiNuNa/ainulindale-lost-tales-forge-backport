@@ -254,15 +254,8 @@ public final class LostTalesQuestDefinitionValidator {
     }
 
     /** The entries a conversation may hold. */
-    private static final Set<String> DIALOGUE_LINES = new HashSet<String>(
-            Arrays.asList(LostTalesQuestDialogue.OFFER,
-                    LostTalesQuestDialogue.MORE,
-                    LostTalesQuestDialogue.ACCEPT,
-                    LostTalesQuestDialogue.DECLINE,
-                    LostTalesQuestDialogue.PROGRESS,
-                    LostTalesQuestDialogue.HAND_IN,
-                    LostTalesQuestDialogue.HAND_OVER,
-                    LostTalesQuestDialogue.LEAVE));
+    private static final Set<String> DIALOGUE_LINES =
+            new HashSet<String>(LostTalesQuestDialogue.LINES);
 
     private static boolean hasAny(Map<String, String> params, String... keys) {
         if (params == null || keys == null) {

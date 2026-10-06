@@ -10,6 +10,7 @@ package com.ninuna.losttales.chat;
  */
 public final class ChatChannelDescriptor {
     private final String id;
+    private final String nameKey;
     private final String displayName;
     private final ChatPresentationMode presentation;
     private final ChatRecipientRule recipientRule;
@@ -18,6 +19,7 @@ public final class ChatChannelDescriptor {
     private final boolean bridgeable;
     private final ChatChannelScope scope;
 
+    /** A channel a server defined: its config names it, in every language. */
     public ChatChannelDescriptor(String id, String displayName,
                                  ChatPresentationMode presentation,
                                  ChatRecipientRule recipientRule,
@@ -25,6 +27,22 @@ public final class ChatChannelDescriptor {
                                  int displayColor,
                                  boolean bridgeable,
                                  ChatChannelScope scope) {
+        this(id, "", displayName, presentation, recipientRule, access,
+                displayColor, bridgeable, scope);
+    }
+
+    /**
+     * A channel named by the lang file under {@code nameKey}, each game in
+     * its own language; {@code displayName} is its English name, which the
+     * logs use.
+     */
+    ChatChannelDescriptor(String id, String nameKey, String displayName,
+                          ChatPresentationMode presentation,
+                          ChatRecipientRule recipientRule,
+                          ChatChannelAccess access,
+                          int displayColor,
+                          boolean bridgeable,
+                          ChatChannelScope scope) {
         if (id == null || id.trim().length() == 0) {
             throw new IllegalArgumentException("id must not be empty");
         }
@@ -34,6 +52,7 @@ public final class ChatChannelDescriptor {
                     "channel " + id + " is incompletely described");
         }
         this.id = id.trim();
+        this.nameKey = nameKey == null ? "" : nameKey;
         this.displayName = clipDisplayName(displayName);
         this.presentation = presentation;
         this.recipientRule = recipientRule;
@@ -64,6 +83,17 @@ public final class ChatChannelDescriptor {
     }
 
     public String getId() { return this.id; }
+    /**
+     * The lang key the channel is named by in each game's language
+     * ({@code chat.losttales.channel.ooc}); empty for a channel a server
+     * defined, which {@link #getDisplayName} names.
+     */
+    public String getNameKey() { return this.nameKey; }
+    /**
+     * The channel's name as its config gives it, or a built-in channel's
+     * English name, which the logs use; what a game shows is
+     * {@link ChatNames#channel}.
+     */
     public String getDisplayName() { return this.displayName; }
     /** How the channel's lines present their sender; see {@link ChatRolePresentation}. */
     public ChatPresentationMode getPresentation() { return this.presentation; }

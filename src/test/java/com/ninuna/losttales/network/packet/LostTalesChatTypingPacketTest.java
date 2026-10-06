@@ -110,7 +110,7 @@ public final class LostTalesChatTypingPacketTest {
     public void syncRoundTripsAndRejectsAnEmptyNameOrUnknownChannel() {
         LostTalesChatTypingSyncPacket original =
                 new LostTalesChatTypingSyncPacket(
-                        ChatChannel.WHISPER, "Frodo", "Bilbo Baggins", true, "", "");
+                        ChatChannel.WHISPER, "Frodo", "Bilbo Baggins", true, true, "", "");
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatTypingSyncPacket decoded =
@@ -120,10 +120,11 @@ public final class LostTalesChatTypingPacketTest {
         assertEquals(ChatChannel.WHISPER, decoded.getChannel());
         assertEquals("Frodo", decoded.getPartner());
         assertEquals("Bilbo Baggins", decoded.getIdentityName());
+        assertTrue(decoded.isNarrator());
         assertTrue(decoded.isTyping());
 
         try {
-            new LostTalesChatTypingSyncPacket(ChatChannel.GLOBAL, "", " ", true, "", "");
+            new LostTalesChatTypingSyncPacket(ChatChannel.GLOBAL, "", " ", false, true, "", "");
             fail("a typist has a name");
         } catch (IllegalArgumentException expected) {
             // The packet is never built.
@@ -144,7 +145,7 @@ public final class LostTalesChatTypingPacketTest {
         String identity = new java.util.UUID(1L, 2L).toString();
         ByteBuf wire = Unpooled.buffer();
         new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "Aldric",
-                true, "lotr:gondor", identity).toBytes(wire);
+                false, true, "lotr:gondor", identity).toBytes(wire);
         LostTalesChatTypingSyncPacket decoded = new LostTalesChatTypingSyncPacket();
         decoded.fromBytes(wire.copy());
         assertFalse(decoded.isMalformed());

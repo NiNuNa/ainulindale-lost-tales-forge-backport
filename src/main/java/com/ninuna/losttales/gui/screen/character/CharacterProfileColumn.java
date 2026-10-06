@@ -16,6 +16,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
@@ -290,7 +291,7 @@ final class CharacterProfileColumn {
             LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore
                     .getQuest(progress.getQuestId());
             add(Kind.TEXT, quest == null ? progress.getQuestId()
-                    : quest.getTitle(), "", LostTalesColors.rgb(
+                    : LostTalesQuestWords.title(quest), "", LostTalesColors.rgb(
                             LostTalesColors.HONEY));
             wrapped(font, width, objectiveOf(quest, progress),
                     LostTalesUiInk.IVORY);

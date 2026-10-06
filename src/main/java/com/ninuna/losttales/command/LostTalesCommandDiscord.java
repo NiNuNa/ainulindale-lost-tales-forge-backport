@@ -22,7 +22,9 @@ import java.util.Locale;
 import java.util.UUID;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
 
 /**
  * The Discord links, live. {@code list} shows what is linked where;
@@ -32,11 +34,15 @@ import net.minecraft.util.EnumChatFormatting;
  * shown; {@code unlink} takes a game channel's links away, or one
  * Discord channel's, and deletes their webhooks; {@code reload} restarts
  * the bridge from the file. The links are written through the config
- * service, which saves the file and restarts the bridge on it.
+ * service, which saves the file and restarts the bridge on it. Every
+ * answer is words the sender's game translates, the channels it names
+ * among them; the usage lines are the command's own syntax.
  */
 public final class LostTalesCommandDiscord extends LostTalesCommandBase {
 
     private static final String BINDINGS_KEY = "channelBindings";
+    /** What the lang key of each of the command's answers begins with. */
+    static final String SAY = "chat.losttales.command.discord.";
 
     public LostTalesCommandDiscord() {
         super("discord");
@@ -59,8 +65,7 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             return;
         }
         if (FMLCommonHandler.instance().getEffectiveSide() != Side.SERVER) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
-                    + "The Discord bridge runs on the logical server only.");
+            say(sender, EnumChatFormatting.RED, SAY + "side_only");
             return;
         }
         String action = args[0];
@@ -72,10 +77,9 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             unlink(sender, args);
         } else if ("reload".equalsIgnoreCase(action)) {
             LostTalesDiscordBridge.getInstance().start();
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.GREEN
-                    + "Discord bridge restarted from the config file"
-                    + (LostTalesDiscordBridge.getInstance().isRunning()
-                            ? "." : "; it is off or has nothing to do."));
+            say(sender, EnumChatFormatting.GREEN,
+                    LostTalesDiscordBridge.getInstance().isRunning()
+                            ? SAY + "reloaded" : SAY + "reloaded.idle");
         } else {
             sendUsage(sender);
         }
@@ -84,7 +88,7 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
     /** Every link, as a line each: the game channel, the Discord channel, the way lines cross. */
     private void list(ICommandSender sender) {
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
-        List<String> lines = new ArrayList<String>();
+        List<IChatComponent> lines = new ArrayList<IChatComponent>();
         for (String entry : LostTalesConfig.discordChannelBindings) {
             String key = DiscordBindingEntries.keyOf(entry);
             if (key.length() == 0) {
@@ -93,16 +97,25 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             String channel = DiscordBindingEntries.optionOf(entry, "channel");
             DiscordBridgeDirection direction = DiscordBridgeDirection.parse(
                     entry.substring(entry.indexOf('=') + 1).split(";")[0]);
-            lines.add(LostTalesDiscordBridge.gameChannelName(key) + " - "
-                    + (channel.length() > 0 ? bridge.describeDiscordChannel(channel)
-                            : "a webhook naming no channel")
-                    + ", " + describe(direction));
+            // Indented under the heading, the indent outside the words.
+            IChatComponent line = new ChatComponentText("  ");
+            line.getChatStyle().setColor(EnumChatFormatting.WHITE);
+            line.appendSibling(words(SAY + "list.entry",
+                    LostTalesDiscordBridge.gameChannelComponent(key),
+                    channel.length() > 0 ? bridge.discordChannelComponent(channel)
+                            : words(SAY + "list.no_channel"),
+                    describe(direction)));
+            lines.add(line);
         }
-        LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "Discord bridge "
-                + (bridge.isRunning() ? "running" : "stopped") + "; "
-                + (lines.isEmpty() ? "nothing is linked." : "linked:"));
-        for (String line : lines) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.WHITE + "  " + line);
+        String heading;
+        if (bridge.isRunning()) {
+            heading = lines.isEmpty() ? SAY + "list.running.none" : SAY + "list.running";
+        } else {
+            heading = lines.isEmpty() ? SAY + "list.stopped.none" : SAY + "list.stopped";
+        }
+        say(sender, EnumChatFormatting.GRAY, heading);
+        for (IChatComponent line : lines) {
+            sender.addChatMessage(line);
         }
     }
 
@@ -113,23 +126,21 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
      */
     private void link(ICommandSender sender, String[] args) {
         if (args.length < 2) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                    + "/losttales discord link <channel> "
+            usage(sender, "/losttales discord link <channel> "
                     + "[BIDIRECTIONAL|GAME_TO_DISCORD|DISCORD_TO_GAME]");
             return;
         }
         String key = args[1].toLowerCase(Locale.ROOT);
         String refusal = linkRefusal(args[1]);
         if (refusal != null) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED + refusal);
+            say(sender, EnumChatFormatting.RED, refusal, args[1]);
             return;
         }
         ChatCodeNames.Named named = ChatCodeNames.parse(key);
         DiscordBridgeDirection direction = args.length > 2
                 ? DiscordBridgeDirection.parse(args[2]) : DiscordBridgeDirection.BIDIRECTIONAL;
         if (direction == null || direction == DiscordBridgeDirection.DISABLED) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
-                    + "Unknown direction " + args[2] + ".");
+            say(sender, EnumChatFormatting.RED, SAY + "unknown_direction", args[2]);
             return;
         }
         if (named.channel.getRecipientRule() == ChatRecipientRule.PROXIMITY
@@ -139,50 +150,37 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
         }
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
         if (!bridge.canPair()) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
-                    + (bridge.isGatewayClosedForGood()
-                            ? "The Discord bot is not connected: Discord closed its"
-                                    + " connection for good, and the server log says why."
-                                    + " Put that right, then /losttales discord reload."
-                            : "Linking needs the Discord bot connected with its slash"
-                                    + " commands: set discord.enabled, discord.botToken,"
-                                    + " discord.gateway and discord.slashCommands."));
+            say(sender, EnumChatFormatting.RED, bridge.isGatewayClosedForGood()
+                    ? SAY + "not_connected.closed" : SAY + "not_connected.setup");
             return;
         }
         UUID issuer = sender instanceof EntityPlayerMP
                 ? ((EntityPlayerMP)sender).getUniqueID() : null;
         String code = DiscordLinkCodes.issue(key, direction, issuer,
                 sender.getCommandSenderName(), System.currentTimeMillis());
-        LostTalesCommandConfig.send(sender, EnumChatFormatting.GREEN
-                + "Type /link code:" + code + " in the Discord channel to link it to "
-                + LostTalesDiscordBridge.gameChannelName(key) + ", "
-                + describe(direction) + ". The code works once, for "
-                + DiscordLinkCodes.LIFETIME_MILLIS / 60000L + " minutes, and needs a"
-                + " member who may manage that channel's webhooks.");
+        say(sender, EnumChatFormatting.GREEN, SAY + "code", code,
+                LostTalesDiscordBridge.gameChannelComponent(key), describe(direction),
+                String.valueOf(DiscordLinkCodes.LIFETIME_MILLIS / 60000L));
         if (DiscordBridgePolicy.isLimitedInGame(named.channel)) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.YELLOW
-                    + "Only some players read " + LostTalesDiscordBridge.gameChannelName(key)
-                    + " in the game. On Discord, everyone who can see the linked channel"
-                    + " reads it: link it to a channel only your staff can see.");
+            say(sender, EnumChatFormatting.YELLOW, SAY + "limited",
+                    LostTalesDiscordBridge.gameChannelComponent(key));
         }
     }
 
     /**
      * Why the game channel {@code typed} names cannot be linked, as the
-     * command says it; null when it can. A private channel never leaves
-     * the game, and a channel whose gate lets nobody read it would carry
-     * nothing.
+     * lang key of the answer, which names what was typed; null when it
+     * can. A private channel never leaves the game, and a channel whose
+     * gate lets nobody read it would carry nothing.
      */
     static String linkRefusal(String typed) {
         String key = typed == null ? "" : typed.toLowerCase(Locale.ROOT);
         ChatCodeNames.Named named = ChatCodeNames.parse(key);
         if (named == null || !named.channel.isBridgeable()) {
-            return "Cannot link " + typed + ": name a channel that may reach"
-                    + " Discord, or a faction such as gondor.";
+            return SAY + "refused.channel";
         }
         if (!DiscordBridgePolicy.isOpenToTheBridge(named.channel)) {
-            return "Cannot link " + typed + ": its gate in channels.cfg lets"
-                    + " nobody read it, so nothing would cross.";
+            return SAY + "refused.gate";
         }
         return null;
     }
@@ -193,8 +191,7 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
      */
     private void unlink(ICommandSender sender, String[] args) {
         if (args.length < 2) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                    + "/losttales discord unlink <channel> [<Discord channel id>]");
+            usage(sender, "/losttales discord unlink <channel> [<Discord channel id>]");
             return;
         }
         String key = args[1].toLowerCase(Locale.ROOT);
@@ -213,9 +210,8 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             after = DiscordBindingEntries.removeKey(before, key);
         }
         if (after.size() == before.length) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
-                    + "Nothing of " + args[1] + " is linked"
-                    + (args.length > 2 ? " to that Discord channel." : "."));
+            say(sender, EnumChatFormatting.RED, args.length > 2
+                    ? SAY + "unlink.nothing_there" : SAY + "unlink.nothing", args[1]);
             return;
         }
         List<String> webhooks = DiscordBindingEntries.webhooksRemoved(before, after);
@@ -226,23 +222,27 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
         LostTalesDiscordBridge.getInstance().retireWebhooks(webhooks);
     }
 
-    private static String describe(DiscordBridgeDirection direction) {
+    /** The way lines cross a link, as words the sender's game translates. */
+    private static IChatComponent describe(DiscordBridgeDirection direction) {
+        return words(directionKey(direction));
+    }
+
+    /** The lang key a direction is named by. */
+    static String directionKey(DiscordBridgeDirection direction) {
         if (direction == null || direction == DiscordBridgeDirection.DISABLED) {
-            return "switched off";
+            return SAY + "direction.off";
         }
-        return direction == DiscordBridgeDirection.GAME_TO_DISCORD ? "game to Discord"
-                : direction == DiscordBridgeDirection.DISCORD_TO_GAME ? "Discord to game"
-                : "both ways";
+        return direction == DiscordBridgeDirection.GAME_TO_DISCORD ? SAY + "direction.to_discord"
+                : direction == DiscordBridgeDirection.DISCORD_TO_GAME ? SAY + "direction.to_game"
+                : SAY + "direction.both";
     }
 
     private void sendUsage(ICommandSender sender) {
-        LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
-        LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales discord list");
-        LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                + "/losttales discord link <channel> [direction]");
-        LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                + "/losttales discord unlink <channel> [<Discord channel id>]");
-        LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales discord reload");
+        usage(sender, getCommandUsage(sender));
+        usage(sender, "/losttales discord list");
+        usage(sender, "/losttales discord link <channel> [direction]");
+        usage(sender, "/losttales discord unlink <channel> [<Discord channel id>]");
+        usage(sender, "/losttales discord reload");
     }
 
     @Override

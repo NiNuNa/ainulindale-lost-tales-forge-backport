@@ -21,9 +21,8 @@ public final class MissiveBoardWatchesTest {
     @Test
     public void aNoticesTimeLeftIsTheBoardsOwnExpiry() {
         LostTalesMissiveData posted = LostTalesMissiveData.builder("q", "kill")
-                .title("Posted").generationWorldTime(1000L)
-                .objective(new LostTalesMissiveObjectiveData("o", "kill", "",
-                        false, null))
+                .titleId("dangerous_work").generationWorldTime(1000L)
+                .objective(new LostTalesMissiveObjectiveData("o", "kill", false, null))
                 .build();
         assertEquals(6000L, MissiveBoardService.ticksLeft(posted, 8000L, 3000L));
         assertEquals("due already", 0L,
@@ -35,9 +34,8 @@ public final class MissiveBoardWatchesTest {
         assertEquals("posted after the clock", MissiveNotice.STAYS_UP,
                 MissiveBoardService.ticksLeft(posted, 8000L, 500L));
         LostTalesMissiveData undated = LostTalesMissiveData.builder("q", "kill")
-                .title("Undated")
-                .objective(new LostTalesMissiveObjectiveData("o", "kill", "",
-                        false, null))
+                .titleId("dangerous_work")
+                .objective(new LostTalesMissiveObjectiveData("o", "kill", false, null))
                 .build();
         assertEquals("no time it was posted at", MissiveNotice.STAYS_UP,
                 MissiveBoardService.ticksLeft(undated, 8000L, 3000L));

@@ -9,16 +9,21 @@ import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.SubWindowContent;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowHover;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WordButton;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorChoice;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorContext;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorControl;
+import com.ninuna.losttales.gui.screen.character.creator.CreatorRows;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorStepper;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorTileGrid;
 import com.ninuna.losttales.gui.screen.character.creator.PlainChoice;
@@ -26,7 +31,6 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
-import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,25 +47,29 @@ import org.lwjgl.input.Keyboard;
  * sub-window of the Characters page's window, its player's to change at any
  * time. The skins are the grid of faces the creator shows — every skin the
  * character's race and sex may wear, the account's own among them where
- * the race allows it — scrolled a few rows at a time, the chosen one named
- * above it; under it the arm width and the chest, fixed where the skin
- * decides them. Name, race, sex and faction are not here. Save sends the
- * look and the window closes once the server has kept it; Cancel, the
- * cross and Escape leave it as it was. The figure on the page wears the
- * look while the window is open.
+ * the race allows it — under a heading naming the chosen one, scrolled by
+ * whole rows of faces a few at a time; under it the arm width and the
+ * chest as rows of the windows' Settings, fixed where the skin decides
+ * them. Name, race, sex and faction are not here. Save sends the look and
+ * the window closes once the server has kept it; Cancel, the cross and
+ * Escape leave it as it was. The figure on the page wears the look while
+ * the window is open.
  */
 final class LookEditWindow extends SubWindowContent {
     private static final String SAVE = "save";
     private static final String CANCEL = "cancel";
     private static final String CONTROL = "control";
     private static final int WIDTH = 300;
-    private static final int PADDING = 6;
-    private static final int CONTROL_GAP = 6;
-    private static final int STATUS_HEIGHT = 12;
+    private static final int PADDING_X = MenuWindow.PADDING_X;
+    private static final int PADDING_Y = MenuWindow.PADDING_Y;
     /** The rows of faces the grid shows at once; the wheel scrolls the rest. */
     private static final int GRID_ROWS = 4;
     /** How often the rows keep time, as a screen's ticks would. */
     private static final long TICK_NANOS = 50L * 1000000L;
+    /** Closer than this to the target and the drawn scroll arrives. */
+    private static final double SCROLL_SNAP_PIXELS = 0.5D;
+    /** What is drawn under the pointer while it is off a part. */
+    private static final int AWAY = Integer.MIN_VALUE / 2;
 
     private final UUID characterId;
     private final LostTalesUiButtonMotion saveMotion =
@@ -76,12 +84,17 @@ final class LookEditWindow extends SubWindowContent {
     private int skinIndex;
     private int bodyTypeIndex;
     private int chestTypeIndex;
+    private CreatorContext context;
     private CreatorTileGrid grid;
     private CreatorStepper body;
     private CreatorStepper chest;
     private final List<CreatorControl> controls = new ArrayList<CreatorControl>();
-    /** How far the grid is scrolled, in pixels, a whole row of faces at a time. */
+    /** Pixels the grid is asked to be scrolled by, a whole row of faces at a time; the drawn offset glides after it. */
     private int gridScroll;
+    private double renderedGridScroll;
+    private long gridScrollNanos;
+    /** The height of the band the grid shows in, as last laid out. */
+    private int gridBand;
     private CreatorControl focused;
     private CreatorControl held;
     private CreatorControl hovered;
@@ -123,6 +136,7 @@ final class LookEditWindow extends SubWindowContent {
                         : character.getChestTypeId()));
         build();
         this.gridScroll = 0;
+        this.renderedGridScroll = 0.0D;
         this.status = "";
         this.statusError = false;
         this.pendingRequestId = 0;
@@ -135,10 +149,11 @@ final class LookEditWindow extends SubWindowContent {
 
     private void build() {
         Minecraft minecraft = Minecraft.getMinecraft();
-        CreatorContext context = new CreatorContext(minecraft,
-                minecraft.fontRenderer, minecraft.thePlayer == null ? null
-                        : minecraft.thePlayer.getUniqueID());
-        this.grid = new CreatorTileGrid(context, null, new PlainChoice() {
+        this.context = new CreatorContext(minecraft, minecraft.fontRenderer,
+                minecraft.thePlayer == null ? null
+                        : minecraft.thePlayer.getUniqueID(),
+                CreatorContext.Presentation.ROWS);
+        this.grid = new CreatorTileGrid(this.context, null, new PlainChoice() {
             @Override public int count() { return skinIds.size(); }
             @Override public int index() { return skinIndex; }
             @Override public String id(int index) { return skinIds.get(index); }
@@ -150,7 +165,7 @@ final class LookEditWindow extends SubWindowContent {
                 clearError();
             }
         });
-        this.body = new CreatorStepper(context,
+        this.body = new CreatorStepper(this.context,
                 I18n.format("gui.losttales.character.body"), new CreatorChoice() {
             @Override public int count() { return bodyTypeIds.size(); }
             @Override public int index() { return bodyTypeIndex; }
@@ -172,7 +187,7 @@ final class LookEditWindow extends SubWindowContent {
                 return I18n.format("gui.losttales.character.no_options");
             }
         });
-        this.chest = new CreatorStepper(context,
+        this.chest = new CreatorStepper(this.context,
                 I18n.format("gui.losttales.character.chest"), new CreatorChoice() {
             @Override public int count() { return chestTypeIds.size(); }
             @Override public int index() { return chestTypeIndex; }
@@ -231,37 +246,78 @@ final class LookEditWindow extends SubWindowContent {
 
     /* ---- Where things stand ---- */
 
-    /** The grid's box: as tall as its rows, a few of them at most. */
+    private static int inner(LostTalesUiHitBox box) {
+        return (int)box.width - 2 * PADDING_X;
+    }
+
+    /** The band the grid shows in: as tall as its rows, a few of them at most, ending on a row's foot. */
     private int gridBoxHeight(int width) {
         this.grid.place(0, 0, width);
         return Math.min(this.grid.height(),
-                GRID_ROWS * CreatorTileGrid.ROW_PITCH);
+                CreatorTileGrid.rowsHeight(GRID_ROWS));
     }
 
-    private int gridTop(LostTalesUiHitBox box) {
-        return (int)box.top + PADDING + WindowStyle.LINE_HEIGHT;
+    /** Where the heading naming the chosen skin stands. */
+    private static int headingTop(LostTalesUiHitBox box) {
+        return (int)box.top + PADDING_Y;
     }
 
-    /** Places the rows from the box's top left; answers where the status line stands. */
+    /** Where the grid's band starts: under the heading, a padding clear of its hairline. */
+    private static int gridTop(LostTalesUiHitBox box) {
+        return headingTop(box) + CreatorRows.height() + PADDING_Y;
+    }
+
+    /** Where the status line stands: a note's height over Cancel and Save. */
+    private static int statusTop(LostTalesUiHitBox box) {
+        return (int)(box.top + box.height) - PADDING_Y
+                - LostTalesUiFramedButton.HEIGHT - CreatorRows.noteHeight(1);
+    }
+
+    /**
+     * Places the rows from the box's top left: the grid from its drawn
+     * offset, its scroll kept within its rows, and the two steppers under
+     * its band. Answers the furthest the grid scrolls.
+     */
     private int layOut(LostTalesUiHitBox box) {
-        int left = (int)box.left + PADDING;
-        int width = (int)box.width - 2 * PADDING;
-        int gridHeight = gridBoxHeight(width);
-        this.gridScroll = Math.max(0, Math.min(this.gridScroll,
-                this.grid.height() - gridHeight));
-        this.grid.place(left, gridTop(box) - this.gridScroll, width);
-        int y = gridTop(box) + gridHeight + CONTROL_GAP;
+        int left = (int)box.left + PADDING_X;
+        int width = inner(box);
+        this.gridBand = gridBoxHeight(width);
+        int maxScroll = Math.max(0, this.grid.height() - this.gridBand);
+        this.gridScroll = Math.max(0, Math.min(this.gridScroll, maxScroll));
+        this.renderedGridScroll = Math.max(0.0D, Math.min(maxScroll,
+                this.renderedGridScroll));
+        placeGrid(box);
+        int y = gridTop(box) + this.gridBand + PADDING_Y;
         this.body.place(left, y, width);
-        y += this.body.height() + CONTROL_GAP;
-        this.chest.place(left, y, width);
-        return y + this.chest.height() + CONTROL_GAP;
+        this.chest.place(left, y + this.body.height(), width);
+        return maxScroll;
     }
 
-    /** Whether a point is on the part of the grid the box shows. */
+    /** The grid at its drawn offset in the band. */
+    private void placeGrid(LostTalesUiHitBox box) {
+        this.grid.place((int)box.left + PADDING_X, gridTop(box)
+                - (int)Math.round(this.renderedGridScroll), inner(box));
+    }
+
+    /** The grid's drawn scroll glides after the asked one with the windows' shared scroll motion, as a menu's does. */
+    private void glideGridScroll() {
+        long now = System.nanoTime();
+        double elapsed = this.gridScrollNanos == 0L ? 0.0D
+                : (now - this.gridScrollNanos) / 1.0E9D;
+        this.gridScrollNanos = now;
+        if (Math.abs(this.gridScroll - this.renderedGridScroll)
+                <= SCROLL_SNAP_PIXELS) {
+            this.renderedGridScroll = this.gridScroll;
+            return;
+        }
+        this.renderedGridScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
+                this.renderedGridScroll, this.gridScroll, elapsed);
+    }
+
+    /** Whether a point is on the band the grid shows in, across the whole box, as last laid out. */
     private boolean inGridBox(LostTalesUiHitBox box, double x, double y) {
-        int width = (int)box.width - 2 * PADDING;
-        return LostTalesUiHitBox.contains(x, y, box.left + PADDING,
-                gridTop(box), width, gridBoxHeight(width));
+        return LostTalesUiHitBox.contains(x, y, box.left, gridTop(box),
+                box.width, this.gridBand);
     }
 
     /* ---- Saving ---- */
@@ -345,13 +401,14 @@ final class LookEditWindow extends SubWindowContent {
         return WIDTH;
     }
 
+    /** The heading, the grid's band, the two steppers, the status line and the foot's buttons. */
     @Override
     public int naturalHeight(int width) {
-        int inner = width - 2 * PADDING;
-        return PADDING + WindowStyle.LINE_HEIGHT + gridBoxHeight(inner)
-                + CONTROL_GAP + this.body.height() + CONTROL_GAP
-                + this.chest.height() + CONTROL_GAP + STATUS_HEIGHT
-                + LostTalesUiFramedButton.HEIGHT + PADDING;
+        int inner = width - 2 * PADDING_X;
+        return PADDING_Y + CreatorRows.height() + PADDING_Y
+                + gridBoxHeight(inner) + PADDING_Y + this.body.height()
+                + this.chest.height() + CreatorRows.noteHeight(1)
+                + LostTalesUiFramedButton.HEIGHT + PADDING_Y;
     }
 
     @Override
@@ -371,41 +428,44 @@ final class LookEditWindow extends SubWindowContent {
         keepTime();
         followRequest();
         FontRenderer font = minecraft.fontRenderer;
-        int left = (int)box.left + PADDING;
-        int inner = (int)box.width - 2 * PADDING;
-        int statusTop = layOut(box);
-        int mouseX = Double.isNaN(pointerX) ? Integer.MIN_VALUE / 2
-                : (int)Math.floor(pointerX);
-        int mouseY = Double.isNaN(pointerY) ? Integer.MIN_VALUE / 2
-                : (int)Math.floor(pointerY);
+        int left = (int)box.left + PADDING_X;
+        int inner = inner(box);
+        int maxScroll = layOut(box);
+        glideGridScroll();
+        placeGrid(box);
+        this.context.frame(alpha, surfaceAlpha, (int)box.left,
+                (int)(box.left + box.width));
+        boolean pointed = !Double.isNaN(pointerX) && !Double.isNaN(pointerY);
+        int mouseX = pointed ? (int)Math.floor(pointerX) : AWAY;
+        int mouseY = pointed ? (int)Math.floor(pointerY) : AWAY;
         String part = partAt(font, box, pointerX, pointerY);
         String skinName = skinId().length() == 0 ? ""
                 : ClientCharacterDisplayNames.skin(skinId());
-        LostTalesUiInk.drawText(font, font.trimStringToWidth(I18n.format(
-                        "gui.losttales.character.look.skin", skinName), inner),
-                left, (int)box.top + PADDING + WindowStyle.ROW_TEXT_TOP,
-                LostTalesUiInk.IVORY, alpha);
-        int gridHeight = gridBoxHeight(inner);
-        this.grid.place(left, gridTop(box) - this.gridScroll, inner);
-        boolean clipped = SubWindowContent.beginClip(minecraft,
-                clipX + PADDING, clipY + (gridTop(box) - box.top), inner,
-                gridHeight);
+        WindowLists.drawHeading(font, I18n.format(
+                        "gui.losttales.character.look.skin", skinName), left,
+                left, left + inner, headingTop(box), CreatorRows.height(),
+                false, alpha);
+        int gridHeight = this.gridBand;
+        boolean clipped = SubWindowContent.beginClip(minecraft, clipX,
+                clipY + (gridTop(box) - box.top), box.width, gridHeight);
         try {
             boolean overGrid = inGridBox(box, pointerX, pointerY);
-            this.grid.draw(overGrid ? mouseX : Integer.MIN_VALUE / 2,
-                    overGrid ? mouseY : Integer.MIN_VALUE / 2);
+            this.grid.draw(overGrid ? mouseX : AWAY, overGrid ? mouseY : AWAY);
         } finally {
             SubWindowContent.endClip(clipped);
         }
-        LostTalesUiInk.beginContent();
+        WindowLists.drawScroll(box.left, gridTop(box), box.left + box.width,
+                gridTop(box) + gridHeight, gridTop(box),
+                gridTop(box) + gridHeight, this.renderedGridScroll, maxScroll,
+                alpha);
         this.body.draw(mouseX, mouseY);
         this.chest.draw(mouseX, mouseY);
         String said = statusText();
         if (said.length() > 0) {
-            LostTalesUiInk.drawText(font, font.trimStringToWidth(said, inner),
-                    left, statusTop, this.statusError
-                            ? LostTalesColors.rgb(LostTalesColors.RED)
-                            : WindowStyle.asideRgb(), alpha);
+            CreatorRows.drawNote(this.context, Collections.singletonList(
+                    font.trimStringToWidth(said, inner)), left, statusTop(box),
+                    this.statusError ? LostTalesColors.rgb(LostTalesColors.RED)
+                            : WindowStyle.asideRgb());
         }
         WordButton.draw(font, buttonBox(font, box, CANCEL), cancelLabel(),
                 false, true, CANCEL.equals(part), this.cancelMotion, alpha,
@@ -450,9 +510,9 @@ final class LookEditWindow extends SubWindowContent {
                                                String part) {
         int saveWidth = WordButton.width(font, saveLabel());
         int cancelWidth = WordButton.width(font, cancelLabel());
-        double top = box.top + box.height - PADDING
+        double top = box.top + box.height - PADDING_Y
                 - LostTalesUiFramedButton.HEIGHT;
-        double saveLeft = box.left + box.width - PADDING - saveWidth;
+        double saveLeft = box.left + box.width - PADDING_X - saveWidth;
         if (SAVE.equals(part)) {
             return new LostTalesUiHitBox(saveLeft, top, saveWidth,
                     LostTalesUiFramedButton.HEIGHT);
@@ -473,7 +533,7 @@ final class LookEditWindow extends SubWindowContent {
         return controlAt(box, x, y) != null ? CONTROL : null;
     }
 
-    /** The row under a point; the grid only where the box shows it. */
+    /** The row under a point; the grid only where its band shows it. */
     private CreatorControl controlAt(LostTalesUiHitBox box, double x, double y) {
         if (Double.isNaN(x) || Double.isNaN(y)) {
             return null;
@@ -541,7 +601,7 @@ final class LookEditWindow extends SubWindowContent {
         }
     }
 
-    /** The wheel over the grid scrolls it a row of faces; over a stepper it steps. */
+    /** The wheel over the grid scrolls it a whole row of faces; over a stepper it steps. */
     @Override
     public void scrollBy(int lines) {
         if (this.hovered == this.grid) {

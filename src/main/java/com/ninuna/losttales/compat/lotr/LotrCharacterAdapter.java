@@ -348,6 +348,33 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         }
     }
 
+    /**
+     * The lang key LOTR names a faction by ({@code lotr.faction.GONDOR.name}),
+     * for a line each game translates in its own language; null when the
+     * identifier cannot be resolved.
+     */
+    public synchronized String getFactionNameKey(String factionId) {
+        ensureInitialized();
+        if (!this.available) {
+            return null;
+        }
+        String normalizedId = normalizeFactionId(factionId);
+        if (normalizedId.length() == 0) {
+            return null;
+        }
+        try {
+            LOTRFaction faction = findFaction(normalizedId);
+            return faction == null ? null : faction.untranslatedFactionName();
+        } catch (LinkageError error) {
+            markUnavailable("incompatible_lotr_api", error);
+            return null;
+        } catch (RuntimeException exception) {
+            FMLLog.warning("[%s] Failed to obtain LOTR faction name key for %s: %s",
+                    LostTalesMetaData.MOD_ID, normalizedId, exception.toString());
+            return null;
+        }
+    }
+
     /** Resolves the configured character faction to LOTR's readable RGB color. */
     public synchronized int getFactionColor(String factionId, int fallback) {
         String normalizedId = normalizeFactionId(factionId);
@@ -449,11 +476,12 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
     }
 
     /**
-     * The LOTR title the player wears, as LOTR names it in this server's
-     * language ({@code Gondor Farmer}): empty for none, null when LOTR's
-     * player data cannot be read.
+     * The LOTR title the player wears, as the lang key LOTR names it by
+     * ({@code lotr.title.farmer}), for each game to name in its own
+     * language: empty for none, null when LOTR's player data cannot be
+     * read.
      */
-    public String getTitleName(EntityPlayerMP player) {
+    public String getTitleKey(EntityPlayerMP player) {
         if (player == null || player.worldObj == null
                 || player.worldObj.isRemote) {
             return null;
@@ -465,7 +493,7 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
             }
             LOTRTitle.PlayerTitle worn = data.getPlayerTitle();
             return worn == null || worn.getTitle() == null ? ""
-                    : worn.getTitle().getDisplayName(player);
+                    : worn.getTitle().getUntranslatedName(player);
         } catch (LinkageError error) {
             warnTitleOnce(error);
             return null;

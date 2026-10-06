@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.util.EnglishWords;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -23,7 +24,9 @@ public final class LostTalesChatServiceUnkeptQuoteTest {
         assertTrue(posted.exists());
         assertFalse(posted.isAnchored());
         assertFalse(posted.hasHead());
-        assertEquals(ChatReplyReference.UNKEPT_WORDS, posted.getAuthor());
+        assertEquals("the lang line, in the server's words",
+                EnglishWords.INSTANCE.format(ChatReplyReference.UNKEPT_KEY),
+                posted.getAuthor());
         assertEquals("", posted.getExcerpt());
     }
 

@@ -1,14 +1,14 @@
 package com.ninuna.losttales.client.mapmarker;
 
-import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import lotr.common.LOTRDimension;
 import net.minecraft.client.resources.IResourceManager;
 
 /**
@@ -20,7 +20,7 @@ import net.minecraft.client.resources.IResourceManager;
  */
 public final class LostTalesClientMapMarkerStore {
     private static volatile List<LostTalesMapMarkerData> decorativeMarkers =
-            createFallbackMarkers();
+            Collections.emptyList();
     private static volatile LostTalesClientMapMarkerIndex.Snapshot
             decorativeSnapshot =
                     LostTalesClientMapMarkerIndex
@@ -94,10 +94,16 @@ public final class LostTalesClientMapMarkerStore {
         return getSharedMarker(markerId) != null;
     }
 
+    /**
+     * Reads the marker files again. With none to read the map and compass
+     * show no bundled markers, and the log says why.
+     */
     public static synchronized void reloadFromResources(IResourceManager resourceManager) {
         List<LostTalesMapMarkerData> loaded = LostTalesMapMarkerResourceLoader.loadSharedMarkers(resourceManager);
         if (loaded.isEmpty()) {
-            loaded = createFallbackMarkers();
+            LostTalesLog.warning("No map markers could be read from the "
+                    + "map_markers files; the map and compass show none of "
+                    + "the bundled places.");
         }
         decorativeMarkers = Collections.unmodifiableList(
                 new ArrayList<LostTalesMapMarkerData>(loaded));
@@ -140,11 +146,24 @@ public final class LostTalesClientMapMarkerStore {
                 Collections.<LostTalesMapMarkerData>emptyList());
     }
 
+    /**
+     * The server's marker as this client draws it. Words an operator gave
+     * a bundled marker stay as they are; a marker keeping the words it
+     * ships with is read in the game's language.
+     */
     private static LostTalesMapMarkerData toClientMarker(LostTalesMapMarkerDefinition marker) {
         if (marker == null || marker.getId() == null || marker.getId().length() == 0) {
             return null;
         }
-        String name = marker.getName() == null || marker.getName().length() == 0 ? marker.getId() : marker.getName();
+        String name = marker.getName() == null || marker.getName().length() == 0
+                ? (marker.getNamedAfter().length() > 0 ? "" : marker.getId())
+                : marker.getName();
+        String nameKey = LostTalesMapMarkerNames.isBundledName(
+                marker.getId(), marker.getName())
+                ? LostTalesMapMarkerNames.nameKey(marker.getId()) : "";
+        String descriptionKey = LostTalesMapMarkerNames.isBundledDescription(
+                marker.getId(), marker.getDescription())
+                ? LostTalesMapMarkerNames.descriptionKey(marker.getId()) : "";
         String icon = marker.getIconName() == null || marker.getIconName().length() == 0 ? "quest" : marker.getIconName();
         String color = marker.getColorName() == null || marker.getColorName().length() == 0 ? "white" : marker.getColorName();
         return new LostTalesMapMarkerData(
@@ -166,15 +185,10 @@ public final class LostTalesClientMapMarkerStore {
                 marker.requiresRegionUnlock(),
                 marker.hasWaystone(),
                 marker.getPriority(),
-                marker.getSource()
+                marker.getSource(),
+                nameKey,
+                descriptionKey,
+                marker.getNamedAfter()
         );
-    }
-
-    private static List<LostTalesMapMarkerData> createFallbackMarkers() {
-        List<LostTalesMapMarkerData> markers = new ArrayList<LostTalesMapMarkerData>();
-        int middleEarth = LOTRDimension.MIDDLE_EARTH.dimensionID;
-        markers.add(new LostTalesMapMarkerData("fallback-town", "Town", LostTalesCompassMarkerIcon.TOWN.name(), "red", middleEarth, 15.0D, LostTalesMapMarkerDefinition.AUTOMATIC_Y, 15.0D, 160.0D, 10.0D));
-        markers.add(new LostTalesMapMarkerData("fallback-cheese-fort", "Cheese's Fort", LostTalesCompassMarkerIcon.TOWN.name(), "white", middleEarth, -180.0D, LostTalesMapMarkerDefinition.AUTOMATIC_Y, -140.0D, 250.0D, 10.0D));
-        return Collections.unmodifiableList(markers);
     }
 }

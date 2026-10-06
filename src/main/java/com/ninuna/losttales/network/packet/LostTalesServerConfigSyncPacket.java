@@ -13,8 +13,9 @@ import java.util.List;
 
 /**
  * The server's config as an operator's client may see it: every
- * server-side key with its type, bounds and comment, secrets blanked.
- * Sent only to a player the server has checked is an operator.
+ * server-side key with its type, bounds and words, secrets blanked; the
+ * client names and explains each from its own lang file. Sent only to a
+ * player the server has checked is an operator.
  */
 public final class LostTalesServerConfigSyncPacket implements IMessage {
 

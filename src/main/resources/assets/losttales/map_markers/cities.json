@@ -2,7 +2,6 @@
   "map_markers": [
     {
       "id": "losttales:test_city_northgate",
-      "name": "Northgate Test City",
       "relevance": "high",
       "icon": "town",
       "color": "orange",
@@ -16,12 +15,10 @@
       "requiresRegionUnlock": false,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "description": "A visible test city for validating automatic terrain height, waystone generation, and fast travel."
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "losttales:test_city_lakewatch",
-      "name": "Lakewatch Test City",
       "relevance": "high",
       "icon": "town",
       "color": "blue",
@@ -35,12 +32,10 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "description": "A discovery-gated test city used to verify ground-resolved markers and generated waystones."
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "losttales:test_city_sunfield",
-      "name": "Sunfield Test City",
       "relevance": "high",
       "icon": "town",
       "color": "yellow",
@@ -54,8 +49,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "description": "A hidden test city for checking discovery, map visibility, and automatic surface placement."
+      "waystoneStructureType": "losttales:glowstone_house"
     }
   ]
 }

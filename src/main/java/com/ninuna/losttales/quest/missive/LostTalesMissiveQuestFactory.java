@@ -5,15 +5,15 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * A missive's quest, made from its letter: one stage of the letter's
- * objectives, its reward, its words as the quest's description and journal
- * line, and a locked start, so only the letter starts it. Who issued it is
- * said on the letter, not in the quest.
+ * objectives, its reward, the letter's template ids as the words it is
+ * read by ({@link MissiveWords}: its title, its description, and its
+ * flavour line as the journal's), and a locked start, so only the letter
+ * starts it.
  */
 public final class LostTalesMissiveQuestFactory {
     private static final String DEFAULT_STAGE_ID = "10";
@@ -33,7 +33,7 @@ public final class LostTalesMissiveQuestFactory {
             objectives.add(new LostTalesQuestObjectiveDefinition(
                     objective.getId(),
                     objective.getType(),
-                    objective.getDescription(),
+                    "",
                     objective.isOptional(),
                     objective.getParams()
             ));
@@ -49,26 +49,21 @@ public final class LostTalesMissiveQuestFactory {
 
         return new LostTalesQuestDefinition(
                 missive.getQuestId(),
-                missive.getTitle(),
-                missive.getDescription(),
+                "",
+                "",
+                missive.isRepeatable(),
                 missive.isRepeatable(),
                 LostTalesQuestDefinition.START_MODE_LOCKED,
                 prerequisites,
                 missive.getRewardData().getRewards(),
                 interaction,
                 markers,
-                createJournalLog(missive),
-                stages
+                Collections.<String, String>emptyMap(),
+                Collections.<String, String>emptyMap(),
+                Collections.<String, String>emptyMap(),
+                stages,
+                false,
+                MissiveWords.wordsOf(missive)
         );
-    }
-
-    /** The journal's line: the letter's flavour text, else its description; none where it has neither. */
-    private static Map<String, String> createJournalLog(LostTalesMissiveData missive) {
-        LinkedHashMap<String, String> journalLog = new LinkedHashMap<String, String>();
-        String entry = missive.getFlavorText().length() > 0 ? missive.getFlavorText() : missive.getDescription();
-        if (entry.length() > 0) {
-            journalLog.put(DEFAULT_STAGE_ID, entry);
-        }
-        return journalLog;
     }
 }

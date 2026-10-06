@@ -30,6 +30,8 @@ import net.minecraftforge.common.config.Property;
  * category lives in the client's file, every other category in the
  * server's, with the roles and the channels in files of their own
  * ({@link LostTalesSidedConfiguration} routes each category to its file).
+ * An option's name and comment are lines of the lang file
+ * ({@link LostTalesConfigWords}), not words in the code.
  */
 public final class LostTalesConfig {
     public static final String CATEGORY_CLIENT = "client";
@@ -78,6 +80,8 @@ public final class LostTalesConfig {
      * holds its shipped value. Null until then.
      */
     private static Configuration shipped;
+    /** What every option is read with where Forge asks for a comment. */
+    private static final String TIP = LostTalesConfigWords.TIP;
 
 
     public static boolean showLostTalesHud = true;
@@ -297,6 +301,8 @@ public final class LostTalesConfig {
     public static String[] chatProfanityWords = new String[0];
     /** What a new player is greeted with on their first join, in OOC Chat; none greets nobody. */
     public static String[] chatWelcomeLines = new String[0];
+    /** The address players join by, in the Server's status line and Discord's topics; empty for none. */
+    public static String serverAddress = "";
     /** The config-defined permissions a role may grant; see {@code ChatRoleConfig}. */
     public static String[] chatPermissions = new String[0];
     /** The config-defined chat roles; see {@code ChatRoleConfig}. */
@@ -446,10 +452,12 @@ public final class LostTalesConfig {
     /**
      * Reads every option into {@code definitions}, a configuration of no
      * file, as it is defined: the first load's first step, taken while
-     * each field still holds its shipped value.
+     * each field still holds its shipped value. Each option's comment is
+     * then its English tip from the lang file.
      */
     static void defineOptions(Configuration definitions) {
         readOptions(definitions, false);
+        LostTalesConfigWords.apply(definitions);
     }
 
     /**
@@ -469,20 +477,16 @@ public final class LostTalesConfig {
 
             enableChargeTiers = config.getBoolean(
                     "enableChargeTiers", CATEGORY_RANGED_COMBAT,
-                    enableChargeTiers,
-                    "Enable server-authoritative post-full-draw charge tiers for bows, chargeable spears, and explicitly registered compatible weapons.");
+                    enableChargeTiers, TIP);
             chargeTierOneTicks = config.getInt(
                     "chargeTierOneTicks", CATEGORY_RANGED_COMBAT,
-                    chargeTierOneTicks, 1, 200,
-                    "Ticks held after the weapon reaches its normal full draw before charge tier one activates.");
+                    chargeTierOneTicks, 1, 200, TIP);
             chargeTierTwoTicks = config.getInt(
                     "chargeTierTwoTicks", CATEGORY_RANGED_COMBAT,
-                    chargeTierTwoTicks, 1, 400,
-                    "Ticks held after normal full draw before charge tier two activates.");
+                    chargeTierTwoTicks, 1, 400, TIP);
             chargeTierThreeTicks = config.getInt(
                     "chargeTierThreeTicks", CATEGORY_RANGED_COMBAT,
-                    chargeTierThreeTicks, 1, 600,
-                    "Ticks held after normal full draw before charge tier three activates.");
+                    chargeTierThreeTicks, 1, 600, TIP);
             chargeTierTwoTicks = Math.max(
                     chargeTierOneTicks + 1, chargeTierTwoTicks);
             chargeTierThreeTicks = Math.max(
@@ -495,64 +499,55 @@ public final class LostTalesConfig {
                     .get("chargeTierThreeTicks").set(chargeTierThreeTicks);
             chargeTierOneDamageMultiplier = getBoundedDouble(
                     config, "chargeTierOneDamageMultiplier",
-                    chargeTierOneDamageMultiplier, 1.0D, 3.0D,
-                    "Damage multiplier applied by a tier-one projectile.");
+                    chargeTierOneDamageMultiplier, 1.0D, 3.0D);
             chargeTierTwoDamageMultiplier = getBoundedDouble(
                     config, "chargeTierTwoDamageMultiplier",
-                    chargeTierTwoDamageMultiplier, 1.0D, 4.0D,
-                    "Damage multiplier applied by a tier-two projectile.");
+                    chargeTierTwoDamageMultiplier, 1.0D, 4.0D);
             chargeTierThreeDamageMultiplier = getBoundedDouble(
                     config, "chargeTierThreeDamageMultiplier",
-                    chargeTierThreeDamageMultiplier, 1.0D, 6.0D,
-                    "Damage multiplier applied by a tier-three projectile.");
+                    chargeTierThreeDamageMultiplier, 1.0D, 6.0D);
             chargeTierOneVelocityMultiplier = getBoundedDouble(
                     config, "chargeTierOneVelocityMultiplier",
-                    chargeTierOneVelocityMultiplier, 1.0D, 2.0D,
-                    "Launch-speed multiplier applied to a tier-one projectile.");
+                    chargeTierOneVelocityMultiplier, 1.0D, 2.0D);
             chargeTierTwoVelocityMultiplier = getBoundedDouble(
                     config, "chargeTierTwoVelocityMultiplier",
-                    chargeTierTwoVelocityMultiplier, 1.0D, 2.0D,
-                    "Launch-speed multiplier applied to a tier-two projectile.");
+                    chargeTierTwoVelocityMultiplier, 1.0D, 2.0D);
             chargeTierThreeVelocityMultiplier = getBoundedDouble(
                     config, "chargeTierThreeVelocityMultiplier",
-                    chargeTierThreeVelocityMultiplier, 1.0D, 2.0D,
-                    "Launch-speed multiplier applied to a tier-three projectile.");
+                    chargeTierThreeVelocityMultiplier, 1.0D, 2.0D);
             chargeTierOneKnockback = getBoundedDouble(
                     config, "chargeTierOneKnockback",
-                    chargeTierOneKnockback, 0.0D, 1.0D,
-                    "Additional horizontal knockback velocity from a tier-one projectile.");
+                    chargeTierOneKnockback, 0.0D, 1.0D);
             chargeTierTwoKnockback = getBoundedDouble(
                     config, "chargeTierTwoKnockback",
-                    chargeTierTwoKnockback, 0.0D, 1.0D,
-                    "Additional horizontal knockback velocity from a tier-two projectile.");
+                    chargeTierTwoKnockback, 0.0D, 1.0D);
             chargeTierThreeKnockback = getBoundedDouble(
                     config, "chargeTierThreeKnockback",
-                    chargeTierThreeKnockback, 0.0D, 1.0D,
-                    "Additional horizontal knockback velocity from a tier-three projectile.");
+                    chargeTierThreeKnockback, 0.0D, 1.0D);
 
             allowedStartingFactionIds = config.get(
                     CATEGORY_CHARACTERS,
                     "allowedStartingFactionIds",
                     allowedStartingFactionIds,
-                    "Optional canonical LOTR faction IDs (for example lotr:lothlorien). Empty means all LOTR-playable factions may be offered before race filtering."
+                    TIP
             ).getStringList();
             deniedStartingFactionIds = config.get(
                     CATEGORY_CHARACTERS,
                     "deniedStartingFactionIds",
                     deniedStartingFactionIds,
-                    "Canonical LOTR faction IDs excluded from character creation. Deny entries override allow entries."
+                    TIP
             ).getStringList();
             characterSwitchCooldownSeconds = config.get(
                     CATEGORY_CHARACTERS,
                     "switchCooldownSeconds",
                     characterSwitchCooldownSeconds,
-                    "Escalating server-authoritative cooldown stages in seconds. The default is 1m, 3m, 5m, 15m, 30m, 60m."
+                    TIP
             ).getIntList();
             characterSwitchDecaySeconds = config.get(
                     CATEGORY_CHARACTERS,
                     "switchCooldownDecaySeconds",
                     characterSwitchDecaySeconds,
-                    "Inactivity required to decay each current cooldown stage. Higher stages should use longer values."
+                    TIP
             ).getIntList();
             characterSwitchCombatGraceSeconds = config.getInt(
                     "switchCombatGraceSeconds",
@@ -560,7 +555,7 @@ public final class LostTalesConfig {
                     characterSwitchCombatGraceSeconds,
                     0,
                     3600,
-                    "Reject switching for this many seconds after incoming or outgoing combat evidence."
+                    TIP
             );
             characterSwitchTeleportGraceSeconds = config.getInt(
                     "switchTeleportGraceSeconds",
@@ -568,7 +563,7 @@ public final class LostTalesConfig {
                     characterSwitchTeleportGraceSeconds,
                     0,
                     300,
-                    "Reject switching for this many seconds after teleport, respawn, or dimension-transition evidence."
+                    TIP
             );
             characterSwitchStableGroundTicks = config.getInt(
                     "switchStableGroundTicks",
@@ -576,13 +571,13 @@ public final class LostTalesConfig {
                     characterSwitchStableGroundTicks,
                     0,
                     200,
-                    "Number of consecutive safe grounded ticks required before switching."
+                    TIP
             );
             characterSwitchTeleportDistancePerTick = config.get(
                     CATEGORY_CHARACTERS,
                     "switchTeleportDistancePerTick",
                     characterSwitchTeleportDistancePerTick,
-                    "Movement farther than this many blocks in one tick is treated as teleportation."
+                    TIP
             ).getDouble(characterSwitchTeleportDistancePerTick);
             characterStateMaxSnapshotBytes = config.getInt(
                     "characterStateMaxSnapshotBytes",
@@ -590,7 +585,7 @@ public final class LostTalesConfig {
                     characterStateMaxSnapshotBytes,
                     64 * 1024,
                     16 * 1024 * 1024,
-                    "Maximum compressed size of one character-owned player-state snapshot. Oversized snapshots are rejected before switching."
+                    TIP
             );
             characterStateCheckpointIntervalSeconds = config.getInt(
                     "characterStateCheckpointIntervalSeconds",
@@ -598,7 +593,7 @@ public final class LostTalesConfig {
                     characterStateCheckpointIntervalSeconds,
                     30,
                     3600,
-                    "Seconds between durable checkpoints of every online active character. Work is spread across server ticks."
+                    TIP
             );
             characterStateCheckpointPlayersPerTick = config.getInt(
                     "characterStateCheckpointPlayersPerTick",
@@ -606,7 +601,7 @@ public final class LostTalesConfig {
                     characterStateCheckpointPlayersPerTick,
                     1,
                     4,
-                    "Maximum online characters durably checkpointed in one server tick."
+                    TIP
             );
             characterDeletionRetentionDays = config.getInt(
                     "characterDeletionRetentionDays",
@@ -614,7 +609,7 @@ public final class LostTalesConfig {
                     characterDeletionRetentionDays,
                     1,
                     3650,
-                    "Days a deleted character stays restorable by its player from the roster; after that the server purges it and its saved state at the next start or at the owner's next login."
+                    TIP
             );
             sanitizeCharacterSwitchOptions();
 
@@ -622,13 +617,13 @@ public final class LostTalesConfig {
                     "showLostTalesHud",
                     CATEGORY_CLIENT,
                     showLostTalesHud,
-                    "Master toggle for Lost Tales HUD elements."
+                    TIP
             );
             Property hudPresetProperty = config.get(
                     CATEGORY_CLIENT,
                     "hudPlacementPreset",
                     hudPlacementPreset,
-                    "Where the HUD's panels stand: custom keeps each panel where it was placed; default, lotr-safe, compact and minimal put every panel in that layout's place. Set in Client Settings, HUD."
+                    TIP
             );
             hudPresetProperty.setValidValues(HUD_PRESET_VALUES);
             hudPlacementPreset = normalizeHudPreset(hudPresetProperty.getString());
@@ -637,55 +632,51 @@ public final class LostTalesConfig {
                     "showCompassHud",
                     CATEGORY_CLIENT,
                     showCompassHud,
-                    "Render the Lost Tales compass HUD."
+                    TIP
             );
             linkShowCompassHud = config.getBoolean(
                     "linkShowCompassHud",
                     CATEGORY_CLIENT,
                     linkShowCompassHud,
-                    "When true, changing showLostTalesHud also changes showCompassHud. Disabled by default in the 1.7.10 backport to preserve existing per-HUD settings."
+                    TIP
             );
             compassHudOffsetX = getHudPercent(
                     config, "compassHudOffsetX",
-                    compassHudOffsetX, 0.0D, 100.0D,
-                    "Horizontal compass position as a percentage of the scaled screen width."
-            );
+                    compassHudOffsetX, 0.0D, 100.0D);
             compassHudOffsetY = getHudPercent(
                     config, "compassHudOffsetY",
-                    compassHudOffsetY, 0.0D, 100.0D,
-                    "Vertical compass position as a percentage of the scaled screen height."
-            );
+                    compassHudOffsetY, 0.0D, 100.0D);
             compassHudDisplayRadius = config.getInt(
                     "compassHudDisplayRadius",
                     CATEGORY_CLIENT,
                     compassHudDisplayRadius,
                     45,
                     225,
-                    "Visible compass field in degrees. Larger values show more markers but reduce precision."
+                    TIP
             );
             showStaticCompassMarkers = config.getBoolean(
                     "showStaticCompassMarkers",
                     CATEGORY_CLIENT,
                     showStaticCompassMarkers,
-                    "Render JSON-defined/static map markers on the compass."
+                    TIP
             );
             showLotrWaypointCompassMarkers = config.getBoolean(
                     "showLotrWaypointCompassMarkers",
                     CATEGORY_CLIENT,
                     showLotrWaypointCompassMarkers,
-                    "Render public Lord of the Rings Legacy waypoints as compass Point of Interest markers."
+                    TIP
             );
             onlyShowUnlockedLotrWaypoints = config.getBoolean(
                     "onlyShowUnlockedLotrWaypoints",
                     CATEGORY_CLIENT,
                     onlyShowUnlockedLotrWaypoints,
-                    "Only show LOTR waypoints on the compass after the player has unlocked them according to LOTR's own waypoint logic."
+                    TIP
             );
             showHostileCompassMarkers = config.getBoolean(
                     "showHostileCompassMarkers",
                     CATEGORY_CLIENT,
                     showHostileCompassMarkers,
-                    "Render server-approved enemies actively engaged with the local player on the Lost Tales compass."
+                    TIP
             );
             hostileCompassMarkerScanRadius = config.getInt(
                     "hostileCompassMarkerScanRadius",
@@ -693,13 +684,13 @@ public final class LostTalesConfig {
                     hostileCompassMarkerScanRadius,
                     8,
                     128,
-                    "Client display radius in blocks for enemy compass markers. The server tracking radius remains authoritative."
+                    TIP
             );
             showHostileMapMarkers = config.getBoolean(
                     "showHostileMapMarkers",
                     CATEGORY_CLIENT,
                     showHostileMapMarkers,
-                    "Render transient active-combat enemy markers on the LOTR main map. These markers are never saved."
+                    TIP
             );
             hostileMapMarkerDisplayRadius = config.getInt(
                     "hostileMapMarkerDisplayRadius",
@@ -707,22 +698,18 @@ public final class LostTalesConfig {
                     hostileMapMarkerDisplayRadius,
                     8,
                     128,
-                    "Client display radius in blocks for transient enemy markers on the LOTR main map. The server tracking radius remains authoritative."
+                    TIP
             );
             closeMapTerrainTransitionStartZoom = getBoundedDouble(
                     config, CATEGORY_CLIENT,
                     "closeMapTerrainTransitionStartZoom",
                     closeMapTerrainTransitionStartZoom,
-                    -2.25D, 9.20D,
-                    "Zoom exponent where the close-map terrain transition begins. The ordinary LOTR map remains fully visible at and below this value."
-            );
+                    -2.25D, 9.20D);
             closeMapTerrainTransitionEndZoom = getBoundedDouble(
                     config, CATEGORY_CLIENT,
                     "closeMapTerrainTransitionEndZoom",
                     closeMapTerrainTransitionEndZoom,
-                    -2.2D, 9.25D,
-                    "Zoom exponent where prepared close-map terrain may fully replace the ordinary LOTR map. Must be greater than closeMapTerrainTransitionStartZoom."
-            );
+                    -2.2D, 9.25D);
             if (closeMapTerrainTransitionEndZoom
                     <= closeMapTerrainTransitionStartZoom) {
                 closeMapTerrainTransitionEndZoom = Math.min(9.25D,
@@ -735,19 +722,19 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     "hiddenMapLegendCategories",
                     hiddenMapLegendCategories,
-                    "Client-only map legend category IDs that are hidden. Unknown IDs are ignored and new categories remain visible by default."
+                    TIP
             ).getStringList();
             customWaypointColors = config.get(
                     CATEGORY_CLIENT,
                     "customWaypointColors",
                     customWaypointColors,
-                    "Client-only icon colour per custom waypoint, as name=colour. LOTR stores no colour for its waypoints, so this is presentation only and is not shared with anyone else."
+                    TIP
             ).getStringList();
             customWaypointNotes = config.get(
                     CATEGORY_CLIENT,
                     "customWaypointNotes",
                     customWaypointNotes,
-                    "Client-only tooltip note per custom waypoint, as name=note. LOTR stores no description for its waypoints, so this is presentation only and is not shared with anyone else."
+                    TIP
             ).getStringList();
 
             combatMarkerTrackingRadius = config.getInt(
@@ -756,7 +743,7 @@ public final class LostTalesConfig {
                     combatMarkerTrackingRadius,
                     8,
                     128,
-                    "Server-authoritative maximum range in blocks for player-specific combat marker tracking."
+                    TIP
             );
             combatMarkerUpdateIntervalTicks = config.getInt(
                     "updateIntervalTicks",
@@ -764,7 +751,7 @@ public final class LostTalesConfig {
                     combatMarkerUpdateIntervalTicks,
                     1,
                     40,
-                    "Server ticks between combat-state scans. Snapshots are sent only when their contents change."
+                    TIP
             );
             combatMarkerDisengagementGraceTicks = config.getInt(
                     "disengagementGraceTicks",
@@ -772,50 +759,46 @@ public final class LostTalesConfig {
                     combatMarkerDisengagementGraceTicks,
                     0,
                     60,
-                    "Ticks that an exact player/entity combat relationship may remain visible after direct evidence disappears."
+                    TIP
             );
             combatMarkerDebugLogging = config.getBoolean(
                     "debugLogging",
                     CATEGORY_COMBAT_MARKERS,
                     combatMarkerDebugLogging,
-                    "Log changed combat marker snapshots. Disabled by default to avoid log spam."
+                    TIP
             );
             fellowshipSharedAggroTracking = config.getBoolean(
                     "shareWithFellowship",
                     CATEGORY_COMBAT_MARKERS,
                     fellowshipSharedAggroTracking,
-                    "Share server-approved active-combat enemy markers with authorized nearby members of the same role-playing fellowship."
+                    TIP
             );
 
             showFellowshipHud = config.getBoolean(
                     "showFellowshipHud",
                     CATEGORY_CLIENT,
                     showFellowshipHud,
-                    "Render the compact fellowship member HUD while the active role-playing character belongs to a fellowship."
+                    TIP
             );
             linkShowFellowshipHud = config.getBoolean(
                     "linkShowFellowshipHud",
                     CATEGORY_CLIENT,
                     linkShowFellowshipHud,
-                    "When true, changing showLostTalesHud also changes showFellowshipHud."
+                    TIP
             );
             fellowshipHudOffsetX = getHudPercent(
                     config, "fellowshipHudOffsetX",
-                    fellowshipHudOffsetX, 0.0D, 100.0D,
-                    "Horizontal fellowship HUD position as a percentage of the scaled screen width."
-            );
+                    fellowshipHudOffsetX, 0.0D, 100.0D);
             fellowshipHudOffsetY = getHudPercent(
                     config, "fellowshipHudOffsetY",
-                    fellowshipHudOffsetY, 0.0D, 100.0D,
-                    "Vertical fellowship HUD position as a percentage of the scaled screen height."
-            );
+                    fellowshipHudOffsetY, 0.0D, 100.0D);
             fellowshipCompassMarkerFadeRadius = config.getInt(
                     "fellowshipCompassMarkerFadeRadius",
                     CATEGORY_CLIENT,
                     fellowshipCompassMarkerFadeRadius,
                     16,
                     2048,
-                    "Distance in blocks over which fellowship-member compass markers fade to their minimum opacity. Beyond this distance they remain visible at the opacity floor."
+                    TIP
             );
             fellowshipStatusUpdateIntervalTicks = config.getInt(
                     "statusUpdateIntervalTicks",
@@ -823,7 +806,7 @@ public final class LostTalesConfig {
                     fellowshipStatusUpdateIntervalTicks,
                     2,
                     40,
-                    "Server ticks between fellowship health and availability checks. Packets are sent only when state changes or a heartbeat is due."
+                    TIP
             );
             fellowshipStatusHeartbeatTicks = config.getInt(
                     "statusHeartbeatTicks",
@@ -831,7 +814,7 @@ public final class LostTalesConfig {
                     fellowshipStatusHeartbeatTicks,
                     20,
                     400,
-                    "Maximum server ticks between unchanged fellowship status snapshots for online fellowship members."
+                    TIP
             );
             fellowshipTrackingUpdateIntervalTicks = config.getInt(
                     "trackingUpdateIntervalTicks",
@@ -839,7 +822,7 @@ public final class LostTalesConfig {
                     fellowshipTrackingUpdateIntervalTicks,
                     2,
                     40,
-                    "Server ticks between authorized fellowship position checks. Coordinates are quantized and packets are sent only when state changes or a heartbeat is due."
+                    TIP
             );
             fellowshipTrackingHeartbeatTicks = config.getInt(
                     "trackingHeartbeatTicks",
@@ -847,13 +830,13 @@ public final class LostTalesConfig {
                     fellowshipTrackingHeartbeatTicks,
                     20,
                     400,
-                    "Maximum server ticks between unchanged fellowship tracking snapshots for online fellowship members."
+                    TIP
             );
             enableSharedQuestProgress = config.getBoolean(
                     "enableSharedQuestProgress",
                     CATEGORY_FELLOWSHIP,
                     enableSharedQuestProgress,
-                    "Allow authoritative kill and destination-arrival events to advance matching Lost Tales objectives for eligible nearby fellowship members. Gathering, crafting, hand-ins, completion, and rewards remain individual."
+                    TIP
             );
             fellowshipSharedQuestRadius = config.getInt(
                     "sharedQuestRadius",
@@ -861,70 +844,62 @@ public final class LostTalesConfig {
                     fellowshipSharedQuestRadius,
                     1,
                     128,
-                    "Maximum block distance for conservative fellowship-shared kill and travel objective progress. Members must be online, alive, in the same dimension, using the fellowship character, and independently possess the matching quest."
+                    TIP
             );
 
             showQuickLootHud = config.getBoolean(
                     "showQuickLootHud",
                     CATEGORY_CLIENT,
                     showQuickLootHud,
-                    "Render the Quick Loot HUD when looking at supported inventories."
+                    TIP
             );
             linkShowQuickLootHud = config.getBoolean(
                     "linkShowQuickLootHud",
                     CATEGORY_CLIENT,
                     linkShowQuickLootHud,
-                    "When true, changing showLostTalesHud also changes showQuickLootHud. Disabled by default in the 1.7.10 backport to preserve existing per-HUD settings."
+                    TIP
             );
             quickLootHudOffsetX = getHudPercent(
                     config, "quickLootHudOffsetX",
                     quickLootHudOffsetX,
-                    0.0D, 100.0D,
-                    "Horizontal quick-loot position as a percentage of the scaled screen width."
-            );
+                    0.0D, 100.0D);
             quickLootHudOffsetY = getHudPercent(
                     config, "quickLootHudOffsetY",
-                    quickLootHudOffsetY, 0.0D, 100.0D,
-                    "Vertical quick-loot position as a percentage of the scaled screen height."
-            );
+                    quickLootHudOffsetY, 0.0D, 100.0D);
             quickLootHudMaxRows = config.getInt(
                     "quickLootHudMaxRows",
                     CATEGORY_CLIENT,
                     quickLootHudMaxRows,
                     1,
                     12,
-                    "Maximum number of item rows visible in the Quick Loot HUD."
+                    TIP
             );
 
             showQuestHud = config.getBoolean(
                     "showQuestHud",
                     CATEGORY_CLIENT,
                     showQuestHud,
-                    "Render the Lost Tales active quest tracker and quest notifications."
+                    TIP
             );
             linkShowQuestHud = config.getBoolean(
                     "linkShowQuestHud",
                     CATEGORY_CLIENT,
                     linkShowQuestHud,
-                    "When true, changing showLostTalesHud also changes showQuestHud. Off, the quest tracker keeps its own setting."
+                    TIP
             );
             questHudOffsetX = getHudPercent(
                     config, "questHudOffsetX",
-                    questHudOffsetX, 0.0D, 100.0D,
-                    "Horizontal quest tracker position as a percentage of the scaled screen width."
-            );
+                    questHudOffsetX, 0.0D, 100.0D);
             questHudOffsetY = getHudPercent(
                     config, "questHudOffsetY",
-                    questHudOffsetY, 0.0D, 100.0D,
-                    "Vertical quest tracker position as a percentage of the scaled screen height."
-            );
+                    questHudOffsetY, 0.0D, 100.0D);
             questHudMaxTrackedQuests = config.getInt(
                     "questHudMaxTrackedQuests",
                     CATEGORY_CLIENT,
                     questHudMaxTrackedQuests,
                     1,
                     8,
-                    "Maximum number of tracked quests drawn on the quest HUD before showing an overflow count."
+                    TIP
             );
             questHudObjectiveLineCount = config.getInt(
                     "questHudObjectiveLineCount",
@@ -932,47 +907,43 @@ public final class LostTalesConfig {
                     questHudObjectiveLineCount,
                     1,
                     3,
-                    "The most text lines a tracked quest's objectives take on the tracker, all its objectives together."
+                    TIP
             );
             showQuestHudNotifications = config.getBoolean(
                     "showQuestHudNotifications",
                     CATEGORY_CLIENT,
                     showQuestHudNotifications,
-                    "Render centered quest notification banners for quest starts, objective progress, and completions."
+                    TIP
             );
             showNativeLotrQuestTracker = config.getBoolean(
                     "showNativeLotrQuestTracker",
                     CATEGORY_CLIENT,
                     showNativeLotrQuestTracker,
-                    "Also render LOTR's original single-quest tracker as a compatibility fallback."
+                    TIP
             );
             enableQuestDialogue = config.getBoolean(
                     "enableQuestDialogue",
                     CATEGORY_CLIENT,
                     enableQuestDialogue,
-                    "Talk to a quest giver in the Lost Tales conversation screen. Off, Middle-earth quests are offered on LOTR's own screen, and a Lost Tales quest giver's words go to the chat while their quest is taken or handed in on touch."
+                    TIP
             );
             notificationHudOffsetX = getHudPercent(
                     config, "notificationHudOffsetX",
-                    notificationHudOffsetX, 0.0D, 100.0D,
-                    "Horizontal position of the notification slot (quest banners, location discoveries, area names) within the available scaled screen width."
-            );
+                    notificationHudOffsetX, 0.0D, 100.0D);
             notificationHudOffsetY = getHudPercent(
                     config, "notificationHudOffsetY",
-                    notificationHudOffsetY, 0.0D, 100.0D,
-                    "Vertical position of the notification slot within the available scaled screen height."
-            );
+                    notificationHudOffsetY, 0.0D, 100.0D);
             showWorldQuestMarkers = config.getBoolean(
                     "showWorldQuestMarkers",
                     CATEGORY_CLIENT,
                     showWorldQuestMarkers,
-                    "Show labels in the world over the places tracked quests send you: the quest's title and how far it is."
+                    TIP
             );
             showDiscoveredWorldMapMarkers = config.getBoolean(
                     "showDiscoveredWorldMapMarkers",
                     CATEGORY_CLIENT,
                     showDiscoveredWorldMapMarkers,
-                    "Also render world-space labels for discovered non-quest map markers. Disable this if too many map markers clutter the world view."
+                    TIP
             );
             worldQuestMarkerMaxDistance = config.getInt(
                     "worldQuestMarkerMaxDistance",
@@ -980,13 +951,13 @@ public final class LostTalesConfig {
                     worldQuestMarkerMaxDistance,
                     48,
                     1024,
-                    "Quest marker labels in the world show out to this many blocks."
+                    TIP
             );
             showQuestChatFeedback = config.getBoolean(
                     "showQuestChatFeedback",
                     CATEGORY_CLIENT,
                     showQuestChatFeedback,
-                    "Show the server's quest notes in the Console: tracking, markers found and rewards received. Off hides only these notes; a refusal always shows."
+                    TIP
             );
             chatProximityRadius = config.getInt(
                     "proximityRadius",
@@ -994,31 +965,37 @@ public final class LostTalesConfig {
                     chatProximityRadius,
                     1,
                     512,
-                    "Server-authoritative maximum distance in blocks for Proximity chat recipients."
+                    TIP
             );
             chatTypingIndicators = config.getBoolean(
                     "typingIndicators",
                     CATEGORY_CHAT,
                     chatTypingIndicators,
-                    "Relay who is typing into a channel to the players who would read the message; off drops every typing notice on the server."
+                    TIP
             );
             chatProfanityWords = config.getStringList(
                     "profanityWords",
                     CATEGORY_CHAT,
                     chatProfanityWords,
-                    "Words added to the chat's profanity list beside the ones the mod bundles, one per line as word=replacement, both a run of letters: the word, matched whole with stretched letters and the common endings, and the silly word that stands in for it. Sent to every client with its chat access, refused in a character's name, and applied to what the Discord bridge posts when discord.profanityFilter says so. An entry naming a bundled word replaces its stand-in."
+                    TIP
             );
             chatWelcomeLines = config.getStringList(
                     "welcomeLines",
                     CATEGORY_CHAT,
                     chatWelcomeLines,
-                    "Server only: what a new player is greeted with the first time they join this world, as Server lines in OOC Chat that wait there unread: the rules, a Discord invite, anything. One line each, at most 8 lines of 1,024 characters; a web address becomes a link. Empty greets nobody."
+                    TIP
+            );
+            serverAddress = config.getString(
+                    "serverAddress",
+                    CATEGORY_CHAT,
+                    serverAddress,
+                    TIP
             );
             chatAuditLogEnabled = config.getBoolean(
                     "auditLog",
                     CATEGORY_CHAT,
                     chatAuditLogEnabled,
-                    "Server only: append every accepted chat message, edit, and deletion - private whispers included - as JSON lines under logs/losttales-chat/, one file per UTC day, for moderation. Off by default; tell your players before turning it on."
+                    TIP
             );
             chatAuditRetentionDays = config.getInt(
                     "auditRetentionDays",
@@ -1026,13 +1003,13 @@ public final class LostTalesConfig {
                     chatAuditRetentionDays,
                     1,
                     365,
-                    "Days of chat audit files kept; files older than this are deleted when the server starts and as the day rolls over."
+                    TIP
             );
             chatHistoryPersisted = config.getBoolean(
                     "historyPersisted",
                     CATEGORY_CHAT,
                     chatHistoryPersisted,
-                    "Server only: keep the recent chat history in the world save, so a player who rejoins after a restart is still shown the conversation they missed. Off keeps it in memory for the server's run alone."
+                    TIP
             );
             chatHistoryPerChannel = config.getInt(
                     "historyPerChannel",
@@ -1040,56 +1017,56 @@ public final class LostTalesConfig {
                     chatHistoryPerChannel,
                     20,
                     1000,
-                    "Server only: the most messages of each channel the history keeps, live and in the save; the oldest go first. A joining player is replayed at most 100 of a channel and 400 in all of them."
+                    TIP
             );
             chatPermissions = config.getStringList(
                     "permissions",
                     CATEGORY_ROLES,
                     chatPermissions,
-                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.server_console.read (the Server Log), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, fellowship.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
+                    TIP
             );
             chatRoles = config.getStringList(
                     "definitions",
                     CATEGORY_ROLES,
                     new String[] {ChatRoleConfig.DEFAULT_OPERATOR_ENTRY},
-                    "The chat roles, one per line as <id>=name:<text>;colour:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;grant:<permission>;icon:<emoji:<name>|item:<id>|channel:<id>>;desc:<text>. Every option is optional: a role is held by the accounts and characters listed under members, by anyone with the op level, and by anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name; rank never grants anything. grant names a permission from the permissions list, or a capability directly; it may repeat, and one naming neither is kept and allows nothing until a permission of that id is defined. icon is what the role's heading wears in a member list; channel:<id> wears whatever that channel wears. The operator entry a fresh file starts with is a role like any other and wears the Operator channel's icon; the Lost Tales Team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
+                    TIP
             );
             chatRoleMembers = config.getStringList(
                     "members",
                     CATEGORY_ROLES,
                     chatRoleMembers,
-                    "Who holds each role, one role per line as <id>=<account uuid>,<account uuid>,character:<character uuid>. An account holds the role as every identity it plays and gains its grants; a character holds it as that character alone and gains no grant. /losttales role assign writes this."
+                    TIP
             );
             chatChannelDefinitions = config.getStringList(
                     "definitions",
                     CATEGORY_CHANNELS,
                     new String[0],
-                    "Channels this server has of its own, one per line as <id>=name:<shown name>;rule:<everyone|proximity|operators>;colour:<RRGGBB>;ooc:<true|false>;bridge:<true|false>. The id is the channel's code name: packets, the layout file, the gates, # links and Discord links all name a channel by it. The routing rules a config cannot describe - a fellowship, a faction, a whisper, the Console's or the Server Log's - are refused, and so is an entry naming a channel this build already has or a faction's code name (gondor, high_elf)."
+                    TIP
             );
             chatChannelRoles = config.getStringList(
                     "gates",
                     CATEGORY_CHANNELS,
                     new String[] {ChatRoleConfig.DEFAULT_OPERATOR_GATE},
-                    "The roles a channel asks for, one channel per line as <channel>=read:<role,role|any|none>;send:<role,role|any|none>. A side left out or set to any is open to everyone the channel already admits; none closes it; a side naming a role that does not exist is closed until the entry is fixed. A fresh file starts with the Operator channel asking for the operator role on both sides, and that line is put back whenever it is missing; to open the channel on purpose, keep the line and set its sides to any."
+                    TIP
             );
             chatChannelIcons = config.getStringList(
                     "icons",
                     CATEGORY_CHANNELS,
                     new String[0],
-                    "The icon a channel wears before its name, on its tab and wherever the name stands alone, one channel per line as <channel id>=emoji:<name> or <channel id>=item:<item id>[@<damage>], for example operator=item:minecraft:iron_sword or trade=emoji:moneybag. Built-in channels and the ones defined above alike; a channel not named here keeps the emoji the mod gives it, and a client without the item shows that emoji too."
+                    TIP
             );
             installChatRoles();
             discordEnabled = config.getBoolean(
                     "enabled",
                     CATEGORY_DISCORD,
                     discordEnabled,
-                    "Server only: run the Discord bridge. The links in channelBindings carry game channels to Discord text channels and back: game to Discord through webhooks the bot makes, Discord to game through the bot's gateway, read by polling while it is down. With the bot's slash commands on it runs before the first link, so channels can be linked with /losttales discord link. Every channel exists for players whether or not this is on; the switch only says whether anything crosses."
+                    TIP
             );
             discordBotToken = config.getString(
                     "botToken",
                     CATEGORY_DISCORD,
                     discordBotToken,
-                    "Server only, secret: the bot's token, used to read every bound Discord channel. The bot must be in the server with access to those channels and have the Message Content intent enabled."
+                    TIP
             );
             discordPollIntervalSeconds = config.getInt(
                     "pollIntervalSeconds",
@@ -1097,44 +1074,44 @@ public final class LostTalesConfig {
                     discordPollIntervalSeconds,
                     2,
                     60,
-                    "Server only: how often each bound Discord channel is read for new messages while the bot's gateway connection is down, in seconds. Lines said in the game are posted to Discord as soon as they are said, whatever this is."
+                    TIP
             );
             Property bindingsProperty = config.get(
                     CATEGORY_DISCORD,
                     "channelBindings",
                     new String[0],
-                    "Server only, secrets: the links between game channels and Discord channels. Make one with /losttales discord link <channel> in the game, which gives a code, and /link code:<code> in the Discord channel, where the bot makes the channel's webhook itself; take one away with /losttales discord unlink or /unlink. Each entry is <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook address>: a game channel may be linked to several Discord channels, in any Discord server the bot is in, while a Discord channel holds one game channel only. The channel is its code name: global, proximity, ooc, operator, a server's own, or a faction's code name for that faction's chat (gondor, high_elf); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. Fellowship, the Console, the Server Log and whispers are private and refused. Kept off the Server Settings screen and /losttales config, since a webhook address lets whoever holds it post into its channel."
+                    TIP
             );
             discordChannelBindings = bindingsProperty.getStringList();
             discordAvatarUrlTemplate = config.getString(
                     "avatarUrlTemplate",
                     CATEGORY_DISCORD,
                     discordAvatarUrlTemplate,
-                    "Server only: the https URL of the picture a Discord post carries, with {name} and/or {uuid} replaced by the sender's Minecraft account (the default is an isometric head; https://mc-heads.net/avatar/{name}/64 is the flat face); empty shows the webhook's own picture."
+                    TIP
             );
             discordJoinsAndLeaves = config.getBoolean(
                     "joinsAndLeaves",
                     CATEGORY_DISCORD,
                     discordJoinsAndLeaves,
-                    "Server only: post a notice when a player joins or leaves, naming the account, to the Discord channels linked to OOC, as the game says it there."
+                    TIP
             );
             discordDeathMessages = config.getBoolean(
                     "deathMessages",
                     CATEGORY_DISCORD,
                     discordDeathMessages,
-                    "Server only: post every player's death message, worded exactly as the game announces it in Global, to the Discord channels linked to Global."
+                    TIP
             );
             discordAchievements = config.getBoolean(
                     "achievements",
                     CATEGORY_DISCORD,
                     discordAchievements,
-                    "Server only: post vanilla and Middle-earth achievement announcements, worded exactly as the game announces them in Global, to the Discord channels linked to Global."
+                    TIP
             );
             discordChannelStatus = config.getBoolean(
                     "channelStatus",
                     CATEGORY_DISCORD,
                     discordChannelStatus,
-                    "Server only: keep the topic of every bound Discord channel saying whether the server is online and how many players are on (online, 3/20 players). Needs the bot token and the channel ids in the bindings, and the bot needs the Manage Channels permission in each channel."
+                    TIP
             );
             discordChannelStatusIntervalSeconds = config.getInt(
                     "channelStatusIntervalSeconds",
@@ -1142,35 +1119,34 @@ public final class LostTalesConfig {
                     discordChannelStatusIntervalSeconds,
                     60,
                     3600,
-                    "Server only: the least time between two topic writes, in seconds. Discord allows a channel's topic to change only twice per ten minutes, so the default of five minutes is the fastest that never waits; joins and leaves inside the interval are folded into the next write."
+                    TIP
             );
             discordGateway = config.getBoolean(
                     "gateway",
                     CATEGORY_DISCORD,
                     discordGateway,
-                    "Server only: keep the bot connected to Discord's gateway, so Discord messages reach the game the moment they are sent and the bot's slash commands work. Needs botToken. Off, or a gateway Discord refuses, leaves polling to do the reading as before."
+                    TIP
             );
             discordSlashCommands = config.getBoolean(
                     "slashCommands",
                     CATEGORY_DISCORD,
                     discordSlashCommands,
-                    "Server only: register the bot's slash commands (/link, /unlink, /online, /who, /server) in every guild the bot is in as the gateway sees it, and answer them; /online, /who and /server answer only in linked channels. Linking a channel needs them. Needs gateway."
+                    TIP
             );
             discordMemberList = config.getBoolean(
                     "memberList",
                     CATEGORY_DISCORD,
                     discordMemberList,
-                    "Server only: show everyone who can see a linked Discord channel in the member list of the game channel it is linked to, under their Discord server's name while they are online and under Offline otherwise, and let them and their lines wear their Discord status. A player is told only about the members of channels linked to what they can read. Needs gateway, and the Server Members and Presence intents switched on for the bot in the Discord developer portal; if Discord refuses them, the bridge goes on without the member lists."
+                    TIP
             );
             discordPingMembers = config.getBoolean(
                     "pingMembers",
                     CATEGORY_DISCORD,
                     discordPingMembers,
-                    "Server only: let a player's line ping the Discord members its mentions name, in the linked Discord channels those members can see: at most five a post, never a role, @everyone or @here. A Discord code typed into a line never pings anyone. Needs memberList."
+                    TIP
             );
             Property discordProfanityProperty = config.get(
-                    CATEGORY_DISCORD, "profanityFilter", discordProfanityFilter,
-                    "Server only: how the words on the chat's profanity list read in what the bridge posts to Discord: OFF as typed, SILLY as their silly stand-ins, STARS as their first letter and stars. Lines arriving from Discord are left as they are; each client shows them by its own setting.");
+                    CATEGORY_DISCORD, "profanityFilter", discordProfanityFilter, TIP);
             discordProfanityProperty.setValidValues(ChatProfanityMode.names());
             discordProfanityFilter = ChatProfanityMode.of(
                     discordProfanityProperty.getString(), ChatProfanityMode.OFF).name();
@@ -1178,17 +1154,16 @@ public final class LostTalesConfig {
                     "enableChatEmojis",
                     CATEGORY_CLIENT,
                     enableChatEmojis,
-                    "Render supported :shortcodes: as inline emojis and show the chat emoji picker."
+                    TIP
             );
             convertChatEmoticons = config.getBoolean(
                     "convertChatEmoticons",
                     CATEGORY_CLIENT,
                     convertChatEmoticons,
-                    "Turn classic emoticons you type (:) :D <3 ...) into their emojis as the message is sent."
+                    TIP
             );
             Property profanityProperty = config.get(
-                    CATEGORY_CLIENT, "chatProfanityFilter", chatProfanityFilter,
-                    "How the words on the chat's profanity list read on this client: OFF as typed, SILLY as their silly stand-ins (fuck reads flip, shit reads poop), STARS as their first letter and stars (f***). Display only: what you type reaches everyone else as typed, and what they see is their own setting's. The list is the mod's, plus the server's words and any in client/chat/profanity.txt.");
+                    CATEGORY_CLIENT, "chatProfanityFilter", chatProfanityFilter, TIP);
             profanityProperty.setValidValues(ChatProfanityMode.names());
             chatProfanityFilter = ChatProfanityMode.of(
                     profanityProperty.getString(), ChatProfanityMode.SILLY).name();
@@ -1196,122 +1171,93 @@ public final class LostTalesConfig {
                     "enableChatMessageGrouping",
                     CATEGORY_CLIENT,
                     enableChatMessageGrouping,
-                    "Drop the repeated head and name when the same identity sends several messages in a row."
+                    TIP
             );
             windowBackgroundBlur = config.getBoolean(
                     "windowBackgroundBlur",
                     CATEGORY_CLIENT,
                     windowBackgroundBlur,
-                    "Blur the world inside each window's box while the window screen is open; the rest of the screen stays sharp. Needs enableGuiBackgroundBlur."
+                    TIP
             );
             enableChatPings = config.getBoolean(
                     "enableChatPings",
                     CATEGORY_CLIENT,
                     enableChatPings,
-                    "Highlight and play a sound for chat messages that @-mention your account or active character name."
+                    TIP
             );
             chatPingSound = config.getString(
                     "chatPingSound",
                     CATEGORY_CLIENT,
                     chatPingSound,
-                    "Sound event played when a chat message @-mentions you; empty disables the sound."
+                    TIP
             );
             windowBackgroundColor = paletteName(config.getString(
                     "windowBackgroundColor",
                     CATEGORY_CLIENT,
                     windowBackgroundColor,
-                    "Palette colour of every window's surface while the window screen is open. Set in Settings.",
+                    TIP,
                     LostTalesColors.paletteNames()
             ), DEFAULT_WINDOW_BACKGROUND_COLOR);
             chatSelectedLineColor = paletteName(config.getString(
                     "chatSelectedLineColor",
                     CATEGORY_CLIENT,
                     chatSelectedLineColor,
-                    "Palette colour of the chat line under the pointer. Set in Settings.",
+                    TIP,
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_SELECTED_LINE_COLOR);
             chatMentionLineColor = paletteName(config.getString(
                     "chatMentionLineColor",
                     CATEGORY_CLIENT,
                     chatMentionLineColor,
-                    "Palette colour of a chat line that @-mentions you. Set in Settings.",
+                    TIP,
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_MENTION_LINE_COLOR);
             chatSelectedMentionColor = automaticOrPaletteName(config.getString(
                     "chatSelectedMentionColor",
                     CATEGORY_CLIENT,
                     chatSelectedMentionColor,
-                    "Palette colour of a chat line that @-mentions you while it is under the pointer. AUTO, the default, is the mention colour one shade lighter on its own ramp of the palette, or the selected-line colour where the mention colour is already its ramp's lightest. Set in Settings.",
+                    TIP,
                     automaticOrPaletteNames()
             ));
             chatReplyHighlightColor = paletteName(config.getString(
                     "chatReplyHighlightColor",
                     CATEGORY_CLIENT,
                     chatReplyHighlightColor,
-                    "Palette colour a chat line is lit in when a reply's quote jumps to it. Set in Settings.",
+                    TIP,
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR);
             chatServerTextColor = paletteName(config.getString(
                     "chatServerTextColor",
                     CATEGORY_CLIENT,
                     chatServerTextColor,
-                    "Palette colour of what the Server and the Client say in the chat: joins, command answers, notices, the lines of the Console and the Server Log. Names, links and warnings keep their own colours. Set in Settings.",
+                    TIP,
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_SERVER_TEXT_COLOR);
             Property feedAlignmentProperty = config.get(
-                    CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment,
-                    "Which edge the chat feed's lines stand against: LEFT, CENTRE (the default), or RIGHT. Each line's background thins out away from that edge, from the middle to both sides for CENTRE.");
+                    CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment, TIP);
             feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
             chatFeedAlignment = normalizeFeedAlignment(
                     feedAlignmentProperty.getString());
             chatSpeakerSize = readSize(config, "chatSpeakerSize",
-                    chatSpeakerSize,
-                    "How big the row a message names its speaker on is in "
-                            + "the open chat window, against the words under "
-                            + "it: SMALLER, SAME or LARGER, each one whole "
-                            + "display pixel per font pixel, which is the "
-                            + "only step that keeps the font crisp. The row "
-                            + "is as tall as the text it is drawn in.");
+                    chatSpeakerSize);
             chatFeedSpeakerSize = readSize(config, "chatFeedSpeakerSize",
-                    chatFeedSpeakerSize,
-                    "The same row in the chat feed, against the "
-                            + "feed's own words: SMALLER, SAME or LARGER. "
-                            + "LARGER, the default, stands it a step over "
-                            + "them, which is the size the open window's "
-                            + "words have, so a glance reads the voices "
-                            + "first.");
+                    chatFeedSpeakerSize);
             chatFeedMessageSize = readSize(config, "chatFeedMessageSize",
-                    chatFeedMessageSize,
-                    "How big what a message says is in the chat feed, "
-                            + "against the same words in the open window: "
-                            + "SMALLER, SAME or LARGER. The open window's "
-                            + "words are the size every other row is measured "
-                            + "against and are set by the game's Chat Scale.");
-            chatQuoteSize = readSize(config, "chatQuoteSize", chatQuoteSize,
-                    "How big the row a reply opens with is in the open "
-                            + "chat window, the quote of the message it "
-                            + "answers, against the words under it: "
-                            + "SMALLER, SAME or LARGER.");
+                    chatFeedMessageSize);
+            chatQuoteSize = readSize(config, "chatQuoteSize", chatQuoteSize);
             chatFeedQuoteSize = readSize(config, "chatFeedQuoteSize",
-                    chatFeedQuoteSize,
-                    "The same row in the chat feed, against the "
-                            + "feed's own words: SMALLER, SAME or LARGER. "
-                            + "SAME, the default, draws the quote as large "
-                            + "as the words it stands over.");
+                    chatFeedQuoteSize);
             chatFeedWidth = config.getInt("chatFeedWidth", CATEGORY_CLIENT,
-                    chatFeedWidth, 80, 640,
-                    "How wide the chat feed stands, in GUI pixels. Set in a conversation's Chat Feed Settings.");
+                    chatFeedWidth, 80, 640, TIP);
             chatFeedLines = config.getInt("chatFeedLines", CATEGORY_CLIENT,
-                    chatFeedLines, 1, 20,
-                    "The most lines the chat feed shows at once; never more than half the screen holds. Set in a conversation's Chat Feed Settings.");
+                    chatFeedLines, 1, 20, TIP);
             chatFeedSeconds = config.getInt("chatFeedSeconds", CATEGORY_CLIENT,
-                    chatFeedSeconds, 2, 60,
-                    "How many seconds a line stays in the chat feed, fading in the last of them. Set in a conversation's Chat Feed Settings.");
+                    chatFeedSeconds, 2, 60, TIP);
             hideHudWithWindows = config.getBoolean(
                     "hideHudWithWindows",
                     CATEGORY_CLIENT,
                     hideHudWithWindows,
-                    "Fade the game's HUD (hotbar, health, crosshair and the rest) and the Lost Tales panels out while the window screen is open, and back in when it closes."
+                    TIP
             );
             pinnedWindowOpacity = config.getInt(
                     "pinnedWindowOpacity",
@@ -1319,11 +1265,10 @@ public final class LostTalesConfig {
                     pinnedWindowOpacity,
                     20,
                     100,
-                    "How strong a pinned window shows while you play, in percent of how it shows on the window screen."
+                    TIP
             );
             Property tipDelayProperty = config.get(CATEGORY_CLIENT, "tipDelay",
-                    tipDelay,
-                    "How long the pointer rests on something before its tip shows: INSTANT, SHORT (the default), MEDIUM or LONG. Once a tip has shown, the next one shows at once for a moment. The times are the motion files' (ui.tip.show).");
+                    tipDelay, TIP);
             tipDelayProperty.setValidValues(TIP_DELAYS);
             tipDelay = normalizeWord(tipDelayProperty.getString(), TIP_DELAYS,
                     DEFAULT_TIP_DELAY);
@@ -1332,32 +1277,32 @@ public final class LostTalesConfig {
                     "devSkinOverridePath",
                     CATEGORY_CLIENT,
                     devSkinOverridePath,
-                    "Developer aid: path of a 64x32 or 64x64 PNG drawn on your own player instead of your account skin. Empty disables it."
+                    TIP
             );
             devSkinOverrideBodyType = config.getString(
                     "devSkinOverrideBodyType",
                     CATEGORY_CLIENT,
                     devSkinOverrideBodyType,
-                    "Arm width for the override skin: wide or slim. Anything else means wide.",
+                    TIP,
                     DEV_SKIN_BODY_TYPES
             );
             showSkinOverlays = config.getBoolean(
                     "showSkinOverlays",
                     CATEGORY_CLIENT,
                     showSkinOverlays,
-                    "Draw the jacket, sleeve, and trouser overlay layers of 64x64 skins on players."
+                    TIP
             );
             chestPhysics = config.getBoolean(
                     "chestPhysics",
                     CATEGORY_CLIENT,
                     chestPhysics,
-                    "Let the chest sway and bounce with movement."
+                    TIP
             );
             chestBounce = config.getFloat(
                     "chestBounce",
                     CATEGORY_CLIENT,
                     chestBounce, 0.0F, 1.0F,
-                    "Strength of the chest physics; 0 is still, 1 is the most movement."
+                    TIP
             );
             chatHistoryLines = config.getInt(
                     "chatHistoryLines",
@@ -1365,25 +1310,25 @@ public final class LostTalesConfig {
                     chatHistoryLines,
                     100,
                     5000,
-                    "Chat messages kept in the history, shared by every channel tab (vanilla keeps 100)."
+                    TIP
             );
             sendChatTypingStatus = config.getBoolean(
                     "sendChatTypingStatus",
                     CATEGORY_CLIENT,
                     sendChatTypingStatus,
-                    "Let the people who would read your message see that you are typing it."
+                    TIP
             );
             showChatTypingIndicators = config.getBoolean(
                     "showChatTypingIndicators",
                     CATEGORY_CLIENT,
                     showChatTypingIndicators,
-                    "Show who is typing into a channel above that window's input bar."
+                    TIP
             );
             enableNpcChatStyling = config.getBoolean(
                     "enableNpcChatStyling",
                     CATEGORY_CLIENT,
                     enableNpcChatStyling,
-                    "Show LOTR NPC speech through the Lost Tales chat style with head icons, timestamps, and channels."
+                    TIP
             );
             npcConversationsOpen = config.getInt(
                     "npcConversationsOpen",
@@ -1391,100 +1336,94 @@ public final class LostTalesConfig {
                     npcConversationsOpen,
                     1,
                     10,
-                    "How many conversations with NPCs open a page by themselves; older ones wait in +."
+                    TIP
             );
             showChatSpeechBubbles = config.getBoolean(
                     "showChatSpeechBubbles",
                     CATEGORY_CLIENT,
                     showChatSpeechBubbles,
-                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech, as far as the server's Proximity radius. In-character channels only (Global, Proximity, Fellowship, Faction and whispers); never OOC, the operator channel, the Console or the Server Log."
+                    TIP
             );
             animations = config.getBoolean(
                     "animations", CATEGORY_CLIENT, animations,
-                    "Let the mod's screens, HUD and chat move. Off, everything stands where it ends. How each motion looks is in the motion files (assets/losttales/motion, tuned in the Motion Lab)."
+                    TIP
             );
             animationSpeed = getBoundedDouble(
                     config, CATEGORY_CLIENT, "animationSpeed",
-                    animationSpeed, 0.25D, 4.0D,
-                    "How fast every motion plays: 2 is twice as fast, 0.5 half as fast."
-            );
+                    animationSpeed, 0.25D, 4.0D);
             reducedMotion = config.getBoolean(
                     "reducedMotion", CATEGORY_CLIENT, reducedMotion,
-                    "Keep motion to short fades: nothing travels, overshoots, anticipates or stretches."
+                    TIP
             );
             enableGuiBackground = config.getBoolean(
                     "enableGuiBackground", CATEGORY_CLIENT,
                     enableGuiBackground,
-                    "Draw the dark semi-transparent background behind compatible GUIs."
+                    TIP
             );
             guiBackgroundOpacity = getBoundedDouble(
                     config, CATEGORY_CLIENT, "guiBackgroundOpacity",
-                    guiBackgroundOpacity, 0.0D, 1.0D,
-                    "Final opacity of the GUI's black background veil."
-            );
+                    guiBackgroundOpacity, 0.0D, 1.0D);
             guiAlwaysBlur = config.getBoolean(
                     "guiAlwaysBlur", CATEGORY_CLIENT,
                     guiAlwaysBlur,
-                    "Blur every compatible in-world GUI background, including screens that opt out by default."
+                    TIP
             );
             enableGuiBackgroundBlur = config.getBoolean(
                     "enableGuiBackgroundBlur", CATEGORY_CLIENT,
                     enableGuiBackgroundBlur,
-                    "Blur the world behind compatible GUIs when legacy framebuffer shaders are available."
+                    TIP
             );
             guiBlurStrength = getBoundedDouble(
                     config, CATEGORY_CLIENT, "guiBlurStrength",
-                    guiBlurStrength, 0.0D, 8.0D,
-                    "Background blur radius. Blur failure falls back to the normal GUI background."
-            );
+                    guiBlurStrength, 0.0D, 8.0D);
             playQuestSounds = config.getBoolean(
                     "playQuestSounds",
                     CATEGORY_CLIENT,
                     playQuestSounds,
-                    "Play simple vanilla UI sounds for quest milestones."
+                    TIP
             );
 
             enableQuestPrerequisites = config.getBoolean(
                     "enableQuestPrerequisites",
                     CATEGORY_QUESTS,
                     enableQuestPrerequisites,
-                    "Require optional quest JSON prerequisites before quests can be started."
+                    TIP
             );
             enableQuestRewards = config.getBoolean(
                     "enableQuestRewards",
                     CATEGORY_QUESTS,
                     enableQuestRewards,
-                    "Grant optional quest JSON rewards when quests complete naturally or by command."
+                    TIP
             );
             allowQuestItemStarts = config.getBoolean(
                     "allowQuestItemStarts",
                     CATEGORY_QUESTS,
                     allowQuestItemStarts,
-                    "Allow right-click quest starter items with LostTalesQuestId NBT to start quests whose startMode allows item starts."
+                    TIP
             );
             allowQuestInteractionStarts = config.getBoolean(
                     "allowQuestInteractionStarts",
                     CATEGORY_QUESTS,
                     allowQuestInteractionStarts,
-                    "Allow right-click entity/block quest giver hooks for quests whose startMode allows interaction starts."
+                    TIP
             );
             autoRevealQuestMarkersOnStart = config.getBoolean(
                     "autoRevealQuestMarkersOnStart",
                     CATEGORY_QUESTS,
                     autoRevealQuestMarkersOnStart,
-                    "Automatically reveal marker hints from a quest when that quest starts."
+                    TIP
             );
             autoPinQuestOnStart = config.getBoolean(
                     "autoPinQuestOnStart",
                     CATEGORY_QUESTS,
                     autoPinQuestOnStart,
-                    "Automatically track a quest on the HUD when it starts, as long as the player is not already tracking it."
+                    TIP
             );
             autoDiscoverNearbyMapMarkers = config.getBoolean(
                     "autoDiscoverNearbyMapMarkers",
                     CATEGORY_QUESTS,
                     autoDiscoverNearbyMapMarkers,
-                    "Automatically discover bundled map markers when a player walks within that marker's unlock radius."
+                    TIP
             );
             mapMarkerDiscoveryScanIntervalTicks = config.getInt(
                     "mapMarkerDiscoveryScanIntervalTicks",
@@ -1492,39 +1431,39 @@ public final class LostTalesConfig {
                     mapMarkerDiscoveryScanIntervalTicks,
                     20,
                     200,
-                    "How often, in ticks, nearby map marker discovery is checked on the server."
+                    TIP
             );
 
             enableWaystoneRecipe = config.getBoolean(
                     "enableWaystoneRecipe",
                     CATEGORY_WAYSTONES,
                     enableWaystoneRecipe,
-                    "Register the Lost Tales waystone crafting recipe. Recipe changes require a restart."
+                    TIP
             );
             waystoneRecipeCornerIngredient = config.getString(
                     "waystoneRecipeCornerIngredient",
                     CATEGORY_WAYSTONES,
                     waystoneRecipeCornerIngredient,
-                    "Registry name (namespace:path[@meta]) or ore dictionary name prefixed with ore: used in recipe corners."
+                    TIP
             );
             waystoneRecipeEdgeIngredient = config.getString(
                     "waystoneRecipeEdgeIngredient",
                     CATEGORY_WAYSTONES,
                     waystoneRecipeEdgeIngredient,
-                    "Registry name (namespace:path[@meta]) or ore dictionary name prefixed with ore: used on recipe edges."
+                    TIP
             );
             waystoneRecipeCenterIngredient = config.getString(
                     "waystoneRecipeCenterIngredient",
                     CATEGORY_WAYSTONES,
                     waystoneRecipeCenterIngredient,
-                    "Registry name (namespace:path[@meta]) or ore dictionary name prefixed with ore: used at the recipe center."
+                    TIP
             );
 
             enableDynamicMissiveBoards = config.getBoolean(
                     "enableDynamicMissiveBoards",
                     CATEGORY_MISSIVES,
                     enableDynamicMissiveBoards,
-                    "When true, missive board tile entities generate dynamic missive letters on the server."
+                    TIP
             );
             missiveBoardMinAvailable = config.getInt(
                     "missiveBoardMinAvailable",
@@ -1532,7 +1471,7 @@ public final class LostTalesConfig {
                     missiveBoardMinAvailable,
                     0,
                     9,
-                    "Notices a board refills towards: while it holds fewer, each refill posts as many as missiveBoardMaxGeneratedPerCycle allows. A board has room for 9; every board reads this as it stands."
+                    TIP
             );
             missiveBoardMaxAvailable = config.getInt(
                     "missiveBoardMaxAvailable",
@@ -1540,7 +1479,7 @@ public final class LostTalesConfig {
                     missiveBoardMaxAvailable,
                     1,
                     9,
-                    "The most notices a board holds, never fewer than missiveBoardMinAvailable. A board has room for 9; every board reads this as it stands."
+                    TIP
             );
             missiveBoardGenerationIntervalTicks = config.getInt(
                     "missiveBoardGenerationIntervalTicks",
@@ -1548,7 +1487,7 @@ public final class LostTalesConfig {
                     missiveBoardGenerationIntervalTicks,
                     1200,
                     240000,
-                    "World ticks between a board's ordinary refills; 36000 ticks is 30 real minutes. Every board reads it as it stands."
+                    TIP
             );
             missiveBoardMinGeneratedPerCycle = config.getInt(
                     "missiveBoardMinGeneratedPerCycle",
@@ -1556,7 +1495,7 @@ public final class LostTalesConfig {
                     missiveBoardMinGeneratedPerCycle,
                     1,
                     9,
-                    "Minimum number of new notices generated per refill cycle when space is available."
+                    TIP
             );
             missiveBoardMaxGeneratedPerCycle = config.getInt(
                     "missiveBoardMaxGeneratedPerCycle",
@@ -1564,13 +1503,13 @@ public final class LostTalesConfig {
                     missiveBoardMaxGeneratedPerCycle,
                     1,
                     9,
-                    "Maximum number of new notices generated per refill cycle when space is available."
+                    TIP
             );
             expireMissiveBoardNotices = config.getBoolean(
                     "expireMissiveBoardNotices",
                     CATEGORY_MISSIVES,
                     expireMissiveBoardNotices,
-                    "When true, old unaccepted notices are removed from missive boards so they can be replaced over time."
+                    TIP
             );
             missiveBoardNoticeExpirationDays = config.getInt(
                     "missiveBoardNoticeExpirationDays",
@@ -1578,13 +1517,13 @@ public final class LostTalesConfig {
                     missiveBoardNoticeExpirationDays,
                     1,
                     30,
-                    "How many in-game days an unaccepted generated board notice remains available before expiring."
+                    TIP
             );
             enableTimedMissives = config.getBoolean(
                     "enableTimedMissives",
                     CATEGORY_MISSIVES,
                     enableTimedMissives,
-                    "When true, some generated missives receive a deadline after being accepted."
+                    TIP
             );
             timedMissiveChancePercent = config.getInt(
                     "timedMissiveChancePercent",
@@ -1592,7 +1531,7 @@ public final class LostTalesConfig {
                     timedMissiveChancePercent,
                     0,
                     100,
-                    "Percent chance that a generated missive receives a deadline."
+                    TIP
             );
             timedMissiveMinDays = config.getInt(
                     "timedMissiveMinDays",
@@ -1600,7 +1539,7 @@ public final class LostTalesConfig {
                     timedMissiveMinDays,
                     1,
                     30,
-                    "Minimum accepted-quest deadline length in in-game days for timed missives."
+                    TIP
             );
             timedMissiveMaxDays = config.getInt(
                     "timedMissiveMaxDays",
@@ -1608,7 +1547,7 @@ public final class LostTalesConfig {
                     timedMissiveMaxDays,
                     1,
                     30,
-                    "Maximum accepted-quest deadline length in in-game days for timed missives."
+                    TIP
             );
             clampMissiveOptions();
 
@@ -2154,6 +2093,8 @@ public final class LostTalesConfig {
                 .set(chatProfanityWords);
         config.get(CATEGORY_CHAT, "welcomeLines", chatWelcomeLines)
                 .set(chatWelcomeLines);
+        config.get(CATEGORY_CHAT, "serverAddress", serverAddress)
+                .set(serverAddress);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",
                 enableChatEmojis).set(enableChatEmojis);
         config.get(CATEGORY_CLIENT, "convertChatEmoticons",
@@ -2498,10 +2439,8 @@ public final class LostTalesConfig {
      * box.
      */
     private static String readSize(Configuration config,
-                                   String key, String shipped,
-                                   String comment) {
-        Property property = config.get(CATEGORY_CLIENT, key, shipped,
-                comment);
+                                   String key, String shipped) {
+        Property property = config.get(CATEGORY_CLIENT, key, shipped, TIP);
         property.setValidValues(CHAT_SIZES);
         return normalizeSize(property.getString(), shipped);
     }
@@ -2555,7 +2494,7 @@ public final class LostTalesConfig {
 
     static double getHudPercent(
             Configuration config, String key, double defaultValue,
-            double minimum, double maximum, String comment) {
+            double minimum, double maximum) {
         if (config.hasKey(CATEGORY_CLIENT, key)) {
             Property existing = config.getCategory(CATEGORY_CLIENT).get(key);
             if (existing != null
@@ -2567,23 +2506,22 @@ public final class LostTalesConfig {
             }
         }
         return getBoundedDouble(config, CATEGORY_CLIENT, key, defaultValue,
-                minimum, maximum, comment);
+                minimum, maximum);
     }
 
     private static double getBoundedDouble(
             Configuration config, String key, double defaultValue,
-            double minimum, double maximum, String comment) {
+            double minimum, double maximum) {
         return getBoundedDouble(config, CATEGORY_RANGED_COMBAT, key,
-                defaultValue, minimum, maximum, comment);
+                defaultValue, minimum, maximum);
     }
 
     private static double getBoundedDouble(
             Configuration config, String category, String key,
-            double defaultValue, double minimum, double maximum,
-            String comment) {
+            double defaultValue, double minimum, double maximum) {
         Property property = config.get(
                 category, key, defaultValue,
-                comment, minimum, maximum);
+                TIP, minimum, maximum);
         double value = property.getDouble(defaultValue);
         double bounded = Math.max(minimum, Math.min(maximum, value));
         if (bounded != value) {

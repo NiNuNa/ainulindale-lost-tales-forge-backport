@@ -1,5 +1,8 @@
 package com.ninuna.losttales.gui.screen.fellowship;
 
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.client.window.OptionGlyph;
 import com.ninuna.losttales.client.window.PageOption;
@@ -12,6 +15,9 @@ import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageSearch;
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.client.window.WheelStep;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
@@ -40,7 +46,6 @@ import java.util.Set;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.init.Items;
@@ -70,13 +75,10 @@ public final class FellowshipPage extends PageContent {
     /** The code name the page is registered and remembered under. */
     public static final String PAGE_ID = "fellowship";
 
-    private static final int MARGIN = 8;
-    private static final int ROW_HEIGHT = 14;
-    private static final int HEADING_HEIGHT = 15;
-    private static final int NOTE_LINE = 10;
-    /** The member's colour, a small square before the name. */
+    /** The member's colour, a small square in the icon box before the name. */
     private static final int CHIP = 6;
-    private static final int NAME_X = CHIP + 5;
+    /** How close the drawn scroll comes to the asked one before it is there. */
+    private static final double SCROLL_SNAP = 0.1D;
     /** The longest name the invite field takes. */
     private static final int MAX_NAME = 32;
     /** Ticks between asks while the server has not answered with the state. */
@@ -128,7 +130,6 @@ public final class FellowshipPage extends PageContent {
     /** What the name field is typed for. */
     private enum Naming { NONE, CREATE, RENAME }
 
-    private final Minecraft mc = Minecraft.getMinecraft();
     private FontRenderer font;
     private int width = -1;
     private int height = -1;
@@ -146,7 +147,12 @@ public final class FellowshipPage extends PageContent {
     private UUID pickedId;
     /** The row under the pointer this frame; null for none. */
     private Row hovered;
+    /** The list's offset asked for, in pixels: whole rows from the wheel. */
     private int scroll;
+    /** The offset the rows are drawn at, gliding after the asked one. */
+    private double renderedScroll;
+    /** When the drawn offset last moved; 0 before the first frame. */
+    private long scrollNanos;
     /** The words in the window's well; empty while its search is closed. */
     private String query = "";
 
@@ -215,13 +221,15 @@ public final class FellowshipPage extends PageContent {
      * The list's rows, the search held: the invitations to the player
      * under a heading while there are any, then each fellowship under its
      * name with its members and the invitations it sent; a note where the
-     * character is in no fellowship.
+     * character is in no fellowship. Every row is a menu's row high, a
+     * note a row a line.
      */
     private List<Row> rows(FellowshipStateSnapshot snapshot) {
         List<Row> rows = new ArrayList<Row>();
         if (snapshot == null || !snapshot.isAvailable() || this.font == null) {
             return rows;
         }
+        int rowHeight = MenuWindow.rowHeight();
         PageSearch search = PageSearch.of(this.query);
         List<Row> incoming = new ArrayList<Row>();
         for (FellowshipInvitationSnapshot invitation : snapshot.getIncomingInvitations()) {
@@ -231,7 +239,7 @@ public final class FellowshipPage extends PageContent {
                         "gui.losttales.fellowship.invitation.row",
                         invitation.getFellowshipName(),
                         invitation.getInvitingCharacterName()),
-                        null, null, invitation, ROW_HEIGHT));
+                        null, null, invitation, rowHeight));
             }
         }
         if (!incoming.isEmpty()) {
@@ -252,7 +260,7 @@ public final class FellowshipPage extends PageContent {
             for (FellowshipMemberSnapshot member : fellowship.getMembers()) {
                 if (named || search.matches(member.getCharacterName())) {
                     inside.add(new Row(Kind.MEMBER, member.getCharacterName(),
-                            fellowship, member, null, ROW_HEIGHT));
+                            fellowship, member, null, rowHeight));
                 }
             }
             for (FellowshipInvitationSnapshot invitation : snapshot.getOutgoingInvitations()) {
@@ -261,7 +269,7 @@ public final class FellowshipPage extends PageContent {
                     inside.add(new Row(Kind.OUTGOING, I18n.format(
                             "gui.losttales.fellowship.invited",
                             invitation.getTargetCharacterName()),
-                            fellowship, null, invitation, ROW_HEIGHT));
+                            fellowship, null, invitation, rowHeight));
                 }
             }
             if (named || !inside.isEmpty()) {
@@ -270,7 +278,7 @@ public final class FellowshipPage extends PageContent {
                         fellowship.getName(),
                         Integer.valueOf(fellowship.getMemberCount()),
                         Integer.valueOf(snapshot.getMemberLimit())),
-                        fellowship, null, null, HEADING_HEIGHT));
+                        fellowship, null, null, rowHeight));
                 rows.addAll(inside);
             }
         }
@@ -285,15 +293,21 @@ public final class FellowshipPage extends PageContent {
     }
 
     private static Row heading(String text) {
-        return new Row(Kind.HEADING, text, null, null, null, HEADING_HEIGHT);
+        return new Row(Kind.HEADING, text, null, null, null,
+                MenuWindow.rowHeight());
     }
 
-    /** A note in the aside tone, as many lines as it wraps to. */
+    /** A note in the aside tone, a row for each line it wraps to. */
     private void addNote(List<Row> rows, String text) {
-        int lines = this.font.listFormattedStringToWidth(text,
-                Math.max(1, this.width - 2 * MARGIN)).size();
+        int lines = noteLines(text).size();
         rows.add(new Row(Kind.NOTE, text, null, null, null,
-                Math.max(1, lines) * NOTE_LINE + 4));
+                Math.max(1, lines) * MenuWindow.rowHeight()));
+    }
+
+    /** A note's lines, wrapped between the list's padding. */
+    private List<?> noteLines(String text) {
+        return this.font.listFormattedStringToWidth(text,
+                Math.max(1, this.width - 2 * MenuWindow.PADDING_X));
     }
 
     private static int found(List<Row> rows) {
@@ -315,9 +329,20 @@ public final class FellowshipPage extends PageContent {
         return total;
     }
 
-    /** The room the list has: the page less its margins. */
-    private int listHeight() {
-        return Math.max(ROW_HEIGHT, this.height - 2 * MARGIN);
+    /** How tall the band the rows show in is: the page less the list's padding above and below. */
+    private int bandHeight() {
+        return Math.max(MenuWindow.rowHeight(),
+                this.height - 2 * MenuWindow.PADDING_Y);
+    }
+
+    /** Where the list's first row is drawn: the drawn offset slides it up past the band. */
+    private int listTop() {
+        return MenuWindow.PADDING_Y - (int)Math.round(this.renderedScroll);
+    }
+
+    /** The furthest the list scrolls: its last row whole at the band's foot. */
+    private int maxScroll(List<Row> rows) {
+        return Math.max(0, contentHeight(rows) - bandHeight());
     }
 
     /* ---- Life ---- */
@@ -468,49 +493,67 @@ public final class FellowshipPage extends PageContent {
         if (this.stateRequestId == 0) {
             askForState();
         }
-        int mouseX = pageX(box, pointerX);
-        int mouseY = pageY(box, pointerY);
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef((float)box.left, (float)box.top, 0.0F);
-            drawPage(mouseX, mouseY);
+            drawPage(minecraft, box, pointerX, pointerY, alpha);
         } finally {
             GL11.glPopMatrix();
         }
     }
 
-    /** A screen x in the page's own space; far off for a pointer away. */
-    private static int pageX(LostTalesUiHitBox box, double x) {
-        return Double.isNaN(x) ? Integer.MIN_VALUE / 2
-                : (int)Math.floor(x - box.left);
-    }
-
-    private static int pageY(LostTalesUiHitBox box, double y) {
-        return Double.isNaN(y) ? Integer.MIN_VALUE / 2
-                : (int)Math.floor(y - box.top);
-    }
-
-    private void drawPage(int mouseX, int mouseY) {
+    /**
+     * The list in the page's own space, as a menu draws its rows: the
+     * picked row and the hovered one lit across the page's width, cut to
+     * the band, before anything lands on them; then the rows, clipped to
+     * the band they glide in; then where more of the list waits.
+     */
+    private void drawPage(Minecraft minecraft, LostTalesUiHitBox box,
+                          double pointerX, double pointerY, int alpha) {
         FellowshipStateSnapshot snapshot = getSnapshot();
         if (snapshot == null || !snapshot.isAvailable()) {
-            drawCentred(unavailableMessage(snapshot));
+            drawCentred(unavailableMessage(snapshot), alpha);
             return;
         }
         List<Row> rows = rows(snapshot);
         clampScroll(rows);
-        this.hovered = rowAt(rows, mouseX, mouseY);
+        glideScroll();
+        this.hovered = rowAt(rows, box, pointerX, pointerY);
         Row picked = picked(rows);
-        boolean clipped = LostTalesUiClip.beginLocal(this.mc, 0, MARGIN,
-                this.width, MARGIN + listHeight());
+        int bandTop = MenuWindow.PADDING_Y;
+        int bandBottom = bandTop + bandHeight();
+        int surfaceAlpha = WindowLists.pageSurfaceAlpha(minecraft, alpha);
+        int y = listTop();
+        for (Row row : rows) {
+            if (row == picked || row == this.hovered) {
+                int litTop = Math.max(bandTop, y);
+                int litBottom = Math.min(bandBottom, y + row.height);
+                if (litBottom > litTop) {
+                    WindowLists.drawLitRow(0.0D, box.width, 0.0D, litTop,
+                            box.width, litBottom, surfaceAlpha);
+                }
+            }
+            y += row.height;
+        }
+        boolean clipped = LostTalesUiClip.beginLocal(minecraft, 0.0F, bandTop,
+                (float)box.width, bandBottom);
         try {
-            int y = MARGIN - this.scroll;
+            y = listTop();
             for (Row row : rows) {
-                drawRow(snapshot, row, y, row == picked, row == this.hovered);
+                if (y >= bandBottom) {
+                    break;
+                }
+                if (y + row.height > bandTop) {
+                    drawRow(snapshot, row, y, row == picked,
+                            row == this.hovered, alpha);
+                }
                 y += row.height;
             }
         } finally {
             LostTalesUiClip.end(clipped);
         }
+        WindowLists.drawScroll(0.0D, 0.0D, box.width, box.height, bandTop,
+                bandBottom, this.renderedScroll, maxScroll(rows), alpha);
     }
 
     /**
@@ -529,90 +572,100 @@ public final class FellowshipPage extends PageContent {
                 : I18n.format("gui.losttales.fellowship.loading");
     }
 
-    /** A message alone in the middle of the page, in the aside tone. */
-    private void drawCentred(String text) {
-        List<?> lines = this.font.listFormattedStringToWidth(text,
-                Math.max(1, this.width - 2 * MARGIN));
-        int y = (this.height - lines.size() * NOTE_LINE) / 2;
+    /** A message alone in the middle of the page, in the aside tone, a row a line. */
+    private void drawCentred(String text, int alpha) {
+        int rowHeight = MenuWindow.rowHeight();
+        List<?> lines = noteLines(text);
+        int y = LostTalesUiInk.centredStart(this.height,
+                lines.size() * rowHeight);
         for (Object line : lines) {
             String each = String.valueOf(line);
             LostTalesUiInk.drawText(this.font, each,
-                    (this.width - this.font.getStringWidth(each)) / 2, y,
-                    WindowStyle.asideRgb(), 0xFF);
-            y += NOTE_LINE;
+                    (this.width - this.font.getStringWidth(each)) / 2,
+                    y + LostTalesUiInk.centredStart(rowHeight,
+                            LostTalesUiInk.CAP_HEIGHT),
+                    WindowStyle.asideRgb(), alpha);
+            y += rowHeight;
         }
     }
 
+    /**
+     * One row at {@code y}, as a menu draws its rows. A heading's words
+     * over its hairline, lit while its fellowship is picked or under the
+     * pointer; a note's lines, each centred in a row of its own; any other
+     * row's words in the list's one label column, a member's colour in the
+     * icon box before them, and what stands at the row's right ending at
+     * the padding, the words giving way before it.
+     */
     private void drawRow(FellowshipStateSnapshot snapshot, Row row, int y,
-                         boolean picked, boolean hovered) {
-        int left = MARGIN;
-        int right = this.width - MARGIN;
+                         boolean picked, boolean hovered, int alpha) {
+        int rowHeight = MenuWindow.rowHeight();
+        int left = MenuWindow.PADDING_X;
+        int right = this.width - MenuWindow.PADDING_X;
+        int textTop = y + LostTalesUiInk.centredStart(rowHeight,
+                LostTalesUiInk.CAP_HEIGHT);
         if (row.kind == Kind.NOTE) {
-            int lineY = y + 2;
-            for (Object line : this.font.listFormattedStringToWidth(row.text,
-                    Math.max(1, right - left))) {
+            for (Object line : noteLines(row.text)) {
                 LostTalesUiInk.drawText(this.font, String.valueOf(line), left,
-                        lineY, WindowStyle.asideRgb(), 0xFF);
-                lineY += NOTE_LINE;
+                        textTop, WindowStyle.asideRgb(), alpha);
+                textTop += rowHeight;
             }
             return;
-        }
-        if (picked || hovered) {
-            Gui.drawRect(left - 2, y, right, y + row.height, picked
-                    ? LostTalesColors.withAlpha(LostTalesColors.PLUM_GRAY, 0xB4)
-                    : LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x72));
         }
         String aside = asideOf(snapshot, row);
-        int asideWidth = aside.length() == 0 ? 0
-                : this.font.getStringWidth(aside) + 4;
+        int asideWidth = this.font.getStringWidth(aside);
+        int wordsRight = aside.length() == 0 ? right
+                : right - asideWidth - MenuWindow.VALUE_GAP;
         if (row.kind == Kind.HEADING || row.kind == Kind.FELLOWSHIP) {
-            String name = LostTalesSkyrimUiStyle.uppercase(row.text);
-            int top = y + LostTalesUiInk.centredStart(HEADING_HEIGHT, 7);
-            name = this.font.trimStringToWidth(name,
-                    Math.max(0, right - left - asideWidth));
-            LostTalesUiInk.drawText(this.font, name, left, top, picked
-                    ? LostTalesUiInk.IVORY : LostTalesColors.rgb(LostTalesColors.TEXT), 0xFF);
-            int ruleLeft = left + this.font.getStringWidth(name) + 5;
-            int ruleRight = right - asideWidth;
-            if (ruleLeft < ruleRight) {
-                Gui.drawRect(ruleLeft, top + 3, ruleRight, top + 4,
-                        LostTalesColors.BORDER_DIM);
-            }
+            boolean lit = picked || hovered;
+            WindowLists.drawHeading(this.font,
+                    LostTalesSkyrimUiStyle.trimToWidth(this.font, row.text,
+                            wordsRight - left),
+                    left, left, right, y, rowHeight, lit, alpha);
             if (aside.length() > 0) {
-                LostTalesUiInk.drawText(this.font, aside,
-                        right - this.font.getStringWidth(aside), top,
-                        WindowStyle.asideRgb(), 0xFF);
+                // The aside on the heading's own line, in the aside tone.
+                LostTalesUiInk.drawText(this.font, aside, right - asideWidth,
+                        WindowLists.headingTextTop(y, rowHeight),
+                        WindowStyle.asideRgb(), alpha);
             }
             return;
         }
-        int textTop = y + LostTalesUiInk.centredStart(ROW_HEIGHT, 7);
+        if (row.kind == Kind.MEMBER) {
+            drawChip(row.member.getColor(),
+                    left + LostTalesUiInk.centredStart(TabIcons.SIZE, CHIP),
+                    textTop + Math.floorDiv(LostTalesUiInk.CAP_HEIGHT - CHIP, 2),
+                    alpha);
+        }
+        int labelLeft = left + TabIcons.SLOT + TabIcons.GAP;
         boolean away = row.member != null
                 && row.member.getPresence() != FellowshipMemberPresence.HERE;
-        if (row.kind == Kind.MEMBER) {
-            int chipTop = y + (ROW_HEIGHT - CHIP) / 2;
-            FellowshipColor colour = row.member.getColor();
-            LostTalesUiInk.fillRect(left + 1, chipTop + 1, left + CHIP + 1,
-                    chipTop + CHIP + 1, LostTalesUiInk.argb(
-                            LostTalesUiInk.SHADOW, 0xFF));
-            LostTalesUiInk.fillRect(left, chipTop, left + CHIP,
-                    chipTop + CHIP, LostTalesUiInk.argb(colour == null
-                            ? LostTalesUiInk.IVORY : colour.getRgb(), 0xFF));
-        }
-        int nameX = row.kind == Kind.MEMBER ? left + NAME_X : left;
-        int nameRgb = picked ? LostTalesUiInk.IVORY
-                : away || row.kind == Kind.OUTGOING ? WindowStyle.asideRgb()
-                : LostTalesColors.rgb(LostTalesColors.TEXT);
-        LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(
-                        row.text, Math.max(0, right - nameX - asideWidth)),
-                nameX, textTop, nameRgb, 0xFF);
+        LostTalesUiInk.drawText(this.font, LostTalesSkyrimUiStyle.trimToWidth(
+                        this.font, row.text, wordsRight - labelLeft),
+                labelLeft, textTop, away || row.kind == Kind.OUTGOING
+                        ? WindowStyle.asideRgb() : LostTalesUiInk.IVORY, alpha);
         if (aside.length() > 0) {
             boolean expired = row.invitation != null
                     && row.invitation.isExpired(System.currentTimeMillis());
-            LostTalesUiInk.drawText(this.font, aside,
-                    right - this.font.getStringWidth(aside), textTop,
-                    expired ? LostTalesColors.rgb(LostTalesColors.RED)
-                            : WindowStyle.asideRgb(), 0xFF);
+            LostTalesUiInk.drawText(this.font, aside, right - asideWidth,
+                    textTop, expired ? LostTalesColors.rgb(LostTalesColors.RED)
+                            : WindowStyle.asideRgb(), alpha);
         }
+    }
+
+    /**
+     * A member's colour, a square with the one shadow cast only where the
+     * square does not cover it, so it fades as one picture.
+     */
+    private static void drawChip(FellowshipColor colour, int x, int y,
+                                 int alpha) {
+        int shadow = LostTalesUiInk.argb(LostTalesUiInk.SHADOW,
+                LostTalesUiInk.shadowAlpha(alpha));
+        LostTalesUiInk.fillRect(x + CHIP, y + 1, x + CHIP + 1, y + CHIP + 1,
+                shadow);
+        LostTalesUiInk.fillRect(x + 1, y + CHIP, x + CHIP, y + CHIP + 1,
+                shadow);
+        LostTalesUiInk.fillRect(x, y, x + CHIP, y + CHIP, LostTalesUiInk.argb(
+                colour == null ? LostTalesUiInk.IVORY : colour.getRgb(), alpha));
     }
 
     /**
@@ -657,15 +710,23 @@ public final class FellowshipPage extends PageContent {
 
     /* ---- The pointer ---- */
 
-    /** The row under a point in the page's own space; null off every row. */
-    private Row rowAt(List<Row> rows, int x, int y) {
-        if (x < MARGIN - 2 || x >= this.width - MARGIN || y < MARGIN
-                || y >= MARGIN + listHeight()) {
+    /**
+     * The pickable row under a point on the screen, where the rows are
+     * drawn: across the page's whole width and inside the band they show
+     * in. Null off every pickable row, and for a pointer away.
+     */
+    private Row rowAt(List<Row> rows, LostTalesUiHitBox box, double x,
+                      double y) {
+        double pageX = x - box.left;
+        double pageY = y - box.top;
+        if (!(pageX >= 0.0D && pageX < box.width
+                && pageY >= MenuWindow.PADDING_Y
+                && pageY < MenuWindow.PADDING_Y + bandHeight())) {
             return null;
         }
-        int top = MARGIN - this.scroll;
+        int top = listTop();
         for (Row row : rows) {
-            if (y >= top && y < top + row.height) {
+            if (pageY >= top && pageY < top + row.height) {
                 return row.pickable() ? row : null;
             }
             top += row.height;
@@ -680,7 +741,7 @@ public final class FellowshipPage extends PageContent {
             return false;
         }
         releaseField();
-        Row row = rowAt(rows(getSnapshot()), pageX(box, x), pageY(box, y));
+        Row row = rowAt(rows(getSnapshot()), box, x, y);
         if (button == 0 && row != null) {
             pickRow(row);
             return true;
@@ -699,25 +760,46 @@ public final class FellowshipPage extends PageContent {
 
     @Override
     public boolean acts(LostTalesUiHitBox box, double x, double y) {
-        return this.width >= 0 && rowAt(rows(getSnapshot()), pageX(box, x),
-                pageY(box, y)) != null;
+        return this.width >= 0
+                && rowAt(rows(getSnapshot()), box, x, y) != null;
     }
 
-    /** The wheel moves the list a row a turn. */
+    /** The wheel moves the list by whole rows, as a menu's; the drawn rows glide after. */
     @Override
     public boolean scroll(LostTalesUiHitBox box, double x, double y,
                           int lines) {
         if (lines == 0 || this.width < 0) {
             return false;
         }
-        this.scroll += lines * ROW_HEIGHT;
+        this.scroll += WheelStep.pixels(WheelStep.menuRows(lines),
+                MenuWindow.rowHeight());
         clampScroll(rows(getSnapshot()));
         return true;
     }
 
+    /** Keeps both the asked offset and the drawn one within the list. */
     private void clampScroll(List<Row> rows) {
-        int most = Math.max(0, contentHeight(rows) - listHeight());
+        int most = maxScroll(rows);
         this.scroll = Math.max(0, Math.min(this.scroll, most));
+        this.renderedScroll = Math.max(0.0D, Math.min(most,
+                this.renderedScroll));
+    }
+
+    /**
+     * Moves the drawn offset toward the asked one, once a drawn frame,
+     * with the windows' scroll motion, as a menu's does.
+     */
+    private void glideScroll() {
+        long now = System.nanoTime();
+        double elapsed = this.scrollNanos == 0L ? 0.0D
+                : (now - this.scrollNanos) / 1.0E9D;
+        this.scrollNanos = now;
+        if (Math.abs(this.scroll - this.renderedScroll) <= SCROLL_SNAP) {
+            this.renderedScroll = this.scroll;
+            return;
+        }
+        this.renderedScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
+                this.renderedScroll, this.scroll, elapsed);
     }
 
     /** Keeps the picked row in view. */
@@ -728,8 +810,8 @@ public final class FellowshipPage extends PageContent {
             if (row == picked) {
                 if (top < this.scroll) {
                     this.scroll = top;
-                } else if (top + row.height > this.scroll + listHeight()) {
-                    this.scroll = top + row.height - listHeight();
+                } else if (top + row.height > this.scroll + bandHeight()) {
+                    this.scroll = top + row.height - bandHeight();
                 }
                 return;
             }

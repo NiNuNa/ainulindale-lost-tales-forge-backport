@@ -1802,7 +1802,7 @@ public final class WindowGestures {
         WindowFrame frame = WindowFrame.of(holder);
         TabRow.Row row = this.host.rowFor(holder, frame, opening);
         return row == null ? 0
-                : frame.tabBar.carriedRunWidth(this.font, row);
+                : frame.tabBar.runWidth(this.font, row, drag.group);
     }
 
     /**

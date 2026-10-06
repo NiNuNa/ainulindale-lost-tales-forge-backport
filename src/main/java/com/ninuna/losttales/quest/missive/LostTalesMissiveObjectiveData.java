@@ -5,8 +5,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Data-only objective payload used by generated missives before they are turned
- * into normal Lost Tales quest definitions.
+ * One objective of a missive: its id, kind and parameters, before the
+ * missive becomes a quest. It carries no words; each game words it from
+ * its kind and target ({@code LostTalesQuestObjectiveTextHelper.describe}).
  */
 public final class LostTalesMissiveObjectiveData {
     public static final String TYPE_KILL = "kill";
@@ -14,14 +15,12 @@ public final class LostTalesMissiveObjectiveData {
 
     private final String id;
     private final String type;
-    private final String description;
     private final boolean optional;
     private final Map<String, String> params;
 
-    public LostTalesMissiveObjectiveData(String id, String type, String description, boolean optional, Map<String, String> params) {
+    public LostTalesMissiveObjectiveData(String id, String type, boolean optional, Map<String, String> params) {
         this.id = clean(id);
         this.type = clean(type);
-        this.description = description == null ? "" : description;
         this.optional = optional;
         this.params = Collections.unmodifiableMap(copyStringMap(params));
     }
@@ -32,10 +31,6 @@ public final class LostTalesMissiveObjectiveData {
 
     public String getType() {
         return this.type;
-    }
-
-    public String getDescription() {
-        return this.description;
     }
 
     public boolean isOptional() {

@@ -410,10 +410,9 @@ public final class Fellowship {
         if (member == null || ownerId == null) {
             return false;
         }
-        String safeName = characterName == null ? "Unknown" : characterName.trim();
-        if (safeName.length() == 0) {
-            safeName = "Unknown";
-        }
+        // A name the server does not know stays empty; each reader's game
+        // words it ({@link FellowshipNames}).
+        String safeName = characterName == null ? "" : characterName.trim();
         if (ownerId.equals(member.getOwnerId()) && safeName.equals(member.getCharacterName())) {
             return false;
         }

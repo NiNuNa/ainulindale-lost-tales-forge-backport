@@ -11,7 +11,9 @@ import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipPersonalMarkerOwner;
+import com.ninuna.losttales.fellowship.sync.FellowshipSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import java.util.UUID;
@@ -43,6 +45,7 @@ import lotr.common.world.map.LOTRAbstractWaypoint;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -132,7 +135,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     private boolean roadsRenderedBelowClouds;
     private boolean mapLegendOpen;
     private final Object mapLegendAnimationKey = new Object();
-    private int mapLegendScrollIndex;
+    private final LostTalesLotrMapLegend.Scroll mapLegendScroll =
+            new LostTalesLotrMapLegend.Scroll();
     private boolean smoothZoomInitialized;
     private float smoothZoomPrevious;
     private float smoothZoomCurrent;
@@ -145,6 +149,12 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     private LostTalesMapFastTravelPrompt fastTravelPrompt;
     private LostTalesMapWaypointPrompt waypointPrompt;
     private LostTalesMapMoveMarkerPrompt moveMarkerPrompt;
+    /** The mark {@link #moveMarkerPrompt} asks about; null while it asks about the "go here" marker. */
+    private UUID promptedMarkId;
+    private LostTalesMapMarkPrompt markPrompt;
+    /** Where the mark being named goes, as {dimension, x, z}, and whose it is. */
+    private int[] pendingMarkPosition;
+    private UUID pendingMarkFellowshipId;
     private LostTalesMapSearchPrompt searchPrompt;
     /** Search result brackets that survive the popup until the next input. */
     private boolean searchSelectionFrameActive;
@@ -229,6 +239,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     private String[] cursorLines = new String[0];
     /** Waiting for a press on the map to teleport there: an operator's Teleport on the bar. */
     private boolean teleportArmed;
+    /** Waiting for a press on the map to place a mark there, or to move {@link #movingMarkId} there. */
+    private boolean markArmed;
+    /** The mark Move It picked up; null while a new one is placed. */
+    private UUID movingMarkId;
     /** Find Location in a window's well: every place, what the words found, and which is shown. */
     private List<LostTalesMapSearchPrompt.Entry> places;
     private List<LostTalesMapSearchPrompt.Entry> placesFound =
@@ -281,9 +295,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         minecraft.displayGuiScreen(new LOTRGuiMap());
     }
 
-    /** Whether a prompt with a field is open, the waypoint's or Find Location's: it takes every key. */
+    /** Whether a prompt with a field is open, a waypoint's, a mark's or Find Location's: it takes every key. */
     boolean hasFieldPrompt() {
-        return this.waypointPrompt != null || this.searchPrompt != null;
+        return this.waypointPrompt != null || this.markPrompt != null
+                || this.searchPrompt != null;
     }
 
     /** Stands the map on a page in a window: the window screen draws it and hands it the pointer and the keys. */
@@ -378,10 +393,66 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     /** Arms the operator's teleport, or takes it back: the next press on the map teleports there. */
     void toggleTeleport() {
         this.teleportArmed = this.isPlayerOp && !this.teleportArmed;
+        if (this.teleportArmed) {
+            disarmMark();
+        }
     }
 
     boolean isTeleportArmed() {
         return this.teleportArmed && this.isPlayerOp;
+    }
+
+    /** Whether Mark belongs on the bar: the character played is in a fellowship. */
+    boolean offersMarks() {
+        FellowshipStateSnapshot state = ClientFellowshipStateCache.getSnapshot();
+        return state != null && state.isAvailable()
+                && !state.getFellowships().isEmpty();
+    }
+
+    /**
+     * Why a mark cannot be placed now, or null when it can: the character
+     * travels with a fellowship it leads or guides, and that fellowship
+     * holds fewer marks than it may.
+     */
+    String markRefusal() {
+        FellowshipStateSnapshot state = ClientFellowshipStateCache.getSnapshot();
+        FellowshipSnapshot fellowship = state == null || !state.isAvailable()
+                ? null : state.getTravellingFellowship();
+        if (fellowship == null) {
+            return I18n.format("gui.losttales.map.mark.why.no_fellowship");
+        }
+        if (!fellowship.canManage(state.getActiveIdentityId())) {
+            return I18n.format("gui.losttales.map.mark.why.not_guide");
+        }
+        if (fellowship.getMarks().size() >= FellowshipMark.MAX_PER_FELLOWSHIP) {
+            return I18n.format("gui.losttales.map.mark.why.full",
+                    Integer.valueOf(FellowshipMark.MAX_PER_FELLOWSHIP));
+        }
+        return null;
+    }
+
+    /** Arms placing a mark, or takes it back: the next press on the map names one there. */
+    void toggleMarkPlacing() {
+        boolean arm = !this.markArmed && markRefusal() == null;
+        disarmMark();
+        this.markArmed = arm;
+        if (arm) {
+            this.teleportArmed = false;
+        }
+    }
+
+    boolean isMarkArmed() {
+        return this.markArmed;
+    }
+
+    /** Whether the press the mark waits for moves one, rather than placing a new one. */
+    boolean isMovingMark() {
+        return this.markArmed && this.movingMarkId != null;
+    }
+
+    private void disarmMark() {
+        this.markArmed = false;
+        this.movingMarkId = null;
     }
 
     /**
@@ -489,6 +560,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         LostTalesMapMarkerData marker =
                 LostTalesClientMapMarkerStore.getSharedMarker(
                         pendingFocusMarkerId);
+        if (marker == null) {
+            // A fellowship's mark, from a link in its conversation.
+            marker = ClientFellowshipTrackingCache.markMarker(
+                    pendingFocusMarkerId);
+        }
         float[] target = marker != null
                 ? LostTalesLotrMapMarkerIconOverlay
                         .resolveMapImagePosition(marker, null)
@@ -704,6 +780,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         return this.fastTravelPrompt != null
                 || this.waypointPrompt != null
                 || this.moveMarkerPrompt != null
+                || this.markPrompt != null
                 || this.searchPrompt != null;
     }
 
@@ -732,6 +809,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         }
         if (this.waypointPrompt != null) {
             this.waypointPrompt.updateCursor();
+        }
+        if (this.markPrompt != null) {
+            this.markPrompt.updateCursor();
         }
         if (this.searchPrompt != null) {
             this.searchPrompt.updateCursor();
@@ -1466,6 +1546,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             this.moveMarkerPrompt.render(
                     this.width, this.height, fixedMouseX, fixedMouseY);
         }
+        if (this.markPrompt != null) {
+            this.markPrompt.render(
+                    this.width, this.height, fixedMouseX, fixedMouseY);
+        }
         if (this.searchPrompt != null) {
             this.searchPrompt.render(
                     this.width, this.height, fixedMouseX, fixedMouseY);
@@ -1508,6 +1592,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         }
         if (this.moveMarkerPrompt != null) {
             return this.moveMarkerPrompt.isPointerOverAction(
+                    this.width, this.height, fixedMouseX, fixedMouseY);
+        }
+        if (this.markPrompt != null) {
+            return this.markPrompt.isPointerOverAction(
                     this.width, this.height, fixedMouseX, fixedMouseY);
         }
         if (this.searchPrompt != null) {
@@ -1566,7 +1654,6 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         this.searchPrompt = LostTalesMapSearchPrompt.open(
-                this.mc.fontRenderer, this.width, this.height,
                 LostTalesClientMapMarkerStore.getMapMarkers(
                         ClientFellowshipTrackingCache.getMapMarkers()));
         this.mapLegendOpen = false;
@@ -1846,6 +1933,16 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             }
             return;
         }
+        if (this.markArmed && !isModalOpen()) {
+            // An armed mark takes the press as Teleport does: a left press
+            // picks the place, any other puts the mark away.
+            UUID moving = this.movingMarkId;
+            disarmMark();
+            if (button == 0) {
+                pickMarkPlace(mouseX, mouseY, moving);
+            }
+            return;
+        }
         int fixedMouseX = LostTalesGuiAnimations.forwardMouseX(
                 this, mouseX);
         int fixedMouseY = LostTalesGuiAnimations.forwardMouseY(
@@ -1869,6 +1966,13 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         if (this.moveMarkerPrompt != null) {
             handleMoveMarkerPromptAction(
                     this.moveMarkerPrompt.mouseClicked(
+                            this.width, this.height,
+                            fixedMouseX, fixedMouseY, button));
+            return;
+        }
+        if (this.markPrompt != null) {
+            handleMarkPromptAction(
+                    this.markPrompt.mouseClicked(
                             this.width, this.height,
                             fixedMouseX, fixedMouseY, button));
             return;
@@ -2016,10 +2120,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         if (marker != null) {
             if (localMarkerId != null
                     && localMarkerId.equals(marker.getId())) {
-                // Touching the marker no longer throws it away. Removing it is
+                // Touching the marker does not throw it away. Removing it is
                 // one of the answers to the question this opens.
                 openMoveMarkerPrompt(null);
-            } else {
+            } else if (!openMarkQuestion(state, marker)) {
                 openFastTravelPrompt(marker, null);
             }
             LostTalesLotrMapMarkerIconOverlay
@@ -2139,8 +2243,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      */
     private void openMoveMarkerPrompt(int[] destination) {
         this.pendingGoHereDestination = destination;
-        this.moveMarkerPrompt =
-                new LostTalesMapMoveMarkerPrompt(destination != null);
+        this.promptedMarkId = null;
+        this.moveMarkerPrompt = new LostTalesMapMoveMarkerPrompt(
+                I18n.format("gui.losttales.map.move_marker.prompt"),
+                destination != null);
         this.mapLegendOpen = false;
         LostTalesLotrMapMarkerIconOverlay
                 .clearLotrSelectedWaypoint(this);
@@ -2154,9 +2260,29 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         int[] destination = this.pendingGoHereDestination;
+        UUID markId = this.promptedMarkId;
         UUID ownerId = personalMarkerOwnerId(
                 ClientFellowshipStateCache.getSnapshot());
         clearMoveMarkerPrompt();
+        if (markId != null) {
+            if (action == LostTalesMapMoveMarkerPrompt.Action.MOVE) {
+                // Move It picks the new place with the next press on the map.
+                this.markArmed = true;
+                this.movingMarkId = markId;
+                this.teleportArmed = false;
+            } else if (action == LostTalesMapMoveMarkerPrompt.Action.REMOVE) {
+                FellowshipStateSnapshot state =
+                        ClientFellowshipStateCache.getSnapshot();
+                FellowshipSnapshot fellowship = fellowshipOfMark(state, markId);
+                if (fellowship != null) {
+                    FellowshipClientRequestManager.removeMark(
+                            state.getActiveIdentityId(),
+                            fellowship.getFellowshipId(),
+                            fellowship.getRevision(), markId);
+                }
+            }
+            return;
+        }
         // Every answer is a request the server re-derives ownership for; the
         // popup itself owns nothing.
         if (action == LostTalesMapMoveMarkerPrompt.Action.MOVE) {
@@ -2170,6 +2296,131 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     private void clearMoveMarkerPrompt() {
         this.moveMarkerPrompt = null;
         this.pendingGoHereDestination = null;
+        this.promptedMarkId = null;
+        this.mapInput.cancelPress();
+        this.goHerePressPending = false;
+        LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
+    }
+
+    /**
+     * Asks a leader or guide whether to move or remove the mark clicked.
+     *
+     * @return false when the marker is no mark, or one this character may
+     *         not change: it opens the travel popup as any marker does
+     */
+    private boolean openMarkQuestion(FellowshipStateSnapshot state,
+                                     LostTalesMapMarkerData marker) {
+        if (!marker.getId().startsWith(FellowshipMark.MARKER_ID_PREFIX)) {
+            return false;
+        }
+        UUID markId;
+        try {
+            markId = UUID.fromString(marker.getId().substring(
+                    FellowshipMark.MARKER_ID_PREFIX.length()));
+        } catch (IllegalArgumentException notAMark) {
+            return false;
+        }
+        FellowshipSnapshot fellowship = fellowshipOfMark(state, markId);
+        if (fellowship == null
+                || !fellowship.canManage(state.getActiveIdentityId())) {
+            return false;
+        }
+        this.pendingGoHereDestination = null;
+        this.promptedMarkId = markId;
+        this.moveMarkerPrompt = new LostTalesMapMoveMarkerPrompt(
+                I18n.format("gui.losttales.map.mark.prompt",
+                        marker.getName()), true);
+        this.mapLegendOpen = false;
+        LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
+        return true;
+    }
+
+    /** The fellowship of the character played that holds a mark; null for none. */
+    private static FellowshipSnapshot fellowshipOfMark(
+            FellowshipStateSnapshot state, UUID markId) {
+        if (state == null || !state.isAvailable() || markId == null) {
+            return null;
+        }
+        for (FellowshipSnapshot fellowship : state.getFellowships()) {
+            for (FellowshipMark mark : fellowship.getMarks()) {
+                if (mark.getMarkId().equals(markId)) {
+                    return fellowship;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Acts on the press an armed mark waited for: moves the mark Move It
+     * picked up there, or asks the new mark's name. The server checks
+     * again who may place it, and where.
+     */
+    private void pickMarkPlace(int mouseX, int mouseY, UUID movingMark) {
+        if (this.mc == null || this.mc.thePlayer == null) {
+            return;
+        }
+        int[] position = LostTalesLotrMapMarkerIconOverlay
+                .getMapClickWorldPosition(this, mouseX, mouseY);
+        if (position == null) {
+            return;
+        }
+        int dimension = this.mc.thePlayer.dimension;
+        FellowshipStateSnapshot state = ClientFellowshipStateCache.getSnapshot();
+        if (movingMark != null) {
+            FellowshipSnapshot fellowship = fellowshipOfMark(state, movingMark);
+            if (fellowship != null) {
+                FellowshipClientRequestManager.moveMark(
+                        state.getActiveIdentityId(),
+                        fellowship.getFellowshipId(), fellowship.getRevision(),
+                        movingMark, dimension, position[0], position[1]);
+            }
+            return;
+        }
+        FellowshipSnapshot fellowship = state == null || !state.isAvailable()
+                ? null : state.getTravellingFellowship();
+        if (fellowship == null || this.mc.fontRenderer == null) {
+            return;
+        }
+        this.pendingMarkPosition = new int[] {
+                dimension, position[0], position[1]
+        };
+        this.pendingMarkFellowshipId = fellowship.getFellowshipId();
+        this.markPrompt = new LostTalesMapMarkPrompt(this.mc.fontRenderer,
+                this.width, this.height, fellowship.getName(),
+                fellowship.getMarks().size());
+        this.mapLegendOpen = false;
+        LostTalesLotrMapMarkerIconOverlay.clearLotrSelectedWaypoint(this);
+        LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
+    }
+
+    private void handleMarkPromptAction(LostTalesMapMarkPrompt.Action action) {
+        if (action == null || action == LostTalesMapMarkPrompt.Action.NONE
+                || this.markPrompt == null) {
+            return;
+        }
+        String name = this.markPrompt.getName();
+        int[] position = this.pendingMarkPosition;
+        UUID fellowshipId = this.pendingMarkFellowshipId;
+        clearMarkPrompt();
+        if (action != LostTalesMapMarkPrompt.Action.PLACE || position == null) {
+            return;
+        }
+        FellowshipStateSnapshot state = ClientFellowshipStateCache.getSnapshot();
+        FellowshipSnapshot fellowship = state == null || !state.isAvailable()
+                ? null : state.getFellowship(fellowshipId);
+        if (fellowship != null) {
+            FellowshipClientRequestManager.placeMark(
+                    state.getActiveIdentityId(), fellowshipId,
+                    fellowship.getRevision(), name,
+                    position[0], position[1], position[2]);
+        }
+    }
+
+    private void clearMarkPrompt() {
+        this.markPrompt = null;
+        this.pendingMarkPosition = null;
+        this.pendingMarkFellowshipId = null;
         this.mapInput.cancelPress();
         this.goHerePressPending = false;
         LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
@@ -2686,6 +2937,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                             isWithinCustomWaypointLimit()));
             return;
         }
+        if (this.markPrompt != null) {
+            handleMarkPromptAction(
+                    this.markPrompt.keyTyped(typedChar, keyCode));
+            return;
+        }
         if (this.searchPrompt != null) {
             if (!this.searchPrompt.keyTyped(typedChar, keyCode)) {
                 clearSearchPrompt();
@@ -2742,6 +2998,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             this.teleportArmed = false;
             return;
         }
+        if (this.markArmed && keyCode == Keyboard.KEY_ESCAPE) {
+            disarmMark();
+            return;
+        }
         if (this.mapLegendOpen && keyCode == Keyboard.KEY_ESCAPE) {
             this.mapLegendOpen = false;
             return;
@@ -2767,7 +3027,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                     this.mapLegendAnimationKey);
         }
         if (!this.mapLegendOpen) {
-            this.mapLegendScrollIndex = 0;
+            this.mapLegendScroll.reset();
         }
     }
 
@@ -2787,12 +3047,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         return this.mapLegendAnimationKey;
     }
 
-    int getMapLegendScrollIndex() {
-        return this.mapLegendScrollIndex;
-    }
-
-    void setMapLegendScrollIndex(int index) {
-        this.mapLegendScrollIndex = Math.max(0, index);
+    /** How far the legend's rows are scrolled; back at the top as it folds away. */
+    LostTalesLotrMapLegend.Scroll getMapLegendScroll() {
+        return this.mapLegendScroll;
     }
 
     /**
@@ -2815,6 +3072,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         clearFastTravelPrompt();
         clearWaypointPrompt();
         clearMoveMarkerPrompt();
+        clearMarkPrompt();
+        disarmMark();
         clearSearchPrompt();
         this.mapInput.clear();
         this.cameraFocus.cancel();

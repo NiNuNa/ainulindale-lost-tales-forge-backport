@@ -93,18 +93,18 @@ public final class MenuWindowTest {
         rows.add(new MenuWindow.Entry("b", "Closed").unavailable("Not here"));
         menu.setRows(rows);
         LostTalesUiHitBox box = new LostTalesUiHitBox(10, 20, 80,
-                3 * MenuWindow.ROW_HEIGHT + 6);
+                3 * MenuWindow.rowHeight() + 6);
         int rowsTop = 20 + 3;
         WindowHover header = menu.hoverAt(box, 20, rowsTop + 5);
         assertEquals(WindowHover.Kind.SUB_WINDOW, header.kind);
         assertNull(header.menuEntry);
         assertFalse(header.acts());
         WindowHover row = menu.hoverAt(box, 20,
-                rowsTop + MenuWindow.ROW_HEIGHT + 5);
+                rowsTop + MenuWindow.rowHeight() + 5);
         assertSame(open, row.menuEntry);
         assertTrue(row.acts());
         WindowHover closed = menu.hoverAt(box, 20,
-                rowsTop + 2 * MenuWindow.ROW_HEIGHT + 5);
+                rowsTop + 2 * MenuWindow.rowHeight() + 5);
         assertNull(closed.menuEntry);
         assertEquals("it says why", "Not here", closed.tip);
         assertNull("the padding is nobody's",

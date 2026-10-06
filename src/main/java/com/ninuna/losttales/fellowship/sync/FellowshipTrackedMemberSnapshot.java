@@ -106,8 +106,8 @@ public final class FellowshipTrackedMemberSnapshot {
         return result;
     }
 
+    /** The name trimmed; empty where there is none, which the client words. */
     private static String normalizeName(String value) {
-        String name = value == null ? "Unknown" : value.trim();
-        return name.length() == 0 ? "Unknown" : name;
+        return value == null ? "" : value.trim();
     }
 }

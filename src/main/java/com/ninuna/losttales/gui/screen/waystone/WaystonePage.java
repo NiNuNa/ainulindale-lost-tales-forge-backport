@@ -31,6 +31,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdResolver;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneStateReason;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
@@ -93,10 +96,6 @@ public final class WaystonePage extends PageContent
     private static final int SAVE_KEY = Keyboard.KEY_S;
     /** The lang keys of the lines the server says in the chat about a waystone. */
     private static final String SERVER_LINES = "chat.losttales.waystone.";
-    /** Clear room above and below the rows. */
-    private static final int TOP = 2;
-    /** The widest the column of rows grows, so a name and its value stay near. */
-    private static final int MAX_COLUMN_WIDTH = 300;
     /** Ticks a request waits for its answer before the page stops waiting: five seconds. */
     private static final int ANSWER_TICKS = 100;
     /** The most names the share field offers at once. */
@@ -225,7 +224,7 @@ public final class WaystonePage extends PageContent
         }
         final LostTalesWaystoneStatePacket next = this.asking;
         if (screen.ask(tab, word("discard.title"),
-                word("discard", this.state.getName()),
+                word("discard", shownName(this.state)),
                 word("discard.confirm"), new Runnable() {
                     @Override
                     public void run() {
@@ -379,12 +378,28 @@ public final class WaystonePage extends PageContent
     }
 
     /**
+     * The waystone's name as the page's words name it: a bundled place in
+     * the game's language, words an operator gave it as they are.
+     */
+    private static String shownName(LostTalesWaystoneStatePacket state) {
+        if (state.getName().trim().length() == 0) {
+            String called = LostTalesMapMarkerNamedAfter.shownName(
+                    state.getNamedAfter());
+            if (called.length() > 0) {
+                return called;
+            }
+        }
+        return LostTalesMapMarkerNames.shownName(state.getMarkerId(),
+                state.getName());
+    }
+
+    /**
      * The tab closes by itself, as a tab closed by hand does, and the
      * notice over its window's bar says why.
      */
     private void close(OtherPage tab, WorldPageReach.Leave leave) {
         String name = this.state == null ? StatCollector.translateToLocal(
-                "gui.losttales.page.waystone") : this.state.getName();
+                "gui.losttales.page.waystone") : shownName(this.state);
         WorldPageWatch.close(tab, StatCollector.translateToLocalFormatted(
                 leave.messageKey("waystone"), name));
         forget();
@@ -589,45 +604,36 @@ public final class WaystonePage extends PageContent
                     "gui.losttales.window.settings.none")));
         }
         this.list.setRows(built);
-        LostTalesUiHitBox column = column(box);
+        LostTalesUiHitBox column = PageRows.column(box);
         this.list.draw(minecraft, column, clipX + (column.left - box.left),
                 clipY + (column.top - box.top), pointerX, pointerY, alpha);
     }
 
-    /** The column the rows stand in: the page's width up to a limit, centred. */
-    private static LostTalesUiHitBox column(LostTalesUiHitBox box) {
-        int boxWidth = (int)Math.floor(box.width);
-        int width = Math.max(0, Math.min(boxWidth, MAX_COLUMN_WIDTH));
-        return new LostTalesUiHitBox(Math.floor(box.left)
-                + LostTalesUiInk.centredStart(boxWidth, width),
-                Math.floor(box.top) + TOP, width,
-                Math.max(0.0D, Math.floor(box.height) - 2 * TOP));
-    }
 
     /* ---- The pointer ---- */
 
     @Override
     public boolean acts(LostTalesUiHitBox box, double x, double y) {
-        return this.draft != null && this.list.acts(column(box), x, y);
+        return this.draft != null && this.list.acts(PageRows.column(box), x, y);
     }
 
     @Override
     public String tipAt(LostTalesUiHitBox box, double x, double y) {
-        return this.draft == null ? "" : this.list.tipAt(column(box), x, y);
+        return this.draft == null ? "" : this.list.tipAt(PageRows.column(box), x, y);
     }
 
     @Override
     public boolean mousePressed(Minecraft minecraft, LostTalesUiHitBox box,
                                 double x, double y, int button) {
         return this.draft != null
-                && this.list.press(column(box), x, y, button);
+                && this.list.press(PageRows.column(box), x, y, button);
     }
 
     @Override
     public boolean scroll(LostTalesUiHitBox box, double x, double y,
                           int lines) {
         if (this.draft == null || lines == 0
-                || !column(box).contains(x, y)) {
+                || !PageRows.column(box).contains(x, y)) {
             return false;
         }
         this.list.scroll(lines);
@@ -807,6 +813,35 @@ public final class WaystonePage extends PageContent
         @Override
         public String nativeLore() {
             return WaystonePage.this.lore;
+        }
+
+        @Override
+        public String defaultName() {
+            return WaystonePage.this.state == null ? ""
+                    : LostTalesMapMarkerNamedAfter.shownName(
+                            WaystonePage.this.state.getNamedAfter());
+        }
+
+        @Override
+        public String defaultCategory() {
+            LostTalesWaystoneStatePacket state = WaystonePage.this.state;
+            return state == null ? "" : LostTalesMapMarkerNames.shownCategory("",
+                    state.isPlayerPlaced()
+                            ? LostTalesMapMarkerSource.PLAYER_CREATED
+                            : LostTalesMapMarkerSource.CUSTOM_PRESET,
+                    state.hasFastTravel());
+        }
+
+        @Override
+        public String defaultDescription() {
+            LostTalesWaystoneStatePacket state = WaystonePage.this.state;
+            if (WaystonePage.this.lore.length() > 0 || state == null) {
+                return WaystonePage.this.lore;
+            }
+            return LostTalesMapMarkerNames.defaultDescription(
+                    state.isPlayerPlaced()
+                            ? LostTalesMapMarkerSource.PLAYER_CREATED
+                            : LostTalesMapMarkerSource.CUSTOM_PRESET);
         }
 
         @Override

@@ -6,10 +6,12 @@ import java.util.List;
 
 /**
  * One server config key as an operator's client sees it: where it lives,
- * what it holds, what it defaults to, its bounds and its comment. A
- * secret key travels without its value, as one blank value while it is
- * set and as none while it is not, and is only ever written, never
- * shown. Immutable; the value of a list is a copy.
+ * what it holds, what it defaults to, its bounds and its words. Its name
+ * and its tip are not carried: the client reads them from its own lang
+ * file by the category and the key ({@code LostTalesConfigWords}), in the
+ * player's language. A secret key travels without its value, as one
+ * blank value while it is set and as none while it is not, and is only
+ * ever written, never shown. Immutable; the value of a list is a copy.
  */
 public final class ServerConfigEntry {
 
@@ -45,15 +47,13 @@ public final class ServerConfigEntry {
     private final List<String> defaults;
     private final String minValue;
     private final String maxValue;
-    private final String comment;
-    private final String langKey;
     private final boolean secret;
     private final List<String> validValues;
 
     public ServerConfigEntry(String category, String key, Type type, boolean list,
                              List<String> values, List<String> defaults,
-                             String minValue, String maxValue, String comment,
-                             String langKey, boolean secret, List<String> validValues) {
+                             String minValue, String maxValue, boolean secret,
+                             List<String> validValues) {
         if (category == null || category.length() == 0 || key == null
                 || key.length() == 0 || type == null) {
             throw new IllegalArgumentException("category, key and type are required");
@@ -66,8 +66,6 @@ public final class ServerConfigEntry {
         this.defaults = copy(defaults);
         this.minValue = minValue == null ? "" : minValue;
         this.maxValue = maxValue == null ? "" : maxValue;
-        this.comment = comment == null ? "" : comment;
-        this.langKey = langKey == null || langKey.length() == 0 ? key : langKey;
         this.secret = secret;
         this.validValues = copy(validValues);
     }
@@ -122,14 +120,6 @@ public final class ServerConfigEntry {
 
     public String getMaxValue() {
         return this.maxValue;
-    }
-
-    public String getComment() {
-        return this.comment;
-    }
-
-    public String getLangKey() {
-        return this.langKey;
     }
 
     public boolean isSecret() {

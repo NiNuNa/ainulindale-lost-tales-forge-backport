@@ -2,6 +2,7 @@ package com.ninuna.losttales.fellowship.sync;
 
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipIcon;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 
@@ -18,8 +19,8 @@ import java.util.UUID;
 
 /**
  * One fellowship as its members' clients see it: its name, icon, leader,
- * guides, switches and members, each with where they stand now. Sent only
- * to its members.
+ * guides, switches, members, each with where they stand now, and the marks
+ * its leader and guides placed on the map. Sent only to its members.
  */
 public final class FellowshipSnapshot {
 
@@ -30,6 +31,19 @@ public final class FellowshipSnapshot {
         /** The other character the member's account plays now; empty for none. */
         String elsewhereName(FellowshipMember member);
     }
+
+    /** The marks of each fellowship, as the server holds them when it builds a snapshot. */
+    public interface Marks {
+        List<FellowshipMark> of(UUID fellowshipId);
+    }
+
+    /** No marks at all: for a snapshot built where none can be read. */
+    public static final Marks NO_MARKS = new Marks() {
+        @Override
+        public List<FellowshipMark> of(UUID fellowshipId) {
+            return Collections.emptyList();
+        }
+    };
 
     private final UUID fellowshipId;
     private final UUID leaderIdentityId;
@@ -42,11 +56,13 @@ public final class FellowshipSnapshot {
     private final int dataVersion;
     private final List<FellowshipMemberSnapshot> members;
     private final Map<UUID, FellowshipMemberSnapshot> membersByIdentityId;
+    private final List<FellowshipMark> marks;
 
     public FellowshipSnapshot(UUID fellowshipId, UUID leaderIdentityId, String name,
                               FellowshipIcon icon, Set<FellowshipSwitch> switchesOn,
                               Collection<UUID> guides, long createdAt, long revision,
-                              int dataVersion, List<FellowshipMemberSnapshot> members) {
+                              int dataVersion, List<FellowshipMemberSnapshot> members,
+                              List<FellowshipMark> marks) {
         if (fellowshipId == null || leaderIdentityId == null) {
             throw new IllegalArgumentException("fellowship and leader identifiers must not be null");
         }
@@ -88,11 +104,24 @@ public final class FellowshipSnapshot {
         this.guides = Collections.unmodifiableSet(acceptedGuides);
         this.members = Collections.unmodifiableList(accepted);
         this.membersByIdentityId = Collections.unmodifiableMap(byId);
+        List<FellowshipMark> acceptedMarks = new ArrayList<FellowshipMark>();
+        Set<UUID> markIds = new LinkedHashSet<UUID>();
+        if (marks != null) {
+            for (FellowshipMark mark : marks) {
+                if (mark != null && mark.getFellowshipId().equals(fellowshipId)
+                        && acceptedMarks.size() < FellowshipMark.MAX_PER_FELLOWSHIP
+                        && markIds.add(mark.getMarkId())) {
+                    acceptedMarks.add(mark);
+                }
+            }
+        }
+        this.marks = Collections.unmodifiableList(acceptedMarks);
     }
 
-    public static FellowshipSnapshot fromFellowship(Fellowship fellowship, Presence presence) {
-        if (fellowship == null || presence == null) {
-            throw new IllegalArgumentException("fellowship and presence must not be null");
+    public static FellowshipSnapshot fromFellowship(Fellowship fellowship, Presence presence,
+                                                    Marks marks) {
+        if (fellowship == null || presence == null || marks == null) {
+            throw new IllegalArgumentException("fellowship, presence and marks must not be null");
         }
         ArrayList<FellowshipMemberSnapshot> members = new ArrayList<FellowshipMemberSnapshot>();
         for (FellowshipMember member : fellowship.getMembers()) {
@@ -103,7 +132,13 @@ public final class FellowshipSnapshot {
                 fellowship.getLeaderIdentityId(), fellowship.getName(),
                 fellowship.getIcon(), fellowship.getSwitchesOn(), fellowship.getGuides(),
                 fellowship.getCreatedAt(), fellowship.getRevision(),
-                fellowship.getDataVersion(), members);
+                fellowship.getDataVersion(), members,
+                marks.of(fellowship.getFellowshipId()));
+    }
+
+    /** The marks its leader and guides placed on the map, the oldest first. */
+    public List<FellowshipMark> getMarks() {
+        return this.marks;
     }
 
     public UUID getFellowshipId() {

@@ -8,16 +8,20 @@ import cpw.mods.fml.relauncher.Side;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.command.ICommandSender;
-import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
 /**
  * Small config command for HUD placement presets and percent-based offsets.
  *
  * These values are the same legacy Forge config values used by the client HUD
  * renderers. The command is useful in an integrated server, but cannot alter a
- * remote client's configuration from a dedicated server.
+ * remote client's configuration from a dedicated server. Presets and HUD
+ * elements are named by their config ids.
  */
 public class LostTalesCommandHud extends LostTalesCommandBase {
+    /** What the lang key of each of the command's answers begins with. */
+    static final String SAY = "chat.losttales.command.hud.";
+
     private final String commandPath;
 
     public LostTalesCommandHud() {
@@ -42,10 +46,8 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
     @Override
     public void processCommand(ICommandSender sender, String[] args) {
         if (FMLCommonHandler.instance().getSide() == Side.SERVER) {
-            send(sender, EnumChatFormatting.RED
-                    + "HUD settings are client-side and cannot be changed by a dedicated server command.");
-            send(sender, EnumChatFormatting.GRAY
-                    + "Use the HUD Placement page on the client: hold the Modifier Key and press H.");
+            say(sender, EnumChatFormatting.RED, SAY + "dedicated");
+            say(sender, EnumChatFormatting.GRAY, SAY + "dedicated.tip");
             return;
         }
 
@@ -70,25 +72,27 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
 
     private void applyPreset(ICommandSender sender, String[] args) {
         if (args.length < 2) {
-            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " preset <custom|default|lotr-safe|compact|minimal>");
+            say(sender, EnumChatFormatting.RED, SAY + "usage",
+                    commandPrefix() + " preset <custom|default|lotr-safe|compact|minimal>");
             return;
         }
         if (LostTalesConfig.applyHudPreset(args[1])) {
-            send(sender, EnumChatFormatting.GREEN + "Applied HUD preset: " + args[1]);
+            say(sender, EnumChatFormatting.GREEN, SAY + "preset.applied", args[1]);
             sendStatus(sender);
         } else {
-            send(sender, EnumChatFormatting.RED + "Unknown HUD preset: " + args[1]);
+            say(sender, EnumChatFormatting.RED, SAY + "preset.unknown", args[1]);
         }
     }
 
     private void setOffset(ICommandSender sender, String[] args) {
         if (args.length < 4) {
-            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " set <compass|fellowship|quickloot|quest|notifications> <xPercent> <yPercent>");
+            say(sender, EnumChatFormatting.RED, SAY + "usage", commandPrefix()
+                    + " set <compass|fellowship|quickloot|quest|notifications> <xPercent> <yPercent>");
             return;
         }
         String element = LostTalesConfig.normalizeHudElement(args[1]);
         if (element.length() == 0) {
-            send(sender, EnumChatFormatting.RED + "Unknown HUD element: " + args[1]);
+            say(sender, EnumChatFormatting.RED, SAY + "unknown_element", args[1]);
             return;
         }
         Integer x = parseInt(sender, args[2], "xPercent");
@@ -97,17 +101,18 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
             return;
         }
         LostTalesConfig.setHudOffset(element, x.intValue(), y.intValue());
-        send(sender, EnumChatFormatting.GREEN + "Set " + element + " HUD offset to " + formatOffset(element) + ".");
+        say(sender, EnumChatFormatting.GREEN, SAY + "set", element, formatOffset(element));
     }
 
     private void moveOffset(ICommandSender sender, String[] args) {
         if (args.length < 4) {
-            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " move <compass|fellowship|quickloot|quest|notifications> <dxPercent> <dyPercent>");
+            say(sender, EnumChatFormatting.RED, SAY + "usage", commandPrefix()
+                    + " move <compass|fellowship|quickloot|quest|notifications> <dxPercent> <dyPercent>");
             return;
         }
         String element = LostTalesConfig.normalizeHudElement(args[1]);
         if (element.length() == 0) {
-            send(sender, EnumChatFormatting.RED + "Unknown HUD element: " + args[1]);
+            say(sender, EnumChatFormatting.RED, SAY + "unknown_element", args[1]);
             return;
         }
         Integer dx = parseInt(sender, args[2], "dxPercent");
@@ -116,19 +121,21 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
             return;
         }
         LostTalesConfig.moveHudOffset(element, dx.intValue(), dy.intValue());
-        send(sender, EnumChatFormatting.GREEN + "Moved " + element + " HUD offset to " + formatOffset(element) + ".");
+        say(sender, EnumChatFormatting.GREEN, SAY + "moved", element, formatOffset(element));
     }
 
     private void toggle(ICommandSender sender, String[] args) {
         if (args.length < 2) {
-            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " toggle <hud|compass|quickloot|quest|worldmarkers>");
+            say(sender, EnumChatFormatting.RED, SAY + "usage",
+                    commandPrefix() + " toggle <hud|compass|quickloot|quest|worldmarkers>");
             return;
         }
 
         String key = args[1].toLowerCase();
         if ("hud".equals(key) || "all".equals(key)) {
             LostTalesConfig.toggleLostTalesHud();
-            send(sender, EnumChatFormatting.GREEN + "Lost Tales HUD is now " + onOff(LostTalesConfig.showLostTalesHud) + ".");
+            say(sender, EnumChatFormatting.GREEN, SAY + "toggled",
+                    onOff(LostTalesConfig.showLostTalesHud));
             return;
         }
         if ("compass".equals(key)) {
@@ -140,7 +147,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
         } else if ("worldmarkers".equals(key) || "world".equals(key)) {
             LostTalesConfig.showWorldQuestMarkers = !LostTalesConfig.showWorldQuestMarkers;
         } else {
-            send(sender, EnumChatFormatting.RED + "Unknown HUD toggle: " + args[1]);
+            say(sender, EnumChatFormatting.RED, SAY + "unknown_toggle", args[1]);
             return;
         }
 
@@ -152,29 +159,29 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
         try {
             return Integer.valueOf(Integer.parseInt(value));
         } catch (NumberFormatException e) {
-            send(sender, EnumChatFormatting.RED + name + " must be a whole number: " + value);
+            say(sender, EnumChatFormatting.RED, SAY + "not_whole", name, value);
             return null;
         }
     }
 
     private void sendStatus(ICommandSender sender) {
-        send(sender, EnumChatFormatting.GOLD + "Lost Tales HUD config:");
-        send(sender, EnumChatFormatting.GRAY + "Master: " + onOff(LostTalesConfig.showLostTalesHud)
-                + ", compass: " + onOff(LostTalesConfig.showCompassHud)
-                + ", quick loot: " + onOff(LostTalesConfig.showQuickLootHud)
-                + ", quest: " + onOff(LostTalesConfig.showQuestHud)
-                + ", world markers: " + onOff(LostTalesConfig.showWorldQuestMarkers));
-        send(sender, EnumChatFormatting.GRAY + "Preset: " + LostTalesConfig.hudPlacementPreset
-                + ", compass " + formatOffset("compass")
-                + ", fellowship " + formatOffset("fellowship")
-                + ", quick loot " + formatOffset("quickloot")
-                + ", quest " + formatOffset("quest"));
-        send(sender, EnumChatFormatting.GRAY
-                + "Notifications " + formatOffset("notifications"));
-        send(sender, EnumChatFormatting.DARK_GRAY + "Tip: hold the Lost Tales Modifier Key and press H client-side to open the HUD Placement page.");
+        say(sender, EnumChatFormatting.GOLD, SAY + "status.header");
+        say(sender, EnumChatFormatting.GRAY, SAY + "status.shown",
+                onOff(LostTalesConfig.showLostTalesHud),
+                onOff(LostTalesConfig.showCompassHud),
+                onOff(LostTalesConfig.showQuickLootHud),
+                onOff(LostTalesConfig.showQuestHud),
+                onOff(LostTalesConfig.showWorldQuestMarkers));
+        say(sender, EnumChatFormatting.GRAY, SAY + "status.placed",
+                LostTalesConfig.hudPlacementPreset, formatOffset("compass"),
+                formatOffset("fellowship"), formatOffset("quickloot"), formatOffset("quest"));
+        say(sender, EnumChatFormatting.GRAY, SAY + "status.notifications",
+                formatOffset("notifications"));
+        say(sender, EnumChatFormatting.DARK_GRAY, SAY + "status.tip");
     }
 
-    private String formatOffset(String element) {
+    /** An element's offset as {@code x,y} percent, or the word for unknown. */
+    private Object formatOffset(String element) {
         if ("compass".equals(element)) {
             return formatOffset(LostTalesConfig.compassHudOffsetX,
                     LostTalesConfig.compassHudOffsetY);
@@ -195,7 +202,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
             return formatOffset(LostTalesConfig.notificationHudOffsetX,
                     LostTalesConfig.notificationHudOffsetY);
         }
-        return "unknown";
+        return words(SAY + "unknown_offset");
     }
 
     private String formatOffset(double x, double y) {
@@ -209,25 +216,23 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
         return String.format(Locale.ROOT, "%.2f", value);
     }
 
-    private String onOff(boolean value) {
-        return value ? EnumChatFormatting.GREEN + "ON" : EnumChatFormatting.RED + "OFF";
+    /** On in green or off in red, in the reader's words. */
+    private static IChatComponent onOff(boolean value) {
+        return value ? line(EnumChatFormatting.GREEN, SAY + "on")
+                : line(EnumChatFormatting.RED, SAY + "off");
     }
 
     private void sendUsage(ICommandSender sender) {
-        send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " status");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " preset lotr-safe");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " set compass 50 12");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " move quickloot -5 3");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " toggle worldmarkers");
+        usage(sender, getCommandUsage(sender));
+        usage(sender, commandPrefix() + " status");
+        usage(sender, commandPrefix() + " preset lotr-safe");
+        usage(sender, commandPrefix() + " set compass 50 12");
+        usage(sender, commandPrefix() + " move quickloot -5 3");
+        usage(sender, commandPrefix() + " toggle worldmarkers");
     }
 
     private String commandPrefix() {
         return "/" + commandPath;
-    }
-
-    private void send(ICommandSender sender, String message) {
-        sender.addChatMessage(new ChatComponentText(message));
     }
 
     @Override

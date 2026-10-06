@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat;
 
+import com.ninuna.losttales.util.LostTalesWords;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -45,13 +46,15 @@ public final class ChatChannelSuggester {
 
     /**
      * The channels the prefix opens, in the order given: a channel whose
-     * code name or shown name starts with it, an empty prefix every one.
-     * The Faction channel stands for the faction {@code factionScope}
-     * names, and is left out while it names none.
+     * code name or shown name in {@code words}, the game's own language,
+     * starts with it, an empty prefix every one. The Faction channel
+     * stands for the faction {@code factionScope} names, and is left out
+     * while it names none.
      */
     public static List<ChatChannel> matches(String prefix,
                                             List<ChatChannel> channels,
-                                            String factionScope, int limit) {
+                                            String factionScope, int limit,
+                                            LostTalesWords words) {
         if (prefix == null || channels == null || limit <= 0) {
             return Collections.emptyList();
         }
@@ -63,7 +66,7 @@ public final class ChatChannelSuggester {
             if (word == null || isPerConversation(channel)) {
                 continue;
             }
-            if (word.startsWith(query) || shownKey(channel).startsWith(query)) {
+            if (word.startsWith(query) || shownKey(words, channel).startsWith(query)) {
                 result.add(channel);
                 if (result.size() >= limit) {
                     break;
@@ -185,8 +188,8 @@ public final class ChatChannelSuggester {
     }
 
     /** The shown name without its spaces: what the completion list also matches. */
-    private static String shownKey(ChatChannel channel) {
-        return channel.getDisplayName().toLowerCase(Locale.ROOT)
+    private static String shownKey(LostTalesWords words, ChatChannel channel) {
+        return ChatNames.channel(words, channel).toLowerCase(Locale.ROOT)
                 .replace(" ", "");
     }
 

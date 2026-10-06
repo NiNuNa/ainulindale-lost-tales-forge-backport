@@ -3,6 +3,8 @@ package com.ninuna.losttales.command;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerReseedService;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
@@ -25,8 +27,8 @@ import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
 import net.minecraft.world.WorldServer;
 import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementResult;
 import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementService;
@@ -36,9 +38,13 @@ import cpw.mods.fml.common.FMLLog;
  * Legacy Forge companion to the modern map-marker command.
  *
  * Operator tools for player discovery state, bundled marker inspection, and
- * retrying failed waystone generation.
+ * retrying failed waystone generation. Markers are named by their ids and
+ * the names their JSON gives them; a placement's reason is its code.
  */
 public class LostTalesCommandMapMarker extends LostTalesCommandBase {
+
+    /** What the lang key of each of the command's answers begins with. */
+    static final String SAY = "chat.losttales.command.mapmarker.";
 
     private final String commandPath;
 
@@ -156,21 +162,47 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         }
 
         if (visible.isEmpty()) {
-            send(sender, EnumChatFormatting.YELLOW + "No bundled map markers found" + (normalizedFilter.length() > 0 ? " for filter: " + filter : "."));
+            if (normalizedFilter.length() > 0) {
+                say(sender, EnumChatFormatting.YELLOW, SAY + "known.none.filter", filter);
+            } else {
+                say(sender, EnumChatFormatting.YELLOW, SAY + "known.none");
+            }
             return;
         }
 
-        send(sender, EnumChatFormatting.GOLD + "Bundled map markers (" + visible.size() + "):");
+        say(sender, EnumChatFormatting.GOLD, SAY + "known.header",
+                Integer.valueOf(visible.size()));
         int shown = 0;
         for (LostTalesMapMarkerDefinition marker : visible) {
             if (shown >= 12) {
-                send(sender, EnumChatFormatting.GRAY + "...and " + (visible.size() - shown) + " more. Use a filter to narrow the list.");
+                say(sender, EnumChatFormatting.GRAY, SAY + "more",
+                        Integer.valueOf(visible.size() - shown));
                 break;
             }
-            String hidden = marker.isHiddenUntilDiscovered() ? EnumChatFormatting.DARK_GRAY + " hidden" : "";
-            send(sender, EnumChatFormatting.GRAY + "- " + marker.getShortDescription() + hidden);
+            if (marker.isHiddenUntilDiscovered()) {
+                say(sender, EnumChatFormatting.GRAY, SAY + "entry.marked", describe(marker),
+                        line(EnumChatFormatting.DARK_GRAY, SAY + "hidden"));
+            } else {
+                say(sender, EnumChatFormatting.GRAY, SAY + "entry", describe(marker));
+            }
             shown++;
         }
+    }
+
+    /** A marker's id, name, dimension, place and discovery radius. */
+    private static IChatComponent describe(LostTalesMapMarkerDefinition marker) {
+        return words(SAY + "marker", marker.getId(),
+                LostTalesMapMarkerNames.component(marker.getId(), marker.getName(),
+                        marker.getNamedAfter()),
+                Integer.valueOf(marker.getDimensionId()), coordinate(marker.getX()),
+                coordinate(marker.getY()), coordinate(marker.getZ()),
+                coordinate(marker.getDiscoveryRadius()));
+    }
+
+    /** A coordinate as a whole number where it is one. */
+    private static String coordinate(double value) {
+        long rounded = Math.round(value);
+        return Math.abs(value - rounded) < 0.01D ? String.valueOf(rounded) : String.valueOf(value);
     }
 
     private void listMarkers(ICommandSender sender, EntityPlayerMP player) {
@@ -178,15 +210,15 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         String pinned = LostTalesQuestManager.getPinnedMapMarkerId(player);
         Map<String, LostTalesMapMarkerDefinition> dynamicMarkers = collectDynamicMarkerMap(player);
 
-        send(sender, EnumChatFormatting.GOLD + "Map marker state for " + player.getCommandSenderName() + ":");
-        send(sender, EnumChatFormatting.GRAY + "Tracked marker: " + (pinned.length() == 0 ? "none" : formatMarkerId(pinned, dynamicMarkers)));
-        if (markers.isEmpty()) {
-            send(sender, EnumChatFormatting.GRAY + "Discovered markers: none");
-        } else {
-            send(sender, EnumChatFormatting.GRAY + "Discovered markers: " + joinFormatted(markers, dynamicMarkers));
-        }
+        say(sender, EnumChatFormatting.GOLD, SAY + "list.header", player.getCommandSenderName());
+        say(sender, EnumChatFormatting.GRAY, SAY + "list.tracked", pinned.length() == 0
+                ? words(SAY + "none") : formatMarkerId(pinned, dynamicMarkers));
+        say(sender, EnumChatFormatting.GRAY, SAY + "list.discovered", markers.isEmpty()
+                ? words(SAY + "none") : joinFormatted(markers, dynamicMarkers));
         if (!dynamicMarkers.isEmpty()) {
-            send(sender, EnumChatFormatting.GRAY + "Dynamic quest-giver markers: " + dynamicMarkers.size() + " (use " + commandPrefix() + " dynamic " + player.getCommandSenderName() + " for details)");
+            say(sender, EnumChatFormatting.GRAY, SAY + "list.dynamic",
+                    Integer.valueOf(dynamicMarkers.size()), commandPrefix(),
+                    player.getCommandSenderName());
         }
     }
 
@@ -199,24 +231,35 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             }
             String id = marker.getId() == null ? "" : marker.getId();
             String name = marker.getName() == null ? "" : marker.getName();
-            if (normalizedFilter.length() == 0 || id.toLowerCase(Locale.ROOT).contains(normalizedFilter) || name.toLowerCase(Locale.ROOT).contains(normalizedFilter)) {
+            String namedAfter = LostTalesMapMarkerNamedAfter.subject(marker.getNamedAfter());
+            if (normalizedFilter.length() == 0 || id.toLowerCase(Locale.ROOT).contains(normalizedFilter) || name.toLowerCase(Locale.ROOT).contains(normalizedFilter)
+                    || namedAfter.toLowerCase(Locale.ROOT).contains(normalizedFilter)) {
                 visible.add(marker);
             }
         }
 
         if (visible.isEmpty()) {
-            send(sender, EnumChatFormatting.YELLOW + "No dynamic quest-giver markers found for " + player.getCommandSenderName() + (normalizedFilter.length() > 0 ? " with filter: " + filter : "."));
+            if (normalizedFilter.length() > 0) {
+                say(sender, EnumChatFormatting.YELLOW, SAY + "dynamic.none.filter",
+                        player.getCommandSenderName(), filter);
+            } else {
+                say(sender, EnumChatFormatting.YELLOW, SAY + "dynamic.none",
+                        player.getCommandSenderName());
+            }
             return;
         }
 
-        send(sender, EnumChatFormatting.GOLD + "Dynamic quest-giver markers for " + player.getCommandSenderName() + " (" + visible.size() + "):");
+        say(sender, EnumChatFormatting.GOLD, SAY + "dynamic.header",
+                player.getCommandSenderName(), Integer.valueOf(visible.size()));
         int shown = 0;
         for (LostTalesMapMarkerDefinition marker : visible) {
             if (shown >= 12) {
-                send(sender, EnumChatFormatting.GRAY + "...and " + (visible.size() - shown) + " more. Use a filter to narrow the list.");
+                say(sender, EnumChatFormatting.GRAY, SAY + "more",
+                        Integer.valueOf(visible.size() - shown));
                 break;
             }
-            send(sender, EnumChatFormatting.GRAY + "- " + marker.getShortDescription() + EnumChatFormatting.DARK_GRAY + " dynamic");
+            say(sender, EnumChatFormatting.GRAY, SAY + "entry.marked", describe(marker),
+                    line(EnumChatFormatting.DARK_GRAY, SAY + "dynamic"));
             shown++;
         }
     }
@@ -224,34 +267,42 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
     private void discoverMarker(ICommandSender sender, EntityPlayerMP player, String markerId) {
         warnIfUnknownMarker(sender, player, markerId);
         if (LostTalesQuestManager.revealMapMarker(player, markerId)) {
-            send(sender, EnumChatFormatting.GREEN + "Discovered marker " + formatMarkerId(markerId) + " for " + player.getCommandSenderName() + ".");
+            say(sender, EnumChatFormatting.GREEN, SAY + "discover.done",
+                    formatMarkerId(markerId), player.getCommandSenderName());
         } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " already knows marker " + formatMarkerId(markerId) + ".");
+            say(sender, EnumChatFormatting.YELLOW, SAY + "discover.known",
+                    player.getCommandSenderName(), formatMarkerId(markerId));
         }
     }
 
     private void forgetMarker(ICommandSender sender, EntityPlayerMP player, String markerId) {
         if (LostTalesQuestManager.forgetMapMarker(player, markerId)) {
-            send(sender, EnumChatFormatting.GREEN + "Forgot marker " + formatMarkerId(markerId) + " for " + player.getCommandSenderName() + ".");
+            say(sender, EnumChatFormatting.GREEN, SAY + "forget.done",
+                    formatMarkerId(markerId), player.getCommandSenderName());
         } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " did not have marker " + formatMarkerId(markerId) + " discovered.");
+            say(sender, EnumChatFormatting.YELLOW, SAY + "forget.unknown",
+                    player.getCommandSenderName(), formatMarkerId(markerId));
         }
     }
 
     private void trackMarker(ICommandSender sender, EntityPlayerMP player, String markerId) {
         warnIfUnknownMarker(sender, player, markerId);
         if (LostTalesQuestManager.pinMapMarker(player, markerId)) {
-            send(sender, EnumChatFormatting.GREEN + "Tracking marker " + formatMarkerId(markerId) + " for " + player.getCommandSenderName() + ".");
+            say(sender, EnumChatFormatting.GREEN, SAY + "track.done",
+                    formatMarkerId(markerId), player.getCommandSenderName());
         } else {
-            send(sender, EnumChatFormatting.YELLOW + "Could not track marker " + formatMarkerId(markerId) + ". It may not be discovered yet.");
+            say(sender, EnumChatFormatting.YELLOW, SAY + "track.failed",
+                    formatMarkerId(markerId));
         }
     }
 
     private void untrackMarker(ICommandSender sender, EntityPlayerMP player) {
         if (LostTalesQuestManager.unpinMapMarker(player)) {
-            send(sender, EnumChatFormatting.GREEN + "Stopped tracking marker for " + player.getCommandSenderName() + ".");
+            say(sender, EnumChatFormatting.GREEN, SAY + "untrack.done",
+                    player.getCommandSenderName());
         } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " had no tracked marker.");
+            say(sender, EnumChatFormatting.YELLOW, SAY + "untrack.nothing",
+                    player.getCommandSenderName());
         }
     }
 
@@ -261,22 +312,19 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         WorldServer overworld = server == null
                 ? null : server.worldServerForDimension(0);
         if (overworld == null) {
-            send(sender, EnumChatFormatting.RED
-                    + "The marker repository is not available.");
+            say(sender, EnumChatFormatting.RED, SAY + "repository.unavailable");
             return;
         }
         LostTalesMapMarkerWorldData data;
         try {
             data = LostTalesMapMarkerStorage.get(overworld);
         } catch (RuntimeException exception) {
-            send(sender, EnumChatFormatting.RED
-                    + "The marker repository could not be opened.");
+            say(sender, EnumChatFormatting.RED, SAY + "repository.unopened");
             return;
         }
         LostTalesMapMarkerRecord record = data.getRecord(markerId);
         if (record == null) {
-            send(sender, EnumChatFormatting.RED
-                    + "Unknown marker: " + markerId);
+            say(sender, EnumChatFormatting.RED, SAY + "unknown", markerId);
             return;
         }
         if (!record.hasWaystone()
@@ -287,24 +335,20 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
                     && record.getGenerationState()
                         != LostTalesWaystoneGenerationState
                                 .NOT_ATTEMPTED)) {
-            send(sender, EnumChatFormatting.YELLOW
-                    + "Marker " + markerId
-                    + " is not an unlinked waystone awaiting generation.");
+            say(sender, EnumChatFormatting.YELLOW, SAY + "retry.not_waiting", markerId);
             return;
         }
         WorldServer world = server.worldServerForDimension(
                 record.getDimensionId());
         if (world == null) {
-            send(sender, EnumChatFormatting.RED
-                    + "Dimension " + record.getDimensionId()
-                    + " is not loaded.");
+            say(sender, EnumChatFormatting.RED, SAY + "retry.dimension",
+                    Integer.valueOf(record.getDimensionId()));
             return;
         }
         int chunkX = floor(record.getX()) >> 4;
         int chunkZ = floor(record.getZ()) >> 4;
         if (!world.getChunkProvider().chunkExists(chunkX, chunkZ)) {
-            send(sender, EnumChatFormatting.YELLOW
-                    + "The target chunk is not loaded. Visit the marker area, then retry; no chunk was force-loaded.");
+            say(sender, EnumChatFormatting.YELLOW, SAY + "retry.chunk");
             return;
         }
         LostTalesMapMarkerRecord retry =
@@ -314,13 +358,17 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         data.saveRecord(retry);
         LostTalesWaystonePlacementResult result =
                 LostTalesWaystonePlacementService.attempt(world, retry);
-        send(sender, (result.getStatus()
-                == LostTalesWaystonePlacementResult.Status.SUCCESS
-                        ? EnumChatFormatting.GREEN
-                        : EnumChatFormatting.YELLOW)
-                + "Waystone retry for " + markerId + ": "
-                + result.getStatus().name().toLowerCase(Locale.ROOT)
-                + " (" + result.getReason() + ").");
+        LostTalesWaystonePlacementResult.Status status = result.getStatus();
+        say(sender, status == LostTalesWaystonePlacementResult.Status.SUCCESS
+                        ? EnumChatFormatting.GREEN : EnumChatFormatting.YELLOW,
+                SAY + "retry.result", markerId, words(statusKey(status)), result.getReason());
+    }
+
+    /** The lang key of the word a placement's status is named by. */
+    private static String statusKey(LostTalesWaystonePlacementResult.Status status) {
+        return status == LostTalesWaystonePlacementResult.Status.SUCCESS ? SAY + "status.success"
+                : status == LostTalesWaystonePlacementResult.Status.DEFERRED
+                        ? SAY + "status.deferred" : SAY + "status.blocked";
     }
 
     private static int floor(double value) {
@@ -334,8 +382,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         WorldServer overworld = server == null
                 ? null : server.worldServerForDimension(0);
         if (overworld == null) {
-            send(sender, EnumChatFormatting.RED
-                    + "The marker repository is not available.");
+            say(sender, EnumChatFormatting.RED, SAY + "repository.unavailable");
             return;
         }
 
@@ -350,8 +397,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             LostTalesMapMarkerDefinition definition =
                     LostTalesMapMarkerCatalog.getMarker(markerId);
             if (definition == null) {
-                send(sender, EnumChatFormatting.RED
-                        + "Unknown bundled marker: " + markerId);
+                say(sender, EnumChatFormatting.RED, SAY + "unknown_bundled", markerId);
                 return;
             }
             definitions = java.util.Collections.singleton(definition);
@@ -361,14 +407,12 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         try {
             data = LostTalesMapMarkerStorage.get(overworld);
         } catch (RuntimeException exception) {
-            send(sender, EnumChatFormatting.RED
-                    + "The marker repository could not be opened.");
+            say(sender, EnumChatFormatting.RED, SAY + "repository.unopened");
             return;
         }
         if (data.isReadOnlyForNewerVersion()) {
-            send(sender, EnumChatFormatting.RED
-                    + "The marker repository is read-only because it uses data version "
-                    + data.getUnsupportedDataVersion() + ".");
+            say(sender, EnumChatFormatting.RED, SAY + "repository.read_only",
+                    Integer.valueOf(data.getUnsupportedDataVersion()));
             return;
         }
 
@@ -426,20 +470,14 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             }
         }
         LostTalesMapMarkerSyncManager.syncAll();
-        send(sender, (blocked == 0
-                ? EnumChatFormatting.GREEN
-                : EnumChatFormatting.YELLOW)
-                + "Reseeded " + reseeded + " bundled marker(s) from JSON"
-                + "; preserved " + linked + " linked waystone(s)"
-                + ", placed " + placed + ", deferred " + deferred
-                + ", blocked " + blocked + ".");
+        say(sender, blocked == 0 ? EnumChatFormatting.GREEN : EnumChatFormatting.YELLOW,
+                SAY + "reseed.done", Integer.valueOf(reseeded), Integer.valueOf(linked),
+                Integer.valueOf(placed), Integer.valueOf(deferred), Integer.valueOf(blocked));
         if (linked > 0) {
-            send(sender, EnumChatFormatting.GRAY
-                    + "Linked waystones kept their live block coordinates and link tokens.");
+            say(sender, EnumChatFormatting.GRAY, SAY + "reseed.linked");
         }
         if (firstFailure.length() > 0) {
-            send(sender, EnumChatFormatting.RED
-                    + "First reseed failure: " + firstFailure);
+            say(sender, EnumChatFormatting.RED, SAY + "reseed.failure", firstFailure);
         }
     }
 
@@ -451,14 +489,11 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             if (sender instanceof EntityPlayerMP) {
                 return (EntityPlayerMP) sender;
             }
-            ChatComponentTranslation refusal = new ChatComponentTranslation(
-                    "chat.losttales.command.player_required");
-            refusal.getChatStyle().setColor(EnumChatFormatting.RED);
-            sender.addChatMessage(refusal);
+            say(sender, EnumChatFormatting.RED, PLAYER_REQUIRED);
             return null;
         } catch (Exception e) {
             String playerName = args.length > playerArgIndex ? args[playerArgIndex] : "";
-            send(sender, EnumChatFormatting.RED + "Could not find player: " + playerName);
+            say(sender, EnumChatFormatting.RED, SAY + "no_player", playerName);
             return null;
         }
     }
@@ -479,55 +514,59 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         if (dynamic != null) {
             return;
         }
-        send(sender, EnumChatFormatting.YELLOW + "Warning: " + markerId + " is not present in bundled map_markers JSON or " + player.getCommandSenderName() + "'s dynamic marker data. The ID will still be stored so resource-pack/server experiments are not blocked.");
+        say(sender, EnumChatFormatting.YELLOW, SAY + "unknown_warning", markerId,
+                player.getCommandSenderName());
     }
 
-    private String formatMarkerId(String markerId) {
+    private Object formatMarkerId(String markerId) {
         return formatMarkerId(markerId, null);
     }
 
-    private String formatMarkerId(String markerId, Map<String, LostTalesMapMarkerDefinition> dynamicMarkers) {
+    /** A marker by its id and name; a dynamic one with where it stands. */
+    private Object formatMarkerId(String markerId, Map<String, LostTalesMapMarkerDefinition> dynamicMarkers) {
         if (dynamicMarkers != null) {
             LostTalesMapMarkerDefinition marker = dynamicMarkers.get(markerId);
             if (marker != null) {
-                return marker.getId() + " (" + marker.getName() + ", dynamic @ " + Math.round(marker.getX()) + ", " + Math.round(marker.getY()) + ", " + Math.round(marker.getZ()) + ")";
+                return words(SAY + "marker.dynamic", marker.getId(),
+                        LostTalesMapMarkerNames.component(marker.getId(), marker.getName(),
+                        marker.getNamedAfter()),
+                        Long.valueOf(Math.round(marker.getX())),
+                        Long.valueOf(Math.round(marker.getY())),
+                        Long.valueOf(Math.round(marker.getZ())));
             }
         }
         return LostTalesMapMarkerCatalog.getDisplayName(markerId);
     }
 
     private void sendUsage(ICommandSender sender) {
-        send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
-        send(sender, EnumChatFormatting.GRAY + "Examples:");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " known");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " list <player>");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " dynamic <player> [filter]");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " discover losttales:quest_giver_nia <player>");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " track losttales:quest_giver_nia <player>");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " forget losttales:quest_giver_nia <player>");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " retry losttales:marker_id");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " reseed <markerId|all>");
+        usage(sender, getCommandUsage(sender));
+        say(sender, EnumChatFormatting.GRAY, SAY + "examples");
+        usage(sender, commandPrefix() + " known");
+        usage(sender, commandPrefix() + " list <player>");
+        usage(sender, commandPrefix() + " dynamic <player> [filter]");
+        usage(sender, commandPrefix() + " discover losttales:quest_giver_nia <player>");
+        usage(sender, commandPrefix() + " track losttales:quest_giver_nia <player>");
+        usage(sender, commandPrefix() + " forget losttales:quest_giver_nia <player>");
+        usage(sender, commandPrefix() + " retry losttales:marker_id");
+        usage(sender, commandPrefix() + " reseed <markerId|all>");
     }
 
     private String commandPrefix() {
         return "/" + commandPath;
     }
 
-    private void send(ICommandSender sender, String message) {
-        sender.addChatMessage(new ChatComponentText(message));
-    }
-
-    private String joinFormatted(Collection<String> values, Map<String, LostTalesMapMarkerDefinition> dynamicMarkers) {
-        StringBuilder builder = new StringBuilder();
-        boolean first = true;
+    /** The markers, comma-separated, each as {@link #formatMarkerId} names it. */
+    private IChatComponent joinFormatted(Collection<String> values, Map<String, LostTalesMapMarkerDefinition> dynamicMarkers) {
+        IChatComponent joined = new ChatComponentText("");
         for (String value : values) {
-            if (!first) {
-                builder.append(", ");
+            if (!joined.getSiblings().isEmpty()) {
+                joined.appendSibling(new ChatComponentText(", "));
             }
-            builder.append(formatMarkerId(value, dynamicMarkers));
-            first = false;
+            Object marker = formatMarkerId(value, dynamicMarkers);
+            joined.appendSibling(marker instanceof IChatComponent ? (IChatComponent)marker
+                    : new ChatComponentText(String.valueOf(marker)));
         }
-        return builder.toString();
+        return joined;
     }
 
     private Map<String, LostTalesMapMarkerDefinition> collectDynamicMarkerMap(EntityPlayerMP player) {

@@ -11,6 +11,7 @@ import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 
@@ -61,20 +62,38 @@ final class ChatShareCandidates {
      * order with duplicate-name ordinals.
      */
     static List<MarkerEntry> markers() {
+        List<LostTalesMapMarkerData> reached = new ArrayList<LostTalesMapMarkerData>();
+        for (LostTalesMapMarkerData marker
+                : LostTalesClientMapMarkerStore.getAllMarkers()) {
+            if (marker != null && marker.getId() != null
+                    && marker.getId().length() > 0
+                    && LostTalesClientMapMarkerVisibility.isVisited(marker)) {
+                reached.add(marker);
+            }
+        }
+        return markers(reached);
+    }
+
+    /**
+     * The markers as entries, each named as this game shows it and
+     * numbered among those names; a token written with the words the
+     * marker was given ({@code [m:Rivendell]} in a game showing
+     * Bruchtal) finds it too, numbered among those words.
+     */
+    static List<MarkerEntry> markers(List<LostTalesMapMarkerData> reached) {
         List<MarkerEntry> entries = new ArrayList<MarkerEntry>();
         List<String> seenNames = new ArrayList<String>();
         List<Integer> seenCounts = new ArrayList<Integer>();
-        for (LostTalesMapMarkerData marker
-                : LostTalesClientMapMarkerStore.getAllMarkers()) {
-            if (marker == null || marker.getId() == null
-                    || marker.getId().length() == 0
-                    || !LostTalesClientMapMarkerVisibility.isVisited(marker)) {
-                continue;
-            }
+        List<String> seenGiven = new ArrayList<String>();
+        List<Integer> seenGivenCounts = new ArrayList<Integer>();
+        for (LostTalesMapMarkerData marker : reached) {
             String name = ChatShareTokenParser.plainName(marker.getName());
             int ordinal = nextOrdinal(seenNames, seenCounts, name);
             if (ordinal > 0) {
-                entries.add(new MarkerEntry(marker, name, ordinal));
+                String given = ChatShareTokenParser.plainName(
+                        marker.getGivenName() == null ? "" : marker.getGivenName());
+                entries.add(new MarkerEntry(marker, name, ordinal, given,
+                        nextOrdinal(seenGiven, seenGivenCounts, given)));
             }
         }
         return entries;
@@ -187,16 +206,41 @@ final class ChatShareCandidates {
 
     static final class MarkerEntry extends Entry {
         final LostTalesMapMarkerData marker;
+        /** The words the marker was given, which a token may name it by too. */
+        final String givenName;
+        /** Its number among markers given the same words; 0 where they cannot be a token. */
+        final int givenOrdinal;
 
         MarkerEntry(LostTalesMapMarkerData marker, String name,
-                    int ordinal) {
+                    int ordinal, String givenName, int givenOrdinal) {
             super(name, ordinal);
             this.marker = marker;
+            this.givenName = givenName;
+            this.givenOrdinal = givenOrdinal;
         }
 
         @Override
         ChatShareKind kind() {
             return ChatShareKind.MARKER;
+        }
+
+        @Override
+        boolean matchesToken(ChatShareTokenParser.Token token) {
+            return super.matchesToken(token)
+                    || token != null && token.kind == kind()
+                    && this.givenOrdinal > 0
+                    && token.ordinal == this.givenOrdinal
+                    && token.normalizedName().equals(
+                            ChatShareTokenParser.normalizeName(this.givenName));
+        }
+
+        /** Whether a picker's search finds it: by its name here, its given words or its id. */
+        boolean answers(String loweredQuery) {
+            return ChatShareTokenParser.normalizeName(this.name).contains(loweredQuery)
+                    || ChatShareTokenParser.normalizeName(this.givenName)
+                            .contains(loweredQuery)
+                    || this.marker.getId().toLowerCase(Locale.ROOT)
+                            .contains(loweredQuery);
         }
     }
 

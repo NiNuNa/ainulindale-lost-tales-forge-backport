@@ -2,6 +2,7 @@ package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.util.LostTalesLangFile;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
@@ -18,6 +19,10 @@ import java.util.Map;
  * {@link LostTalesQuestIds} bound, and a file whose id an earlier file has
  * are left out with a line saying why; the others still load. The server
  * reads the files from its classpath, the client from its resources.
+ *
+ * <p>Each quest read is worded by the lang lines its id names
+ * ({@link LostTalesQuestWords#bundled}); the files hold no words of their
+ * own, and an id that cannot name lang lines is left out.</p>
  */
 public final class BundledQuestFiles {
     public static final String INDEX_FILE = "quests/index.json";
@@ -59,6 +64,12 @@ public final class BundledQuestFiles {
                         + LostTalesQuestIds.MAX_BYTES + " bytes");
                 continue;
             }
+            if (!LostTalesQuestWords.isKeySafe(quest.getId())) {
+                problems.add(file + ": its id " + quest.getId()
+                        + " cannot name lang lines; it holds only lower-case"
+                        + " letters, digits and _ . / :");
+                continue;
+            }
             String earlier = fileOf.get(quest.getId());
             if (earlier != null) {
                 problems.add(file + ": the id " + quest.getId()
@@ -66,7 +77,8 @@ public final class BundledQuestFiles {
                 continue;
             }
             fileOf.put(quest.getId(), file);
-            byId.put(quest.getId(), quest);
+            byId.put(quest.getId(), LostTalesQuestWords.bundled(quest,
+                    LostTalesLangFile.english()));
         }
         return new Result(new ArrayList<LostTalesQuestDefinition>(
                 byId.values()), problems);

@@ -9,6 +9,7 @@ import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatReplyReference;
@@ -20,7 +21,7 @@ import com.ninuna.losttales.chat.server.ChatChannelPolicy;
 import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.ChatIdentitySelection;
 import com.ninuna.losttales.chat.server.ChatMemberWatches;
-import com.ninuna.losttales.chat.server.ChatPresenceService;
+import com.ninuna.losttales.chat.server.ChatServerStatus;
 import com.ninuna.losttales.chat.server.ChatReactions;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.chat.server.LostTalesServerBroadcastHook;
@@ -38,6 +39,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatDeliveryMarkPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
+import com.ninuna.losttales.util.LostTalesWords;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -67,6 +69,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 
 /**
  * The server's own Discord bridge, no library behind it: the bot sits
@@ -235,7 +239,6 @@ public final class LostTalesDiscordBridge {
     /** Message ids already queued, so the two readers never deliver one twice. */
     private final LinkedHashSet<String> recentInboundIds = new LinkedHashSet<String>();
     private static final int MAX_RECENT_INBOUND_IDS = 512;
-    private volatile long serverStartedMillis;
     /**
      * Where the bindings' findings go: the log, once each at start — a
      * trimmed entry as a warning, a refused one as an error, so a
@@ -377,6 +380,9 @@ public final class LostTalesDiscordBridge {
         Worker started = new Worker(configured, reads, posts, manages);
         this.worker = started;
         started.start();
+        // A fresh start says the server's status at once: the topics it
+        // keeps may be new, or may still read offline.
+        requestStatusRefresh();
         boolean listsMembers = LostTalesConfig.discordMemberList
                 && !configured.channels().isEmpty();
         if (botPresent && LostTalesConfig.discordGateway
@@ -414,7 +420,8 @@ public final class LostTalesDiscordBridge {
             return;
         }
         for (String channelId : topicsLeft(running.statuses.keySet(), next, nextManages)) {
-            running.statuses.get(channelId).request(DiscordServerNotices.offlineTopic());
+            running.statuses.get(channelId).request(DiscordServerNotices
+                    .offlineTopic(LostTalesWords.LANG));
         }
     }
 
@@ -887,21 +894,12 @@ public final class LostTalesDiscordBridge {
     }
 
     /**
-     * Asks for the topic to be recomputed from the live server on the
-     * next tick. Cheap and idempotent, so every join and leave may call it.
+     * Asks for the topic to be said again from the server's status on the
+     * next tick ({@link ChatServerStatus}): as the status changes, and as
+     * the bridge starts. Cheap and idempotent.
      */
     public void requestStatusRefresh() {
         this.statusRefreshRequested = true;
-    }
-
-    /**
-     * The server is up and accepting players: the clock starts and the
-     * topic is asked for, which is how Discord hears of it. Server
-     * thread.
-     */
-    public void onServerStarted() {
-        this.serverStartedMillis = System.currentTimeMillis();
-        requestStatusRefresh();
     }
 
     /**
@@ -912,7 +910,7 @@ public final class LostTalesDiscordBridge {
     public void onServerStopping() {
         Worker running = this.worker;
         if (running != null && running.manages) {
-            requestTopic(DiscordServerNotices.offlineTopic());
+            requestTopic(DiscordServerNotices.offlineTopic(LostTalesWords.LANG));
         }
         this.statusRefreshRequested = false;
     }
@@ -963,11 +961,10 @@ public final class LostTalesDiscordBridge {
         sendMarks(running, MAX_MARKS_PER_TICK);
         if (this.statusRefreshRequested && running.manages) {
             this.statusRefreshRequested = false;
-            MinecraftServer server = MinecraftServer.getServer();
-            if (server != null) {
+            List<String> status = ChatServerStatus.parts();
+            if (!status.isEmpty()) {
                 requestTopic(DiscordServerNotices.onlineTopic(
-                        shownPlayerCount(server),
-                        server.getMaxPlayers()));
+                        LostTalesWords.LANG, status));
             }
         }
         if (++this.memberTicks >= MEMBER_STEP_TICKS) {
@@ -1045,7 +1042,8 @@ public final class LostTalesDiscordBridge {
             // game channel, and that channel is open to the bridge.
             long target = liveTarget(message);
             if (target != ChatMessageIds.NONE) {
-                LostTalesChatService.editFromDiscord(target, message.text);
+                LostTalesChatService.editFromDiscord(target, message.text,
+                        message.body);
             }
             return;
         }
@@ -1118,7 +1116,8 @@ public final class LostTalesDiscordBridge {
         String guild = this.directory.guildNameOfChannel(message.discordChannelId);
         long messageId = LostTalesChatService.sendFromDiscord(
                 binding.getChannel(), binding.getFactionScope(),
-                message.name, guild, message.authorId, message.text, reply);
+                message.name, guild, message.authorId, message.text, message.body,
+                reply);
         if (!ChatMessageIds.isServerId(messageId)) {
             return;
         }
@@ -1266,9 +1265,9 @@ public final class LostTalesDiscordBridge {
         // Answered only where the game is linked: a Discord server that
         // merely has the bot in it learns nothing of who plays.
         String content = isLinkedChannel(interaction.channelId)
-                ? DiscordSlashCommands.answer(interaction.name,
-                        interaction.options, this.serverStartedMillis)
-                : DiscordSlashCommands.NOT_LINKED;
+                ? DiscordSlashCommands.answer(LostTalesWords.LANG,
+                        interaction.name, interaction.options)
+                : DiscordSlashCommands.notLinked(LostTalesWords.LANG);
         if (content.length() > 0) {
             answer(client, interaction, content);
         }
@@ -1346,18 +1345,20 @@ public final class LostTalesDiscordBridge {
         String problem = null;
         if (interaction.guildId.length() == 0
                 || !DiscordChannelBindings.isSnowflake(interaction.channelId)) {
-            problem = DiscordSlashCommands.LINK_NEEDS_SERVER;
+            problem = DiscordSlashCommands.linkNeedsServer(LostTalesWords.LANG);
         } else if (!interaction.memberMay(DiscordJson.Interaction.MANAGE_WEBHOOKS)) {
-            problem = DiscordSlashCommands.LINK_NEEDS_PERMISSION;
+            problem = DiscordSlashCommands.linkNeedsPermission(LostTalesWords.LANG);
         } else {
             DiscordLinkCodes.Pending pending = DiscordLinkCodes.peek(code, now);
             String owner = ownerOfDiscordChannel(running, interaction.channelId);
             if (pending == null) {
-                problem = DiscordSlashCommands.LINK_UNKNOWN_CODE;
+                problem = DiscordSlashCommands.linkUnknownCode(LostTalesWords.LANG);
             } else if (owner.length() > 0) {
                 problem = owner.equals(pending.gameKey)
-                        ? DiscordSlashCommands.linkAlready(gameChannelName(owner))
-                        : DiscordSlashCommands.linkTaken(gameChannelName(owner));
+                        ? DiscordSlashCommands.linkAlready(LostTalesWords.LANG,
+                                gameChannelName(LostTalesWords.LANG, owner))
+                        : DiscordSlashCommands.linkTaken(LostTalesWords.LANG,
+                                gameChannelName(LostTalesWords.LANG, owner));
             }
         }
         if (problem != null) {
@@ -1376,7 +1377,8 @@ public final class LostTalesDiscordBridge {
                 DiscordLinkCodes.Pending link = DiscordLinkCodes.take(typed,
                         System.currentTimeMillis());
                 if (link == null) {
-                    reply(appId, interaction, DiscordSlashCommands.LINK_UNKNOWN_CODE);
+                    reply(appId, interaction,
+                            DiscordSlashCommands.linkUnknownCode(LostTalesWords.LANG));
                     return;
                 }
                 try {
@@ -1390,13 +1392,16 @@ public final class LostTalesDiscordBridge {
                         return;
                     }
                     reply(appId, interaction, made.status == 403
-                            ? DiscordSlashCommands.LINK_BOT_NEEDS_PERMISSION
-                            : DiscordSlashCommands.linkFailed(made.status));
+                            ? DiscordSlashCommands.linkBotNeedsPermission(
+                                    LostTalesWords.LANG)
+                            : DiscordSlashCommands.linkFailed(LostTalesWords.LANG,
+                                    made.status));
                 } catch (IOException exception) {
                     FMLLog.warning("[%s] Could not make a webhook to link a Discord "
                             + "channel: %s", LostTalesMetaData.MOD_ID,
                             DiscordHttp.describe(exception));
-                    reply(appId, interaction, DiscordSlashCommands.linkFailed(0));
+                    reply(appId, interaction,
+                            DiscordSlashCommands.linkFailed(LostTalesWords.LANG, 0));
                 }
             }
         });
@@ -1426,26 +1431,30 @@ public final class LostTalesDiscordBridge {
                     Collections.<String>emptySet(), ServerConfigSnapshot.COMMAND_KEYS);
             saved = applied.getRefused().isEmpty() && !applied.getApplied().isEmpty();
         }
-        String gameName = gameChannelName(result.link.gameKey);
+        String gameName = gameChannelName(LostTalesWords.LANG, result.link.gameKey);
         if (!saved) {
             retireWebhooks(Collections.singletonList(result.webhookUrl));
             answerLater(result.interaction, owner.length() > 0
                     && !owner.equals(result.link.gameKey)
-                    ? DiscordSlashCommands.linkTaken(gameChannelName(owner))
-                    : DiscordSlashCommands.LINK_NOT_SAVED);
+                    ? DiscordSlashCommands.linkTaken(LostTalesWords.LANG,
+                            gameChannelName(LostTalesWords.LANG, owner))
+                    : DiscordSlashCommands.linkNotSaved(LostTalesWords.LANG));
             return;
         }
         ChatCodeNames.Named linkedChannel = ChatCodeNames.parse(result.link.gameKey);
         answerLater(result.interaction,
-                DiscordSlashCommands.linked(gameName, result.link.direction,
-                        linkedChannel != null
+                DiscordSlashCommands.linked(LostTalesWords.LANG, gameName,
+                        result.link.direction, linkedChannel != null
                                 && DiscordBridgePolicy.isLimitedInGame(linkedChannel.channel)));
-        String where = describeDiscordChannel(channelId);
+        String where = describeDiscordChannel(LostTalesWords.LANG, channelId);
         EntityPlayerMP issuer = result.link.issuer == null ? null
                 : LostTalesServerPlayers.findOnline(result.link.issuer);
         if (issuer != null) {
-            issuer.addChatMessage(new ChatComponentText(
-                    "Linked Discord channel " + where + " to " + gameName + "."));
+            // In the asker's own language: the Discord channel and the
+            // game channel are words their game translates too.
+            issuer.addChatMessage(new ChatComponentTranslation(LINKED_IN_GAME_KEY,
+                    discordChannelComponent(channelId),
+                    gameChannelComponent(result.link.gameKey)));
         }
         LostTalesChatService.console(ChatConsoleEvent.Kind.CONFIG,
                 ChatConsoleEvent.Severity.NOTICE,
@@ -1466,7 +1475,8 @@ public final class LostTalesDiscordBridge {
             return;
         }
         if (!interaction.memberMay(DiscordJson.Interaction.MANAGE_WEBHOOKS)) {
-            answer(client, interaction, DiscordSlashCommands.LINK_NEEDS_PERMISSION);
+            answer(client, interaction,
+                    DiscordSlashCommands.linkNeedsPermission(LostTalesWords.LANG));
             return;
         }
         String owner = ownerOfDiscordChannel(running, interaction.channelId);
@@ -1474,25 +1484,29 @@ public final class LostTalesDiscordBridge {
         List<String> after = DiscordBindingEntries.removeChannel(before,
                 interaction.channelId);
         if (owner.length() == 0 || after.size() == before.length) {
-            answer(client, interaction, DiscordSlashCommands.NOT_LINKED);
+            answer(client, interaction,
+                    DiscordSlashCommands.notLinked(LostTalesWords.LANG));
             return;
         }
-        String where = describeDiscordChannel(interaction.channelId);
+        String where = describeDiscordChannel(LostTalesWords.LANG, interaction.channelId);
         List<String> webhooks = DiscordBindingEntries.webhooksRemoved(before, after);
         ServerConfigApplyResult applied = LostTalesServerConfigService.applyOwned(
                 Collections.singletonList(new ServerConfigChange(
                         LostTalesConfig.CATEGORY_DISCORD, BINDINGS_KEY, true, after)),
                 Collections.<String>emptySet(), ServerConfigSnapshot.COMMAND_KEYS);
         if (!applied.getRefused().isEmpty() || applied.getApplied().isEmpty()) {
-            answerLater(interaction, DiscordSlashCommands.LINK_NOT_SAVED);
+            answerLater(interaction,
+                    DiscordSlashCommands.linkNotSaved(LostTalesWords.LANG));
             return;
         }
-        answerLater(interaction, DiscordSlashCommands.unlinked(gameChannelName(owner)));
+        String gameName = gameChannelName(LostTalesWords.LANG, owner);
+        answerLater(interaction, DiscordSlashCommands.unlinked(LostTalesWords.LANG,
+                gameName));
         retireWebhooks(webhooks);
         LostTalesChatService.console(ChatConsoleEvent.Kind.CONFIG,
                 ChatConsoleEvent.Severity.NOTICE,
                 LostTalesServerBroadcastHook.SERVER_NAME, "Discord channel " + where
-                        + " was unlinked from " + gameChannelName(owner) + " by "
+                        + " was unlinked from " + gameName + " by "
                         + DiscordMessageSanitizer.inboundName(interaction.userName)
                         + " on Discord");
     }
@@ -1621,37 +1635,101 @@ public final class LostTalesDiscordBridge {
         return client != null && client.isClosedForGood();
     }
 
+    /** The lang key of a Discord channel named with its server ({@code #general of The Shire}). */
+    static final String CHANNEL_OF_KEY = "chat.losttales.discord.where.of";
+    /** The lang key of a Discord channel known by its id alone ({@code channel 1234}). */
+    static final String CHANNEL_ID_KEY = "chat.losttales.discord.where.id";
     /**
-     * How a Discord channel reads in the game and in answers:
-     * {@code #general of The Shire}, the parts Discord has not said left
-     * out, the channel's id where nothing is known.
+     * The lang key of what the player who asked for a link's code is told
+     * once the link is made: the Discord channel, then the game channel.
      */
-    public String describeDiscordChannel(String discordChannelId) {
-        String channel = this.directory.channelName(discordChannelId);
-        String guild = this.directory.guildNameOfChannel(discordChannelId);
-        String named = channel.length() > 0 ? "#" + channel
-                : "channel " + discordChannelId;
-        return guild.length() > 0 ? named + " of " + guild : named;
+    static final String LINKED_IN_GAME_KEY = "chat.losttales.command.discord.linked";
+
+    /**
+     * How a Discord channel reads in {@code words}, the server's in the
+     * logs and the Server Log: {@code #general of The Shire}, the parts
+     * Discord has not said left out, the channel's id where nothing is
+     * known.
+     */
+    public String describeDiscordChannel(LostTalesWords words, String discordChannelId) {
+        return describeDiscordChannel(words,
+                this.directory.channelName(discordChannelId),
+                this.directory.guildNameOfChannel(discordChannelId), discordChannelId);
     }
 
     /**
-     * The name a link's game channel reads by: the channel's own
-     * ({@code OOC Chat}, {@code Global Chat}), or a faction's chat by its
-     * faction ({@code Gondor Chat}).
+     * The same description as words each game translates, for a line a
+     * player is sent.
      */
-    public static String gameChannelName(String key) {
+    public IChatComponent discordChannelComponent(String discordChannelId) {
+        return discordChannelComponent(this.directory.channelName(discordChannelId),
+                this.directory.guildNameOfChannel(discordChannelId), discordChannelId);
+    }
+
+    /** A Discord channel's description from what is known of it: its name and its server's, either empty. */
+    static String describeDiscordChannel(LostTalesWords words, String channelName,
+                                         String guildName, String discordChannelId) {
+        String named = channelName.length() > 0 ? "#" + channelName
+                : words.format(CHANNEL_ID_KEY, discordChannelId);
+        return guildName.length() > 0 ? words.format(CHANNEL_OF_KEY, named, guildName)
+                : named;
+    }
+
+    /** The description as a component, its words translations: see {@link #describeDiscordChannel}. */
+    static IChatComponent discordChannelComponent(String channelName, String guildName,
+                                                  String discordChannelId) {
+        IChatComponent named = channelName.length() > 0
+                ? new ChatComponentText("#" + channelName)
+                : new ChatComponentTranslation(CHANNEL_ID_KEY, discordChannelId);
+        return guildName.length() > 0
+                ? new ChatComponentTranslation(CHANNEL_OF_KEY, named, guildName)
+                : named;
+    }
+
+    /**
+     * The name a link's game channel reads by in {@code words}, the
+     * server's on Discord and in the logs: the channel's own
+     * ({@code OOC Chat}, {@code Global Chat}), or a faction's chat by its
+     * faction ({@code Gondor Chat}). A channel a server defined has no
+     * lang line and reads by its display name.
+     */
+    public static String gameChannelName(LostTalesWords words, String key) {
         String value = key == null ? "" : key.trim();
         ChatCodeNames.Named named = ChatCodeNames.parse(value);
         if (named == null) {
             return value;
         }
         if (named.channel != ChatChannel.FACTION) {
-            return named.channel.getDisplayName();
+            return ChatNames.channel(words, named.channel);
         }
         String faction = LotrCharacterAdapter.getInstance()
                 .getFactionDisplayName(named.scope);
         return faction == null || faction.length() == 0 ? value
-                : ChatChannel.factionChatName(faction);
+                : ChatNames.factionChat(words, faction);
+    }
+
+    /**
+     * The same name as words each game translates, for a line a player is
+     * sent: a faction's own name is LOTR's lang key where LOTR knows the
+     * faction, so each game names it in its own language too.
+     */
+    public static IChatComponent gameChannelComponent(String key) {
+        String value = key == null ? "" : key.trim();
+        ChatCodeNames.Named named = ChatCodeNames.parse(value);
+        if (named == null) {
+            return new ChatComponentText(value);
+        }
+        if (named.channel != ChatChannel.FACTION) {
+            return ChatNames.channelComponent(named.channel);
+        }
+        LotrCharacterAdapter lotr = LotrCharacterAdapter.getInstance();
+        String faction = lotr.getFactionDisplayName(named.scope);
+        if (faction == null || faction.length() == 0) {
+            return new ChatComponentText(value);
+        }
+        String factionKey = lotr.getFactionNameKey(named.scope);
+        return new ChatComponentTranslation(ChatNames.FACTION_CHAT_KEY,
+                factionKey == null ? faction : new ChatComponentTranslation(factionKey));
     }
 
     /**
@@ -1885,24 +1963,33 @@ public final class LostTalesDiscordBridge {
 
     /**
      * A member's message as the game shows it: its words with mentions,
-     * emoji and links made the game's, then what it carries besides
-     * ({@link DiscordMessageSanitizer#inboundWithAttachments}).
+     * emoji and links made the game's, a role or a channel it mentions
+     * named as its own Discord server names them, then what it carries
+     * besides ({@link DiscordMessageSanitizer#inboundWithAttachments}), in
+     * the server's words, its marks kept apart for each game to translate.
      */
-    private String inboundText(DiscordJson.Message message,
-                               DiscordMessageLinkRewriter.Resolver resolver) {
+    private DiscordInboundLine inboundLine(DiscordJson.Message message,
+                                           DiscordMessageLinkRewriter.Resolver resolver) {
         Map<String, String> mentions = mentionNamesIn(message);
-        return DiscordMessageSanitizer.inboundWithAttachments(
+        DiscordMessageSanitizer.Places places = this.directory.placesIn(guildOf(message));
+        return DiscordMessageSanitizer.inboundWithAttachments(LostTalesWords.LANG,
                 DiscordMessageSanitizer.inbound(
                         DiscordMessageLinkRewriter.inbound(message.content, resolver),
-                        mentions),
-                DiscordMessageSanitizer.inbound(message.forwardedContent, mentions),
+                        mentions, places, LostTalesWords.LANG),
+                DiscordMessageSanitizer.inbound(message.forwardedContent, mentions,
+                        places, LostTalesWords.LANG),
                 message.stickerNames, message.fileNames, messageLink(message));
+    }
+
+    /** The id of the Discord server a message was said in; empty where it is not known. */
+    private String guildOf(DiscordJson.Message message) {
+        return message.guildId.length() > 0 ? message.guildId
+                : this.directory.guildIdOfChannel(message.channelId);
     }
 
     /** The message's own link on Discord, or null where its server is not known. */
     private String messageLink(DiscordJson.Message message) {
-        String guild = message.guildId.length() > 0 ? message.guildId
-                : this.directory.guildIdOfChannel(message.channelId);
+        String guild = guildOf(message);
         return guild.matches("\\d{1,24}") && message.channelId.matches("\\d{1,24}")
                 && message.id.matches("\\d{1,24}")
                 ? "https://discord.com/channels/" + guild + "/" + message.channelId
@@ -2003,7 +2090,7 @@ public final class LostTalesDiscordBridge {
             try {
                 DiscordHttp.Reply reply = DiscordHttp.putGuildCommands(
                         LostTalesConfig.discordBotToken.trim(), applicationId, guildId,
-                        DiscordSlashCommands.definitionsBody());
+                        DiscordSlashCommands.definitionsBody(LostTalesWords.LANG));
                 if (reply.isSuccess()) {
                     FMLLog.info("[%s] Discord slash commands registered in guild %s",
                             LostTalesMetaData.MOD_ID, guildId);
@@ -2062,11 +2149,11 @@ public final class LostTalesDiscordBridge {
                     return;
                 }
                 String author = DiscordMessageSanitizer.inboundName(authorNameIn(message));
-                String text = inboundText(message, linkResolver(this.bound));
-                if (author.length() > 0 && text.length() > 0) {
+                DiscordInboundLine line = inboundLine(message, linkResolver(this.bound));
+                if (author.length() > 0 && line.getText().length() > 0) {
                     rememberAuthor(author, message.authorId);
                     enqueueInbound(Inbound.message(author, message.authorId,
-                            message.authorAvatarUrl, text, message.id,
+                            message.authorAvatarUrl, line, message.id,
                             message.referencedMessageId, message.channelId));
                 }
             } else if ("MESSAGE_UPDATE".equals(name)) {
@@ -2079,10 +2166,9 @@ public final class LostTalesDiscordBridge {
                 if (binding == null || message.bot || !message.isEdited()) {
                     return;
                 }
-                String text = inboundText(message, linkResolver(this.bound));
-                if (text.length() > 0) {
-                    enqueueInbound(new Inbound(Inbound.Kind.EDIT, "", "", text,
-                            message.id, "", message.channelId));
+                DiscordInboundLine line = inboundLine(message, linkResolver(this.bound));
+                if (line.getText().length() > 0) {
+                    enqueueInbound(Inbound.edit(line, message.id, message.channelId));
                 }
             } else if ("MESSAGE_DELETE".equals(name)) {
                 String id = data.has("id") && data.get("id").isJsonPrimitive()
@@ -2200,8 +2286,14 @@ public final class LostTalesDiscordBridge {
         final String name;
         /** The author's Discord id; empty for word about an old message. */
         final String authorId;
-        /** The message's text, or an edit's new text. */
+        /** The message's text, or an edit's new text, in the server's words. */
         final String text;
+        /**
+         * The same text with its marks as words each game translates, as
+         * chat JSON ({@link DiscordInboundBody}); empty for a text without
+         * a mark and for anything but a message or an edit.
+         */
+        final String body;
         /** The message's own Discord id, for the link a reply follows. */
         final String discordId;
         /** The Discord id this message replies to; empty for none. */
@@ -2225,38 +2317,48 @@ public final class LostTalesDiscordBridge {
         Inbound(Kind kind, String name, String authorId, String text,
                 String discordId, String referencedDiscordId,
                 String discordChannelId) {
-            this(kind, name, authorId, text, discordId, referencedDiscordId,
+            this(kind, name, authorId, text, "", discordId, referencedDiscordId,
                     discordChannelId, "", null, "");
         }
 
         Inbound(Kind kind, String name, String authorId, String text,
                 String discordId, String referencedDiscordId,
                 String discordChannelId, String emojiId) {
-            this(kind, name, authorId, text, discordId, referencedDiscordId,
+            this(kind, name, authorId, text, "", discordId, referencedDiscordId,
                     discordChannelId, emojiId, null, "");
         }
 
         Inbound(DiscordJson.Interaction interaction) {
-            this(Kind.COMMAND, interaction.name, "", "", "", "", "", "",
+            this(Kind.COMMAND, interaction.name, "", "", "", "", "", "", "",
                     interaction, "");
         }
 
         /** A member's message, read from the Discord channel it was said in. */
         static Inbound message(String name, String authorId, String avatarUrl,
-                               String text, String discordId,
+                               DiscordInboundLine line, String discordId,
                                String referencedDiscordId, String discordChannelId) {
-            return new Inbound(Kind.MESSAGE, name, authorId, text, discordId,
+            return new Inbound(Kind.MESSAGE, name, authorId, line.getText(),
+                    DiscordInboundBody.jsonOf(line), discordId,
                     referencedDiscordId, discordChannelId, "", null, avatarUrl);
         }
 
+        /** A member's edit of a message, read from the Discord channel it was said in. */
+        static Inbound edit(DiscordInboundLine line, String discordId,
+                            String discordChannelId) {
+            return new Inbound(Kind.EDIT, "", "", line.getText(),
+                    DiscordInboundBody.jsonOf(line), discordId, "",
+                    discordChannelId, "", null, "");
+        }
+
         private Inbound(Kind kind, String name, String authorId, String text,
-                        String discordId, String referencedDiscordId,
+                        String body, String discordId, String referencedDiscordId,
                         String discordChannelId, String emojiId,
                         DiscordJson.Interaction interaction, String avatarUrl) {
             this.kind = kind;
             this.name = name;
             this.authorId = authorId;
             this.text = text;
+            this.body = body == null ? "" : body;
             this.discordId = discordId;
             this.referencedDiscordId = referencedDiscordId;
             this.discordChannelId = discordChannelId == null ? "" : discordChannelId;
@@ -3053,11 +3155,12 @@ public final class LostTalesDiscordBridge {
                     }
                     String name = DiscordMessageSanitizer.inboundName(
                             authorNameIn(message));
-                    String text = inboundText(message, linkResolver(this.bindings));
-                    if (name.length() > 0 && text.length() > 0) {
+                    DiscordInboundLine line = inboundLine(message,
+                            linkResolver(this.bindings));
+                    if (name.length() > 0 && line.getText().length() > 0) {
                         rememberAuthor(name, message.authorId);
                         enqueueInbound(Inbound.message(name, message.authorId,
-                                message.authorAvatarUrl, text, message.id,
+                                message.authorAvatarUrl, line, message.id,
                                 message.referencedMessageId,
                                 binding.getDiscordChannelId()));
                         // Watched from now on, so a later edit or deletion
@@ -3186,12 +3289,13 @@ public final class LostTalesDiscordBridge {
                 }
                 DiscordMessageSweep.Changes changes = cursor.sweep.apply(page);
                 for (DiscordJson.Message message : changes.edited) {
-                    String text = inboundText(message, linkResolver(this.bindings));
+                    DiscordInboundLine line = inboundLine(message,
+                            linkResolver(this.bindings));
                     // Edited down to nothing sayable — an attachment left
                     // alone — keeps the words it was delivered with.
-                    if (text.length() > 0) {
-                        enqueueInbound(new Inbound(Inbound.Kind.EDIT, "", "",
-                                text, message.id, "", binding.getDiscordChannelId()));
+                    if (line.getText().length() > 0) {
+                        enqueueInbound(Inbound.edit(line, message.id,
+                                binding.getDiscordChannelId()));
                     }
                 }
                 for (int index = 0; index < changes.deletedIds.size(); index++) {
@@ -3818,7 +3922,7 @@ public final class LostTalesDiscordBridge {
             if (next.reply.isForward()) {
                 // A forward's message lives in another game channel, so
                 // no copy of it is in this Discord channel to point at.
-                return DiscordMessageSanitizer.forwardHeader(
+                return DiscordMessageSanitizer.forwardHeader(LostTalesWords.LANG,
                         next.reply.getAuthor(), next.reply.getForwardedFrom());
             }
             String jumpUrl = "";
@@ -4037,12 +4141,5 @@ public final class LostTalesDiscordBridge {
             LostTalesChatService.typingFromDiscord(binding.getChannel(),
                     binding.getFactionScope(), typer.name, typer.authorId, typing);
         }
-    }
-
-    /** Players who show as online: an Invisible one is not counted in the topic. */
-    private static int shownPlayerCount(MinecraftServer server) {
-        return server.getConfigurationManager() == null ? 0
-                : ChatPresenceService.countShownOnline(
-                        server.getConfigurationManager().playerEntityList);
     }
 }

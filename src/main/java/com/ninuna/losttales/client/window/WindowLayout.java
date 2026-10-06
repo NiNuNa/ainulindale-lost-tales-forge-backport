@@ -2,9 +2,9 @@ package com.ninuna.losttales.client.window;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -12,9 +12,9 @@ import java.util.Set;
 /**
  * The one authoritative window layout: which windows exist, which tabs
  * each holds in what order, which tab is in front, whether a window is
- * locked, where each window sits and how big it is, which window stands
- * in front of which, and where a page's window last stood. A tab lives
- * in at most one window. Every window is equal: one that loses its last
+ * locked, where each window sits and how big it is, and which window
+ * stands in front of which. A tab lives in at most one window, and a page
+ * opens in a window of its category ({@link PageCategory}). Every window is equal: one that loses its last
  * tab disappears, and the layout with no windows left at all is a valid
  * state. Windows stand on their own: one dragged against another's edge
  * lines up with it and stays where it was put.
@@ -53,9 +53,12 @@ public final class WindowLayout {
      * never stored; windows not listed sit at the back in layout order.
      */
     private static final List<String> STACK = new ArrayList<String>();
-    /** By a page tab's id, where its window last stood. */
-    private static final Map<String, Place> PLACES =
-            new LinkedHashMap<String, Place>();
+    /**
+     * Where each category's first window opens, once a window of it was
+     * locked by hand; a category with none opens at its shipped defaults.
+     */
+    private static final Map<PageCategory, Place> CATEGORY_PLACES =
+            new EnumMap<PageCategory, Place>(PageCategory.class);
     private static int nextWindowNumber = 1;
     private static Runnable changeListener;
     /** What lays the windows out for a new player; see {@link #reset}. */
@@ -75,10 +78,10 @@ public final class WindowLayout {
     /**
      * Back to the layout a player starts with: no window at all, then the
      * windows the systems lay out for a new player ({@link #setDefaults}:
-     * the chat's one window of Global and OOC). Remembered places go too.
+     * the chat's one window of Global and OOC).
      */
     public static synchronized void reset() {
-        PLACES.clear();
+        CATEGORY_PLACES.clear();
         WINDOWS.clear();
         STACK.clear();
         nextWindowNumber = 1;
@@ -93,11 +96,14 @@ public final class WindowLayout {
     }
 
     /**
-     * Adds a window holding {@code tabs}, {@code active} in front, at the
-     * default place and locked: how a system lays out its windows for a
-     * new player, or gives tabs a loaded layout placed nowhere a home.
-     * These are the only windows that open locked. Null with no tabs; a
-     * tab already open elsewhere stays where it is.
+     * Adds a window holding {@code tabs}, {@code active} in front, as a
+     * category's first window stands: at the default place, filling the
+     * part of the screen its category's first window fills
+     * ({@link PageCategory#firstFill}), and locked. How a system lays out
+     * its windows for a new player, how a category with no window opens
+     * one, and how tabs a loaded layout placed nowhere find a home. These
+     * are the only windows that open locked. Null with no tabs; a tab
+     * already open elsewhere stays where it is.
      */
     public static synchronized Window addWindow(List<? extends WindowPage> tabs,
                                                 WindowPage active) {
@@ -116,108 +122,148 @@ public final class WindowLayout {
         window.setLocked(true);
         window.tabs().addAll(fresh);
         window.setActiveTab(active);
+        Place place = CATEGORY_PLACES.get(categoryOf(window));
+        if (place == null || !staysPut(window.getActiveTab())) {
+            window.setFill(firstFillOf(window));
+        } else {
+            place.applyTo(window);
+        }
         WINDOWS.add(window);
         return window;
     }
 
-    /* ---- Pages ---- */
-
     /**
-     * Where a page's window stood as its tab last left it: its padlock,
-     * its pins, and its own place and size, a size of 0 standing for the
-     * default place.
+     * Where a category's first window stands once a window of it was
+     * locked by hand: its place, its size and the part of the screen it
+     * filled.
      */
     static final class Place {
         final double x;
         final double y;
         final double height;
         final int width;
-        /** The part of the screen the window filled; its own box for none. */
         final Window.ScreenFill fill;
-        final boolean pinnedToHud;
-        final boolean pinnedToGui;
 
         Place(double x, double y, double height, int width,
-              Window.ScreenFill fill, boolean pinnedToHud,
-              boolean pinnedToGui) {
+              Window.ScreenFill fill) {
             this.x = x;
             this.y = y;
             this.height = height;
             this.width = width;
             this.fill = fill == null ? Window.ScreenFill.NONE : fill;
-            this.pinnedToHud = pinnedToHud;
-            this.pinnedToGui = pinnedToGui;
+        }
+
+        static Place of(Window window) {
+            return new Place(window.getOffsetX(), window.getOffsetY(),
+                    window.getOwnHeight(), window.getOwnWidth(),
+                    window.getFill());
+        }
+
+        void applyTo(Window window) {
+            window.setOffsets(this.x, this.y);
+            window.setOwnHeight(clampWindowHeight(this.height));
+            window.setOwnWidth(this.width <= 0 ? 0 : clampWindowWidth(this.width));
+            window.setFill(this.fill);
+        }
+    }
+
+    /** The category a window stands for: its front page's, else its first page's; null for none. */
+    static PageCategory categoryOf(Window window) {
+        WindowPage front = window.getActiveTab() != null
+                ? window.getActiveTab()
+                : window.tabs().isEmpty() ? null : window.tabs().get(0);
+        return front == null ? null : front.category().home();
+    }
+
+    /** Where each category's first window opens, for the layout file. */
+    static synchronized Map<PageCategory, Place> categoryPlaces() {
+        return new EnumMap<PageCategory, Place>(CATEGORY_PLACES);
+    }
+
+    /** What the layout file said of the categories' places. */
+    static synchronized void loadCategoryPlaces(Map<PageCategory, Place> places) {
+        CATEGORY_PLACES.clear();
+        if (places != null) {
+            CATEGORY_PLACES.putAll(places);
         }
     }
 
     /**
+     * What a window fills as its category's first window, by the page in
+     * front, else its first: what the category's first window fills, but
+     * for a page standing for a thing in the world, a waystone's or a
+     * missive board's, which stands at the default place, filling nothing.
+     */
+    private static Window.ScreenFill firstFillOf(Window window) {
+        WindowPage front = window.getActiveTab() != null
+                ? window.getActiveTab()
+                : window.tabs().isEmpty() ? null : window.tabs().get(0);
+        return front == null || !staysPut(front) ? Window.ScreenFill.NONE
+                : front.category().home().firstFill();
+    }
+
+    /* ---- Pages ---- */
+
+    /**
      * Brings a page forward: in the window holding its tab, the tab put in
-     * front there and the window raised; else in a window of its own, in
-     * front and unlocked, where the page's window last stood with its pins,
-     * or a step on from the window in front. Only a first window opens
-     * locked. Null for no page.
+     * front there and the window raised; else where a page opened by hand
+     * opens ({@link #openInCategory}), in front and raised. Null for no
+     * page.
      */
     public static synchronized Window showPage(OtherPage page) {
         if (page == null) {
             return null;
         }
+        if (openInCategory(page, null) == null) {
+            return null;
+        }
         Window holding = windowOf(page);
-        if (holding != null) {
-            holding.setActiveTab(page);
-            raise(holding.getId());
-            changed();
-            return holding;
-        }
-        Window created = newWindow();
-        Place place = PLACES.get(page.id());
-        if (place != null) {
-            created.setOffsets(place.x, place.y);
-            created.setOwnHeight(clampWindowHeight(place.height));
-            created.setOwnWidth(clampWindowWidth(place.width));
-            created.setFill(place.fill);
-            created.setPinnedToHud(place.pinnedToHud);
-            created.setPinnedToGui(place.pinnedToGui);
-        } else {
-            cascadeFrom(created, frontWindow());
-        }
-        created.tabs().add(page);
-        created.setActiveTab(page);
-        WINDOWS.add(created);
-        raise(created.getId());
+        holding.setActiveTab(page);
+        raise(holding.getId());
         changed();
-        return created;
+        return holding;
+    }
+
+    /**
+     * Opens a page by hand or by its key where its category keeps its
+     * pages: in the window asked for while that window holds pages of its
+     * category and takes it; else in the unlocked window of its category
+     * last brought to the front, with room; else in a new window a step on
+     * from the window of its category last in front, unlocked; and with
+     * no window of its category at all, in its category's first window
+     * ({@link #addWindow}). Never in the window of another category: only a
+     * hand carrying a tab mixes them. Answers the page as the layout holds
+     * it; null for none.
+     */
+    public static synchronized WindowPage openInCategory(WindowPage tab,
+                                                         String askedWindowId) {
+        if (tab == null) {
+            return null;
+        }
+        Window existing = windowOf(tab);
+        if (existing != null) {
+            return existing.getTabs().get(existing.getTabs().indexOf(tab));
+        }
+        Window asked = window(askedWindowId);
+        Window window = receivingWindow(
+                asked != null && holdsKindOf(asked, tab) ? asked : null, tab);
+        if (window == null) {
+            Window first = addWindow(Collections.singletonList(tab), tab);
+            raise(first.getId());
+            changed();
+            return tab;
+        }
+        window.tabs().add(tab);
+        if (window.getActiveTab() == null) {
+            window.setActiveTab(tab);
+        }
+        changed();
+        return tab;
     }
 
     /** Whether the window has a page in front. */
     public static synchronized boolean showsPage(Window window) {
         return window != null && window.getActiveTab() instanceof OtherPage;
-    }
-
-    /** Notes where the window stands for every page tab in {@code tabs} that is leaving it. */
-    private static void rememberPlaces(Window window,
-                                       List<? extends WindowPage> tabs) {
-        for (WindowPage tab : tabs) {
-            if (tab instanceof OtherPage) {
-                PLACES.put(tab.id(), new Place(
-                        window.getOffsetX(), window.getOffsetY(),
-                        window.getOwnHeight(), window.getOwnWidth(),
-                        window.getFill(),
-                        window.isPinnedToHud(), window.isPinnedToGui()));
-            }
-        }
-    }
-
-    /** Where each page's window last stood, by its tab's id, for the layout file. */
-    static synchronized Map<String, Place> places() {
-        return new LinkedHashMap<String, Place>(PLACES);
-    }
-
-    /** What the layout file said of the pages' places. */
-    static synchronized void loadPlaces(Map<String, Place> places) {
-        PLACES.clear();
-        if (places != null) {
-            PLACES.putAll(places);
-        }
     }
 
     /* ---- Pinning ---- */
@@ -375,7 +421,6 @@ public final class WindowLayout {
             changed();
             return true;
         }
-        rememberPlaces(window, window.tabs());
         window.tabs().clear();
         window.setActiveTab(null);
         dropWindow(window);
@@ -402,9 +447,8 @@ public final class WindowLayout {
 
     /**
      * Takes every tab the filter picks out of its window, a window left
-     * empty going with it, and answers the tabs taken. A page's tab
-     * remembers where its window stood, as one closed by hand does, and a
-     * front tab taken hands the front to its neighbour
+     * empty going with it, and answers the tabs taken. A front tab taken
+     * hands the front to its neighbour
      * ({@link #successor}). The listener is not told; the caller writes
      * the change when it is done.
      */
@@ -429,7 +473,6 @@ public final class WindowLayout {
             if (taken.isEmpty()) {
                 continue;
             }
-            rememberPlaces(window, taken);
             window.tabs().removeAll(taken);
             removed.addAll(taken);
             if (window.tabs().isEmpty()) {
@@ -472,18 +515,20 @@ public final class WindowLayout {
      * The window a tab opening in no window of its own belongs in: the
      * window asked for (the one the player opened it from, or the one of
      * the conversation last used), else the window most recently brought
-     * to the front that holds a tab of its kind, as long as its row has
-     * room for one more; when none of them takes it, a new window opens a
-     * step on from the window asked for, else from the one in front,
-     * unlocked and in front of it.
+     * to the front that holds a page of its category, as long as its row
+     * has room for one more; when none of them takes it, a new window opens
+     * a step on from the window asked for, else from the window of its
+     * category last in front, unlocked and in front of it.
      *
      * <p>A locked window takes nothing, whoever opens the tab: the padlock
      * keeps the tabs a window holds, so a whisper reaching a player whose
      * conversation windows are all locked opens in a window of its own.</p>
      *
-     * <p>Null when none was asked for and no window holds a tab of its
-     * kind: a tab never opens a window of its own by itself, and waits in
-     * the {@code +} until the player opens one.</p>
+     * <p>Null when none was asked for and no window holds a page of its
+     * category: a conversation never opens a window of its own by itself,
+     * and waits in the {@code +} until the player opens one; a page opened
+     * by hand opens its category's first window
+     * ({@link #openInCategory}).</p>
      */
     private static Window receivingWindow(Window preferred, WindowPage tab) {
         // A window whose row cannot hold one more tab at its least — the
@@ -493,20 +538,22 @@ public final class WindowLayout {
         if (asked && takes(preferred, candidate)) {
             return preferred;
         }
-        boolean ofItsKind = false;
+        Window kin = null;
         for (Window window : byRecency()) {
             if (window != preferred && holdsKindOf(window, tab)) {
-                ofItsKind = true;
+                if (kin == null) {
+                    kin = window;
+                }
                 if (takes(window, candidate)) {
                     return window;
                 }
             }
         }
-        if (!asked && !ofItsKind) {
+        if (!asked && kin == null) {
             return null;
         }
         Window created = newWindow();
-        cascadeFrom(created, asked ? preferred : frontWindow());
+        cascadeFrom(created, asked ? preferred : kin);
         WINDOWS.add(created);
         raise(created.getId());
         return created;
@@ -518,10 +565,13 @@ public final class WindowLayout {
         return !window.isLocked() && hasRoomFor(window, tabs);
     }
 
-    /** Whether the window holds a tab of the same kind as {@code tab}: a conversation, or a page. */
+    /**
+     * Whether the window holds a page of {@code tab}'s category, or of one
+     * sharing its windows: the channels and the whispers.
+     */
     private static boolean holdsKindOf(Window window, WindowPage tab) {
         for (WindowPage held : window.tabs()) {
-            if (held.getClass() == tab.getClass()) {
+            if (held.category().home() == tab.category().home()) {
                 return true;
             }
         }
@@ -576,8 +626,9 @@ public final class WindowLayout {
 
     /**
      * Opens a tab in a window of its own, a step on from the window in
-     * front, unlocked and in front of it: how a tab comes back when no
-     * window is left to put it in. Refused for a tab that is already open.
+     * front, unlocked and in front of it: where a page opened beside
+     * another goes when that page's window has no room for it. Refused for
+     * a tab that is already open.
      */
     public static synchronized WindowPage openInNewWindow(WindowPage tab) {
         if (tab == null || isOpen(tab)) {
@@ -917,7 +968,6 @@ public final class WindowLayout {
      * ({@link #successor}).
      */
     private static void removeTab(Window window, WindowPage tab) {
-        rememberPlaces(window, Collections.singletonList(tab));
         int index = window.tabs().indexOf(tab);
         window.tabs().remove(tab);
         if (window.tabs().isEmpty()) {
@@ -1273,6 +1323,12 @@ public final class WindowLayout {
         return result;
     }
 
+    /**
+     * Locks a window by hand, or unlocks it. Locking makes where the window
+     * stands its category's first place: that category's first window
+     * opens there from now on, as a sub-window's padlock keeps its kind's
+     * place. A world page's window keeps no place.
+     */
     public static synchronized boolean setLocked(String windowId,
                                                  boolean locked) {
         Window window = window(windowId);
@@ -1280,15 +1336,21 @@ public final class WindowLayout {
             return false;
         }
         window.setLocked(locked);
+        PageCategory category = categoryOf(window);
+        if (locked && category != null && staysPut(window.getActiveTab())) {
+            CATEGORY_PLACES.put(category, Place.of(window));
+        }
         changed();
         return true;
     }
 
     /**
-     * Puts a window's layout back as it first was: at the default place,
-     * in the middle of the screen at two thirds of it, filling no part of
-     * the screen, pinned nowhere, its splits parted, and locked again. Its
-     * pages stay; what each lays out is put back by the page
+     * Puts a window's layout back as its category's first window first
+     * stood: at the default place, in the middle of the screen at two
+     * thirds of it, filling what that first window fills (the map the
+     * whole screen), pinned nowhere, its splits parted, and locked again.
+     * The category forgets the place a padlock gave it. Its pages stay;
+     * what each lays out is put back by the page
      * ({@link WindowPage#resetView}), and the settings keep their own reset.
      * A locked window stays where it is, so only an unlocked one resets.
      */
@@ -1297,9 +1359,13 @@ public final class WindowLayout {
         if (window == null || window.isLocked()) {
             return false;
         }
+        PageCategory category = categoryOf(window);
+        if (category != null) {
+            CATEGORY_PLACES.remove(category);
+        }
         window.setOwnWidth(0);
         window.setOwnHeight(0.0D);
-        window.setFill(Window.ScreenFill.NONE);
+        window.setFill(firstFillOf(window));
         window.setPinnedToHud(false);
         window.setPinnedToGui(false);
         window.splits().clear();
@@ -1399,8 +1465,8 @@ public final class WindowLayout {
 
     /**
      * A new window, at the default place and unlocked: in the middle of
-     * the screen at two thirds of it until it is given a place. Only the
-     * windows a new player starts with are locked ({@link #addWindow}).
+     * the screen at two thirds of it until it is given a place. Only a
+     * category's first window is locked ({@link #addWindow}).
      */
     private static Window newWindow() {
         Window window = new Window(ID_PREFIX + nextWindowNumber++);

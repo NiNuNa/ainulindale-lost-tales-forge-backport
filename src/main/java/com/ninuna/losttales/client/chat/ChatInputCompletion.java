@@ -797,7 +797,8 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
     /**
      * The candidates for a conversation: the mentionable roles first,
      * since addressing a whole group is never buried under a list of
-     * names; then the player themself; then everyone else the
+     * names, each shown by the name this game gives it and found by its id
+     * too; then the player themself; then everyone else the
      * conversation's member list shows here — and anyone online it has
      * not reached yet — alphabetical; then those it shows absent, players
      * and Discord members alike, alphabetical, since a mention reaches
@@ -820,9 +821,9 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
                 new ArrayList<ChatMentionCandidate>();
         for (ChatAccountRole role : ChatAccountRole.mentionable()) {
             String name = role.getDisplayName();
-            if (name.length() > 0 && !name.equals(role.getNameKey())) {
-                result.add(ChatMentionCandidate.role(
-                        "role:" + role.getId(), name, role.getColor()));
+            if (name.length() > 0) {
+                result.add(ChatMentionCandidate.role("role:" + role.getId(),
+                        name, role.mentionNames(), role.getColor()));
             }
         }
         result.add(candidate(selfId == null ? "self" : selfId.toString(),

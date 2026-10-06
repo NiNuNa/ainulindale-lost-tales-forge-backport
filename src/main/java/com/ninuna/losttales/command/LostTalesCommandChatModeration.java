@@ -16,9 +16,9 @@ import java.util.UUID;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
 import net.minecraft.world.World;
 
 /**
@@ -31,6 +31,9 @@ import net.minecraft.world.World;
  * every capability the account holds ({@link #withheldPower}).
  */
 public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
+
+    /** What the lang key of each of the command's answers begins with. */
+    static final String SAY = "chat.losttales.command.chat.";
 
     public LostTalesCommandChatModeration() {
         super("chat");
@@ -55,24 +58,20 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
         }
         World world = resolveWorld(sender);
         if (world == null || world.isRemote) {
-            send(sender, EnumChatFormatting.RED
-                    + "Chat moderation requires a running logical server world.");
+            say(sender, EnumChatFormatting.RED, SAY + "no_world");
             return;
         }
         ChatMuteWorldData mutes;
         try {
             mutes = ChatMuteStorage.get(world);
         } catch (RuntimeException exception) {
-            send(sender, EnumChatFormatting.RED
-                    + "Unable to open chat mute storage: "
-                    + exception.getClass().getSimpleName());
+            say(sender, EnumChatFormatting.RED, SAY + "storage_failed",
+                    exception.getClass().getSimpleName());
             return;
         }
         if (mutes.isReadOnlyForNewerVersion()) {
-            send(sender, EnumChatFormatting.RED
-                    + "Chat mutes are read-only: the data was written by a newer version ("
-                    + mutes.getUnsupportedDataVersion()
-                    + "). Nobody is being silenced.");
+            say(sender, EnumChatFormatting.RED, SAY + "read_only",
+                    Integer.valueOf(mutes.getUnsupportedDataVersion()));
             return;
         }
         String action = args[0];
@@ -91,29 +90,24 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
     private void mute(ICommandSender sender, ChatMuteWorldData mutes,
                       String[] args) {
         if (args.length < 2) {
-            send(sender, EnumChatFormatting.GRAY
-                    + "/losttales chat mute <player> [30s|15m|2h|7d] [reason]");
+            usage(sender, "/losttales chat mute <player> [30s|15m|2h|7d] [reason]");
             return;
         }
         EntityPlayerMP target = LostTalesServerPlayers.findOnline(args[1]);
         DiscordMember member = target == null
                 ? DiscordMember.parse(args[1]) : null;
         if (target == null && member == null) {
-            send(sender, EnumChatFormatting.RED + "No online player named "
-                    + args[1] + ". Muting needs the player online; a "
-                    + "Discord member is named discord:<name> after they "
-                    + "have written, or discord:<their Discord id>.");
+            say(sender, EnumChatFormatting.RED, SAY + "mute.not_online", args[1]);
             return;
         }
         if (target != null && target == sender) {
-            send(sender, EnumChatFormatting.RED + "You cannot mute yourself.");
+            say(sender, EnumChatFormatting.RED, SAY + "mute.self");
             return;
         }
         String withheld = target == null ? null : withheldPower(sender, target);
         if (withheld != null) {
-            send(sender, EnumChatFormatting.RED + "You cannot mute "
-                    + target.getCommandSenderName() + ": they hold " + withheld
-                    + ", which you do not.");
+            say(sender, EnumChatFormatting.RED, SAY + "mute.withheld",
+                    target.getCommandSenderName(), withheld);
             return;
         }
         long now = System.currentTimeMillis();
@@ -133,20 +127,25 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                 sender == null ? "" : sender.getCommandSenderName(),
                 reason, now, expiresAt);
         if (!mutes.mute(entry)) {
-            send(sender, EnumChatFormatting.RED
-                    + "The mute list is full; lift one before adding another.");
+            say(sender, EnumChatFormatting.RED, SAY + "mute.full");
             return;
         }
         if (target != null) {
             tellMuted(target, entry, now);
         }
         LostTalesChatService.sendAccessToModerators();
-        send(sender, EnumChatFormatting.GREEN + "Muted "
-                + entry.getAccountName()
-                + (entry.isPermanent() ? " permanently"
-                        : " for " + ChatMuteDurations.formatRemaining(
-                                expiresAt - now))
-                + (reason.length() > 0 ? ": " + reason : "") + ".");
+        boolean hasReason = reason.length() > 0;
+        if (entry.isPermanent()) {
+            say(sender, EnumChatFormatting.GREEN, hasReason
+                    ? SAY + "muted.permanent.because" : SAY + "muted.permanent",
+                    entry.getAccountName(), reason);
+        } else {
+            say(sender, EnumChatFormatting.GREEN, hasReason
+                    ? SAY + "muted.timed.because" : SAY + "muted.timed",
+                    entry.getAccountName(),
+                    ChatMuteDurations.remaining(expiresAt - now).component(),
+                    reason);
+        }
     }
 
     /**
@@ -188,8 +187,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
     private void unmute(ICommandSender sender, ChatMuteWorldData mutes,
                         String[] args) {
         if (args.length < 2) {
-            send(sender, EnumChatFormatting.GRAY
-                    + "/losttales chat unmute <player>");
+            usage(sender, "/losttales chat unmute <player>");
             return;
         }
         EntityPlayerMP online = LostTalesServerPlayers.findOnline(args[1]);
@@ -205,13 +203,13 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             stored = mutes.findByName(args[1]);
         }
         if (stored == null) {
-            send(sender, EnumChatFormatting.RED + args[1] + " is not muted.");
+            say(sender, EnumChatFormatting.RED, SAY + "unmute.not_muted", args[1]);
             return;
         }
         if (sender instanceof EntityPlayerMP && stored.getAccountId().equals(
                 ((EntityPlayerMP)sender).getUniqueID())) {
             // As nobody mutes themselves, nobody lifts their own mute.
-            send(sender, EnumChatFormatting.RED + "You cannot unmute yourself.");
+            say(sender, EnumChatFormatting.RED, SAY + "unmute.self");
             return;
         }
         // Lifting a mute overrules whoever set it, so it asks what muting
@@ -221,19 +219,17 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                 : withheldPower(sender, ChatAbsentReader.of(
                         stored.getAccountId(), stored.getAccountName()));
         if (withheld != null) {
-            send(sender, EnumChatFormatting.RED + "You cannot unmute "
-                    + stored.getAccountName() + ": they hold " + withheld
-                    + ", which you do not.");
+            say(sender, EnumChatFormatting.RED, SAY + "unmute.withheld",
+                    stored.getAccountName(), withheld);
             return;
         }
         ChatMuteEntry lifted = mutes.unmute(stored.getAccountId());
         if (lifted == null) {
-            send(sender, EnumChatFormatting.RED + args[1] + " is not muted.");
+            say(sender, EnumChatFormatting.RED, SAY + "unmute.not_muted", args[1]);
             return;
         }
         LostTalesChatService.sendAccessToModerators();
-        send(sender, EnumChatFormatting.GREEN + "Unmuted "
-                + lifted.getAccountName() + ".");
+        say(sender, EnumChatFormatting.GREEN, SAY + "unmuted", lifted.getAccountName());
         if (online != null) {
             online.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.unmuted"));
@@ -244,27 +240,31 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
         long now = System.currentTimeMillis();
         List<ChatMuteEntry> active = mutes.getActiveMutes(now);
         if (active.isEmpty()) {
-            send(sender, EnumChatFormatting.GRAY + "Nobody is muted.");
+            say(sender, EnumChatFormatting.GRAY, SAY + "mutes.none");
             return;
         }
-        send(sender, EnumChatFormatting.GOLD + "Muted accounts ("
-                + active.size() + "):");
+        say(sender, EnumChatFormatting.GOLD, SAY + "mutes.header",
+                Integer.valueOf(active.size()));
         for (ChatMuteEntry mute : active) {
-            StringBuilder line = new StringBuilder();
-            line.append(EnumChatFormatting.GRAY);
-            line.append(mute.getAccountName().length() > 0
-                    ? mute.getAccountName() : mute.getAccountId().toString());
-            line.append(" - ");
-            line.append(mute.isPermanent() ? "permanent"
-                    : ChatMuteDurations.formatRemaining(
-                            mute.getExpiresAtMillis() - now) + " left");
-            if (mute.getReason().length() > 0) {
-                line.append(" - ").append(mute.getReason());
+            String name = mute.getAccountName().length() > 0
+                    ? mute.getAccountName() : mute.getAccountId().toString();
+            Object left = mute.isPermanent() ? words(SAY + "mutes.permanent")
+                    : words(SAY + "mutes.left", ChatMuteDurations.remaining(
+                            mute.getExpiresAtMillis() - now).component());
+            boolean hasReason = mute.getReason().length() > 0;
+            boolean hasMuter = mute.getMutedByName().length() > 0;
+            if (hasReason && hasMuter) {
+                say(sender, EnumChatFormatting.GRAY, SAY + "mutes.entry.because.by", name,
+                        left, mute.getReason(), mute.getMutedByName());
+            } else if (hasReason) {
+                say(sender, EnumChatFormatting.GRAY, SAY + "mutes.entry.because", name,
+                        left, mute.getReason());
+            } else if (hasMuter) {
+                say(sender, EnumChatFormatting.GRAY, SAY + "mutes.entry.by", name, left,
+                        mute.getMutedByName());
+            } else {
+                say(sender, EnumChatFormatting.GRAY, SAY + "mutes.entry", name, left);
             }
-            if (mute.getMutedByName().length() > 0) {
-                line.append(" (by ").append(mute.getMutedByName()).append(")");
-            }
-            send(sender, line.toString());
         }
     }
 
@@ -279,8 +279,8 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                     : new ChatComponentTranslation("chat.losttales.muted"));
             return;
         }
-        String remaining = ChatMuteDurations.formatRemaining(
-                mute.getExpiresAtMillis() - now);
+        IChatComponent remaining = ChatMuteDurations.remaining(
+                mute.getExpiresAtMillis() - now).component();
         target.addChatMessage(hasReason
                 ? new ChatComponentTranslation(
                         "chat.losttales.muted.timed.because", remaining,
@@ -364,19 +364,11 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
     }
 
     private void sendUsage(ICommandSender sender) {
-        send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
-        send(sender, EnumChatFormatting.GRAY
-                + "/losttales chat mute <player|discord:name|discord:id> "
+        usage(sender, getCommandUsage(sender));
+        usage(sender, "/losttales chat mute <player|discord:name|discord:id> "
                 + "[30s|15m|2h|7d] [reason]");
-        send(sender, EnumChatFormatting.GRAY
-                + "/losttales chat unmute <player|discord:name|discord:id>");
-        send(sender, EnumChatFormatting.GRAY + "/losttales chat mutes");
-    }
-
-    private void send(ICommandSender sender, String message) {
-        if (sender != null) {
-            sender.addChatMessage(new ChatComponentText(message));
-        }
+        usage(sender, "/losttales chat unmute <player|discord:name|discord:id>");
+        usage(sender, "/losttales chat mutes");
     }
 
     @Override

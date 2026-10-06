@@ -2,8 +2,8 @@ package com.ninuna.losttales.gui.screen.missive;
 
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.screen.quest.QuestJournalLayout;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
@@ -12,6 +12,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.item.LostTalesItemMissiveLetter;
 import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveObjectiveData;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -145,7 +146,7 @@ final class MissiveLetterView {
         return new LostTalesUiHitBox(Math.floor(box.left) + PADDING,
                 Math.floor(box.top) + PADDING,
                 Math.max(0.0D, Math.floor(box.width) - PADDING * 2
-                        - QuestJournalLayout.SCROLLBAR_WIDTH),
+                        - WindowLists.SCROLLBAR_ROOM),
                 Math.max(0.0D, Math.floor(box.height) - PADDING * 2));
     }
 
@@ -190,17 +191,15 @@ final class MissiveLetterView {
 
     private static void addLetter(FontRenderer font, List<Line> lines,
                                   LostTalesMissiveData missive, int width) {
-        String title = missive.getTitle().length() > 0 ? missive.getTitle()
-                : StatCollector.translateToLocal("item.missive_letter.name");
-        wrap(font, lines, Kind.TITLE, title, width, 0);
-        if (missive.getIssuer().length() > 0) {
+        wrap(font, lines, Kind.TITLE, MissiveWords.title(missive), width, 0);
+        String issuer = MissiveWords.issuer(missive);
+        if (issuer.length() > 0) {
             wrap(font, lines, Kind.ASIDE, StatCollector.translateToLocalFormatted(
-                    "gui.losttales.missive_letter.issuer", missive.getIssuer()),
+                    "gui.losttales.missive_letter.issuer", issuer),
                     width, 0);
         }
         lines.add(new Line(Kind.RULE, "", 0));
-        String body = missive.getFlavorText().length() > 0
-                ? missive.getFlavorText() : missive.getDescription();
+        String body = MissiveWords.journalLine(missive);
         if (body.length() > 0) {
             wrap(font, lines, Kind.TEXT, body, width, 0);
             lines.add(new Line(Kind.GAP, "", 0));
@@ -211,7 +210,7 @@ final class MissiveLetterView {
             int indent = font.getStringWidth(DASH);
             for (LostTalesMissiveObjectiveData objective : missive.getObjectives()) {
                 List<String> wrapped = split(font,
-                        LostTalesItemMissiveLetter.buildObjectiveSummary(objective),
+                        MissiveWords.objective(objective),
                         Math.max(1, width - indent));
                 for (int index = 0; index < wrapped.size(); index++) {
                     lines.add(new Line(Kind.TEXT, index == 0
@@ -318,26 +317,15 @@ final class MissiveLetterView {
         LostTalesUiInk.fillRect(right - 1, top + 1, right, bottom - 1, edge);
     }
 
-    /** A scrollbar inside the sheet's right edge, only where there is more than fits. */
+    /** Where more of the letter waits, as every list in the windows says it, inside the sheet's right edge. */
     private void drawScrollbar(LostTalesUiHitBox box, LostTalesUiHitBox inner,
                                int alpha) {
-        LostTalesUiHitBox area = new LostTalesUiHitBox(inner.left, inner.top,
-                inner.width + QuestJournalLayout.SCROLLBAR_WIDTH, inner.height);
-        LostTalesUiHitBox bar = QuestJournalLayout.scrollbar(area,
-                this.contentHeight);
-        if (bar.width <= 0.0D) {
-            return;
-        }
-        LostTalesUiInk.fillRect((float)bar.left, (float)bar.top,
-                (float)bar.right(), (float)bar.bottom(),
-                faded(LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x8C),
-                        alpha));
-        LostTalesUiHitBox handle = QuestJournalLayout.scrollHandle(bar,
-                this.contentHeight, this.shownScroll);
-        LostTalesUiInk.fillRect((float)handle.left, (float)handle.top,
-                (float)handle.right(), (float)handle.bottom(),
-                faded(LostTalesColors.withAlpha(LostTalesColors.MAUVE, 0xC8),
-                        alpha));
+        // The fades hang from just inside the sheet's own edge.
+        double top = Math.floor(box.top);
+        WindowLists.drawScroll(Math.floor(box.left) + 1, top + 1,
+                Math.floor(box.left) + Math.floor(box.width) - 1,
+                top + Math.floor(box.height) - 1, inner.top, inner.bottom(),
+                this.shownScroll, maxScroll(inner), alpha);
     }
 
     /** A colour of the palette at its own opacity times the page's. */

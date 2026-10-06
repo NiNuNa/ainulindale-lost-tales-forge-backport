@@ -82,11 +82,6 @@ final class ChatEmojiSuggestionBox extends ChatSuggestionBox {
         return this.matches.size();
     }
 
-    @Override
-    int rowHeight() {
-        return GLYPH_ROW_HEIGHT;
-    }
-
     /** The suggestion on a row, or null. */
     ChatEmoji at(int row) {
         return row >= 0 && row < this.matches.size()
@@ -108,7 +103,7 @@ final class ChatEmojiSuggestionBox extends ChatSuggestionBox {
                         ? this.selectedIndex : -1);
         for (int row = 0; row < this.matches.size(); row++) {
             ChatEmoji emoji = this.matches.get(row);
-            int rowTop = top + PADDING + row * GLYPH_ROW_HEIGHT;
+            int rowTop = top + PADDING + row * ROW_HEIGHT;
             ChatInlineIcons.drawEmoji(minecraft, emoji,
                     ChatInlineIcons.boxLeft(inputX + PADDING,
                             ChatInlineIcons.SLOT_WIDTH),
@@ -118,7 +113,7 @@ final class ChatEmojiSuggestionBox extends ChatSuggestionBox {
             LostTalesChatVisualStyle.drawPlain(font, emoji.getShortcode(),
                     inputX + PADDING + ChatInlineIcons.SLOT_WIDTH + ICON_GAP,
                     rowTop + 2,
-                    row == this.selectedIndex ? 255 : 200);
+                    255);
         }
     }
 

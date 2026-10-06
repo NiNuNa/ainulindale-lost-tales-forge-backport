@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +33,8 @@ public final class LostTalesQuestDefinition {
     private final Map<String, String> dialogue;
     private final Map<String, String> world;
     private final List<LostTalesQuestStageDefinition> stages;
+    private final boolean bundled;
+    private final Map<String, String> words;
 
     public LostTalesQuestDefinition(String id, String title, String description, boolean repeatable, String startMode, Map<String, String> prerequisites, Map<String, String> rewards, Map<String, String> interaction, Map<String, String> markers, Map<String, String> journalLog, List<LostTalesQuestStageDefinition> stages) {
         this(id, title, description, repeatable, repeatable, startMode,
@@ -58,6 +61,25 @@ public final class LostTalesQuestDefinition {
             Map<String, String> markers, Map<String, String> journalLog,
             Map<String, String> dialogue, Map<String, String> world,
             List<LostTalesQuestStageDefinition> stages) {
+        this(id, title, description, repeatable, restartable, startMode,
+                prerequisites, rewards, interaction, markers, journalLog,
+                dialogue, world, stages, false,
+                Collections.<String, String>emptyMap());
+    }
+
+    /**
+     * A quest whose words are found as {@code bundled} and {@code words}
+     * say ({@link LostTalesQuestWords}): a bundled quest's by lang lines
+     * under its id, a missive's by its template ids in {@code words}.
+     */
+    public LostTalesQuestDefinition(String id, String title,
+            String description, boolean repeatable, boolean restartable,
+            String startMode, Map<String, String> prerequisites,
+            Map<String, String> rewards, Map<String, String> interaction,
+            Map<String, String> markers, Map<String, String> journalLog,
+            Map<String, String> dialogue, Map<String, String> world,
+            List<LostTalesQuestStageDefinition> stages, boolean bundled,
+            Map<String, String> words) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -71,7 +93,32 @@ public final class LostTalesQuestDefinition {
         this.journalLog = Collections.unmodifiableMap(new LinkedHashMap<String, String>(journalLog == null ? Collections.<String, String>emptyMap() : journalLog));
         this.dialogue = Collections.unmodifiableMap(new LinkedHashMap<String, String>(dialogue == null ? Collections.<String, String>emptyMap() : dialogue));
         this.world = Collections.unmodifiableMap(new LinkedHashMap<String, String>(world == null ? Collections.<String, String>emptyMap() : world));
-        this.stages = Collections.unmodifiableList(new ArrayList<LostTalesQuestStageDefinition>(stages == null ? Collections.<LostTalesQuestStageDefinition>emptyList() : stages));
+        // A missive keeps only its letter's ids; its objectives read by its
+        // kinds' missive lines wherever its quest is made or read again.
+        this.stages = Collections.unmodifiableList(new ArrayList<LostTalesQuestStageDefinition>(stages == null ? Collections.<LostTalesQuestStageDefinition>emptyList()
+                : !bundled && MissiveWords.isMissive(words)
+                ? MissiveWords.wordedStages(stages) : stages));
+        this.bundled = bundled;
+        this.words = Collections.unmodifiableMap(new LinkedHashMap<String, String>(words == null ? Collections.<String, String>emptyMap() : words));
+    }
+
+    /**
+     * Whether the quest ships with the mod: its words are the lang lines
+     * its id names, in each player's language ({@link LostTalesQuestWords}).
+     * A quest read from the server's folder, sent over the wire or made in
+     * the game is never bundled.
+     */
+    public boolean isBundled() {
+        return this.bundled;
+    }
+
+    /**
+     * The ids a quest made in the game is worded by, a missive's template
+     * ids and target ({@link com.ninuna.losttales.quest.missive.MissiveWords});
+     * empty for a quest whose words are written out.
+     */
+    public Map<String, String> getWords() {
+        return this.words;
     }
 
     /**
@@ -105,10 +152,16 @@ public final class LostTalesQuestDefinition {
         return this.id;
     }
 
+    /**
+     * The title as written: an operator's words, or a bundled quest's
+     * English line. Every place a player reads it asks
+     * {@link LostTalesQuestWords#title} instead.
+     */
     public String getTitle() {
         return this.title;
     }
 
+    /** The description as written; read through {@link LostTalesQuestWords#description}. */
     public String getDescription() {
         return this.description;
     }
@@ -186,16 +239,28 @@ public final class LostTalesQuestDefinition {
     }
 
     /**
-     * The journal line for the stage at {@code stageIndex}: the one under
-     * that stage's id, else the one under the latest stage before it that
-     * has a line; empty where none has.
+     * The journal line for the stage at {@code stageIndex}, as written: the
+     * one under that stage's id, else the one under the latest stage before
+     * it that has a line; empty where none has. A player reads it through
+     * {@link LostTalesQuestWords#journalLine}.
      */
     public String journalLine(int stageIndex) {
+        String stageId = journalStageId(stageIndex);
+        return stageId.length() == 0 ? "" : this.journalLog.get(stageId);
+    }
+
+    /**
+     * The id of the stage whose journal line stands for the stage at
+     * {@code stageIndex}: that stage's, else the latest before it with a
+     * line; empty where none has one.
+     */
+    public String journalStageId(int stageIndex) {
         for (int index = Math.min(stageIndex, this.stages.size() - 1);
                 index >= 0; index--) {
-            String line = this.journalLog.get(this.stages.get(index).getId());
+            String stageId = this.stages.get(index).getId();
+            String line = this.journalLog.get(stageId);
             if (line != null && line.trim().length() > 0) {
-                return line;
+                return stageId;
             }
         }
         return "";

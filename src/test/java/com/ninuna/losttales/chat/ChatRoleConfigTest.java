@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat;
 
 import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.util.EnglishWords;
 import org.junit.After;
 import org.junit.Test;
 
@@ -161,11 +162,15 @@ public final class ChatRoleConfigTest {
                 new String[] {ChatRoleConfig.DEFAULT_OPERATOR_ENTRY}, null, collect);
         ChatAccountRole operator = catalog.byId(ChatRoleFixtures.OPERATOR_ID);
         assertNotNull(operator);
-        assertEquals("Operator", operator.getDisplayName());
+        // Named and described by the lang file, in each game's language.
+        assertEquals("", operator.getName());
+        assertEquals("chat.losttales.role.operator", operator.getNameKey());
+        assertEquals("Operator", operator.displayName(EnglishWords.INSTANCE));
+        assertEquals("Runs the server day to day.",
+                operator.displayDescription(EnglishWords.INSTANCE));
         assertEquals(0xA94B54, operator.getColor());
         assertEquals(10, operator.getRank());
         assertEquals(2, operator.bit());
-        assertEquals("Runs the server day to day.", operator.getDisplayDescription());
         assertTrue(operator.isMentionable());
         assertFalse(operator.isLocked());
         assertEquals(1, operator.getSources().size());
@@ -178,6 +183,7 @@ public final class ChatRoleConfigTest {
         }, null, collect);
         ChatAccountRole staff = restyled.byId(ChatRoleFixtures.OPERATOR_ID);
         assertEquals("Staff", staff.getDisplayName());
+        assertEquals("", staff.getNameKey());
         assertEquals(0x00FF00, staff.getColor());
         assertEquals(4, staff.getSources().get(0).getLevel());
         assertEquals(java.util.Collections.singleton(
@@ -330,6 +336,41 @@ public final class ChatRoleConfigTest {
         assertTrue(gates.hasEntry(ChatChannel.OPERATOR));
         assertFalse(gates.canRead(catalog.byId("moderator").bit(), ChatChannel.OPERATOR));
         assertTrue(gates.canSend(catalog.byId("operator").bit(), ChatChannel.OPERATOR));
+    }
+
+    /**
+     * A role is named by the name its entry writes, in every language; the
+     * seeded operator role, named nothing, by its lang line, which it is
+     * written back without; any other role named nothing by its id. A key
+     * is never built from an id an operator chose.
+     */
+    @Test
+    public void onlyAShippedRoleNamedNothingIsNamedByTheLangFile() {
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {
+                ChatRoleConfig.DEFAULT_OPERATOR_ENTRY,
+                "moderator=colour:A94B54",
+                "herald=name:Heralds;desc:Cries the news.",
+        }, null, collect);
+        ChatAccountRole operator = catalog.byId("operator");
+        String written = ChatRoleConfig.formatRole(operator);
+        assertFalse(written, written.contains("name:"));
+        assertFalse(written, written.contains("desc:"));
+        assertEquals(operator.getNameKey(), ChatRoleConfig.parse(
+                new String[] {written}, null, collect).byId("operator").getNameKey());
+        ChatAccountRole moderator = catalog.byId("moderator");
+        assertEquals("", moderator.getNameKey());
+        assertEquals("moderator", moderator.getDisplayName());
+        assertEquals("Heralds", catalog.byId("herald").getDisplayName());
+        assertEquals("Cries the news.", catalog.byId("herald").getDisplayDescription());
+        // An empty name puts the seeded role back on its lang line; its
+        // own desc stands beside it.
+        ChatAccountRole unnamed = ChatRoleConfig.parse(new String[] {
+                "operator=name:;desc:Keeps the lights on."}, null, collect)
+                .byId("operator");
+        assertEquals("chat.losttales.role.operator", unnamed.getNameKey());
+        assertEquals("Keeps the lights on.",
+                unnamed.displayDescription(EnglishWords.INSTANCE));
+        assertTrue(warnings.isEmpty());
     }
 
     @Test

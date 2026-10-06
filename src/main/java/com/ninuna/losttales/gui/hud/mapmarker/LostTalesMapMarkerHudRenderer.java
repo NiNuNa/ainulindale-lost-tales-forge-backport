@@ -9,6 +9,7 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.MathHelper;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -62,7 +63,8 @@ public final class LostTalesMapMarkerHudRenderer {
                 resolution.getScaledWidth(), resolution.getScaledHeight());
         int y = LostTalesNotificationHud.claim(resolution.getScaledWidth(),
                 resolution.getScaledHeight(), DISCOVERY_NOTICE_HEIGHT);
-        String title = "Location Discovered";
+        String title = StatCollector.translateToLocal(
+                "gui.losttales.hud.location_discovered");
         String name = trimToWidth(font, notice.getName(), DISCOVERY_NOTICE_WIDTH);
 
         int titleColor = colorWithAlpha(LostTalesColors.SAND, alpha * 0.78F);

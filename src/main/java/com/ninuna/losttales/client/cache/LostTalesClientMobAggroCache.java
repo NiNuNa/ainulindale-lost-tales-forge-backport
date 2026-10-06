@@ -9,11 +9,14 @@ import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
 
 /** Client replacement snapshot of server-approved combat marker entities. */
 @SideOnly(Side.CLIENT)
 public final class LostTalesClientMobAggroCache {
+    /** The word for an enemy the server sends no name for. */
+    public static final String ENEMY_KEY = "gui.losttales.marker.enemy";
     private static final int STALE_SNAPSHOT_TICKS = 240;
     private static volatile List<TrackedEnemy> trackedEnemies =
             Collections.emptyList();
@@ -125,6 +128,11 @@ public final class LostTalesClientMobAggroCache {
         clearInternal();
     }
 
+    /** What an enemy with no name of its own is called, in the game's language. */
+    public static String enemyWord() {
+        return StatCollector.translateToLocal(ENEMY_KEY);
+    }
+
     private static void clearInternal() {
         trackedEnemies = Collections.emptyList();
         dimensionId = Integer.MIN_VALUE;
@@ -161,8 +169,9 @@ public final class LostTalesClientMobAggroCache {
             return this.sharedFromFellowship;
         }
 
+        /** The name the server sent, or this game's word for an enemy where it sent none. */
         public String getName() {
-            return this.name;
+            return this.name.length() > 0 ? this.name : enemyWord();
         }
 
         public double getX() {

@@ -26,16 +26,18 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.SubWindow;
+import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.ToolStrip;
+import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowMenus;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -79,12 +81,9 @@ public final class CharactersPage extends PageContent {
     /** The item the tab wears: a head. */
     public static final ItemStack ICON = new ItemStack(Items.skull, 1, 3);
 
-    private static final int ROW_HEIGHT = 14;
-    private static final int HEADING_HEIGHT = 15;
     private static final int NOTE_LINE = 10;
-    /** A head before a name, and its gap. */
+    /** A head before a name: eight pixels, centred in the icon's box. */
     private static final int HEAD = 8;
-    private static final int HEAD_GAP = 4;
 
     /** The roster's button at the strip's left end: the person. */
     private static final ToolStrip.Panel ROSTER_PANEL = new ToolStrip.Panel(
@@ -340,12 +339,11 @@ public final class CharactersPage extends PageContent {
         this.frameSeconds = this.glideNanos == 0L ? 0.0D
                 : (now - this.glideNanos) / 1.0E9D;
         this.glideNanos = now;
-        int mouseX = pageX(box, pointerX);
-        int mouseY = pageY(box, pointerY);
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef((float)box.left, (float)box.top, 0.0F);
-            drawPage(clipX, clipY, mouseX, mouseY, alpha);
+            drawPage(clipX, clipY, pointerX - box.left, pointerY - box.top,
+                    alpha);
         } finally {
             GL11.glPopMatrix();
         }
@@ -367,8 +365,9 @@ public final class CharactersPage extends PageContent {
                 this.rosterOut && this.visit == null);
     }
 
-    private void drawPage(double clipX, double clipY, int mouseX, int mouseY,
-                          int alpha) {
+    /** The page in its own space; the pointer is there too, NaN while it is away. */
+    private void drawPage(double clipX, double clipY, double mouseX,
+                          double mouseY, int alpha) {
         CharacterRosterSnapshot snapshot = snapshot();
         if (snapshot == null) {
             drawCentred(I18n.format(ClientCharacterRosterCache.getState()
@@ -380,11 +379,11 @@ public final class CharactersPage extends PageContent {
         CharactersLayout layout = layout();
         List<CharacterRosterRows.Row> rows = rows(snapshot);
         CharacterRosterRows.Row picked = picked(snapshot, rows);
-        LostTalesUiHitBox roster = layout.roster();
-        if (roster.width > 0) {
-            clampRosterScroll(rows, roster);
-            this.hovered = rowAt(rows, roster, mouseX, mouseY);
-            drawRoster(snapshot, rows, picked, roster, alpha);
+        LostTalesUiHitBox list = rosterList(layout);
+        if (list.width > 0) {
+            clampRosterScroll(rows, list);
+            this.hovered = rowAt(rows, list, mouseX, mouseY);
+            drawRoster(snapshot, rows, picked, list, alpha);
         } else {
             this.hovered = null;
         }
@@ -406,7 +405,7 @@ public final class CharactersPage extends PageContent {
     /** A message alone in the middle of the page, in the aside tone. */
     private void drawCentred(String text, int alpha) {
         List<?> lines = this.font.listFormattedStringToWidth(text,
-                Math.max(1, this.width - 2 * CharactersLayout.MARGIN));
+                Math.max(1, this.width - 2 * CharactersLayout.MARGIN_X));
         int y = (this.height - lines.size() * NOTE_LINE) / 2;
         for (Object line : lines) {
             String each = String.valueOf(line);
@@ -419,8 +418,21 @@ public final class CharactersPage extends PageContent {
 
     /* ---- The roster ---- */
 
-    private static int rowHeight(CharacterRosterRows.Row row) {
-        return isHeading(row) ? HEADING_HEIGHT : ROW_HEIGHT;
+    /**
+     * The roster's list, where its rows are lit, cut and pointed at: from
+     * the page's left side to the rule beside it, or across the page while
+     * it stands alone, a menu's padding clear above and below; empty while
+     * the roster is folded away.
+     */
+    private LostTalesUiHitBox rosterList(CharactersLayout layout) {
+        LostTalesUiHitBox roster = layout.roster();
+        if (roster.width <= 0) {
+            return roster;
+        }
+        LostTalesUiHitBox divider = layout.divider();
+        int right = divider.width > 0 ? (int)divider.left : this.width;
+        return new LostTalesUiHitBox(0, MenuWindow.PADDING_Y, right,
+                Math.max(0, this.height - 2 * MenuWindow.PADDING_Y));
     }
 
     private static boolean isHeading(CharacterRosterRows.Row row) {
@@ -428,21 +440,20 @@ public final class CharactersPage extends PageContent {
                 || row.kind == CharacterRosterRows.Kind.DELETED_HEADING;
     }
 
-    private static int contentHeight(List<CharacterRosterRows.Row> rows) {
-        int total = 0;
-        for (CharacterRosterRows.Row row : rows) {
-            total += rowHeight(row);
-        }
-        return total;
+    /** The furthest the roster scrolls: its last row whole at the list's foot. */
+    private static int mostRosterScroll(List<CharacterRosterRows.Row> rows,
+                                        LostTalesUiHitBox list) {
+        return Math.max(0, rows.size() * MenuWindow.rowHeight()
+                - (int)list.height);
     }
 
-    /** Keeps the roster's scroll within its rows, and glides the drawn one after it. */
+    /** Keeps the roster's scroll and its drawn one within its rows, and glides the drawn one after it. */
     private void clampRosterScroll(List<CharacterRosterRows.Row> rows,
-                                   LostTalesUiHitBox roster) {
-        int most = Math.max(0, contentHeight(rows) - rosterHeight(roster));
+                                   LostTalesUiHitBox list) {
+        int most = mostRosterScroll(rows, list);
         this.rosterScroll = Math.max(0, Math.min(this.rosterScroll, most));
-        this.shownRosterScroll = glide(this.shownRosterScroll,
-                this.rosterScroll);
+        this.shownRosterScroll = glide(Math.max(0.0D, Math.min(most,
+                this.shownRosterScroll)), this.rosterScroll);
     }
 
     private double glide(double shown, int target) {
@@ -455,75 +466,97 @@ public final class CharactersPage extends PageContent {
         return (int)Math.floor(scroll);
     }
 
-    /** The room the roster's rows have: its box less the status line. */
-    private static int rosterHeight(LostTalesUiHitBox roster) {
-        return Math.max(ROW_HEIGHT, (int)roster.height - NOTE_LINE);
-    }
-
+    /**
+     * The roster's rows in its list, a menu's row high each: the picked
+     * row and the one under the pointer lit first, cut to the list's band,
+     * then every row in the band, gliding with the drawn scroll, and over
+     * them where more of the list waits.
+     */
     private void drawRoster(CharacterRosterSnapshot snapshot,
                             List<CharacterRosterRows.Row> rows,
                             CharacterRosterRows.Row picked,
-                            LostTalesUiHitBox roster, int alpha) {
-        int top = (int)roster.top;
-        boolean clipped = LostTalesUiClip.beginLocal(this.mc,
-                (float)roster.left - 2, top, (float)roster.right(),
-                top + rosterHeight(roster));
-        GL11.glPushMatrix();
-        try {
-            GL11.glTranslatef(0.0F, (float)(whole(this.shownRosterScroll)
-                    - this.shownRosterScroll), 0.0F);
-            int y = top - whole(this.shownRosterScroll);
-            for (CharacterRosterRows.Row row : rows) {
-                drawRow(snapshot, row, roster, y, row == picked,
-                        row == this.hovered, alpha);
-                y += rowHeight(row);
+                            LostTalesUiHitBox list, int alpha) {
+        int rowHeight = MenuWindow.rowHeight();
+        double firstTop = list.top - this.shownRosterScroll;
+        int surfaceAlpha = WindowLists.pageSurfaceAlpha(this.mc, alpha);
+        for (int index = 0; index < rows.size(); index++) {
+            CharacterRosterRows.Row row = rows.get(index);
+            if (row != picked && row != this.hovered) {
+                continue;
             }
-        } finally {
-            GL11.glPopMatrix();
-            LostTalesUiClip.end(clipped);
+            double rowTop = firstTop + index * rowHeight;
+            double litTop = Math.max(list.top, rowTop);
+            double litBottom = Math.min(list.bottom(), rowTop + rowHeight);
+            if (litBottom > litTop) {
+                WindowLists.drawLitRow(0.0D, this.width, list.left, litTop,
+                        list.right(), litBottom, surfaceAlpha);
+            }
         }
+        if (LostTalesUiClip.beginLocal(this.mc, (float)list.left,
+                (float)list.top, (float)list.right(), (float)list.bottom())) {
+            int scrolled = whole(this.shownRosterScroll);
+            GL11.glPushMatrix();
+            try {
+                GL11.glTranslatef(0.0F,
+                        (float)(scrolled - this.shownRosterScroll), 0.0F);
+                int y = (int)list.top - scrolled;
+                for (CharacterRosterRows.Row row : rows) {
+                    if (y > list.bottom()) {
+                        break;
+                    }
+                    if (y + rowHeight > list.top) {
+                        drawRow(snapshot, row, list, y, row == picked,
+                                row == this.hovered, alpha);
+                    }
+                    y += rowHeight;
+                }
+            } finally {
+                GL11.glPopMatrix();
+                LostTalesUiClip.end(true);
+            }
+        }
+        WindowLists.drawScroll(list.left, 0.0D, list.right(), this.height,
+                list.top, list.bottom(), this.shownRosterScroll,
+                mostRosterScroll(rows, list), alpha);
     }
 
+    /**
+     * One row from {@code y}, laid out as a menu's: a heading's words at
+     * the padding over its hairline; any other row's head or glyph in the
+     * icon's box at the padding, centred on the capitals of its words,
+     * which start after the icon's room, and what stands at its right
+     * ending at the padding.
+     */
     private void drawRow(CharacterRosterSnapshot snapshot,
-                         CharacterRosterRows.Row row, LostTalesUiHitBox roster,
+                         CharacterRosterRows.Row row, LostTalesUiHitBox list,
                          int y, boolean picked, boolean hovered, int alpha) {
-        int left = (int)roster.left;
-        int right = (int)roster.right();
+        int rowHeight = MenuWindow.rowHeight();
+        int left = (int)list.left + MenuWindow.PADDING_X;
+        int right = (int)list.right() - MenuWindow.PADDING_X;
         if (isHeading(row)) {
-            String name = LostTalesSkyrimUiStyle.uppercase(
-                    row.kind == CharacterRosterRows.Kind.DELETED_HEADING
-                            ? I18n.format("gui.losttales.character.heading.deleted")
-                            : I18n.format("gui.losttales.character.heading.slots",
-                                    Integer.valueOf(CharacterRosterRows
-                                            .filledSlots(snapshot)),
-                                    Integer.valueOf(snapshot
-                                            .getUnlockedSlotCount())));
-            int textTop = y + LostTalesUiInk.centredStart(HEADING_HEIGHT, 7);
-            LostTalesUiInk.drawText(this.font, name, left, textTop,
-                    LostTalesColors.rgb(LostTalesColors.TEXT), alpha);
-            int ruleLeft = left + this.font.getStringWidth(name) + 5;
-            if (ruleLeft < right) {
-                Gui.drawRect(ruleLeft, textTop + 3, right, textTop + 4,
-                        LostTalesColors.BORDER_DIM);
-            }
+            String name = row.kind == CharacterRosterRows.Kind.DELETED_HEADING
+                    ? I18n.format("gui.losttales.character.heading.deleted")
+                    : I18n.format("gui.losttales.character.heading.slots",
+                            Integer.valueOf(CharacterRosterRows
+                                    .filledSlots(snapshot)),
+                            Integer.valueOf(snapshot.getUnlockedSlotCount()));
+            WindowLists.drawHeading(this.font, name, left, left, right, y,
+                    rowHeight, false, alpha);
             return;
         }
-        if (picked || hovered) {
-            Gui.drawRect(left - 2, y, right, y + ROW_HEIGHT, picked
-                    ? LostTalesColors.withAlpha(LostTalesColors.PLUM_GRAY, 0xB4)
-                    : LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x72));
-        }
-        int textTop = y + LostTalesUiInk.centredStart(ROW_HEIGHT, 7);
-        int nameX = left + HEAD + HEAD_GAP;
+        int textTop = y + LostTalesUiInk.centredStart(rowHeight,
+                LostTalesUiInk.CAP_HEIGHT);
+        int nameX = left + TabIcons.SLOT + TabIcons.GAP;
         if (row.kind == CharacterRosterRows.Kind.EMPTY
                 || row.kind == CharacterRosterRows.Kind.LORE) {
+            boolean lit = picked || hovered;
             LostTalesUiSheet sprite = row.kind == CharacterRosterRows.Kind.EMPTY
-                    ? (hovered ? LostTalesUiSheet.PLUS_ADD : LostTalesUiSheet.PLUS)
-                    : (hovered ? LostTalesUiSheet.MEMBERS_HOVER
+                    ? (lit ? LostTalesUiSheet.PLUS_ADD : LostTalesUiSheet.PLUS)
+                    : (lit ? LostTalesUiSheet.MEMBERS_HOVER
                             : LostTalesUiSheet.MEMBERS);
             LostTalesUiInk.beginContent();
-            sprite.drawWithShadow(left + LostTalesUiInk.centredStart(HEAD,
-                    sprite.getWidth()), textTop + Math.floorDiv(
+            sprite.drawWithShadow(left + LostTalesUiInk.centredStart(
+                    TabIcons.SIZE, sprite.getWidth()), textTop + Math.floorDiv(
                             LostTalesUiInk.CAP_HEIGHT - sprite.getHeight(), 2),
                     alpha);
             String words = I18n.format(row.kind == CharacterRosterRows.Kind.EMPTY
@@ -534,13 +567,14 @@ public final class CharactersPage extends PageContent {
                     nameX, textTop, WindowStyle.asideRgb(), alpha);
             return;
         }
-        drawHead(row, left, textTop + LostTalesUiInk.CAP_HEIGHT / 2 - HEAD / 2,
+        drawHead(row, left + LostTalesUiInk.centredStart(TabIcons.SIZE, HEAD),
+                textTop + Math.floorDiv(LostTalesUiInk.CAP_HEIGHT - HEAD, 2),
                 alpha);
         if (row.kind == CharacterRosterRows.Kind.DELETED) {
             // A deleted character stands in italics in the aside tone,
             // the days left to restore it at the right.
             String daysLeft = daysText(row.deleted.getDaysLeft());
-            int daysWidth = this.font.getStringWidth(daysLeft) + 4;
+            int daysWidth = this.font.getStringWidth(daysLeft) + MenuWindow.VALUE_GAP;
             LostTalesUiInk.drawText(this.font, "\u00a7o" + this.font
                             .trimStringToWidth(row.deleted.getName(),
                                     Math.max(0, right - nameX - daysWidth)),
@@ -556,7 +590,7 @@ public final class CharactersPage extends PageContent {
                 : row.character.getName();
         String aside = asideOf(row, played);
         int asideWidth = aside.length() == 0 ? 0
-                : this.font.getStringWidth(aside) + 4;
+                : this.font.getStringWidth(aside) + MenuWindow.VALUE_GAP;
         LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(name,
                         Math.max(0, right - nameX - asideWidth)), nameX,
                 textTop, played ? LostTalesColors.rgb(LostTalesColors.HONEY)
@@ -616,24 +650,24 @@ public final class CharactersPage extends PageContent {
                 });
     }
 
-    /** The row under a point in the page's own space; null off every row that is picked. */
+    /**
+     * The row under a point in the page's own space, where the rows are
+     * drawn, the drawn scroll taken in; null off every row and on a
+     * heading, which is not picked.
+     */
     private CharacterRosterRows.Row rowAt(List<CharacterRosterRows.Row> rows,
-                                          LostTalesUiHitBox roster, int x,
-                                          int y) {
-        if (x < roster.left - 2 || x >= roster.right() || y < roster.top
-                || y >= roster.top + rosterHeight(roster)) {
+                                          LostTalesUiHitBox list, double x,
+                                          double y) {
+        if (!list.contains(x, y)) {
             return null;
         }
-        int top = (int)roster.top
-                - (int)Math.round(this.shownRosterScroll);
-        for (CharacterRosterRows.Row row : rows) {
-            int rowHeight = rowHeight(row);
-            if (y >= top && y < top + rowHeight) {
-                return isHeading(row) ? null : row;
-            }
-            top += rowHeight;
+        int index = (int)Math.floor((y - list.top + this.shownRosterScroll)
+                / MenuWindow.rowHeight());
+        if (index < 0 || index >= rows.size()) {
+            return null;
         }
-        return null;
+        CharacterRosterRows.Row row = rows.get(index);
+        return isHeading(row) ? null : row;
     }
 
     /* ---- The profile ---- */
@@ -818,7 +852,8 @@ public final class CharactersPage extends PageContent {
         CharacterRosterSnapshot snapshot = snapshot();
         CharactersLayout layout = layout();
         CharacterRosterRows.Row row = snapshot == null ? null
-                : rowAt(rows(snapshot), layout.roster(), pageX, pageY);
+                : rowAt(rows(snapshot), rosterList(layout), x - box.left,
+                        y - box.top);
         if (row != null) {
             if (row.kind == CharacterRosterRows.Kind.LORE) {
                 openLoreCharacters();
@@ -860,8 +895,9 @@ public final class CharactersPage extends PageContent {
         int pageY = pageY(box, y);
         CharactersLayout layout = layout();
         CharacterRosterSnapshot snapshot = snapshot();
-        return snapshot != null && (rowAt(rows(snapshot), layout.roster(),
-                pageX, pageY) != null || layout.figure(whole(this.shownProfileScroll))
+        return snapshot != null && (rowAt(rows(snapshot), rosterList(layout),
+                x - box.left, y - box.top) != null
+                || layout.figure(whole(this.shownProfileScroll))
                         .contains(pageX, pageY));
     }
 
@@ -875,8 +911,9 @@ public final class CharactersPage extends PageContent {
         int pageX = pageX(box, x);
         int pageY = pageY(box, y);
         CharactersLayout layout = layout();
-        if (layout.roster().contains(pageX, pageY)) {
-            this.rosterScroll += lines * ROW_HEIGHT;
+        if (rosterList(layout).contains(x - box.left, y - box.top)) {
+            this.rosterScroll += WheelStep.pixels(WheelStep.menuRows(lines),
+                    MenuWindow.rowHeight());
             return true;
         }
         if (layout.figure(whole(this.shownProfileScroll)).contains(pageX, pageY)

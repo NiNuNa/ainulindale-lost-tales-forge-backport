@@ -1,5 +1,6 @@
 package com.ninuna.losttales.command;
 
+import com.ninuna.losttales.config.LostTalesConfigWords;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigApplyResult;
 import com.ninuna.losttales.config.server.ServerConfigChange;
@@ -15,15 +16,21 @@ import java.util.TreeSet;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
 
 /**
  * The server's config from the console or an operator's chat: list the
  * categories and keys, read one, set one, or reload the file and restart
  * what its categories own. Every change goes through the same service
  * the settings screen uses, so the file, the screen and the running
- * server never disagree.
+ * server never disagree. The service's own words (why a change is
+ * refused, what restarted) and each option's tip are lang keys too,
+ * read in the sender's language like the command's.
  */
 public final class LostTalesCommandConfig extends LostTalesCommandBase {
+
+    /** What the lang key of each of the command's answers begins with. */
+    static final String SAY = "chat.losttales.command.config.";
 
     public LostTalesCommandConfig() {
         super("config");
@@ -47,15 +54,18 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
             return;
         }
         if (FMLCommonHandler.instance().getEffectiveSide() != Side.SERVER) {
-            send(sender, EnumChatFormatting.RED
-                    + "The server config can only be changed on the logical server.");
+            say(sender, EnumChatFormatting.RED, SAY + "side_only");
             return;
         }
         String action = args[0];
         if ("reload".equalsIgnoreCase(action)) {
             List<String> restarted = LostTalesServerConfigService.reloadAll();
-            send(sender, EnumChatFormatting.GREEN + "Config reloaded"
-                    + (restarted.isEmpty() ? "." : "; restarted " + join(restarted) + "."));
+            if (restarted.isEmpty()) {
+                say(sender, EnumChatFormatting.GREEN, SAY + "reloaded");
+            } else {
+                say(sender, EnumChatFormatting.GREEN, SAY + "reloaded.restarted",
+                        restartedWords(restarted));
+            }
         } else if ("list".equalsIgnoreCase(action)) {
             list(sender, args.length > 1 ? args[1] : null);
         } else if ("get".equalsIgnoreCase(action)) {
@@ -74,51 +84,54 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
             for (ServerConfigEntry entry : entries) {
                 categories.add(entry.getCategory());
             }
-            send(sender, EnumChatFormatting.GRAY + "Categories: " + join(
-                    new ArrayList<String>(categories)));
+            say(sender, EnumChatFormatting.GRAY, SAY + "categories",
+                    join(new ArrayList<String>(categories)));
             return;
         }
         int shown = 0;
         for (ServerConfigEntry entry : entries) {
             if (entry.getCategory().equalsIgnoreCase(category)) {
-                send(sender, EnumChatFormatting.GRAY + entry.getKey() + " = "
-                        + EnumChatFormatting.WHITE + shownValue(entry));
+                say(sender, EnumChatFormatting.GRAY, SAY + "entry", entry.getKey(),
+                        shownValue(entry));
                 shown++;
             }
         }
         if (shown == 0) {
-            send(sender, EnumChatFormatting.RED + "No server category named " + category + ".");
+            say(sender, EnumChatFormatting.RED, SAY + "no_category", category);
         }
     }
 
     private void get(ICommandSender sender, String[] args) {
         if (args.length < 3) {
-            send(sender, EnumChatFormatting.GRAY + "/losttales config get <category> <key>");
+            usage(sender, "/losttales config get <category> <key>");
             return;
         }
         ServerConfigEntry entry = ServerConfigSnapshot.find(
                 LostTalesServerConfigService.snapshot(), args[1], args[2]);
         if (entry == null) {
-            send(sender, EnumChatFormatting.RED + "No server key " + args[1] + "." + args[2] + ".");
+            say(sender, EnumChatFormatting.RED, SAY + "no_key", args[1], args[2]);
             return;
         }
-        send(sender, EnumChatFormatting.GRAY + entry.qualifiedName() + " = "
-                + EnumChatFormatting.WHITE + shownValue(entry));
-        if (entry.getComment().length() > 0) {
-            send(sender, EnumChatFormatting.DARK_GRAY + entry.getComment());
+        say(sender, EnumChatFormatting.GRAY, SAY + "entry", entry.qualifiedName(),
+                shownValue(entry));
+        // What the option does, its tip line: the words of the file's
+        // comment, in the reader's language. A key the mod does not
+        // define, left in the file, has none.
+        String tip = LostTalesConfigWords.tipKey(entry.getCategory(), entry.getKey());
+        if (LostTalesConfigWords.hasEnglish(tip)) {
+            say(sender, EnumChatFormatting.DARK_GRAY, tip);
         }
     }
 
     private void set(ICommandSender sender, String[] args) {
         if (args.length < 4) {
-            send(sender, EnumChatFormatting.GRAY
-                    + "/losttales config set <category> <key> <value> [more list items...]");
+            usage(sender, "/losttales config set <category> <key> <value> [more list items...]");
             return;
         }
         ServerConfigEntry entry = ServerConfigSnapshot.find(
                 LostTalesServerConfigService.snapshot(), args[1], args[2]);
         if (entry == null) {
-            send(sender, EnumChatFormatting.RED + "No server key " + args[1] + "." + args[2] + ".");
+            say(sender, EnumChatFormatting.RED, SAY + "no_key", args[1], args[2]);
             return;
         }
         List<String> values = Arrays.asList(args).subList(3, args.length);
@@ -130,26 +143,49 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
                 java.util.Collections.singletonList(change)));
     }
 
+    /**
+     * What the config service made of a change, for the role and Discord
+     * commands too: its message, what it applied and restarted, and each
+     * refusal with its reason.
+     */
     static void report(ICommandSender sender, ServerConfigApplyResult result) {
         if (result.getMessage().length() > 0) {
-            send(sender, EnumChatFormatting.RED + result.getMessage());
+            say(sender, EnumChatFormatting.RED, result.getMessage());
         }
         if (!result.getApplied().isEmpty()) {
-            send(sender, EnumChatFormatting.GREEN + "Applied " + join(result.getApplied())
-                    + (result.getRestarted().isEmpty() ? "."
-                            : "; restarted " + join(result.getRestarted()) + "."));
+            if (result.getRestarted().isEmpty()) {
+                say(sender, EnumChatFormatting.GREEN, SAY + "applied",
+                        join(result.getApplied()));
+            } else {
+                say(sender, EnumChatFormatting.GREEN, SAY + "applied.restarted",
+                        join(result.getApplied()), restartedWords(result.getRestarted()));
+            }
         }
         for (ServerConfigApplyResult.Refusal refusal : result.getRefused()) {
-            send(sender, EnumChatFormatting.RED + "Refused " + refusal.getName() + ": "
-                    + refusal.getReason());
+            say(sender, EnumChatFormatting.RED, SAY + "refused", refusal.getName(),
+                    words(refusal.getReasonKey(), refusal.getReasonArguments().toArray()));
         }
     }
 
-    private static String shownValue(ServerConfigEntry entry) {
-        if (entry.isSecret()) {
-            return "(secret)";
+    /** The names of what restarted, joined by commas, each in the reader's words. */
+    private static IChatComponent restartedWords(List<String> keys) {
+        IChatComponent joined = new ChatComponentText("");
+        for (int index = 0; index < keys.size(); index++) {
+            if (index > 0) {
+                joined.appendSibling(new ChatComponentText(", "));
+            }
+            joined.appendSibling(words(keys.get(index)));
         }
-        return entry.isList() ? entry.getValues().toString() : entry.getValue();
+        return joined;
+    }
+
+    /** An entry's value in white; a secret never shows. */
+    private static IChatComponent shownValue(ServerConfigEntry entry) {
+        IChatComponent value = entry.isSecret() ? words(SAY + "secret")
+                : new ChatComponentText(entry.isList() ? entry.getValues().toString()
+                        : entry.getValue());
+        value.getChatStyle().setColor(EnumChatFormatting.WHITE);
+        return value;
     }
 
     private static String join(List<String> values) {
@@ -168,18 +204,11 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
     }
 
     private void sendUsage(ICommandSender sender) {
-        send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
-        send(sender, EnumChatFormatting.GRAY + "/losttales config list [category]");
-        send(sender, EnumChatFormatting.GRAY + "/losttales config get <category> <key>");
-        send(sender, EnumChatFormatting.GRAY
-                + "/losttales config set <category> <key> <value> [more list items...]");
-        send(sender, EnumChatFormatting.GRAY + "/losttales config reload");
-    }
-
-    static void send(ICommandSender sender, String message) {
-        if (sender != null) {
-            sender.addChatMessage(new ChatComponentText(message));
-        }
+        usage(sender, getCommandUsage(sender));
+        usage(sender, "/losttales config list [category]");
+        usage(sender, "/losttales config get <category> <key>");
+        usage(sender, "/losttales config set <category> <key> <value> [more list items...]");
+        usage(sender, "/losttales config reload");
     }
 
     @Override

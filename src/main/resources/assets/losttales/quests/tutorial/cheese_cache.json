@@ -1,7 +1,5 @@
 {
   "id": "losttales:tutorial/cheese_cache",
-  "title": "The Cheese Cache",
-  "description": "A roadside cheese cache is running short of grain. Leave a little wheat and take provisions for the road.",
   "repeatable": true,
   "restartable": true,
   "startMode": "interaction",
@@ -15,9 +13,6 @@
     "experience": "8",
     "items": "minecraft:bread*1"
   },
-  "journalLog": {
-    "10": "The cheese cache needs a little extra wheat before it can be shared."
-  },
   "stages": [
     {
       "id": "10",
@@ -25,7 +20,6 @@
         {
           "id": "gather_wheat",
           "type": "gather",
-          "description": "Gather 3 wheat for the cache.",
           "optional": false,
           "params": {
             "item": "minecraft:wheat",

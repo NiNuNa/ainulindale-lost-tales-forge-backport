@@ -4,13 +4,16 @@ import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatEpithet;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.window.TabRow;
 import com.ninuna.losttales.client.window.WindowPlacement;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.compat.lotr.LotrFactionBannerResolver;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
@@ -24,6 +27,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -52,7 +56,9 @@ import org.lwjgl.opengl.GL11;
  * over those without a role under Online — then under the grey sphere and
  * Offline everyone else who may read it, by name, its count taking in
  * those an answer too long to list leaves out, who are counted on a line
- * of their own at the end. The Server stands in every
+ * of their own at the end. The server names each group by its key alone,
+ * and this game names it in its player's language ({@link #groupNameOf}),
+ * the factions standing in the order of those names. The Server stands in every
  * conversation's list, since it can speak in every one. A whisper lists
  * its two people and the Console the player; a conversation with
  * an NPC lists the player and the NPC, and the Console the Client,
@@ -116,7 +122,7 @@ public final class ChatMemberList {
     static final String NPC_GROUP_PREFIX = "npc:";
 
     /** What the heading of a group of those here stands behind. */
-    enum HeadingIcon { ONLINE, NPC, DISCORD, FACTION, ROLE }
+    enum HeadingIcon { SERVER, ONLINE, NPC, DISCORD, FACTION, ROLE }
     /** Clear space between the name's capitals and the title's, in the list's units. */
     static final int TITLE_GAP = 3;
     /** Clear space the names keep from the window's edge, in the list's units. */
@@ -251,21 +257,33 @@ public final class ChatMemberList {
     }
 
     /**
+     * What this game calls each group of a list ({@link #groupNameOf}),
+     * which the factions stand in order by.
+     */
+    static final LostTalesChatMembersPacket.GroupNames GROUP_NAMES =
+            new LostTalesChatMembersPacket.GroupNames() {
+                @Override
+                public String of(LostTalesChatMembersPacket.Member member) {
+                    return groupNameOf(member);
+                }
+            };
+
+    /**
      * The members a tab's list shows: the server's answer, and those the
      * server knows nothing of — in a conversation with an NPC the NPC, and
      * in the Console the Client, this computer's own voice there —
-     * in the order the list keeps.
+     * in the order the list keeps, its factions by the names this game
+     * gives them.
      */
     static List<LostTalesChatMembersPacket.Member> membersOf(ConversationPage tab,
             List<LostTalesChatMembersPacket.Member> answered) {
-        boolean console = tab != null && tab.getChannel() == ChatChannel.CLIENT_CONSOLE;
-        if (tab == null || !(tab.isNpc() || console)) {
-            return answered;
-        }
         List<LostTalesChatMembersPacket.Member> members =
                 new ArrayList<LostTalesChatMembersPacket.Member>(answered);
-        members.add(console ? clientMember() : npcOf(tab, answered));
-        Collections.sort(members, LostTalesChatMembersPacket.ORDER);
+        boolean console = tab != null && tab.getChannel() == ChatChannel.CLIENT_CONSOLE;
+        if (tab != null && (tab.isNpc() || console)) {
+            members.add(console ? clientMember() : npcOf(tab, answered));
+        }
+        Collections.sort(members, LostTalesChatMembersPacket.order(GROUP_NAMES));
         return members;
     }
 
@@ -274,16 +292,16 @@ public final class ChatMemberList {
         int color = ChatChannel.CLIENT_CONSOLE.getDisplayColor();
         return new LostTalesChatMembersPacket.Member(
                 LostTalesChatMessagePacket.CLIENT_SENDER_ID, "", null,
-                StatCollector.translateToLocal("chat.losttales.client.name"),
+                ChatNames.client(LostTalesWords.LANG),
                 color, "", "", color, "", "", 0, true);
     }
 
     /**
      * The NPC a conversation is with, as its list shows it: its portrait
      * for a head, its name in the colour its speech wore, and the faction
-     * it spoke for as its group — the group of a member here that already
-     * goes by that name, so the two stand under one heading — or the plain
-     * one where no faction was captured.
+     * it spoke for as its group — the group of a member here that this
+     * game already calls by that name, so the two stand under one heading
+     * — or the plain one where no faction was captured.
      */
     static LostTalesChatMembersPacket.Member npcOf(ConversationPage tab,
             List<LostTalesChatMembersPacket.Member> answered) {
@@ -301,7 +319,7 @@ public final class ChatMemberList {
             groupKey = NPC_GROUP_PREFIX + groupName.toLowerCase(Locale.ROOT);
             for (LostTalesChatMembersPacket.Member member : answered) {
                 if (member.isOnline()
-                        && member.getGroupName().equalsIgnoreCase(groupName)) {
+                        && groupNameOf(member).equalsIgnoreCase(groupName)) {
                     groupKey = member.getGroupKey();
                     groupOrder = member.getGroupOrder();
                     break;
@@ -384,17 +402,62 @@ public final class ChatMemberList {
                         || one.getGroupKey().equals(other.getGroupKey()));
     }
 
-    /** A group's heading: its name and how many stand in it, {@code Gondor — 3}. */
+    /**
+     * A group's heading: its name and how many stand in it, {@code Gondor
+     * - 3}, the Server's own group as every other, {@code Server - 1}.
+     */
     static String headingOf(LostTalesChatMembersPacket.Member first,
                             int count) {
         if (!first.isOnline()) {
             return offlineHeading(count);
         }
-        String name = first.getGroupName().length() > 0 ? first.getGroupName()
-                : StatCollector.translateToLocal("gui.losttales.chat.members.online");
         return StatCollector.translateToLocalFormatted(
-                "gui.losttales.chat.members.heading", name,
+                "gui.losttales.chat.members.heading", groupNameOf(first),
                 Integer.toString(count));
+    }
+
+    /**
+     * What this game calls the group a member stands in: the Server's and
+     * the plain one, Online, by the lang file; a faction by LOTR's name
+     * for it; a role by the name this game shows it by; a Discord server,
+     * and an NPC's faction, by the name the group was given. The server
+     * sends only keys, so each player reads the groups in their own
+     * language.
+     */
+    static String groupNameOf(LostTalesChatMembersPacket.Member member) {
+        String key = member.getGroupKey();
+        if (LostTalesChatMembersPacket.SERVER_GROUP.equals(key)) {
+            return ChatNames.server(LostTalesWords.LANG);
+        }
+        if (key.length() == 0) {
+            return StatCollector.translateToLocal("gui.losttales.chat.members.online");
+        }
+        if (member.getGroupName().length() > 0) {
+            return member.getGroupName();
+        }
+        if (LotrCharacterAdapter.normalizeFactionId(key).length() > 0) {
+            return ClientChatChannelState.factionName(key, key);
+        }
+        ChatAccountRole role = ChatAccountRole.byId(key);
+        return role.isNone() ? key : role.getDisplayName();
+    }
+
+    /**
+     * The epithet after a member's name, as a line of theirs carries it,
+     * in this game's words: their LOTR title, with their faction's people
+     * before it while they stand under their faction ({@code Gondor
+     * Farmer}); empty for no title.
+     */
+    static String epithetOf(LostTalesChatMembersPacket.Member member) {
+        String title = ChatEpithet.titleName(member.getTitle());
+        if (title.length() == 0) {
+            return "";
+        }
+        String key = member.getGroupKey();
+        String people = member.isOnline()
+                && LotrCharacterAdapter.normalizeFactionId(key).length() > 0
+                ? ClientChatChannelState.factionPeople(key) : "";
+        return ChatEpithet.epithet(people, title);
     }
 
     private static String offlineHeading(int count) {
@@ -404,13 +467,10 @@ public final class ChatMemberList {
                 Integer.toString(count));
     }
 
-    /** A member's name as the row writes it: the server's in this client's language. */
+    /** A member's name as the row writes it: the Server's and the Client's in this client's language. */
     static String nameOf(LostTalesChatMembersPacket.Member member) {
-        return LostTalesChatMessagePacket.isServerSender(member.getPlayerId())
-                ? StatCollector.translateToLocal("chat.losttales.server.name")
-                : LostTalesChatMessagePacket.isClientSender(member.getPlayerId())
-                        ? StatCollector.translateToLocal("chat.losttales.client.name")
-                        : member.getName();
+        return ChatNames.sender(LostTalesWords.LANG, member.getPlayerId(),
+                "", member.getName());
     }
 
     /**
@@ -636,6 +696,10 @@ public final class ChatMemberList {
                 LostTalesUiClip.end(ringClipped);
             }
         }
+        // Where more of the list waits, as every list in the windows says it.
+        WindowLists.drawScroll(rowsLeft, top, windowRight, bottom, top,
+                bottom, state.scroll, Math.max(0.0F,
+                        state.contentHeight - (bottom - top)), alpha);
         LostTalesUiRules.drawVerticalRule(left, left
                         + ChatTimestampColumn.SEPARATOR_WIDTH, top, bottom,
                 alpha);
@@ -682,14 +746,17 @@ public final class ChatMemberList {
 
     /**
      * The icon over the group {@code groupKey} of those here, in a list
-     * that is {@code inCharacter} or not: the green sphere over the plain
-     * group, Online, in every list; the face an NPC's conversation wears
+     * that is {@code inCharacter} or not: the Server's own mark over its
+     * group; the green sphere over the plain group, Online, in every list; the face an NPC's conversation wears
      * over an NPC's own group; the Discord emoji over a Discord server's
      * members; in character a faction's banner, out of character a role's
      * own icon.
      */
     static HeadingIcon headingIconOf(String groupKey, boolean inCharacter) {
         String group = groupKey == null ? "" : groupKey;
+        if (LostTalesChatMembersPacket.SERVER_GROUP.equals(group)) {
+            return HeadingIcon.SERVER;
+        }
         if (group.length() == 0) {
             return HeadingIcon.ONLINE;
         }
@@ -716,6 +783,10 @@ public final class ChatMemberList {
         ChatChannel channel = tab == null ? null : tab.getChannel();
         switch (headingIconOf(group, channel != null
                 && ChatRolePresentation.isInCharacter(channel))) {
+            case SERVER:
+                ChatInlineIcons.drawEmoji(minecraft, ChatEmoji.CONSOLE, x,
+                        boxTop, HEADING_ICON_SIZE, alpha);
+                return;
             case ONLINE:
                 drawHeadingMark(LostTalesUiSheet.PRESENCE_ONLINE, x, textTop,
                         alpha);
@@ -819,20 +890,22 @@ public final class ChatMemberList {
         final int capitals = LostTalesUiInk.CAP_HEIGHT;
         final List<Part> nameLine = new ArrayList<Part>(2);
         nameLine.add(new Part(nameOf(member), "", member.getNameColor()));
-        if (member.getTitle().length() > 0) {
-            nameLine.add(new Part(ChatEpithet.translate(
-                    "chat.losttales.title.suffix", ", the %s",
-                    ChatEpithet.epithet(member.getGroupName(),
-                            member.getTitle())), "", member.getTitleColor()));
+        String epithet = epithetOf(member);
+        if (epithet.length() > 0) {
+            nameLine.add(new Part(ChatEpithet.titleSuffix(false, epithet), "",
+                    member.getTitleColor()));
         }
         ChatPresenceIdentity identity = member.getCharacterId() == null
                 ? ChatPresenceIdentity.ACCOUNT
                 : ChatPresenceIdentity.character(member.getCharacterId());
         // The status line is for those here, Away and Do Not Disturb
-        // included; an offline member keeps the name and title only.
+        // included; an offline member keeps the name and title only. The
+        // Server's is the server's status.
         String statusLine = !member.isOnline() ? ""
-                : ClientChatProfanity.filter(ClientChatPresence.lineOf(
-                        member.getPlayerId(), identity));
+                : LostTalesChatMessagePacket.isServerSender(member.getPlayerId())
+                        ? ClientServerStatus.line()
+                        : ClientChatProfanity.filter(ClientChatPresence.lineOf(
+                                member.getPlayerId(), identity));
         // The role-play status's mark stands at the end of the name's line,
         // which gives it its room; an NPC and an offline member wear none.
         final ChatRoleplayStatus roleplay = member.isNpc() || !member.isOnline()

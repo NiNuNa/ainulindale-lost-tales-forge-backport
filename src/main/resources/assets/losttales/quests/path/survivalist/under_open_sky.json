@@ -1,16 +1,10 @@
 {
   "id": "losttales:path/survivalist/under_open_sky",
-  "title": "Path of the Survivalist: Under Open Sky",
-  "description": "Even the hardiest traveler must rest. A bedroll, spare wool, and a few comforts can turn a dangerous night into a quiet one.",
   "repeatable": false,
   "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/tools_of_the_trail"
-  },
-  "journalLog": {
-    "10": "A good camp must be ready before exhaustion sets in. I should gather wool and prepare a place to sleep.",
-    "20": "I have made a bed for the road. Rest will come easier now, even far from walls and inns."
   },
   "stages": [
     {
@@ -19,7 +13,6 @@
         {
           "id": "gather_wool",
           "type": "gather",
-          "description": "Gather 3 wool.",
           "optional": false,
           "params": {
             "item": "minecraft:wool",
@@ -34,7 +27,6 @@
         {
           "id": "craft_bed",
           "type": "craft",
-          "description": "Make a bed for the trail.",
           "optional": false,
           "params": {
             "item": "minecraft:bed",

@@ -24,11 +24,16 @@ import java.util.regex.Pattern;
  * <p>{@code roles.definitions} in {@code server/roles.cfg}, one role per
  * entry:</p>
  * <pre>
- * operator=name:Operator;colour:A94B54;mention:true;rank:10;op:2;icon:emoji:expressionless
+ * operator=colour:A94B54;mention:true;rank:10;op:2;icon:channel:operator
  * moderator=name:Moderator;colour:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;grant:chat.moderate;icon:item:minecraft:iron_sword;desc:Keeps the peace.
  * </pre>
- * Options are optional and case-insensitive; a role without a name is
- * named by its id. {@code icon:} is what the role wears over its members
+ * Options are optional and case-insensitive. A role without a name is
+ * named by its id, except a role the mod ships a name for
+ * ({@link #SHIPPED_NAMES}, the seeded operator role): each game names that
+ * one by its lang line, and its card describes it by the line under it,
+ * until the entry gives it a name or a {@code desc:} of its own. A name
+ * written in the entry is shown as written, in every language.
+ * {@code icon:} is what the role wears over its members
  * in a member list, written as a channel's icon is: {@code emoji:<name>}
  * or {@code item:<id>}. The
  * operator entry is seeded into a fresh file ({@link #DEFAULT_OPERATOR_ENTRY})
@@ -82,16 +87,25 @@ public final class ChatRoleConfig {
             Arrays.asList("read", "send"));
     /** The prefix a member entry gives a character id rather than an account id. */
     public static final String CHARACTER_MEMBER_PREFIX = "character:";
+    /** The id of the role a fresh file is seeded with. */
+    static final String SEEDED_OPERATOR_ID = "operator";
+    /**
+     * The roles the mod ships a name for: the seeded ones. An entry of
+     * one of these ids that names no role name is named by the lang file
+     * ({@link ChatAccountRole#nameKeyOf}), never by a key built from an
+     * id an operator chose.
+     */
+    static final Set<String> SHIPPED_NAMES = Collections.singleton(SEEDED_OPERATOR_ID);
     /**
      * The operator role a fresh file starts with: held by op level 2,
      * crimson, mentionable, rank 10, no grants, wearing whatever the
-     * Operator channel wears. Text only — the code knows no operator role
-     * — and the file's to change once written.
+     * Operator channel wears, and named and described by the lang file in
+     * each game. Text only — the code knows no operator role — and the
+     * file's to change once written.
      */
     public static final String DEFAULT_OPERATOR_ENTRY =
-            "operator=name:Operator;colour:A94B54;mention:true;rank:10;op:2"
-            + ";icon:channel:" + ChatChannel.OPERATOR.getId()
-            + ";desc:Runs the server day to day.";
+            SEEDED_OPERATOR_ID + "=colour:A94B54;mention:true;rank:10;op:2"
+            + ";icon:channel:" + ChatChannel.OPERATOR.getId();
     /** The gate a fresh file starts with: the Operator channel for the operator role. */
     public static final String DEFAULT_OPERATOR_GATE = ChatChannel.OPERATOR.getId()
             + "=read:operator;send:operator";
@@ -225,6 +239,10 @@ public final class ChatRoleConfig {
                         + "', which is none of emoji:<name>, item:<id> or "
                         + "channel:<id>; it wears the plain face");
             }
+        }
+        if (name.length() == 0 && SHIPPED_NAMES.contains(id)) {
+            return ChatAccountRole.shipped(id, description, color, mentionable, rank,
+                    sources, grants, icon);
         }
         return ChatAccountRole.custom(id, name.length() == 0 ? id : name, description,
                 color, mentionable, rank, sources, grants, icon);
@@ -662,12 +680,17 @@ public final class ChatRoleConfig {
 
     /* ---- writing back ---- */
 
-    /** The entry a role is written as. */
+    /**
+     * The entry a role is written as. A role named by its lang line is
+     * written without a name, so each game goes on naming it in its own
+     * language.
+     */
     public static String formatRole(ChatAccountRole role) {
-        StringBuilder entry = new StringBuilder(role.getId());
-        entry.append("=name:").append(role.getName().length() == 0
-                ? role.getDisplayName() : role.getName());
-        entry.append(";colour:").append(String.format("%06X", role.getColor()));
+        StringBuilder entry = new StringBuilder(role.getId()).append('=');
+        if (role.getName().length() > 0) {
+            entry.append("name:").append(role.getName()).append(';');
+        }
+        entry.append("colour:").append(String.format("%06X", role.getColor()));
         entry.append(";mention:").append(role.isMentionable());
         entry.append(";rank:").append(role.getRank());
         for (ChatRoleSource source : role.getSources()) {

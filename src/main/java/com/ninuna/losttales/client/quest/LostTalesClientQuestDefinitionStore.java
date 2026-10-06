@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
+import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.ServerQuestFiles;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
@@ -120,8 +121,8 @@ public final class LostTalesClientQuestDefinitionStore {
         Collections.sort(rebuilt, new Comparator<LostTalesQuestDefinition>() {
             @Override
             public int compare(LostTalesQuestDefinition left, LostTalesQuestDefinition right) {
-                String leftTitle = left == null || left.getTitle() == null ? "" : left.getTitle();
-                String rightTitle = right == null || right.getTitle() == null ? "" : right.getTitle();
+                String leftTitle = LostTalesQuestWords.title(left);
+                String rightTitle = LostTalesQuestWords.title(right);
                 int titleCompare = leftTitle.compareToIgnoreCase(rightTitle);
                 if (titleCompare != 0) {
                     return titleCompare;

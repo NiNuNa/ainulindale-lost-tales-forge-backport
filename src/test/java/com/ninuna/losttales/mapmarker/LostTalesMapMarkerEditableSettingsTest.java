@@ -13,7 +13,7 @@ public final class LostTalesMapMarkerEditableSettingsTest {
         UUID token = UUID.randomUUID();
         LostTalesMapMarkerRecord original =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/editor", "Old",
+                        "losttales:player/editor", "Aldric",
                         UUID.randomUUID(), 100,
                         4, 70, 8, token);
         LostTalesMapMarkerEditableSettings settings =

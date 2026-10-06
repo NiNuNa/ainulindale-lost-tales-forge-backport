@@ -10,7 +10,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
 import java.util.UUID;
+import net.minecraft.util.EnumChatFormatting;
 import org.junit.After;
 import org.junit.Test;
 
@@ -84,6 +86,29 @@ public final class LostTalesCommandAuthorizationTest {
                 com.ninuna.losttales.permission.LostTalesPermissionCatalog.current()));
     }
 
+
+    /**
+     * An unknown sub-command is answered in the lang file's words, the
+     * name as typed and never read as a pattern, and the usage that
+     * follows lists only what the sender may run.
+     */
+    @Test
+    public void anUnknownSubCommandIsAnsweredWithWhatTheSenderMayRun() {
+        FakeCommandSender operator = FakeCommandSender.operator("Ops");
+        new LostTalesCommandRoot().processCommand(operator, new String[] {"%s%n"});
+        List<String> told = operator.told();
+        assertEquals("Unknown Lost Tales sub-command: %s%n", told.get(0));
+        assertEquals(EnumChatFormatting.RED,
+                operator.heard().get(0).getChatStyle().getColor());
+        assertEquals("Lost Tales commands:", told.get(1));
+        assertEquals("/losttales " + ELostTalesSubCommand.QUEST.getUsage(), told.get(2));
+        assertEquals(2 + ELostTalesSubCommand.values().length, told.size());
+
+        FakeCommandSender player = FakeCommandSender.player("Someone");
+        new LostTalesCommandRoot().processCommand(player, new String[] {"nowhere"});
+        assertEquals(Arrays.asList("Unknown Lost Tales sub-command: nowhere",
+                "Lost Tales commands:"), player.told());
+    }
 
     /**
      * Every capability-bearing sub-command reaches the same decision,

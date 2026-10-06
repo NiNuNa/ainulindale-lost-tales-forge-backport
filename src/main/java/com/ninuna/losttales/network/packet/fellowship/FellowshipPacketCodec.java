@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet.fellowship;
 
 import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.model.FellowshipNames;
 import java.nio.charset.Charset;
 
 /**
@@ -18,6 +19,15 @@ final class FellowshipPacketCodec {
     static final Charset UTF_8 = Charset.forName("UTF-8");
 
     private FellowshipPacketCodec() {}
+
+    /**
+     * A character's name as the client reading the packet shows it: the
+     * name sent, or the client's word for an unknown one where the server
+     * sent none. Only the client reads these packets.
+     */
+    static String shownName(String sent) {
+        return FellowshipNames.shown(sent);
+    }
 
     /** This family's name for a payload that could not be read. */
     static final class DecodeException

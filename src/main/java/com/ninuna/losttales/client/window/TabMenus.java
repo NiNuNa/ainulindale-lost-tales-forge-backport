@@ -2,7 +2,9 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
@@ -26,6 +28,11 @@ final class TabMenus {
     private static final String ENTRY_PIN_GUI = "window:pin_gui";
     /** Marks a search row that jumps to a tab already open. */
     private static final String ENTRY_OPEN_PREFIX = "open:";
+    /** What a category's name in the {@code +} is taken by, before the category. */
+    private static final String ENTRY_FOLD_PREFIX = "fold:";
+    /** The categories folded away in the {@code +}, for the session. */
+    private static final Set<PageCategory> FOLDED =
+            EnumSet.noneOf(PageCategory.class);
     /** Marks a row a page found: this, the page's id, a colon, and the row's own id. */
     private static final String ENTRY_FIND_PREFIX = "find:";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
@@ -67,6 +74,8 @@ final class TabMenus {
         menus.register(SubWindowKind.SPLIT, new SplitSource());
         menus.register(SubWindowKind.WINDOW, new WindowSource());
         menus.register(SubWindowKind.OPEN, new OpenSource());
+        menus.register(SubWindowKind.CATEGORY, new CategorySource());
+        menus.register(SubWindowKind.CATEGORY_PICK, new CategoryPickSource());
         menus.register(SubWindowKind.TAB_SEARCH, new SearchSource(
                 SubWindowKind.TAB_SEARCH));
         menus.register(SubWindowKind.SWITCHER, new SearchSource(
@@ -599,46 +608,113 @@ final class TabMenus {
     /* ---- The rows ---- */
 
     /**
-     * What can be opened again: each system's closed tabs, then the pages
-     * no window holds, narrowed by {@code filter}; in the {@code search},
-     * leaving out what is open already.
+     * What can be opened, by category ({@link PageCategory}): each system's
+     * closed pages, the pages no window holds and, but in the
+     * {@code search}, the pages the view hides, which show where they stand
+     * once picked; narrowed by {@code filter}. The {@code search} lists the
+     * open pages itself, so it leaves out what is open already.
      */
     private List<MenuWindow.Entry> openRows(String filter, boolean search) {
-        List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
+        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
         for (ScreenPart part : this.screen.parts()) {
-            part.addOpenable(entries, filter, search);
+            part.addOpenable(rows, filter, search);
         }
-        List<MenuWindow.Entry> pages = new ArrayList<MenuWindow.Entry>();
         for (WindowPages.Page page : WindowPages.all()) {
             OtherPage tab = page.tab();
             if (WindowPages.isOffered(page)
                     && WindowMenus.matchesFilter(page.title(), filter)) {
-                pages.add(new MenuWindow.Entry(tab.id(), page.title(), false,
+                rows.add(new MenuWindow.Entry(tab.id(), page.title(), false,
                         -1, tab));
             }
         }
-        WindowMenus.addSection(entries, StatCollector.translateToLocal(
-                "gui.losttales.window.open.pages"), pages);
         if (!search) {
-            // The tabs the view hides wait in their windows: picking one
-            // shows it here until the screen closes. The search lists
-            // every open tab itself.
-            List<MenuWindow.Entry> hidden = new ArrayList<MenuWindow.Entry>();
             for (Window window : WindowLayout.windows()) {
                 for (WindowPage tab : window.getTabs()) {
                     if (tab.isAvailable() && !WindowView.shows(tab)
-                            && WindowMenus.matchesFilter(tab.title(),
-                                    filter)) {
-                        hidden.add(new MenuWindow.Entry(
+                            && tab.answers(filter)) {
+                        rows.add(new MenuWindow.Entry(
                                 ENTRY_OPEN_PREFIX + tab.id(), tab.title(),
                                 tab.isMuted(), tab.tone(), tab));
                     }
                 }
             }
-            WindowMenus.addSection(entries, StatCollector.translateToLocal(
-                    "gui.losttales.window.open.hidden"), hidden);
+        }
+        return byCategory(rows, !search && filter.length() == 0);
+    }
+
+    /**
+     * The rows under their categories' names, in the categories' order,
+     * each subcategory's under its own name after its category's rows; a
+     * category with nothing to offer is left out. With {@code folds} each
+     * name folds its rows away and back, a subcategory's with its
+     * category's; a name with words typed under it folds nothing.
+     */
+    static List<MenuWindow.Entry> byCategory(List<MenuWindow.Entry> rows,
+                                             boolean folds) {
+        List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
+        for (PageCategory category : PageCategory.values()) {
+            if (category.parent() != null) {
+                continue;
+            }
+            List<MenuWindow.Entry> own = rowsOf(rows, category);
+            List<PageCategory> subs = new ArrayList<PageCategory>();
+            for (PageCategory sub : PageCategory.values()) {
+                if (sub.parent() == category && !rowsOf(rows, sub).isEmpty()) {
+                    subs.add(sub);
+                }
+            }
+            if (own.isEmpty() && subs.isEmpty()) {
+                continue;
+            }
+            boolean folded = folds && FOLDED.contains(category);
+            entries.add(heading(category, folds, folded, 0));
+            if (folded) {
+                continue;
+            }
+            entries.addAll(own);
+            for (PageCategory sub : subs) {
+                boolean subFolded = folds && FOLDED.contains(sub);
+                entries.add(heading(sub, folds, subFolded, 1));
+                if (!subFolded) {
+                    entries.addAll(rowsOf(rows, sub));
+                }
+            }
         }
         return entries;
+    }
+
+    /** The rows whose page is of {@code category}. */
+    private static List<MenuWindow.Entry> rowsOf(List<MenuWindow.Entry> rows,
+                                                 PageCategory category) {
+        List<MenuWindow.Entry> of = new ArrayList<MenuWindow.Entry>();
+        for (MenuWindow.Entry row : rows) {
+            if (row.icon != null && row.icon.category() == category) {
+                of.add(row);
+            }
+        }
+        return of;
+    }
+
+    /** A category's name over its rows: one that folds them, or a plain one. */
+    private static MenuWindow.Entry heading(PageCategory category,
+                                            boolean folds, boolean folded,
+                                            int depth) {
+        return folds ? MenuWindow.Entry.fold(
+                        ENTRY_FOLD_PREFIX + category.name(), category.title(),
+                        folded, depth)
+                : MenuWindow.Entry.header(category.title());
+    }
+
+    /** Folds a category's rows away in the {@code +}, or brings them back. */
+    static void toggleFold(PageCategory category) {
+        if (!FOLDED.remove(category)) {
+            FOLDED.add(category);
+        }
+    }
+
+    /** Leaving the world unfolds every category again. */
+    static void clearFolds() {
+        FOLDED.clear();
     }
 
     /**
@@ -658,8 +734,7 @@ final class TabMenus {
             // tab wherever it waits, and going to it shows it.
             for (WindowPage tab : window.getTabs()) {
                 String name = tab.title();
-                if (tab.isAvailable()
-                        && WindowMenus.matchesFilter(name, filter)) {
+                if (tab.isAvailable() && tab.answers(filter)) {
                     open.add(new MenuWindow.Entry(ENTRY_OPEN_PREFIX + tab.id(),
                             name, tab.isMuted(), tab.tone(), tab));
                 }
@@ -697,33 +772,17 @@ final class TabMenus {
     }
 
     /**
-     * One row of the {@code +} or of the tab search: the tab joins the
-     * window the menu was opened for, or — when that window is gone — the
-     * first window, or a window of its own when none is left. A locked
-     * window takes nothing: asked of one, a page opens where it last
-     * stood, and a conversation in an unlocked window of conversations,
-     * else in a window of its own. The tab then takes the keys.
+     * One row of the {@code +} or of the tab search: the page opens in a
+     * window of its category, the window the menu was opened for when it is
+     * one and takes it, else where its category keeps its pages
+     * ({@link WindowLayout#openInCategory}). The page then takes the keys.
      */
     private void openFromMenu(String windowId, MenuWindow.Entry entry) {
         open(windowId, WindowPage.fromId(entry.id));
     }
 
     private void open(String windowId, WindowPage tab) {
-        if (tab == null) {
-            return;
-        }
-        Window target = WindowLayout.window(windowId);
-        if (target == null) {
-            target = WindowLayout.firstWindow();
-        }
-        if (tab instanceof OtherPage && (target == null || target.isLocked())) {
-            WindowLayout.showPage((OtherPage)tab);
-            this.screen.jumpToTab(tab);
-            return;
-        }
-        WindowPage opened = target == null
-                ? WindowLayout.openInNewWindow(tab)
-                : WindowLayout.openTab(tab, target.getId());
+        WindowPage opened = WindowLayout.openInCategory(tab, windowId);
         if (opened != null) {
             this.screen.jumpToTab(opened);
         }
@@ -897,8 +956,6 @@ final class TabMenus {
                             .placeRows(option.settings()));
                 }
             }
-            menu.setRowHeight(option != null && option.settings() != null
-                    ? MenuWindow.TALL_ROW_HEIGHT : MenuWindow.ROW_HEIGHT);
             menu.setRows(rows);
         }
 
@@ -1025,7 +1082,6 @@ final class TabMenus {
                             "gui.losttales.window.help.search"),
                     new int[] {Keyboard.KEY_F1}, LostTalesUiSheet.SEARCH,
                     MenuWindow.MAX_FILTER_LENGTH, false);
-            menu.setRowHeight(MenuWindow.TALL_ROW_HEIGHT);
             menu.setVisibleRows(VISIBLE_ROWS);
         }
 
@@ -1150,9 +1206,32 @@ final class TabMenus {
             menu.setRows(openRows("", false));
         }
 
+        /** A right-click on a category's name opens what reaches all its pages. */
+        @Override
+        public boolean takesBack() {
+            return true;
+        }
+
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
                            SubWindow window, boolean back) {
+            if (back) {
+                if (entry.id.startsWith(ENTRY_FOLD_PREFIX)) {
+                    TabMenus.this.menus.show(SubWindowKind.CATEGORY,
+                            PageCategory.valueOf(entry.id.substring(
+                                    ENTRY_FOLD_PREFIX.length())),
+                            WindowMenus.besideWindow(window), true);
+                }
+                return true;
+            }
+            if (entry.id.startsWith(ENTRY_FOLD_PREFIX)) {
+                // A category's name folds its rows away, or brings them
+                // back; the menu stays for the next.
+                toggleFold(PageCategory.valueOf(entry.id.substring(
+                        ENTRY_FOLD_PREFIX.length())));
+                menu.setRows(openRows("", false));
+                return true;
+            }
             if (entry.id.startsWith(ENTRY_OPEN_PREFIX)) {
                 // A tab the view hides: it shows where it stands.
                 TabMenus.this.screen.jumpToTab(WindowPage.fromId(
@@ -1162,6 +1241,271 @@ final class TabMenus {
             }
             return false;
         }
+    }
+
+    /* ---- A category's own menu ---- */
+
+    private static final String CATEGORY_OPEN_ALL = "category:open_all";
+    private static final String CATEGORY_CLOSE_ALL = "category:close_all";
+
+    /**
+     * The pages a category's menu reaches: every open page of it, in any
+     * window and any view, and what the {@code +} lists under it, but for
+     * whispers, which reach only those open: the {@code +} lists every
+     * player online under them.
+     */
+    private List<WindowPage> pagesOf(PageCategory category) {
+        List<WindowPage> pages = new ArrayList<WindowPage>(openPagesOf(category));
+        if (category != PageCategory.WHISPERS) {
+            pages.addAll(closedPagesOf(category));
+        }
+        return pages;
+    }
+
+    /** Every open page of a category, in any window and any view. */
+    private static List<WindowPage> openPagesOf(PageCategory category) {
+        List<WindowPage> pages = new ArrayList<WindowPage>();
+        for (Window window : WindowLayout.windows()) {
+            for (WindowPage tab : window.getTabs()) {
+                if (tab.category() == category && tab.isAvailable()) {
+                    pages.add(tab);
+                }
+            }
+        }
+        return pages;
+    }
+
+    /** What the {@code +} lists under a category that no window holds. */
+    private List<WindowPage> closedPagesOf(PageCategory category) {
+        List<WindowPage> pages = new ArrayList<WindowPage>();
+        for (MenuWindow.Entry row : openRows("", true)) {
+            if (row.icon != null && !row.header && row.icon.category() == category
+                    && !WindowLayout.isOpen(row.icon)) {
+                pages.add(row.icon);
+            }
+        }
+        return pages;
+    }
+
+    /**
+     * The options of a category's pages that reach every page of it
+     * ({@link PageOption#reachesEveryPage}), each as its first page offers
+     * it, in the order the pages offer them.
+     */
+    static List<PageOption> everyPageOptions(List<WindowPage> pages) {
+        List<PageOption> options = new ArrayList<PageOption>();
+        List<String> ids = new ArrayList<String>();
+        for (WindowPage page : pages) {
+            for (PageOption option : page.options()) {
+                if (option.forEveryPage() && !ids.contains(option.id)) {
+                    ids.add(option.id);
+                    options.add(option);
+                }
+            }
+        }
+        return options;
+    }
+
+    /**
+     * What a right-click on a category's name in the {@code +} offers for
+     * all its pages: *Open All*, *Close All*, then each option its pages
+     * may take all at once — *Mark All as Read*, a conversation's two
+     * settings, their words opening beside the menu. A row that cannot be
+     * taken stays, greyed, and says why.
+     */
+    private final class CategorySource extends WindowMenus.Source {
+        @Override
+        public void rebuild(MenuWindow menu) {
+            PageCategory category = (PageCategory)menu.about();
+            menu.setTitle(category.title(), LostTalesUiSheet.MORE);
+            List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
+            String name = category.title();
+            MenuWindow.Entry openAll = new MenuWindow.Entry(CATEGORY_OPEN_ALL,
+                    StatCollector.translateToLocal("gui.losttales.window.category.open_all"));
+            if (category == PageCategory.WHISPERS) {
+                openAll.unavailable(StatCollector.translateToLocal(
+                        "gui.losttales.window.category.whispers_one_by_one"));
+            } else if (closedPagesOf(category).isEmpty()) {
+                openAll.unavailable(StatCollector.translateToLocalFormatted(
+                        "gui.losttales.window.category.all_open", name));
+            }
+            rows.add(openAll);
+            MenuWindow.Entry closeAll = new MenuWindow.Entry(CATEGORY_CLOSE_ALL,
+                    StatCollector.translateToLocal("gui.losttales.window.category.close_all"));
+            if (closablePagesOf(category).isEmpty()) {
+                closeAll.unavailable(StatCollector.translateToLocalFormatted(
+                        "gui.losttales.window.category.none_to_close", name));
+            }
+            rows.add(closeAll);
+            List<WindowPage> pages = pagesOf(category);
+            List<PageOption> options = everyPageOptions(pages);
+            if (!options.isEmpty()) {
+                rows.add(MenuWindow.Entry.separator());
+            }
+            for (PageOption option : options) {
+                MenuWindow.Entry row = new MenuWindow.Entry(option.id,
+                        option.everyPageLabel())
+                        .withPicture(option.glyph.asPicture());
+                if (option.kind == PageOption.Kind.ACTION
+                        && !anyAvailable(pages, option.id)) {
+                    row.unavailable(option.unavailable());
+                }
+                rows.add(row);
+            }
+            menu.setRows(rows);
+        }
+
+        @Override
+        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
+                           SubWindow window, boolean back) {
+            PageCategory category = (PageCategory)menu.about();
+            if (CATEGORY_OPEN_ALL.equals(entry.id)) {
+                WindowPage last = null;
+                for (WindowPage page : closedPagesOf(category)) {
+                    WindowPage opened = WindowLayout.openInCategory(page, null);
+                    last = opened == null ? last : opened;
+                }
+                if (last != null) {
+                    TabMenus.this.screen.jumpToTab(last);
+                }
+                return false;
+            }
+            if (CATEGORY_CLOSE_ALL.equals(entry.id)) {
+                for (WindowPage page : closablePagesOf(category)) {
+                    TabMenus.this.screen.closeTab(page);
+                }
+                return false;
+            }
+            List<WindowPage> pages = pagesOf(category);
+            for (PageOption option : everyPageOptions(pages)) {
+                if (!option.id.equals(entry.id)) {
+                    continue;
+                }
+                if (option.kind == PageOption.Kind.PICK) {
+                    TabMenus.this.menus.show(SubWindowKind.CATEGORY_PICK,
+                            new CategoryPicking(category, option.id),
+                            WindowMenus.besideWindow(window), true);
+                    return true;
+                }
+                for (WindowPage page : pages) {
+                    PageOption own = optionOf(page, option.id);
+                    if (own != null && own.isAvailable()) {
+                        page.takeOption(own.id);
+                    }
+                }
+                return false;
+            }
+            return false;
+        }
+    }
+
+    /** The open pages of a category the hand may close: those in windows no padlock holds. */
+    private static List<WindowPage> closablePagesOf(PageCategory category) {
+        List<WindowPage> pages = new ArrayList<WindowPage>();
+        for (WindowPage page : openPagesOf(category)) {
+            if (WindowLayout.isClosable(page)) {
+                pages.add(page);
+            }
+        }
+        return pages;
+    }
+
+    /** Whether any of the pages may take the option now. */
+    private static boolean anyAvailable(List<WindowPage> pages, String optionId) {
+        for (WindowPage page : pages) {
+            PageOption option = optionOf(page, optionId);
+            if (option != null && option.isAvailable()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A pick's words being taken for every page of a category. */
+    private static final class CategoryPicking {
+        final PageCategory category;
+        final String optionId;
+
+        CategoryPicking(PageCategory category, String optionId) {
+            this.category = category;
+            this.optionId = optionId;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof CategoryPicking
+                    && ((CategoryPicking)other).category == this.category
+                    && ((CategoryPicking)other).optionId.equals(this.optionId);
+        }
+
+        @Override
+        public int hashCode() {
+            return this.category.hashCode() * 31 + this.optionId.hashCode();
+        }
+    }
+
+    /**
+     * A pick's words for every page of a category at once, beside the
+     * category's menu: a word is marked while every page reads it, and
+     * taking one gives it to them all; the sub-window stays for another try.
+     */
+    private final class CategoryPickSource extends WindowMenus.Source {
+        @Override
+        public boolean stillStands(MenuWindow menu) {
+            return menu.about() instanceof CategoryPicking;
+        }
+
+        @Override
+        public void rebuild(MenuWindow menu) {
+            CategoryPicking picking = (CategoryPicking)menu.about();
+            List<WindowPage> pages = pagesOf(picking.category);
+            PageOption first = null;
+            for (WindowPage page : pages) {
+                first = first != null ? first : optionOf(page, picking.optionId);
+            }
+            List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
+            if (first != null) {
+                menu.setTitle(first.everyPageLabel(), first.glyph.sprite());
+                for (PageOption word : first.choices()) {
+                    rows.add(word.row(everyPageReads(pages, picking.optionId,
+                            word.id)));
+                }
+            }
+            menu.setRows(rows);
+        }
+
+        @Override
+        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
+                           SubWindow window, boolean back) {
+            CategoryPicking picking = (CategoryPicking)menu.about();
+            for (WindowPage page : pagesOf(picking.category)) {
+                if (optionOf(page, picking.optionId) != null) {
+                    page.takeOption(entry.id);
+                }
+            }
+            return true;
+        }
+    }
+
+    /** Whether every page offering the pick reads the word {@code wordId}. */
+    static boolean everyPageReads(List<WindowPage> pages,
+                                          String optionId, String wordId) {
+        boolean any = false;
+        for (WindowPage page : pages) {
+            PageOption option = optionOf(page, optionId);
+            if (option == null) {
+                continue;
+            }
+            for (PageOption word : option.choices()) {
+                if (word.id.equals(wordId)) {
+                    if (!word.on) {
+                        return false;
+                    }
+                    any = true;
+                }
+            }
+        }
+        return any;
     }
 
     /**

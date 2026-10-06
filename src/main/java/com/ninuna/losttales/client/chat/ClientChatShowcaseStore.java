@@ -1,7 +1,11 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.share.ChatQuestCard;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShowcase;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
+import com.ninuna.losttales.quest.LostTalesQuestCardWords;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -102,7 +106,15 @@ public final class ClientChatShowcaseStore {
 
         Marker(ChatShowcase showcase) {
             this.id = showcase.getMarkerId();
-            this.name = showcase.getMarkerName();
+            // A bundled marker reads in this game's language; words an
+            // operator gave one stay as they came; one with no name of its
+            // own is named after what it is called after.
+            String called = showcase.getMarkerName().trim().length() == 0
+                    ? LostTalesMapMarkerNamedAfter.shownName(
+                            showcase.getMarkerNamedAfter()) : "";
+            this.name = called.length() > 0 ? called
+                    : LostTalesMapMarkerNames.shownName(this.id,
+                            showcase.getMarkerName());
             this.iconName = showcase.getMarkerIcon();
             this.colorName = showcase.getMarkerColor();
             this.dimensionId = showcase.getMarkerDimension();
@@ -111,7 +123,10 @@ public final class ClientChatShowcaseStore {
         }
     }
 
-    /** Immutable quest-card fields validated by the sending server. */
+    /**
+     * A quest card's fields in this game's words, made once from the card
+     * the sending server validated ({@link LostTalesQuestCardWords}).
+     */
     static final class Quest {
         final long messageId;
         final int tokenIndex;
@@ -124,10 +139,13 @@ public final class ClientChatShowcaseStore {
         Quest(ChatShowcase showcase, long messageId) {
             this.messageId = messageId;
             this.tokenIndex = showcase.getTokenIndex();
-            this.title = showcase.getQuestTitle();
-            this.category = showcase.getQuestCategory();
-            this.objective = showcase.getQuestObjective();
-            this.reward = showcase.getQuestReward();
+            ChatQuestCard card = showcase.getQuestCard();
+            this.title = LostTalesQuestCardWords.title(
+                    showcase.getQuestReference(), card);
+            this.category = card.getCategory();
+            this.objective = LostTalesQuestCardWords.objectives(
+                    showcase.getQuestReference(), card);
+            this.reward = LostTalesQuestCardWords.reward(card);
             this.joinable = showcase.isQuestJoinable()
                     && com.ninuna.losttales.chat.ChatMessageIds.isServerId(
                             messageId);

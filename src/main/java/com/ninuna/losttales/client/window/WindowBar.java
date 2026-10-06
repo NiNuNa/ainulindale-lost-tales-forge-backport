@@ -418,7 +418,7 @@ public final class WindowBar {
             return -1;
         }
         int row = (int)Math.floor((y - list[1] - WindowStyle.POPUP_INSET)
-                / WindowStyle.LINE_HEIGHT);
+                / MenuWindow.ROW_HEIGHT);
         int shown = Math.min(MAX_OFFERS, field.item.offers.size());
         return row >= 0 && row < shown ? firstOffer(field.item) + row : -1;
     }
@@ -440,7 +440,7 @@ public final class WindowBar {
         }
         int width = Math.max(field.right - field.left,
                 widest + 2 * WindowStyle.POPUP_INSET);
-        int height = rows * WindowStyle.LINE_HEIGHT
+        int height = rows * MenuWindow.ROW_HEIGHT
                 + 2 * WindowStyle.POPUP_INSET;
         int bottom = top - 2;
         return new int[] {field.left, bottom - height, field.left + width,
@@ -874,15 +874,16 @@ public final class WindowBar {
                 ? hit.offer : field.item.offered;
         int rowsTop = list[1] + WindowStyle.POPUP_INSET;
         WindowStyle.drawPopupList(list[0], list[1], list[2], list[3], rowsTop,
-                WindowStyle.LINE_HEIGHT, pointed - first);
+                MenuWindow.ROW_HEIGHT, pointed - first);
         int rows = Math.min(MAX_OFFERS, field.item.offers.size());
         for (int row = 0; row < rows; row++) {
             String name = field.item.offers.get(first + row);
             LostTalesUiInk.drawText(font, font.trimStringToWidth(name,
                     list[2] - list[0] - 2 * WindowStyle.POPUP_INSET),
                     list[0] + WindowStyle.POPUP_INSET,
-                    rowsTop + row * WindowStyle.LINE_HEIGHT
-                            + WindowStyle.ROW_TEXT_TOP,
+                    rowsTop + row * MenuWindow.ROW_HEIGHT
+                            + LostTalesUiInk.centredStart(MenuWindow.ROW_HEIGHT,
+                                    LostTalesUiInk.CAP_HEIGHT),
                     LostTalesUiInk.IVORY, Math.round(255.0F * share));
         }
         regions.add(list[0], list[1], list[2], list[3]);

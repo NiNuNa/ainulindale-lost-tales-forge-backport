@@ -2,7 +2,6 @@
   "map_markers": [
     {
       "id": "losttales:test_town",
-      "name": "Town",
       "relevance": "medium",
       "icon": "town",
       "color": "red",
@@ -16,12 +15,10 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "description": "A small test town marker used to verify Lost Tales discovery, compass labels, and public LOTR waypoint unlocking."
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "losttales:greenway_market",
-      "name": "Greenway Market",
       "relevance": "medium",
       "icon": "town",
       "color": "yellow",
@@ -35,12 +32,10 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "description": "A modest market along the Greenway where travellers gather before continuing through the Shire borderlands."
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "losttales:south_road_hamlet",
-      "name": "South Road Hamlet",
       "relevance": "low",
       "icon": "town",
       "color": "green",

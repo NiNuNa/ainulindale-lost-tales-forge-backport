@@ -37,15 +37,16 @@ public final class LostTalesMissivePacketTest {
         params.put("entity", "Zombie");
         params.put("count", "5");
         return LostTalesMissiveData.builder(questId, "kill")
-                .title("Missive: Clear the Paths")
-                .issuer("A Road Warden")
-                .description("Travellers have reported zombies.")
-                .flavorText("The roads must remain open.")
+                .titleId("clear_the_paths")
+                .issuerId("road_warden")
+                .descriptionId("kill")
+                .flavorId("roads_open")
+                .target("Zombie")
                 .generationWorldTime(1200L)
                 .timeLimitTicks(48000L)
                 .context("board", "dim0_4_65_9")
                 .objective(new LostTalesMissiveObjectiveData("kill_zombies",
-                        "kill", "Defeat 5 zombies.", false, params))
+                        "kill", false, params))
                 .rewardData(LostTalesMissiveRewardData.experienceAndItems(40,
                         "minecraft:emerald*2"))
                 .build();
@@ -106,15 +107,15 @@ public final class LostTalesMissivePacketTest {
         LostTalesMissiveData letter = first.getMissive();
         assertEquals(QUEST, letter.getQuestId());
         assertEquals("kill", letter.getQuestType());
-        assertEquals("Missive: Clear the Paths", letter.getTitle());
-        assertEquals("A Road Warden", letter.getIssuer());
-        assertEquals("Travellers have reported zombies.",
-                letter.getDescription());
-        assertEquals("The roads must remain open.", letter.getFlavorText());
+        assertEquals("the words travel as template ids",
+                "clear_the_paths", letter.getTitleId());
+        assertEquals("road_warden", letter.getIssuerId());
+        assertEquals("kill", letter.getDescriptionId());
+        assertEquals("roads_open", letter.getFlavorId());
+        assertEquals("Zombie", letter.getTarget());
         assertEquals(48000L, letter.getTimeLimitTicks());
         assertEquals(1, letter.getObjectives().size());
-        assertEquals("Defeat 5 zombies.",
-                letter.getObjectives().get(0).getDescription());
+        assertEquals("kill_zombies", letter.getObjectives().get(0).getId());
         assertEquals("5", letter.getObjectives().get(0).getParams().get("count"));
         assertEquals("40", letter.getRewardData().getRewards().get("experience"));
         assertTrue("what the server keeps to make the quest never travels",
@@ -143,14 +144,14 @@ public final class LostTalesMissivePacketTest {
 
     @Test
     public void aLetterTooLargeToSendGoesAsOneThatCannotBeRead() {
-        StringBuilder title = new StringBuilder();
-        while (title.length() <= LostTalesMissiveCodec.MAX_TITLE_BYTES) {
-            title.append("Long ");
+        Map<String, String> rewards = new LinkedHashMap<String, String>();
+        for (int index = 0; index <= LostTalesMissiveCodec.MAX_ENTRIES; index++) {
+            rewards.put("reward" + index, "1");
         }
         LostTalesMissiveData large = LostTalesMissiveData.builder(QUEST, "kill")
-                .title(title.toString())
-                .objective(new LostTalesMissiveObjectiveData("a", "kill", "",
-                        false, null))
+                .titleId("dangerous_work")
+                .rewardData(new LostTalesMissiveRewardData(rewards))
+                .objective(new LostTalesMissiveObjectiveData("a", "kill", false, null))
                 .build();
         assertFalse(LostTalesMissiveCodec.fits(large));
         LostTalesMissiveBoardStatePacket decoded = decodeState(bytes(state(
@@ -165,10 +166,10 @@ public final class LostTalesMissivePacketTest {
     public void theLetterBoundsAreKept() {
         assertTrue(LostTalesMissiveCodec.fits(missive(QUEST)));
         LostTalesMissiveData.Builder many =
-                LostTalesMissiveData.builder(QUEST, "kill").title("Many");
+                LostTalesMissiveData.builder(QUEST, "kill").titleId("dangerous_work");
         for (int index = 0; index <= LostTalesMissiveCodec.MAX_OBJECTIVES; index++) {
             many.objective(new LostTalesMissiveObjectiveData("o" + index,
-                    "kill", "", false, null));
+                    "kill", false, null));
         }
         assertFalse("too many objectives", LostTalesMissiveCodec.fits(many.build()));
         Map<String, String> rewards = new LinkedHashMap<String, String>();
@@ -176,9 +177,9 @@ public final class LostTalesMissivePacketTest {
             rewards.put("reward" + index, "1");
         }
         assertFalse("too many rewards", LostTalesMissiveCodec.fits(
-                LostTalesMissiveData.builder(QUEST, "kill").title("Rich")
+                LostTalesMissiveData.builder(QUEST, "kill").titleId("dangerous_work")
                         .objective(new LostTalesMissiveObjectiveData("a",
-                                "kill", "", false, null))
+                                "kill", false, null))
                         .rewardData(new LostTalesMissiveRewardData(rewards))
                         .build()));
         assertFalse("no letter", LostTalesMissiveCodec.fits(null));

@@ -1,17 +1,10 @@
 {
   "id": "losttales:path/survivalist/keeper_of_the_trail",
-  "title": "Path of the Survivalist: Keeper of the Trail",
-  "description": "The final lesson is not about surviving one night, but being ready for many. A true survivalist carries food, light, tools, and direction.",
   "repeatable": false,
   "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/night_watch"
-  },
-  "journalLog": {
-    "10": "The path has taught me many small habits. Now I should prepare a pack that can carry me through a long and uncertain journey.",
-    "20": "I have gathered a traveler's kit worthy of the road. Wherever I go next, I will not go unprepared.",
-    "30": "I have completed the first lessons of the survivalist path. The wilds are still dangerous, but they no longer feel unknowable."
   },
   "stages": [
     {
@@ -20,7 +13,6 @@
         {
           "id": "carry_food",
           "type": "gather",
-          "description": "Pack 6 pieces of lasting food.",
           "optional": false,
           "params": {
             "item": "minecraft:bread,minecraft:cooked_beef,minecraft:cooked_porkchop,minecraft:cooked_chicken,minecraft:baked_potato",
@@ -30,7 +22,6 @@
         {
           "id": "carry_torches",
           "type": "gather",
-          "description": "Pack 16 torches.",
           "optional": false,
           "params": {
             "item": "minecraft:torch",
@@ -45,7 +36,6 @@
         {
           "id": "craft_compass",
           "type": "craft",
-          "description": "Craft a compass for the road ahead.",
           "optional": false,
           "params": {
             "item": "minecraft:compass",
@@ -55,7 +45,6 @@
         {
           "id": "craft_fishing_rod",
           "type": "craft",
-          "description": "Craft a fishing rod for lean days.",
           "optional": false,
           "params": {
             "item": "minecraft:fishing_rod",
@@ -70,7 +59,6 @@
         {
           "id": "gather_fish",
           "type": "gather",
-          "description": "Catch or gather 2 fish.",
           "optional": false,
           "params": {
             "item": "minecraft:fish",

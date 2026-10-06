@@ -12,13 +12,16 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
-/** A missive as a letter and a board keep it: in the letter's item data. */
+/**
+ * A missive as a letter and a board keep it: in the letter's item data,
+ * its words as template ids and a target ({@link MissiveWords}). A letter
+ * written before the template ids, or with any field out of bounds, reads
+ * as one that cannot be read.
+ */
 public final class LostTalesMissiveNbt {
     public static final String TAG_MISSIVE = "LostTalesMissive";
     public static final int MAX_OBJECTIVES = 512;
     public static final int MAX_IDENTIFIER_CHARACTERS = 256;
-    public static final int MAX_NAME_CHARACTERS = 1024;
-    public static final int MAX_TEXT_CHARACTERS = 8192;
 
     private LostTalesMissiveNbt() {}
 
@@ -58,10 +61,11 @@ public final class LostTalesMissiveNbt {
 
         tag.setString("QuestId", missive.getQuestId());
         tag.setString("QuestType", missive.getQuestType());
-        tag.setString("Title", missive.getTitle());
-        tag.setString("Description", missive.getDescription());
-        tag.setString("Issuer", missive.getIssuer());
-        tag.setString("FlavorText", missive.getFlavorText());
+        tag.setString("TitleId", missive.getTitleId());
+        tag.setString("DescriptionId", missive.getDescriptionId());
+        tag.setString("IssuerId", missive.getIssuerId());
+        tag.setString("FlavorId", missive.getFlavorId());
+        tag.setString("Target", missive.getTarget());
         tag.setBoolean("Repeatable", missive.isRepeatable());
         tag.setBoolean("FirstComeFirstServed", missive.isFirstComeFirstServed());
         tag.setLong("GenerationWorldTime", missive.getGenerationWorldTime());
@@ -80,10 +84,11 @@ public final class LostTalesMissiveNbt {
         LostTalesMissiveData missive = new LostTalesMissiveData(
                 tag.getString("QuestId"),
                 tag.getString("QuestType"),
-                tag.getString("Title"),
-                tag.getString("Description"),
-                tag.getString("Issuer"),
-                tag.getString("FlavorText"),
+                tag.getString("TitleId"),
+                tag.getString("DescriptionId"),
+                tag.getString("IssuerId"),
+                tag.getString("FlavorId"),
+                tag.getString("Target"),
                 tag.getBoolean("Repeatable"),
                 tag.getBoolean("FirstComeFirstServed"),
                 tag.getLong("GenerationWorldTime"),
@@ -101,14 +106,16 @@ public final class LostTalesMissiveNbt {
                 || !LostTalesQuestIds.fits(tag.getString("QuestId"))
                 || !NbtTags.hasReasonableString(tag, "QuestType",
                 MAX_IDENTIFIER_CHARACTERS, true)
-                || !NbtTags.hasReasonableString(tag, "Title",
-                MAX_NAME_CHARACTERS, true)
-                || !NbtTags.hasReasonableString(tag, "Description",
-                MAX_TEXT_CHARACTERS, false)
-                || !NbtTags.hasReasonableString(tag, "Issuer",
-                MAX_NAME_CHARACTERS, false)
-                || !NbtTags.hasReasonableString(tag, "FlavorText",
-                MAX_TEXT_CHARACTERS, false)
+                || !NbtTags.hasReasonableString(tag, "TitleId",
+                MissiveWords.MAX_TEMPLATE_ID_BYTES, true)
+                || !NbtTags.hasReasonableString(tag, "DescriptionId",
+                MissiveWords.MAX_TEMPLATE_ID_BYTES, false)
+                || !NbtTags.hasReasonableString(tag, "IssuerId",
+                MissiveWords.MAX_TEMPLATE_ID_BYTES, false)
+                || !NbtTags.hasReasonableString(tag, "FlavorId",
+                MissiveWords.MAX_TEMPLATE_ID_BYTES, false)
+                || !NbtTags.hasReasonableString(tag, "Target",
+                MissiveWords.MAX_TARGET_BYTES, false)
                 || !tag.hasKey("Repeatable", Constants.NBT.TAG_BYTE)
                 || !tag.hasKey("FirstComeFirstServed", Constants.NBT.TAG_BYTE)
                 || tag.getLong("GenerationWorldTime") < 0L
@@ -127,8 +134,6 @@ public final class LostTalesMissiveNbt {
                     MAX_IDENTIFIER_CHARACTERS, true)
                     || !NbtTags.hasReasonableString(objective, "Type",
                     MAX_IDENTIFIER_CHARACTERS, true)
-                    || !NbtTags.hasReasonableString(objective, "Description",
-                    MAX_TEXT_CHARACTERS, false)
                     || !LostTalesQuestDefinitionNbt.isStringMapReasonable(objective, "Params")) {
                 return false;
             }
@@ -148,7 +153,6 @@ public final class LostTalesMissiveNbt {
             NBTTagCompound objectiveTag = new NBTTagCompound();
             objectiveTag.setString("Id", objective.getId());
             objectiveTag.setString("Type", objective.getType());
-            objectiveTag.setString("Description", objective.getDescription());
             objectiveTag.setBoolean("Optional", objective.isOptional());
             objectiveTag.setTag("Params", writeStringMap(objective.getParams()));
             list.appendTag(objectiveTag);
@@ -166,7 +170,6 @@ public final class LostTalesMissiveNbt {
             LostTalesMissiveObjectiveData objective = new LostTalesMissiveObjectiveData(
                     objectiveTag.getString("Id"),
                     objectiveTag.getString("Type"),
-                    objectiveTag.getString("Description"),
                     objectiveTag.getBoolean("Optional"),
                     readStringMap(objectiveTag.getTagList("Params", Constants.NBT.TAG_COMPOUND))
             );

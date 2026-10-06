@@ -30,18 +30,25 @@ import com.ninuna.losttales.character.switching.CharacterSwitchTransaction;
 import com.ninuna.losttales.character.switching.CharacterSwitchWorldData;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.util.LostTalesDuration;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
 import net.minecraft.world.World;
 
-/** Operator-only switch-state diagnostics and recovery controls. */
+/**
+ * Operator-only switch-state diagnostics and recovery controls. The
+ * status lines name each store's fields as the code does and show their
+ * values as they are: ids, numbers, true and false.
+ */
 public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
+
+    /** What the lang key of each of the command's answers begins with. */
+    static final String SAY = "chat.losttales.command.character.";
 
     public LostTalesCommandCharacterAdmin() {
         super("character");
@@ -78,10 +85,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         }
         EntityPlayerMP target = resolveTarget(sender, args.length > 1 ? args[1] : null);
         if (target == null) {
-            ChatComponentTranslation refusal = new ChatComponentTranslation(
-                    "chat.losttales.command.player_required");
-            refusal.getChatStyle().setColor(EnumChatFormatting.RED);
-            sender.addChatMessage(refusal);
+            say(sender, EnumChatFormatting.RED, PLAYER_REQUIRED);
             return;
         }
         String action = args[0];
@@ -101,10 +105,10 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             }
             if (result == CharacterErrorId.NONE) {
                 CharacterLifecycleStateTracker.markReady(target);
+                say(sender, EnumChatFormatting.GREEN, SAY + "recover.done");
+            } else {
+                say(sender, EnumChatFormatting.RED, SAY + "recover.failed", result.getId());
             }
-            send(sender, result == CharacterErrorId.NONE
-                    ? EnumChatFormatting.GREEN + "Character switch state reconciled."
-                    : EnumChatFormatting.RED + "Recovery did not complete: " + result.getId());
             reportStatus(sender, target);
         } else if ("deleted".equalsIgnoreCase(action)
                 || "tombstones".equalsIgnoreCase(action)) {
@@ -118,7 +122,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                     CharacterDeletionService.getInstance().restore(
                             target, characterId);
             reportMaintenanceResult(sender, target, characterId,
-                    "restore", result);
+                    SAY + "restore.done", SAY + "restore.failed", result);
         } else if ("rollback".equalsIgnoreCase(action)) {
             UUID characterId = parseCharacterId(sender, args);
             if (characterId == null) {
@@ -128,31 +132,31 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                     CharacterDeletionService.getInstance().rollbackInactive(
                             target, characterId);
             reportMaintenanceResult(sender, target, characterId,
-                    "rollback", result);
+                    SAY + "rollback.done", SAY + "rollback.failed", result);
         } else if ("purge".equalsIgnoreCase(action)) {
             UUID characterId = parseCharacterId(sender, args);
             if (characterId == null) {
                 return;
             }
             if (args.length < 4 || !"confirm".equalsIgnoreCase(args[3])) {
-                send(sender, EnumChatFormatting.RED
-                        + "Permanent purge requires: /losttales character purge "
-                        + target.getCommandSenderName() + " " + characterId
-                        + " confirm");
+                say(sender, EnumChatFormatting.RED, SAY + "purge.confirm",
+                        target.getCommandSenderName(), characterId);
                 return;
             }
             CharacterDeletionMaintenanceResult result =
                     CharacterDeletionService.getInstance().purge(
                             target, characterId);
             reportMaintenanceResult(sender, target, characterId,
-                    "purge", result);
+                    SAY + "purge.done", SAY + "purge.failed", result);
         } else if ("cooldown".equalsIgnoreCase(action)
                 || "resetcooldown".equalsIgnoreCase(action)) {
             boolean reset = CharacterSwitchCoordinator.getInstance().resetCooldown(
                     target.worldObj, target.getUniqueID());
-            send(sender, reset
-                    ? EnumChatFormatting.GREEN + "Character switch cooldown reset."
-                    : EnumChatFormatting.RED + "Unable to reset character switch cooldown.");
+            if (reset) {
+                say(sender, EnumChatFormatting.GREEN, SAY + "cooldown.done");
+            } else {
+                say(sender, EnumChatFormatting.RED, SAY + "cooldown.failed");
+            }
             reportStatus(sender, target);
         } else if ("freeze".equalsIgnoreCase(action)) {
             setFrozen(sender, target, true);
@@ -174,13 +178,11 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         MinecraftServer server = MinecraftServer.getServer();
         World world = server == null ? null : server.worldServerForDimension(0);
         if (world == null) {
-            send(sender, EnumChatFormatting.RED
-                    + "The server overworld is not available.");
+            say(sender, EnumChatFormatting.RED, SAY + "no_overworld");
             return;
         }
         if (args.length < 2) {
-            send(sender, EnumChatFormatting.RED
-                    + "Specify an online player name or an account UUID.");
+            say(sender, EnumChatFormatting.RED, SAY + "journal.name");
             return;
         }
         EntityPlayerMP online = resolveTarget(sender, args[1]);
@@ -191,9 +193,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             try {
                 ownerId = UUID.fromString(args[1]);
             } catch (IllegalArgumentException exception) {
-                send(sender, EnumChatFormatting.RED
-                        + "No online player is named " + args[1]
-                        + ", and it is not an account UUID either.");
+                say(sender, EnumChatFormatting.RED, SAY + "journal.unknown", args[1]);
                 return;
             }
         }
@@ -201,27 +201,21 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         CharacterSwitchCoordinator.JournalDiscard outcome =
                 CharacterSwitchCoordinator.getInstance().discardJournal(world, ownerId);
         if (outcome == CharacterSwitchCoordinator.JournalDiscard.NONE) {
-            send(sender, EnumChatFormatting.YELLOW
-                    + "That account holds no switch journal; nothing to discard.");
+            say(sender, EnumChatFormatting.YELLOW, SAY + "journal.none");
             return;
         }
         if (outcome == CharacterSwitchCoordinator.JournalDiscard.UNAVAILABLE) {
-            send(sender, EnumChatFormatting.RED
-                    + "The switch store refused: it is read-only, or that "
-                    + "account's entry is quarantined. See the server log.");
+            say(sender, EnumChatFormatting.RED, SAY + "journal.refused");
             return;
         }
-        send(sender, EnumChatFormatting.GREEN
-                + "Switch journal discarded for " + ownerId
-                + ". The account's own player files are now authoritative.");
+        say(sender, EnumChatFormatting.GREEN, SAY + "journal.discarded", ownerId);
         if (online != null) {
             // Already connected: switching becomes available again without
             // making them reconnect.
             CharacterLifecycleStateTracker.markReady(online);
             reportStatus(sender, online);
         } else {
-            send(sender, EnumChatFormatting.GRAY
-                    + "It takes effect the next time that account joins.");
+            say(sender, EnumChatFormatting.GRAY, SAY + "journal.next_join");
         }
     }
 
@@ -229,8 +223,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         MinecraftServer server = MinecraftServer.getServer();
         World world = server == null ? null : server.worldServerForDimension(0);
         if (world == null) {
-            send(sender, EnumChatFormatting.RED
-                    + "The server overworld is not available.");
+            say(sender, EnumChatFormatting.RED, SAY + "no_overworld");
             return;
         }
         String action = args.length > 1 ? args[1] : "status";
@@ -241,8 +234,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         }
         if ("recover".equalsIgnoreCase(action)) {
             LoreCharacterTransferCoordinator.getInstance().recoverAll(world);
-            send(sender, EnumChatFormatting.GREEN
-                    + "Lore-character transfer recovery pass completed.");
+            say(sender, EnumChatFormatting.GREEN, SAY + "lore.recovered");
             reportLoreStatus(sender, world);
             return;
         }
@@ -250,8 +242,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             reportLoreCharacter(sender, world, args[2]);
             return;
         }
-        send(sender, EnumChatFormatting.GRAY
-                + "/losttales character lore <status|recover|inspect>"
+        usage(sender, "/losttales character lore <status|recover|inspect>"
                 + " [lore-character-id]");
     }
 
@@ -270,32 +261,29 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             for (LoreCharacterOwnershipRecord record : ownership.getRecords()) {
                 if (record.isClaimed()) claimed++;
             }
-            send(sender, EnumChatFormatting.GOLD + "Lore-character status:");
-            send(sender, EnumChatFormatting.GRAY + "definitions="
-                    + LoreCharacterRegistry.getAll().size()
-                    + ", configured=" + configured
-                    + ", rejected=" + LoreCharacterRegistry.getLoadErrors().size()
-                    + ", ownershipRecords=" + ownership.getRecordCount()
-                    + ", claimed=" + claimed
-                    + ", retainedStates=" + transfers.getVaultEntryCount()
-                    + ", pendingTransfers="
-                    + transfers.getTransactions().size());
-            send(sender, EnumChatFormatting.GRAY + "stores: ownershipReadOnly="
-                    + ownership.isReadOnly() + reason(ownership.getReadOnlyReason())
-                    + ", transferReadOnly=" + transfers.isReadOnly()
-                    + reason(transfers.getReadOnlyReason()));
+            say(sender, EnumChatFormatting.GOLD, SAY + "lore.status.header");
+            say(sender, EnumChatFormatting.GRAY, SAY + "lore.status.counts",
+                    Integer.valueOf(LoreCharacterRegistry.getAll().size()),
+                    Integer.valueOf(configured),
+                    Integer.valueOf(LoreCharacterRegistry.getLoadErrors().size()),
+                    Integer.valueOf(ownership.getRecordCount()),
+                    Integer.valueOf(claimed),
+                    Integer.valueOf(transfers.getVaultEntryCount()),
+                    Integer.valueOf(transfers.getTransactions().size()));
+            say(sender, EnumChatFormatting.GRAY, SAY + "lore.status.stores",
+                    Boolean.valueOf(ownership.isReadOnly()),
+                    reason(ownership.getReadOnlyReason()),
+                    Boolean.valueOf(transfers.isReadOnly()),
+                    reason(transfers.getReadOnlyReason()));
             for (LoreCharacterTransferRecord transaction
                     : transfers.getTransactions()) {
-                send(sender, EnumChatFormatting.YELLOW + "pending "
-                        + transaction.getLoreCharacterId()
-                        + " type=" + transaction.getType()
-                        + ", step=" + transaction.getStep()
-                        + ", character=" + transaction.getCharacterId());
+                say(sender, EnumChatFormatting.YELLOW, SAY + "lore.status.pending",
+                        transaction.getLoreCharacterId(), transaction.getType(),
+                        transaction.getStep(), transaction.getCharacterId());
             }
         } catch (RuntimeException exception) {
-            send(sender, EnumChatFormatting.RED
-                    + "Unable to inspect lore-character state: "
-                    + exception.getClass().getSimpleName());
+            say(sender, EnumChatFormatting.RED, SAY + "lore.status.failed",
+                    exception.getClass().getSimpleName());
         }
     }
 
@@ -308,8 +296,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             LoreCharacterTransferWorldData transfers =
                     LoreCharacterTransferStorage.get(world);
             if (definition == null) {
-                send(sender, EnumChatFormatting.RED
-                        + "Unknown lore-character identifier: " + loreId);
+                say(sender, EnumChatFormatting.RED, SAY + "lore.unknown", loreId);
                 return;
             }
             LoreCharacterOwnershipRecord owner = ownership.getRecord(
@@ -318,32 +305,32 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                     definition.getId());
             LoreCharacterTransferRecord transaction = transfers.getTransaction(
                     definition.getId());
-            send(sender, EnumChatFormatting.GOLD + definition.getName()
-                    + " [" + definition.getId() + "]");
-            send(sender, EnumChatFormatting.GRAY + "configured="
-                    + definition.hasAppearance()
-                    + ", claimed=" + (owner != null && owner.isClaimed())
-                    + ", owner=" + (owner == null ? "none" : owner.getOwnerId())
-                    + ", character="
-                    + (owner == null ? "none" : owner.getCharacterId())
-                    + ", ownershipRevision="
-                    + (owner == null ? 0L : owner.getRevision()));
-            send(sender, EnumChatFormatting.GRAY + "retainedState="
-                    + (vault != null)
-                    + (vault == null ? "" : ", stateGeneration="
-                    + vault.getPlayerStateCopy().getCurrentGeneration()
-                    + ", updatedAt=" + vault.getUpdatedAt())
-                    + ", transfer=" + (transaction == null ? "none"
-                    : transaction.getType() + " step="
-                    + transaction.getStep() + " tx="
-                    + transaction.getTransactionId()));
+            say(sender, EnumChatFormatting.GOLD, SAY + "lore.header",
+                    definition.getName(), definition.getId());
+            say(sender, EnumChatFormatting.GRAY, SAY + "lore.ownership",
+                    Boolean.valueOf(definition.hasAppearance()),
+                    Boolean.valueOf(owner != null && owner.isClaimed()),
+                    owner == null ? words(SAY + "none") : owner.getOwnerId(),
+                    owner == null ? words(SAY + "none") : owner.getCharacterId(),
+                    Long.valueOf(owner == null ? 0L : owner.getRevision()));
+            Object transfer = transaction == null ? words(SAY + "none")
+                    : words(SAY + "lore.transfer", transaction.getType(),
+                            transaction.getStep(), transaction.getTransactionId());
+            if (vault == null) {
+                say(sender, EnumChatFormatting.GRAY, SAY + "lore.state", Boolean.FALSE,
+                        transfer);
+            } else {
+                say(sender, EnumChatFormatting.GRAY, SAY + "lore.state.retained", Boolean.TRUE,
+                        Long.valueOf(vault.getPlayerStateCopy().getCurrentGeneration()),
+                        Long.valueOf(vault.getUpdatedAt()), transfer);
+            }
         } catch (RuntimeException exception) {
-            send(sender, EnumChatFormatting.RED
-                    + "Unable to inspect lore character: "
-                    + exception.getClass().getSimpleName());
+            say(sender, EnumChatFormatting.RED, SAY + "lore.failed",
+                    exception.getClass().getSimpleName());
         }
     }
 
+    /** A store's read-only reason in brackets after its flag, or nothing. */
     private static String reason(String value) {
         return value == null || value.length() == 0 ? "" : " (" + value + ")";
     }
@@ -351,10 +338,12 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
     private void setFrozen(ICommandSender sender, EntityPlayerMP target, boolean frozen) {
         boolean changed = CharacterSwitchCoordinator.getInstance().setFrozen(
                 target.worldObj, target.getUniqueID(), frozen);
-        send(sender, changed
-                ? EnumChatFormatting.GREEN + "Character switching "
-                        + (frozen ? "frozen." : "unfrozen.")
-                : EnumChatFormatting.RED + "Unable to update character switch freeze state.");
+        if (!changed) {
+            say(sender, EnumChatFormatting.RED, SAY + "freeze.failed");
+        } else {
+            say(sender, EnumChatFormatting.GREEN, frozen ? SAY + "freeze.done"
+                    : SAY + "unfreeze.done");
+        }
         reportStatus(sender, target);
     }
 
@@ -373,74 +362,61 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             CharacterPlayerStateAccount playerState =
                     playerStateData.getAccount(ownerId);
 
-            send(sender, EnumChatFormatting.GOLD + "Character switch status for "
-                    + target.getCommandSenderName() + ":");
-            send(sender, EnumChatFormatting.GRAY + "owner=" + ownerId
-                    + ", active=" + (roster == null || roster.getActiveCharacterId() == null
-                            ? "account" : roster.getActiveCharacterId())
-                    + ", rosterRevision=" + (roster == null ? -1L : roster.getRevision()));
-            send(sender, EnumChatFormatting.GRAY + "stores: rosterReadOnly="
-                    + characterData.isReadOnlyForNewerVersion()
-                    + ", switchReadOnly=" + switchData.isReadOnlyForNewerVersion()
-                    + ", playerStateReadOnly="
-                    + playerStateData.isReadOnlyForNewerVersion()
-                    + ", deletionReadOnly="
-                    + deletionData.isReadOnlyForNewerVersion()
-                    + ", switchOwnerBlocked=" + switchData.isOwnerBlocked(ownerId)
-                    + ", playerStateOwnerBlocked="
-                    + playerStateData.isOwnerBlocked(ownerId)
-                    + ", switchQuarantine=" + switchData.getQuarantinedEntryCount()
-                    + ", playerStateQuarantine="
-                    + playerStateData.getQuarantinedEntryCount()
-                    + ", deletionQuarantine="
-                    + deletionData.getQuarantinedEntryCount()
-                    + ", recoverableDeletions="
-                    + deletionData.getTombstones(ownerId).size());
+            say(sender, EnumChatFormatting.GOLD, SAY + "status.header",
+                    target.getCommandSenderName());
+            say(sender, EnumChatFormatting.GRAY, SAY + "status.owner", ownerId,
+                    roster == null || roster.getActiveCharacterId() == null
+                            ? words(SAY + "status.account") : roster.getActiveCharacterId(),
+                    Long.valueOf(roster == null ? -1L : roster.getRevision()));
+            say(sender, EnumChatFormatting.GRAY, SAY + "status.stores",
+                    Boolean.valueOf(characterData.isReadOnlyForNewerVersion()),
+                    Boolean.valueOf(switchData.isReadOnlyForNewerVersion()),
+                    Boolean.valueOf(playerStateData.isReadOnlyForNewerVersion()),
+                    Boolean.valueOf(deletionData.isReadOnlyForNewerVersion()),
+                    Boolean.valueOf(switchData.isOwnerBlocked(ownerId)),
+                    Boolean.valueOf(playerStateData.isOwnerBlocked(ownerId)),
+                    Integer.valueOf(switchData.getQuarantinedEntryCount()),
+                    Integer.valueOf(playerStateData.getQuarantinedEntryCount()),
+                    Integer.valueOf(deletionData.getQuarantinedEntryCount()),
+                    Integer.valueOf(deletionData.getTombstones(ownerId).size()));
             if (playerState == null) {
-                send(sender, EnumChatFormatting.GRAY
-                        + "playerState=not bootstrapped");
+                say(sender, EnumChatFormatting.GRAY, SAY + "status.player_state.none");
             } else {
                 CharacterPlayerStateRecord activeRecord = playerState.getRecord(
                         roster == null ? ownerId : roster.getActiveGameplayId());
-                send(sender, EnumChatFormatting.GRAY + "playerStateBootstrap="
-                        + playerState.getBootstrapVersion()
-                        + ", records=" + playerState.getRecords().size()
-                        + ", activeGeneration="
-                        + (activeRecord == null ? -1L
-                        : activeRecord.getCurrentGeneration()));
+                say(sender, EnumChatFormatting.GRAY, SAY + "status.player_state",
+                        Integer.valueOf(playerState.getBootstrapVersion()),
+                        Integer.valueOf(playerState.getRecords().size()),
+                        Long.valueOf(activeRecord == null ? -1L
+                                : activeRecord.getCurrentGeneration()));
             }
             if (state == null) {
-                send(sender, EnumChatFormatting.GRAY + "No switch manifest has been created yet.");
+                say(sender, EnumChatFormatting.GRAY, SAY + "status.no_manifest");
                 return;
             }
             long remaining = Math.max(0L,
                     state.getNextAllowedAt() - System.currentTimeMillis());
-            send(sender, EnumChatFormatting.GRAY + "cooldownStage="
-                    + state.getCooldownStage()
-                    + ", remaining=" + formatDuration(remaining)
-                    + ", nextAllowedAt=" + state.getNextAllowedAt()
-                    + ", frozen=" + state.isFrozen()
-                    + ", deathPending=" + state.isDeathPending()
-                    + ", deathPendingAt=" + state.getDeathPendingAt());
+            say(sender, EnumChatFormatting.GRAY, SAY + "status.cooldown",
+                    Integer.valueOf(state.getCooldownStage()), formatDuration(remaining),
+                    Long.valueOf(state.getNextAllowedAt()), Boolean.valueOf(state.isFrozen()),
+                    Boolean.valueOf(state.isDeathPending()),
+                    Long.valueOf(state.getDeathPendingAt()));
             CharacterSwitchTransaction transaction = state.getTransaction();
             if (transaction == null) {
-                send(sender, EnumChatFormatting.GRAY + "journal=none");
+                say(sender, EnumChatFormatting.GRAY, SAY + "status.journal.none");
             } else {
-                send(sender, EnumChatFormatting.GRAY + "journal="
-                        + transaction.getStatus().getId()
-                        + ", tx=" + transaction.getTransactionId()
-                        + ", source=" + transaction.getSourceCharacterId()
-                        + ", target=" + transaction.getTargetCharacterId()
-                        + ", sourceState="
-                        + transaction.getSourceStateGeneration()
-                        + ", targetState="
-                        + transaction.getTargetStateGeneration()
-                        + ", preparedAt=" + transaction.getPreparedAt()
-                        + ", completedAt=" + transaction.getCompletedAt());
+                say(sender, EnumChatFormatting.GRAY, SAY + "status.journal",
+                        transaction.getStatus().getId(), transaction.getTransactionId(),
+                        transaction.getSourceCharacterId(),
+                        transaction.getTargetCharacterId(),
+                        Long.valueOf(transaction.getSourceStateGeneration()),
+                        Long.valueOf(transaction.getTargetStateGeneration()),
+                        Long.valueOf(transaction.getPreparedAt()),
+                        Long.valueOf(transaction.getCompletedAt()));
             }
         } catch (RuntimeException exception) {
-            send(sender, EnumChatFormatting.RED + "Unable to inspect character state: "
-                    + exception.getClass().getSimpleName());
+            say(sender, EnumChatFormatting.RED, SAY + "status.failed",
+                    exception.getClass().getSimpleName());
         }
     }
 
@@ -450,114 +426,108 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                     CharacterDeletionService.getInstance().getTombstones(
                             target.worldObj, target.getUniqueID());
             if (tombstones.isEmpty()) {
-                send(sender, EnumChatFormatting.GRAY
-                        + "No recoverable deletions exist for "
-                        + target.getCommandSenderName() + ".");
+                say(sender, EnumChatFormatting.GRAY, SAY + "deleted.none",
+                        target.getCommandSenderName());
                 return;
             }
-            send(sender, EnumChatFormatting.GOLD + "Recoverable deletions for "
-                    + target.getCommandSenderName() + ":");
+            say(sender, EnumChatFormatting.GOLD, SAY + "deleted.header",
+                    target.getCommandSenderName());
             long now = System.currentTimeMillis();
             for (CharacterDeletionTombstone tombstone : tombstones) {
-                String retention = tombstone.isCommitted()
+                IChatComponent retention = tombstone.isCommitted()
                         ? (tombstone.isPurgeAllowed(now)
-                        ? "purge eligible"
-                        : "purge in " + formatDuration(
-                                tombstone.getPurgeAfter() - now))
-                        : "prepared; deletion not committed";
-                send(sender, EnumChatFormatting.GRAY
-                        + tombstone.getCharacterCopy().getName()
-                        + " id=" + tombstone.getCharacterId()
-                        + ", slot="
-                        + tombstone.getCharacterCopy().getSlotIndex()
-                        + ", stateGeneration="
-                        + tombstone.getStateGeneration()
-                        + ", " + retention);
+                        ? words(SAY + "deleted.purge_eligible")
+                        : words(SAY + "deleted.purge_in", formatDuration(
+                                tombstone.getPurgeAfter() - now)))
+                        : words(SAY + "deleted.not_committed");
+                say(sender, EnumChatFormatting.GRAY, SAY + "deleted.entry",
+                        tombstone.getCharacterCopy().getName(),
+                        tombstone.getCharacterId(),
+                        Integer.valueOf(tombstone.getCharacterCopy().getSlotIndex()),
+                        Long.valueOf(tombstone.getStateGeneration()), retention);
             }
         } catch (RuntimeException exception) {
-            send(sender, EnumChatFormatting.RED
-                    + "Unable to inspect recoverable deletions: "
-                    + exception.getClass().getSimpleName());
+            say(sender, EnumChatFormatting.RED, SAY + "deleted.failed",
+                    exception.getClass().getSimpleName());
         }
     }
 
     private UUID parseCharacterId(ICommandSender sender, String[] args) {
         if (args == null || args.length < 3) {
-            send(sender, EnumChatFormatting.RED
-                    + "Specify an online player and a character UUID.");
+            say(sender, EnumChatFormatting.RED, SAY + "id.missing");
             return null;
         }
         try {
             return UUID.fromString(args[2]);
         } catch (IllegalArgumentException exception) {
-            send(sender, EnumChatFormatting.RED
-                    + "The character UUID is invalid: " + args[2]);
+            say(sender, EnumChatFormatting.RED, SAY + "id.invalid", args[2]);
             return null;
         }
     }
 
+    /**
+     * The answer to a restore, rollback or purge: {@code doneKey} with the
+     * character's id, or {@code failedKey} with why.
+     */
     private void reportMaintenanceResult(
             ICommandSender sender,
             EntityPlayerMP target,
             UUID characterId,
-            String action,
+            String doneKey,
+            String failedKey,
             CharacterDeletionMaintenanceResult result) {
         if (result == CharacterDeletionMaintenanceResult.SUCCESS) {
-            send(sender, EnumChatFormatting.GREEN + "Character " + action
-                    + " completed for " + characterId + ".");
+            say(sender, EnumChatFormatting.GREEN, doneKey, characterId);
             reportStatus(sender, target);
             return;
         }
         if (result == CharacterDeletionMaintenanceResult.RECONCILED) {
-            send(sender, EnumChatFormatting.GREEN
-                    + "The character already existed; its stale tombstone was removed.");
+            say(sender, EnumChatFormatting.GREEN, SAY + "reconciled");
             return;
         }
-        String detail;
+        IChatComponent detail;
         switch (result) {
             case NOT_FOUND:
-                detail = "No matching character or tombstone was found.";
+                detail = words(SAY + "failure.not_found");
                 break;
             case STORAGE_READ_ONLY:
-                detail = "A required character store is read-only.";
+                detail = words(SAY + "failure.read_only");
                 break;
             case PLAYER_STATE_UNAVAILABLE:
-                detail = "The required character player-state generation is unavailable or invalid.";
+                detail = words(SAY + "failure.player_state");
                 break;
             case SLOT_OCCUPIED:
-                detail = "The character's original roster slot is occupied.";
+                detail = words(SAY + "failure.slot_occupied");
                 break;
             case NAME_TAKEN:
-                detail = "Another character, another account the server has seen, a lore character or a chat voice goes by the character's name.";
+                detail = words(SAY + "failure.name_taken");
                 break;
             case CHARACTER_ID_CONFLICT:
-                detail = "The character UUID is already present in a roster.";
+                detail = words(SAY + "failure.id_conflict");
                 break;
             case CHARACTER_ACTIVE:
-                detail = "Switch away from the character before rolling back its generation.";
+                detail = words(SAY + "failure.active");
                 break;
             case PREVIOUS_GENERATION_UNAVAILABLE:
-                detail = "No retained previous generation is available.";
+                detail = words(SAY + "failure.no_previous");
                 break;
             case RETENTION_ACTIVE:
                 CharacterDeletionTombstone tombstone =
                         CharacterDeletionService.getInstance().getTombstone(
                                 target.worldObj, characterId);
                 detail = tombstone == null
-                        ? "The recovery retention period is still active."
-                        : "The recovery retention period remains active for "
-                        + formatDuration(tombstone.getPurgeAfter()
-                                - System.currentTimeMillis()) + ".";
+                        ? words(SAY + "failure.retention")
+                        : words(SAY + "failure.retention.for", formatDuration(
+                                tombstone.getPurgeAfter() - System.currentTimeMillis()));
                 break;
             case NOT_COMMITTED:
-                detail = "The prepared deletion never committed; restore or retry normal deletion instead.";
+                detail = words(SAY + "failure.not_committed");
                 break;
             default:
-                detail = "The operation failed internally; inspect the server log.";
+                detail = words(SAY + "failure.internal");
                 break;
         }
-        send(sender, EnumChatFormatting.RED + "Character " + action
-                + " failed: " + detail);
+        say(sender, EnumChatFormatting.RED, failedKey, detail);
     }
 
     private EntityPlayerMP resolveTarget(ICommandSender sender, String playerName) {
@@ -571,28 +541,27 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         return sender instanceof EntityPlayerMP ? (EntityPlayerMP) sender : null;
     }
 
-    private static String formatDuration(long millis) {
+    /** A wait as the reader's game words it: every part from the largest there is. */
+    private static IChatComponent formatDuration(long millis) {
         long totalSeconds = (Math.max(0L, millis) + 999L) / 1000L;
         long hours = totalSeconds / 3600L;
         long minutes = (totalSeconds % 3600L) / 60L;
         long seconds = totalSeconds % 60L;
         if (hours > 0L) {
-            return hours + "h " + minutes + "m " + seconds + "s";
+            return LostTalesDuration.of(hours, LostTalesDuration.Unit.HOURS)
+                    .and(minutes, LostTalesDuration.Unit.MINUTES)
+                    .and(seconds, LostTalesDuration.Unit.SECONDS).component();
         }
         if (minutes > 0L) {
-            return minutes + "m " + seconds + "s";
+            return LostTalesDuration.of(minutes, LostTalesDuration.Unit.MINUTES)
+                    .and(seconds, LostTalesDuration.Unit.SECONDS).component();
         }
-        return seconds + "s";
+        return LostTalesDuration.of(seconds, LostTalesDuration.Unit.SECONDS)
+                .component();
     }
 
     private void sendUsage(ICommandSender sender) {
-        send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
-    }
-
-    private void send(ICommandSender sender, String message) {
-        if (sender != null) {
-            sender.addChatMessage(new ChatComponentText(message));
-        }
+        usage(sender, getCommandUsage(sender));
     }
 
     @Override

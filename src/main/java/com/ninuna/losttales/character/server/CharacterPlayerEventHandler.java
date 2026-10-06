@@ -16,6 +16,7 @@ import com.ninuna.losttales.compat.lotr.hired.LotrHiredUnitCustody;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.chat.server.ChatPresenceService;
+import com.ninuna.losttales.chat.server.ChatServerStatus;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -226,6 +227,7 @@ public final class CharacterPlayerEventHandler {
             LostTalesChatService.sendAccessToAll(null);
             LostTalesChatService.sendLoginReplay(serverPlayer);
             ChatPresenceService.sendAll(serverPlayer);
+            ChatServerStatus.sendTo(serverPlayer);
         } else {
             LostTalesChatService.sendAccess(serverPlayer);
         }

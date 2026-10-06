@@ -145,11 +145,6 @@ final class ChatShareSuggestionBox extends ChatSuggestionBox {
         return this.matches.size();
     }
 
-    @Override
-    int rowHeight() {
-        return GLYPH_ROW_HEIGHT;
-    }
-
     /** The suggestion on a row, or null. */
     ChatShareCandidates.Entry at(int row) {
         return row >= 0 && row < this.matches.size()
@@ -171,11 +166,11 @@ final class ChatShareSuggestionBox extends ChatSuggestionBox {
                         ? this.selectedIndex : -1);
         for (int row = 0; row < this.matches.size(); row++) {
             ChatShareCandidates.Entry entry = this.matches.get(row);
-            int rowTop = top + PADDING + row * GLYPH_ROW_HEIGHT;
+            int rowTop = top + PADDING + row * ROW_HEIGHT;
             drawIcon(minecraft, entry, inputX + PADDING, rowTop + 1);
             LostTalesChatVisualStyle.drawPlain(font, entry.label(),
                     inputX + PADDING + ICON_SLOT + ICON_GAP, rowTop + 2,
-                    row == this.selectedIndex ? 255 : 200);
+                    255);
         }
     }
 

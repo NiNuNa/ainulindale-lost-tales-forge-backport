@@ -10,6 +10,11 @@ import net.minecraft.world.World;
  * Immutable authoritative marker record. Callers replace records through
  * {@link LostTalesMapMarkerWorldData}; this prevents mutations that bypass
  * markDirty, revision checks, or spatial-index rebuilding.
+ *
+ * <p>A record keeps only words a player or an operator gave it. A waystone
+ * its placer has not named keeps an empty name and is called after them
+ * ({@link LostTalesMapMarkerNamedAfter}); an empty category or description
+ * is drawn with the words for its kind, in each player's language.</p>
  */
 public final class LostTalesMapMarkerRecord {
     public static final int MAX_ID_LENGTH = 256;
@@ -24,6 +29,7 @@ public final class LostTalesMapMarkerRecord {
     private final String id;
     private final LostTalesMapMarkerSource source;
     private final String name;
+    private final String namedAfter;
     private final String iconName;
     private final String colorName;
     private final String categoryName;
@@ -62,12 +68,17 @@ public final class LostTalesMapMarkerRecord {
         }
         this.source = builder.source == null
                 ? LostTalesMapMarkerSource.QUEST_DYNAMIC : builder.source;
-        this.name = requireText(builder.name, "marker name", MAX_NAME_LENGTH);
+        if (!LostTalesMapMarkerNamedAfter.isValid(builder.namedAfter)) {
+            throw new IllegalArgumentException("marker is named after nothing it can be");
+        }
+        this.namedAfter = builder.namedAfter == null ? "" : builder.namedAfter;
+        this.name = this.namedAfter.length() > 0
+                ? bounded(builder.name, MAX_NAME_LENGTH, "")
+                : requireText(builder.name, "marker name", MAX_NAME_LENGTH);
         this.iconName = bounded(builder.iconName, MAX_NAME_LENGTH, "undiscovered");
         this.colorName = bounded(builder.colorName, MAX_NAME_LENGTH, "white");
         this.categoryName = bounded(
-                builder.categoryName, MAX_NAME_LENGTH,
-                LostTalesMapMarkerDefinition.CATEGORY_DEFAULT);
+                builder.categoryName, MAX_NAME_LENGTH, "");
         this.description = bounded(builder.description, MAX_TEXT_LENGTH, "");
         this.hasFastTravel = builder.hasFastTravel;
         this.dimensionId = builder.dimensionId;
@@ -163,6 +174,7 @@ public final class LostTalesMapMarkerRecord {
         }
         return builder(persistedMarkerId, definition.getSource())
                 .name(definition.getName())
+                .namedAfter(definition.getNamedAfter())
                 .iconName(definition.getIconName())
                 .colorName(definition.getColorName())
                 .categoryName(definition.getCategoryName())
@@ -182,8 +194,13 @@ public final class LostTalesMapMarkerRecord {
                 .build();
     }
 
+    /**
+     * A waystone a player just placed: unnamed, called after
+     * {@code ownerName} ({@code Nils's Waystone}), with no category or
+     * description of its own, until its owner gives it some.
+     */
     public static LostTalesMapMarkerRecord createPlayerMarker(
-            String id, String name, UUID ownerPlayerId,
+            String id, String ownerName, UUID ownerPlayerId,
             int dimensionId, double x, double y, double z,
             UUID linkToken) {
         if (ownerPlayerId == null) {
@@ -191,11 +208,12 @@ public final class LostTalesMapMarkerRecord {
                     "player marker owner must not be null");
         }
         return builder(id, LostTalesMapMarkerSource.PLAYER_CREATED)
-                .name(name)
+                .name("")
+                .namedAfter(LostTalesMapMarkerNamedAfter.player(ownerName))
                 .iconName("fort")
                 .colorName("white")
-                .categoryName("Waystone")
-                .description("A player-placed waystone.")
+                .categoryName("")
+                .description("")
                 .fastTravel(true)
                 .position(dimensionId, x, y, z)
                 .radii(128.0D, 8.0D)
@@ -241,7 +259,7 @@ public final class LostTalesMapMarkerRecord {
                 this.hiddenUntilDiscovered, this.discoverable,
                 this.requiresRegionUnlock, this.source,
                 this.hasWaystone, this.waystoneStructureType,
-                this.priority);
+                this.priority, this.namedAfter);
     }
 
     public LostTalesMapMarkerRecord withEditableSettings(
@@ -295,7 +313,10 @@ public final class LostTalesMapMarkerRecord {
 
     public String getId() { return this.id; }
     public LostTalesMapMarkerSource getSource() { return this.source; }
+    /** The name a player or operator gave it; empty for one called after its placer. */
     public String getName() { return this.name; }
+    /** What it is called after while its name is empty ({@link LostTalesMapMarkerNamedAfter}). */
+    public String getNamedAfter() { return this.namedAfter; }
     public String getIconName() { return this.iconName; }
     public String getColorName() { return this.colorName; }
     public String getCategoryName() { return this.categoryName; }
@@ -395,10 +416,11 @@ public final class LostTalesMapMarkerRecord {
     public static final class Builder {
         private final String id;
         private final LostTalesMapMarkerSource source;
-        private String name = "Map Marker";
+        private String name = "";
+        private String namedAfter = "";
         private String iconName = "undiscovered";
         private String colorName = "white";
-        private String categoryName = LostTalesMapMarkerDefinition.CATEGORY_DEFAULT;
+        private String categoryName = "";
         private String description = "";
         private boolean hasFastTravel;
         private int dimensionId;
@@ -438,6 +460,7 @@ public final class LostTalesMapMarkerRecord {
             this.id = record.id;
             this.source = record.source;
             this.name = record.name;
+            this.namedAfter = record.namedAfter;
             this.iconName = record.iconName;
             this.colorName = record.colorName;
             this.categoryName = record.categoryName;
@@ -472,6 +495,10 @@ public final class LostTalesMapMarkerRecord {
         }
 
         public Builder name(String value) { this.name = value; return this; }
+        public Builder namedAfter(String value) {
+            this.namedAfter = value == null ? "" : value;
+            return this;
+        }
         public Builder iconName(String value) { this.iconName = value; return this; }
         public Builder colorName(String value) { this.colorName = value; return this; }
         public Builder categoryName(String value) { this.categoryName = value; return this; }

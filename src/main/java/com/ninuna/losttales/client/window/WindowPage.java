@@ -50,6 +50,11 @@ public abstract class WindowPage {
     /** The words on the tab. */
     public abstract String title();
 
+    /** Whether a search finds the page by what is typed: its title holds it. */
+    public boolean answers(String filter) {
+        return WindowMenus.matchesFilter(title(), filter);
+    }
+
     /** The colour the tab wears: its accent, its glow and its lit words. */
     public abstract int tone();
 
@@ -98,10 +103,11 @@ public abstract class WindowPage {
         return true;
     }
 
-    /** Whether the tab is a console, which the command key's view shows and the chat key's does not. */
-    public boolean isConsole() {
-        return false;
-    }
+    /**
+     * What kind of page it is: where the {@code +} lists it, which key's
+     * view shows it, and which windows it opens in.
+     */
+    public abstract PageCategory category();
 
     /* ---- What the window's tool strip offers while the tab is in front ---- */
 

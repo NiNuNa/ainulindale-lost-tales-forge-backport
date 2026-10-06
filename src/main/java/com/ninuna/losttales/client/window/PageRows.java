@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
@@ -55,13 +56,28 @@ public final class PageRows {
             @Override
             public void keyTyped(MenuWindow menu, LostTalesKeyPress press) {}
         });
-        // As tall as Settings' rows, which carry a shortcut's key icons.
-        this.menu.setRowHeight(MenuWindow.TALL_ROW_HEIGHT);
     }
 
     /** The rows, top first, in place of the ones it had; the scroll and each row's light carry on. */
     public void setRows(List<MenuWindow.Entry> rows) {
         this.menu.setRows(rows);
+    }
+
+    /** The widest a page's column of rows grows, however wide the window. */
+    private static final int MAX_COLUMN_WIDTH = 320;
+
+    /**
+     * The column a page's rows stand in: the page's width up to
+     * {@link #MAX_COLUMN_WIDTH}, centred, its whole height, so the rows
+     * stand under the page's strip as a sub-window's stand under its own.
+     */
+    public static LostTalesUiHitBox column(LostTalesUiHitBox box) {
+        int boxWidth = (int)Math.floor(box.width);
+        int width = Math.max(0, Math.min(boxWidth, MAX_COLUMN_WIDTH));
+        return new LostTalesUiHitBox(Math.floor(box.left)
+                + LostTalesUiInk.centredStart(boxWidth, width),
+                Math.floor(box.top), width,
+                Math.max(0.0D, Math.floor(box.height)));
     }
 
     /** Back at the top with no row lit: the page turned to something else. */
@@ -78,10 +94,8 @@ public final class PageRows {
     public void draw(Minecraft minecraft, LostTalesUiHitBox box,
                      double clipX, double clipY, double pointerX,
                      double pointerY, int alpha) {
-        int surfaceAlpha = WindowStyle.insetArgb(Math.max(0, Math.min(255,
-                alpha)) / 255.0F * WindowStyle.opacity(minecraft)) >>> 24;
         this.menu.draw(minecraft, box, clipX, clipY, pointerX, pointerY,
-                alpha, surfaceAlpha);
+                alpha, WindowLists.pageSurfaceAlpha(minecraft, alpha));
     }
 
     /** Whether a press at the point takes a row. */

@@ -107,14 +107,9 @@ public final class FellowshipInvitation {
         return now >= this.expiresAt;
     }
 
+    /** The name trimmed and cut to its bound; empty for none, which each reader's game words ({@link FellowshipNames}). */
     private static String normalizeName(String name) {
-        if (name == null) {
-            return "Unknown";
-        }
-        String normalized = name.trim();
-        if (normalized.length() == 0) {
-            return "Unknown";
-        }
+        String normalized = name == null ? "" : name.trim();
         return normalized.length() <= 64 ? normalized : normalized.substring(0, 64);
     }
 }

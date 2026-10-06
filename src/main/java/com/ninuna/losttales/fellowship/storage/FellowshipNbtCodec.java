@@ -402,11 +402,11 @@ public final class FellowshipNbtCodec {
             return MemberReadResult.failed(true, "missing_or_invalid_owner_uuid");
         }
 
-        String name = source.hasKey(TAG_CHARACTER_NAME, Constants.NBT.TAG_STRING)
-                ? source.getString(TAG_CHARACTER_NAME) : "";
-        if (name.trim().length() == 0) {
-            return MemberReadResult.failed(true, "missing_or_blank_character_name");
+        // An empty name is one the server did not know; it is kept empty.
+        if (!source.hasKey(TAG_CHARACTER_NAME, Constants.NBT.TAG_STRING)) {
+            return MemberReadResult.failed(true, "missing_character_name");
         }
+        String name = source.getString(TAG_CHARACTER_NAME);
         if (!source.hasKey(TAG_JOINED_AT, Constants.NBT.TAG_LONG)
                 || source.getLong(TAG_JOINED_AT) < 0L) {
             return MemberReadResult.failed(true, "missing_or_invalid_joined_at");

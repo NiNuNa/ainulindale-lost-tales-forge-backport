@@ -38,7 +38,7 @@ public final class LostTalesClientMapMarkerVisibilityTest {
                 "Hidden marker",
                 "fort",
                 "white",
-                LostTalesMapMarkerData.CATEGORY_POINT_OF_INTEREST,
+                "",
                 "",
                 false,
                 100,

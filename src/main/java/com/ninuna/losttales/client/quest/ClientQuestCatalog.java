@@ -8,6 +8,7 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestRewardText;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.quest.world.WorldQuestRules;
@@ -155,9 +156,9 @@ public final class ClientQuestCatalog {
                     minecraft.theWorld.getTotalWorldTime());
         }
         return new ClientQuestEntry(ClientQuestEntry.Source.LOST_TALES,
-                quest.getId(), quest.getTitle(), "",
+                quest.getId(), LostTalesQuestWords.title(quest), "",
                 categoryName(LostTalesQuestCategory.of(quest)),
-                quest.getDescription(), status,
+                LostTalesQuestWords.description(quest), status,
                 LostTalesClientQuestProgressStore.isQuestPinned(quest.getId()),
                 progress == null ? 0
                         : LostTalesQuestObjectiveSelection
@@ -228,9 +229,9 @@ public final class ClientQuestCatalog {
             rewards.add(summary);
         }
         return new ClientQuestEntry(ClientQuestEntry.Source.WORLD,
-                quest.getId(), quest.getTitle(), subtitle,
+                quest.getId(), LostTalesQuestWords.title(quest), subtitle,
                 categoryName(LostTalesQuestCategory.of(quest)),
-                quest.getDescription(), status, view.isRunning(), 1, 1,
+                LostTalesQuestWords.description(quest), status, view.isRunning(), 1, 1,
                 remainingTicks, objectives, rewards,
                 Collections.<ClientQuestEntry.Target>emptyList(), null, null);
     }

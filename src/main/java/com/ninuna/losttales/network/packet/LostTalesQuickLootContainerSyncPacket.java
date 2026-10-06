@@ -28,7 +28,7 @@ public class LostTalesQuickLootContainerSyncPacket implements IMessage {
         this.x = x;
         this.y = y;
         this.z = z;
-        this.title = title == null ? "Container" : title;
+        this.title = title == null ? "" : title;
         this.sealed = sealed;
         this.items = copyItems(items, MAX_ITEM_SLOTS);
         validate();

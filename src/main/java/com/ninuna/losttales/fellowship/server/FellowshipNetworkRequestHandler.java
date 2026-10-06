@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.model.FellowshipInvitation;
+import com.ninuna.losttales.fellowship.model.FellowshipNames;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import com.ninuna.losttales.fellowship.sync.FellowshipInvitationNotice;
@@ -126,6 +127,20 @@ public final class FellowshipNetworkRequestHandler {
                     finish(player, requestId, operationType, before,
                             service.removeGoHereMarker(player));
                     return;
+                case PLACE_MARK:
+                    finishMark(player, requestId, operationType, before,
+                            service.placeMark(player, fellowshipId, revision, name,
+                                    markerDimensionId, markerX, markerZ));
+                    return;
+                case MOVE_MARK:
+                    finishMark(player, requestId, operationType, before,
+                            service.moveMark(player, fellowshipId, revision, targetId,
+                                    markerDimensionId, markerX, markerZ));
+                    return;
+                case REMOVE_MARK:
+                    finishMark(player, requestId, operationType, before,
+                            service.removeMark(player, fellowshipId, revision, targetId));
+                    return;
                 case INVITE_PLAYER: {
                     FellowshipInvitationOperationResult invited =
                             service.invitePlayer(player, fellowshipId, revision, targetId);
@@ -171,8 +186,9 @@ public final class FellowshipNetworkRequestHandler {
                 : LostTalesServerPlayers.findOnline(invitation.getTargetOwnerId());
         if (invited != null && fellowship != null) {
             invited.addChatMessage(FellowshipInvitationNotice.line(
-                    invitation.getInvitingCharacterName(), fellowship.getName(),
-                    invitation.getInvitationId()));
+                    FellowshipNames.component(
+                            invitation.getInvitingCharacterName()),
+                    fellowship.getName(), invitation.getInvitationId()));
         }
     }
 
@@ -250,6 +266,18 @@ public final class FellowshipNetworkRequestHandler {
                     before, result.getFellowship(), result.getAffectedMember(),
                     result.getInvitation()), player.getUniqueID());
             mirror(player, result.getFellowship());
+        }
+    }
+
+    /** As {@link #finish}, and the fellowship's conversation is told what became of the mark. */
+    private static void finishMark(EntityPlayerMP player, int requestId,
+                                   FellowshipOperationType operationType,
+                                   FellowshipSyncManager.AudienceSnapshot before,
+                                   FellowshipOperationResult result) {
+        finish(player, requestId, operationType, before, result);
+        if (result.isSuccessful()) {
+            FellowshipMarkNotice.tell(operationType, result.getFellowship(),
+                    result.getAffectedMember(), result.getMark());
         }
     }
 

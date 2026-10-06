@@ -3,10 +3,10 @@ package com.ninuna.losttales.world.map.waypoint;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.util.LostTalesUtil;
 import cpw.mods.fml.common.FMLLog;
-import cpw.mods.fml.common.registry.LanguageRegistry;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -25,6 +25,10 @@ import lotr.common.world.map.LOTRWaypoint;
  * to the same marker index; only newly generated discoverable waypoints need
  * a private fast-travel region. Map visibility follows the waypoint region
  * that LOTR unlocks when its associated biome is visited.</p>
+ *
+ * <p>A registered waypoint is named in the lang file under its code
+ * ({@code lotr.waypoint.LOSTTALES_MOSSY_CAVE} and its {@code .info}), the
+ * line every map marker screen reads too ({@link LostTalesMapMarkerNames}).</p>
  */
 public final class LostTalesMapMarkerWaypointRegistry {
     private static final String LOTR_WAYPOINT_MARKER_PREFIX = "lotr:waypoint:";
@@ -132,9 +136,8 @@ public final class LostTalesMapMarkerWaypointRegistry {
             return;
         }
 
-        String enumBase = toEnumName(markerId);
+        String enumBase = LostTalesMapMarkerNames.waypointCode(markerId);
         try {
-            registerWaypointLocalization(enumBase, marker);
             // Discoverable markers need a private region that unlocks only
             // after proximity discovery. Non-discoverable markers instead
             // inherit their normal biome/faction region, so the standard LOTR
@@ -232,43 +235,6 @@ public final class LostTalesMapMarkerWaypointRegistry {
     static boolean shouldHideGeneratedWaypoint(
             LostTalesMapMarkerDefinition marker) {
         return marker != null && marker.isDiscoverable();
-    }
-
-    private static void registerWaypointLocalization(String enumBase, LostTalesMapMarkerDefinition marker) {
-        if (enumBase == null || enumBase.length() == 0 || marker == null) {
-            return;
-        }
-        String displayName = marker.getName() == null || marker.getName().length() == 0 ? enumBase : marker.getName();
-        String description = marker.getDescription() == null || marker.getDescription().length() == 0
-                ? "A discovered location in Middle-earth."
-                : marker.getDescription();
-        LanguageRegistry.instance().addStringLocalization("lotr.waypoint." + enumBase, "en_US", displayName);
-        LanguageRegistry.instance().addStringLocalization("lotr.waypoint." + enumBase + ".info", "en_US", description);
-    }
-
-    private static String toEnumName(String markerId) {
-        String normalized = markerId == null ? "" : markerId.trim().toUpperCase(Locale.ROOT);
-        int namespaceIndex = normalized.indexOf(':');
-        if (namespaceIndex >= 0 && namespaceIndex < normalized.length() - 1) {
-            normalized = normalized.substring(namespaceIndex + 1);
-        }
-        StringBuilder builder = new StringBuilder("LOSTTALES_");
-        for (int i = 0; i < normalized.length(); i++) {
-            char c = normalized.charAt(i);
-            if (c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') {
-                builder.append(c);
-            } else {
-                builder.append('_');
-            }
-        }
-        while (builder.indexOf("__") >= 0) {
-            int index = builder.indexOf("__");
-            builder.deleteCharAt(index);
-        }
-        if (builder.length() <= "LOSTTALES_".length()) {
-            builder.append("MARKER");
-        }
-        return builder.toString();
     }
 
     private static String normalizeWaypointKey(String value) {

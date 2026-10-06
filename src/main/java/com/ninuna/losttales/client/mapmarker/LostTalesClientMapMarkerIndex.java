@@ -205,7 +205,7 @@ final class LostTalesClientMapMarkerIndex {
                             (int)Math.round(marker.getX()),
                             (int)Math.round(marker.getZ())), marker);
                     putFirst(byName, normalizeLookupKey(
-                            marker.getName()), marker);
+                            marker.getGivenName()), marker);
                 }
             }
             return new Snapshot(

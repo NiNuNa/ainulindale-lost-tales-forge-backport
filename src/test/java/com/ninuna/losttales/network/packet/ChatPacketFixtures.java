@@ -66,7 +66,7 @@ public final class ChatPacketFixtures {
         private long timestampMillis = 1L;
         private String skinId = "";
         private List<ChatShowcase> showcases;
-        private String factionName = "";
+        private String factionId = "";
         private String partner = "";
         private int roles;
         private boolean accountLine;
@@ -115,8 +115,9 @@ public final class ChatPacketFixtures {
             return this;
         }
 
-        public Line faction(String factionName) {
-            this.factionName = factionName;
+        /** The sender's faction, by its id ({@code lotr:gondor}). */
+        public Line faction(String factionId) {
+            this.factionId = factionId;
             return this;
         }
 
@@ -156,7 +157,7 @@ public final class ChatPacketFixtures {
                     this.identityName, this.accountName, this.title,
                     this.titleColor, this.nameColor, this.message,
                     this.timestampMillis, this.skinId, this.showcases,
-                    this.factionName, this.partner, this.roles,
+                    this.factionId, this.partner, this.roles,
                     this.accountLine, this.messageId, ChatReplyReference.NONE,
                     "", this.echoNonce, this.identityCharacterId);
         }

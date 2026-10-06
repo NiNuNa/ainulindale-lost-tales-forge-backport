@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
+import com.ninuna.losttales.util.LostTalesWords;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
 import java.util.Iterator;
@@ -65,14 +66,13 @@ public final class DiscordGameEventRelay {
         }
         EntityPlayerMP player = (EntityPlayerMP)event.player;
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
-        bridge.announce(DiscordServerNotices.playerJoined(
+        bridge.announce(DiscordServerNotices.playerJoined(LostTalesWords.LANG,
                 player.getCommandSenderName(),
                 DiscordAvatarUrl.forPlayer(player)),
                 takeLine(ChatSystemLineClassifier.Kind.JOIN,
                         player.getCommandSenderName()),
                 ChatSystemLineClassifier.channelOf(
                         ChatSystemLineClassifier.Kind.JOIN));
-        bridge.requestStatusRefresh();
     }
 
     @SubscribeEvent
@@ -82,16 +82,13 @@ public final class DiscordGameEventRelay {
         }
         EntityPlayerMP player = (EntityPlayerMP)event.player;
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
-        bridge.announce(DiscordServerNotices.playerLeft(
+        bridge.announce(DiscordServerNotices.playerLeft(LostTalesWords.LANG,
                 player.getCommandSenderName(),
                 DiscordAvatarUrl.forPlayer(player)),
                 takeLine(ChatSystemLineClassifier.Kind.LEAVE,
                         player.getCommandSenderName()),
                 ChatSystemLineClassifier.channelOf(
                         ChatSystemLineClassifier.Kind.LEAVE));
-        // The player is still on the list while this fires; the count
-        // is taken on the next tick, when they are gone.
-        bridge.requestStatusRefresh();
     }
 
     /**

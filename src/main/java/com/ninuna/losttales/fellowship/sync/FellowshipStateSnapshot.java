@@ -120,6 +120,7 @@ public final class FellowshipStateSnapshot {
                                                     int memberLimit,
                                                     FellowshipInvitationState state,
                                                     FellowshipSnapshot.Presence presence,
+                                                    FellowshipSnapshot.Marks marks,
                                                     List<FellowshipInviteTargetSnapshot> inviteTargets,
                                                     boolean inviteTargetsTruncated) {
         if (state == null || !state.isSuccessful()) {
@@ -129,7 +130,8 @@ public final class FellowshipStateSnapshot {
         }
         ArrayList<FellowshipSnapshot> fellowships = new ArrayList<FellowshipSnapshot>();
         for (Fellowship fellowship : state.getFellowships()) {
-            fellowships.add(FellowshipSnapshot.fromFellowship(fellowship, presence));
+            fellowships.add(FellowshipSnapshot.fromFellowship(fellowship, presence,
+                    marks));
         }
         ArrayList<FellowshipInvitationSnapshot> incoming = convert(
                 state, state.getIncomingInvitations(), MAX_INCOMING_INVITATIONS);

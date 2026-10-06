@@ -2,16 +2,19 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.client.window.OptionGlyph;
 import com.ninuna.losttales.client.window.PageHelp;
+import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.PageOption;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowMenus;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -415,6 +418,26 @@ public final class ConversationPage extends WindowPage {
         return ClientChatChannelState.displayName(this);
     }
 
+    /**
+     * Whether a search finds the conversation: by its name in this game's
+     * language, or by its channel's code name ({@code ooc}, {@code gondor}),
+     * which reads the same in every language.
+     */
+    @Override
+    public boolean answers(String filter) {
+        if (super.answers(filter)) {
+            return true;
+        }
+        if (this.npc || isWhisper() || this.channel == null) {
+            return false;
+        }
+        String code = ChatCodeNames.of(this.channel,
+                this.channel != ChatChannel.FACTION ? ""
+                        : this.ownerKey.length() > 0 ? this.ownerKey
+                        : ClientChatChannelState.scopeKeyRead(this.channel));
+        return code != null && WindowMenus.matchesFilter(code, filter);
+    }
+
     @Override
     public int tone() {
         return ClientChatChannelState.displayColor(this);
@@ -598,7 +621,8 @@ public final class ConversationPage extends WindowPage {
         options.add(PageOption.action(MENU_MARK_READ,
                 word("gui.losttales.chat.tab.mark_read"), READ_GLYPH)
                 .unavailable(unread ? "" : word("gui.losttales.chat.tab.nothing_unread"))
-                .inGroup(GROUP_READING, ""));
+                .inGroup(GROUP_READING, "")
+                .reachesEveryPage(word("gui.losttales.chat.tab.mark_all_read")));
         options.add(PageOption.action(MENU_JUMP_UNREAD,
                 word("gui.losttales.chat.tab.jump_unread"), JUMP_GLYPH)
                 .unavailable(divided ? "" : word("gui.losttales.chat.tab.nothing_unread"))
@@ -607,9 +631,11 @@ public final class ConversationPage extends WindowPage {
         // words that say what of this one reaches it.
         options.add(pick(MENU_FEED, "gui.losttales.chat.tab.feed",
                 ChatLayout.feedChoice(this), FEED_GLYPHS)
-                .withSettings(Settings.Place.FEED));
+                .withSettings(Settings.Place.FEED)
+                .reachesEveryPage(word("gui.losttales.chat.tab.feed_all")));
         options.add(pick(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
-                ChatLayout.notification(this), BELL_GLYPHS));
+                ChatLayout.notification(this), BELL_GLYPHS)
+                .reachesEveryPage(word("gui.losttales.chat.tab.notify_all")));
         return options;
     }
 
@@ -677,11 +703,22 @@ public final class ConversationPage extends WindowPage {
         return false;
     }
 
-    /** The two consoles stand in the command key's view, not the chat key's. */
-    @Override
+    /** Whether it is one of the two consoles, the command key's. */
     public boolean isConsole() {
         return this.channel == ChatChannel.CLIENT_CONSOLE
                 || this.channel == ChatChannel.SERVER_CONSOLE;
+    }
+
+    /**
+     * A console stands among the consoles, a whisper, a player's or an
+     * NPC's, among the whispers, and every other conversation among the
+     * channels.
+     */
+    @Override
+    public PageCategory category() {
+        return isConsole() ? PageCategory.CONSOLES
+                : isWhisper() || isNpc() ? PageCategory.WHISPERS
+                : PageCategory.CHANNELS;
     }
 
     @Override

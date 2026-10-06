@@ -2,6 +2,9 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -20,7 +23,6 @@ import net.minecraft.util.StatCollector;
 final class ChatQuestPicker extends ChatPickerPanel {
     /** A row's width where the window first opens; it stretches with the window. */
     private static final int ROW_WIDTH = 116;
-    private static final int ROW_HEIGHT = 12;
     private static final long REFRESH_INTERVAL_NANOS = 500L * 1000000L;
     private List<ChatShareCandidates.QuestEntry> quests =
             new ArrayList<ChatShareCandidates.QuestEntry>();
@@ -50,9 +52,10 @@ final class ChatQuestPicker extends ChatPickerPanel {
         return ROW_WIDTH;
     }
 
+    /** A menu's row. */
     @Override
     int cellHeight() {
-        return ROW_HEIGHT;
+        return MenuWindow.rowHeight();
     }
 
     @Override
@@ -86,11 +89,21 @@ final class ChatQuestPicker extends ChatPickerPanel {
                    int width, int alpha, boolean hovered) {
         ChatShareCandidates.QuestEntry quest =
                 (ChatShareCandidates.QuestEntry)entry.value;
-        LostTalesUiSheet.QUEST.drawWithShadow(x + 1, y + 1, alpha);
+        // A menu's sprite row: the quest mark centred in the icon column
+        // and on the capitals of the name, which stands where a menu's
+        // label does.
+        int labelTop = y + LostTalesUiInk.centredStart(cellHeight(),
+                LostTalesUiInk.CAP_HEIGHT);
+        LostTalesUiSheet mark = LostTalesUiSheet.QUEST;
+        mark.drawWithShadow(x + ICON_LEFT + LostTalesUiInk.centredStart(
+                        TabIcons.SIZE, mark.getWidth()),
+                labelTop + Math.floorDiv(LostTalesUiInk.CAP_HEIGHT
+                        - mark.getHeight(), 2), alpha);
         String label = LostTalesSkyrimUiStyle.trimToWidth(
-                minecraft.fontRenderer, quest.label(), width - 18);
+                minecraft.fontRenderer, quest.label(),
+                width - LABEL_LEFT - MenuWindow.PADDING_X);
         LostTalesChatVisualStyle.drawPlain(minecraft.fontRenderer, label,
-                x + 15, y + 2, hovered ? alpha : Math.min(alpha, 220));
+                x + LABEL_LEFT, labelTop, alpha);
     }
 
     @Override

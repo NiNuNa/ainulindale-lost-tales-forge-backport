@@ -609,6 +609,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
         if (id.length() == 0 || bitIndex >= ChatRoleCatalog.MAX_ROLES) {
             throw new LostTalesPacketCodec.DecodeException("invalid role");
         }
+        // A role named by the lang file is named by its own line and by
+        // nothing else; any other role comes with the name its entry gave it.
+        if (nameKey.length() > 0 && (name.length() > 0
+                || !nameKey.equals(ChatAccountRole.nameKeyOf(id)))) {
+            throw new LostTalesPacketCodec.DecodeException("invalid role name");
+        }
         // No icon, or one this side cannot read, is the plain face.
         ChatChannelIconSpec icon = iconText.length() == 0 ? null
                 : ChatChannelIconSpec.parse(iconText);

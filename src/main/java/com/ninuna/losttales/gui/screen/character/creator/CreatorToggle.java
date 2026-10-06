@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -7,8 +8,9 @@ import org.lwjgl.input.Keyboard;
 
 /**
  * A row that is on or off: its name at the left, a small switch at the
- * right. A click anywhere on the row, or space or enter while it holds the
- * focus, flips it.
+ * right; in a window's rows, as a switch's row in Settings, the word for
+ * its state at the right end in place of the switch. A click anywhere on
+ * the row, or space or enter while it holds the focus, flips it.
  */
 public final class CreatorToggle extends CreatorControl {
 
@@ -38,7 +40,7 @@ public final class CreatorToggle extends CreatorControl {
 
     @Override
     public int height() {
-        return 18;
+        return inRows() ? CreatorRows.height() : 18;
     }
 
     @Override
@@ -48,6 +50,10 @@ public final class CreatorToggle extends CreatorControl {
 
     @Override
     public void draw(int mouseX, int mouseY) {
+        if (inRows()) {
+            drawRow(mouseX, mouseY);
+            return;
+        }
         FontRenderer font = this.context.getFont();
         boolean on = this.value.get();
         boolean hovered = contains(mouseX, mouseY);
@@ -80,6 +86,23 @@ public final class CreatorToggle extends CreatorControl {
                 hovered || isFocused()
                         ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
                         : LostTalesSkyrimUiStyle.TEXT);
+    }
+
+    /**
+     * As a window's row: lit under the pointer and while it holds the
+     * keys, its name at the left in ivory, the word for its state at the
+     * right end in the aside tone, ivory under the pointer.
+     */
+    private void drawRow(int mouseX, int mouseY) {
+        boolean hovered = contains(mouseX, mouseY);
+        if (hovered || isFocused()) {
+            CreatorRows.light(this.context, this.y, this.y + height());
+        }
+        String state = this.value.get() ? this.onLabel : this.offLabel;
+        int stateLeft = CreatorRows.drawValue(this.context, state, this.x,
+                this.x + this.width, this.y, hovered);
+        CreatorRows.drawLabel(this.context, this.label, this.x, this.y,
+                stateLeft - MenuWindow.VALUE_GAP);
     }
 
     @Override

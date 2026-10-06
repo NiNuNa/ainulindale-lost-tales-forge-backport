@@ -1,6 +1,8 @@
 package com.ninuna.losttales.block.tileentity;
 
+import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.util.LostTalesBlockRotationHelper;
+import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
@@ -195,12 +197,16 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
         this.markDirtyAndSync();
     }
 
+    /**
+     * The lang key of the urn's name, which the game showing it translates,
+     * as vanilla's containers name themselves; whether it is sealed the
+     * quick-loot snapshot carries beside it.
+     */
     @Override
     public String getInventoryName() {
-        if (this.getBlockType() != null) {
-            return this.getBlockType().getLocalizedName() + (this.sealed ? " (Sealed)" : "");
-        }
-        return this.sealed ? "Sealed Urn" : "Urn";
+        Block block = this.getBlockType();
+        return (block != null ? block : ELostTalesBlock.URN.getBlock())
+                .getUnlocalizedName() + ".name";
     }
 
     @Override

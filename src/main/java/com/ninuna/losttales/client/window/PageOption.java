@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -52,6 +51,11 @@ public final class PageOption {
     private String headingKey = "";
     /** The settings a pick's sub-window shows under its words; null for none. */
     private Settings.Place settings;
+    /**
+     * What it is called when taken for every page of its category at once,
+     * from the {@code +}; empty while it cannot be.
+     */
+    private String everyPageLabel = "";
 
     private PageOption(String id, String label, Kind kind, boolean on,
                        String value, OptionGlyph glyph) {
@@ -122,6 +126,26 @@ public final class PageOption {
         return this.settings;
     }
 
+    /**
+     * The same option, offered for every page of its category at once by a
+     * right-click on the category's name in the {@code +}, under
+     * {@code label}: *Mark All as Read*, a conversation's two settings.
+     */
+    public PageOption reachesEveryPage(String label) {
+        this.everyPageLabel = label == null ? "" : label;
+        return this;
+    }
+
+    /** Whether it may be taken for every page of its category at once. */
+    boolean forEveryPage() {
+        return this.everyPageLabel.length() > 0;
+    }
+
+    /** What it is called when taken for every page of its category at once. */
+    String everyPageLabel() {
+        return this.everyPageLabel;
+    }
+
     /** The same option, greyed, saying {@code reason}; an empty reason leaves it as it is. */
     public PageOption unavailable(String reason) {
         this.unavailable = reason == null ? "" : reason;
@@ -177,11 +201,15 @@ public final class PageOption {
      * pointer.
      */
     MenuWindow.Entry row() {
-        boolean marked = (this.kind == Kind.SWITCH || this.kind == Kind.CHOICE)
-                && this.on;
+        return row((this.kind == Kind.SWITCH || this.kind == Kind.CHOICE)
+                && this.on);
+    }
+
+    /** Its row, chosen, so lit, or not as {@code marked} says. */
+    MenuWindow.Entry row(boolean marked) {
         MenuWindow.Entry entry = new MenuWindow.Entry(this.id, this.label,
-                false, marked ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1,
-                null).withPicture(this.glyph.asPicture());
+                false, -1, null).withPicture(this.glyph.asPicture())
+                .chosen(marked);
         if (this.kind == Kind.PICK) {
             entry.withValue(this.value);
         }

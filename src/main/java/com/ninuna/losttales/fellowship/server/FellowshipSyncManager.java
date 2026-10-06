@@ -7,6 +7,7 @@ import com.ninuna.losttales.network.packet.fellowship.FellowshipOperationResultP
 import com.ninuna.losttales.network.packet.fellowship.FellowshipStateSyncPacket;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipInvitation;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationWorldData;
@@ -14,6 +15,7 @@ import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import com.ninuna.losttales.fellowship.sync.FellowshipInviteTargetSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipOperationType;
+import com.ninuna.losttales.fellowship.sync.FellowshipSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -49,6 +51,16 @@ public final class FellowshipSyncManager {
 
     private FellowshipSyncManager() {}
 
+    /** The fellowships' marks as the world holds them now. */
+    private static FellowshipSnapshot.Marks marksView(final World world) {
+        return new FellowshipSnapshot.Marks() {
+            @Override
+            public List<FellowshipMark> of(UUID fellowshipId) {
+                return FellowshipService.getInstance().marksOf(world, fellowshipId);
+            }
+        };
+    }
+
     public static boolean sendState(EntityPlayerMP player, int requestId) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return false;
@@ -69,8 +81,8 @@ public final class FellowshipSyncManager {
                 player, state);
         FellowshipStateSnapshot snapshot = FellowshipStateSnapshot.fromState(
                 ownerId, sequence, FellowshipService.memberLimit(), state,
-                onlineView(player.worldObj), inviteTargets.targets,
-                inviteTargets.truncated);
+                onlineView(player.worldObj), marksView(player.worldObj),
+                inviteTargets.targets, inviteTargets.truncated);
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new FellowshipStateSyncPacket(requestId, snapshot), player);
         FellowshipMemberStatusSyncManager.sendNow(player);

@@ -2,6 +2,7 @@ package com.ninuna.losttales.compat.discord;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.ninuna.losttales.util.EnglishWords;
 import java.util.List;
 import java.util.Collections;
 import org.junit.Test;
@@ -120,7 +121,8 @@ public final class DiscordJsonTest {
 
         // No picture, no icon field; the colour is never negative.
         JsonObject plain = new JsonParser().parse(DiscordJson.webhookEmbedBody(
-                DiscordServerNotices.playerJoined("Steve", ""))).getAsJsonObject();
+                DiscordServerNotices.playerJoined(EnglishWords.INSTANCE, "Steve",
+                        ""))).getAsJsonObject();
         JsonObject plainEmbed = plain.getAsJsonArray("embeds").get(0)
                 .getAsJsonObject();
         assertFalse(plainEmbed.getAsJsonObject("author").has("icon_url"));

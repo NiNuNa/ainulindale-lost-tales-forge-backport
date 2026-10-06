@@ -5,14 +5,19 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageHelp;
 import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.client.window.WindowKeys;
+import com.ninuna.losttales.client.input.LostTalesInputBinding;
+import com.ninuna.losttales.util.LostTalesLangFile;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import net.minecraft.util.StringTranslate;
 import org.junit.Test;
 import org.lwjgl.input.Keyboard;
 
@@ -55,8 +60,17 @@ public final class ChatShortcutsTest {
         assertTrue("the rows show their words as keys", checked > 0);
     }
 
+    /** In English, as the mod's lang file words the keys. */
     @Test
     public void aKeyIsFoundByTheNameItsIconWrites() {
+        StringBuilder english = new StringBuilder();
+        for (String id : new String[] {"backspace", "page_up", "page_down"}) {
+            String key = LostTalesInputBinding.NAME_PREFIX + id;
+            english.append(key).append('=')
+                    .append(LostTalesLangFile.english().get(key)).append('\n');
+        }
+        StringTranslate.inject(new ByteArrayInputStream(
+                english.toString().getBytes(Charset.forName("UTF-8"))));
         assertEquals("f", WindowKeys.keyName(Keyboard.KEY_F));
         assertEquals("backspace", WindowKeys.keyName(Keyboard.KEY_BACK));
         assertEquals("pgup", WindowKeys.keyName(Keyboard.KEY_PRIOR));

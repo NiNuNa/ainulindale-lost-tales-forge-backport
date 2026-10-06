@@ -3,7 +3,6 @@ package com.ninuna.losttales.client.window;
 import org.lwjgl.input.Keyboard;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
-import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.init.Items;
@@ -23,10 +22,6 @@ import net.minecraft.util.StatCollector;
 public final class ClientSettingsPage extends PageContent {
     public static final String PAGE_ID = "client_settings";
     public static final ItemStack ICON = new ItemStack(Items.comparator);
-    /** Clear room above and below the rows. */
-    private static final int TOP = 3;
-    /** The widest the column of rows grows, however wide the window. */
-    private static final int MAX_COLUMN_WIDTH = 320;
 
     private final PageRows list;
     /** What the tool strip's search holds; empty for everything. */
@@ -92,43 +87,34 @@ public final class ClientSettingsPage extends PageContent {
             return;
         }
         this.list.setRows(rows);
-        LostTalesUiHitBox column = column(box);
+        LostTalesUiHitBox column = PageRows.column(box);
         this.list.draw(minecraft, column, clipX + (column.left - box.left),
                 clipY + (column.top - box.top), pointerX, pointerY, alpha);
     }
 
-    /** The column the rows stand in: the page's width up to a limit, centred. */
-    private static LostTalesUiHitBox column(LostTalesUiHitBox box) {
-        int boxWidth = (int)Math.floor(box.width);
-        int width = Math.max(0, Math.min(boxWidth, MAX_COLUMN_WIDTH));
-        return new LostTalesUiHitBox(Math.floor(box.left)
-                + LostTalesUiInk.centredStart(boxWidth, width),
-                Math.floor(box.top) + TOP, width,
-                Math.max(0.0D, Math.floor(box.height) - 2 * TOP));
-    }
 
     /* ---- The pointer ---- */
 
     @Override
     public boolean acts(LostTalesUiHitBox box, double x, double y) {
-        return this.list.acts(column(box), x, y);
+        return this.list.acts(PageRows.column(box), x, y);
     }
 
     @Override
     public String tipAt(LostTalesUiHitBox box, double x, double y) {
-        return this.list.tipAt(column(box), x, y);
+        return this.list.tipAt(PageRows.column(box), x, y);
     }
 
     @Override
     public boolean mousePressed(Minecraft minecraft, LostTalesUiHitBox box,
                                 double x, double y, int button) {
-        return this.list.press(column(box), x, y, button);
+        return this.list.press(PageRows.column(box), x, y, button);
     }
 
     @Override
     public boolean scroll(LostTalesUiHitBox box, double x, double y,
                           int lines) {
-        if (lines == 0 || !column(box).contains(x, y)) {
+        if (lines == 0 || !PageRows.column(box).contains(x, y)) {
             return false;
         }
         this.list.scroll(lines);

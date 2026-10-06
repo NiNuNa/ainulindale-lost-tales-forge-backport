@@ -79,6 +79,11 @@ public class LostTalesUiTextField extends GuiTextField {
 
     @Override
     public void drawTextBox() {
+        drawTextBox(0xFF);
+    }
+
+    /** The field at {@code alpha} of its full strength, as a window fading in draws it. */
+    public void drawTextBox(int alpha) {
         if (!getVisible()) {
             return;
         }
@@ -105,20 +110,20 @@ public class LostTalesUiTextField extends GuiTextField {
             int selectionX = left
                     + this.font.getStringWidth(visible.substring(0, bounded));
             drawSelection(Math.min(caretX, selectionX),
-                    Math.max(caretX, selectionX), top);
+                    Math.max(caretX, selectionX), top, alpha);
         }
         int caretTop = LostTalesUiCaret.topFor(top);
         if (caretShown) {
             LostTalesUiCaret.drawShadow(caretX, caretTop,
-                    LostTalesUiCaret.HEIGHT, 0xFF);
+                    LostTalesUiCaret.HEIGHT, alpha);
         }
         LostTalesUiInk.beginContent();
         if (visible.length() > 0) {
-            drawShadowedText(visible, left, top, LostTalesUiInk.IVORY, 0xFF);
+            drawShadowedText(visible, left, top, LostTalesUiInk.IVORY, alpha);
         }
         if (caretShown) {
             LostTalesUiCaret.drawBar(caretX, caretTop,
-                    LostTalesUiCaret.HEIGHT, 0xFF);
+                    LostTalesUiCaret.HEIGHT, alpha);
         }
     }
 
@@ -223,11 +228,12 @@ public class LostTalesUiTextField extends GuiTextField {
         LostTalesUiInk.beginContent();
     }
 
-    private void drawSelection(int from, int to, int textTop) {
+    private void drawSelection(int from, int to, int textTop, int alpha) {
         int top = LostTalesUiCaret.topFor(textTop);
         Gui.drawRect(from, top, to, top + LostTalesUiCaret.HEIGHT,
                 LostTalesUiInk.argb(
-                        LostTalesColors.rgb(LostTalesColors.PLUM_GRAY), 0xB4));
+                        LostTalesColors.rgb(LostTalesColors.PLUM_GRAY),
+                        Math.min(alpha, 0xB4)));
         LostTalesUiInk.beginContent();
     }
 }

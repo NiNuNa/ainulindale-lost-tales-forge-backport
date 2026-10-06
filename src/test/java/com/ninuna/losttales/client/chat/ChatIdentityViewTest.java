@@ -117,10 +117,10 @@ public final class ChatIdentityViewTest {
         ClientChatIdentities.select(identityOf(BEREN));
         assertFalse(ClientChatChannelState.isAvailable(gondor));
         assertTrue(ClientChatChannelState.isAvailable(rohan));
-        ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "A friend", true,
+        ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "A friend", false, true,
                         GONDOR, ALDRIC.toString()));
         assertTrue(ClientChatTypingState.namesTyping(ConversationPage.of(ChatChannel.FACTION)).isEmpty());
-        ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "Beren's friend", true,
+        ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "Beren's friend", false, true,
                         ROHAN, BEREN.toString()));
         assertEquals(java.util.Collections.singletonList("Beren's friend"),
                 ClientChatTypingState.namesTyping(ConversationPage.of(ChatChannel.FACTION)));
@@ -153,15 +153,35 @@ public final class ChatIdentityViewTest {
         roster();
         ClientChatIdentities.select(identityOf(BEREN));
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
-                "Steve", "Friend", true, "", ALDRIC.toString()));
+                "Steve", "Friend", false, true, "", ALDRIC.toString()));
         ConversationPage beren = ConversationPage.whisper("Steve", "Friend", BEREN.toString());
         assertTrue(ClientChatTypingState.namesTyping(beren).isEmpty());
         ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
-                "Steve", "Friend", true, "", BEREN.toString()));
+                "Steve", "Friend", false, true, "", BEREN.toString()));
         assertEquals(java.util.Collections.singletonList("Friend"),
                 ClientChatTypingState.namesTyping(beren));
         assertTrue(ClientChatTypingState.namesTyping(
                 ConversationPage.whisper("Steve", "Another character", BEREN.toString())).isEmpty());
+    }
+
+    /** The Narrator types under the name this game gives it, and stops under it too. */
+    @Test
+    public void theNarratorTypesUnderThisGamesName() {
+        roster();
+        ClientChatIdentities.select(identityOf(BEREN));
+        ConversationPage told = ConversationPage.whisper("Steve",
+                com.ninuna.losttales.chat.ChatNarrator.NAME, BEREN.toString());
+        ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
+                "Steve", com.ninuna.losttales.chat.ChatNarrator.NAME, true, true, "",
+                BEREN.toString()));
+        assertEquals(java.util.Collections.singletonList(
+                com.ninuna.losttales.chat.ChatNames.narrator(
+                        com.ninuna.losttales.util.LostTalesWords.LANG)),
+                ClientChatTypingState.namesTyping(told));
+        ClientChatTypingState.accept(new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
+                "Steve", com.ninuna.losttales.chat.ChatNarrator.NAME, true, false, "",
+                BEREN.toString()));
+        assertTrue(ClientChatTypingState.namesTyping(told).isEmpty());
     }
 
     /**

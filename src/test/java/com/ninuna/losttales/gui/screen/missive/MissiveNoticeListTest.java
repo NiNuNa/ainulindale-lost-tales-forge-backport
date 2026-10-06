@@ -3,9 +3,15 @@ package com.ninuna.losttales.gui.screen.missive;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveObjectiveData;
 import com.ninuna.losttales.quest.missive.MissiveNotice;
+import com.ninuna.losttales.util.LostTalesLangFile;
+import java.io.ByteArrayInputStream;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import net.minecraft.util.StringTranslate;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -20,23 +26,48 @@ import static org.junit.Assert.assertTrue;
  */
 public final class MissiveNoticeListTest {
 
+    /**
+     * The words a game in English reads the letters in: the mod's own
+     * missive and objective lines, and no other, so the rest of the suite
+     * still reads keys where it expects them.
+     */
+    @BeforeClass
+    public static void readInEnglish() throws Exception {
+        StringBuilder lines = new StringBuilder();
+        for (Map.Entry<String, String> line
+                : LostTalesLangFile.english().entrySet()) {
+            if (line.getKey().startsWith("missive.losttales.")
+                    || line.getKey().startsWith("gui.losttales.quest.objective.")) {
+                lines.append(line.getKey()).append('=').append(line.getValue())
+                        .append('\n');
+            }
+        }
+        StringTranslate.inject(new ByteArrayInputStream(
+                lines.toString().getBytes("UTF-8")));
+    }
+
     private static MissiveNotice notice(int slot, String id, String title,
-                                        String issuer, String objective) {
-        LostTalesMissiveData missive = LostTalesMissiveData.builder(id, "kill")
-                .title(title).issuer(issuer)
-                .objective(new LostTalesMissiveObjectiveData("o", "kill",
-                        objective, false, null))
+                                        String issuer, String type,
+                                        String target, int count) {
+        Map<String, String> params = new LinkedHashMap<String, String>();
+        params.put("kill".equals(type) ? "entity" : "item", target);
+        params.put("count", String.valueOf(count));
+        LostTalesMissiveData missive = LostTalesMissiveData.builder(id, type)
+                .titleId(title).issuerId(issuer).descriptionId(type)
+                .target(target)
+                .objective(new LostTalesMissiveObjectiveData("o", type, false,
+                        params))
                 .build();
         return new MissiveNotice(slot, 1000L, missive);
     }
 
     private static final MissiveNotice ROAD = notice(0, "q/road",
-            "Trouble on the Road", "A Road Warden", "Defeat 5 zombies.");
+            "trouble_on_the_road", "road_warden", "kill", "Zombie", 5);
     private static final MissiveNotice COAL = notice(3, "q/coal",
-            "Supplies for the Forge", "The Quartermaster", "Bring 12 coal.");
+            "materials_wanted", "quartermaster", "gather", "minecraft:coal", 12);
     private static final MissiveNotice BLANK = new MissiveNotice(5, 1000L, null);
     private static final MissiveNotice BONES = notice(8, "q/bones",
-            "Old Bones", "A Village Reeve", "Bring 6 bones.");
+            "gatherers_pay", "village_reeve", "gather", "minecraft:bone", 6);
     private static final List<MissiveNotice> BOARD =
             Arrays.asList(ROAD, COAL, BLANK, BONES);
 
@@ -47,18 +78,20 @@ public final class MissiveNoticeListTest {
         assertTrue(MissiveNoticeList.of(null, "").isEmpty());
     }
 
+    /** A search reads the letters in the game's words, made from their template ids. */
     @Test
     public void aSearchKeepsTheNoticesHoldingEveryWordAnywhere() {
         assertEquals(Collections.singletonList(COAL),
-                MissiveNoticeList.of(BOARD, "forge"));
+                MissiveNoticeList.of(BOARD, "materials"));
         assertEquals("the issuer counts", Collections.singletonList(ROAD),
                 MissiveNoticeList.of(BOARD, "warden"));
         assertEquals("the objectives count, in any order and case",
-                Arrays.asList(COAL, BONES), MissiveNoticeList.of(BOARD, "BRING"));
-        assertEquals(Collections.singletonList(BONES),
+                Arrays.asList(COAL, BONES), MissiveNoticeList.of(BOARD, "GATHER"));
+        assertEquals("the target's noun and the issuer",
+                Collections.singletonList(BONES),
                 MissiveNoticeList.of(BOARD, "bones reeve"));
         assertTrue("a notice that cannot be read says nothing",
-                MissiveNoticeList.of(BOARD, "notice").isEmpty());
+                MissiveNoticeList.of(BOARD, "dragon").isEmpty());
     }
 
     @Test
@@ -74,8 +107,8 @@ public final class MissiveNoticeListTest {
                 MissiveNoticeList.keepPick(BOARD, -1, ""));
         assertEquals("the letter picked stays picked", 3,
                 MissiveNoticeList.keepPick(BOARD, 3, "q/coal"));
-        MissiveNotice movedCoal = notice(6, "q/coal", "Supplies for the Forge",
-                "The Quartermaster", "Bring 12 coal.");
+        MissiveNotice movedCoal = notice(6, "q/coal", "materials_wanted",
+                "quartermaster", "gather", "minecraft:coal", 12);
         assertEquals("even where it moved", 6, MissiveNoticeList.keepPick(
                 Arrays.asList(ROAD, movedCoal), 3, "q/coal"));
         List<MissiveNotice> taken = Arrays.asList(ROAD, BLANK, BONES);

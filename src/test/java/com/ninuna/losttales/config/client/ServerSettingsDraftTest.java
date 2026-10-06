@@ -27,19 +27,19 @@ public final class ServerSettingsDraftTest {
                                             String value, String min, String max) {
         return new ServerConfigEntry(category, key, type, false,
                 Collections.singletonList(value), Collections.singletonList(value),
-                min, max, "What it does.", key, false, null);
+                min, max, false, null);
     }
 
     private static ServerConfigEntry list(String key, String... values) {
         return new ServerConfigEntry("chat", key, ServerConfigEntry.Type.STRING, true,
                 Arrays.asList(values), Collections.<String>emptyList(), "", "",
-                "Lines.", key, false, null);
+                false, null);
     }
 
     private static ServerConfigEntry secret(boolean set) {
         return new ServerConfigEntry("discord", "botToken", ServerConfigEntry.Type.STRING,
                 false, set ? Collections.singletonList("") : Collections.<String>emptyList(),
-                Collections.singletonList(""), "", "", "Secret.", "botToken", true, null);
+                Collections.singletonList(""), "", "", true, null);
     }
 
     private static ServerSettingsDraft loaded(ServerConfigEntry... entries) {
@@ -168,7 +168,8 @@ public final class ServerSettingsDraftTest {
         draft.settle(sent, new ServerConfigApplyResult(
                 Arrays.asList("chat.auditLog", "fellowship.maxMembers"),
                 Collections.singletonList(new ServerConfigApplyResult.Refusal(
-                        "fellowship.sharedQuestRadius", "above the maximum 128")),
+                        "fellowship.sharedQuestRadius",
+                        ServerConfigChangeValidator.REASON + "above_maximum", "128")),
                 null, ""));
         assertFalse(draft.isChanged(audit));
         assertEquals("true", draft.find("chat.auditLog").getValue());

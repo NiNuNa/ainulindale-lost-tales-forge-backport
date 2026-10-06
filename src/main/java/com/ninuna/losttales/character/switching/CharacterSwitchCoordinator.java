@@ -24,8 +24,14 @@ import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.play.server.S40PacketDisconnect;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
@@ -1016,12 +1022,28 @@ public final class CharacterSwitchCoordinator {
         return CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
     }
 
+    /**
+     * Disconnects the player with the reason in their own language: the
+     * steps of vanilla's kick, with a translation in place of its plain
+     * text.
+     */
     private static void disconnectForRecovery(EntityPlayerMP player) {
         try {
             if (player != null && player.playerNetServerHandler != null) {
-                player.playerNetServerHandler.kickPlayerFromServer(
-                        "Character state could not be finalized safely. Reconnect; "
-                                + "contact an administrator if this repeats.");
+                final NetworkManager network =
+                        player.playerNetServerHandler.netManager;
+                final IChatComponent reason = new ChatComponentTranslation(
+                        "disconnect.losttales.character_recovery");
+                network.scheduleOutboundPacket(new S40PacketDisconnect(reason),
+                        new GenericFutureListener[] {
+                                new GenericFutureListener<Future<? super Void>>() {
+                                    @Override
+                                    public void operationComplete(
+                                            Future<? super Void> sent) {
+                                        network.closeChannel(reason);
+                                    }
+                                }});
+                network.disableAutoRead();
             }
         } catch (Throwable kickFailure) {
             // The durable journal still prevents an unsafe future switch.

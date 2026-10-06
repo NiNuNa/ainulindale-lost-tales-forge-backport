@@ -65,6 +65,18 @@ final class WaystoneRows {
         /** The lore LOTR gives the waystone's place, which an empty description shows; empty for none. */
         String nativeLore();
 
+        /**
+         * The name an unnamed waystone is called by, its placer's
+         * ({@code Nils's Waystone}); empty for one that must keep a name.
+         */
+        String defaultName();
+
+        /** The word for the waystone's kind, which an empty category reads. */
+        String defaultCategory();
+
+        /** What an empty description reads: the place's lore, else the words for a player's waystone. */
+        String defaultDescription();
+
         /** The players, or the fellowships, whose names hold {@code typed}. */
         List<String> offers(String typed);
 
@@ -94,8 +106,26 @@ final class WaystoneRows {
     WaystoneRows(Host host, int iconWidth) {
         this.host = host;
         this.iconWidth = iconWidth;
+        // An empty name, category or description stands for the words of
+        // the waystone's kind, which the field reads as its prompt: they
+        // are shown, never saved.
         this.name = new Typed("waystone_name", LANG + "name", false,
                 LostTalesMapMarkerRecord.MAX_NAME_LENGTH) {
+            @Override
+            protected boolean mayBeEmpty() {
+                return WaystoneRows.this.host.defaultName().length() > 0;
+            }
+
+            @Override
+            protected String prompt() {
+                return orLabel(WaystoneRows.this.host.defaultName());
+            }
+
+            @Override
+            protected String emptyValue() {
+                return orNone(WaystoneRows.this.host.defaultName());
+            }
+
             @Override
             protected String get() {
                 WaystoneDraft draft = draft();
@@ -111,7 +141,17 @@ final class WaystoneRows {
             }
         };
         this.category = new Typed("waystone_category", LANG + "category",
-                false, LostTalesMapMarkerRecord.MAX_NAME_LENGTH) {
+                true, LostTalesMapMarkerRecord.MAX_NAME_LENGTH) {
+            @Override
+            protected String prompt() {
+                return orLabel(WaystoneRows.this.host.defaultCategory());
+            }
+
+            @Override
+            protected String emptyValue() {
+                return orNone(WaystoneRows.this.host.defaultCategory());
+            }
+
             @Override
             protected String get() {
                 WaystoneDraft draft = draft();
@@ -126,21 +166,25 @@ final class WaystoneRows {
                 }
             }
         };
-        // An empty description shows the lore LOTR gives the place, and
-        // keeping that lore as it reads keeps the description empty: the
-        // lore is shown, never saved.
+        // An empty description reads the lore LOTR gives the place, and
+        // typing that lore as it reads keeps the description empty.
         this.description = new Typed("waystone_description",
                 LANG + "description", true,
                 LostTalesMapMarkerRecord.MAX_TEXT_LENGTH) {
             @Override
+            protected String prompt() {
+                return orLabel(WaystoneRows.this.host.defaultDescription());
+            }
+
+            @Override
+            protected String emptyValue() {
+                return orNone(WaystoneRows.this.host.defaultDescription());
+            }
+
+            @Override
             protected String get() {
                 WaystoneDraft draft = draft();
-                if (draft == null) {
-                    return "";
-                }
-                return draft.description().trim().length() > 0
-                        ? draft.description() : WaystoneRows.this.host
-                                .nativeLore();
+                return draft == null ? "" : draft.description();
             }
 
             @Override
@@ -382,6 +426,11 @@ final class WaystoneRows {
      * the row: kept by the page until Save ({@link Settings.Store#NONE}),
      * and gone with the waystone the page shows.
      */
+    /** {@code words}, or the row's name where there are none. */
+    private static String orLabelOr(String words, String label) {
+        return words == null || words.trim().length() == 0 ? label : words;
+    }
+
     private abstract class Typed extends Settings.Line {
         private final boolean mayBeEmpty;
         private final int maxLength;
@@ -411,6 +460,17 @@ final class WaystoneRows {
         @Override
         public boolean stands() {
             return WaystoneRows.this.host.stands();
+        }
+
+        /** {@code words}, or the row's name where there are none: what the field reads empty. */
+        String orLabel(String words) {
+            return orLabelOr(words, label());
+        }
+
+        /** {@code words}, cut as a row reads words, or None where there are none: what the row reads empty. */
+        String orNone(String words) {
+            return words == null || words.trim().length() == 0
+                    ? super.emptyValue() : shown(words.trim());
         }
     }
 

@@ -73,6 +73,34 @@ public final class FellowshipNbtCodecTest {
         assertEquals(mirror, read.getMirrors().get(FELLOWSHIP));
     }
 
+    /**
+     * A member whose name the server did not know is kept with no name,
+     * never with a word in the server's language, and read back as it was
+     * kept; each reader's game words it.
+     */
+    @Test
+    public void aMemberWithNoKnownNameIsKeptWithoutAWord() {
+        FellowshipMember nameless = new FellowshipMember(GUIDE,
+                UUID.randomUUID(), null, 2L, FellowshipColor.BLUE);
+        assertEquals("", nameless.getCharacterName());
+        List<FellowshipMember> members = new ArrayList<FellowshipMember>();
+        members.add(new FellowshipMember(LEADER, UUID.randomUUID(), "Aldric",
+                1L, FellowshipColor.GREEN));
+        members.add(nameless);
+        Fellowship fellowship = new Fellowship(FELLOWSHIP, LEADER, members,
+                Collections.<UUID>emptyList(), "Grey Company", null,
+                EnumSet.allOf(FellowshipSwitch.class), 1L, 3L,
+                Fellowship.CURRENT_DATA_VERSION);
+        assertTrue(fellowship.refreshMemberIdentity(LEADER,
+                fellowship.getMember(LEADER).getOwnerId(), "  "));
+        assertEquals("", fellowship.getMember(LEADER).getCharacterName());
+
+        FellowshipNbtCodec.ReadResult read = FellowshipNbtCodec.read(write(fellowship));
+        assertTrue(read.getQuarantineEntriesCopy().isEmpty());
+        assertEquals("", read.getFellowships().get(FELLOWSHIP)
+                .getMember(GUIDE).getCharacterName());
+    }
+
     @Test
     public void fiftyMembersAreSavedAndRead() {
         List<FellowshipMember> members = new ArrayList<FellowshipMember>();

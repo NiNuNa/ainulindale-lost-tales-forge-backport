@@ -5,8 +5,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
+import com.ninuna.losttales.util.LostTalesWords;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.util.StatCollector;
@@ -184,6 +186,17 @@ final class ChatComposer {
         }
     }
 
+    /**
+     * Whom the chip says is answered: the Server, the Client and the
+     * Narrator by this game's words, told by the answered line's head;
+     * anyone else by the name kept for the quote.
+     */
+    private String shownReplyName() {
+        ChatHeadMarker.Data head = this.replyToHead;
+        return head == null ? this.replyToName : ChatNames.sender(
+                LostTalesWords.LANG, head.senderId, head.skinId, this.replyToName);
+    }
+
     /** The tab whose strip the chip stands in, or null with nothing composed. */
     private ConversationPage composingTab() {
         return isEditing() ? this.editingTab : isReplying() ? this.replyTab : null;
@@ -225,7 +238,7 @@ final class ChatComposer {
                                 "gui.losttales.chat.editing")
                         : StatCollector.translateToLocalFormatted(
                                 "gui.losttales.chat.message.replying",
-                                this.replyToName),
+                                shownReplyName()),
                 Math.max(20, room - LostTalesUiSheet.CLOSE.getWidth() - 6));
         int width = font.getStringWidth(label);
         // The cross is the control, so its own box is what answers to

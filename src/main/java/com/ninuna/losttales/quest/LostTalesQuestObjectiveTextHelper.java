@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.quest.missive.MissiveWords;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import net.minecraft.util.StatCollector;
 
@@ -28,10 +29,24 @@ public final class LostTalesQuestObjectiveTextHelper {
                 : line;
     }
 
-    /** An objective's own description, or words made from its kind and target. */
+    /**
+     * An objective's own description, or words made from its kind and
+     * target: a bundled quest's lang line in the side's language, or a
+     * missive's line with its count and target's noun; else the words
+     * written, else the made words.
+     */
     public static String describe(LostTalesQuestObjectiveDefinition objective) {
         if (objective == null) {
             return StatCollector.translateToLocal("gui.losttales.quest.objective.generic");
+        }
+        String key = objective.getDescriptionKey();
+        if (MissiveWords.isObjectiveKey(key)) {
+            String line = MissiveWords.objectiveLine(objective);
+            if (line.length() > 0) {
+                return line;
+            }
+        } else if (key.length() > 0 && StatCollector.canTranslate(key)) {
+            return StatCollector.translateToLocal(key);
         }
         String description = objective.getDescription();
         if (description != null && description.length() > 0) {
@@ -103,13 +118,16 @@ public final class LostTalesQuestObjectiveTextHelper {
      * Who the objective names, for a reader: the first creature kind its
      * {@code entity} lists, by the game's name for it where the game has
      * one, else the kind made readable; else the first group its
-     * {@code group} lists. {@code noun} stands for nobody named.
+     * {@code group} lists, by its noun line ({@code hostile creatures}).
+     * {@code noun} stands for nobody named.
      */
     private static String targetName(LostTalesQuestObjectiveDefinition objective,
             String noun) {
         String target = LostTalesQuestParams.value(objective.getParams(), "entity");
+        boolean group = false;
         if (target.length() == 0) {
             target = LostTalesQuestParams.value(objective.getParams(), "group");
+            group = true;
         }
         int comma = target.indexOf(',');
         if (comma >= 0) {
@@ -117,6 +135,11 @@ public final class LostTalesQuestObjectiveTextHelper {
         }
         if (target.length() == 0) {
             return noun.length() == 0 ? "" : translate("noun." + noun);
+        }
+        String groupKey = "gui.losttales.quest.objective.group."
+                + target.toLowerCase(java.util.Locale.ROOT);
+        if (group && StatCollector.canTranslate(groupKey)) {
+            return StatCollector.translateToLocal(groupKey);
         }
         String key = "entity." + target + ".name";
         if (StatCollector.canTranslate(key)) {

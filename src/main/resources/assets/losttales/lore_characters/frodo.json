@@ -2,7 +2,7 @@
   "dataVersion": 1,
   "id": "losttales:frodo",
   "name": "Frodo",
-  "description": "A Hobbit of the Shire entrusted with a dangerous burden.",
+  "description": "",
   "appearance": {
     "raceId": "losttales:hobbit",
     "genderId": "losttales:male",

@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.character;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayRegistry;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
+import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
 
 import java.util.Locale;
@@ -21,7 +22,7 @@ public final class ClientCharacterRaceAttributes {
 
     public static String formatHitbox(CharacterRaceGameplayProfile profile) {
         CharacterRaceGameplayProfile safe = safe(profile);
-        return format(safe.getWidth(), 2) + " x " + format(safe.getHeight(), 2);
+        return word("size", format(safe.getWidth(), 2), format(safe.getHeight(), 2));
     }
 
     public static String formatEyeHeight(CharacterRaceGameplayProfile profile) {
@@ -30,22 +31,29 @@ public final class ClientCharacterRaceAttributes {
 
     public static String formatHealth(CharacterRaceGameplayProfile profile) {
         CharacterRaceGameplayProfile safe = safe(profile);
-        return format(safe.getMaxHealth(), 1)
-                + " (" + format(safe.getMaxHealth() / 2.0D, 1) + " hearts)";
+        return word("hearts", format(safe.getMaxHealth(), 1),
+                format(safe.getMaxHealth() / 2.0D, 1));
     }
 
     public static String formatMovementSpeed(CharacterRaceGameplayProfile profile) {
-        return format(safe(profile).getMovementSpeedMultiplier() * 100.0D, 0) + "%";
+        return word("percent",
+                format(safe(profile).getMovementSpeedMultiplier() * 100.0D, 0));
     }
 
     public static String formatAttackDamage(CharacterRaceGameplayProfile profile) {
         CharacterRaceGameplayProfile safe = safe(profile);
-        return format(safe.getAttackDamage(), 1)
-                + " (" + format(safe.getAttackDamage() / 2.0D, 1) + " hearts)";
+        return word("hearts", format(safe.getAttackDamage(), 1),
+                format(safe.getAttackDamage() / 2.0D, 1));
     }
 
     private static CharacterRaceGameplayProfile safe(CharacterRaceGameplayProfile profile) {
         return profile == null ? CharacterRaceGameplayRegistry.DEFAULT : profile;
+    }
+
+    /** An attribute's value as the lang line under {@code key} writes it. */
+    private static String word(String key, Object... values) {
+        return StatCollector.translateToLocalFormatted(
+                "gui.losttales.character.attribute.value." + key, values);
     }
 
     private static String format(double value, int decimals) {

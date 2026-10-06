@@ -5,7 +5,9 @@ import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatNarrator;
+import com.ninuna.losttales.util.LostTalesWords;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatReportReason;
@@ -23,7 +25,6 @@ import com.ninuna.losttales.client.window.WindowMenus;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -254,51 +255,46 @@ final class ChatMenus {
     /* ---- What the chat offers to open ---- */
 
     /**
-     * The chat's part of the {@code +} and of the tab search: the closed
-     * channels, each wearing the icon its tab would wear, its unread mark
-     * included — a closed channel keeps receiving, and the mark is the one
-     * the tab shows once restored; a muted one reads italic, like its tab
-     * would. Then the online players, each opening (or selecting) the
-     * conversation with them, wearing the head its tab wears and the
-     * conversation's mark; the search leaves out a conversation already
-     * open, which it lists among the open tabs. After them the NPC
-     * conversations of the session in no window, the one that spoke last
-     * first, each wearing the NPC's portrait its tab wears. Every row
-     * whose name holds {@code filter}, and a section with none left is
-     * left out.
+     * The chat's part of the {@code +} and of the tab search, each row
+     * under its page's category there ({@link PageCategory}): the closed
+     * channels and consoles, each wearing the icon its tab would wear, its
+     * unread mark included — a closed channel keeps receiving, and the mark
+     * is the one the tab shows once restored; a muted one reads italic,
+     * like its tab would. Then the online players, each opening (or
+     * selecting) the conversation with them, wearing the head its tab
+     * wears and the conversation's mark; the search leaves out a
+     * conversation already open, which it lists among the open tabs. After
+     * them the NPC conversations of the session in no window, the one that
+     * spoke last first, each wearing the NPC's portrait its tab wears.
+     * Every row whose name holds {@code filter}, or a channel's whose code
+     * name does ({@link ConversationPage#answers}).
      */
     static void addOpenable(Minecraft mc, List<MenuWindow.Entry> entries,
                             String filter, boolean search) {
-        List<MenuWindow.Entry> closed = new ArrayList<MenuWindow.Entry>();
         for (ConversationPage tab : restorableTabs()) {
             String name = ClientChatChannelState.displayName(tab);
-            if (WindowMenus.matchesFilter(name, filter)) {
-                closed.add(new MenuWindow.Entry(tab.id(), name,
+            if (tab.answers(filter)) {
+                entries.add(new MenuWindow.Entry(tab.id(), name,
                         ChatLayout.isMuted(tab),
                         ClientChatChannelState.displayColor(tab), tab));
             }
         }
-        WindowMenus.addSection(entries, StatCollector.translateToLocal(
-                "gui.losttales.chat.open.channels"), closed);
-        List<MenuWindow.Entry> players = new ArrayList<MenuWindow.Entry>();
         for (String name : whisperCandidates(mc)) {
             ConversationPage conversation = ConversationPage.whisper(name, "");
             if (conversation != null
                     && !(search && ChatLayout.isOpen(conversation))
                     && WindowMenus.matchesFilter(name, filter)) {
-                players.add(new MenuWindow.Entry(conversation.id(), name,
+                entries.add(new MenuWindow.Entry(conversation.id(), name,
                         ChatLayout.isMuted(conversation), -1, conversation));
             }
         }
         for (ConversationPage npc : ChatLayout.closedNpcConversations()) {
             String name = npc.title();
-            if (WindowMenus.matchesFilter(name, filter)) {
-                players.add(new MenuWindow.Entry(npc.id(), name,
+            if (npc.answers(filter)) {
+                entries.add(new MenuWindow.Entry(npc.id(), name,
                         npc.isMuted(), -1, npc));
             }
         }
-        WindowMenus.addSection(entries, StatCollector.translateToLocal(
-                "gui.losttales.chat.open.players"), players);
     }
 
     /**
@@ -728,8 +724,7 @@ final class ChatMenus {
         List<MenuWindow.Entry> open = new ArrayList<MenuWindow.Entry>();
         for (WindowPage each : WindowLayout.order()) {
             ConversationPage tab = ConversationPage.from(each);
-            if (tab != null && forwardsInto(tab)
-                    && WindowMenus.matchesFilter(tab.title(), filter)) {
+            if (tab != null && forwardsInto(tab) && tab.answers(filter)) {
                 open.add(new MenuWindow.Entry(tab.id(), tab.title(),
                         tab.isMuted(), tab.tone(), tab));
             }
@@ -739,7 +734,7 @@ final class ChatMenus {
         List<MenuWindow.Entry> channels = new ArrayList<MenuWindow.Entry>();
         for (ConversationPage tab : restorableTabs()) {
             String name = ClientChatChannelState.displayName(tab);
-            if (forwardsInto(tab) && WindowMenus.matchesFilter(name, filter)) {
+            if (forwardsInto(tab) && tab.answers(filter)) {
                 channels.add(new MenuWindow.Entry(tab.id(), name,
                         ChatLayout.isMuted(tab),
                         ClientChatChannelState.displayColor(tab), tab));
@@ -1168,7 +1163,7 @@ final class ChatMenus {
             return entries;
         }
         entries.add(MenuWindow.Entry.passive(ClientChatIdentities.isNarrating()
-                ? ChatNarrator.NAME : current.name)
+                ? ChatNames.narrator(LostTalesWords.LANG) : current.name)
                 .withPicture(head(self, current.account ? ""
                         : current.skinId)));
         if (ClientChatChannelState.holds(LostTalesCapability.CHAT_NARRATE)) {
@@ -1177,8 +1172,7 @@ final class ChatMenus {
             entries.add(new MenuWindow.Entry(ENTRY_NARRATOR,
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.character_selection.narrator"),
-                    false, ClientChatIdentities.isNarrating()
-                            ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null)
+                    false, -1, null)
                     .withSprite(LostTalesUiSheet.SPEECH_BUBBLE,
                             LostTalesUiSheet.SPEECH_BUBBLE_HOVER,
                             ClientChatIdentities.isNarrating()));
@@ -1216,8 +1210,7 @@ final class ChatMenus {
         for (final ChatRoleplayStatus status : ChatRoleplayStatus.values()) {
             rows.add(new MenuWindow.Entry(ENTRY_ROLEPLAY_PREFIX + status.name(),
                     StatCollector.translateToLocal(status.labelKey()), false,
-                    chosen == status
-                            ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null)
+                    -1, null).chosen(chosen == status)
                     .withPicture(new MenuWindow.Picture() {
                         @Override
                         public void draw(Minecraft minecraft, float iconX,
@@ -1253,10 +1246,10 @@ final class ChatMenus {
             }
             rows.add(new MenuWindow.Entry(ENTRY_STATUS_PREFIX + presence.name(),
                     StatCollector.translateToLocal(presence.labelKey()), false,
-                    chosen == presence
-                            ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null)
+                    -1, null)
                     .withSprite(ChatPresenceMark.markOf(presence),
-                            LostTalesUiSheet.PRESENCE_SELECTED, false));
+                            LostTalesUiSheet.PRESENCE_SELECTED,
+                            chosen == presence));
         }
         String line = ClientChatPresence.chosenLine(speaker);
         rows.add(new MenuWindow.Entry(ENTRY_STATUS_LINE,
@@ -1284,14 +1277,13 @@ final class ChatMenus {
         return rows;
     }
 
-    /** One choosable identity: its head, its name, and the mention honey as the swatch of the shared chat identity. */
+    /** One choosable identity: its head and its name, lit while it is the shared chat identity. */
     private static MenuWindow.Entry characterEntry(
             String id, ClientChatIdentities.Identity identity,
             UUID self) {
-        boolean effective = ClientChatIdentities.isSelected(identity);
-        return new MenuWindow.Entry(id, identity.name, false,
-                effective ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1,
-                null).withPicture(head(self, identity.skinId));
+        return new MenuWindow.Entry(id, identity.name, false, -1, null)
+                .withPicture(head(self, identity.skinId))
+                .chosen(ClientChatIdentities.isSelected(identity));
     }
 
     /**

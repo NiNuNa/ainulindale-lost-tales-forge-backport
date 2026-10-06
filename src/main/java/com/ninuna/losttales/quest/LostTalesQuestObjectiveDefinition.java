@@ -4,10 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 /**
- * Immutable description of one quest objective loaded from JSON.
- *
- * Runtime state stays server-owned; this class only describes the authored
- * objective and its policy parameters.
+ * One objective of a quest, as its file or a missive writes it: its id,
+ * kind, words and parameters. Progress is the server's and lives
+ * elsewhere.
  */
 public final class LostTalesQuestObjectiveDefinition {
     private final String id;
@@ -15,13 +14,24 @@ public final class LostTalesQuestObjectiveDefinition {
     private final String description;
     private final boolean optional;
     private final Map<String, String> params;
+    private final String descriptionKey;
 
     public LostTalesQuestObjectiveDefinition(String id, String type, String description, boolean optional, Map<String, String> params) {
+        this(id, type, description, optional, params, "");
+    }
+
+    /**
+     * An objective whose description is the lang line under
+     * {@code descriptionKey} in each player's language, a bundled quest's;
+     * an empty key leaves the description as written.
+     */
+    public LostTalesQuestObjectiveDefinition(String id, String type, String description, boolean optional, Map<String, String> params, String descriptionKey) {
         this.id = id;
         this.type = type;
         this.description = description;
         this.optional = optional;
         this.params = Collections.unmodifiableMap(new LinkedHashMap<String, String>(params == null ? Collections.<String, String>emptyMap() : params));
+        this.descriptionKey = descriptionKey == null ? "" : descriptionKey;
     }
 
     public String getId() {
@@ -32,8 +42,14 @@ public final class LostTalesQuestObjectiveDefinition {
         return this.type;
     }
 
+    /** The description as written; read through {@link LostTalesQuestObjectiveTextHelper#describe}. */
     public String getDescription() {
         return this.description;
+    }
+
+    /** The lang key of a bundled quest's objective line; empty for one written out. */
+    public String getDescriptionKey() {
+        return this.descriptionKey;
     }
 
     public boolean isOptional() {

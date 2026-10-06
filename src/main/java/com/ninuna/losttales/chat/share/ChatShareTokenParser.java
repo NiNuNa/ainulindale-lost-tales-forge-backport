@@ -11,9 +11,10 @@ import java.util.Locale;
  * When the sender holds several stacks with the same display name the
  * completion list distinguishes them as {@code [i:Name#2]}, and so on. A
  * token never carries a slot or marker id: the sending client resolves the
- * name against its own inventory or marker list at send time, and the
- * server re-resolves the reference it is given against its own state and
- * checks the name before anything is distributed. Anything that is not a
+ * name, as its own game shows it, against its own inventory or marker list
+ * at send time, and the server re-resolves the reference it is given
+ * against its own state before anything is distributed; the name is only
+ * the sender's label. Anything that is not a
  * complete, well-formed token stays literal text, so malformed input can
  * never fail here.
  *

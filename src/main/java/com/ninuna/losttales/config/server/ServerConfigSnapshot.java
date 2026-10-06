@@ -16,9 +16,9 @@ import java.util.TreeSet;
 
 /**
  * The server-side keys of a Forge configuration as entries: every
- * category but the client's, each property with its type, bounds,
- * comment and valid values, and the secrets blanked. What the Server
- * Settings page and the commands read; nothing here touches a file.
+ * category but the client's, each property with its type, bounds and
+ * valid values, and the secrets blanked. What the Server Settings page
+ * and the commands read; nothing here touches a file.
  */
 public final class ServerConfigSnapshot {
 
@@ -118,8 +118,8 @@ public final class ServerConfigSnapshot {
         String[] valid = property.getValidValues();
         return new ServerConfigEntry(category, key, typeOf(property.getType()),
                 property.isList(), values, defaults, property.getMinValue(),
-                property.getMaxValue(), property.comment, property.getLanguageKey(),
-                secret, valid == null ? null : Arrays.asList(valid));
+                property.getMaxValue(), secret,
+                valid == null ? null : Arrays.asList(valid));
     }
 
     static ServerConfigEntry.Type typeOf(Property.Type type) {

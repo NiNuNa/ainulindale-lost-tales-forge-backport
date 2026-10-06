@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.window.PointerRegions;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -46,7 +47,7 @@ final class ChatChannelSuggestionBox extends ChatSuggestionBox {
         if (changed) {
             this.matches = ChatChannelSuggester.matches(found.prefix,
                     channels, ClientChatChannelState.scopeKeyRead(
-                            ChatChannel.FACTION), MAX_ROWS);
+                            ChatChannel.FACTION), MAX_ROWS, LostTalesWords.LANG);
             if (this.selectedIndex >= this.matches.size()) {
                 this.selectedIndex = 0;
             }
@@ -87,11 +88,6 @@ final class ChatChannelSuggestionBox extends ChatSuggestionBox {
     @Override
     int shownRows() {
         return this.matches.size();
-    }
-
-    @Override
-    int rowHeight() {
-        return ROW_HEIGHT;
     }
 
     /** The suggestion on a row, or null. */

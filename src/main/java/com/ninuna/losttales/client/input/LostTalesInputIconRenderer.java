@@ -4,6 +4,8 @@ import com.ninuna.losttales.client.input.LostTalesInputBinding.Type;
 import com.ninuna.losttales.client.input.LostTalesInputIconAnimation.Pose;
 import com.ninuna.losttales.client.input.LostTalesInputIconAtlas.Sprite;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.io.IOException;
@@ -59,6 +61,48 @@ public final class LostTalesInputIconRenderer {
                 ? Integer.MIN_VALUE : keyBinding.getKeyCode();
         return measureInput(minecraft,
                 LostTalesInputBinding.getType(keyBinding), keyCode, scale);
+    }
+
+    /**
+     * The scale the window system draws its keys at, a size smaller than
+     * the GUI's own: one display pixel fewer to each pixel of the artwork,
+     * two for three at GUI scale 3, never under one. A key drawn at it
+     * starts and ends on display pixels wherever it stands on the GUI's
+     * grid.
+     */
+    public static float windowScale() {
+        int factor = LostTalesDisplayPixels.scaleFactor();
+        return factor <= 1 ? 1.0F : (factor - 1) / (float)factor;
+    }
+
+    /** A key's height at {@link #windowScale}, in the GUI's units. */
+    public static float windowHeight() {
+        return BASE_ICON_HEIGHT * windowScale();
+    }
+
+    /**
+     * A keyboard key's width at {@link #windowScale}, in the GUI's units,
+     * unrounded: what follows it starts on the display pixel after it.
+     */
+    public static float windowWidth(Minecraft minecraft, int keyCode) {
+        Sprite sprite = LostTalesInputIconAtlas.findSprite(Type.KEYBOARD,
+                keyCode);
+        if (minecraft != null && sprite != null
+                && isTextureAvailable(minecraft)) {
+            return sprite.getWidth() * windowScale();
+        }
+        return measureInput(minecraft, Type.KEYBOARD, keyCode, 1.0F)
+                * windowScale();
+    }
+
+    /**
+     * The top of a key at {@link #windowScale} standing centred in a box
+     * {@code height} units tall from {@code top}, the odd display pixel up.
+     */
+    public static float windowTop(float top, int height) {
+        int factor = LostTalesDisplayPixels.scaleFactor();
+        return top + LostTalesUiInk.centredStart(height * factor,
+                Math.round(windowHeight() * factor)) / (float)factor;
     }
 
     public static int measureInput(

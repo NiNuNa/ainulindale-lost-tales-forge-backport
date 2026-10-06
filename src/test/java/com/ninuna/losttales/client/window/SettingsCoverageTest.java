@@ -3,7 +3,12 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.client.chat.ChatSettingsSections;
 import com.ninuna.losttales.client.settings.ClientSettingsSections;
 import com.ninuna.losttales.config.DefinedClientOptions;
+import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.config.LostTalesConfigWords;
 import com.ninuna.losttales.config.client.DefinedCameraOptions;
+import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
+import com.ninuna.losttales.util.EnglishWords;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -113,6 +118,32 @@ public final class SettingsCoverageTest {
         assertTrue("each key kept in the file alone is an option",
                 DefinedClientOptions.keys().containsAll(
                         FILE_ONLY_CLIENT_KEYS));
+    }
+
+    /**
+     * A row standing for an option of the mod's files is named by that
+     * option's name line, so the word has one source; only the HUD panels'
+     * rows, whose words their group completes, share labels of their own.
+     * Every row's name has an English line.
+     */
+    @Test
+    public void everyOptionsRowIsNamedByItsNameLine() {
+        List<String> wrong = new ArrayList<String>();
+        for (Settings.Setting setting : everySection().allSettings()) {
+            String label = setting.labelKey();
+            if (!EnglishWords.INSTANCE.has(label)) {
+                wrong.add(setting.key + " has no English line " + label);
+            }
+            String category = setting.store() == Settings.Store.CLIENT_FILE
+                    ? LostTalesConfig.CATEGORY_CLIENT
+                    : setting.store() == Settings.Store.CAMERA_FILE
+                    ? LostTalesThirdPersonConfig.CATEGORY_CAMERA : null;
+            if (category != null && !label.startsWith("gui.losttales.settings.hud.panel.")
+                    && !label.equals(LostTalesConfigWords.nameKey(category, setting.key))) {
+                wrong.add(setting.key + " is labelled " + label);
+            }
+        }
+        assertEquals(new ArrayList<String>(), wrong);
     }
 
     @Test

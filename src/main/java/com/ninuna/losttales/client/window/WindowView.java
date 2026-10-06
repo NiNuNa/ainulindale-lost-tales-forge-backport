@@ -4,30 +4,18 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * What the screen shows: the tabs of the key that opened it — T the
- * conversations, {@code /} the consoles, a page's key or Ctrl+, that page —
- * every tab of a window pinned to the GUI ({@link WindowLayout#isOnGui}),
- * and every tab the player opened by hand since. The rest wait hidden in
- * their windows for their own key; a window with nothing shown is not
- * drawn. With no screen open every tab counts as shown. For the session
- * only: a view ends as the screen closes.
+ * What the screen shows: the pages of the category whose key opened it —
+ * T the channels and whispers, {@code /} the consoles, a page's key or
+ * Ctrl+, that page's category ({@link PageCategory#home}) — every page of
+ * a window pinned to the GUI ({@link WindowLayout#isOnGui}), and every page
+ * the player opened by hand since. The rest wait hidden in their windows
+ * for their own key; a window with nothing shown is not drawn. With no
+ * screen open every page counts as shown. For the session only: a view
+ * ends as the screen closes.
  */
 public final class WindowView {
-    /** What a view is for. */
-    public enum Kind {
-        /** No screen is open: every tab counts as shown. */
-        NONE,
-        /** The chat's key: the conversations, the consoles left out. */
-        CHAT,
-        /** The command key: the consoles. */
-        CONSOLE,
-        /** A page's key: that page. */
-        PAGE
-    }
-
-    private static Kind kind = Kind.NONE;
-    /** The page a page's view is for; null otherwise. */
-    private static OtherPage page;
+    /** The category the screen shows; null while no screen is open. */
+    private static PageCategory category;
     /** Tabs the player opened by hand while this view stands. */
     private static final Set<WindowPage> BY_HAND = new HashSet<WindowPage>();
     /** Whether the windows pinned to the HUD are being drawn: only what the HUD shows counts. */
@@ -35,29 +23,28 @@ public final class WindowView {
 
     private WindowView() {}
 
-    /** The screen opens for the chat: the conversations. */
+    /** The screen opens for the chat: the channels and the whispers. */
     public static synchronized void forChat() {
-        set(Kind.CHAT, null);
+        set(PageCategory.CHANNELS);
     }
 
     /** The screen opens for a command: the consoles. */
     public static synchronized void forConsole() {
-        set(Kind.CONSOLE, null);
+        set(PageCategory.CONSOLES);
     }
 
-    /** The screen opens for a page, or turns to it by its key: that page alone. */
+    /** The screen opens for a page, or turns to it by its key: the page's category. */
     public static synchronized void forPage(OtherPage shown) {
-        set(Kind.PAGE, shown);
+        set(shown == null ? PageCategory.CHANNELS : shown.category().home());
     }
 
     /** The screen closed: every tab counts as shown again. */
     public static synchronized void clear() {
-        set(Kind.NONE, null);
+        set(null);
     }
 
-    private static void set(Kind next, OtherPage shown) {
-        kind = next;
-        page = shown;
+    private static void set(PageCategory next) {
+        category = next;
         BY_HAND.clear();
     }
 
@@ -80,18 +67,20 @@ public final class WindowView {
 
     /** A tab the player opened by hand joins what is shown until the screen closes. */
     public static synchronized void show(WindowPage tab) {
-        if (tab != null && kind != Kind.NONE && !shows(tab)) {
+        if (tab != null && category != null && !shows(tab)) {
             BY_HAND.add(tab);
         }
     }
 
-    public static synchronized Kind kind() {
-        return kind;
+    /** The category the screen shows; null while no screen is open. */
+    public static synchronized PageCategory category() {
+        return category;
     }
 
-    /** Whether the view stands for this page: its key turned the screen to it. */
+    /** Whether the view stands for this page's category: a key of it turned the screen there. */
     public static synchronized boolean isFor(OtherPage shown) {
-        return kind == Kind.PAGE && shown != null && shown.equals(page);
+        return category != null && shown != null
+                && shown.category().home() == category;
     }
 
     /** Whether the view shows the tab, whether or not it can be shown now. */
@@ -102,20 +91,8 @@ public final class WindowView {
         if (pinnedPass) {
             return WindowLayout.isOnHud(tab);
         }
-        if (kind == Kind.NONE || WindowLayout.isOnGui(tab)
-                || BY_HAND.contains(tab)) {
-            return true;
-        }
-        switch (kind) {
-            case CHAT:
-                return !(tab instanceof OtherPage) && !tab.isConsole();
-            case CONSOLE:
-                return tab.isConsole();
-            case PAGE:
-                return tab.equals(page);
-            default:
-                return false;
-        }
+        return category == null || WindowLayout.isOnGui(tab)
+                || BY_HAND.contains(tab) || tab.category().home() == category;
     }
 
     /** Whether the tab stands on screen now: the view shows it and it can be shown. */

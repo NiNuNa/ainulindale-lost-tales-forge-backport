@@ -1,7 +1,9 @@
 package com.ninuna.losttales.quest;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,6 +32,11 @@ public final class LostTalesQuestDialogue {
     /** What the player says to end the conversation. */
     public static final String LEAVE = "leave";
 
+    /** Every line a quest may write, in the order a conversation reaches them. */
+    public static final List<String> LINES = Collections.unmodifiableList(
+            Arrays.asList(OFFER, MORE, ACCEPT, DECLINE, PROGRESS, HAND_IN,
+                    HAND_OVER, LEAVE));
+
     /** The longest any one line may be; a speech bubble's worth. */
     public static final int MAX_LINE = 512;
 
@@ -43,9 +50,25 @@ public final class LostTalesQuestDialogue {
         this.lines = lines;
     }
 
-    /** The dialogue a quest wrote; never null. */
+    /**
+     * The dialogue a quest wrote; never null. A bundled quest's lines
+     * read in the side's language ({@link LostTalesQuestWords#dialogueKey}).
+     */
     public static LostTalesQuestDialogue of(LostTalesQuestDefinition quest) {
-        return quest == null ? NONE : of(quest.getDialogue());
+        if (quest == null) {
+            return NONE;
+        }
+        if (!quest.isBundled()) {
+            return of(quest.getDialogue());
+        }
+        Map<String, String> spoken = new LinkedHashMap<String, String>();
+        for (Map.Entry<String, String> entry : quest.getDialogue().entrySet()) {
+            String name = entry.getKey() == null ? "" : entry.getKey().trim();
+            spoken.put(entry.getKey(), LostTalesQuestWords.line(
+                    LostTalesQuestWords.dialogueKey(quest.getId(), name),
+                    entry.getValue()));
+        }
+        return of(spoken);
     }
 
     /** The dialogue a block of entries stands for; never null. */

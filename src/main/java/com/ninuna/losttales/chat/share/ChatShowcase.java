@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.share;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
 import java.io.IOException;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompressedStreamTools;
@@ -11,8 +12,10 @@ import net.minecraft.nbt.NBTTagCompound;
  * the index of the token it replaces. An item travels as compressed NBT the
  * server produced from the sender's real inventory; a marker travels as the
  * public fields of the record the server looked up and confirmed the sender
- * may see. Clients decode each once on arrival. Bounds are deliberately
- * tight: a message may show a few ordinary things, not ferry data.
+ * may see; a quest as a card each reader's game words in its own language
+ * ({@link ChatQuestCard}). Clients decode each once on arrival. Bounds are
+ * deliberately tight: a message may show a few ordinary things, not ferry
+ * data.
  */
 public final class ChatShowcase {
     /** Compressed NBT bytes per stack; enchanted and named gear fits easily. */
@@ -35,12 +38,10 @@ public final class ChatShowcase {
             ChatShareReference.MAX_MARKER_ID_BYTES;
     public static final int MAX_MARKER_NAME_BYTES = 256;
     public static final int MAX_MARKER_STYLE_BYTES = 64;
+    public static final int MAX_MARKER_NAMED_AFTER_BYTES =
+            LostTalesMapMarkerNamedAfter.MAX_LENGTH;
     public static final int MAX_QUEST_REFERENCE_BYTES =
             ChatShareReference.MAX_QUEST_REFERENCE_BYTES;
-    public static final int MAX_QUEST_TITLE_BYTES = 256;
-    public static final int MAX_QUEST_CATEGORY_BYTES = 128;
-    public static final int MAX_QUEST_OBJECTIVE_BYTES = 512;
-    public static final int MAX_QUEST_REWARD_BYTES = 512;
     /** Matches {@code LostTalesMapMarkerRecord.MAX_ABSOLUTE_COORDINATE}. */
     public static final double MAX_MARKER_COORDINATE = 30000000.0D;
 
@@ -49,26 +50,24 @@ public final class ChatShowcase {
     private final byte[] stackData;
     private final String markerId;
     private final String markerName;
+    private final String markerNamedAfter;
     private final String markerIcon;
     private final String markerColor;
     private final int markerDimension;
     private final double markerX;
     private final double markerZ;
     private final String questReference;
-    private final String questTitle;
-    private final String questCategory;
-    private final String questObjective;
-    private final String questReward;
+    private final ChatQuestCard questCard;
     private final boolean questJoinable;
 
     private ChatShowcase(ChatShareKind kind, int tokenIndex,
                          byte[] stackData, String markerId,
-                         String markerName, String markerIcon,
+                         String markerName, String markerNamedAfter,
+                         String markerIcon,
                          String markerColor, int markerDimension,
                          double markerX, double markerZ,
-                         String questReference, String questTitle,
-                         String questCategory, String questObjective,
-                         String questReward, boolean questJoinable) {
+                         String questReference, ChatQuestCard questCard,
+                         boolean questJoinable) {
         if (kind == null || tokenIndex < 0
                 || tokenIndex >= ChatShareTokenParser.MAX_TOKENS) {
             throw new IllegalArgumentException("invalid chat showcase");
@@ -78,16 +77,14 @@ public final class ChatShowcase {
         this.stackData = stackData == null ? new byte[0] : stackData.clone();
         this.markerId = markerId == null ? "" : markerId;
         this.markerName = markerName == null ? "" : markerName;
+        this.markerNamedAfter = markerNamedAfter == null ? "" : markerNamedAfter;
         this.markerIcon = markerIcon == null ? "" : markerIcon;
         this.markerColor = markerColor == null ? "" : markerColor;
         this.markerDimension = markerDimension;
         this.markerX = markerX;
         this.markerZ = markerZ;
         this.questReference = questReference == null ? "" : questReference;
-        this.questTitle = questTitle == null ? "" : questTitle;
-        this.questCategory = questCategory == null ? "" : questCategory;
-        this.questObjective = questObjective == null ? "" : questObjective;
-        this.questReward = questReward == null ? "" : questReward;
+        this.questCard = questCard;
         this.questJoinable = questJoinable;
     }
 
@@ -97,8 +94,7 @@ public final class ChatShowcase {
             throw new IllegalArgumentException("invalid chat item showcase");
         }
         return new ChatShowcase(ChatShareKind.ITEM, tokenIndex, stackData,
-                "", "", "", "", 0, 0.0D, 0.0D,
-                "", "", "", "", "", false);
+                "", "", "", "", "", 0, 0.0D, 0.0D, "", null, false);
     }
 
     public static ChatShowcase marker(int tokenIndex, String markerId,
@@ -106,10 +102,31 @@ public final class ChatShowcase {
                                       String markerColor,
                                       int markerDimension,
                                       double markerX, double markerZ) {
+        return marker(tokenIndex, markerId, markerName, "", markerIcon,
+                markerColor, markerDimension, markerX, markerZ);
+    }
+
+    /**
+     * A marker with its own name, or one with none that each reader's
+     * game names after {@code markerNamedAfter}
+     * ({@link LostTalesMapMarkerNamedAfter}).
+     */
+    public static ChatShowcase marker(int tokenIndex, String markerId,
+                                      String markerName,
+                                      String markerNamedAfter,
+                                      String markerIcon,
+                                      String markerColor,
+                                      int markerDimension,
+                                      double markerX, double markerZ) {
+        boolean named = markerName != null && markerName.length() > 0;
+        boolean calledAfter = markerNamedAfter != null
+                && markerNamedAfter.length() > 0;
         if (markerId == null || markerId.length() == 0
                 || utf8Length(markerId) > MAX_MARKER_ID_BYTES
-                || markerName == null || markerName.length() == 0
+                || !named && !calledAfter
                 || utf8Length(markerName) > MAX_MARKER_NAME_BYTES
+                || utf8Length(markerNamedAfter) > MAX_MARKER_NAMED_AFTER_BYTES
+                || !LostTalesMapMarkerNamedAfter.isValid(markerNamedAfter)
                 || utf8Length(markerIcon) > MAX_MARKER_STYLE_BYTES
                 || utf8Length(markerColor) > MAX_MARKER_STYLE_BYTES
                 || !isFiniteCoordinate(markerX)
@@ -118,27 +135,28 @@ public final class ChatShowcase {
                     "invalid chat marker showcase");
         }
         return new ChatShowcase(ChatShareKind.MARKER, tokenIndex, null,
-                markerId, markerName, markerIcon, markerColor,
-                markerDimension, markerX, markerZ,
-                "", "", "", "", "", false);
+                markerId, markerName == null ? "" : markerName,
+                markerNamedAfter, markerIcon, markerColor,
+                markerDimension, markerX, markerZ, "", null, false);
     }
 
+    /** A quest by its reference and the card each reader's game words. */
     public static ChatShowcase quest(int tokenIndex, String reference,
-                                     String title, String category,
-                                     String objective, String reward,
-                                     boolean joinable) {
+                                     ChatQuestCard card, boolean joinable) {
         if (reference == null || reference.length() == 0
                 || utf8Length(reference) > MAX_QUEST_REFERENCE_BYTES
-                || title == null || title.length() == 0
-                || utf8Length(title) > MAX_QUEST_TITLE_BYTES
-                || utf8Length(category) > MAX_QUEST_CATEGORY_BYTES
-                || utf8Length(objective) > MAX_QUEST_OBJECTIVE_BYTES
-                || utf8Length(reward) > MAX_QUEST_REWARD_BYTES) {
+                || card == null) {
             throw new IllegalArgumentException("invalid chat quest showcase");
         }
         return new ChatShowcase(ChatShareKind.QUEST, tokenIndex, null,
-                "", "", "", "", 0, 0.0D, 0.0D,
-                reference, title, category, objective, reward, joinable);
+                "", "", "", "", "", 0, 0.0D, 0.0D, reference, card, joinable);
+    }
+
+    /** The same quest card, which nobody may join: a card replayed later. */
+    public ChatShowcase withoutJoin() {
+        return this.kind != ChatShareKind.QUEST || !this.questJoinable ? this
+                : quest(this.tokenIndex, this.questReference, this.questCard,
+                        false);
     }
 
     public static boolean isFiniteCoordinate(double value) {
@@ -167,13 +185,13 @@ public final class ChatShowcase {
         }
         if (this.kind == ChatShareKind.MARKER) {
             return SHOWCASE_OVERHEAD_BYTES + utf8Length(this.markerId)
-                + utf8Length(this.markerName) + utf8Length(this.markerIcon)
+                + utf8Length(this.markerName)
+                + utf8Length(this.markerNamedAfter) + 2
+                + utf8Length(this.markerIcon)
                 + utf8Length(this.markerColor) + 4 + 8 + 8;
         }
         return SHOWCASE_OVERHEAD_BYTES + utf8Length(this.questReference)
-                + utf8Length(this.questTitle) + utf8Length(this.questCategory)
-                + utf8Length(this.questObjective) + utf8Length(this.questReward)
-                + 1;
+                + this.questCard.serializedBytes() + 1;
     }
 
     /** The wire cost of a whole set of showcases. */
@@ -195,16 +213,16 @@ public final class ChatShowcase {
     public byte[] getStackData() { return this.stackData.clone(); }
     public String getMarkerId() { return this.markerId; }
     public String getMarkerName() { return this.markerName; }
+    /** What the marker is called after while it has no name of its own; empty for nothing. */
+    public String getMarkerNamedAfter() { return this.markerNamedAfter; }
     public String getMarkerIcon() { return this.markerIcon; }
     public String getMarkerColor() { return this.markerColor; }
     public int getMarkerDimension() { return this.markerDimension; }
     public double getMarkerX() { return this.markerX; }
     public double getMarkerZ() { return this.markerZ; }
     public String getQuestReference() { return this.questReference; }
-    public String getQuestTitle() { return this.questTitle; }
-    public String getQuestCategory() { return this.questCategory; }
-    public String getQuestObjective() { return this.questObjective; }
-    public String getQuestReward() { return this.questReward; }
+    /** A quest's card; null for an item or a marker. */
+    public ChatQuestCard getQuestCard() { return this.questCard; }
     public boolean isQuestJoinable() { return this.questJoinable; }
 
     /**

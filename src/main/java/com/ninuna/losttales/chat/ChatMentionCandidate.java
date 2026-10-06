@@ -43,7 +43,16 @@ public final class ChatMentionCandidate {
      */
     public static ChatMentionCandidate role(String key, String name,
                                             int color) {
-        return new ChatMentionCandidate(key, name, null, "", "",
+        return role(key, name, null, color);
+    }
+
+    /**
+     * A role found by {@code aliases} too: the other names an {@code @}
+     * reaches it by, its id among them.
+     */
+    public static ChatMentionCandidate role(String key, String name,
+                                            List<String> aliases, int color) {
+        return new ChatMentionCandidate(key, name, aliases, "", "",
                 color & 0xFFFFFF);
     }
 

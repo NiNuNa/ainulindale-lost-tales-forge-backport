@@ -28,7 +28,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 "30000000-0000-0000-0000-000000000003");
         LostTalesMapMarkerRecord marker =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/test", "A Waystone", owner,
+                        "losttales:player/test", "Aldric", owner,
                         100, 10, 65, 20, token).toBuilder()
                         .visibility(LostTalesMapMarkerVisibility.SHARED)
                         .sharedPlayerIds(new LinkedHashSet<UUID>(
@@ -52,6 +52,11 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 result.getRecords().get(marker.getId());
         assertNotNull(decoded);
         assertEquals(owner, decoded.getOwnerPlayerId());
+        assertEquals("an unnamed waystone keeps no words", "",
+                decoded.getName());
+        assertEquals("player:Aldric", decoded.getNamedAfter());
+        assertEquals("", decoded.getCategoryName());
+        assertEquals("", decoded.getDescription());
         assertEquals(token, decoded.getLinkToken());
         assertEquals(7L, decoded.getRevision());
         assertEquals(17, decoded.getPriority());
@@ -70,7 +75,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 "30000000-0000-0000-0000-000000000003");
         LostTalesMapMarkerRecord oldRecord =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/test", "Old", owner,
+                        "losttales:player/test", "Aldric", owner,
                         0, 1, 64, 1, token);
         LostTalesMapMarkerRecord newRecord = oldRecord.toBuilder()
                 .name("New")

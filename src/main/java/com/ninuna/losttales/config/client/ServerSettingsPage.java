@@ -22,11 +22,11 @@ import com.ninuna.losttales.config.server.ServerConfigChange;
 import com.ninuna.losttales.config.server.ServerConfigEntry;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
-import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigApplyPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigRequestPacket;
+import com.ninuna.losttales.util.LostTalesWords;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
@@ -74,10 +74,6 @@ public final class ServerSettingsPage extends PageContent {
     private static final int REFRESH_KEY = Keyboard.KEY_R;
     /** Ticks a request waits for its answer: ten seconds. */
     private static final int ANSWER_TICKS = 200;
-    /** Clear room above and below the rows. */
-    private static final int TOP = 2;
-    /** The widest the column grows, so a name and its value stay near. */
-    private static final int MAX_COLUMN_WIDTH = 360;
 
     /** What the page waits for from the server. */
     private enum Wait { NONE, SETTINGS, RESULT }
@@ -277,39 +273,30 @@ public final class ServerSettingsPage extends PageContent {
         this.draft.settle(changes, result);
         List<ServerConfigApplyResult.Refusal> refused = result.getRefused();
         if (result.getMessage().length() > 0) {
-            sayRefused(result.getMessage());
+            sayRefused(LostTalesWords.LANG.format(result.getMessage()));
         } else if (!refused.isEmpty()) {
             ServerConfigApplyResult.Refusal first = refused.get(0);
             String name = settingName(first.getName());
+            String reason = first.reason(LostTalesWords.LANG);
             sayRefused(refused.size() == 1
-                    ? word("refused", name, first.getReason())
-                    : word("refused.more", name, first.getReason(),
+                    ? word("refused", name, reason)
+                    : word("refused.more", name, reason,
                             Integer.valueOf(refused.size() - 1)));
         } else if (result.getApplied().isEmpty()) {
             sayDone(word("nothing_changed"));
         } else if (result.getRestarted().isEmpty()) {
             sayDone(word("saved"));
         } else {
-            sayDone(word("saved.restarted", join(result.getRestarted())));
+            sayDone(word("saved.restarted", result.restartedIn(LostTalesWords.LANG)));
         }
     }
 
-    /** A setting's words from its {@code category.key}. */
+    /** A setting's name from its {@code category.key}, in the player's language. */
     private static String settingName(String qualifiedName) {
         int point = qualifiedName.indexOf('.');
-        return ServerSettingNames.name(point < 0 ? qualifiedName
-                : qualifiedName.substring(point + 1));
-    }
-
-    private static String join(List<String> words) {
-        StringBuilder joined = new StringBuilder();
-        for (String word : words) {
-            if (joined.length() > 0) {
-                joined.append(", ");
-            }
-            joined.append(word);
-        }
-        return joined.toString();
+        return point < 0 ? ServerSettingNames.name(qualifiedName)
+                : ServerSettingsRows.settingName(qualifiedName.substring(0, point),
+                        qualifiedName.substring(point + 1));
     }
 
     /* ---- The rows ---- */
@@ -381,48 +368,36 @@ public final class ServerSettingsPage extends PageContent {
                     "gui.losttales.window.settings.none")));
         }
         this.list.setRows(built);
-        LostTalesUiHitBox rowsBox = rowsBox(box);
+        LostTalesUiHitBox rowsBox = PageRows.column(box);
         this.list.draw(minecraft, rowsBox, clipX + (rowsBox.left - box.left),
                 clipY + (rowsBox.top - box.top), pointerX, pointerY, alpha);
     }
 
-    /**
-     * Where the rows stand: a column as wide as the page up to a limit,
-     * centred, with clear room above and below.
-     */
-    private static LostTalesUiHitBox rowsBox(LostTalesUiHitBox box) {
-        int boxWidth = (int)Math.floor(box.width);
-        int width = Math.max(0, Math.min(boxWidth, MAX_COLUMN_WIDTH));
-        return new LostTalesUiHitBox(Math.floor(box.left)
-                + LostTalesUiInk.centredStart(boxWidth, width),
-                Math.floor(box.top) + TOP, width,
-                Math.max(0.0D, Math.floor(box.height) - 2 * TOP));
-    }
 
     /* ---- The pointer ---- */
 
     @Override
     public boolean acts(LostTalesUiHitBox box, double x, double y) {
-        return this.draft.isLoaded() && this.list.acts(rowsBox(box), x, y);
+        return this.draft.isLoaded() && this.list.acts(PageRows.column(box), x, y);
     }
 
     @Override
     public String tipAt(LostTalesUiHitBox box, double x, double y) {
-        return this.draft.isLoaded() ? this.list.tipAt(rowsBox(box), x, y) : "";
+        return this.draft.isLoaded() ? this.list.tipAt(PageRows.column(box), x, y) : "";
     }
 
     @Override
     public boolean mousePressed(Minecraft minecraft, LostTalesUiHitBox box,
                                 double x, double y, int button) {
         return this.draft.isLoaded()
-                && this.list.press(rowsBox(box), x, y, button);
+                && this.list.press(PageRows.column(box), x, y, button);
     }
 
     @Override
     public boolean scroll(LostTalesUiHitBox box, double x, double y,
                           int lines) {
         if (!this.draft.isLoaded() || lines == 0
-                || !rowsBox(box).contains(x, y)) {
+                || !PageRows.column(box).contains(x, y)) {
             return false;
         }
         this.list.scroll(lines);

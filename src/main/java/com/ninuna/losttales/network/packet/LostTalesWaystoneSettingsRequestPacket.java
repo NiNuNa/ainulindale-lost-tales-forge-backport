@@ -260,7 +260,6 @@ public final class LostTalesWaystoneSettingsRequestPacket
     private static boolean isValidSettings(
             LostTalesMapMarkerEditableSettings value) {
         return value != null
-                && value.getName().trim().length() > 0
                 && value.getVisibility() != null
                 && LostTalesPacketCodec.isUtf8WithinLimit(
                         value.getName(), MAX_TEXT_BYTES)

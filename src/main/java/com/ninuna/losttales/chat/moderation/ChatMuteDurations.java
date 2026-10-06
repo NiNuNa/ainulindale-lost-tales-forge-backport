@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.moderation;
 
+import com.ninuna.losttales.util.LostTalesDuration;
 import java.util.Locale;
 
 /**
@@ -62,11 +63,11 @@ public final class ChatMuteDurations {
 
     /**
      * How long remains, in the largest unit and the one below it —
-     * {@code 2d 5h}, {@code 3h 12m}, {@code 45m 30s}, {@code 20s}.
-     * Anything under a second reads as {@code 1s}: a mute about to end
-     * is still a mute.
+     * {@code 2d 5h}, {@code 3h 12m}, {@code 45m 30s}, {@code 20s} — for
+     * the reader's game to word ({@link LostTalesDuration}). Anything under
+     * a second reads as {@code 1s}: a mute about to end is still a mute.
      */
-    public static String formatRemaining(long remainingMillis) {
+    public static LostTalesDuration remaining(long remainingMillis) {
         long seconds = (remainingMillis + 999L) / 1000L;
         if (seconds < 1L) {
             seconds = 1L;
@@ -76,15 +77,24 @@ public final class ChatMuteDurations {
         long minutes = (seconds % 3600L) / 60L;
         long secondsLeft = seconds % 60L;
         if (days > 0L) {
-            return hours > 0L ? days + "d " + hours + "h" : days + "d";
+            return pair(days, LostTalesDuration.Unit.DAYS,
+                    hours, LostTalesDuration.Unit.HOURS);
         }
         if (hours > 0L) {
-            return minutes > 0L ? hours + "h " + minutes + "m" : hours + "h";
+            return pair(hours, LostTalesDuration.Unit.HOURS,
+                    minutes, LostTalesDuration.Unit.MINUTES);
         }
         if (minutes > 0L) {
-            return secondsLeft > 0L
-                    ? minutes + "m " + secondsLeft + "s" : minutes + "m";
+            return pair(minutes, LostTalesDuration.Unit.MINUTES,
+                    secondsLeft, LostTalesDuration.Unit.SECONDS);
         }
-        return secondsLeft + "s";
+        return LostTalesDuration.of(secondsLeft, LostTalesDuration.Unit.SECONDS);
+    }
+
+    /** A count and the one below it, the second left out when it is nothing. */
+    private static LostTalesDuration pair(long count, LostTalesDuration.Unit unit,
+                                          long below, LostTalesDuration.Unit belowUnit) {
+        LostTalesDuration written = LostTalesDuration.of(count, unit);
+        return below > 0L ? written.and(below, belowUnit) : written;
     }
 }

@@ -55,21 +55,20 @@ public final class LostTalesServerConfigService {
                 ServerConfigSnapshot.SECRET_KEYS);
     }
 
-    /** Why a key is not on the settings surface, for a refused change. */
-    private static String refusalReason(ServerConfigChange change) {
+    /** The refusal of a key that is not on the settings surface, saying why. */
+    private static ServerConfigApplyResult.Refusal offTheSurface(ServerConfigChange change) {
         String name = change.getCategory() == null ? ""
                 : change.getCategory().toLowerCase(Locale.ROOT);
+        String reason = "no_such_key";
         if (ServerConfigSnapshot.CLIENT_CATEGORIES.contains(name)) {
-            return "a client setting, not the server's";
-        }
-        if (ServerConfigSnapshot.AUTHORIZATION_CATEGORIES.contains(name)) {
-            return "decides what players may do; edit it with /losttales role";
-        }
-        if (ServerConfigSnapshot.COMMAND_KEYS.contains(
+            reason = "client_setting";
+        } else if (ServerConfigSnapshot.AUTHORIZATION_CATEGORIES.contains(name)) {
+            reason = "roles_command";
+        } else if (ServerConfigSnapshot.COMMAND_KEYS.contains(
                 change.qualifiedName().toLowerCase(Locale.ROOT))) {
-            return "the Discord links; make them with /losttales discord link";
+            reason = "discord_command";
         }
-        return "no such key";
+        return ServerConfigChangeValidator.refused(change.qualifiedName(), reason);
     }
 
     /**
@@ -97,8 +96,7 @@ public final class LostTalesServerConfigService {
                                                      Set<String> ownedKeys) {
         Configuration config = openFile();
         if (config == null) {
-            return ServerConfigApplyResult.refusedOutright(
-                    "The server has no config file loaded.");
+            return ServerConfigApplyResult.refusedOutright(ServerConfigApplyResult.NO_FILE);
         }
         Set<String> excludedCategories = new HashSet<String>(
                 ServerConfigSnapshot.EXCLUDED_CATEGORIES);
@@ -122,17 +120,17 @@ public final class LostTalesServerConfigService {
             ServerConfigEntry entry = ServerConfigSnapshot.find(entries,
                     change.getCategory(), change.getKey());
             if (entry == null) {
-                refused.add(new ServerConfigApplyResult.Refusal(change.qualifiedName(),
-                        refusalReason(change)));
+                refused.add(offTheSurface(change));
                 continue;
             }
             if (entry.isSecret() && !change.isList() && change.getValue().length() == 0) {
                 // An empty secret is the page saying "leave it".
                 continue;
             }
-            String reason = ServerConfigChangeValidator.refusal(entry, change);
-            if (reason != null) {
-                refused.add(new ServerConfigApplyResult.Refusal(change.qualifiedName(), reason));
+            ServerConfigApplyResult.Refusal refusal =
+                    ServerConfigChangeValidator.refusal(entry, change);
+            if (refusal != null) {
+                refused.add(refusal);
                 continue;
             }
             ConfigCategory category = config.getCategory(entry.getCategory());
@@ -170,18 +168,18 @@ public final class LostTalesServerConfigService {
         return restarted;
     }
 
-    /** What the changed categories own, restarted; the names for the operator. */
+    /** What the changed categories own, restarted; the lang keys of their names. */
     private static List<String> restartOwners(Set<String> categories) {
         List<String> restarted = new ArrayList<String>();
         if (categories.contains(LostTalesConfig.CATEGORY_DISCORD)) {
             LostTalesDiscordBridge.getInstance().start();
-            restarted.add("Discord bridge");
+            restarted.add(ServerConfigApplyResult.RESTARTED_DISCORD);
         } else if ((categories.contains(LostTalesConfig.CATEGORY_ROLES)
                 || categories.contains(LostTalesConfig.CATEGORY_CHANNELS))
                 && LostTalesDiscordBridge.getInstance().restartIfGatesMoved()) {
             // The bridge refuses a link to a channel nobody may read, so
             // a gate that opened or closed one changes what it carries.
-            restarted.add("Discord bridge");
+            restarted.add(ServerConfigApplyResult.RESTARTED_DISCORD);
         }
         // The chat access names the channels linked to Discord, so the
         // bridge's category sends it again too.
@@ -190,7 +188,7 @@ public final class LostTalesServerConfigService {
                 || categories.contains(LostTalesConfig.CATEGORY_CHANNELS)
                 || categories.contains(LostTalesConfig.CATEGORY_DISCORD)) {
             LostTalesChatService.sendAccessToAll(null);
-            restarted.add("chat access");
+            restarted.add(ServerConfigApplyResult.RESTARTED_CHAT_ACCESS);
         }
         return restarted;
     }

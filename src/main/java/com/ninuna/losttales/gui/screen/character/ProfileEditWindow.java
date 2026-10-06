@@ -9,16 +9,22 @@ import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterProfileCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.SubWindowContent;
+import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowHover;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WordButton;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorContext;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorControl;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorNote;
+import com.ninuna.losttales.gui.screen.character.creator.CreatorRows;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorSlider;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorTextArea;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorTextControl;
@@ -28,7 +34,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -42,12 +50,14 @@ import org.lwjgl.input.Keyboard;
 /**
  * What a character says about itself, in a sub-window of the Characters
  * page's window, its player's to change at any time: three sections,
- * each a word button at its top — About, with Appearance, Personality and History, each a
- * box of several lines; Facts, with the age and the six short facts; and
- * Glances. Save sends all of it, and the window closes once the server
- * has kept it; Cancel, the cross and Escape leave it as it was. The
- * window is as tall as its tallest section, so it stands still as the
- * sections change.
+ * each a word button at its top — About, with Appearance, Personality and
+ * History, each several lines under its name; Facts, with the age and the
+ * six short facts; and Glances. The rows stand as the windows' Settings
+ * do, one row a control, and scroll by whole rows where the window is too
+ * short for them. Save sends all of it, and the window closes once the
+ * server has kept it; Cancel, the cross and Escape leave it as it was.
+ * The window opens as tall as its tallest section, so it stands still as
+ * the sections change.
  */
 final class ProfileEditWindow extends SubWindowContent {
     /** The window's sections. */
@@ -68,13 +78,18 @@ final class ProfileEditWindow extends SubWindowContent {
     private static final String CONTROL = "control";
     private static final String SECTION_PREFIX = "section:";
     private static final int WIDTH = 300;
-    private static final int PADDING = 6;
-    private static final int CONTROL_GAP = 6;
-    private static final int STATUS_HEIGHT = 12;
-    /** The lines an About text's box shows at once. */
+    private static final int PADDING_X = MenuWindow.PADDING_X;
+    private static final int PADDING_Y = MenuWindow.PADDING_Y;
+    /** The rows the window shows at least; a shorter one cannot be made. */
+    private static final int MIN_ROWS = 4;
+    /** The lines an About text shows at once. */
     private static final int ABOUT_LINES = 4;
     /** How often the rows keep time, as a screen's ticks would. */
     private static final long TICK_NANOS = 50L * 1000000L;
+    /** Closer than this to the target and the drawn scroll arrives. */
+    private static final double SCROLL_SNAP_PIXELS = 0.5D;
+    /** What is drawn under the pointer while it is off the rows. */
+    private static final int AWAY = Integer.MIN_VALUE / 2;
 
     private final UUID characterId;
     private final Map<Page, List<CreatorControl>> pages =
@@ -91,6 +106,7 @@ final class ProfileEditWindow extends SubWindowContent {
             new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
     private final LostTalesUiButtonMotion cancelMotion =
             new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private CreatorContext context;
     private GlanceEditor glances;
     private Page page = Page.ABOUT;
     private CreatorControl focused;
@@ -105,6 +121,15 @@ final class ProfileEditWindow extends SubWindowContent {
     private String status = "";
     private boolean statusError;
     private long tickedNanos;
+    /** The content box the rows were last laid out in; null before the first. */
+    private LostTalesUiHitBox box;
+    /** The band the rows show in, as last laid out. */
+    private int bandTop;
+    private int bandBottom;
+    /** Pixels the rows are asked to be scrolled by; the drawn offset glides after it, as a menu's does. */
+    private int scroll;
+    private double renderedScroll;
+    private long scrollNanos;
 
     ProfileEditWindow(UUID characterId) {
         this.characterId = characterId;
@@ -130,6 +155,8 @@ final class ProfileEditWindow extends SubWindowContent {
         this.status = "";
         this.statusError = false;
         this.pendingRequestId = 0;
+        this.scroll = 0;
+        this.renderedScroll = 0.0D;
     }
 
     private CharacterSummary character() {
@@ -139,14 +166,15 @@ final class ProfileEditWindow extends SubWindowContent {
 
     private void build(CharacterProfile profile) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        CreatorContext context = new CreatorContext(minecraft,
-                minecraft.fontRenderer, minecraft.thePlayer == null ? null
-                        : minecraft.thePlayer.getUniqueID());
+        this.context = new CreatorContext(minecraft, minecraft.fontRenderer,
+                minecraft.thePlayer == null ? null
+                        : minecraft.thePlayer.getUniqueID(),
+                CreatorContext.Presentation.ROWS);
         List<CreatorControl> about = new ArrayList<CreatorControl>();
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
-            CreatorTextArea area = new CreatorTextArea(context, I18n.format(
-                    "gui.losttales.character.profile." + section.getId()),
-                    profile.section(section),
+            CreatorTextArea area = new CreatorTextArea(this.context,
+                    I18n.format("gui.losttales.character.profile."
+                            + section.getId()), profile.section(section),
                     CharacterProfile.MAX_SECTION_LENGTH, ABOUT_LINES);
             this.sections.put(section, area);
             about.add(area);
@@ -154,7 +182,7 @@ final class ProfileEditWindow extends SubWindowContent {
         this.pages.put(Page.ABOUT, about);
 
         List<CreatorControl> facts = new ArrayList<CreatorControl>();
-        facts.add(new CreatorSlider(context,
+        facts.add(new CreatorSlider(this.context,
                 I18n.format("gui.losttales.character.age"),
                 new CreatorSlider.IntValue() {
                     @Override
@@ -174,10 +202,10 @@ final class ProfileEditWindow extends SubWindowContent {
                         return CharacterValidator.MAX_AGE;
                     }
                 }, I18n.format("gui.losttales.character.creator.age.oldest")));
-        facts.add(new CreatorNote(context,
+        facts.add(new CreatorNote(this.context,
                 I18n.format("gui.losttales.character.creator.age.hint")));
         for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
-            CreatorTextControl field = new CreatorTextControl(context,
+            CreatorTextControl field = new CreatorTextControl(this.context,
                     I18n.format("gui.losttales.character.profile.fact."
                             + fact.getId()), profile.fact(fact),
                     CharacterProfile.MAX_FACT_LENGTH, true);
@@ -186,7 +214,7 @@ final class ProfileEditWindow extends SubWindowContent {
         }
         this.pages.put(Page.FACTS, facts);
 
-        this.glances = new GlanceEditor(context, profile.glances());
+        this.glances = new GlanceEditor(this.context, profile.glances());
         List<CreatorControl> glanceRows = new ArrayList<CreatorControl>();
         glanceRows.add(this.glances);
         this.pages.put(Page.GLANCES, glanceRows);
@@ -213,33 +241,14 @@ final class ProfileEditWindow extends SubWindowContent {
 
     /* ---- Where things stand ---- */
 
-    /**
-     * Places a section's rows from the box's top left; answers where they
-     * end. The facts stand two to a row under the age.
-     */
+    /** Stacks a section's rows from {@code top}, one under the other; answers how tall they stand. */
     private int layOut(Page shown, int left, int top, int width) {
         int y = top;
-        int column = 0;
-        int rowHeight = 0;
-        int half = (width - CONTROL_GAP) / 2;
         for (CreatorControl control : this.pages.get(shown)) {
-            if (shown == Page.FACTS && control instanceof CreatorTextControl) {
-                control.place(left + column * (half + CONTROL_GAP), y, half);
-                rowHeight = Math.max(rowHeight, control.height());
-                if (++column == 2) {
-                    y += rowHeight + CONTROL_GAP;
-                    column = 0;
-                    rowHeight = 0;
-                }
-                continue;
-            }
             control.place(left, y, width);
-            y += control.height() + CONTROL_GAP;
+            y += control.height();
         }
-        if (column > 0) {
-            y += rowHeight + CONTROL_GAP;
-        }
-        return y;
+        return y - top;
     }
 
     /** The rows' height the tallest section takes. */
@@ -251,9 +260,77 @@ final class ProfileEditWindow extends SubWindowContent {
         return tallest;
     }
 
-    private int pagesTop(LostTalesUiHitBox box) {
-        return (int)box.top + PADDING + LostTalesUiFramedButton.HEIGHT
-                + CONTROL_GAP;
+    private static int inner(LostTalesUiHitBox box) {
+        return (int)box.width - 2 * PADDING_X;
+    }
+
+    /** Where the rows' band starts: under the section buttons, a padding clear. */
+    private static int bandTop(LostTalesUiHitBox box) {
+        return (int)box.top + PADDING_Y + LostTalesUiFramedButton.HEIGHT
+                + PADDING_Y;
+    }
+
+    /** Where the status line stands: a note's height over Cancel and Save. */
+    private static int statusTop(LostTalesUiHitBox box) {
+        return (int)(box.top + box.height) - PADDING_Y
+                - LostTalesUiFramedButton.HEIGHT - CreatorRows.noteHeight(1);
+    }
+
+    /**
+     * Lays the shown section out in {@code box}: the band its rows show
+     * in, the scroll kept within them, and each row placed from the drawn
+     * offset. Answers the furthest the rows scroll.
+     */
+    private int layOut(LostTalesUiHitBox box) {
+        this.box = box;
+        this.bandTop = bandTop(box);
+        this.bandBottom = Math.max(this.bandTop, statusTop(box));
+        int maxScroll = Math.max(0, layOut(this.page, 0, 0, inner(box))
+                - (this.bandBottom - this.bandTop));
+        this.scroll = Math.max(0, Math.min(this.scroll, maxScroll));
+        this.renderedScroll = Math.max(0.0D, Math.min(maxScroll,
+                this.renderedScroll));
+        place();
+        return maxScroll;
+    }
+
+    /** Places the shown section's rows in the band, from the drawn offset. */
+    private void place() {
+        if (this.box != null) {
+            layOut(this.page, (int)this.box.left + PADDING_X, this.bandTop
+                    - (int)Math.round(this.renderedScroll), inner(this.box));
+        }
+    }
+
+    /** The drawn scroll glides after the asked one with the windows' shared scroll motion, as a menu's does. */
+    private void glideScroll() {
+        long now = System.nanoTime();
+        double elapsed = this.scrollNanos == 0L ? 0.0D
+                : (now - this.scrollNanos) / 1.0E9D;
+        this.scrollNanos = now;
+        if (Math.abs(this.scroll - this.renderedScroll) <= SCROLL_SNAP_PIXELS) {
+            this.renderedScroll = this.scroll;
+            return;
+        }
+        this.renderedScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
+                this.renderedScroll, this.scroll, elapsed);
+    }
+
+    /** Asks the band to scroll so a row that took the keys stands whole in it. */
+    private void reveal(CreatorControl control) {
+        if (control == null || this.box == null) {
+            return;
+        }
+        place();
+        int band = this.bandBottom - this.bandTop;
+        int top = control.getY() - (this.bandTop
+                - (int)Math.round(this.renderedScroll));
+        int bottom = top + control.height();
+        if (top < this.scroll) {
+            this.scroll = top;
+        } else if (bottom > this.scroll + band) {
+            this.scroll = Math.min(top, bottom - band);
+        }
     }
 
     /* ---- Saving ---- */
@@ -368,11 +445,17 @@ final class ProfileEditWindow extends SubWindowContent {
         return WIDTH;
     }
 
+    /** The section buttons, the tallest section's rows, the status line and the foot's buttons. */
     @Override
     public int naturalHeight(int width) {
-        return PADDING + LostTalesUiFramedButton.HEIGHT + CONTROL_GAP
-                + pageHeight(width - 2 * PADDING) + STATUS_HEIGHT
-                + LostTalesUiFramedButton.HEIGHT + PADDING;
+        return chromeHeight() + pageHeight(width - 2 * PADDING_X);
+    }
+
+    /** Everything but the rows: the section buttons, the status line and the foot's buttons, each a padding clear. */
+    private static int chromeHeight() {
+        return PADDING_Y + LostTalesUiFramedButton.HEIGHT + PADDING_Y
+                + CreatorRows.noteHeight(1) + LostTalesUiFramedButton.HEIGHT
+                + PADDING_Y;
     }
 
     @Override
@@ -382,7 +465,7 @@ final class ProfileEditWindow extends SubWindowContent {
 
     @Override
     public int minHeight() {
-        return naturalHeight(minWidth());
+        return chromeHeight() + MIN_ROWS * CreatorRows.height();
     }
 
     @Override
@@ -393,28 +476,46 @@ final class ProfileEditWindow extends SubWindowContent {
         followProfile();
         followRequest();
         FontRenderer font = minecraft.fontRenderer;
-        int left = (int)box.left;
-        int inner = (int)box.width - 2 * PADDING;
-        int statusTop = pagesTop(box) + pageHeight(inner);
-        layOut(this.page, left + PADDING, pagesTop(box), inner);
-        int mouseX = Double.isNaN(pointerX) ? Integer.MIN_VALUE / 2
-                : (int)Math.floor(pointerX);
-        int mouseY = Double.isNaN(pointerY) ? Integer.MIN_VALUE / 2
-                : (int)Math.floor(pointerY);
+        int left = (int)box.left + PADDING_X;
+        int maxScroll = layOut(box);
+        glideScroll();
+        place();
+        this.context.frame(alpha, surfaceAlpha, (int)box.left,
+                (int)(box.left + box.width));
         String part = partAt(font, box, pointerX, pointerY);
         for (Page each : Page.values()) {
             drawSection(font, box, each, (SECTION_PREFIX + each.name()).equals(part),
                     alpha, surfaceAlpha);
         }
-        for (CreatorControl control : this.pages.get(this.page)) {
-            control.draw(mouseX, mouseY);
+        boolean onRows = inBand(pointerX, pointerY);
+        int mouseX = onRows ? (int)Math.floor(pointerX) : AWAY;
+        int mouseY = onRows ? (int)Math.floor(pointerY) : AWAY;
+        // The rows are cut to their band; across, the cut takes in the
+        // frame's ring, which a lit row recolours beside it.
+        int ring = LostTalesUiWindowFrame.WIDTH;
+        boolean clipped = SubWindowContent.beginClip(minecraft, clipX - ring,
+                clipY + (this.bandTop - box.top), box.width + 2 * ring,
+                this.bandBottom - this.bandTop);
+        try {
+            for (CreatorControl control : this.pages.get(this.page)) {
+                if (control.getY() < this.bandBottom
+                        && control.getY() + control.height() > this.bandTop) {
+                    control.draw(mouseX, mouseY);
+                }
+            }
+        } finally {
+            SubWindowContent.endClip(clipped);
         }
+        WindowLists.drawScroll(box.left, this.bandTop, box.left + box.width,
+                this.bandBottom, this.bandTop, this.bandBottom,
+                this.renderedScroll, maxScroll, alpha);
         String said = statusText();
         if (said.length() > 0) {
-            LostTalesUiInk.drawText(font, font.trimStringToWidth(said, inner),
-                    left + PADDING, statusTop, this.statusError
+            CreatorRows.drawNote(this.context, Collections.singletonList(
+                    font.trimStringToWidth(said, inner(box))), left,
+                    statusTop(box), this.statusError
                             ? LostTalesColors.rgb(LostTalesColors.RED)
-                            : WindowStyle.asideRgb(), alpha);
+                            : WindowStyle.asideRgb());
         }
         WordButton.draw(font, buttonBox(font, box, CANCEL), cancelLabel(),
                 false, true, CANCEL.equals(part), this.cancelMotion, alpha,
@@ -471,16 +572,16 @@ final class ProfileEditWindow extends SubWindowContent {
     /** The section buttons side by side at the window's top left, a framed button's gap apart. */
     private static LostTalesUiHitBox sectionBox(FontRenderer font,
                                             LostTalesUiHitBox box, Page each) {
-        double left = box.left + PADDING;
+        double left = box.left + PADDING_X;
         for (Page before : Page.values()) {
             int width = WordButton.width(font, I18n.format(before.labelKey));
             if (before == each) {
-                return new LostTalesUiHitBox(left, box.top + PADDING, width,
+                return new LostTalesUiHitBox(left, box.top + PADDING_Y, width,
                         LostTalesUiFramedButton.HEIGHT);
             }
             left += width + WindowBar.BUTTON_GAP;
         }
-        return new LostTalesUiHitBox(left, box.top + PADDING, 0, 0);
+        return new LostTalesUiHitBox(left, box.top + PADDING_Y, 0, 0);
     }
 
     /** Cancel and Save at the foot's right, Save last, a framed button's gap apart. */
@@ -489,9 +590,9 @@ final class ProfileEditWindow extends SubWindowContent {
                                                String part) {
         int saveWidth = WordButton.width(font, saveLabel());
         int cancelWidth = WordButton.width(font, cancelLabel());
-        double top = box.top + box.height - PADDING
+        double top = box.top + box.height - PADDING_Y
                 - LostTalesUiFramedButton.HEIGHT;
-        double saveLeft = box.left + box.width - PADDING - saveWidth;
+        double saveLeft = box.left + box.width - PADDING_X - saveWidth;
         if (SAVE.equals(part)) {
             return new LostTalesUiHitBox(saveLeft, top, saveWidth,
                     LostTalesUiFramedButton.HEIGHT);
@@ -517,10 +618,20 @@ final class ProfileEditWindow extends SubWindowContent {
         return controlAt(x, y) != null ? CONTROL : null;
     }
 
+    /** Whether a point is in the band the rows show in, across the whole box. */
+    private boolean inBand(double x, double y) {
+        return this.box != null && !Double.isNaN(x) && !Double.isNaN(y)
+                && LostTalesUiHitBox.contains(x, y, this.box.left,
+                        this.bandTop, this.box.width,
+                        this.bandBottom - this.bandTop);
+    }
+
+    /** The row under a point, as the rows were last laid out; only where the band shows them. */
     private CreatorControl controlAt(double x, double y) {
-        if (Double.isNaN(x) || Double.isNaN(y)) {
+        if (!inBand(x, y)) {
             return null;
         }
+        place();
         for (CreatorControl control : this.pages.get(this.page)) {
             if (control.contains((int)Math.floor(x), (int)Math.floor(y))) {
                 return control;
@@ -532,6 +643,7 @@ final class ProfileEditWindow extends SubWindowContent {
     @Override
     public WindowHover hoverAt(LostTalesUiHitBox box, double x, double y) {
         FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+        layOut(box);
         String part = partAt(font, box, x, y);
         this.hovered = controlAt(x, y);
         if (part == null) {
@@ -572,7 +684,7 @@ final class ProfileEditWindow extends SubWindowContent {
         return true;
     }
 
-    /** Turns the window to one of its sections; its first row takes the keys. */
+    /** Turns the window to one of its sections, from its top; its first row takes the keys. */
     private void show(Page shown) {
         if (shown == this.page) {
             return;
@@ -580,6 +692,8 @@ final class ProfileEditWindow extends SubWindowContent {
         focus(null);
         this.page = shown;
         this.hovered = null;
+        this.scroll = 0;
+        this.renderedScroll = 0.0D;
         focusNext(1);
     }
 
@@ -598,12 +712,19 @@ final class ProfileEditWindow extends SubWindowContent {
         }
     }
 
-    /** The wheel over a row turns it: the age steps, a text scrolls. */
+    /**
+     * The wheel over a row turns it: the age steps, a text scrolls its
+     * lines. Elsewhere, and past a text's ends, it scrolls the rows by
+     * whole rows, as a menu's.
+     */
     @Override
     public void scrollBy(int lines) {
         if (this.hovered != null && this.hovered.mouseWheel(lines < 0 ? 1 : -1)) {
             clearError();
+            return;
         }
+        this.scroll = Math.max(0, this.scroll + WheelStep.pixels(
+                WheelStep.menuRows(lines), CreatorRows.height()));
     }
 
     private void focus(CreatorControl control) {
@@ -660,8 +781,9 @@ final class ProfileEditWindow extends SubWindowContent {
     }
 
     /**
-     * A row takes its keys first; then Tab walks the section's rows,
-     * Ctrl+Tab the window's sections, and Return saves.
+     * A row takes its keys first; then Tab walks the section's rows, the
+     * band scrolling to the one that takes them, Ctrl+Tab the window's
+     * sections, and Return saves.
      */
     @Override
     public boolean keyTyped(char typedChar, int keyCode) {
@@ -678,6 +800,7 @@ final class ProfileEditWindow extends SubWindowContent {
         }
         if (keyCode == Keyboard.KEY_TAB) {
             focusNext(GuiScreen.isShiftKeyDown() ? -1 : 1);
+            reveal(this.focused);
             return true;
         }
         if (keyCode == Keyboard.KEY_RETURN

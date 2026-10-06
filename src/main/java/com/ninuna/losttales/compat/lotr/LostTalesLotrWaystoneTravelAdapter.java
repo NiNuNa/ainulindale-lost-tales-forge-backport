@@ -1,6 +1,8 @@
 package com.ninuna.losttales.compat.lotr;
 
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
@@ -85,7 +87,10 @@ public final class LostTalesLotrWaystoneTravelAdapter {
         if (lotrData.getTimeSinceFT()
                 < lotrData.getWaypointFTTime(waypoint, player)) {
             deny(player, "lotr.fastTravel.moreTime",
-                    resolved.destination.getName());
+                    LostTalesMapMarkerNames.component(
+                            resolved.destination.getId(),
+                            resolved.destination.getName(),
+                            resolved.destination.getNamedAfter()));
             return;
         }
         if (!lotrData.canFastTravel()) {
@@ -383,8 +388,14 @@ public final class LostTalesLotrWaystoneTravelAdapter {
     private static LOTRCustomWaypoint createWaypointAt(
             LostTalesMapMarkerRecord destination, int travelId,
             int x, int y, int z) {
+        // LOTR keeps a waypoint's name as one string, so an unnamed
+        // waystone's is the server's words for what it is called after.
+        String name = destination.getName().length() > 0
+                ? destination.getName()
+                : LostTalesMapMarkerNamedAfter.shownName(
+                        destination.getNamedAfter());
         return new LOTRCustomWaypoint(
-                destination.getName(),
+                name.length() > 0 ? name : destination.getId(),
                 LostTalesMapCoordinateHelper.worldToMapImageX(
                         destination.getX()),
                 LostTalesMapCoordinateHelper.worldToMapImageZ(

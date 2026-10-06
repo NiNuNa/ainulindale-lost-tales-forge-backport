@@ -14,7 +14,7 @@ public final class LostTalesHudPlacementConfigTest {
                 "quickLootHudOffsetX", 24).set(24);
 
         double value = LostTalesConfig.getHudPercent(config,
-                "quickLootHudOffsetX", 62.0D, 0.0D, 100.0D, "test");
+                "quickLootHudOffsetX", 62.0D, 0.0D, 100.0D);
         Property migrated = config.getCategory(
                 LostTalesConfig.CATEGORY_CLIENT).get("quickLootHudOffsetX");
 

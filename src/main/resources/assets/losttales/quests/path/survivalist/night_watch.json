@@ -1,17 +1,10 @@
 {
   "id": "losttales:path/survivalist/night_watch",
-  "title": "Path of the Survivalist: Night Watch",
-  "description": "The wilds do not sleep when the sun goes down. A survivalist learns to hear the dark and answer before it reaches the firelight.",
   "repeatable": false,
   "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/under_open_sky"
-  },
-  "journalLog": {
-    "10": "The night brings teeth, claws, and worse. I should prepare a weapon that keeps danger at a distance.",
-    "20": "I have made a bow and arrows. Now I must prove I can hold the camp through the night.",
-    "30": "The camp survived the dark. I am beginning to understand the patience and caution of the survivalist path."
   },
   "stages": [
     {
@@ -20,7 +13,6 @@
         {
           "id": "craft_bow",
           "type": "craft",
-          "description": "Craft a bow.",
           "optional": false,
           "params": {
             "item": "minecraft:bow",
@@ -30,7 +22,6 @@
         {
           "id": "gather_arrows",
           "type": "gather",
-          "description": "Gather 8 arrows.",
           "optional": false,
           "params": {
             "item": "minecraft:arrow",
@@ -45,7 +36,6 @@
         {
           "id": "defend_camp",
           "type": "kill",
-          "description": "Drive off 3 hostile creatures.",
           "optional": false,
           "params": {
             "group": "hostile",
@@ -61,7 +51,6 @@
         {
           "id": "gather_bones",
           "type": "gather",
-          "description": "Gather 2 bones as proof of the watch.",
           "optional": false,
           "params": {
             "item": "minecraft:bone",

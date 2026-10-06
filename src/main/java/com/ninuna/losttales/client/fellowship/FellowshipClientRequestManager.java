@@ -160,6 +160,38 @@ public final class FellowshipClientRequestManager {
                 FellowshipActionRequestPacket.NO_FELLOWSHIP_REVISION, null, null);
     }
 
+    /** Marks a place on the map for every member of the fellowship, named. */
+    public static int placeMark(UUID expectedActiveIdentityId,
+                                UUID expectedFellowshipId,
+                                long expectedFellowshipRevision,
+                                String name, int dimensionId, double x, double z) {
+        return send(FellowshipOperationType.PLACE_MARK,
+                expectedActiveIdentityId, expectedFellowshipId,
+                expectedFellowshipRevision, null, null,
+                true, dimensionId, x, z, name, -1);
+    }
+
+    /** Moves one of the fellowship's marks to a place picked on the map. */
+    public static int moveMark(UUID expectedActiveIdentityId,
+                               UUID expectedFellowshipId,
+                               long expectedFellowshipRevision,
+                               UUID markId, int dimensionId, double x, double z) {
+        return send(FellowshipOperationType.MOVE_MARK,
+                expectedActiveIdentityId, expectedFellowshipId,
+                expectedFellowshipRevision, markId, null,
+                true, dimensionId, x, z, null, -1);
+    }
+
+    /** Takes one of the fellowship's marks away. */
+    public static int removeMark(UUID expectedActiveIdentityId,
+                                 UUID expectedFellowshipId,
+                                 long expectedFellowshipRevision,
+                                 UUID markId) {
+        return send(FellowshipOperationType.REMOVE_MARK,
+                expectedActiveIdentityId, expectedFellowshipId,
+                expectedFellowshipRevision, markId, null);
+    }
+
     public static int invitePlayer(UUID expectedActiveIdentityId,
                                    UUID expectedFellowshipId,
                                    long expectedFellowshipRevision,

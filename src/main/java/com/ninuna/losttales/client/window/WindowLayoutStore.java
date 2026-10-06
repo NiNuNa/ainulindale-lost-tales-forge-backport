@@ -19,8 +19,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * between worlds. Two people sharing a machine keep their own windows,
  * and one person with two accounts keeps an arrangement for each. The
  * file is a few plain lines — one per window, one per sub-window the
- * player has placed, one per page whose window was closed — and the
- * lines of each system with windows of its own ({@link Part}: the chat
+ * player has placed and one per category whose window was locked where it
+ * stands — and the lines of each system with windows of its own ({@link Part}: the chat
  * keeps its closed channels and preferences here), so a hand edit or a
  * stale entry cannot corrupt anything: whatever does not parse is
  * skipped and the layout repairs itself on load.
@@ -30,7 +30,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * window w2 locked=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
  * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00
- * place page:fellowship locked=false hud=true x=40.00 y=60.00 height=292.00 width=366 fill=full
+ * category map x=50.00 y=50.00 height=0.00 width=0 fill=left
  * tips seen=3
  * </pre>
  */
@@ -159,8 +159,8 @@ public final class WindowLayoutStore {
                 new ArrayList<WindowLayout.WindowSpec>();
         Map<SubWindowKind, SubWindowPlaces.Placement> placed =
                 new LinkedHashMap<SubWindowKind, SubWindowPlaces.Placement>();
-        Map<String, WindowLayout.Place> places =
-                new LinkedHashMap<String, WindowLayout.Place>();
+        Map<PageCategory, WindowLayout.Place> categories =
+                new LinkedHashMap<PageCategory, WindowLayout.Place>();
         int tipsSeen = 0;
         for (String raw : lines) {
             String line = raw == null ? "" : raw.trim();
@@ -173,10 +173,11 @@ public final class WindowLayoutStore {
                 if (spec != null) {
                     specs.add(spec);
                 }
-            } else if (parts.length >= 2 && "place".equals(parts[0])) {
-                WindowLayout.Place place = parsePlace(parts);
-                if (place != null) {
-                    places.put(parts[1], place);
+            } else if (parts.length >= 2 && "category".equals(parts[0])) {
+                PageCategory category = PageCategory.fromId(parts[1]);
+                WindowLayout.Place place = parseCategoryPlace(parts);
+                if (category != null && place != null) {
+                    categories.put(category, place);
                 }
             } else if (FirstTips.read(parts) >= 0) {
                 tipsSeen = FirstTips.read(parts);
@@ -196,7 +197,7 @@ public final class WindowLayoutStore {
         }
         WindowLayout.load(specs);
         SubWindowPlaces.load(placed);
-        WindowLayout.loadPlaces(places);
+        WindowLayout.loadCategoryPlaces(categories);
         FirstTips.load(tipsSeen);
         for (Part part : PARTS) {
             part.loaded();
@@ -204,26 +205,21 @@ public final class WindowLayoutStore {
     }
 
     /**
-     * Where a page's window last stood: its pins, its place and its size, a size of 0 standing for the default place; null for
-     * a line that cannot be read, which leaves the page to open at the
-     * default place.
+     * Where a category's first window opens: its place, its size, a size
+     * of 0 standing for the default place's, and the part of the screen it
+     * fills; null for a line that cannot be read, which leaves the category
+     * at its shipped defaults.
      */
-    private static WindowLayout.Place parsePlace(String[] parts) {
+    private static WindowLayout.Place parseCategoryPlace(String[] parts) {
         double x = Double.NaN;
         double y = Double.NaN;
         double height = Double.NaN;
         int width = -1;
         Window.ScreenFill fill = Window.ScreenFill.NONE;
-        boolean hud = false;
-        boolean gui = false;
         for (int index = 2; index < parts.length; index++) {
             String part = parts[index];
             try {
-                if (part.startsWith("hud=")) {
-                    hud = Boolean.parseBoolean(part.substring(4));
-                } else if (part.startsWith("gui=")) {
-                    gui = Boolean.parseBoolean(part.substring(4));
-                } else if (part.startsWith("fill=")) {
+                if (part.startsWith("fill=")) {
                     fill = Window.ScreenFill.fromId(part.substring(5));
                 } else if (part.startsWith("x=")) {
                     x = parsePercent(part.substring(2));
@@ -239,10 +235,10 @@ public final class WindowLayoutStore {
             }
         }
         if (Double.isNaN(x) || Double.isNaN(y) || Double.isNaN(height)
-                || height < 0.0D || width < 0) {
+                || height < 0.0D || width < 0 || fill == null) {
             return null;
         }
-        return new WindowLayout.Place(x, y, height, width, fill, hud, gui);
+        return new WindowLayout.Place(x, y, height, width, fill);
     }
 
     /**
@@ -447,12 +443,10 @@ public final class WindowLayoutStore {
                     + (placement.isSized() ? " w=" + placement.width
                             + " h=" + placement.height : ""));
         }
-        for (Map.Entry<String, WindowLayout.Place> entry
-                : WindowLayout.places().entrySet()) {
+        for (Map.Entry<PageCategory, WindowLayout.Place> entry
+                : WindowLayout.categoryPlaces().entrySet()) {
             WindowLayout.Place place = entry.getValue();
-            lines.add("place " + entry.getKey()
-                    + (place.pinnedToHud ? " hud=true" : "")
-                    + (place.pinnedToGui ? " gui=true" : "")
+            lines.add("category " + entry.getKey().id()
                     + " x=" + format(place.x)
                     + " y=" + format(place.y)
                     + " height=" + format(place.height)

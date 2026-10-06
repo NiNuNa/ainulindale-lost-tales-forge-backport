@@ -6,6 +6,7 @@ import com.ninuna.losttales.gui.screen.LostTalesQuestDialogueGui;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.screen.quest.QuestDialogueModel;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.LostTalesQuestDialogue;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveMatcher;
@@ -342,7 +343,7 @@ public final class LostTalesQuestDialogueHooks {
         LostTalesQuestDefinition quest = exchange.quest;
         LostTalesQuestDialogue dialogue = exchange.dialogue;
         QuestDialogueModel model = QuestDialogueModel.of(
-                speakerName(exchange.speaker), "", quest.getTitle(),
+                speakerName(exchange.speaker), "", LostTalesQuestWords.title(quest),
                 exchange.objective, exchange.mood, exchange.said,
                 // Nothing written to say further leaves what the quest
                 // pays as the answer, which is what a player asks for.

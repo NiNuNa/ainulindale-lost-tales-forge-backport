@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.moderation;
 
+import com.ninuna.losttales.util.EnglishWords;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -39,17 +40,22 @@ public final class ChatMuteDurationsTest {
 
     @Test
     public void remainingReadsInTheLargestTwoUnits() {
-        assertEquals("2d 5h", ChatMuteDurations.formatRemaining(
+        assertEquals("2d 5h", remaining(
                 (2L * 86400L + 5L * 3600L) * 1000L));
-        assertEquals("2d", ChatMuteDurations.formatRemaining(
+        assertEquals("2d", remaining(
                 2L * 86400L * 1000L));
-        assertEquals("3h 12m", ChatMuteDurations.formatRemaining(
+        assertEquals("3h 12m", remaining(
                 (3L * 3600L + 12L * 60L) * 1000L));
-        assertEquals("45m 30s", ChatMuteDurations.formatRemaining(
+        assertEquals("45m 30s", remaining(
                 (45L * 60L + 30L) * 1000L));
-        assertEquals("20s", ChatMuteDurations.formatRemaining(20000L));
+        assertEquals("20s", remaining(20000L));
         // A fraction of a second still reads as a mute.
-        assertEquals("1s", ChatMuteDurations.formatRemaining(1L));
-        assertEquals("1s", ChatMuteDurations.formatRemaining(0L));
+        assertEquals("1s", remaining(1L));
+        assertEquals("1s", remaining(0L));
+    }
+
+    /** What is left, as a game in English words it. */
+    private static String remaining(long millis) {
+        return ChatMuteDurations.remaining(millis).write(EnglishWords.INSTANCE);
     }
 }

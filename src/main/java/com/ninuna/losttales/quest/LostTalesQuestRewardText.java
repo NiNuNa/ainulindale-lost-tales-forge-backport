@@ -73,7 +73,7 @@ public final class LostTalesQuestRewardText {
      * as {@code 2x Bread}: the item's own name, or its id made readable for
      * an item this game does not have.
      */
-    static String itemPhrase(String written) {
+    public static String itemPhrase(String written) {
         return itemPhrase(LostTalesQuestItemSpec.parse(written, 1, 0));
     }
 

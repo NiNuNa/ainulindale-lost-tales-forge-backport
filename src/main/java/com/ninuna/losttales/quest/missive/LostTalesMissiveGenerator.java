@@ -12,37 +12,50 @@ import net.minecraft.world.World;
 
 /**
  * Writes a missive board's notices: kill-or-gather tasks built from the
- * objective types and selectors the quest runtime already handles.
+ * objective types and selectors the quest runtime already handles. A
+ * notice is written as template ids and a target, never as sentences
+ * ({@link MissiveWords}), so each player reads it in their own language.
  */
 public final class LostTalesMissiveGenerator {
-    private static final String GENERATOR_VERSION = "1";
+    /** Which generator wrote a letter, kept in its context; letters of another kind of words are not read. */
+    private static final String GENERATOR_VERSION = "2";
     private static final long ONE_INGAME_DAY_TICKS = 24000L;
 
+    /** Who writes the notices, as template ids ({@code missive.losttales.issuer.*}). */
     private static final String[] ISSUERS = new String[] {
-            "The Local Watch",
-            "A Road Warden",
-            "A Village Reeve",
-            "A Caravan Master",
-            "The Quartermaster"
+            "local_watch", "road_warden", "village_reeve", "caravan_master",
+            "quartermaster"
+    };
+    private static final String[] KILL_TITLES = new String[] {
+            "trouble_on_the_road", "dangerous_work", "clear_the_paths"
+    };
+    private static final String[] KILL_FLAVORS = new String[] {
+            "shapes_beyond_firelight", "roads_open", "steady_blade"
+    };
+    private static final String[] GATHER_TITLES = new String[] {
+            "materials_wanted", "gatherers_pay", "stores_run_low"
+    };
+    private static final String[] GATHER_FLAVORS = new String[] {
+            "small_stores", "plain_notice", "useful_materials"
     };
 
     private static final KillTemplate[] KILL_TEMPLATES = new KillTemplate[] {
-            new KillTemplate("hostile", "hostile creatures", true, 4, 8, 12),
-            new KillTemplate("Zombie", "zombies", false, 3, 7, 10),
-            new KillTemplate("Skeleton", "skeletons", false, 3, 6, 12),
-            new KillTemplate("Spider", "spiders", false, 3, 6, 12),
-            new KillTemplate("Creeper", "creepers", false, 2, 4, 18)
+            new KillTemplate("hostile", true, 4, 8, 12),
+            new KillTemplate("Zombie", false, 3, 7, 10),
+            new KillTemplate("Skeleton", false, 3, 6, 12),
+            new KillTemplate("Spider", false, 3, 6, 12),
+            new KillTemplate("Creeper", false, 2, 4, 18)
     };
 
     private static final GatherTemplate[] GATHER_TEMPLATES = new GatherTemplate[] {
-            new GatherTemplate("minecraft:coal", "coal", 8, 18, 3),
-            new GatherTemplate("minecraft:iron_ingot", "iron ingots", 4, 10, 6),
-            new GatherTemplate("minecraft:gold_ingot", "gold ingots", 2, 6, 10),
-            new GatherTemplate("minecraft:wheat", "wheat", 8, 18, 3),
-            new GatherTemplate("minecraft:leather", "leather", 3, 8, 6),
-            new GatherTemplate("minecraft:string", "string", 4, 10, 5),
-            new GatherTemplate("minecraft:bone", "bones", 4, 10, 5),
-            new GatherTemplate("minecraft:log", "logs", 8, 20, 2)
+            new GatherTemplate("minecraft:coal", 8, 18, 3),
+            new GatherTemplate("minecraft:iron_ingot", 4, 10, 6),
+            new GatherTemplate("minecraft:gold_ingot", 2, 6, 10),
+            new GatherTemplate("minecraft:wheat", 8, 18, 3),
+            new GatherTemplate("minecraft:leather", 3, 8, 6),
+            new GatherTemplate("minecraft:string", 4, 10, 5),
+            new GatherTemplate("minecraft:bone", 4, 10, 5),
+            new GatherTemplate("minecraft:log", 8, 20, 2)
     };
 
     private LostTalesMissiveGenerator() {}
@@ -97,24 +110,18 @@ public final class LostTalesMissiveGenerator {
         params.put("count", String.valueOf(count));
 
         LostTalesMissiveObjectiveData objective = new LostTalesMissiveObjectiveData(
-                "kill_" + normalizeId(template.displayName),
+                "kill_" + normalizeId(template.selector),
                 LostTalesMissiveObjectiveData.TYPE_KILL,
-                "Defeat " + count + " " + template.displayName + ".",
                 false,
                 params
         );
 
         return LostTalesMissiveData.builder(questId, LostTalesMissiveObjectiveData.TYPE_KILL)
-                .title(randomChoice(random,
-                        "Missive: Trouble on the Road",
-                        "Bounty: Dangerous Work",
-                        "Missive: Clear the Paths"))
-                .description("Travellers have reported " + template.displayName + " threatening the roads. Thin their numbers and claim the posted reward.")
-                .issuer(issuer)
-                .flavorText(randomChoice(random,
-                        "Those who walk after dusk speak of shapes moving beyond the firelight.",
-                        "The roads must remain open for honest folk and weary travellers.",
-                        "A steady blade and a brave heart will be paid in coin and thanks."))
+                .titleId(randomChoice(random, KILL_TITLES))
+                .descriptionId(LostTalesMissiveObjectiveData.TYPE_KILL)
+                .issuerId(issuer)
+                .flavorId(randomChoice(random, KILL_FLAVORS))
+                .target(template.selector)
                 .repeatable(true)
                 .firstComeFirstServed(true)
                 .generationWorldTime(worldTime)
@@ -122,7 +129,6 @@ public final class LostTalesMissiveGenerator {
                 .context("generator", GENERATOR_VERSION)
                 .context("board", safeBoardKey(boardKey))
                 .context("dimension", String.valueOf(getDimensionId(world)))
-                .context("target", template.displayName)
                 .objective(objective)
                 .rewardData(LostTalesMissiveRewardData.experienceAndItems(xp, rewardItemsForDifficulty(random, count)))
                 .build();
@@ -140,21 +146,18 @@ public final class LostTalesMissiveGenerator {
         params.put("count", String.valueOf(count));
 
         LostTalesMissiveObjectiveData objective = new LostTalesMissiveObjectiveData(
-                "gather_" + normalizeId(template.displayName),
+                "gather_" + normalizeId(template.itemId),
                 LostTalesMissiveObjectiveData.TYPE_GATHER,
-                "Gather " + count + " " + template.displayName + ".",
                 false,
                 params
         );
 
         return LostTalesMissiveData.builder(questId, LostTalesMissiveObjectiveData.TYPE_GATHER)
-                .title(randomChoice(random, "Missive: Materials Wanted", "Notice: Gatherer's Pay", "Missive: Stores Run Low"))
-                .description("The stores are running short of " + template.displayName + ". Bring what is asked and take the posted reward.")
-                .issuer(issuer)
-                .flavorText(randomChoice(random,
-                                "Every hall and camp depends on small stores gathered before they are missed.",
-                                "The notice is plain, but the reward is marked clearly beneath it.",
-                                "Useful materials are worth more than idle promises."))
+                .titleId(randomChoice(random, GATHER_TITLES))
+                .descriptionId(LostTalesMissiveObjectiveData.TYPE_GATHER)
+                .issuerId(issuer)
+                .flavorId(randomChoice(random, GATHER_FLAVORS))
+                .target(template.itemId)
                 .repeatable(true)
                 .firstComeFirstServed(true)
                 .generationWorldTime(worldTime)
@@ -162,7 +165,6 @@ public final class LostTalesMissiveGenerator {
                 .context("generator", GENERATOR_VERSION)
                 .context("board", safeBoardKey(boardKey))
                 .context("dimension", String.valueOf(getDimensionId(world)))
-                .context("target", template.displayName)
                 .objective(objective)
                 .rewardData(LostTalesMissiveRewardData.experienceAndItems(xp, rewardItemsForDifficulty(random, Math.max(1, count / 2))))
                 .build();
@@ -196,9 +198,8 @@ public final class LostTalesMissiveGenerator {
         return ISSUERS[random.nextInt(ISSUERS.length)];
     }
 
-    private static String randomChoice(Random random, String a, String b, String c) {
-        int choice = random.nextInt(3);
-        return choice == 0 ? a : choice == 1 ? b : c;
+    private static String randomChoice(Random random, String[] choices) {
+        return choices[random.nextInt(choices.length)];
     }
 
     private static int randomBetween(Random random, int min, int max) {
@@ -235,15 +236,13 @@ public final class LostTalesMissiveGenerator {
 
     private static final class KillTemplate {
         private final String selector;
-        private final String displayName;
         private final boolean groupSelector;
         private final int minCount;
         private final int maxCount;
         private final int xpPerTarget;
 
-        private KillTemplate(String selector, String displayName, boolean groupSelector, int minCount, int maxCount, int xpPerTarget) {
+        private KillTemplate(String selector, boolean groupSelector, int minCount, int maxCount, int xpPerTarget) {
             this.selector = selector;
-            this.displayName = displayName;
             this.groupSelector = groupSelector;
             this.minCount = minCount;
             this.maxCount = maxCount;
@@ -253,14 +252,12 @@ public final class LostTalesMissiveGenerator {
 
     private static final class GatherTemplate {
         private final String itemId;
-        private final String displayName;
         private final int minCount;
         private final int maxCount;
         private final int xpPerItem;
 
-        private GatherTemplate(String itemId, String displayName, int minCount, int maxCount, int xpPerItem) {
+        private GatherTemplate(String itemId, int minCount, int maxCount, int xpPerItem) {
             this.itemId = itemId;
-            this.displayName = displayName;
             this.minCount = minCount;
             this.maxCount = maxCount;
             this.xpPerItem = xpPerItem;

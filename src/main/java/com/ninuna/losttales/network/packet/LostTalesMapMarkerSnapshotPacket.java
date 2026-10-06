@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -12,7 +13,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-/** Server-authoritative active marker definitions visible to one player. */
+/**
+ * Server-authoritative active marker definitions visible to one player. A
+ * marker's own words travel as they are; a marker with no name of its own
+ * travels with what it is called after, and each client words it.
+ */
 public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 2 * 1024 * 1024;
     private static final int MAX_MARKERS = 4096;
@@ -53,6 +58,7 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
             for (int index = 0; index < count; index++) {
                 String id = readId(buffer);
                 String name = readName(buffer);
+                String namedAfter = readNamedAfter(buffer);
                 String icon = readId(buffer);
                 String color = readId(buffer);
                 String category = readName(buffer);
@@ -87,7 +93,8 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
                         fastTravel, dimensionId,
                         x, y, z, compassRadius, discoveryRadius,
                         hidden, discoverable, requiresRegion,
-                        source, hasWaystone, structureType, priority));
+                        source, hasWaystone, structureType, priority,
+                        namedAfter));
             }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
@@ -107,6 +114,9 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
         for (LostTalesMapMarkerDefinition marker : this.markers) {
             writeId(buffer, marker.getId());
             writeName(buffer, marker.getName());
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    marker.getNamedAfter(),
+                    LostTalesMapMarkerNamedAfter.MAX_LENGTH);
             writeId(buffer, marker.getIconName());
             writeId(buffer, marker.getColorName());
             writeName(buffer, marker.getCategoryName());
@@ -130,6 +140,17 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
             throw new IllegalStateException(
                     "map marker snapshot exceeds packet limit");
         }
+    }
+
+    /** What a marker is called after: nothing, or a reference in its own bounds. */
+    private static String readNamedAfter(ByteBuf buffer) {
+        String namedAfter = LostTalesPacketCodec.readUtf8String(buffer,
+                LostTalesMapMarkerNamedAfter.MAX_LENGTH);
+        if (!LostTalesMapMarkerNamedAfter.isValid(namedAfter)) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "invalid map marker reference");
+        }
+        return namedAfter;
     }
 
     public List<LostTalesMapMarkerDefinition> getMarkers() {

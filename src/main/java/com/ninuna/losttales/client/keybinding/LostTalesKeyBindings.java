@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.keybinding;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
 import com.ninuna.losttales.client.character.room.CharacterRoomSession;
+import com.ninuna.losttales.client.input.LostTalesInputBinding;
 import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
@@ -20,12 +21,15 @@ import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.InputEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.util.StatCollector;
 import net.minecraftforge.client.event.MouseEvent;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
 public class LostTalesKeyBindings {
     public static final String CATEGORY = "key.categories.losttales.mappings";
+    /** What the lang keys of the keys' full names begin with. */
+    public static final String FULL_NAME_PREFIX = "gui.losttales.keys.full.";
     private static final int MIDDLE_MOUSE_KEY_CODE = -98;
 
     private static final KeyBinding CHARACTER_MENU = new KeyBinding("key.losttales.characterMenu", Keyboard.KEY_CAPITAL, CATEGORY);
@@ -262,43 +266,68 @@ public class LostTalesKeyBindings {
         return mouseButton >= 0 && Mouse.isButtonDown(mouseButton);
     }
 
-    private static String getKeyDisplayName(KeyBinding keyBinding) {
+    /**
+     * A binding's key written out in the game's language ({@code Left Shift}):
+     * the keys with a full name of their own from the lang file, every
+     * other key by LWJGL's name for it.
+     */
+    static String getKeyDisplayName(KeyBinding keyBinding) {
         if (keyBinding == null) return "";
         int keyCode = keyBinding.getKeyCode();
-        if (keyCode == Keyboard.KEY_NONE) return "None";
+        if (keyCode == Keyboard.KEY_NONE) {
+            return LostTalesInputBinding.word("none");
+        }
         if (keyCode < 0) {
-            return "Mouse " + (keyCode + 101);
+            return StatCollector.translateToLocalFormatted(FULL_NAME_PREFIX + "mouse",
+                    Integer.valueOf(keyCode + 101));
         }
         return getFriendlyKeyboardName(keyCode);
     }
 
     private static String getFriendlyKeyboardName(int keyCode) {
+        String full = fullNamedKey(keyCode);
+        if (full != null) {
+            return StatCollector.translateToLocal(FULL_NAME_PREFIX + full);
+        }
         switch (keyCode) {
-            case Keyboard.KEY_CAPITAL:
-                return "Caps Lock";
-            case Keyboard.KEY_LMENU:
-                return "Left Alt";
-            case Keyboard.KEY_RMENU:
-                return "Right Alt";
-            case Keyboard.KEY_LSHIFT:
-                return "Left Shift";
-            case Keyboard.KEY_RSHIFT:
-                return "Right Shift";
-            case Keyboard.KEY_LCONTROL:
-                return "Left Ctrl";
-            case Keyboard.KEY_RCONTROL:
-                return "Right Ctrl";
             case Keyboard.KEY_RETURN:
-                return "Enter";
-            case Keyboard.KEY_ESCAPE:
-                return "Escape";
+                return LostTalesInputBinding.word("enter");
             case Keyboard.KEY_SPACE:
-                return "Space";
-            case Keyboard.KEY_TAB:
-                return "Tab";
+                return LostTalesInputBinding.word("space");
             default:
                 String name = Keyboard.getKeyName(keyCode);
-                return name == null ? "Key " + keyCode : name;
+                return name == null
+                        ? LostTalesInputBinding.word("code", Integer.valueOf(keyCode))
+                        : name;
+        }
+    }
+
+    /**
+     * The id of a key whose full name differs from its short one
+     * ({@code left_shift}: Left Shift, not L Shift), or null.
+     */
+    static String fullNamedKey(int keyCode) {
+        switch (keyCode) {
+            case Keyboard.KEY_CAPITAL:
+                return "caps";
+            case Keyboard.KEY_LMENU:
+                return "left_alt";
+            case Keyboard.KEY_RMENU:
+                return "right_alt";
+            case Keyboard.KEY_LSHIFT:
+                return "left_shift";
+            case Keyboard.KEY_RSHIFT:
+                return "right_shift";
+            case Keyboard.KEY_LCONTROL:
+                return "left_ctrl";
+            case Keyboard.KEY_RCONTROL:
+                return "right_ctrl";
+            case Keyboard.KEY_ESCAPE:
+                return "escape";
+            case Keyboard.KEY_TAB:
+                return "tab";
+            default:
+                return null;
         }
     }
 }

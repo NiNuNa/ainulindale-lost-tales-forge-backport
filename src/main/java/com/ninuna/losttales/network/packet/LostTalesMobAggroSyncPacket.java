@@ -171,8 +171,8 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
             this.engagement = engagement == null
                     ? LostTalesCombatEngagement.NONE : engagement;
             this.sharedFromFellowship = sharedFromFellowship;
-            String safeName = name == null ? "Enemy" : name.trim();
-            this.name = safeName.length() == 0 ? "Enemy" : safeName;
+            // Empty where the server has no name for it; the client words it.
+            this.name = name == null ? "" : name.trim();
             this.x = x;
             this.y = y;
             this.z = z;

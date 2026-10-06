@@ -27,7 +27,6 @@ import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.SubWindowAnchor;
 import com.ninuna.losttales.client.window.SubWindowPlaces;
 import com.ninuna.losttales.client.window.TabMark;
-import com.ninuna.losttales.client.window.TabRow;
 import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowDrawing;
@@ -44,7 +43,6 @@ import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
-import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatCommandContextPacket;
@@ -204,10 +202,9 @@ public final class ChatScreenPart extends ScreenPart {
      * its own, since no window would take it, and waits there unread comes
      * first instead. Opened by the command key, the screen shows the
      * consoles, the Console in front, where the command and its
-     * answer stand; a closed one opens in the window of the conversation
-     * last used, or where a conversation opens while that window is
-     * locked. The chat's key comes back to the conversation last used,
-     * since a console is never that.
+     * answer stand; a closed one opens in a window of the consoles, else
+     * in their first window. The chat's key comes back to the
+     * conversation last used, since a console is never that.
      */
     @Override
     public void opening(OtherPage forPage) {
@@ -226,9 +223,7 @@ public final class ChatScreenPart extends ScreenPart {
             front = waiting;
         }
         if (this.screen.isOpenedForCommand()) {
-            Window beside = WindowLayout.windowOf(last);
-            ConversationPage console = ChatLayout.openHere(CONSOLE,
-                    beside == null ? null : beside.getId());
+            ConversationPage console = ChatLayout.openHere(CONSOLE, null);
             if (ClientChatChannelState.isSelectable(console)) {
                 front = console;
             }
@@ -2025,7 +2020,8 @@ public final class ChatScreenPart extends ScreenPart {
                 this.screen.drawItemTooltip(stack, mouseX, mouseY);
             } else {
                 LostTalesChatHoverCard.drawTextCard(this.mc, Collections.singletonList(
-                        EnumChatFormatting.RED + "Invalid Item!"),
+                        EnumChatFormatting.RED + StatCollector.translateToLocal(
+                                "gui.losttales.chat.hover.invalid_item")),
                         mouseX, mouseY, this.screen.width, this.screen.height);
             }
         } else if (hoverEvent.getAction() == HoverEvent.Action.SHOW_TEXT) {
@@ -2058,7 +2054,8 @@ public final class ChatScreenPart extends ScreenPart {
                         this.screen.width, this.screen.height);
             } else {
                 LostTalesChatHoverCard.drawTextCard(this.mc, Collections.singletonList(
-                        EnumChatFormatting.RED + "Invalid statistic/achievement!"),
+                        EnumChatFormatting.RED + StatCollector.translateToLocal(
+                                "gui.losttales.chat.hover.invalid_statistic")),
                         mouseX, mouseY, this.screen.width, this.screen.height);
             }
         }

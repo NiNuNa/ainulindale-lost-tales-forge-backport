@@ -27,17 +27,18 @@ public final class MissiveSealTest {
         params.put("group", "zombie");
         params.put("count", "5");
         return LostTalesMissiveData.builder(QUEST, "kill")
-                .title("Missive: Clear the Paths")
-                .issuer("A Road Warden")
-                .description("Travellers have reported zombies.")
-                .flavorText("The roads must remain open.")
+                .titleId("clear_the_paths")
+                .issuerId("road_warden")
+                .descriptionId("kill")
+                .flavorId("roads_open")
+                .target("Zombie")
                 .repeatable(true)
                 .firstComeFirstServed(true)
                 .generationWorldTime(posted)
                 .timeLimitTicks(48000L)
                 .context("board", "dim0_4_65_9")
                 .objective(new LostTalesMissiveObjectiveData("kill_zombies",
-                        "kill", "Defeat 5 zombies.", false, params))
+                        "kill", false, params))
                 .rewardData(LostTalesMissiveRewardData.experienceAndItems(40, reward))
                 .build();
     }
@@ -90,16 +91,15 @@ public final class MissiveSealTest {
     @Test
     public void aRepostedLetterIsSealedAgain() {
         LostTalesMissiveData letter = LostTalesMissiveData.builder(
-                "losttales:missive/generated/b/1_0", "kill").title("Bounty")
+                "losttales:missive/generated/b/1_0", "kill").titleId("dangerous_work")
                 .generationWorldTime(1000L)
-                .objective(new LostTalesMissiveObjectiveData("o", "kill", "",
-                        false, null))
+                .objective(new LostTalesMissiveObjectiveData("o", "kill", false, null))
                 .build();
         byte[] old = MissiveSeal.sign(key(7), letter);
         LostTalesMissiveData posted = letter.postedAt(50000L);
         assertEquals(50000L, posted.getGenerationWorldTime());
         assertEquals(letter.getQuestId(), posted.getQuestId());
-        assertEquals(letter.getTitle(), posted.getTitle());
+        assertEquals(letter.getTitleId(), posted.getTitleId());
         assertFalse(MissiveSeal.verifies(key(7), posted, old));
         assertTrue(MissiveSeal.verifies(key(7), posted,
                 MissiveSeal.sign(key(7), posted)));
