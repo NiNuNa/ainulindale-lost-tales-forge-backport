@@ -4,9 +4,8 @@ import com.ninuna.losttales.config.LostTalesConfig;
 
 /**
  * The one place on the screen where passing notices appear: quest
- * banners, location discoveries, area names, and the character room's
- * journey line. One slot, placed once in the HUD editor, rather than a
- * position per kind of notice.
+ * banners, location discoveries and area names. One slot, placed once in
+ * the HUD editor, rather than a position per kind of notice.
  *
  * <p>Within a frame each notice claims a strip of the slot, top down, in
  * the order it is drawn, so two notices shown at once stack under each

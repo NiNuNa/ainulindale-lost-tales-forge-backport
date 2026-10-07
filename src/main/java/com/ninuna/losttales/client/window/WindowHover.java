@@ -99,8 +99,14 @@ public class WindowHover {
     public String part;
     /** On a menu's row that can be taken, the row; null anywhere else. */
     public MenuWindow.Entry menuEntry;
-    /** What the pointer's tip says over a sub-window's content: why a menu's row cannot be taken. */
+    /** What the pointer's tip says over a sub-window's content. */
     public String tip = "";
+    /**
+     * Why the greyed control under the pointer cannot be taken; empty for
+     * one that can. A greyed control has no tip: a press on it says this
+     * over its window's bar instead.
+     */
+    public String greyedWhy = "";
 
     public WindowHover(Kind kind) {
         this.kind = kind;

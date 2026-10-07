@@ -48,10 +48,10 @@ public final class WindowBarTest {
         WindowBar.Placed track = of(placed, "track");
         WindowBar.Placed share = of(placed, "share");
         WindowBar.Placed abandon = of(placed, "abandon");
-        assertEquals(WindowBar.GAP, track.left);
-        assertEquals("framed buttons stand close", track.right
+        assertEquals("7 from the frame", WindowBar.EDGE_GAP, track.left);
+        assertEquals("5 between two buttons", track.right
                 + WindowBar.BUTTON_GAP, share.left);
-        assertEquals(400 - WindowBar.GAP, abandon.right);
+        assertEquals(400 - WindowBar.EDGE_GAP, abandon.right);
         assertFalse(track.compact);
     }
 
@@ -73,7 +73,7 @@ public final class WindowBarTest {
         WindowBar.Placed leave = of(placed, "leave");
         assertEquals("at the bar's own edge, no divider", WindowBar.GAP,
                 field.left);
-        assertEquals(leave.left - WindowBar.GAP
+        assertEquals(leave.left - WindowBar.EDGE_GAP
                 - WindowStyle.DIVIDER_WIDTH - WindowBar.WELL_GAP, field.right);
     }
 
@@ -87,8 +87,10 @@ public final class WindowBarTest {
                         LostTalesUiSheet.PLUS_LIT, "Zoom in")), 0, 400, SIX);
         WindowBar.Placed out = of(placed, "out");
         WindowBar.Placed in = of(placed, "in");
-        assertEquals(400 - WindowBar.GAP, in.right);
-        assertEquals(in.left - WindowBar.GLYPH_MARGIN, out.right);
+        assertEquals("7 from the frame", 400 - WindowBar.EDGE_GAP, in.right);
+        assertEquals("a glyph's ink, 5 apart",
+                LostTalesUiSheet.PLUS.getWidth(), in.right - in.left);
+        assertEquals(in.left - WindowBar.BUTTON_GAP, out.right);
         assertTrue("the words before the glyphs",
                 of(placed, "").right <= out.left - WindowBar.GAP);
     }
@@ -123,15 +125,15 @@ public final class WindowBarTest {
         WindowBar.Placed tab = of(placed, BarItem.TAB_ID);
         WindowBar.Placed identity = of(placed, BarItem.IDENTITY_ID);
         WindowBar.Placed track = of(placed, "track");
-        assertEquals(WindowBar.GAP, tab.left);
+        assertEquals(WindowBar.EDGE_GAP, tab.left);
         assertEquals(tab.right + BarLead.BUTTON_GAP, identity.left);
         assertEquals(BarLead.IDENTITY_SIZE, identity.right - identity.left);
         assertEquals("the page's own start past a divider", identity.right
-                + WindowBar.GAP + WindowStyle.DIVIDER_WIDTH + WindowBar.GAP,
-                track.left);
+                + WindowBar.EDGE_GAP + WindowStyle.DIVIDER_WIDTH
+                + WindowBar.EDGE_GAP, track.left);
         assertTrue(track.afterLead);
         assertFalse(of(placed, "abandon").afterLead);
-        assertEquals(400 - WindowBar.GAP, of(placed, "abandon").right);
+        assertEquals(400 - WindowBar.EDGE_GAP, of(placed, "abandon").right);
     }
 
     @Test
@@ -140,8 +142,8 @@ public final class WindowBarTest {
                 BarItem.field("invite", null, "Invite")), 0, 300, SIX);
         WindowBar.Placed identity = of(placed, BarItem.IDENTITY_ID);
         WindowBar.Placed field = of(placed, "invite");
-        assertEquals(identity.right + WindowBar.GAP + WindowStyle.DIVIDER_WIDTH
-                + WindowBar.WELL_GAP, field.left);
+        assertEquals(identity.right + WindowBar.EDGE_GAP
+                + WindowStyle.DIVIDER_WIDTH + WindowBar.WELL_GAP, field.left);
         assertFalse(field.afterLead);
     }
 
@@ -160,13 +162,16 @@ public final class WindowBarTest {
                 of(tight, "replay").compact);
     }
 
+    /** A greyed item has no tip; a press on it says why. */
     @Test
-    public void aGreyedItemSaysWhyInItsTip() {
+    public void aGreyedItemSaysWhyWhenPressed() {
         BarItem track = button("track").tip("Track (Space)");
         assertEquals("Track (Space)", track.tipText());
+        assertEquals("", track.greyedWhy());
         assertTrue(track.isAvailable());
         track.unavailable("Pick a quest first.");
         assertFalse(track.isAvailable());
-        assertEquals("Pick a quest first.", track.tipText());
+        assertEquals("", track.tipText());
+        assertEquals("Pick a quest first.", track.greyedWhy());
     }
 }

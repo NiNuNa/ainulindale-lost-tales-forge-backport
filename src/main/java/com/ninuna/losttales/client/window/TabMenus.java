@@ -10,7 +10,7 @@ import org.lwjgl.input.Keyboard;
  * The window's own menus: a tab's options, behind the three dots on the
  * tab or under a right-click on it; a window's, Window
  * Options, behind the three dots at the end of its row; a category's,
- * under a right-click on its name on the Lost Tales Menu; the tab search
+ * under a right-click on its name on the New Page; the tab search
  * over every tab, open or not; and the quick switcher, the tab search with
  * what the pages find besides. What a tab's options hold is the tab's own
  * ({@link WindowPage#options}, which its tool strip also shows as
@@ -46,11 +46,11 @@ final class TabMenus {
     private static final String SETTINGS_NONE = "settings";
     /**
      * The rows of a page's options that stand for the tool strip's own
-     * buttons: the panel, full window, the member list, the search and
+     * buttons: the panel, borderless, the member list, the search and
      * the help.
      */
     private static final String STRIP_PANEL = "strip:panel";
-    private static final String STRIP_FULL_WINDOW = "strip:full_window";
+    private static final String STRIP_BORDERLESS = "strip:borderless";
     private static final String STRIP_MEMBERS = "strip:members";
     private static final String STRIP_SEARCH = "strip:search";
     private static final String STRIP_HELP = "strip:help";
@@ -98,7 +98,7 @@ final class TabMenus {
      * A page's options as rows: everything its tool strip holds, in the
      * strip's order read from its left, a hairline wherever the strip
      * has one. The panel's row; the page's own options, a hairline
-     * between two groups; then the cog's row, Split View, Full Window,
+     * between two groups; then the cog's row, Split View, Borderless,
      * the member list's row (conversations), the search and the help.
      * What the strip greys stands greyed here, saying the same.
      */
@@ -124,8 +124,8 @@ final class TabMenus {
         rows.add(settingsRow(tab));
         rows.add(splitViewRow(tab));
         rows.add(duplicateRow(tab));
-        rows.add(new MenuWindow.Entry(STRIP_FULL_WINDOW,
-                StatCollector.translateToLocal("gui.losttales.window.option.full_window"))
+        rows.add(new MenuWindow.Entry(STRIP_BORDERLESS,
+                StatCollector.translateToLocal("gui.losttales.window.option.borderless"))
                 .withSprite(LostTalesUiSheet.FULLSCREEN,
                         LostTalesUiSheet.FULLSCREEN_HOVER, false)
                 .withKeys(PageKeys.keysOf(Keyboard.KEY_LMENU, PageKeys.PLUS,
@@ -592,7 +592,7 @@ final class TabMenus {
         for (WindowPages.Page page : WindowPages.all()) {
             OtherPage tab = page.tab();
             if (WindowPages.isOffered(page)
-                    && page.category() != PageCategory.MENU
+                    && page.category() != PageCategory.NEW_PAGE
                     && WindowMenus.matchesFilter(page.title(), filter)) {
                 rows.add(new MenuWindow.Entry(tab.id(), page.title(), false,
                         -1, tab));
@@ -704,7 +704,7 @@ final class TabMenus {
      * when it is one and takes it, else where its category keeps its pages
      * ({@link WindowLayout#openCopy}). The page then takes the keys.
      */
-    private void openFromMenu(String windowId, MenuWindow.Entry entry) {
+    private void openFromNewPage(String windowId, MenuWindow.Entry entry) {
         WindowPage opened = WindowLayout.openCopy(
                 WindowPage.fromId(entry.id), windowId);
         if (opened != null) {
@@ -737,7 +737,7 @@ final class TabMenus {
          * row opens its settings beside the menu, the split view row the
          * split view, the help row the help, and a pick's row its words,
          * the menu staying; the panel's and the member list's rows are
-         * switches and stay; full window and the search are done with the
+         * switches and stay; borderless and the search are done with the
          * menu. The rest are the tab's: its switches stay, its actions
          * are done with it.
          */
@@ -771,8 +771,8 @@ final class TabMenus {
                 return false;
             }
             Window held = WindowLayout.windowOf(tab);
-            if (STRIP_FULL_WINDOW.equals(entry.id)) {
-                TabMenus.this.screen.toggleFullWindow(held);
+            if (STRIP_BORDERLESS.equals(entry.id)) {
+                TabMenus.this.screen.toggleBorderless(held);
                 return false;
             }
             if (STRIP_SEARCH.equals(entry.id)) {
@@ -948,7 +948,7 @@ final class TabMenus {
         }
 
         /**
-         * Under *Open Beside*, every page the Lost Tales Menu offers, a new
+         * Under *Open Beside*, every page the New Page offers, a new
          * copy of each opening straight beside the page. Greyed while the
          * padlock holds the window.
          */
@@ -1189,7 +1189,7 @@ final class TabMenus {
     }
 
     /**
-     * What a right-click on a category's name on the Lost Tales Menu offers for
+     * What a right-click on a category's name on the New Page offers for
      * all its pages: *Open All*, *Close All*, then each option its pages
      * may take all at once — *Mark All as Read*, a conversation's two
      * settings, their words opening beside the menu. A row that cannot be
@@ -1439,7 +1439,7 @@ final class TabMenus {
                 showFound((String)menu.about(), entry.id.substring(
                         ENTRY_FIND_PREFIX.length()));
             } else {
-                openFromMenu((String)menu.about(), entry);
+                openFromNewPage((String)menu.about(), entry);
             }
             return false;
         }

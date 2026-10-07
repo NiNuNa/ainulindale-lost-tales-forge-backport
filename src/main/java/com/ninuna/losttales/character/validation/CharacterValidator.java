@@ -298,7 +298,7 @@ public final class CharacterValidator {
         }
 
         int slotIndex = request.getSlotIndex();
-        if (!CharacterRoster.isCreatableSlotIndex(slotIndex)) {
+        if (!CharacterRoster.isValidSlotIndex(slotIndex)) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_SLOT);
         }
         if (slotIndex >= roster.getUnlockedSlotCount()) {
@@ -307,7 +307,7 @@ public final class CharacterValidator {
         if (roster.getCharacterAtSlot(slotIndex) != null) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.SLOT_OCCUPIED);
         }
-        if (roster.roleplayCharacterCount() >= CharacterRoster.MAX_SLOTS) {
+        if (roster.characterCount() >= CharacterRoster.MAX_SLOTS) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.MAX_CHARACTERS);
         }
 

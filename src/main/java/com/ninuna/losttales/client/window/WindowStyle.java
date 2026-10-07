@@ -262,6 +262,19 @@ public final class WindowStyle {
     /** Width of the hairline between two controls. */
     public static final int DIVIDER_WIDTH = 1;
 
+    /**
+     * Clear space between two buttons standing side by side in a window's
+     * rows and bars: from ink to ink for a glyph, from the outer edge for
+     * a framed button.
+     */
+    public static final int BUTTON_GAP = 5;
+
+    /**
+     * Clear space between a button and the window's frame beside it, or a
+     * hairline: a hairline counts as an edge.
+     */
+    public static final int EDGE_GAP = 7;
+
     /** Quiet enough to divide without reading as an edge of its own. */
     public static final int DIVIDER_ALPHA = 0x66;
 

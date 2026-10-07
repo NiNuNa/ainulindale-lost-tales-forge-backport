@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.sync;
 
-import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.CharacterSlotState;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -26,9 +25,6 @@ public final class CharacterRosterSnapshot {
     private final List<CharacterSummary> characters;
     private final Map<UUID, CharacterSummary> charactersById;
     private final Map<Integer, CharacterSummary> charactersBySlot;
-    private final boolean accountShowMinecraftCape;
-    private final int accountCosmeticCapeId;
-    private final boolean templateTaken;
     private final List<DeletedCharacterSummary> deleted;
 
     /**
@@ -39,9 +35,6 @@ public final class CharacterRosterSnapshot {
     public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
                                    UUID activeCharacterId, long revision,
                                    List<CharacterSummary> characters,
-                                   boolean accountShowMinecraftCape,
-                                   int accountCosmeticCapeId,
-                                   boolean templateTaken,
                                    List<DeletedCharacterSummary> deleted) {
         if (ownerId == null) {
             throw new IllegalArgumentException("ownerId must not be null");
@@ -78,9 +71,6 @@ public final class CharacterRosterSnapshot {
         this.charactersBySlot = Collections.unmodifiableMap(bySlot);
         this.activeCharacterId = activeCharacterId != null && byId.containsKey(activeCharacterId)
                 ? activeCharacterId : null;
-        this.accountShowMinecraftCape = accountShowMinecraftCape;
-        this.accountCosmeticCapeId = CharacterCapeCatalog.normalizeSelection(accountCosmeticCapeId);
-        this.templateTaken = templateTaken;
         List<DeletedCharacterSummary> kept = new ArrayList<DeletedCharacterSummary>();
         if (deleted != null) {
             for (DeletedCharacterSummary each : deleted) {
@@ -108,25 +98,16 @@ public final class CharacterRosterSnapshot {
                 roster.getActiveCharacterId(),
                 roster.getRevision(),
                 summaries,
-                roster.isAccountMinecraftCapeVisible(),
-                roster.getAccountCosmeticCapeId(),
-                roster.isTemplateTaken(),
                 deleted
         );
     }
 
-    /** Whether this world has already taken the account character's look. */
-    public boolean isTemplateTaken() {
-        return this.templateTaken;
-    }
-
-    /** The cape the account wears when played as itself. */
-    public boolean isAccountMinecraftCapeVisible() {
-        return this.accountShowMinecraftCape;
-    }
-
-    public int getAccountCosmeticCapeId() {
-        return this.accountCosmeticCapeId;
+    /**
+     * Whether the player has not made a character yet: on a first visit
+     * they wait in the creator, held as a ghost, until they have.
+     */
+    public boolean isWaitingForFirstCharacter() {
+        return this.activeCharacterId == null;
     }
 
     public UUID getOwnerId() {
@@ -160,16 +141,6 @@ public final class CharacterRosterSnapshot {
 
     public int getCharacterCount() {
         return this.characters.size();
-    }
-
-    /** The account character, or null on a roster that has none. */
-    public CharacterSummary getDefaultCharacter() {
-        for (CharacterSummary character : this.characters) {
-            if (character != null && character.isDefault()) {
-                return character;
-            }
-        }
-        return null;
     }
 
     public CharacterSummary getCharacter(UUID characterId) {

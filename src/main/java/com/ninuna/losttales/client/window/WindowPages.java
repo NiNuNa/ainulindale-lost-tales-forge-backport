@@ -157,6 +157,20 @@ public final class WindowPages {
                         ? tab(id.substring(OtherPage.ID_PREFIX.length())) : null;
             }
         });
+        // A category's key opens its first window with every page of it
+        // the player can open, in the order they were registered.
+        WindowLayout.addViewPages(new WindowLayout.ViewPages() {
+            @Override
+            public List<? extends WindowPage> pagesOf(PageCategory category) {
+                List<OtherPage> pages = new ArrayList<OtherPage>();
+                for (Page page : all()) {
+                    if (page.category().home() == category && isOffered(page)) {
+                        pages.add(page.tab());
+                    }
+                }
+                return pages;
+            }
+        });
     }
 
     private WindowPages() {}

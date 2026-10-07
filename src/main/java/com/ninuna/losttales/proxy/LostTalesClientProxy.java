@@ -18,8 +18,6 @@ import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
 import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
-import com.ninuna.losttales.client.character.CharacterTemplateOffer;
-import com.ninuna.losttales.client.character.CharacterTemplateStore;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
 import com.ninuna.losttales.client.character.ClientCharacterProfileCache;
@@ -29,7 +27,7 @@ import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.chat.ChatEmojiUsageStore;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.window.ClientSettingsPage;
-import com.ninuna.losttales.client.window.LostTalesMenuPage;
+import com.ninuna.losttales.client.window.NewPage;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.WindowPages;
@@ -37,6 +35,7 @@ import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.gui.screen.character.CharacterSubWindows;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
+import com.ninuna.losttales.gui.screen.character.FirstCharacterCreator;
 import com.ninuna.losttales.gui.screen.fellowship.FellowshipPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.gui.screen.missive.MissiveBoardPage;
@@ -179,7 +178,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ClientChatDrafts.initialize(clientFolder);
         ClientChatPresenceChoices.initialize(clientFolder);
         LostTalesClientMapMarkerUsageStore.initialize(clientFolder);
-        CharacterTemplateStore.initialize(clientFolder);
         // The Motion Lab's tuning, read over the mod's own motion files.
         Motions.initialize(clientFolder);
         LostTalesThirdPersonConfig.load(
@@ -199,6 +197,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(keyBindings);
         FMLCommonHandler.instance().bus().register(clientEventHandler);
         FMLCommonHandler.instance().bus().register(characterClientTaskQueue);
+        FMLCommonHandler.instance().bus().register(new FirstCharacterCreator());
         FMLCommonHandler.instance().bus().register(guiAnimationHandler);
         MinecraftForge.EVENT_BUS.register(new LostTalesMainMenuHandler());
         ELostTalesMapLabels.initAndRegisterMapLabels();
@@ -209,7 +208,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     /**
-     * The Lost Tales Menu, every page's way in; the quest journal, the
+     * The New Page, every page's way in; the quest journal, the
      * fellowship, the map and the characters, each a page a window can
      * hold, with the key that opens it from another page; the Characters
      * page's own kinds of sub-window; the Motion Lab,
@@ -219,12 +218,12 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
      * waystone's, a missive board's and a missive letter's.
      */
     private static void registerPages() {
-        WindowPages.register(LostTalesMenuPage.PAGE_ID, "gui.losttales.page.menu",
-                LostTalesMenuPage.ICON, LostTalesKeyBindings.getMenuKeyBinding(),
-                PageCategory.MENU, new WindowPages.Factory() {
+        WindowPages.register(NewPage.PAGE_ID, "gui.losttales.page.new_page",
+                NewPage.ICON, LostTalesKeyBindings.getNewPageKeyBinding(),
+                PageCategory.NEW_PAGE, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
-                        return new LostTalesMenuPage();
+                        return new NewPage();
                     }
                 });
         WindowPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",
@@ -523,7 +522,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             return;
         }
         ClientCharacterRosterCache.acceptRoster(packet.getRequestId(), packet.getSnapshot());
-        CharacterTemplateOffer.onRoster(packet.getSnapshot());
     }
 
     @Override
@@ -588,7 +586,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         }
         CharacterOperationFeedback feedback = packet.toFeedback();
         ClientCharacterRosterCache.acceptOperation(feedback);
-        CharacterTemplateOffer.onResult(feedback);
     }
 
     @Override

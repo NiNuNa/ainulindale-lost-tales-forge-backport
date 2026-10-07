@@ -247,16 +247,15 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
     }
 
     /** The account's own name: the online player's, else the one the server knows it by. */
-    private static String accountNameOf(World world, UUID ownerId,
+    private static String accountNameOf(UUID ownerId,
                                         EntityPlayerMP online) {
         return online != null ? SeenAccountNames.accountNameOf(online)
-                : KnownAccounts.nameOf(ownerId,
-                        CharacterStorage.get(world).getRoster(ownerId));
+                : KnownAccounts.nameOf(ownerId);
     }
 
     /**
      * Restores a deleted character into its own slot, the player online
-     * or away (R15): an away player finds it on their next visit.
+     * or away: an away player finds it on their next visit.
      */
     private void processRestore(ICommandSender sender, String[] args) {
         World world = overworld(sender);
@@ -268,13 +267,13 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         EntityPlayerMP online = resolveTarget(sender, args[1]);
         CharacterDeletionMaintenanceResult result =
                 CharacterDeletionService.getInstance().restore(world, ownerId,
-                        accountNameOf(world, ownerId, online), online, characterId);
+                        accountNameOf(ownerId, online), online, characterId);
         reportMaintenanceResult(sender, online, characterId,
                 SAY + "restore.done", SAY + "restore.failed", result);
     }
 
     /**
-     * Renames a character, the player online or away (R10): the one way a
+     * Renames a character, the player online or away: the one way a
      * name changes, checked as a new character's name is.
      */
     private void processRename(ICommandSender sender, String[] args) {
@@ -297,7 +296,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         }
         EntityPlayerMP online = resolveTarget(sender, args[1]);
         CharacterOperationResult result = CharacterService.getInstance().renameByAdmin(
-                world, ownerId, accountNameOf(world, ownerId, online),
+                world, ownerId, accountNameOf(ownerId, online),
                 characterId, name.toString());
         if (!result.isSuccessful()) {
             say(sender, EnumChatFormatting.RED, SAY + "rename.failed",

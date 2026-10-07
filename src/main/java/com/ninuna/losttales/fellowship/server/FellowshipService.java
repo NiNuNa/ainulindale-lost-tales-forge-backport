@@ -1174,7 +1174,7 @@ public final class FellowshipService {
 
     /**
      * Why a member no longer stands: its id is held by two rosters, names
-     * nobody, or names a character of another account. Null while it
+     * no character, or names a character of another account. Null while it
      * stands.
      */
     private static String memberRemovalReason(FellowshipMember member, CharacterIndex index) {
@@ -1183,16 +1183,10 @@ public final class FellowshipService {
             return "ambiguous_character_uuid";
         }
         RoleplayCharacter character = index.find(identityId);
-        // A member whose id is its own owner's is that account playing as
-        // itself; it stands as long as the account has a roster, exactly as
-        // a character stands while it exists.
-        boolean accountMember = character == null
-                && identityId.equals(member.getOwnerId())
-                && index.isAccountOwner(identityId);
-        if (character == null && !accountMember) {
+        if (character == null) {
             return "missing_character";
         }
-        if (character != null && !character.getOwnerId().equals(member.getOwnerId())) {
+        if (!character.getOwnerId().equals(member.getOwnerId())) {
             return "character_owner_mismatch";
         }
         return null;
@@ -1236,12 +1230,12 @@ public final class FellowshipService {
     }
 
     /**
-     * The identity the player is playing, as the fellowship system needs it:
-     * the shared resolver's answer — the account, a character, or a
-     * store that cannot say — plus the fellowship's own integrity checks on a
-     * character, since a member is filed by its identity id and an id held
+     * The character the player is playing, as the fellowship system needs
+     * it: the shared resolver's answer plus the fellowship's own integrity
+     * checks, since a member is filed by its character's id and an id held
      * by two rosters or by another owner would file it under the wrong
-     * person.
+     * person. A fellowship is a company of characters, so a player who has
+     * not made one yet acts in none.
      */
     ActiveIdentityContext resolveActiveIdentity(EntityPlayerMP player) {
         PlayableIdentityResolver.Resolution resolution = PlayableIdentityResolver.resolve(player);
@@ -1251,8 +1245,7 @@ public final class FellowshipService {
         CharacterWorldData data = resolution.getData();
         RoleplayCharacter character = resolution.getCharacter();
         if (character == null) {
-            return ActiveIdentityContext.success(data, resolution.getIdentity(),
-                    player.getCommandSenderName());
+            return ActiveIdentityContext.failure(FellowshipErrorId.CHARACTER_NOT_FOUND);
         }
         int matches = data.characterIndex().countOf(character.getCharacterId());
         if (matches == 0) {

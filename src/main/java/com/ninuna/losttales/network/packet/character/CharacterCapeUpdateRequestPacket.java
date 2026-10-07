@@ -14,10 +14,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.UUID;
 
-/**
- * Client request to update the persistent cape settings of one owned
- * identity: a character by id, or the account itself (no id).
- */
+/** Client request to update the persistent cape settings of one owned character. */
 public final class CharacterCapeUpdateRequestPacket implements IMessage {
 
     private static final UUID NIL_UUID = new UUID(0L, 0L);
@@ -36,7 +33,7 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
                                             UUID characterId,
                                             boolean showMinecraftCape,
                                             int cosmeticCapeId) {
-        if (expectedRosterRevision < 0L
+        if (expectedRosterRevision < 0L || characterId == null
                 || !CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
             throw new IllegalArgumentException("invalid cape update request");
         }
@@ -52,7 +49,7 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
         try {
             this.requestId = buffer.readInt();
             this.expectedRosterRevision = buffer.readLong();
-            this.characterId = LostTalesPacketCodec.readNullableUuid(buffer);
+            this.characterId = LostTalesPacketCodec.readUuid(buffer);
             this.showMinecraftCape = buffer.readBoolean();
             this.cosmeticCapeId = buffer.readUnsignedShort();
             if (NIL_UUID.equals(this.characterId)) {
@@ -78,12 +75,12 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
     public void toBytes(ByteBuf buffer) {
         buffer.writeInt(this.requestId);
         buffer.writeLong(this.expectedRosterRevision);
-        LostTalesPacketCodec.writeNullableUuid(buffer, this.characterId);
+        LostTalesPacketCodec.writeUuid(buffer, this.characterId);
         buffer.writeBoolean(this.showMinecraftCape);
         buffer.writeShort(this.cosmeticCapeId);
     }
 
-    /** The character asked about; null for the account itself. */
+    /** The character asked about. */
     public UUID getCharacterId() {
         return this.characterId;
     }

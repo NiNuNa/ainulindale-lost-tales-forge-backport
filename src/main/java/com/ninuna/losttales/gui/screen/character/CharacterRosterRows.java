@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * The rows of the Characters page's roster, as the page draws them and the
- * pointer hits them: the account character first, then the slots under a
+ * pointer hits them: the slots under a
  * heading counting them — a character, or an unlocked slot waiting to be
  * filled — then the way to the lore characters, and at the foot the
  * deleted characters the player may still restore, under a heading of
@@ -20,8 +20,7 @@ import java.util.List;
  */
 final class CharacterRosterRows {
     /** What a row is. */
-    enum Kind { ACCOUNT, HEADING, CHARACTER, EMPTY, LORE, DELETED_HEADING,
-        DELETED }
+    enum Kind { HEADING, CHARACTER, EMPTY, LORE, DELETED_HEADING, DELETED }
 
     /** The slot a row stands for when it stands for none. */
     static final int NO_SLOT = Integer.MIN_VALUE;
@@ -29,9 +28,9 @@ final class CharacterRosterRows {
     /** One row: its kind, its slot, and the character in it where there is one. */
     static final class Row {
         final Kind kind;
-        /** The slot the row stands for; the default slot for the account's row, {@link #NO_SLOT} for a deleted character's. */
+        /** The slot the row stands for; {@link #NO_SLOT} for a row that stands for none. */
         final int slot;
-        /** The character in the slot; null for an empty one, and for the account's row before a world made its record. */
+        /** The character in the slot; null for an empty one. */
         final CharacterSummary character;
         /** The deleted character a deleted row names; null on every other row. */
         final DeletedCharacterSummary deleted;
@@ -50,8 +49,8 @@ final class CharacterRosterRows {
 
         /** Whether a press picks the row. */
         boolean pickable() {
-            return this.kind == Kind.ACCOUNT || this.kind == Kind.CHARACTER
-                    || this.kind == Kind.EMPTY || this.kind == Kind.DELETED;
+            return this.kind == Kind.CHARACTER || this.kind == Kind.EMPTY
+                    || this.kind == Kind.DELETED;
         }
 
         /** What the page remembers the pick by: the slot, or the deleted character's id. */
@@ -64,25 +63,14 @@ final class CharacterRosterRows {
 
     private CharacterRosterRows() {}
 
-    /**
-     * The roster's rows for {@code snapshot}, the search held; the
-     * account's row matched by {@code accountName} while its record is not
-     * made. None while no roster is known.
-     */
-    static List<Row> of(CharacterRosterSnapshot snapshot, String accountName,
-                        String query) {
+    /** The roster's rows for {@code snapshot}, the search held; none while no roster is known. */
+    static List<Row> of(CharacterRosterSnapshot snapshot, String query) {
         List<Row> rows = new ArrayList<Row>();
         if (snapshot == null) {
             return rows;
         }
         PageSearch search = PageSearch.of(query);
         boolean searching = query != null && query.trim().length() > 0;
-        CharacterSummary own = snapshot.getCharacterAtSlot(
-                CharacterRoster.DEFAULT_SLOT_INDEX);
-        if (search.matches(own == null ? accountName : own.getName())) {
-            rows.add(new Row(Kind.ACCOUNT, CharacterRoster.DEFAULT_SLOT_INDEX,
-                    own));
-        }
         List<Row> slots = new ArrayList<Row>();
         for (int slot = 0; slot < CharacterRoster.MAX_SLOTS; slot++) {
             CharacterSlotState state = snapshot.getSlotState(slot);
@@ -96,13 +84,11 @@ final class CharacterRosterRows {
             }
         }
         if (!slots.isEmpty()) {
-            rows.add(new Row(Kind.HEADING, CharacterRoster.DEFAULT_SLOT_INDEX,
-                    null));
+            rows.add(new Row(Kind.HEADING, NO_SLOT, null));
             rows.addAll(slots);
         }
         if (!searching) {
-            rows.add(new Row(Kind.LORE, CharacterRoster.DEFAULT_SLOT_INDEX,
-                    null));
+            rows.add(new Row(Kind.LORE, NO_SLOT, null));
         }
         List<Row> deleted = new ArrayList<Row>();
         for (DeletedCharacterSummary each : snapshot.getDeleted()) {
@@ -117,7 +103,7 @@ final class CharacterRosterRows {
         return rows;
     }
 
-    /** The characters the heading counts: those in the slots, the account character left out. */
+    /** The characters the heading counts: those in the slots. */
     static int filledSlots(CharacterRosterSnapshot snapshot) {
         int filled = 0;
         for (int slot = 0; slot < CharacterRoster.MAX_SLOTS; slot++) {
@@ -132,32 +118,17 @@ final class CharacterRosterRows {
     static int found(List<Row> rows) {
         int found = 0;
         for (Row row : rows) {
-            if (row.kind == Kind.CHARACTER || row.kind == Kind.ACCOUNT
-                    || row.kind == Kind.DELETED) {
+            if (row.kind == Kind.CHARACTER || row.kind == Kind.DELETED) {
                 found++;
             }
         }
         return found;
     }
 
-    /**
-     * Whether a character is the one played. A world that has not made
-     * the account's record names no character played, and the account is
-     * what is played then, so its row answers for it.
-     */
+    /** Whether the row's character is the one played. */
     static boolean isPlayed(CharacterRosterSnapshot snapshot, Row row) {
-        if (snapshot == null || row == null || row.kind == Kind.DELETED) {
-            return false;
-        }
-        if (row.kind == Kind.ACCOUNT && row.character == null) {
-            return snapshot.getActiveCharacterId() == null;
-        }
-        if (row.character == null) {
-            return false;
-        }
-        return snapshot.getActiveCharacterId() == null
-                ? row.character.isDefault()
-                : row.character.getCharacterId().equals(
+        return snapshot != null && row != null && row.character != null
+                && row.character.getCharacterId().equals(
                         snapshot.getActiveCharacterId());
     }
 

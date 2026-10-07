@@ -33,7 +33,7 @@ import org.lwjgl.input.Mouse;
  * well a third of the strip wide naming what it searches — {@code
  * Search Global}, {@code Search active quests} — with its magnifier at
  * the well's right end; the member list's button, two people, which a
- * page has none of; the full window button, which lets the tab in front
+ * page has none of; the borderless button, which lets the tab in front
  * fill its window ({@link ContentView}); the split view button, which
  * opens the pages that can stand beside it, or the split's own rows; the
  * cog, which opens the settings of the page's kind (Chat Settings for
@@ -78,7 +78,7 @@ public final class ToolStrip {
         SPLIT,
         /** The duplicate button: another copy of the page in front, right after it. */
         DUPLICATE,
-        /** The full window button: the tab in front filling its window. */
+        /** The borderless button: the tab in front filling its window. */
         VIEW,
         MEMBERS_TOGGLE,
         /** The question mark at the strip's right end: the page's help. */
@@ -116,8 +116,8 @@ public final class ToolStrip {
         FOUND
     }
 
-    /** Clear space between the search's own controls. */
-    static final int GAP = 3;
+    /** Clear space between the search's own controls: the field, the count, the chevrons and the icon. */
+    static final int GAP = WindowStyle.BUTTON_GAP;
     /** The well: one message row, a clear row above and below the capitals' seven. */
     static final int WELL_HEIGHT = 12;
     /** The well's field: its text row, the well's clear rows and caret aside. */
@@ -132,22 +132,20 @@ public final class ToolStrip {
      * Clear space between the strip's end glyphs and what stands next to
      * them, ink to edge, as between the tab row's end controls.
      */
-    private static final int END_GAP = 5;
+    private static final int END_GAP = WindowStyle.BUTTON_GAP;
     /**
-     * Clear pixels the strip's right-hand glyph keeps from the window's
-     * edge, as the tab search keeps them on the left.
+     * Clear pixels a button keeps from the window's edge and from a
+     * hairline, as the tab search keeps them on the left.
      */
-    private static final int EDGE_MARGIN = 3;
+    private static final int EDGE_GAP = WindowStyle.EDGE_GAP;
     /** Clear pixels round a glyph that answer with it. */
     private static final int SLACK = 2;
     private static final int MAX_QUERY = 64;
-    /** The least clear space the options keep from the panel button. */
-    private static final int PANEL_CLEARANCE = END_GAP * 2;
     /** The hairline between two groups of buttons: the tab row's own. */
     private static final int DIVIDER_WIDTH = WindowStyle.DIVIDER_WIDTH;
     private static final int DIVIDER_HEIGHT = TabRow.END_CONTROL_SIZE;
-    /** A hairline with a button's gap either side of it. */
-    private static final int DIVIDER_ROOM = END_GAP + DIVIDER_WIDTH + END_GAP;
+    /** A hairline with an edge's gap either side of it. */
+    private static final int DIVIDER_ROOM = EDGE_GAP + DIVIDER_WIDTH + EDGE_GAP;
     private static final int HELP_WIDTH = LostTalesUiSheet.QUESTION.getWidth();
     private static final int HELP_HEIGHT = LostTalesUiSheet.QUESTION.getHeight();
     private static final int MEMBERS_WIDTH = LostTalesUiSheet.MEMBERS.getWidth();
@@ -311,8 +309,7 @@ public final class ToolStrip {
         Panel panel = front.panel();
         Layout laid = layOut(TabRow.toolStripLeft(row),
                 (int)Math.floor(frame.tabBar.toolStripRight(font, row)),
-                row.rowBottom, TabRow.searchButtonLeft(row),
-                TabRow.searchButtonSize(),
+                row.rowBottom,
                 panel == null ? 0 : panel.glyph.getWidth(),
                 panel == null ? 0 : panel.glyph.getHeight(),
                 front.hasMemberList(),
@@ -320,8 +317,8 @@ public final class ToolStrip {
                         : Count.FOUND,
                 font.getStringWidth(front.searchCount()));
         layOptions(laid, front.options(), panel == null
-                ? TabRow.searchButtonLeft(row) + TabRow.searchButtonSize()
-                : laid.panelX + laid.panelWidth, panel != null);
+                ? TabRow.toolStripLeft(row) : laid.panelX + laid.panelWidth,
+                panel != null);
         frame.toolStrip.layout = laid;
         frame.tabBar.setToolStripHole(laid.hasWell
                 ? new LostTalesUiHitBox(laid.wellLeft, laid.wellTop,
@@ -338,10 +335,10 @@ public final class ToolStrip {
     /**
      * Where everything on a strip stands: the panel button, a glyph
      * {@code panelWidth} by {@code panelHeight} (none for a width of 0),
-     * centred under the tab search; the help button against the strip's
-     * right end, {@link #EDGE_MARGIN} in; the well before it, a third of
+     * {@link #EDGE_GAP} in from the strip's left end; the help button
+     * against the strip's right end, as far in; the well before it, a third of
      * the strip wide; before the well the member list's button where the
-     * strip has one, the full window button, the duplicate button, the
+     * strip has one, the borderless button, the duplicate button, the
      * split view button and the cog. A
      * strip whose third is too narrow for a well, or leaves the buttons no
      * room, keeps none, and the buttons stand before the help button. A
@@ -350,7 +347,6 @@ public final class ToolStrip {
      * {@link Count#WALK}, where the field leaves them room. Row space.
      */
     static Layout layOut(int stripLeft, int stripRight, int stripTop,
-                         int searchButtonLeft, int searchButtonSize,
                          int panelWidth, int panelHeight, boolean members,
                          Count count, int countWidth) {
         Layout laid = new Layout();
@@ -360,18 +356,17 @@ public final class ToolStrip {
         laid.textTop = laid.wellTop + 2;
         laid.panelWidth = panelWidth;
         laid.panelHeight = panelHeight;
-        laid.panelX = searchButtonLeft
-                + Math.floorDiv(searchButtonSize - panelWidth, 2);
+        laid.panelX = stripLeft + EDGE_GAP;
         laid.hasMembers = members;
-        laid.helpX = stripRight - EDGE_MARGIN - HELP_WIDTH;
+        laid.helpX = stripRight - EDGE_GAP - HELP_WIDTH;
         laid.wellRight = laid.helpX - END_GAP;
         laid.wellLeft = laid.wellRight
                 - Math.floorDiv(stripRight - stripLeft, 3);
         int buttons = COG_WIDTH + END_GAP + SPLIT_WIDTH + END_GAP
                 + DUPLICATE_WIDTH + END_GAP + VIEW_WIDTH + END_GAP
                 + (members ? MEMBERS_WIDTH + END_GAP : 0);
-        int floor = panelWidth > 0 ? laid.panelX + panelWidth + END_GAP
-                : searchButtonLeft + searchButtonSize + END_GAP;
+        int floor = panelWidth > 0 ? laid.panelX + panelWidth + EDGE_GAP
+                : stripLeft + EDGE_GAP;
         laid.hasWell = laid.wellRight - laid.wellLeft >= MIN_WELL_WIDTH
                 && laid.wellLeft - buttons >= floor;
         int buttonsRight = laid.hasWell ? laid.wellLeft - END_GAP
@@ -408,7 +403,8 @@ public final class ToolStrip {
      * menu parts: one after the panel button's group where it has one
      * ({@code leading}), one between two groups of options, and one between
      * the last option and the cog. As many options as stand whole right of
-     * {@code after}, the panel button's right edge, stand on the strip;
+     * {@code after}, the panel button's right edge or the strip's left
+     * end, an edge's gap clear of it, stand on the strip;
      * they are counted from the start of the list, and the ones left over
      * go behind the overflow button after the last that fits.
      */
@@ -416,7 +412,8 @@ public final class ToolStrip {
                            boolean leading) {
         int tail = options.isEmpty() ? 0 : DIVIDER_ROOM;
         int lead = leading ? DIVIDER_ROOM : 0;
-        int room = laid.settingsX - tail - lead - (after + PANEL_CLEARANCE);
+        int room = laid.settingsX - tail - lead - after
+                - (leading ? 0 : EDGE_GAP);
         int shown = fitting(options, room);
         boolean overflow = shown < options.size();
         if (overflow) {
@@ -429,7 +426,7 @@ public final class ToolStrip {
         List<Integer> dividers = new ArrayList<Integer>();
         int x = laid.settingsX - tail - width;
         if (leading) {
-            dividers.add(Integer.valueOf(x - DIVIDER_ROOM + END_GAP));
+            dividers.add(Integer.valueOf(x - DIVIDER_ROOM + EDGE_GAP));
         }
         for (int index = 0; index < shown; index++) {
             PageOption option = options.get(index);
@@ -437,7 +434,7 @@ public final class ToolStrip {
                 if (sameGroup(options.get(index - 1), option)) {
                     x += END_GAP;
                 } else {
-                    dividers.add(Integer.valueOf(x + END_GAP));
+                    dividers.add(Integer.valueOf(x + EDGE_GAP));
                     x += DIVIDER_ROOM;
                 }
             }
@@ -452,7 +449,7 @@ public final class ToolStrip {
             x += OVERFLOW_WIDTH;
         }
         if (tail > 0) {
-            dividers.add(Integer.valueOf(x + END_GAP));
+            dividers.add(Integer.valueOf(x + EDGE_GAP));
         }
         laid.dividerX = new int[dividers.size()];
         for (int index = 0; index < dividers.size(); index++) {
@@ -949,11 +946,8 @@ public final class ToolStrip {
         if (front == null) {
             return "";
         }
-        String greyed = greyedWhy(part, window);
-        if (greyed.length() > 0) {
-            return greyed;
-        }
-        if (heldByPadlock(part, window)) {
+        if (greyedWhy(part, window).length() > 0
+                || heldByPadlock(part, window)) {
             return "";
         }
         switch (part) {
@@ -987,8 +981,8 @@ public final class ToolStrip {
                                 ? "gui.losttales.window.members.hide"
                                 : "gui.losttales.window.members.show");
             case VIEW:
-                return StatCollector.translateToLocalFormatted(
-                        "gui.losttales.window.view.enter", front.title());
+                return StatCollector.translateToLocal(
+                        "gui.losttales.window.view.enter");
             case ICON:
                 return WindowSearch.isOpenOn(window.getId())
                         && WindowSearch.query().length() > 0

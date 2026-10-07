@@ -1,6 +1,7 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
+import com.ninuna.losttales.character.server.CharacterJoin;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
@@ -59,12 +60,22 @@ public final class DiscordGameEventRelay {
 
     DiscordGameEventRelay() {}
 
+    /**
+     * A player logging in, announced unless they are still waiting for
+     * their first character, who is announced as they join
+     * ({@link #announceJoin}).
+     */
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-        if (event == null || !(event.player instanceof EntityPlayerMP)) {
+        if (event == null || !(event.player instanceof EntityPlayerMP)
+                || CharacterJoin.isWaiting(event.player)) {
             return;
         }
-        EntityPlayerMP player = (EntityPlayerMP)event.player;
+        announceJoin((EntityPlayerMP)event.player);
+    }
+
+    /** Tells Discord a player has joined, with the join line's id. */
+    public static void announceJoin(EntityPlayerMP player) {
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
         bridge.announce(DiscordServerNotices.playerJoined(LostTalesWords.LANG,
                 player.getCommandSenderName(),
@@ -75,9 +86,11 @@ public final class DiscordGameEventRelay {
                         ChatSystemLineClassifier.Kind.JOIN));
     }
 
+    /** A player leaving, unless they never joined: one still waiting goes unannounced. */
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        if (event == null || !(event.player instanceof EntityPlayerMP)) {
+        if (event == null || !(event.player instanceof EntityPlayerMP)
+                || CharacterJoin.isWaiting(event.player)) {
             return;
         }
         EntityPlayerMP player = (EntityPlayerMP)event.player;

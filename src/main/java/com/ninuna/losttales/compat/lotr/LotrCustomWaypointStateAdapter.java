@@ -19,19 +19,25 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Isolates the character-owned subset of LOTR custom-waypoint data.
+ * The part of LOTR's custom-waypoint data each character keeps: its own
+ * waypoints, with the fellowships each is shared with, and how often each
+ * was used.
  *
- * <p>Received shared waypoints and the viewer's shared-waypoint preferences are
- * deliberately excluded. They belong to the account/fellowship relationship,
- * not to one roleplaying character.</p>
+ * <p>Waypoints shared with the player, and the player's choices about
+ * them, stay with the account, and so does the count waypoint numbers are
+ * taken from: one count for all of an account's characters, so no two of
+ * its waypoints ever share a number and another member never takes one
+ * character's waypoint for another's ({@link LotrSharedWaypoints}).</p>
  */
 public final class LotrCustomWaypointStateAdapter {
 
@@ -62,7 +68,7 @@ public final class LotrCustomWaypointStateAdapter {
     private static final int MAX_ABSOLUTE_WORLD_COORDINATE = 30000000;
 
     private static final Set<String> ROOT_KEYS = setOf(
-            TAG_CUSTOM_WAYPOINTS, TAG_CUSTOM_USES, TAG_NEXT_CUSTOM_ID);
+            TAG_CUSTOM_WAYPOINTS, TAG_CUSTOM_USES);
     private static final Set<String> WAYPOINT_REQUIRED_KEYS = setOf(
             TAG_NAME, TAG_MAP_X, TAG_MAP_Y, TAG_X, TAG_Y, TAG_Z, TAG_ID);
     private static final Set<String> WAYPOINT_KEYS = setOf(
@@ -105,10 +111,8 @@ public final class LotrCustomWaypointStateAdapter {
                 state, TAG_CUSTOM_WAYPOINTS, MAX_WAYPOINTS);
         NBTTagList uses = requireCompoundList(
                 state, TAG_CUSTOM_USES, MAX_USE_COUNTS);
-        requireInteger(state, TAG_NEXT_CUSTOM_ID);
 
         HashSet<Integer> waypointIds = new HashSet<Integer>();
-        int greatestId = FIRST_CUSTOM_ID - 1;
         for (int index = 0; index < waypoints.tagCount(); index++) {
             NBTTagCompound waypoint = waypoints.getCompoundTagAt(index);
             validateKeys(waypoint, WAYPOINT_REQUIRED_KEYS, WAYPOINT_KEYS,
@@ -137,7 +141,6 @@ public final class LotrCustomWaypointStateAdapter {
                 throw new IllegalArgumentException(
                         "LOTR custom waypoint ID is duplicated");
             }
-            greatestId = Math.max(greatestId, id);
             validateFellowships(waypoint);
         }
 
@@ -152,15 +155,6 @@ public final class LotrCustomWaypointStateAdapter {
                 throw new IllegalArgumentException(
                         "LOTR custom-waypoint use count is negative or duplicated");
             }
-            if (id >= FIRST_CUSTOM_ID) {
-                greatestId = Math.max(greatestId, id);
-            }
-        }
-
-        int nextId = state.getInteger(TAG_NEXT_CUSTOM_ID);
-        if (nextId < FIRST_CUSTOM_ID || nextId <= greatestId) {
-            throw new IllegalArgumentException(
-                    "LOTR next custom-waypoint ID is invalid");
         }
         if (!normalize(state).equals(state)) {
             throw new IllegalArgumentException(
@@ -168,7 +162,12 @@ public final class LotrCustomWaypointStateAdapter {
         }
     }
 
-    /** Replaces only owned waypoint fields and leaves shared/account fields intact. */
+    /**
+     * Replaces the character's own waypoints and leaves the account's
+     * fields as they are. LOTR drops, as it loads them, every share to a
+     * fellowship the account is not in yet; those are made again once it
+     * is ({@link LotrSharedWaypoints#expectReshares}).
+     */
     public void apply(EntityPlayerMP player, NBTTagCompound state) {
         validate(state);
         LOTRPlayerData data = requireLiveData(player);
@@ -182,6 +181,7 @@ public final class LotrCustomWaypointStateAdapter {
             NBTTagCompound full = save(data);
             overlay(full, state);
             data.load(full);
+            LotrSharedWaypoints.expectReshares(player.getUniqueID(), sharesIn(state));
             List<LOTRCustomWaypoint> current = copyWaypoints(
                     data.getCustomWaypoints());
             this.pendingSync.put(player.getUniqueID(),
@@ -196,9 +196,12 @@ public final class LotrCustomWaypointStateAdapter {
     }
 
     /**
-     * Clears source-only client entries and refreshes fellowship recipients.
-     * The following full LOTR player-data synchronization creates the current
-     * character's own waypoints on the switching client.
+     * Takes the previous character's own waypoints off the switching
+     * player's map and hands the current character's shares to the members
+     * online. The previous character's shares stay with its fellowships:
+     * it is away, not gone ({@link LotrSharedWaypoints}). The following full
+     * LOTR player-data synchronization creates the current character's own
+     * waypoints on the switching client.
      */
     public void synchronize(EntityPlayerMP player) {
         if (player == null || player.getUniqueID() == null
@@ -237,21 +240,6 @@ public final class LotrCustomWaypointStateAdapter {
             UUID ownerId,
             List<LOTRCustomWaypoint> previous,
             List<LOTRCustomWaypoint> current) {
-        for (LOTRCustomWaypoint waypoint : previous) {
-            LOTRCustomWaypoint shared = waypoint.createCopyOfShared(ownerId);
-            for (UUID recipientId : shared.getPlayersInAllSharedFellowships()) {
-                if (isOnline(recipientId)) {
-                    try {
-                        LOTRLevelData.getData(recipientId)
-                                .removeSharedCustomWaypoint(shared);
-                    } catch (RuntimeException exception) {
-                        warn(ownerId, "remove stale fellowship waypoint",
-                                exception);
-                    }
-                }
-            }
-        }
-
         for (LOTRCustomWaypoint waypoint : current) {
             LOTRCustomWaypoint shared = waypoint.createCopyOfShared(ownerId);
             for (UUID recipientId : shared.getPlayersInAllSharedFellowships()) {
@@ -342,11 +330,86 @@ public final class LotrCustomWaypointStateAdapter {
         return state;
     }
 
+    /**
+     * Lays the character's own fields over the account's, and moves the
+     * account's waypoint count past every number the character holds, so a
+     * new waypoint never takes one.
+     */
     private static void overlay(NBTTagCompound full, NBTTagCompound state) {
         for (String key : ROOT_KEYS) {
             full.removeTag(key);
             full.setTag(key, state.getTag(key).copy());
         }
+        int greatest = FIRST_CUSTOM_ID - 1;
+        NBTTagList waypoints = state.getTagList(TAG_CUSTOM_WAYPOINTS,
+                Constants.NBT.TAG_COMPOUND);
+        for (int index = 0; index < waypoints.tagCount(); index++) {
+            greatest = Math.max(greatest, waypoints.getCompoundTagAt(index).getInteger(TAG_ID));
+        }
+        NBTTagList uses = state.getTagList(TAG_CUSTOM_USES, Constants.NBT.TAG_COMPOUND);
+        for (int index = 0; index < uses.tagCount(); index++) {
+            greatest = Math.max(greatest, uses.getCompoundTagAt(index).getInteger(TAG_CUSTOM_ID));
+        }
+        if (full.getInteger(TAG_NEXT_CUSTOM_ID) <= greatest) {
+            full.setInteger(TAG_NEXT_CUSTOM_ID, greatest + 1);
+        }
+    }
+
+    /** Each waypoint of a character's state by its number, with the fellowships it is shared with. */
+    static Map<Integer, Set<UUID>> sharesIn(NBTTagCompound state) {
+        Map<Integer, Set<UUID>> shares = new LinkedHashMap<Integer, Set<UUID>>();
+        NBTTagList waypoints = state == null ? new NBTTagList()
+                : state.getTagList(TAG_CUSTOM_WAYPOINTS, Constants.NBT.TAG_COMPOUND);
+        for (int index = 0; index < waypoints.tagCount(); index++) {
+            NBTTagCompound waypoint = waypoints.getCompoundTagAt(index);
+            Set<UUID> fellowships = fellowshipsOf(waypoint);
+            if (!fellowships.isEmpty()) {
+                shares.put(Integer.valueOf(waypoint.getInteger(TAG_ID)), fellowships);
+            }
+        }
+        return shares;
+    }
+
+    /**
+     * The waypoints of a character's saved state shared with LOTR's
+     * fellowship {@code fellowshipId}, as LOTR's own waypoints, owned by
+     * nobody yet. None for a state that does not read.
+     */
+    static List<LOTRCustomWaypoint> sharedWith(NBTTagCompound state, UUID fellowshipId) {
+        List<LOTRCustomWaypoint> shared = new ArrayList<LOTRCustomWaypoint>();
+        if (state == null || fellowshipId == null) {
+            return shared;
+        }
+        try {
+            new LotrCustomWaypointStateAdapter().validate(state);
+        } catch (RuntimeException unreadable) {
+            return shared;
+        }
+        NBTTagList waypoints = state.getTagList(TAG_CUSTOM_WAYPOINTS,
+                Constants.NBT.TAG_COMPOUND);
+        for (int index = 0; index < waypoints.tagCount(); index++) {
+            NBTTagCompound waypoint = waypoints.getCompoundTagAt(index);
+            if (fellowshipsOf(waypoint).contains(fellowshipId)) {
+                shared.add(new LOTRCustomWaypoint(waypoint.getString(TAG_NAME),
+                        waypoint.getDouble(TAG_MAP_X), waypoint.getDouble(TAG_MAP_Y),
+                        waypoint.getInteger(TAG_X), waypoint.getInteger(TAG_Y),
+                        waypoint.getInteger(TAG_Z), waypoint.getInteger(TAG_ID)));
+            }
+        }
+        return shared;
+    }
+
+    private static Set<UUID> fellowshipsOf(NBTTagCompound waypoint) {
+        Set<UUID> fellowships = new LinkedHashSet<UUID>();
+        NBTTagList list = waypoint.getTagList(TAG_SHARED_FELLOWSHIPS, Constants.NBT.TAG_STRING);
+        for (int index = 0; index < list.tagCount(); index++) {
+            try {
+                fellowships.add(UUID.fromString(list.getStringTagAt(index)));
+            } catch (IllegalArgumentException notAnId) {
+                // validate() refuses a state holding one.
+            }
+        }
+        return fellowships;
     }
 
     private static NBTTagCompound normalize(NBTTagCompound source) {

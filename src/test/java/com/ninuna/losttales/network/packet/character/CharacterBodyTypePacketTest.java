@@ -62,8 +62,6 @@ public final class CharacterBodyTypePacketTest {
                 ownerId, CharacterRoster.INITIAL_UNLOCKED_SLOTS,
                 characterId, 1L,
                 Collections.singletonList(summary),
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
                 Collections.<com.ninuna.losttales.character.sync.DeletedCharacterSummary>emptyList());
 
         ByteBuf buffer = Unpooled.buffer();

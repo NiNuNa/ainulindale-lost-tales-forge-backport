@@ -2,7 +2,6 @@ package com.ninuna.losttales.character.server;
 
 import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
-import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import java.util.UUID;
@@ -37,7 +36,7 @@ public final class KnownAccounts {
         try {
             for (CharacterRoster roster : CharacterStorage.get(world).getRosters()) {
                 UUID owner = roster == null ? null : roster.getOwnerId();
-                if (owner != null && name.equalsIgnoreCase(nameOf(owner, roster))) {
+                if (owner != null && name.equalsIgnoreCase(nameOf(owner))) {
                     return owner;
                 }
             }
@@ -49,10 +48,9 @@ public final class KnownAccounts {
 
     /**
      * An account's name while its player is not here: the one the server last
-     * saw it log in with, else the name its account character was given on
-     * its first visit, which was the account's; empty when neither is known.
+     * saw it log in with; empty when the server does not know it.
      */
-    public static String nameOf(UUID account, CharacterRoster roster) {
+    public static String nameOf(UUID account) {
         MinecraftServer server = MinecraftServer.getServer();
         GameProfile profile = null;
         try {
@@ -61,11 +59,7 @@ public final class KnownAccounts {
         } catch (RuntimeException unavailable) {
             profile = null;
         }
-        if (profile != null && profile.getName() != null
-                && profile.getName().trim().length() > 0) {
-            return profile.getName().trim();
-        }
-        RoleplayCharacter first = roster == null ? null : roster.getDefaultCharacter();
-        return first == null || first.getName() == null ? "" : first.getName().trim();
+        return profile == null || profile.getName() == null ? ""
+                : profile.getName().trim();
     }
 }

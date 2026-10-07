@@ -1,8 +1,10 @@
 package com.ninuna.losttales.compat.lotr.hired;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
@@ -11,6 +13,7 @@ import lotr.common.entity.npc.LOTRHiredNPCInfo;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 
 import java.util.List;
@@ -23,9 +26,12 @@ import java.util.UUID;
  * the unit is released to the owner while that identity is active and
  * parked otherwise (see {@link LotrHiredUnitCustodyRule}); loaded units are
  * settled on every switch and login, and a unit whose chunk loads later is
- * settled as it joins the world. A tag naming a character the roster no
- * longer holds counts as the account character's. Every pass is best effort and
- * never fails the switch that asked for it.
+ * settled as it joins the world. A unit whose character was deleted stays
+ * parked, and comes back with the character if it is restored; once the
+ * character is purged for good, the unit leaves its owner's service. One
+ * whose lore character was released stays parked until its owner claims
+ * that figure again. Every pass is best effort and never fails the switch
+ * that asked for it.
  */
 public final class LotrHiredUnitCustody {
 
@@ -135,10 +141,14 @@ public final class LotrHiredUnitCustody {
                                    String activeKey, CharacterRoster roster) {
         LOTRHiredNPCInfo info = unit.hiredNPCInfo;
         if (tag.getCharacterId() != null && roster != null
-                && roster.getCharacter(tag.getCharacterId()) == null) {
-            // The hiring character is gone: the unit is the account's now.
-            tag = tag.asAccount();
-            tag.write(unit);
+                && roster.getCharacter(tag.getCharacterId()) == null
+                && isGoneForGood(unit.worldObj, tag.getCharacterId())) {
+            // The hiring character was purged: the unit leaves its owner's
+            // service. LOTR tells the hiring player so, who is the owner,
+            // online while their units are settled.
+            LotrHiredUnitInfoAccess.setHiringUuid(info, ownerId);
+            info.dismissUnit(false);
+            return;
         }
         UUID hiring = LotrHiredUnitInfoAccess.hiringUuid(info);
         LotrHiredUnitCustodyRule.Action action = LotrHiredUnitCustodyRule.decide(
@@ -146,6 +156,23 @@ public final class LotrHiredUnitCustody {
         if (action != LotrHiredUnitCustodyRule.Action.LEAVE) {
             LotrHiredUnitInfoAccess.setHiringUuid(info,
                     LotrHiredUnitCustodyRule.hiringUuidAfter(action, ownerId, hiring));
+        }
+    }
+
+    /**
+     * Whether a character no roster of its owner holds is gone for good:
+     * kept neither among the deleted characters, which a restore brings
+     * back, nor as a lore figure, which may be claimed again. A store that
+     * cannot say keeps the unit parked.
+     */
+    private static boolean isGoneForGood(World world, UUID characterId) {
+        try {
+            return CharacterDeletionService.getInstance()
+                    .getTombstone(world, characterId) == null
+                    && LoreCharacterOwnershipStorage.get(world)
+                            .getRecordByCharacterId(characterId) == null;
+        } catch (RuntimeException unreadable) {
+            return false;
         }
     }
 

@@ -36,15 +36,18 @@ import org.lwjgl.opengl.GL11;
  * never read an edge differently.</p>
  */
 public final class WindowBar {
-    /** Clear space before the bar's first control, after its last and between groups, as on the chat's bar. */
+    /** Clear space beside words and inside the well. */
     public static final int GAP = 3;
-    /** Clear space between two framed buttons side by side. */
-    public static final int BUTTON_GAP = 2;
-    /** A glyph button's square and the room between two of them. */
+    /** Clear space between two buttons side by side, framed or glyphs. */
+    public static final int BUTTON_GAP = WindowStyle.BUTTON_GAP;
+    /** Clear space between a button and the frame or a hairline. */
+    public static final int EDGE_GAP = WindowStyle.EDGE_GAP;
+    /** The row a glyph button and the well stand on, a message row high. */
     public static final int GLYPH_SIZE = 12;
-    public static final int GLYPH_MARGIN = 2;
-    /** Clear pixels between a divider and the well beside it. */
-    public static final int WELL_GAP = 2;
+    /** Clear pixels round a glyph button's ink that answer with it. */
+    private static final int GLYPH_SLACK = 2;
+    /** Clear pixels between a divider and the well beside it: the well counts as a control. */
+    public static final int WELL_GAP = WindowStyle.EDGE_GAP;
     /** The narrowest the field is ever squeezed to. */
     public static final int MIN_FIELD_WIDTH = 40;
     /** The most rows a field's list shows at once. */
@@ -170,12 +173,12 @@ public final class WindowBar {
         boolean compact = false;
         boolean words = true;
         while (true) {
-            int needed = (lead ? GAP + leadWidth + (leading.isEmpty() ? 0
-                            : GAP + WindowStyle.DIVIDER_WIDTH) : 0)
+            int needed = (lead ? EDGE_GAP + leadWidth + (leading.isEmpty()
+                            ? 0 : EDGE_GAP + WindowStyle.DIVIDER_WIDTH) : 0)
                     + width(leading, compact, words, measure)
                     + width(trailing, compact, words, measure)
                     + width(atRight, compact, words, measure)
-                    + (field == null ? 0 : MIN_FIELD_WIDTH + 2 * (GAP
+                    + (field == null ? 0 : MIN_FIELD_WIDTH + 2 * (EDGE_GAP
                             + WindowStyle.DIVIDER_WIDTH + WELL_GAP));
             if (needed <= room) {
                 break;
@@ -195,7 +198,7 @@ public final class WindowBar {
             }
         }
         List<Placed> placed = new ArrayList<Placed>();
-        int x = left + GAP;
+        int x = left + EDGE_GAP;
         if (lead) {
             BarLead.Fit fit = BarLead.fit(tab.tab, x, leadWidth, measure);
             placed.add(new Placed(tab, fit.frameLeft, fit.frameRight, false,
@@ -204,7 +207,7 @@ public final class WindowBar {
                     ? BarItem.identityButton() : identity, fit.identityLeft,
                     fit.right, false, fit, false));
             x = fit.right + (leading.isEmpty() ? 0
-                    : GAP + WindowStyle.DIVIDER_WIDTH + GAP);
+                    : EDGE_GAP + WindowStyle.DIVIDER_WIDTH + EDGE_GAP);
         }
         BarItem previous = null;
         for (BarItem item : leading) {
@@ -216,7 +219,7 @@ public final class WindowBar {
             previous = item;
         }
         int leadingRight = x;
-        int rightX = right - GAP;
+        int rightX = right - EDGE_GAP;
         List<Placed> fromRight = new ArrayList<Placed>();
         BarItem next = null;
         List<BarItem> rightToLeft = new ArrayList<BarItem>(atRight);
@@ -237,10 +240,10 @@ public final class WindowBar {
             // The well stands between two dividers, each a gap from what
             // stands beside it; at the bar's own edge there is no divider.
             int wellLeft = leading.isEmpty() && !lead ? left + GAP
-                    : leadingRight + GAP + WindowStyle.DIVIDER_WIDTH
+                    : leadingRight + EDGE_GAP + WindowStyle.DIVIDER_WIDTH
                             + WELL_GAP;
             int wellRight = fromRight.isEmpty() ? right - GAP
-                    : rightX - GAP - WindowStyle.DIVIDER_WIDTH - WELL_GAP;
+                    : rightX - EDGE_GAP - WindowStyle.DIVIDER_WIDTH - WELL_GAP;
             placed.add(new Placed(field, wellLeft,
                     Math.max(wellLeft, wellRight), false));
         }
@@ -248,17 +251,13 @@ public final class WindowBar {
         return placed;
     }
 
-    /** The room between two items side by side: framed buttons stand close, anything else a gap apart. */
+    /** The room between two items side by side: a button's gap between two buttons, a smaller one beside words. */
     private static int gapBefore(BarItem previous, BarItem item) {
         if (previous == null || item == null) {
             return 0;
         }
-        if (previous.kind == BarItem.Kind.GLYPH
-                && item.kind == BarItem.Kind.GLYPH) {
-            return GLYPH_MARGIN;
-        }
-        return previous.kind == BarItem.Kind.BUTTON
-                && item.kind == BarItem.Kind.BUTTON ? BUTTON_GAP : GAP;
+        return previous.kind == BarItem.Kind.WORDS
+                || item.kind == BarItem.Kind.WORDS ? GAP : BUTTON_GAP;
     }
 
     private static int width(List<BarItem> items, boolean compact,
@@ -273,14 +272,13 @@ public final class WindowBar {
                     measure);
             previous = item;
         }
-        return total + (items.isEmpty() ? 0 : GAP);
+        return total + (items.isEmpty() ? 0 : EDGE_GAP);
     }
 
     /**
      * An item's width: a framed button its icon, the gap and its word
      * inside the wide inset, as the channel's button on the chat's bar,
-     * or a square round its icon alone; a glyph its square; words their
-     * ink.
+     * or a square round its icon alone; a glyph and words their ink.
      */
     static int widthOf(BarItem item, boolean compact, Measure measure) {
         switch (item.kind) {
@@ -295,7 +293,7 @@ public final class WindowBar {
                         + (icon ? TabIcons.SIZE + TabIcons.GAP : 0) + word;
             }
             case GLYPH:
-                return GLYPH_SIZE;
+                return item.glyph == null ? GLYPH_SIZE : item.glyph.getWidth();
             case WORDS:
                 return Math.max(0, measure.width(item.label) - 1);
             default:
@@ -379,8 +377,10 @@ public final class WindowBar {
             return null;
         }
         for (Placed each : placed) {
-            if (each.item.kind != BarItem.Kind.WORDS && barX >= each.left
-                    && barX < each.right) {
+            int slack = each.item.kind == BarItem.Kind.GLYPH ? GLYPH_SLACK : 0;
+            if (each.item.kind != BarItem.Kind.WORDS
+                    && barX >= each.left - slack
+                    && barX < each.right + slack) {
                 return new Hit(each.item, -1);
             }
         }
@@ -772,12 +772,12 @@ public final class WindowBar {
                 top + (TabIcons.SIZE - glyph.getHeight()) / 2, alpha);
     }
 
-    /** A glyph button: the bare glyph in its square with the one shadow, lifted and lit under the pointer. */
+    /** A glyph button: the bare glyph, centred on its row, with the one shadow, lifted and lit under the pointer. */
     private void drawGlyph(WindowFrame frame, Placed placed, int top,
                            boolean pointed, long now, int alpha) {
         BarItem item = placed.item;
         LostTalesUiSheet glyph = item.glyph;
-        int glyphLeft = placed.left + (GLYPH_SIZE - glyph.getWidth()) / 2;
+        int glyphLeft = placed.left;
         int glyphTop = glyphTop(top) + (GLYPH_SIZE - glyph.getHeight()) / 2;
         if (!item.isAvailable()) {
             LostTalesUiSheet.drawPairWithShadow(glyph, glyph, 0.0F, glyphLeft,
@@ -829,7 +829,7 @@ public final class WindowBar {
         for (int index = 0; index < placed.size(); index++) {
             Placed field = placed.get(index);
             if (field.afterLead) {
-                WindowStyle.drawDivider(field.left - GAP
+                WindowStyle.drawDivider(field.left - EDGE_GAP
                         - WindowStyle.DIVIDER_WIDTH, glyphTop(top),
                         WindowStyle.LINE_HEIGHT, alpha);
             }

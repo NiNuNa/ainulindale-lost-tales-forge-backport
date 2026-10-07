@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.server.CharacterJoin;
 import com.ninuna.losttales.character.server.KnownAccounts;
 import com.ninuna.losttales.character.state.CharacterLastSeen;
 import com.ninuna.losttales.character.storage.CharacterStorage;
@@ -320,7 +321,7 @@ public final class ChatMemberDirectory {
                 presentKeys.add(keyOf(online, character));
             } else if (owner != null && !owner.equals(viewer.getUniqueID())) {
                 String account = online != null ? accountOf(online)
-                        : KnownAccounts.nameOf(owner, roster);
+                        : KnownAccounts.nameOf(owner);
                 // A character nobody has met lately is not told of; the
                 // conversation names its account instead, as the viewer did.
                 if (character != null && !CharacterLastSeen.seenWithin(viewer.worldObj,
@@ -492,7 +493,7 @@ public final class ChatMemberDirectory {
         for (Map.Entry<UUID, CharacterRoster> entry : known.entrySet()) {
             UUID owner = entry.getKey();
             CharacterRoster roster = entry.getValue();
-            String account = KnownAccounts.nameOf(owner, roster);
+            String account = KnownAccounts.nameOf(owner);
             if (account.length() == 0) {
                 continue;
             }
@@ -604,7 +605,7 @@ public final class ChatMemberDirectory {
                 continue;
             }
             CharacterRoster roster = rosterOf(viewer, owner);
-            String account = KnownAccounts.nameOf(owner, roster);
+            String account = KnownAccounts.nameOf(owner);
             if (account.length() == 0 || !new ChatAbsentReader(server,
                     new GameProfile(owner, account), false).mayJoin()) {
                 continue;
@@ -634,7 +635,8 @@ public final class ChatMemberDirectory {
      * channel speaks as it; in a faction's conversation each of their
      * identities read in that faction; elsewhere the character played and
      * every character their copies read as. Null in the list stands for
-     * the account.
+     * the account. A player still making their first character is in no
+     * conversation in character.
      */
     private static List<RoleplayCharacter> identitiesIn(EntityPlayerMP player,
                                                        ChatChannel channel,
@@ -647,7 +649,8 @@ public final class ChatMemberDirectory {
             return identities;
         }
         boolean byFaction = channel.getRecipientRule() == ChatRecipientRule.FACTION;
-        if (!byFaction || ChatChannelPolicy.factionOf(played).equals(factionId)) {
+        if (played != null && (!byFaction
+                || ChatChannelPolicy.factionOf(played).equals(factionId))) {
             identities.add(played);
         }
         if (ChatRolePresentation.speaksAsPlayedCharacter(channel)) {
@@ -719,6 +722,13 @@ public final class ChatMemberDirectory {
                             : character.getSkinId(),
                     presentation.title, presentation.titleColor, factionId,
                     "", 0, true);
+        }
+        // Someone still making their first character stands apart, as a
+        // ghost: here, but not yet in the world.
+        if (CharacterJoin.isWaiting(member)) {
+            return new LostTalesChatMembersPacket.Member(member.getUniqueID(),
+                    account, null, name, nameColor, "", "", nameColor,
+                    LostTalesChatMembersPacket.GHOST_GROUP, "", 0, true);
         }
         ChatAccountRole role = ChatAccountRole.primary(
                 ChatRolePresentation.rolesShown(channel, roles));

@@ -6,7 +6,6 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesServerStatusPacket;
 import com.ninuna.losttales.util.LostTalesWords;
-import com.ninuna.losttales.world.room.CharacterRoomWorldType;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.util.ArrayList;
@@ -55,8 +54,7 @@ public final class ChatServerStatus {
         }
         ticks = 0;
         MinecraftServer server = MinecraftServer.getServer();
-        if (server == null || server.getConfigurationManager() == null
-                || CharacterRoomWorldType.isRoomServer(server)) {
+        if (server == null || server.getConfigurationManager() == null) {
             return;
         }
         look(ChatPresenceService.countShownOnline(

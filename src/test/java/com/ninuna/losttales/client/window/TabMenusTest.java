@@ -19,7 +19,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * A page's options hold everything its tool strip holds, in the strip's
  * order and parted where the strip is: the panel's row, the page's own
- * options, then the cog's row, Split View, Full Window, the member list's
+ * options, then the cog's row, Split View, Borderless, the member list's
  * row, the search and the help. Every conversation's cog opens the one
  * Chat Settings; a page with none still shows the cog's row, greyed.
  */
@@ -72,7 +72,7 @@ public final class TabMenusTest {
     /**
      * A conversation's options read as its strip does from the left: the
      * timestamp area's row, a hairline, its own options in their groups, a
-     * hairline, then the cog, split view, full window, the member list, the
+     * hairline, then the cog, split view, borderless, the member list, the
      * search and the help.
      */
     @Test
@@ -84,7 +84,7 @@ public final class TabMenusTest {
         int lastHairline = ids.lastIndexOf("-");
         assertTrue("its own options stand between the two", lastHairline > 2);
         assertEquals(Arrays.asList("settings:CHAT", "split_view",
-                "tab:duplicate", "strip:full_window", "strip:members", "strip:search",
+                "tab:duplicate", "strip:borderless", "strip:members", "strip:search",
                 "strip:help"), ids.subList(lastHairline + 1, ids.size()));
     }
 
@@ -98,7 +98,7 @@ public final class TabMenusTest {
         assertNull(BARE.settingsPlace());
         List<MenuWindow.Entry> rows = TabMenus.stripRows(BARE);
         assertEquals(Arrays.asList("settings", "split_view",
-                "tab:duplicate", "strip:full_window", "strip:search",
+                "tab:duplicate", "strip:borderless", "strip:search",
                 "strip:help"), ids(rows));
         assertFalse(rows.get(0).isTakeable());
         assertEquals("gui.losttales.window.cog.nothing", rows.get(0).unavailable);

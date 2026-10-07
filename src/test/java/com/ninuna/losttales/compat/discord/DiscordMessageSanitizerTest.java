@@ -223,7 +223,7 @@ public final class DiscordMessageSanitizerTest {
     /**
      * An action posts as the Narrator tells it in the game: the action
      * mark shown as it is, then the sentence its speaker's name opens, in
-     * italics (C25); a quote of one is in italics too (C2).
+     * italics; a quote of one is in italics too.
      */
     @Test
     public void actionsPostAsTheNarratorTellsThem() {

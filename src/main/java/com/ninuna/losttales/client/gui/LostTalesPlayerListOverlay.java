@@ -10,7 +10,9 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.client.chat.ChatPresenceMark;
 import com.ninuna.losttales.client.chat.ClientChatPresence;
+import com.ninuna.losttales.client.chat.LostTalesChatVisualStyle;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -21,6 +23,7 @@ import net.minecraft.scoreboard.Score;
 import net.minecraft.scoreboard.ScoreObjective;
 import net.minecraft.scoreboard.ScorePlayerTeam;
 import net.minecraft.scoreboard.Scoreboard;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -32,6 +35,9 @@ import org.lwjgl.opengl.GL11;
  * and the tab-list score where a server sets one. The names come from
  * the appearance the server syncs for every online player, and an
  * account this client knows no character for yet is named as itself.
+ * Players still making their first character stand last, as ghosts:
+ * faint, named as their account, with what they are doing after the name
+ * where the column has room.
  */
 public final class LostTalesPlayerListOverlay extends Gui {
     static final int MAX_ROWS = 20;
@@ -56,6 +62,8 @@ public final class LostTalesPlayerListOverlay extends Gui {
             LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x80);
     private static final int CELL_ARGB =
             LostTalesColors.withAlpha(LostTalesColors.IVORY, 0x20);
+    /** How strongly a player still making their first character is drawn. */
+    static final float GHOST_OPACITY = 0.5F;
 
     private static final LostTalesPlayerListOverlay DRAWER =
             new LostTalesPlayerListOverlay();
@@ -77,6 +85,17 @@ public final class LostTalesPlayerListOverlay extends Gui {
         @SuppressWarnings("unchecked")
         List<GuiPlayerInfo> players =
                 new ArrayList<GuiPlayerInfo>(handler.playerInfoList);
+        // Players still making their first character stand after the rest.
+        List<GuiPlayerInfo> ghosts = new ArrayList<GuiPlayerInfo>();
+        Iterator<GuiPlayerInfo> listed = players.iterator();
+        while (listed.hasNext()) {
+            GuiPlayerInfo player = listed.next();
+            if (isGhost(ClientCharacterAppearanceCache.appearanceFor(player.name))) {
+                listed.remove();
+                ghosts.add(player);
+            }
+        }
+        players.addAll(ghosts);
         int maxPlayers = handler.currentServerMaxPlayers;
         int columns = columns(maxPlayers);
         int rows = rows(maxPlayers, columns);
@@ -100,6 +119,9 @@ public final class LostTalesPlayerListOverlay extends Gui {
             GuiPlayerInfo player = players.get(index);
             CharacterAppearance appearance =
                     ClientCharacterAppearanceCache.appearanceFor(player.name);
+            boolean ghost = isGhost(appearance);
+            float strength = ghost ? GHOST_OPACITY : 1.0F;
+            int textAlpha = Math.round(255 * strength);
             LostTalesSkyrimUiStyle.beginContent();
             boolean known = appearance != null
                     && appearance.getPlayerId() != null;
@@ -107,7 +129,7 @@ public final class LostTalesPlayerListOverlay extends Gui {
                 ChatPresenceMark.beginHeadCut(x, y, HEAD_SIZE);
             }
             try {
-                drawHead(minecraft, appearance, x, y);
+                drawHead(minecraft, appearance, x, y, strength);
             } finally {
                 if (known) {
                     ChatPresenceMark.endHeadCut();
@@ -119,19 +141,28 @@ public final class LostTalesPlayerListOverlay extends Gui {
                 ChatPresenceMark.draw(x, y, HEAD_SIZE,
                         ClientChatPresence.presenceOf(
                                 appearance.getPlayerId(),
-                                appearance.isAccount()
-                                        ? ChatPresenceIdentity.ACCOUNT
-                                        : ChatPresenceIdentity.character(
-                                                appearance.getCharacterId())),
-                        255);
+                                ChatPresenceIdentity.character(
+                                        appearance.getCharacterId())),
+                        textAlpha);
             }
             int nameX = x + ICON_WIDTH + HEAD_GAP;
             ScorePlayerTeam team = scoreboard.getPlayersTeam(player.name);
             String shown = ScorePlayerTeam.formatPlayerName(team,
                     shownNameOf(appearance, player.name));
             LostTalesSkyrimUiStyle.beginContent();
-            font.drawStringWithShadow(shown, nameX, y, LostTalesColors.TEXT_BRIGHT);
-            if (objective != null) {
+            font.drawStringWithShadow(shown, nameX, y,
+                    textAlpha << 24 | LostTalesColors.TEXT_BRIGHT & 0xFFFFFF);
+            if (ghost) {
+                String doing = StatCollector.translateToLocal(
+                        "gui.losttales.character.ghost");
+                int doingX = nameX + font.getStringWidth(shown) + 5;
+                if (doingX + font.getStringWidth(doing)
+                        <= x + columnWidth - PING_WIDTH - 2 - 5) {
+                    font.drawStringWithShadow(doing, doingX, y,
+                            textAlpha << 24 | LostTalesChatVisualStyle.asideRgb());
+                }
+            }
+            if (objective != null && !ghost) {
                 int endX = nameX + font.getStringWidth(shown) + 5;
                 int maxX = x + columnWidth - PING_WIDTH - 2 - 5;
                 if (maxX - endX > 5) {
@@ -154,6 +185,11 @@ public final class LostTalesPlayerListOverlay extends Gui {
         return true;
     }
 
+    /** Whether the player is still making their first character, a ghost the world has not seen yet. */
+    static boolean isGhost(CharacterAppearance appearance) {
+        return appearance != null && appearance.isAccount();
+    }
+
     /** The row's name: the character the account plays, else the account. */
     static String shownNameOf(CharacterAppearance appearance, String account) {
         String character = appearance == null || !appearance.hasCharacter()
@@ -164,20 +200,20 @@ public final class LostTalesPlayerListOverlay extends Gui {
     /**
      * The row's head: the character's skin where one is played, the
      * account's otherwise, and nothing for a player this client knows
-     * no appearance of yet.
+     * no appearance of yet; {@code strength} of its full opacity.
      */
     private static void drawHead(Minecraft minecraft, CharacterAppearance appearance,
-                                 int x, int y) {
+                                 int x, int y, float strength) {
         if (appearance == null || appearance.getPlayerId() == null) {
             return;
         }
         if (appearance.hasCharacter() && appearance.getSkinId().length() > 0) {
             LostTalesCharacterHeadIconRenderer.drawSnapshotHead(minecraft,
                     appearance.getPlayerId(), appearance.getSkinId(), x, y,
-                    HEAD_SIZE, 1.0F, 1.0F);
+                    HEAD_SIZE, 1.0F, strength);
         } else {
             LostTalesCharacterHeadIconRenderer.drawAccountHead(minecraft,
-                    appearance.getPlayerId(), x, y, HEAD_SIZE, 1.0F, 1.0F);
+                    appearance.getPlayerId(), x, y, HEAD_SIZE, 1.0F, strength);
         }
     }
 

@@ -15,9 +15,6 @@ import com.ninuna.losttales.client.camera.InspectionCameraMath;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraInspection;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.cape.CharacterCapeDefinition;
-import com.ninuna.losttales.client.character.CharacterTemplate;
-import com.ninuna.losttales.client.character.CharacterTemplateStore;
-import com.ninuna.losttales.client.character.room.CharacterRoomSession;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.CreatorCharacterLight;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
@@ -56,6 +53,8 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiChat;
+import net.minecraft.client.gui.GuiIngameMenu;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.Tessellator;
@@ -80,20 +79,18 @@ import java.util.UUID;
  * that has to be finished before the next. In a world the stage is the world itself: the
  * screen borrows the third-person camera, stands it in front of the
  * player wearing the choices as they stand, and the player orbits it by
- * dragging and brings it nearer with the wheel. The main menu opens it
- * in the character room, a world of one room made for the visit, so the
- * stage is the world there too. Only with no world to stand in does the
- * stage draw the figure from the same body model instead, turned and
- * tilted by the same drag, its head following the pointer.</p>
+ * dragging and brings it nearer with the wheel. Only with no world to
+ * stand in does the stage draw the figure from the same body model
+ * instead, turned and tilted by the same drag, its head following the
+ * pointer.</p>
  *
- * <p>Two things open it. The roster opens it against a world, and
+ * <p>Two things open it. The roster opens it for an empty slot, and
  * confirming sends a creation request the server validates and answers.
- * The character room opens it as the account's own template: nothing is
- * sent, and confirming writes the template this account starts every
- * later world from, then returns to the room. The screen is the same
- * either way; only what confirming does differs, and the pages that only
- * a world can answer — the starting waypoint — are left out of the
- * template.</p>
+ * A first visit opens it by itself ({@link FirstCharacterCreator}): the
+ * player waits in it as a ghost until their first character is made, and
+ * is then played as it. It cannot be closed then; Escape opens the game
+ * menu, where they may leave, and the chat's key opens the chat, where
+ * they may talk out of character.</p>
  *
  * <p>The server remains authoritative for every validation. What this
  * screen refuses on its own is only what it can see is empty.</p>
@@ -102,8 +99,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         implements LostTalesGuiAnimationOptions, LostTalesHudHidingScreen,
         LostTalesPointerInteractable {
 
-    /** The slot a template stands for: none, until a server names one. */
-    private static final int TEMPLATE_SLOT = -1;
     /** What the age slider starts at when nothing chose one. */
     private static final int DEFAULT_AGE = 25;
     /** Between stacked controls in the column. */
@@ -131,9 +126,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
 
     private final GuiScreen parent;
     private final int slotIndex;
-    /** Whether the form edits the account's template rather than a world's roster. */
-    private final boolean templateMode;
-    private boolean seededFromTemplate;
+    /** Whether the player waits in it for their first character, and cannot close it. */
+    private final boolean firstCharacter;
 
     private List<String> raceIds = Collections.emptyList();
     private List<String> genderIds = Collections.emptyList();
@@ -211,117 +205,19 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     }
 
     /**
-     * The same screen as the account's own template editor: no server is
-     * asked anything, and confirming writes the template this client
-     * opens every later creation from.
+     * The screen a first visit waits in, for the roster's first slot: made
+     * there, the character is played at once and the player joins the
+     * world.
      */
-    public static LostTalesCharacterCreationGui forTemplate(GuiScreen parent) {
-        return new LostTalesCharacterCreationGui(parent, TEMPLATE_SLOT, true);
+    static LostTalesCharacterCreationGui forFirstCharacter() {
+        return new LostTalesCharacterCreationGui(null, 0, true);
     }
 
     private LostTalesCharacterCreationGui(GuiScreen parent, int slotIndex,
-                                          boolean templateMode) {
+                                          boolean firstCharacter) {
         this.parent = parent;
         this.slotIndex = slotIndex;
-        this.templateMode = templateMode;
-    }
-
-    // ------------------------------------------------------------------
-    // Options and the template that seeds them
-    // ------------------------------------------------------------------
-
-    /**
-     * Fills the form in from the account's template, once, after the
-     * options are known. A value the options do not offer is left at the
-     * form's own choice and named in the status line, so a template made
-     * against one server never quietly becomes a different character on
-     * another.
-     */
-    private void seedFromTemplate() {
-        CharacterTemplate template = CharacterTemplateStore.load(
-                LostTalesClientAccount.templateId());
-        if (template.isEmpty()) {
-            return;
-        }
-        this.draftName = template.getName();
-        this.draftAge = template.getAge() > 0
-                ? template.getAge() : this.draftAge;
-        this.draftHistory = template.getHistory();
-        this.unconventionalSettings = template.hasUnconventionalSettings();
-        this.showMinecraftCape = template.isMinecraftCapeVisible();
-        int cape = this.capeIds.indexOf(Integer.valueOf(template.getCosmeticCapeId()));
-        this.capeIndex = Math.max(0, cape);
-
-        // Each choice narrows the ones under it, so they are seeded top
-        // down and the lists below are rebuilt in between, the same order
-        // choosing them does. Seeding a skin against the list the previous
-        // sex offered would silently drop it.
-        List<String> unavailable = new ArrayList<String>();
-        int race = this.raceIds.indexOf(template.getRaceId());
-        if (race >= 0) {
-            this.raceIndex = race;
-        } else if (template.getRaceId().length() > 0) {
-            unavailable.add(ClientCharacterDisplayNames.race(template.getRaceId()));
-        }
-        rebuildGenderOptions();
-        this.genderIndex = seedIndex(this.genderIds, template.getGenderId(),
-                this.genderIndex, template.getGenderId().length() > 0
-                        ? ClientCharacterDisplayNames.gender(template.getGenderId())
-                        : null, unavailable);
-        rebuildAppearanceOptions();
-        this.skinIndex = seedIndex(this.skinIds, template.getSkinId(),
-                this.skinIndex, template.getSkinId().length() > 0
-                        ? ClientCharacterDisplayNames.skin(template.getSkinId())
-                        : null, unavailable);
-        this.bodyTypeIndex = seedIndex(this.bodyTypeIds,
-                template.getBodyTypeId(), this.bodyTypeIndex, null, unavailable);
-        this.chestTypeIndex = seedIndex(this.chestTypeIds,
-                template.getChestTypeId(), this.chestTypeIndex, null, unavailable);
-        int faction = this.factionIds.indexOf(template.getStartingFactionId());
-        if (faction >= 0) {
-            this.factionIndex = faction;
-            rebuildWaypoints();
-        } else if (template.getStartingFactionId().length() > 0) {
-            unavailable.add(ClientCharacterDisplayNames.faction(
-                    template.getStartingFactionId()));
-        }
-        if (!unavailable.isEmpty()) {
-            // Away from a world there is no server to name; the template
-            // editor is answering out of this installation's own content.
-            setStatus(I18n.format(this.templateMode
-                            ? "gui.losttales.character.template.unknown"
-                            : "gui.losttales.character.template.unavailable",
-                    join(unavailable)), false);
-        }
-    }
-
-    /**
-     * The template's choice where the options offer it, and the form's own
-     * otherwise. A choice that is dropped is named, so a template made
-     * against one server never quietly becomes a different character on
-     * another; {@code label} is null for a choice not worth naming.
-     */
-    private static int seedIndex(List<String> options, String id, int fallback,
-                                 String label, List<String> unavailable) {
-        int index = id == null ? -1 : options.indexOf(id);
-        if (index >= 0) {
-            return index;
-        }
-        if (label != null) {
-            unavailable.add(label);
-        }
-        return fallback;
-    }
-
-    private static String join(List<String> values) {
-        StringBuilder joined = new StringBuilder();
-        for (String value : values) {
-            if (joined.length() > 0) {
-                joined.append(", ");
-            }
-            joined.append(value);
-        }
-        return joined.toString();
+        this.firstCharacter = firstCharacter;
     }
 
     private void selectRace(int index) {
@@ -437,10 +333,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         rebuildGenderOptions();
         rebuildAppearanceOptions();
         rebuildCapeOptions();
-        if (!this.seededFromTemplate) {
-            this.seededFromTemplate = true;
-            seedFromTemplate();
-        }
         this.worldCamera = this.mc != null && this.mc.theWorld != null
                 && this.mc.thePlayer != null
                 && ThirdPersonCameraInspection.isAvailable();
@@ -522,11 +414,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             setStatus(ClientCharacterDisplayNames.error(feedback.getErrorId()), true);
             return;
         }
-        // A character made in a world stays that world's: only the
-        // character room writes the account character's look.
         setStatus(ClientCharacterDisplayNames.operationSuccess("create"), false);
         // The new character is on the roster; the player is still whoever
-        // they were playing, and picks it from the roster when they want to.
+        // they were playing, and picks it from the roster when they want
+        // to. A first character is played already: the world is theirs.
         if (ClientCharacterRosterCache.getSnapshot() != null) {
             this.mc.displayGuiScreen(this.parent);
         }
@@ -612,12 +503,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             }
             @Override public void choose(int index) { selectRace(index); }
         }));
-        if (!this.templateMode) {
-            this.controls.add(new RaceAttributes(this.context));
-        } else {
-            this.controls.add(new CreatorNote(this.context,
-                    I18n.format("gui.losttales.character.creator.race.template_note")));
-        }
+        this.controls.add(new RaceAttributes(this.context));
     }
 
     private void buildBodyPage() {
@@ -736,23 +622,19 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                         : "gui.losttales.character.integration_unavailable");
             }
         }));
-        if (!this.templateMode) {
-            // A template names no starting waypoint: every server resolves
-            // that against its own map, so only a world asks for it.
-            this.controls.add(new CreatorStepper(this.context,
-                    I18n.format("gui.losttales.character.starting_waypoint"),
-                    new PlainChoice() {
-                @Override public int count() { return waypointIds.size(); }
-                @Override public int index() { return waypointIndex; }
-                @Override public String id(int index) { return waypointIds.get(index); }
-                @Override public String label(int index) {
-                    return ClientCharacterDisplayNames.waypoint(waypointIds.get(index));
-                }
-                @Override public void choose(int index) {
-                    waypointIndex = clampIndex(index, waypointIds.size());
-                }
-            }));
-        }
+        this.controls.add(new CreatorStepper(this.context,
+                I18n.format("gui.losttales.character.starting_waypoint"),
+                new PlainChoice() {
+            @Override public int count() { return waypointIds.size(); }
+            @Override public int index() { return waypointIndex; }
+            @Override public String id(int index) { return waypointIds.get(index); }
+            @Override public String label(int index) {
+                return ClientCharacterDisplayNames.waypoint(waypointIds.get(index));
+            }
+            @Override public void choose(int index) {
+                waypointIndex = clampIndex(index, waypointIds.size());
+            }
+        }));
         this.controls.add(new CreatorToggle(this.context,
                 I18n.format("gui.losttales.character.creator.unconventional"),
                 I18n.format("gui.losttales.character.creator.toggle.on"),
@@ -766,10 +648,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         }));
         this.controls.add(new CreatorNote(this.context,
                 I18n.format("gui.losttales.character.unconventional.hint")));
-        if (this.templateMode) {
-            this.controls.add(new CreatorNote(this.context,
-                    I18n.format("gui.losttales.character.creator.origin.template_note")));
-        }
     }
 
     private void buildCapesPage() {
@@ -801,10 +679,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         }));
         this.controls.add(new CreatorNote(this.context,
                 I18n.format("gui.losttales.character.cape.cosmetic_precedence")));
-        if (!this.templateMode) {
-            this.controls.add(new CreatorNote(this.context,
-                    I18n.format("gui.losttales.character.cape.policy_allowlist")));
-        }
+        this.controls.add(new CreatorNote(this.context,
+                I18n.format("gui.losttales.character.cape.policy_allowlist")));
     }
 
     /** The race's numbers, for whichever race is chosen. */
@@ -970,12 +846,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             LostTalesSkyrimUiStyle.drawScreenShade(this.width, this.height);
         }
         LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj,
-                I18n.format(this.templateMode
-                        ? "gui.losttales.character.template.title"
-                        : "gui.losttales.character.creation"),
+                I18n.format("gui.losttales.character.creation"),
                 // With no stage the status takes the subtitle's line.
-                isStatusInHeader() ? "" : this.templateMode
-                        ? I18n.format("gui.losttales.character.template.subtitle")
+                isStatusInHeader() ? "" : this.firstCharacter
+                        ? I18n.format("gui.losttales.character.first.subtitle")
                         : I18n.format("gui.losttales.character.slot",
                                 Integer.valueOf(this.slotIndex + 1)),
                 this.width, HEADER_TEXT_Y);
@@ -1151,7 +1025,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 this.layout.getPanelRight() - 1, this.layout.getButtonRowTop() + 1,
                 LostTalesSkyrimUiStyle.BORDER_DIM);
         CreatorWidgets.drawButton(this.fontRendererObj, secondary[0], secondary[1],
-                secondary[2], secondary[3], I18n.format("gui.cancel"), true,
+                secondary[2], secondary[3], secondaryLabel(), true,
                 within(secondary, mouseX, mouseY), this.cancelMotion);
         CreatorWidgets.drawButton(this.fontRendererObj, primary[0], primary[1],
                 primary[2], primary[3], primaryLabel(), canSubmit(),
@@ -1159,9 +1033,12 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     }
 
     private String primaryLabel() {
-        return I18n.format(this.templateMode
-                ? "gui.losttales.character.template.save"
-                : "gui.losttales.character.create");
+        return I18n.format("gui.losttales.character.create");
+    }
+
+    /** What the second button and Escape do: back where it came from, or on a first visit the game menu. */
+    private String secondaryLabel() {
+        return I18n.format(this.firstCharacter ? "menu.game" : "gui.cancel");
     }
 
     private boolean appearanceReady() {
@@ -1170,12 +1047,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     }
 
     private boolean canSubmit() {
-        // A template carries no starting waypoint, since every server
-        // resolves that against its own map, so it is not something
-        // saving one can wait for.
         return !isPending() && appearanceReady()
-                && (this.templateMode
-                        || (this.factionIds.size() > 0 && this.waypointIds.size() > 0));
+                && this.factionIds.size() > 0 && this.waypointIds.size() > 0;
     }
 
     /** Whether the status shows on the header's subtitle line, there being no stage to show it over. */
@@ -1434,10 +1307,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         hints.add(Hint.key(this.mc, this.fontRendererObj, Keyboard.KEY_RETURN,
                 primaryLabel()));
         hints.add(Hint.key(this.mc, this.fontRendererObj, Keyboard.KEY_ESCAPE,
-                I18n.format("gui.cancel")));
-        String status = I18n.format(this.templateMode
-                ? "gui.losttales.character.creator.status.template"
-                : "gui.losttales.character.creator.status.server");
+                secondaryLabel()));
+        String status = I18n.format(
+                "gui.losttales.character.creator.status.server");
         LostTalesControlBar.render(this, this.mc, this.fontRendererObj,
                 this.width, this.height, hints, leftHints, 0,
                 Arrays.asList(status));
@@ -1688,13 +1560,26 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                     CreatorCharacterLight.toggle(this);
                     return;
                 }
+                if (this.firstCharacter && this.mc != null
+                        && keyCode == this.mc.gameSettings.keyBindChat.getKeyCode()) {
+                    // A first visit may talk out of character while it
+                    // waits; the creator comes back as the chat closes.
+                    this.mc.displayGuiScreen(new GuiChat());
+                    return;
+                }
                 super.keyTyped(typedChar, keyCode);
         }
     }
 
+    /**
+     * Back to where it was opened from. A first visit has nowhere to go
+     * back to: the game menu opens instead, where the player may leave,
+     * and the creator comes back as it was once the menu closes.
+     */
     private void cancel() {
         if (this.mc != null) {
-            this.mc.displayGuiScreen(this.parent);
+            this.mc.displayGuiScreen(this.firstCharacter
+                    ? new GuiIngameMenu() : this.parent);
         }
     }
 
@@ -1710,10 +1595,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private void submit() {
         captureTextDraft();
         if (isPending()) {
-            return;
-        }
-        if (this.templateMode) {
-            saveTemplate();
             return;
         }
         CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
@@ -1749,45 +1630,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 this.showMinecraftCape, selectedCapeId());
         setStatus(I18n.format("gui.losttales.character.creating"), false);
         this.pendingRequestId = ClientCharacterNetwork.createCharacter(request);
-    }
-
-    /**
-     * Writes the form as the account character's look, in the character
-     * room. Nothing is sent and nothing is validated beyond a name worth
-     * keeping: which of these choices a particular server offers is that
-     * server's to say, and is asked when a world first reads it.
-     */
-    private void saveTemplate() {
-        String normalizedName = CharacterValidator.normalizeName(this.draftName);
-        if (normalizedName.length() == 0) {
-            setStatus(ClientCharacterDisplayNames.error(
-                    CharacterErrorId.INVALID_NAME_EMPTY), true);
-            showCategory(CharacterCreatorCategory.IDENTITY);
-            return;
-        }
-        CharacterTemplate template = new CharacterTemplate(
-                normalizedName,
-                selected(this.raceIds, this.raceIndex),
-                selected(this.genderIds, this.genderIndex),
-                selected(this.skinIds, this.skinIndex),
-                selected(this.bodyTypeIds, this.bodyTypeIndex),
-                selected(this.chestTypeIds, this.chestTypeIndex),
-                selected(this.factionIds, this.factionIndex),
-                CharacterValidator.normalizeSection(this.draftHistory),
-                this.draftAge, this.unconventionalSettings,
-                this.showMinecraftCape, selectedCapeId());
-        boolean saved = CharacterTemplateStore.save(
-                LostTalesClientAccount.templateId(), template);
-        setStatus(I18n.format(saved
-                ? "gui.losttales.character.template.saved"
-                : "gui.losttales.character.template.unsaved"), !saved);
-        if (saved) {
-            // In the character room the body keeps wearing what was saved.
-            CharacterRoomSession.onTemplateSaved(template);
-        }
-        if (saved && this.mc != null) {
-            this.mc.displayGuiScreen(this.parent);
-        }
     }
 
     private void captureTextDraft() {

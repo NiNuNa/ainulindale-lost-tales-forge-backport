@@ -246,10 +246,6 @@ public final class LostTalesConfig {
     public static boolean hideHudWithWindows = true;
     /** How strong a window pinned to the screen shows while playing, in percent of how it shows on the window screen. */
     public static int pinnedWindowOpacity = 70;
-    /** How long the pointer rests before a tip shows: the words Tip Delay picks from. */
-    static final String[] TIP_DELAYS = {"INSTANT", "SHORT", "MEDIUM", "LONG"};
-    static final String DEFAULT_TIP_DELAY = "SHORT";
-    public static String tipDelay = DEFAULT_TIP_DELAY;
     /**
      * Whether anything of the mod's moves: every screen, HUD panel and
      * chat motion. Off, everything stands where it ends.
@@ -1267,11 +1263,6 @@ public final class LostTalesConfig {
                     100,
                     TIP
             );
-            Property tipDelayProperty = config.get(CATEGORY_CLIENT, "tipDelay",
-                    tipDelay, TIP);
-            tipDelayProperty.setValidValues(TIP_DELAYS);
-            tipDelay = normalizeWord(tipDelayProperty.getString(), TIP_DELAYS,
-                    DEFAULT_TIP_DELAY);
 
             devSkinOverridePath = config.getString(
                     "devSkinOverridePath",
@@ -2082,10 +2073,6 @@ public final class LostTalesConfig {
                 CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment);
         feedAlignmentProperty.set(chatFeedAlignment);
         feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
-        Property tipDelayProperty = config.get(
-                CATEGORY_CLIENT, "tipDelay", tipDelay);
-        tipDelayProperty.set(tipDelay);
-        tipDelayProperty.setValidValues(TIP_DELAYS);
         writeSize(config, "chatSpeakerSize", chatSpeakerSize);
         writeSize(config, "chatFeedSpeakerSize", chatFeedSpeakerSize);
         writeSize(config, "chatFeedMessageSize", chatFeedMessageSize);

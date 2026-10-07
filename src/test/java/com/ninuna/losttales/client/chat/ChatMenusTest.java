@@ -101,7 +101,7 @@ public final class ChatMenusTest {
     }
 
     /**
-     * The chat's part of the Lost Tales Menu and Page Search: every channel
+     * The chat's part of the New Page and Page Search: every channel
      * the player can read, open or not, each row's id its tab's, and
      * nothing else while no player list can be read; a filter matching
      * nothing leaves no row.

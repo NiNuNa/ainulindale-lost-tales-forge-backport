@@ -21,14 +21,35 @@ public final class ChatInputBarTest {
         ClientChatChannelState.clear();
     }
 
+    /**
+     * The bar's buttons count from its right edge: the send button's
+     * glyph an edge's gap (7) from the frame, the hairline after it an
+     * edge's gap from both glyphs, the rest a button's gap (5) apart, ink
+     * to ink, each glyph ten pixels in a twelve-pixel square.
+     */
     @Test
     public void barSlotsCountFromTheRightEdgeInButtonSteps() {
+        int send = ChatInputBar.barSlotLeft(200, 0);
+        int first = ChatInputBar.barSlotLeft(200, 1);
+        int second = ChatInputBar.barSlotLeft(200, 2);
+        assertEquals("the send glyph 7 from the edge", 7,
+                200 - inkEnd(send));
+        assertEquals("7, the hairline, 7 between send and the next", 15,
+                inkStart(send) - inkEnd(first));
+        assertEquals("5 between the other glyphs", 5,
+                inkStart(first) - inkEnd(second));
         int step = ChatPickerPanel.BUTTON_SIZE + ChatPickerPanel.BUTTON_MARGIN;
-        int first = ChatInputBar.barSlotLeft(200, 0);
-        assertEquals(200 - ChatPickerPanel.BUTTON_MARGIN
-                - ChatPickerPanel.BUTTON_SIZE, first);
-        assertEquals(first - step, ChatInputBar.barSlotLeft(200, 1));
-        assertEquals(first - 3 * step, ChatInputBar.barSlotLeft(200, 3));
+        assertEquals(first - 2 * step, ChatInputBar.barSlotLeft(200, 3));
+    }
+
+    /** Where a ten-pixel glyph's ink starts in the square at {@code left}. */
+    private static int inkStart(int left) {
+        return left + (ChatPickerPanel.BUTTON_SIZE - 10) / 2;
+    }
+
+    /** Just past a ten-pixel glyph's ink in the square at {@code left}. */
+    private static int inkEnd(int left) {
+        return inkStart(left) + 10;
     }
 
     @Test
@@ -105,17 +126,17 @@ public final class ChatInputBarTest {
     /**
      * The bar's spacing: two clear rows between the rule and what stands
      * on the bar and two between it and the bar's foot, the window's
-     * frame running just below; three clear pixels before the channel
-     * indicator and after the character button, and two between the two
-     * framed buttons.
+     * frame running just below; seven clear pixels before the tab button
+     * and after the identity button, and five between the two framed
+     * buttons.
      */
     @Test
-    public void theBarKeepsTwoRowsAboveAndBelowAndTwoPixelsBetweenItsFramedButtons() {
+    public void theBarKeepsTwoRowsAboveAndBelowAndFivePixelsBetweenItsFramedButtons() {
         assertEquals(2, ChatInputBar.CLEARANCE);
         assertEquals(1 + 2 + LostTalesUiFramedButton.HEIGHT + 2,
                 WindowPlacement.BAR_STRIP_HEIGHT);
-        assertEquals(3, ChatInputBar.BAR_GAP);
-        assertEquals(2, BarLead.BUTTON_GAP);
+        assertEquals(7, WindowStyle.EDGE_GAP);
+        assertEquals(5, BarLead.BUTTON_GAP);
     }
 
     /**

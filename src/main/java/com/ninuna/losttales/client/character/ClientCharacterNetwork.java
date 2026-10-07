@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.character;
 
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
-import com.ninuna.losttales.character.server.CharacterTemplateAdoption;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.character.CharacterCapeUpdateRequestPacket;
@@ -13,7 +12,6 @@ import com.ninuna.losttales.network.packet.character.CharacterProfileUpdateReque
 import com.ninuna.losttales.network.packet.character.CharacterRestoreRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterSelectRequestPacket;
-import com.ninuna.losttales.network.packet.character.CharacterTemplateAdoptRequestPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterClaimRequestPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterReleaseRequestPacket;
 
@@ -51,21 +49,6 @@ public final class ClientCharacterNetwork {
             public void run() {
                 LostTalesNetworkHandler.CHANNEL.sendToServer(
                         new CharacterCreateRequestPacket(requestId, request));
-            }
-        });
-    }
-
-    /** Offers the account character's look for this world's account character. */
-    public static int adoptTemplate(final CharacterTemplateAdoption adoption) {
-        if (adoption == null) {
-            throw new IllegalArgumentException("adoption must not be null");
-        }
-        final int requestId = nextRequestId();
-        return send(requestId, CharacterOperationType.CREATE, new Runnable() {
-            @Override
-            public void run() {
-                LostTalesNetworkHandler.CHANNEL.sendToServer(
-                        new CharacterTemplateAdoptRequestPacket(requestId, adoption));
             }
         });
     }

@@ -191,10 +191,10 @@ public final class ChatIdentitySelection {
      * Who a line from the player speaks as in {@code channel}, as the line
      * names it: the character played where the channel says so
      * ({@link ChatRolePresentation#speaksAsPlayedCharacter}) or the line
-     * names no one, the account where the line names it and no character
-     * is played, else the owned character it names. Null in {@link Worn}
-     * for the account; refused for an account named while a character is
-     * played, or a character the player does not own.
+     * names no one, else the owned character it names. Out of character
+     * the account speaks (null in {@link Worn}). Refused in character for
+     * the account, a player with no character yet, or a character the
+     * player does not own.
      */
     public static Worn worn(EntityPlayerMP player, ChatChannel channel, int kind,
                             UUID characterId) {
@@ -217,10 +217,7 @@ public final class ChatIdentitySelection {
     static Worn decide(boolean speaksAsPlayed, int kind, RoleplayCharacter played,
                        RoleplayCharacter named) {
         if (speaksAsPlayed || kind == LostTalesChatSendPacket.IDENTITY_DEFAULT) {
-            return Worn.as(played);
-        }
-        if (kind == LostTalesChatSendPacket.IDENTITY_ACCOUNT) {
-            return played == null ? Worn.as(null) : Worn.REFUSED;
+            return played == null ? Worn.REFUSED : Worn.as(played);
         }
         return kind != LostTalesChatSendPacket.IDENTITY_CHARACTER || named == null
                 ? Worn.REFUSED : Worn.as(named);

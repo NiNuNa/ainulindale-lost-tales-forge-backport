@@ -350,8 +350,6 @@ public final class ClientChatChannelStateTest {
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(
                 ownerId, 1, characterId, 1L,
                 Collections.singletonList(character),
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
                 Collections.<com.ninuna.losttales.character.sync.DeletedCharacterSummary>emptyList());
         ClientCharacterRosterCache.acceptRoster(0, snapshot);
         return characterId;

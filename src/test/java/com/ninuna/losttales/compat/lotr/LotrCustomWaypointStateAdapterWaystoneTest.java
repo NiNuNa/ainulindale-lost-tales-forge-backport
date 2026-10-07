@@ -16,7 +16,6 @@ public final class LotrCustomWaypointStateAdapterWaystoneTest {
         use.setInteger("Count", 3);
         uses.appendTag(use);
         state.setTag("CWPUses", uses);
-        state.setInteger("NextCWPID", 20000);
 
         new LotrCustomWaypointStateAdapter().validate(state);
     }

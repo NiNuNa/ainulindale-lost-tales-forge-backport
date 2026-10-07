@@ -244,7 +244,7 @@ public final class PageKeys {
                         window("pages.settings", CLICK),
                         window("pages.help", Keyboard.KEY_F1, OR, CLICK),
                         window("pages.search", COMMAND, PLUS, Keyboard.KEY_F),
-                        window("pages.full_window", alt, PLUS, enter, OR, CLICK),
+                        window("pages.borderless", alt, PLUS, enter, OR, CLICK),
                         window("pages.split", CLICK),
                         window("pages.split_drop", DRAG),
                         window("pages.split_divider", DRAG, OR, DOUBLE_CLICK),

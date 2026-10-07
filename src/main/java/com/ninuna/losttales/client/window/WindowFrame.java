@@ -57,7 +57,7 @@ public class WindowFrame {
     /**
      * Top of the drawn message stack (screen y, motion included): the
      * edge the tab row stands a padding above. An open window's is its
-     * box's own edge whatever its tab in front holds — a full window
+     * box's own edge whatever its tab in front holds — a borderless page
      * cuts its topmost line there, and a shorter history leaves empty
      * rows under it — so switching tabs never moves the row; the closed
      * feed's sits on the lines it has.

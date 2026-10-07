@@ -2,8 +2,6 @@ package com.ninuna.losttales.mapmarker;
 
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.character.server.KnownAccounts;
-import com.ninuna.losttales.character.storage.CharacterStorage;
-import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
@@ -334,7 +332,7 @@ public final class LostTalesWaystoneSettingsService {
     private static Outcome applyPlayerSharing(
             World world, LostTalesMapMarkerRecord record,
             String playerName, boolean remove) {
-        UUID targetId = remove ? sharedNamed(world, record, playerName) : null;
+        UUID targetId = remove ? sharedNamed(record, playerName) : null;
         if (targetId == null) {
             targetId = KnownAccounts.find(world, playerName);
         }
@@ -443,20 +441,13 @@ public final class LostTalesWaystoneSettingsService {
      * not visited in a while can still be taken off the list.
      */
     private static UUID sharedNamed(
-            World world, LostTalesMapMarkerRecord record, String playerName) {
+            LostTalesMapMarkerRecord record, String playerName) {
         String wanted = trim(playerName);
         if (wanted.length() == 0) {
             return null;
         }
-        CharacterWorldData storage;
-        try {
-            storage = CharacterStorage.get(world);
-        } catch (RuntimeException unreadable) {
-            return null;
-        }
         for (UUID shared : record.getSharedPlayerIds()) {
-            if (wanted.equalsIgnoreCase(
-                    KnownAccounts.nameOf(shared, storage.getRoster(shared)))) {
+            if (wanted.equalsIgnoreCase(KnownAccounts.nameOf(shared))) {
                 return shared;
             }
         }

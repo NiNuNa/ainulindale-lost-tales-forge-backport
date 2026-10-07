@@ -41,14 +41,15 @@ public final class ChatIdentitySelectionTest {
                         LostTalesChatSendPacket.IDENTITY_CHARACTER, played, other).character);
     }
 
+    /** In character the account is never worn, and nobody without a character speaks. */
     @Test
-    public void theAccountIsWornOnlyWhileNoCharacterIsPlayed() {
-        ChatIdentitySelection.Worn account = ChatIdentitySelection.decide(false,
-                LostTalesChatSendPacket.IDENTITY_ACCOUNT, null, null);
-        assertFalse(account.refused);
-        assertNull(account.character);
+    public void inCharacterNobodySpeaksWithoutACharacter() {
+        assertTrue(ChatIdentitySelection.decide(false,
+                LostTalesChatSendPacket.IDENTITY_ACCOUNT, null, null).refused);
         assertTrue(ChatIdentitySelection.decide(false,
                 LostTalesChatSendPacket.IDENTITY_ACCOUNT, character("Aldric"), null).refused);
+        assertTrue(ChatIdentitySelection.decide(true,
+                LostTalesChatSendPacket.IDENTITY_DEFAULT, null, null).refused);
     }
 
     private static RoleplayCharacter character(String name) {

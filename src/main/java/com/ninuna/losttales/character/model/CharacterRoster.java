@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.model;
 
-import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 
 import java.util.ArrayList;
@@ -23,13 +22,6 @@ public class CharacterRoster {
     public static final int CURRENT_DATA_VERSION = 1;
     public static final int MAX_SLOTS = 9;
     public static final int INITIAL_UNLOCKED_SLOTS = 1;
-    /**
-     * The slot the account character sits in. It is not one of the nine a
-     * player fills: the account character is always there, is shown
-     * before them, and does not spend a slot they could otherwise make
-     * someone in. Sorting by slot puts it first for that reason.
-     */
-    public static final int DEFAULT_SLOT_INDEX = -1;
 
     private final UUID ownerId;
     private final Map<Integer, RoleplayCharacter> charactersBySlot = new HashMap<Integer, RoleplayCharacter>();
@@ -38,10 +30,6 @@ public class CharacterRoster {
     private int unlockedSlotCount;
     private UUID activeCharacterId;
     private long revision;
-    /** The cape the account wears when played as itself. */
-    private boolean accountShowMinecraftCape = RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE;
-    private int accountCosmeticCapeId = RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
-    private boolean templateTaken;
 
     public CharacterRoster(UUID ownerId) {
         this(ownerId, INITIAL_UNLOCKED_SLOTS, null, 0L);
@@ -97,7 +85,10 @@ public class CharacterRoster {
         return this.activeCharacterId == null ? null : this.charactersById.get(this.activeCharacterId);
     }
 
-    /** The id gameplay keys on: the active character's, or the owner's own when on the account. */
+    /**
+     * The id gameplay keys on: the active character's, or the owner's own
+     * before the first character is made.
+     */
     public UUID getActiveGameplayId() {
         return PlayableIdentity.gameplayId(this.activeCharacterId, this.ownerId);
     }
@@ -126,71 +117,13 @@ public class CharacterRoster {
         return this.revision;
     }
 
-    /**
-     * Whether this world has taken the account character's look.
-     *
-     * <p>An account keeps the account character's look on its own
-     * installation, written in the character room. A world reads it once,
-     * on the login where it makes the account character, and never again —
-     * from then on the character is this world's, and what the player
-     * does to the look elsewhere is about the next world, not this one.</p>
-     *
-     * <p>False for a roster that carries no answer, so such a world takes
-     * the look the next time the player joins: the same one reading, one
-     * login later.</p>
-     */
-    public boolean isTemplateTaken() {
-        return this.templateTaken;
-    }
-
-    /** Marks the template read. Answers whether this changed anything. */
-    public boolean markTemplateTaken() {
-        if (this.templateTaken) {
-            return false;
-        }
-        this.templateTaken = true;
-        return true;
-    }
-
-    public boolean isAccountMinecraftCapeVisible() {
-        return this.accountShowMinecraftCape;
-    }
-
-    public int getAccountCosmeticCapeId() {
-        return this.accountCosmeticCapeId;
-    }
-
-    /**
-     * The account's cape settings; called only after server-side catalog
-     * and eligibility validation. Answers whether anything changed.
-     */
-    public boolean setAccountCapeSettings(boolean showMinecraftCape, int cosmeticCapeId) {
-        int normalizedCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
-        boolean changed = this.accountShowMinecraftCape != showMinecraftCape
-                || this.accountCosmeticCapeId != normalizedCapeId;
-        this.accountShowMinecraftCape = showMinecraftCape;
-        this.accountCosmeticCapeId = normalizedCapeId;
-        return changed;
-    }
-
     public RoleplayCharacter getCharacter(UUID characterId) {
         return characterId == null ? null : this.charactersById.get(characterId);
     }
 
-    /** The account character, or null before the world has made it. */
-    public RoleplayCharacter getDefaultCharacter() {
-        return this.charactersBySlot.get(Integer.valueOf(DEFAULT_SLOT_INDEX));
-    }
-
-    /** How many of the nine slots are filled; the account character's is not one. */
-    public int roleplayCharacterCount() {
-        int count = 0;
-        for (RoleplayCharacter character : this.charactersById.values()) {
-            if (!character.isDefault()) {
-                count++;
-            }
-        }
-        return count;
+    /** How many of the nine slots are filled. */
+    public int characterCount() {
+        return this.charactersById.size();
     }
 
     public RoleplayCharacter getCharacterAtSlot(int slotIndex) {
@@ -222,8 +155,7 @@ public class CharacterRoster {
         RoleplayCharacter existing = this.charactersById.get(character.getCharacterId());
         if (existing == null
                 || existing.getSlotIndex() != character.getSlotIndex()
-                || !existing.getOwnerId().equals(character.getOwnerId())
-                || existing.getKind() != character.getKind()) {
+                || !existing.getOwnerId().equals(character.getOwnerId())) {
             return false;
         }
         this.charactersById.put(character.getCharacterId(), character);
@@ -246,16 +178,13 @@ public class CharacterRoster {
         if (this.charactersBySlot.containsKey(Integer.valueOf(character.getSlotIndex()))) {
             return false;
         }
-        // The account character is not one of the nine: it is counted
-        // neither against them nor by the slot it unlocks below.
-        if (!character.isDefault() && roleplayCharacterCount() >= MAX_SLOTS) {
+        if (characterCount() >= MAX_SLOTS) {
             return false;
         }
 
         this.charactersById.put(character.getCharacterId(), character);
         this.charactersBySlot.put(Integer.valueOf(character.getSlotIndex()), character);
-        if (!character.isDefault()
-                && character.getSlotIndex() >= this.unlockedSlotCount) {
+        if (character.getSlotIndex() >= this.unlockedSlotCount) {
             this.unlockedSlotCount = character.getSlotIndex() + 1;
         }
         return true;
@@ -273,23 +202,8 @@ public class CharacterRoster {
         return removed;
     }
 
-    /**
-     * Whether a slot index names a place a character can be stored. The
-     * account character's slot is one of them, which is why this is not
-     * the test for a slot something may be created in.
-     */
+    /** Whether a slot index names one of the nine places a character stands in. */
     public static boolean isValidSlotIndex(int slotIndex) {
-        return slotIndex == DEFAULT_SLOT_INDEX
-                || (slotIndex >= 0 && slotIndex < MAX_SLOTS);
-    }
-
-    /**
-     * Whether a slot index names a place a player may put a character
-     * they are making or claiming. The account character's slot is not
-     * one: only the server mints that record, and a request naming it
-     * would otherwise be answered by whether it happened to be empty.
-     */
-    public static boolean isCreatableSlotIndex(int slotIndex) {
         return slotIndex >= 0 && slotIndex < MAX_SLOTS;
     }
 

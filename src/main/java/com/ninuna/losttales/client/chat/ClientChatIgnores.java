@@ -64,7 +64,7 @@ public final class ClientChatIgnores {
      */
     public static synchronized void initialize(File configDirectory) {
         initialize(configDirectory, configDirectory == null ? null
-                : LostTalesClientAccount.templateId());
+                : LostTalesClientAccount.signedInId());
     }
 
     static synchronized void initialize(File configDirectory, UUID accountId) {

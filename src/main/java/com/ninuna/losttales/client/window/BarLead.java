@@ -26,7 +26,7 @@ import net.minecraft.client.gui.FontRenderer;
  */
 public final class BarLead {
     /** Clear space between the two buttons, frame to frame. */
-    public static final int BUTTON_GAP = 2;
+    public static final int BUTTON_GAP = WindowStyle.BUTTON_GAP;
     /** The identity button: square, the framed buttons' one height. */
     public static final int IDENTITY_SIZE = LostTalesUiFramedButton.HEIGHT;
 

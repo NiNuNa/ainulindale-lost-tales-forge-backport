@@ -58,10 +58,15 @@ public final class ChatLayout {
             Collections.unmodifiableList(Arrays.asList(
                     ConversationPage.of(ChatChannel.GLOBAL),
                     ConversationPage.of(ChatChannel.OOC)));
+    /** The two consoles, in the order their first window holds them. */
+    private static final List<ConversationPage> CONSOLES =
+            Collections.unmodifiableList(Arrays.asList(
+                    ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
+                    ConversationPage.of(ChatChannel.SERVER_CONSOLE)));
     /**
      * The channels that never open by themselves, only by hand: staff talk
      * and the consoles, which speak often and are not conversations. They
-     * wait in the {@code +}.
+     * wait on the New Page.
      */
     private static final List<ConversationPage> OPENED_BY_HAND =
             Collections.unmodifiableList(Arrays.asList(
@@ -194,6 +199,23 @@ public final class ChatLayout {
                         return FIRST_TABS;
                     }
                 });
+        // The command key opens the consoles' first window with both
+        // consoles the player may read: the Server Log only with its
+        // capability.
+        WindowLayout.addViewPages(new WindowLayout.ViewPages() {
+            @Override
+            public List<? extends WindowPage> pagesOf(PageCategory category) {
+                List<ConversationPage> pages = new ArrayList<ConversationPage>();
+                if (category == PageCategory.CONSOLES) {
+                    for (ConversationPage console : CONSOLES) {
+                        if (ClientChatChannelState.isAvailable(console)) {
+                            pages.add(console);
+                        }
+                    }
+                }
+                return pages;
+            }
+        });
         WindowLayoutStore.addPart(PART);
         // A conversation's window pinned to the screen while playing is
         // drawn as the screen draws it.
@@ -724,6 +746,17 @@ public final class ChatLayout {
     }
 
     /**
+     * Opens a console as the command key does: where the consoles keep
+     * their pages, or with no window of them, their first window holding
+     * both consoles the player may read ({@link WindowLayout#openView}).
+     */
+    public static synchronized ConversationPage openConsoles(
+            ConversationPage console) {
+        return ConversationPage.from(WindowLayout.openView(
+                ConversationPage.row(console)));
+    }
+
+    /**
      * Opens a conversation the player asked for — a whisper, a link, a
      * jump to a line — as {@link #openTab} does; when no window holds a
      * conversation, the chat's first window opens with it, the
@@ -890,7 +923,7 @@ public final class ChatLayout {
 
     /**
      * The NPC conversations of the session, the one that spoke last first:
-     * what the Lost Tales Menu offers; with {@code closedOnly}, those no
+     * what the New Page offers; with {@code closedOnly}, those no
      * window holds a copy of.
      */
     static synchronized List<ConversationPage> npcConversations(boolean closedOnly) {

@@ -569,10 +569,10 @@ final class ProfileEditWindow extends SubWindowContent {
         return I18n.format("gui.losttales.character.profile_edit.save");
     }
 
-    /** The section buttons side by side at the window's top left, a framed button's gap apart. */
+    /** The section buttons side by side at the window's top left, a button's gap apart. */
     private static LostTalesUiHitBox sectionBox(FontRenderer font,
                                             LostTalesUiHitBox box, Page each) {
-        double left = box.left + PADDING_X;
+        double left = box.left + WindowStyle.EDGE_GAP;
         for (Page before : Page.values()) {
             int width = WordButton.width(font, I18n.format(before.labelKey));
             if (before == each) {
@@ -592,7 +592,8 @@ final class ProfileEditWindow extends SubWindowContent {
         int cancelWidth = WordButton.width(font, cancelLabel());
         double top = box.top + box.height - PADDING_Y
                 - LostTalesUiFramedButton.HEIGHT;
-        double saveLeft = box.left + box.width - PADDING_X - saveWidth;
+        double saveLeft = box.left + box.width - WindowStyle.EDGE_GAP
+                - saveWidth;
         if (SAVE.equals(part)) {
             return new LostTalesUiHitBox(saveLeft, top, saveWidth,
                     LostTalesUiFramedButton.HEIGHT);

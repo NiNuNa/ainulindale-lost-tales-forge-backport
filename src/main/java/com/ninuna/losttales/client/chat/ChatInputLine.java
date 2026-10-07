@@ -8,7 +8,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiCaret;
  * pixels, left to right:
  *
  * <pre>
- * head button |3| divider |2| well: |3| field + caret |3| :well |2| divider |3| counter |3| controls
+ * head button |7| divider |7| well: |3| field + caret |3| :well |7| divider |3| counter |3| controls
  * </pre>
  *
  * <p>The field lies in a well: a stretch of the chat's darker inset
@@ -26,8 +26,8 @@ import com.ninuna.losttales.gui.style.LostTalesUiCaret;
  * typed into and what answers the pointer never disagree.</p>
  */
 final class ChatInputLine {
-    /** Clear pixels between each divider and the well. */
-    static final int WELL_GAP = 2;
+    /** Clear pixels between each divider and the well: the well counts as a control. */
+    static final int WELL_GAP = WindowStyle.EDGE_GAP;
 
     /** Left edge of the divider after the head button. */
     final int leftDividerX;
@@ -74,11 +74,11 @@ final class ChatInputLine {
     }
 
     /**
-     * Where the divider after the bar's leading buttons stands: a gap
-     * past {@code buttonsRight}, the head button's frame.
+     * Where the divider after the bar's leading buttons stands: an edge's
+     * gap past {@code buttonsRight}, the head button's frame.
      */
     static int dividerAfter(int buttonsRight) {
-        return buttonsRight + ChatInputBar.BAR_GAP;
+        return buttonsRight + WindowStyle.EDGE_GAP;
     }
 }
 

@@ -1,10 +1,6 @@
 package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
-import com.ninuna.losttales.character.storage.CharacterStorage;
-import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.model.CharacterRoster;
-import com.ninuna.losttales.character.server.KnownAccounts;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatNames;
@@ -27,7 +23,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.command.ICommandSender;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
@@ -141,12 +136,9 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
 
     /**
      * {@code assign|unassign <role> <player|character>}: the name is an
-     * account's (online, by id, or one this world has a roster for) or a
-     * character's, on any roster, and is looked up as both. An
+     * account's or a character's ({@link LostTalesCommandSubject}). An
      * account holds the role as every identity it plays and gains its
-     * grants; a character alone wears it and nothing is granted. A name
-     * both an account and a character answer to is refused until it is
-     * given as {@code account:<name>} or {@code character:<name>}.
+     * grants; a character alone wears it and nothing is granted.
      */
     private void assign(ICommandSender sender, String[] args, boolean grant) {
         if (args.length < 3) {
@@ -168,7 +160,8 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "withheld.assign", role.getId(), withheld);
             return;
         }
-        Subject subject = resolveSubject(sender, joinFrom(args, 2));
+        LostTalesCommandSubject subject = LostTalesCommandSubject.resolve(sender,
+                LostTalesCommandSubject.joinFrom(args, 2));
         if (subject.problem != null) {
             say(sender, EnumChatFormatting.RED, subject.problem, subject.problemArguments);
             return;
@@ -194,142 +187,6 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
                         LostTalesConfig.CATEGORY_ROLES, MEMBERS_KEY, true, entries)),
                 ServerConfigSnapshot.AUTHORIZATION_CATEGORIES,
                 java.util.Collections.<String>emptySet()));
-    }
-
-    /**
-     * Whom a name names: one account, or one character, or a problem to
-     * report, as the lang key of the answer and its arguments.
-     */
-    private static final class Subject {
-        final UUID account;
-        final UUID character;
-        final IChatComponent label;
-        final String problem;
-        final Object[] problemArguments;
-
-        private Subject(UUID account, UUID character, IChatComponent label,
-                        String problem, Object... problemArguments) {
-            this.account = account;
-            this.character = character;
-            this.label = label;
-            this.problem = problem;
-            this.problemArguments = problemArguments;
-        }
-
-        static Subject found(UUID account, UUID character, IChatComponent label) {
-            return new Subject(account, character, label, null);
-        }
-
-        static Subject problem(String key, Object... arguments) {
-            return new Subject(null, null, null, key, arguments);
-        }
-    }
-
-    private static final String ACCOUNT_PREFIX = "account:";
-    private static final String CHARACTER_PREFIX = "character:";
-
-    /**
-     * The account or character the name stands for, read from the
-     * server's own records, the player list and the character rosters,
-     * never from the command's words alone and never by asking Mojang.
-     */
-    private static Subject resolveSubject(ICommandSender sender, String typed) {
-        String name = typed == null ? "" : typed.trim();
-        boolean accountOnly = false;
-        boolean characterOnly = false;
-        if (name.toLowerCase(Locale.ROOT).startsWith(ACCOUNT_PREFIX)) {
-            accountOnly = true;
-            name = name.substring(ACCOUNT_PREFIX.length()).trim();
-        } else if (name.toLowerCase(Locale.ROOT).startsWith(CHARACTER_PREFIX)) {
-            characterOnly = true;
-            name = name.substring(CHARACTER_PREFIX.length()).trim();
-        }
-        if (name.length() == 0) {
-            return Subject.problem(SAY + "subject.empty");
-        }
-        UUID account = characterOnly ? null : resolveAccount(sender, name);
-        RoleplayCharacter character = accountOnly ? null
-                : resolveCharacter(sender, name);
-        if (account != null && character != null) {
-            return Subject.problem(SAY + "subject.both", name, ACCOUNT_PREFIX + name,
-                    CHARACTER_PREFIX + name);
-        }
-        if (character != null) {
-            return Subject.found(null, character.getCharacterId(),
-                    words(SAY + "subject.character", character.getName()));
-        }
-        if (account != null) {
-            return Subject.found(account, null, words(SAY + "subject.account", name));
-        }
-        return Subject.problem(SAY + "subject.unknown", name);
-    }
-
-    /**
-     * The character of that name on any roster, or null; two rosters
-     * holding the name make it nobody's, since a role cannot be given
-     * to half a name. Read from the server's store; a store that cannot
-     * be read names nobody.
-     */
-    private static RoleplayCharacter resolveCharacter(ICommandSender sender, String name) {
-        if (sender == null || sender.getEntityWorld() == null) {
-            return null;
-        }
-        RoleplayCharacter found = null;
-        try {
-            for (CharacterRoster roster
-                    : CharacterStorage.get(sender.getEntityWorld()).getRosters()) {
-                if (roster == null) {
-                    continue;
-                }
-                for (RoleplayCharacter character : roster.getCharacters()) {
-                    if (character == null || !name.equalsIgnoreCase(character.getName())) {
-                        continue;
-                    }
-                    if (found != null) {
-                        return null;
-                    }
-                    found = character;
-                }
-            }
-        } catch (RuntimeException unreadable) {
-            return null;
-        }
-        return found;
-    }
-
-    /** Every character name on every roster, for completion. */
-    private static List<String> characterNames(ICommandSender sender) {
-        List<String> names = new ArrayList<String>();
-        if (sender == null || sender.getEntityWorld() == null) {
-            return names;
-        }
-        try {
-            for (CharacterRoster roster
-                    : CharacterStorage.get(sender.getEntityWorld()).getRosters()) {
-                if (roster == null) {
-                    continue;
-                }
-                for (RoleplayCharacter character : roster.getCharacters()) {
-                    if (character != null && character.getName().trim().length() > 0) {
-                        names.add(character.getName());
-                    }
-                }
-            }
-        } catch (RuntimeException unreadable) {
-            // Nothing to complete from a store that cannot be read.
-        }
-        return names;
-    }
-
-    private static String joinFrom(String[] args, int start) {
-        StringBuilder joined = new StringBuilder();
-        for (int index = start; index < args.length; index++) {
-            if (joined.length() > 0) {
-                joined.append(' ');
-            }
-            joined.append(args[index]);
-        }
-        return joined.toString();
     }
 
     /**
@@ -518,20 +375,6 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         return ids.toString();
     }
 
-    /**
-     * The account an id or a name names: a player online, or one this
-     * world knows by that name. Mojang is never asked, so a name nobody
-     * here has used names nobody.
-     */
-    private static UUID resolveAccount(ICommandSender sender, String name) {
-        try {
-            return UUID.fromString(name);
-        } catch (IllegalArgumentException notAnId) {
-            return KnownAccounts.find(
-                    sender == null ? null : sender.getEntityWorld(), name);
-        }
-    }
-
     private static ChatRoleConfig.Warnings collecting(final List<String> into) {
         return new ChatRoleConfig.Warnings() {
             @Override
@@ -575,13 +418,8 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         }
         if (args.length == 3 && ("assign".equalsIgnoreCase(args[0])
                 || "unassign".equalsIgnoreCase(args[0]))) {
-            List<String> names = characterNames(sender);
-            MinecraftServer server = MinecraftServer.getServer();
-            if (server != null) {
-                names.addAll(java.util.Arrays.asList(server.getAllUsernames()));
-            }
             return getListOfStringsMatchingLastWord(args,
-                    names.toArray(new String[names.size()]));
+                    LostTalesCommandSubject.names(sender));
         }
         return null;
     }

@@ -8,7 +8,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
-import com.ninuna.losttales.client.window.LostTalesMenuPage;
+import com.ninuna.losttales.client.window.NewPage;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
@@ -2967,12 +2967,12 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         clearSearchSelectionFrame();
-        if (LostTalesKeyBindings.isMenuKey(keyCode)) {
-            WindowScreen.openPage(LostTalesMenuPage.PAGE_ID);
+        if (LostTalesKeyBindings.isNewPageKey(keyCode)) {
+            WindowScreen.openView(NewPage.PAGE_ID);
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
-            WindowScreen.openPage(QuestJournalPage.PAGE_ID);
+            WindowScreen.openView(QuestJournalPage.PAGE_ID);
             return;
         }
         if (keyCode == CREATE_WAYPOINT_KEY) {

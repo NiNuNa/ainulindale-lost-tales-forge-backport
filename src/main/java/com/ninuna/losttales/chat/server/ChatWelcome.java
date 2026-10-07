@@ -4,7 +4,6 @@ import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
-import com.ninuna.losttales.world.room.CharacterRoomWorldType;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -17,7 +16,6 @@ import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraftforge.common.ForgeHooks;
 
@@ -47,7 +45,6 @@ public final class ChatWelcome {
     public void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.player instanceof EntityPlayerMP)
                 || lines(LostTalesConfig.chatWelcomeLines).isEmpty()
-                || CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())
                 || persisted(event.player).getBoolean(WELCOMED_TAG)) {
             return;
         }

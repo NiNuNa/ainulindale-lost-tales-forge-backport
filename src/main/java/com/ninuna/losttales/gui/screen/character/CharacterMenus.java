@@ -19,13 +19,11 @@ import net.minecraft.client.resources.I18n;
 
 /**
  * The Characters page's capes menu, in a sub-window of its own in the
- * page's window: the capes of the identity picked. Every change is sent at
+ * page's window: the capes of the character picked. Every change is sent at
  * once, as a setting is, and the menu stays for the next; while the
  * server answers, the rows wait.
  */
 final class CharacterMenus {
-    /** What the capes menu is about while the account plays as itself, with no record of its own. */
-    private static final String ACCOUNT = "account";
     private static final String MINECRAFT_CAPE = "minecraft_cape";
     private static final String COSMETIC_CAPE = "cosmetic_cape";
 
@@ -36,10 +34,9 @@ final class CharacterMenus {
         WindowMenus.registerShared(CharacterSubWindows.CAPES, new CapesSource());
     }
 
-    /** What the capes menu is about for a character: its id, or the account for none. */
+    /** What the capes menu is about for a character: its id. */
     static String capesAbout(CharacterSummary character) {
-        return character == null ? ACCOUNT
-                : character.getCharacterId().toString();
+        return character.getCharacterId().toString();
     }
 
     private static String busy(CharactersPage page) {
@@ -49,7 +46,7 @@ final class CharacterMenus {
 
     /* ---- Capes ---- */
 
-    /** One identity's capes as the roster keeps them. */
+    /** One character's capes as the roster keeps them. */
     private static final class Capes {
         final UUID characterId;
         final String name;
@@ -72,13 +69,6 @@ final class CharacterMenus {
             return null;
         }
         String about = (String)menu.about();
-        if (ACCOUNT.equals(about)) {
-            Minecraft minecraft = Minecraft.getMinecraft();
-            return new Capes(null, minecraft.thePlayer == null ? ""
-                    : minecraft.thePlayer.getCommandSenderName(),
-                    snapshot.isAccountMinecraftCapeVisible(),
-                    snapshot.getAccountCosmeticCapeId());
-        }
         CharacterSummary character;
         try {
             character = snapshot.getCharacter(UUID.fromString(about));

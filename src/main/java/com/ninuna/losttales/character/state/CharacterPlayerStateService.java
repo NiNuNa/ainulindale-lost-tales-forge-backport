@@ -434,12 +434,10 @@ public final class CharacterPlayerStateService {
         for (CharacterStateComponent component : this.components) {
             NBTTagCompound state;
             if (character != null && component == this.lotrProgressionComponent) {
-                // A character made in the roster names the faction it starts
-                // with, and starts with alignment for it. Unaligned is
-                // nobody's chosen side: it is the account character's, the
-                // identity that was already being played, so its progression
-                // is whatever that player had, and clean progression is the
-                // right blank for it.
+                // A character names the faction it starts with, and starts
+                // with alignment for it. Unaligned is nobody's chosen side
+                // (a lore figure whose story names none), so clean
+                // progression is the right blank for it.
                 state = isUnaligned(character)
                         ? this.lotrProgressionComponent.createDefault()
                         : this.lotrProgressionComponent.createDefault(

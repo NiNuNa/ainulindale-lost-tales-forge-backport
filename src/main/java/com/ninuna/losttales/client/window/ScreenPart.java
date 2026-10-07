@@ -147,7 +147,7 @@ public abstract class ScreenPart {
     public void windowsMoved() {}
 
     /**
-     * Adds the part's own pages to the Lost Tales Menu and to Page Search:
+     * Adds the part's own pages to the New Page and to Page Search:
      * every page it can open, open already or not, a row each, its id its
      * tab's and its icon the tab, whose category the row stands under,
      * narrowed to the names that hold {@code filter}. A row opens a new

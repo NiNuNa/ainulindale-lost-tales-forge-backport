@@ -288,8 +288,6 @@ public final class ChatIdentityViewTest {
                 ALDRIC, 1L,
                 Arrays.asList(summary(ALDRIC, "Aldric", GONDOR, 0),
                         summary(BEREN, "Beren", ROHAN, 1)),
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
                 java.util.Collections.<com.ninuna.losttales.character.sync.DeletedCharacterSummary>emptyList()));
     }
 
@@ -301,8 +299,6 @@ public final class ChatIdentityViewTest {
                 Arrays.asList(summary(ALDRIC, "Aldric", GONDOR, 0),
                         summary(BEREN, "Beren", ROHAN, 1),
                         summary(CIRION, "Cirion", GONDOR, 2)),
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
                 java.util.Collections.<com.ninuna.losttales.character.sync.DeletedCharacterSummary>emptyList()));
     }
 

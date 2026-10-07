@@ -476,28 +476,18 @@ final class FellowshipInvitationCoordinator {
         if (index.isAmbiguous(targetId)) {
             return "ambiguous_target_character_uuid";
         }
-        // Either side may be an account playing as itself: its id is then
-        // its own owner's and stands as long as that account has a roster.
         RoleplayCharacter inviting = index.find(invitingId);
         RoleplayCharacter target = index.find(targetId);
-        boolean invitingAccount = inviting == null
-                && invitingId.equals(invitation.getInvitingOwnerId())
-                && index.isAccountOwner(invitingId);
-        boolean targetAccount = target == null
-                && targetId.equals(invitation.getTargetOwnerId())
-                && index.isAccountOwner(targetId);
-        if (inviting == null && !invitingAccount) {
+        if (inviting == null) {
             return "missing_inviting_character";
         }
-        if (target == null && !targetAccount) {
+        if (target == null) {
             return "missing_target_character";
         }
-        if (inviting != null
-                && !inviting.getOwnerId().equals(invitation.getInvitingOwnerId())) {
+        if (!inviting.getOwnerId().equals(invitation.getInvitingOwnerId())) {
             return "inviting_owner_mismatch";
         }
-        if (target != null
-                && !target.getOwnerId().equals(invitation.getTargetOwnerId())) {
+        if (!target.getOwnerId().equals(invitation.getTargetOwnerId())) {
             return "target_owner_mismatch";
         }
         return null;

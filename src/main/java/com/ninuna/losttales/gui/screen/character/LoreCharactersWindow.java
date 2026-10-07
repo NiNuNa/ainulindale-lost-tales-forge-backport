@@ -425,8 +425,8 @@ final class LoreCharactersWindow extends SubWindowContent {
     }
 
     /**
-     * The row's card: the figure's name, its whole description, and why a
-     * press does nothing where it does not.
+     * The row's card: the figure's name and its whole description. Why a
+     * greyed row cannot be taken is said when it is pressed.
      */
     @Override
     public String tipKey() {
@@ -443,7 +443,7 @@ final class LoreCharactersWindow extends SubWindowContent {
         }
         String description = ClientCharacterDisplayNames.loreDescription(
                 line.character).trim();
-        if (description.length() == 0 && line.unavailable.length() == 0) {
+        if (description.length() == 0) {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
@@ -455,13 +455,6 @@ final class LoreCharactersWindow extends SubWindowContent {
                 CARD_WIDTH)) {
             text.add(String.valueOf(wrapped));
             colours.add(Integer.valueOf(LostTalesUiInk.IVORY));
-        }
-        if (line.unavailable.length() > 0) {
-            for (Object wrapped : font.listFormattedStringToWidth(
-                    line.unavailable, CARD_WIDTH)) {
-                text.add(String.valueOf(wrapped));
-                colours.add(Integer.valueOf(WindowStyle.asideRgb()));
-            }
         }
         int widest = 0;
         for (String each : text) {
@@ -514,6 +507,7 @@ final class LoreCharactersWindow extends SubWindowContent {
         }
         hover.part = ROW_PREFIX + line.character.getId();
         hover.acts = line.unavailable.length() == 0;
+        hover.greyedWhy = line.unavailable;
         return hover;
     }
 

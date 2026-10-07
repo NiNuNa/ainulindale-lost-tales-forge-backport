@@ -47,7 +47,7 @@ public final class LoreCharacterClaimRequestPacket implements IMessage {
             if (this.expectedRosterRevision < 0L
                     || this.expectedOwnershipRevision < 0L
                     || this.loreCharacterId.length() == 0
-                    || !CharacterRoster.isCreatableSlotIndex(this.slotIndex)) {
+                    || !CharacterRoster.isValidSlotIndex(this.slotIndex)) {
                 throw new CharacterPacketCodec.DecodeException("invalid claim");
             }
         } catch (RuntimeException exception) { this.malformed = true; }

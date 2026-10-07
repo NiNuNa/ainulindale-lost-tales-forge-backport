@@ -49,7 +49,7 @@ public final class ClientChatDrafts {
      */
     public static synchronized void initialize(File configDirectory) {
         initialize(configDirectory, configDirectory == null ? null
-                : LostTalesClientAccount.templateId());
+                : LostTalesClientAccount.signedInId());
     }
 
     static synchronized void initialize(File configDirectory, UUID accountId) {

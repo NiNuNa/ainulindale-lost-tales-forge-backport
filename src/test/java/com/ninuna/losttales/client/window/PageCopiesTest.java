@@ -143,7 +143,7 @@ public final class PageCopiesTest {
     }
 
     @Test
-    public void aPagePickedOnAMenuTabTakesItsPlace() {
+    public void aPagePickedOnANewPageTabTurnsIntoIt() {
         Window window = WindowLayout.windowOf(GLOBAL);
         OtherPage menu = WindowPages.tab(PAGE);
         WindowPage menuTab = WindowLayout.openCopyIn(menu, window.getId());
@@ -154,10 +154,12 @@ public final class PageCopiesTest {
         assertEquals(index, window.getTabs().indexOf(picked));
         assertFalse(window.contains(menuTab));
         assertSame(picked, window.getActiveTab());
+        assertEquals("the row draws it on from the tab it replaced",
+                menuTab, WindowLayout.replacedBy(picked));
     }
 
     @Test
-    public void aLockedWindowsMenuTabIsReplacedByNothing() {
+    public void aLockedWindowsNewPageTabStaysAsItIs() {
         Window window = WindowLayout.windowOf(GLOBAL);
         WindowPage menuTab = WindowLayout.openCopyIn(WindowPages.tab(PAGE),
                 window.getId());

@@ -78,11 +78,11 @@ public final class TabRowTest {
         assertEquals(search.width, search.height, EPSILON);
         // The strip begins two pixels left of the row, on the window's
         // own edge, its one-pixel frame standing just outside it; the
-        // button stands three clear pixels inside the frame, and the
-        // first tab three past the button.
+        // button stands seven clear pixels inside the frame, and the
+        // first tab a button's five past it.
         int stripInset = 2;
-        assertEquals(40 - stripInset + 3, search.left, EPSILON);
-        assertEquals(search.right() + 3,
+        assertEquals(40 - stripInset + 7, search.left, EPSILON);
+        assertEquals(search.right() + 5,
                 40 + TabRow.tabRunLeftInset() - stripInset, EPSILON);
         assertEquals(TabRow.centredInStrip(rowBottom,
                 (int)search.height), search.top, EPSILON);

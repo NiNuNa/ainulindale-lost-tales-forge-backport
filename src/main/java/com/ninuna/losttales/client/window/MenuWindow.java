@@ -13,7 +13,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
-import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -60,8 +59,8 @@ import org.lwjgl.opengl.GL11;
 public final class MenuWindow extends SubWindowContent {
     /** Every menu's row, a plain row of words that holds a key icon too. */
     public static final int ROW_HEIGHT = 11;
-    /** Clear room round a menu's field and rows, across and down; every list in a sub-window keeps it. */
-    public static final int PADDING_X = 6;
+    /** Clear room round a menu's field and rows, across (an edge's gap) and down; every list keeps it. */
+    public static final int PADDING_X = WindowStyle.EDGE_GAP;
     public static final int PADDING_Y = 3;
     private static final int MIN_WIDTH = 56;
     /** Rows a window opens with at most; a longer list scrolls behind them. */
@@ -1172,7 +1171,8 @@ public final class MenuWindow extends SubWindowContent {
         WindowHover hover = new WindowHover(WindowHover.Kind.SUB_WINDOW);
         hover.menuEntry = takes ? row : null;
         hover.acts = takes;
-        hover.tip = row == null ? "" : takes ? row.tip : row.unavailable;
+        hover.tip = takes ? row.tip : "";
+        hover.greyedWhy = row == null || takes ? "" : row.unavailable;
         if (takes && row.stepper) {
             // A stepper's parts answer where they are drawn, measured as
             // the draw measures them.

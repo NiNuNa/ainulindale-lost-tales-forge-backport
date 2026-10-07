@@ -146,7 +146,7 @@ public final class PlayerAppearanceResolverTest {
     public void theAccountIdentityIsThePlayerBodyWithTheProfileArmWidth() {
         ResolvedPlayerAppearance resolved = PlayerAppearanceResolver.resolve(
                 PLAYER, CharacterAppearance.forAccount(PLAYER, "Steve",
-                        "losttales:slim", true, 0));
+                        "losttales:slim"));
         assertNotNull(resolved);
         assertEquals(CharacterBodyModelRegistry.LOSTTALES_PLAYER, resolved.getModelId());
         assertEquals(CharacterSkinLayout.MINECRAFT_64X64, resolved.getLayout());

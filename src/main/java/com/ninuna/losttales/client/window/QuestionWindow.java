@@ -130,7 +130,8 @@ public final class QuestionWindow extends SubWindowContent {
         int cancelWidth = WordButton.width(font, cancelLabel());
         double top = box.top + box.height - PADDING_Y
                 - LostTalesUiFramedButton.HEIGHT;
-        double confirmLeft = box.left + box.width - PADDING_X - confirmWidth;
+        double confirmLeft = box.left + box.width - WindowStyle.EDGE_GAP
+                - confirmWidth;
         if (CONFIRM.equals(part)) {
             return new LostTalesUiHitBox(confirmLeft, top, confirmWidth,
                     LostTalesUiFramedButton.HEIGHT);

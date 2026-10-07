@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.sync;
 
-import com.ninuna.losttales.character.model.CharacterRoster;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -75,20 +74,6 @@ public final class CharacterSummary {
                 character.getBodyTypeId(),
                 character.getChestTypeId()
         );
-    }
-
-    /**
-     * Whether this is the account character. The slot says so: the
-     * account character is the one outside the nine, which is also what
-     * puts it first when the roster is ordered. Nothing else can be
-     * stored there — creation and lore claims both refuse the slot, and
-     * the codec quarantines a record whose slot and kind disagree — so
-     * the slot answers the question the stored kind answers on the
-     * server, without a second field on the wire to fall out of step
-     * with it.
-     */
-    public boolean isDefault() {
-        return this.slotIndex == CharacterRoster.DEFAULT_SLOT_INDEX;
     }
 
     public UUID getCharacterId() {

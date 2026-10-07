@@ -85,12 +85,15 @@ public final class ChatTabActions {
         // the selection just changed or the layout came back from its
         // file with another tab in front; setting what is already set
         // changes nothing.
-        // A page brought in front of the tab typed in lends the input to
-        // the conversation in front of the window last brought forward,
-        // which stays where it stands; with none, the input waits behind
-        // the page with no bar. The covered tab stays the last used.
+        // A page brought in front of the tab typed in, or its locked
+        // window closed, lends the input to the conversation in front of
+        // the window last brought forward, which stays where it stands;
+        // with none, the input waits with no bar. The covered tab stays
+        // the last used.
         boolean moved = false;
-        if (WindowLayout.showsPage(WindowLayout.windowOf(selected))) {
+        Window holding = WindowLayout.windowOf(selected);
+        if (WindowLayout.showsPage(holding)
+                || holding != null && holding.isClosed()) {
             ConversationPage elsewhere = frontConversationElsewhere();
             if (elsewhere != null) {
                 ClientChatChannelState.lendInput(elsewhere);

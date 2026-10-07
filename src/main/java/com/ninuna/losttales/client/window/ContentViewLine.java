@@ -14,7 +14,7 @@ import net.minecraft.util.StatCollector;
 /**
  * The line at the top of a window whose page fills it
  * ({@link ContentView}), saying how to leave, as a video player says how
- * to leave its full screen: <em>Leave Full Window (Esc)</em>. It shows for a
+ * to leave its full screen: <em>Exit Borderless (Esc)</em>. It shows for a
  * moment as the page comes to fill the window, and again while the
  * pointer is in the window near its top edge or on the line; a click on
  * it gives the window its row, strip and bar back. A popup: it wears the

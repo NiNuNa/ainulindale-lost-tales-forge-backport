@@ -5,8 +5,7 @@ import java.util.UUID;
 /**
  * Whose presence, among one account's identities: the account itself,
  * which is what the out-of-character channels speak as, or one of its
- * characters by id. The two are told apart by kind rather than by id,
- * since the default character's id is the account's own.
+ * characters by id. The two are told apart by kind rather than by id.
  */
 public final class ChatPresenceIdentity {
     /** The account speaking as itself. */

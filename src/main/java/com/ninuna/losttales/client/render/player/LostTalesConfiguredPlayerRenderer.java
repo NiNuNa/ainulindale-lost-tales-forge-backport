@@ -2,6 +2,8 @@ package com.ninuna.losttales.client.render.player;
 
 import com.ninuna.losttales.character.physics.CharacterNameplateHeightHelper;
 import com.ninuna.losttales.character.registry.CharacterBodyModelDefinition;
+import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.config.LostTalesConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.AbstractClientPlayer;
@@ -25,6 +27,11 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
     private static final float VANILLA_ARM_PIVOT_X = -5.0F;
     private static final float VANILLA_ARM_PIVOT_Y = 2.0F;
     private static final float VANILLA_ARM_PIVOT_Z = 0.0F;
+    /**
+     * How strongly a ghost stands: a player still making their first
+     * character, drawn faint as LOTR draws its rangers hidden.
+     */
+    private static final float GHOST_ALPHA = 0.3F;
 
     private final boolean vanillaArmPivots;
     private final boolean configured;
@@ -68,6 +75,10 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
     @Override
     protected void passSpecialRender(
             EntityLivingBase entity, double x, double y, double z) {
+        if (isGhost(entity)) {
+            // A ghost has no character, so no name to bear.
+            return;
+        }
         float originalHeight = entity == null ? 0.0F : entity.height;
         float offset = resolveNameplateHeightOffset(entity, originalHeight);
         if (entity != null && offset > 0.0F) {
@@ -95,6 +106,46 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
         }
         return CharacterNameplateHeightHelper.resolveExtraHeight(
                 physicalHeight, appearance.getRendererScale());
+    }
+
+    /** A ghost is drawn faint and leaves the depth to what stands behind it; anyone else as ever. */
+    @Override
+    protected void renderModel(EntityLivingBase entity, float limbSwing,
+                               float limbSwingAmount, float age, float yaw,
+                               float pitch, float scale) {
+        if (!isGhost(entity)) {
+            super.renderModel(entity, limbSwing, limbSwingAmount, age, yaw,
+                    pitch, scale);
+            return;
+        }
+        this.bindEntityTexture(entity);
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, GHOST_ALPHA);
+        GL11.glDepthMask(false);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GL11.glAlphaFunc(GL11.GL_GREATER, 0.003921569F);
+        try {
+            this.mainModel.render(entity, limbSwing, limbSwingAmount, age,
+                    yaw, pitch, scale);
+        } finally {
+            GL11.glDisable(GL11.GL_BLEND);
+            GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
+            GL11.glDepthMask(true);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        }
+    }
+
+    /**
+     * Whether a player has no character yet: still making their first, the
+     * world has not seen them, and they stand as a ghost.
+     */
+    static boolean isGhost(EntityLivingBase entity) {
+        if (!(entity instanceof EntityPlayer)) {
+            return false;
+        }
+        CharacterAppearance appearance =
+                ClientCharacterAppearanceCache.get(entity.getUniqueID());
+        return appearance != null && appearance.isAccount();
     }
 
     /*

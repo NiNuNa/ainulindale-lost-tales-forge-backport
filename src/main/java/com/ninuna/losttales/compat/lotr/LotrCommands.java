@@ -3,6 +3,8 @@ package com.ninuna.losttales.compat.lotr;
 import com.ninuna.losttales.LostTalesMetaData;
 import cpw.mods.fml.common.FMLLog;
 import lotr.common.LOTRReflection;
+import lotr.common.command.LOTRCommandAllowStructures;
+import lotr.common.command.LOTRCommandBanStructures;
 import lotr.common.command.LOTRCommandFellowship;
 import lotr.common.command.LOTRCommandFellowshipMessage;
 
@@ -12,8 +14,11 @@ import lotr.common.command.LOTRCommandFellowshipMessage;
  * from {@code /help} and from completion. {@code /fellowship} made LOTR
  * fellowships beside the mod's own, which nobody could answer or leave;
  * {@code /fmsg} (and {@code /fchat}) said words to a fellowship, which its
- * own conversation page does. Run each time the server starts, after LOTR
- * has registered its commands; a LOTR without them keeps them.
+ * own conversation page does; {@code /banStructures} and
+ * {@code /allowStructures} banned whoever was being played, which
+ * {@code /losttales structures} does for an account or a character. Run
+ * each time the server starts, after LOTR has registered its commands; a
+ * LOTR without them keeps them.
  */
 public final class LotrCommands {
     private LotrCommands() {}
@@ -22,8 +27,10 @@ public final class LotrCommands {
         try {
             LOTRReflection.removeCommand(LOTRCommandFellowship.class);
             LOTRReflection.removeCommand(LOTRCommandFellowshipMessage.class);
+            LOTRReflection.removeCommand(LOTRCommandBanStructures.class);
+            LOTRReflection.removeCommand(LOTRCommandAllowStructures.class);
         } catch (LinkageError incompatible) {
-            FMLLog.warning("[%s] LOTR's fellowship commands could not be removed: %s",
+            FMLLog.warning("[%s] LOTR's replaced commands could not be removed: %s",
                     LostTalesMetaData.MOD_ID, incompatible.toString());
         }
     }

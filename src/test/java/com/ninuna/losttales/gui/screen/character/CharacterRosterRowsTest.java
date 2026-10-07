@@ -1,6 +1,5 @@
 package com.ninuna.losttales.gui.screen.character;
 
-import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
@@ -19,10 +18,10 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The roster lists the account's own character first, then the unlocked
- * slots under their heading — a character, or a slot to create one in —
- * and last the way to the lore characters; a search keeps the names that
- * hold its words. The one played is the account while no character is.
+ * The roster lists the unlocked slots under their heading — a character,
+ * or a slot to create one in — and last the way to the lore characters; a
+ * search keeps the names that hold its words. The one played is the
+ * active character.
  */
 public final class CharacterRosterRowsTest {
     private static final UUID OWNER = UUID.fromString(
@@ -33,17 +32,15 @@ public final class CharacterRosterRowsTest {
             "00000000-0000-0000-0000-000000000011");
 
     @Test
-    public void theAccountComesFirstThenTheSlotsThenTheLoreCharacters() {
+    public void theSlotsComeFirstThenTheLoreCharacters() {
         List<CharacterRosterRows.Row> rows = CharacterRosterRows.of(
-                snapshot(3, null, summary(OWN, CharacterRoster.DEFAULT_SLOT_INDEX,
-                        "Nils"), summary(ALDRIC, 1, "Aldric")), "Nils", "");
-        assertEquals(Arrays.asList(CharacterRosterRows.Kind.ACCOUNT,
-                CharacterRosterRows.Kind.HEADING,
+                snapshot(3, null, summary(ALDRIC, 1, "Aldric")), "");
+        assertEquals(Arrays.asList(CharacterRosterRows.Kind.HEADING,
                 CharacterRosterRows.Kind.EMPTY,
                 CharacterRosterRows.Kind.CHARACTER,
                 CharacterRosterRows.Kind.EMPTY,
                 CharacterRosterRows.Kind.LORE), kinds(rows));
-        assertEquals(1, rows.get(3).slot);
+        assertEquals(1, rows.get(2).slot);
         assertEquals(1, CharacterRosterRows.filledSlots(snapshot(3, null,
                 summary(ALDRIC, 1, "Aldric"))));
     }
@@ -53,32 +50,27 @@ public final class CharacterRosterRowsTest {
         CharacterRosterSnapshot snapshot = snapshot(3, null,
                 summary(ALDRIC, 1, "Aldric"));
         List<CharacterRosterRows.Row> rows = CharacterRosterRows.of(snapshot,
-                "Nils", "ald");
+                "ald");
         assertEquals(Arrays.asList(CharacterRosterRows.Kind.HEADING,
                 CharacterRosterRows.Kind.CHARACTER), kinds(rows));
         assertEquals(1, CharacterRosterRows.found(rows));
-        assertTrue(CharacterRosterRows.of(snapshot, "Nils", "zzz").isEmpty());
+        assertTrue(CharacterRosterRows.of(snapshot, "zzz").isEmpty());
     }
 
     @Test
-    public void theAccountIsPlayedWhileNoCharacterIs() {
+    public void nothingIsPlayedBeforeTheFirstCharacter() {
         CharacterRosterSnapshot snapshot = snapshot(1, null);
-        List<CharacterRosterRows.Row> rows = CharacterRosterRows.of(snapshot,
-                "Nils", "");
-        CharacterRosterRows.Row account = rows.get(0);
-        assertNull("no record is made yet", account.character);
-        assertTrue(CharacterRosterRows.isPlayed(snapshot, account));
-        assertSame(account, CharacterRosterRows.played(snapshot, rows));
+        List<CharacterRosterRows.Row> rows = CharacterRosterRows.of(snapshot, "");
+        assertTrue(snapshot.isWaitingForFirstCharacter());
+        assertNull(CharacterRosterRows.played(snapshot, rows));
     }
 
     @Test
     public void theCharacterPlayedIsTheActiveOne() {
         CharacterRosterSnapshot snapshot = snapshot(2, ALDRIC,
-                summary(OWN, CharacterRoster.DEFAULT_SLOT_INDEX, "Nils"),
-                summary(ALDRIC, 0, "Aldric"));
-        List<CharacterRosterRows.Row> rows = CharacterRosterRows.of(snapshot,
-                "Nils", "");
-        assertFalse(CharacterRosterRows.isPlayed(snapshot, rows.get(0)));
+                summary(OWN, 1, "Nils"), summary(ALDRIC, 0, "Aldric"));
+        List<CharacterRosterRows.Row> rows = CharacterRosterRows.of(snapshot, "");
+        assertFalse(CharacterRosterRows.isPlayed(snapshot, rows.get(2)));
         CharacterRosterRows.Row played = CharacterRosterRows.played(snapshot,
                 rows);
         assertEquals(0, played.slot);
@@ -108,8 +100,6 @@ public final class CharacterRosterRowsTest {
                                                     CharacterSummary... characters) {
         return new CharacterRosterSnapshot(OWNER, unlocked, active, 1L,
                 Arrays.asList(characters),
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
                 Collections.<DeletedCharacterSummary>emptyList());
     }
 

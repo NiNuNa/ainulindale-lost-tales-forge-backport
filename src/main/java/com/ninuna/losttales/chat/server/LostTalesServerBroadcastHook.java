@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.chat.ChatBroadcastMarkers;
+import com.ninuna.losttales.character.server.CharacterJoin;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
@@ -98,11 +99,11 @@ public final class LostTalesServerBroadcastHook {
     /**
      * Sees a line about to be broadcast and hands back the one to send:
      * a join or a leave naming the account, with its id and its named
-     * players appended as empty runs; or nothing, for an in-character
-     * line naming a player whose character is still taking its name
-     * ({@link ChatLinesAwaitingNames}), which goes out in a moment. The
-     * relay is told after, with the id; the runs are empty, so the relay
-     * reads the line's words as they go out.
+     * players appended as empty runs; or nothing, for a line about a
+     * player still waiting for their first character
+     * ({@link #aboutFirstVisit}). The relay is told after, with the id;
+     * the runs are empty, so the relay reads the line's words as they go
+     * out.
      */
     public static IChatComponent onBroadcast(IChatComponent message) {
         if (message == null) {
@@ -112,10 +113,10 @@ public final class LostTalesServerBroadcastHook {
         long messageId = ChatMessageIds.NONE;
         try {
             line = namingTheAccount(message);
-            ChatChannel channel = ChatSystemLineClassifier.classify(line);
-            if (ChatLinesAwaitingNames.hold(line, channel)) {
+            if (aboutFirstVisit(line)) {
                 return null;
             }
+            ChatChannel channel = ChatSystemLineClassifier.classify(line);
             if (channel != null) {
                 messageId = stamp(line, channel);
             }
@@ -128,6 +129,25 @@ public final class LostTalesServerBroadcastHook {
             logOnce("relay", throwable);
         }
         return line;
+    }
+
+    /**
+     * Whether a line names a player still waiting in the creator for their
+     * first character ({@link CharacterJoin}): the world has not seen them
+     * yet. Their join line is kept to be said once they join; anything
+     * else naming them, a leave or an achievement, is said to nobody.
+     */
+    private static boolean aboutFirstVisit(IChatComponent line) {
+        for (String account : namedAccounts(line)) {
+            if (CharacterJoin.isWaitingAccount(account)) {
+                if (ChatSystemLineClassifier.kindOf(line)
+                        == ChatSystemLineClassifier.Kind.JOIN) {
+                    CharacterJoin.holdJoinLine(account, line);
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

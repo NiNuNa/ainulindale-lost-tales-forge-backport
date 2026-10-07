@@ -73,7 +73,7 @@ public final class LoreCharacterTransferCoordinator {
             if (roster.getRevision() != expectedRosterRevision) {
                 return failure(CharacterErrorId.STALE_ROSTER, roster);
             }
-            if (!CharacterRoster.isCreatableSlotIndex(slotIndex)) {
+            if (!CharacterRoster.isValidSlotIndex(slotIndex)) {
                 return failure(CharacterErrorId.INVALID_SLOT, roster);
             }
             if (slotIndex >= roster.getUnlockedSlotCount()) {

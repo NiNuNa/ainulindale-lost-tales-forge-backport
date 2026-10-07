@@ -90,8 +90,4 @@ public final class CharacterIndex {
                         || this.rosterOwnerIds.contains(ownerId));
     }
 
-    /** Whether the id is a player's own: the account as a playable identity. */
-    public boolean isAccountOwner(UUID id) {
-        return id != null && this.rosterOwnerIds.contains(id);
-    }
 }

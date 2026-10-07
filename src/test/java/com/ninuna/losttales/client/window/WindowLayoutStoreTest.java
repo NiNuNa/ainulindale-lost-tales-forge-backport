@@ -74,6 +74,25 @@ public final class WindowLayoutStoreTest {
     }
 
     /**
+     * A locked window closed stays closed through the file and comes
+     * back with its pages; an unlocked one is never kept closed.
+     */
+    @Test
+    public void aClosedLockedWindowStaysClosed() {
+        WindowLayoutStore.load(Arrays.asList(
+                "window w1 locked=true closed=true x=10.00 y=20.00 active=global tabs=global,ooc",
+                "window w2 locked=false closed=true x=0.00 y=0.00 active=client_console tabs=client_console"));
+        assertTrue(WindowLayout.window("w1").isClosed());
+        assertFalse(WindowLayout.window("w2").isClosed());
+        List<String> described = WindowLayoutStore.describe();
+        assertTrue(described.toString(),
+                described.get(1).startsWith("window w1 locked=true closed=true "));
+        assertFalse(described.get(2).contains("closed="));
+        WindowLayoutStore.load(described);
+        assertEquals(described, WindowLayoutStore.describe());
+    }
+
+    /**
      * A place's whisper tabs, open or closed by hand, are lines of their
      * own that survive the round trip and come back for that place only.
      */

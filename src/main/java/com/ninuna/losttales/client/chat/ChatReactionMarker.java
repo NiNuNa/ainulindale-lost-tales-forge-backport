@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -65,8 +66,8 @@ final class ChatReactionMarker {
      * of the padding's pixels, then the rest of the frame's inset.
      */
     static final int TRAIL = PAD - 1;
-    /** Between two chips. */
-    static final int BETWEEN = 2;
+    /** Between two chips, and before the add button: a button's gap. */
+    static final int BETWEEN = WindowStyle.BUTTON_GAP;
     /**
      * The add button's width: the emoji's box with the frame's inset
      * either side, a square as tall as a chip.

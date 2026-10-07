@@ -108,7 +108,7 @@ public final class ChatHover extends WindowHover {
             case SCROLLBAR:
                 return true;
             case MESSAGE_TOOLBAR:
-                // A control that cannot be taken here only says why.
+                // A control that cannot be taken here says why when pressed.
                 return this.frame == null || chatFrame().toolbarWhy(
                         this.toolbarKind).length() == 0;
             case LINE:

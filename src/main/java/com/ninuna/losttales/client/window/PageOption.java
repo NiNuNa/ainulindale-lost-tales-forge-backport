@@ -182,7 +182,7 @@ public final class PageOption {
      */
     public String tip() {
         if (!isAvailable()) {
-            return this.unavailable;
+            return "";
         }
         if (this.kind == Kind.SWITCH) {
             return StatCollector.translateToLocalFormatted(

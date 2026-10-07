@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
-import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
@@ -22,14 +21,14 @@ final class SubWindowStrip {
     /** A window's tool strip, rule included. */
     static final int HEIGHT = WindowPlacement.TOOL_STRIP_HEIGHT;
     /** Clear pixels from the box's edge to the icon. */
-    private static final int EDGE_MARGIN = 3;
     /** Clear pixels between the name and the padlock. */
     private static final int NAME_GAP = 5;
     /** Room for a few letters of the name, the least a strip keeps for it. */
     private static final int FEW_LETTERS = 12;
     /** The capitals' top: centred in the rows above the rule, the odd pixel up. */
     static final int TEXT_TOP = (HEIGHT - 1 - LostTalesUiInk.CAP_HEIGHT) / 2;
-    private static final int GAP = TabRow.END_CONTROL_GAP;
+    /** Clear space between a control and a hairline or the frame. */
+    private static final int EDGE_GAP = WindowStyle.EDGE_GAP;
     private static final int DIVIDER_WIDTH = WindowStyle.DIVIDER_WIDTH;
     private static final int DIVIDER_HEIGHT = TabRow.END_CONTROL_SIZE;
     private static final int CLOSE_WIDTH = LostTalesUiSheet.CLOSE.getWidth();
@@ -40,9 +39,9 @@ final class SubWindowStrip {
      * The controls' run at the strip's right end, from the padlock's left
      * to the edge: each with the gap after it, and the grip's inset.
      */
-    private static final int CONTROLS_WIDTH = LockAnimation.WIDTH + GAP
-            + DIVIDER_WIDTH + GAP + CLOSE_WIDTH + GAP + DIVIDER_WIDTH + GAP
-            + GRIP_WIDTH + TabRow.GRIP_INSET;
+    private static final int CONTROLS_WIDTH = LockAnimation.WIDTH + EDGE_GAP
+            + DIVIDER_WIDTH + EDGE_GAP + CLOSE_WIDTH + EDGE_GAP + DIVIDER_WIDTH
+            + EDGE_GAP + GRIP_WIDTH + EDGE_GAP;
 
     final String label;
     final boolean icon;
@@ -68,11 +67,11 @@ final class SubWindowStrip {
         this.icon = icon;
         this.textX = textX;
         int textTop = top + TEXT_TOP;
-        this.gripX = right - TabRow.GRIP_INSET - GRIP_WIDTH;
-        this.secondDividerX = this.gripX - GAP - DIVIDER_WIDTH;
-        this.closeX = this.secondDividerX - GAP - CLOSE_WIDTH;
-        this.firstDividerX = this.closeX - GAP - DIVIDER_WIDTH;
-        this.lockX = this.firstDividerX - GAP - LockAnimation.WIDTH;
+        this.gripX = right - EDGE_GAP - GRIP_WIDTH;
+        this.secondDividerX = this.gripX - EDGE_GAP - DIVIDER_WIDTH;
+        this.closeX = this.secondDividerX - EDGE_GAP - CLOSE_WIDTH;
+        this.firstDividerX = this.closeX - EDGE_GAP - DIVIDER_WIDTH;
+        this.lockX = this.firstDividerX - EDGE_GAP - LockAnimation.WIDTH;
         this.gripTop = textTop + WindowStyle.centredBoxTop(GRIP_HEIGHT);
         this.closeTop = textTop + WindowStyle.centredBoxTop(CLOSE_HEIGHT);
         this.dividerTop = textTop + WindowStyle.centredBoxTop(DIVIDER_HEIGHT);
@@ -98,7 +97,7 @@ final class SubWindowStrip {
      */
     static SubWindowStrip layOut(FontRenderer font, int left, int right,
                                  int top, String title, boolean icon) {
-        int textX = left + EDGE_MARGIN
+        int textX = left + EDGE_GAP
                 + (icon ? TabIcons.SLOT + TabIcons.GAP : 0);
         int room = Math.max(0, right - CONTROLS_WIDTH - NAME_GAP - textX);
         String shown = font.getStringWidth(title) <= room ? title
@@ -112,13 +111,13 @@ final class SubWindowStrip {
      * its content's own size is at least as wide as.
      */
     static int widthFor(FontRenderer font, String title, boolean icon) {
-        return EDGE_MARGIN + (icon ? TabIcons.SLOT + TabIcons.GAP : 0)
+        return EDGE_GAP + (icon ? TabIcons.SLOT + TabIcons.GAP : 0)
                 + font.getStringWidth(title) + NAME_GAP + CONTROLS_WIDTH;
     }
 
     /** The narrowest strip: its icon, a few letters, and the controls. */
     static int minWidth() {
-        return EDGE_MARGIN + TabIcons.SLOT + TabIcons.GAP + FEW_LETTERS
+        return EDGE_GAP + TabIcons.SLOT + TabIcons.GAP + FEW_LETTERS
                 + NAME_GAP + CONTROLS_WIDTH;
     }
 
@@ -169,7 +168,7 @@ final class SubWindowStrip {
         int textTop = top + TEXT_TOP;
         LostTalesUiInk.beginContent();
         if (this.icon && iconGlyph != null) {
-            iconGlyph.drawWithShadow(left + EDGE_MARGIN
+            iconGlyph.drawWithShadow(left + EDGE_GAP
                             + LostTalesUiInk.centredStart(TabIcons.SIZE,
                                     iconGlyph.getWidth()),
                     textTop + WindowStyle.centredBoxTop(iconGlyph.getHeight()),

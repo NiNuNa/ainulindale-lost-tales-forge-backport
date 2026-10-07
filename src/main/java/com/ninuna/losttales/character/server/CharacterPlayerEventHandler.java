@@ -181,18 +181,7 @@ public final class CharacterPlayerEventHandler {
                     lifecycleResult.getId());
         }
 
-        // Made after the journal has been settled, so an interrupted
-        // switch is reconciled against the roster as it was rather than
-        // against one that has just gained an identity. On a world that
-        // already knows this account it does nothing.
         if (action == LifecycleAction.LOGIN) {
-            CharacterOperationResult defaultCharacter = CharacterService
-                    .getInstance().ensureDefaultCharacter(serverPlayer);
-            if (!defaultCharacter.isSuccessful()) {
-                FMLLog.warning("[%s] Could not make the account character for %s: %s",
-                        LostTalesMetaData.MOD_ID, player.getUniqueID(),
-                        defaultCharacter.getErrorId().getId());
-            }
             // The pledge and the title the played character comes back
             // with, read before the roster and the appearance go out below.
             CharacterLotrRecord.refresh(serverPlayer);
@@ -214,6 +203,11 @@ public final class CharacterPlayerEventHandler {
             // transitions the tracker is expected to be busy during.
             serverPlayer.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.character.switching_unavailable"));
+        }
+        if (action == LifecycleAction.LOGIN) {
+            // A first visit waits in the creator, held as a ghost; one
+            // whose first character was made but not yet played plays it.
+            CharacterJoin.arrive(serverPlayer, result.getRoster());
         }
         CharacterSyncManager.sendRoster(
                 serverPlayer,

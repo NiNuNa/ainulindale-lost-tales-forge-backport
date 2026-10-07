@@ -12,10 +12,10 @@ import java.util.UUID;
  * {@link #id()} is the account the game files data under right now: in a
  * world, the id the server gave the player, which an offline-mode server
  * or a proxy derives from the name; before any world is joined, the
- * session's own id. {@link #templateId()} is always the signed-in
- * session's account, the one the template file on this installation is
- * named after, so the main menu and every world read the same file
- * whatever id a server hands out.</p>
+ * session's own id. {@link #signedInId()} is always the signed-in
+ * session's account, the one this installation's per-account files are
+ * named after, so every world reads the same file whatever id a server
+ * hands out.</p>
  *
  * <p>A session signed in with Mojang carries its own id. One that is not
  * — an offline login, a development launch — carries none, and the
@@ -45,8 +45,8 @@ public final class LostTalesClientAccount {
         return sessionId(minecraft);
     }
 
-    /** The account the template file is named after, or null when the session does not say. */
-    public static UUID templateId() {
+    /** The account signed in on this installation, which its per-account files are named after; null when the session does not say. */
+    public static UUID signedInId() {
         Minecraft minecraft = Minecraft.getMinecraft();
         return minecraft == null ? null : sessionId(minecraft);
     }

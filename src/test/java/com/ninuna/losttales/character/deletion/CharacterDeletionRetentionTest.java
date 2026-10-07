@@ -9,6 +9,9 @@ import com.ninuna.losttales.character.server.SeenAccountNames;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.sync.DeletedCharacterSummary;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraftforge.common.util.Constants;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -146,6 +149,43 @@ public final class CharacterDeletionRetentionTest {
         assertEquals(2, owners.size());
         assertEquals(1, data.getExpired(null, now, 1).size());
         assertTrue(data.getExpired(OWNER, now, 0).isEmpty());
+    }
+
+    /**
+     * The store reads only its own version: one that names none, or a
+     * deleted character without its, is kept as it is and the store goes
+     * read-only, as every character store does.
+     */
+    @Test
+    public void aStoreWithoutItsVersionStaysAsItIs() {
+        CharacterDeletionWorldData data = new CharacterDeletionWorldData(
+                CharacterDeletionWorldData.DATA_NAME);
+        data.saveTombstone(committed(character(OWNER, "Kept", 1), 1000L, 2000L));
+        NBTTagCompound saved = new NBTTagCompound();
+        data.writeToNBT(saved);
+
+        CharacterDeletionWorldData whole = new CharacterDeletionWorldData(
+                CharacterDeletionWorldData.DATA_NAME);
+        whole.readFromNBT((NBTTagCompound)saved.copy());
+        assertFalse(whole.isReadOnlyForNewerVersion());
+
+        NBTTagCompound unnamed =
+                (NBTTagCompound)saved.copy();
+        unnamed.removeTag("DataVersion");
+        CharacterDeletionWorldData root = new CharacterDeletionWorldData(
+                CharacterDeletionWorldData.DATA_NAME);
+        root.readFromNBT(unnamed);
+        assertTrue(root.isReadOnlyForNewerVersion());
+
+        NBTTagCompound bare =
+                (NBTTagCompound)saved.copy();
+        NBTTagList list = bare.getTagList("Tombstones",
+                Constants.NBT.TAG_COMPOUND);
+        list.getCompoundTagAt(0).removeTag("DataVersion");
+        CharacterDeletionWorldData entry = new CharacterDeletionWorldData(
+                CharacterDeletionWorldData.DATA_NAME);
+        entry.readFromNBT(bare);
+        assertTrue(entry.isReadOnlyForNewerVersion());
     }
 
     @Test

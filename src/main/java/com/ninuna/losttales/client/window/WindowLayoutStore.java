@@ -27,7 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
- * window w2 locked=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
+ * window w2 locked=true closed=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
  * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00
  * category map x=50.00 y=50.00 height=0.00 width=0 fill=left
@@ -83,13 +83,13 @@ public final class WindowLayoutStore {
 
     /**
      * Reads the signed-in account's layout as the client starts. The
-     * account is the session's own, the one the template file is named
+     * account is the session's own, the one the per-account files are named
      * after, so every world reads the same file whatever id a server
      * hands out; with no account to name, nothing is read or written.
      */
     public static synchronized void initialize(File configDirectory) {
         initialize(configDirectory, configDirectory == null ? null
-                : LostTalesClientAccount.templateId());
+                : LostTalesClientAccount.signedInId());
     }
 
     /** As above, for a named account. */
@@ -294,6 +294,7 @@ public final class WindowLayoutStore {
         // A line that says nothing of them: unlocked, as a window opens
         // that is not a new player's first, and pinned nowhere.
         boolean locked = false;
+        boolean closed = false;
         boolean hud = false;
         boolean gui = false;
         double offsetX = 0.0D;
@@ -322,6 +323,8 @@ public final class WindowLayoutStore {
                 active = WindowPage.fromId(value);
             } else if ("locked".equals(key)) {
                 locked = "true".equalsIgnoreCase(value);
+            } else if ("closed".equals(key)) {
+                closed = "true".equalsIgnoreCase(value);
             } else if ("hud".equals(key)) {
                 hud = "true".equalsIgnoreCase(value);
             } else if ("gui".equals(key)) {
@@ -343,7 +346,7 @@ public final class WindowLayoutStore {
                 }
             }
         }
-        return new WindowLayout.WindowSpec(id, tabs, active, locked, hud, gui,
+        return new WindowLayout.WindowSpec(id, tabs, active, locked, closed, hud, gui,
                 offsetX, offsetY, height, width, fill, splits);
     }
 
@@ -399,6 +402,9 @@ public final class WindowLayoutStore {
         for (WindowLayout.WindowSpec spec : WindowLayout.describe()) {
             StringBuilder line = new StringBuilder("window ").append(spec.id);
             line.append(" locked=").append(spec.locked);
+            if (spec.closed) {
+                line.append(" closed=true");
+            }
             if (spec.pinnedToHud) {
                 line.append(" hud=true");
             }

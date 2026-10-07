@@ -23,10 +23,6 @@ import com.ninuna.losttales.client.camera.ThirdPersonProjectileTrajectoryRendere
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
-import com.ninuna.losttales.client.character.CharacterTemplateOffer;
-import com.ninuna.losttales.client.character.room.CharacterRoomJourneyPrompt;
-import com.ninuna.losttales.client.character.room.CharacterRoomLauncher;
-import com.ninuna.losttales.client.character.room.CharacterRoomSession;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterFigureRenderer;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
@@ -34,6 +30,7 @@ import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache
 import com.ninuna.losttales.client.character.ClientCharacterProfileCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.gui.screen.character.FirstCharacterCreator;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.window.WindowSession;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
@@ -192,7 +189,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();
         ClientCharacterRosterCache.clear();
-        CharacterTemplateOffer.clear();
+        FirstCharacterCreator.clear();
         // A roster sync still queued from this world must not be applied
         // in the next, whose revisions are its own.
         CharacterClientTaskQueue.clear();
@@ -245,11 +242,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();
         ThirdPersonCameraRuntime.resetSession();
-        // Last, after the camera has given the perspective back: a visit
-        // to the character room that ended without its own menu is
-        // cleaned up here, and that restores the perspective the visit
-        // began with.
-        CharacterRoomLauncher.onWorldLeft(Minecraft.getMinecraft());
     }
 
     /**
@@ -336,18 +328,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent
     public void updateWraithWorldEffect(TickEvent.ClientTickEvent event) {
         WraithWorldVisualEffect.onClientTick(event);
-    }
-
-    /** A visit to the character room: the creator on arrival, then the room. */
-    @SubscribeEvent
-    public void runCharacterRoomVisit(TickEvent.ClientTickEvent event) {
-        CharacterRoomSession.onClientTick(event);
-    }
-
-    /** In the character room the pause menu is the room's own menu. */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void replaceCharacterRoomPauseMenu(GuiOpenEvent event) {
-        CharacterRoomSession.replacePauseMenu(event);
     }
 
     /** Returns the native pointer as soon as Minecraft leaves its GUI layer. */
@@ -698,7 +678,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 LostTalesMapMarkerHudRenderer.render(minecraft, event.partialTicks);
                 LostTalesFellowshipHudRenderer.render(minecraft, event.partialTicks);
                 LostTalesQuestHudRenderer.render(minecraft, event.partialTicks);
-                CharacterRoomJourneyPrompt.render(minecraft);
             } finally {
                 LostTalesHudFade.endPanels(minecraft);
             }

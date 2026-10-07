@@ -30,8 +30,8 @@ final class CharacterPacketCodec {
             CharacterProfile.MAX_GLANCE_LINE_LENGTH * 4;
     static final int MAX_IDENTIFIER_BYTES = 128;
     static final int MAX_ERROR_ID_BYTES = 64;
-    /** A full roster: the nine slots and the account character besides them. */
-    static final int MAX_CHARACTERS = CharacterRoster.MAX_SLOTS + 1;
+    /** A full roster: the nine slots. */
+    static final int MAX_CHARACTERS = CharacterRoster.MAX_SLOTS;
 
     private CharacterPacketCodec() {}
 

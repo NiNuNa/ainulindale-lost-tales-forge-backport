@@ -39,7 +39,10 @@ public enum ELostTalesSubCommand {
             "discord"),
     ROLE(new LostTalesCommandRole(),
             "role <list|assign|unassign|create|edit|delete> ...",
-            "role", "roles");
+            "role", "roles"),
+    STRUCTURES(new LostTalesCommandStructures(),
+            "structures <ban|allow|list> [player|character]",
+            "structures", "structure");
 
     private final CommandBase command;
     private final String usage;

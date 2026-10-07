@@ -125,6 +125,6 @@
   "ui.tip.show": {
     "duration": 140,
     "curve": "ease_out",
-    "params": { "short": 350, "medium": 650, "long": 1100, "warm": 800 }
+    "params": { "warm": 800 }
   }
 }

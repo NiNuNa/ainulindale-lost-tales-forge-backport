@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.client.gui.LostTalesPointerOwner;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
+import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.client.motion.MotionIds;
@@ -276,7 +277,19 @@ public final class WindowScreen extends GuiChat
      * no system registered.
      */
     public static void openPage(String pageId) {
-        GuiScreen screen = screenForPage(pageId);
+        open(screenForPage(pageId, false));
+    }
+
+    /**
+     * Opens the screen as a page's key does: as {@link #openPage}, but a
+     * category with no window opens its first window with every page of
+     * it the player can open ({@link WindowLayout#showView}).
+     */
+    public static void openView(String pageId) {
+        open(screenForPage(pageId, true));
+    }
+
+    private static void open(GuiScreen screen) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (screen != null && minecraft != null
                 && minecraft.currentScreen != screen) {
@@ -290,10 +303,19 @@ public final class WindowScreen extends GuiChat
      * the keys; null when the page cannot come forward.
      */
     public static GuiScreen screenForPage(String pageId) {
+        return screenForPage(pageId, false);
+    }
+
+    /**
+     * As above; {@code byKey}, the page comes as its key brings it
+     * ({@link WindowLayout#showView}).
+     */
+    private static GuiScreen screenForPage(String pageId, boolean byKey) {
         Minecraft minecraft = Minecraft.getMinecraft();
         OtherPage page = WindowPages.tab(pageId);
         if (minecraft == null || page == null
-                || WindowLayout.showPage(page) == null) {
+                || (byKey ? WindowLayout.showView(page)
+                        : WindowLayout.showPage(page)) == null) {
             return null;
         }
         pageToFocus = page;
@@ -589,11 +611,12 @@ public final class WindowScreen extends GuiChat
         }
     }
 
-    /** Closes a whole window by hand: its tabs leave it and the window goes. A locked one stays, and its padlock answers. */
+    /**
+     * Closes a whole window by hand: an unlocked one lets its tabs go and
+     * goes; a locked one goes out of sight as it is, until its view opens
+     * again ({@link WindowLayout#closeWindow}).
+     */
     public void closeWindow(Window window) {
-        if (heldByLock(window)) {
-            return;
-        }
         for (ScreenPart part : this.parts) {
             if (part.closeWindow(window)) {
                 return;
@@ -899,7 +922,7 @@ public final class WindowScreen extends GuiChat
                 && press.key != Keyboard.KEY_NUMPADENTER) {
             return false;
         }
-        toggleFullWindow(isEmpty() ? null : keysWindow());
+        toggleBorderless(isEmpty() ? null : keysWindow());
         return true;
     }
 
@@ -907,10 +930,10 @@ public final class WindowScreen extends GuiChat
      * Lets the page in front of {@code window} fill the window, with the
      * keys ({@link ContentView}); while it fills it, gives the window its
      * row, strip and bar back. The search goes, its well being out of
-     * sight. The full window button, its row in the page's options and
+     * sight. The borderless button, its row in the page's options and
      * Alt+Enter.
      */
-    void toggleFullWindow(Window window) {
+    void toggleBorderless(Window window) {
         if (window == null || ContentView.leave(window)
                 || !ContentView.enter(window)) {
             return;
@@ -1034,7 +1057,7 @@ public final class WindowScreen extends GuiChat
             closeScreen();
             return true;
         }
-        if (WindowLayout.showPage(page) == null) {
+        if (WindowLayout.showView(page) == null) {
             return false;
         }
         WindowView.forPage(page);
@@ -1065,7 +1088,7 @@ public final class WindowScreen extends GuiChat
         if (search) {
             this.tabMenus.toggleSearch(window, null);
         } else if (open) {
-            openMenuTab(window);
+            openNewPage(window);
         } else if (switcher) {
             this.tabMenus.toggleSwitcher(window);
         } else {
@@ -1317,7 +1340,7 @@ public final class WindowScreen extends GuiChat
                 }
                 return;
             case VIEW:
-                toggleFullWindow(press.window);
+                toggleBorderless(press.window);
                 return;
             case FIELD:
                 searchIn(press.window);
@@ -1343,14 +1366,13 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * A new page in {@code window}, as a browser's new tab: a Lost Tales
-     * Menu at its row's end, in front with the keys, where the page picked
+     * A new page in {@code window}, as a browser's new tab: a New Page at its row's end, in front with the keys, where the page picked
      * on it will stand. A locked window takes no page, so its menu opens in
      * a new window a step on; with no window, the menu comes as its key
      * brings it.
      */
-    void openMenuTab(Window window) {
-        OtherPage menu = WindowPages.tab(LostTalesMenuPage.PAGE_ID);
+    void openNewPage(Window window) {
+        OtherPage menu = WindowPages.tab(NewPage.PAGE_ID);
         if (menu == null) {
             return;
         }
@@ -1375,17 +1397,16 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * A page picked on a Lost Tales Menu tab: a new copy of it takes the
-     * menu's place in its window, whatever the window's kind, as a tab
-     * carried there by hand may. In a locked window nothing can change,
-     * so the page comes forward as its key brings it and the screen turns
-     * to its kind.
+     * A page picked on a New Page tab: the tab turns into a new copy of
+     * it in its window, whatever the window's kind, as a tab carried there
+     * by hand may. In a locked window nothing can change, so the page
+     * comes forward as its key brings it and the screen turns to its kind.
      */
-    public void openFromMenu(OtherPage menu, WindowPage picked) {
+    public void openFromNewPage(OtherPage newPage, WindowPage picked) {
         if (picked == null) {
             return;
         }
-        WindowPage copy = WindowLayout.replaceTab(menu, picked);
+        WindowPage copy = WindowLayout.replaceTab(newPage, picked);
         if (copy != null) {
             jumpToTab(copy);
             return;
@@ -2455,6 +2476,9 @@ public final class WindowScreen extends GuiChat
         hover.window = WindowLayout.window(front.windowId);
         hover.barItem = hit.item;
         hover.listRow = hit.offer;
+        if (hit.item != null && hit.offer < 0) {
+            hover.greyedWhy = hit.item.greyedWhy();
+        }
         return hover;
     }
 
@@ -2600,8 +2624,29 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
+     * A press on a greyed control: no tip stood over it, so its reason
+     * shows over its window's bar for a moment, as the padlock's does.
+     */
+    private void sayWhyGreyed(WindowHover press) {
+        String windowId = press.window != null ? press.window.getId()
+                : press.frame != null ? press.frame.windowId
+                : press.subWindow != null ? press.subWindow.parentId : null;
+        showNotice(windowId, press.greyedWhy);
+    }
+
+    /**
+     * A press on a greyed row of a page's own list: its reason over the
+     * bar of the window under the pointer.
+     */
+    public void sayWhyGreyedHere(String why) {
+        WindowFrame frame = WindowFrame.drawnAt(pointerX(), pointerY());
+        showNotice(frame == null ? null : frame.windowId, why);
+    }
+
+    /**
      * Shows a short notice over a window's bar: why a page's tab closed by
-     * itself, or that a locked window cannot be changed. It is placed
+     * itself, why a greyed control cannot be taken, or that a locked
+     * window cannot be changed. It is placed
      * where the bar stands now and stays there, the
      * window gone with its last tab or not; with the window not drawn, it
      * stands over the bottom of the screen's middle. A new notice takes
@@ -2785,9 +2830,14 @@ public final class WindowScreen extends GuiChat
                 hover.frame = frame;
                 hover.row = row;
                 hover.stripPart = part;
+                hover.greyedWhy = ToolStrip.greyedWhy(part, window);
                 if (part == ToolStrip.Part.OPTION) {
                     hover.stripOption = this.toolStrip.optionAt(frame, row,
                             x, y);
+                    if (hover.stripOption != null
+                            && !hover.stripOption.isAvailable()) {
+                        hover.greyedWhy = hover.stripOption.unavailable();
+                    }
                 }
                 return hover;
             }
@@ -2836,6 +2886,9 @@ public final class WindowScreen extends GuiChat
 
     /** The words beside the pointer for what it rests on, empty for none. */
     private String tipFor(WindowHover hover) {
+        if (hover.greyedWhy.length() > 0) {
+            return "";
+        }
         switch (hover.kind) {
             case TAB_ROW:
                 return hover.tabHit == null || hover.window == null ? ""
@@ -2916,7 +2969,7 @@ public final class WindowScreen extends GuiChat
                                 ? "gui.losttales.window.exit_fullscreen"
                                 : "gui.losttales.window.fullscreen");
             case WINDOW_CLOSE:
-                return window.isLocked() ? "" : StatCollector.translateToLocal(
+                return StatCollector.translateToLocal(
                         "gui.losttales.window.close");
             case RESTORE:
                 for (ScreenPart part : this.parts) {
@@ -2936,7 +2989,9 @@ public final class WindowScreen extends GuiChat
     /**
      * The words beside the pointer for what it rests on: a one-line popup
      * four pixels above the pointer, or below it where the screen's top
-     * is too near, at {@code share} of its strength as it fades in.
+     * is too near, at {@code share} of its strength as it fades in. It
+     * keeps pace with the pointer to the display pixel, as the cursor
+     * does, rather than stepping a GUI pixel at a time.
      */
     private void drawHoverTip(float share) {
         List<String> lines = WindowStyle.tipLines(this.fontRendererObj,
@@ -2947,13 +3002,21 @@ public final class WindowScreen extends GuiChat
                     this.fontRendererObj, line));
         }
         int tipHeight = WindowStyle.popupLinesHeight(lines.size());
+        int besidePointer = this.hoverTipX + 8;
         int x = Math.max(2, Math.min(this.width - tipWidth - 2,
-                this.hoverTipX + 8));
+                besidePointer));
         int y = this.hoverTipY - 4 - tipHeight;
         if (y < 2) {
             y = this.hoverTipY + 12;
         }
-        WindowStyle.drawPopupLines(this.fontRendererObj, lines, x, y, share);
+        LostTalesTooltipSmoothing.begin(this.hoverTipX, this.hoverTipY,
+                x == besidePointer, true);
+        try {
+            WindowStyle.drawPopupLines(this.fontRendererObj, lines, x, y,
+                    share);
+        } finally {
+            LostTalesTooltipSmoothing.end();
+        }
     }
 
     /* ---- Presses ---- */
@@ -3005,6 +3068,10 @@ public final class WindowScreen extends GuiChat
             this.snapFlyout.close();
         }
         WindowHover press = hoverAt(x, y);
+        if (button == 0 && press.greyedWhy.length() > 0) {
+            sayWhyGreyed(press);
+            return;
+        }
         // A press anywhere but the tool strip hands the keys back, a press
         // anywhere but a page leaves no page in front of them, and a press
         // anywhere but a sub-window leaves none of those in front.
@@ -3363,10 +3430,10 @@ public final class WindowScreen extends GuiChat
                 WindowLayout.setLocked(window.getId(), !window.isLocked());
                 return;
             case RESTORE:
-                // A new page, as a browser's new tab: the Lost Tales Menu
+                // A new page, as a browser's new tab: the New Page
                 // at the row's end. A locked window takes no page, so its
                 // menu opens in another window.
-                openMenuTab(window);
+                openNewPage(window);
                 return;
             case SEARCH:
                 this.tabMenus.toggleSearch(window, SubWindowAnchor.onRow(

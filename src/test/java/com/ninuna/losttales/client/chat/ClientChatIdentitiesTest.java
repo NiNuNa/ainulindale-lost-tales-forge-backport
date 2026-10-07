@@ -174,8 +174,6 @@ public final class ClientChatIdentitiesTest {
                 summaries.isEmpty() ? Collections.<CharacterSummary>emptyList()
                         : Arrays.asList(summaries.toArray(
                                 new CharacterSummary[summaries.size()])),
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
                 Collections.<com.ninuna.losttales.character.sync.DeletedCharacterSummary>emptyList()));
     }
 }

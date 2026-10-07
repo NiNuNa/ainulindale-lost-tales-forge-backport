@@ -3,7 +3,6 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import java.util.LinkedHashMap;
 import com.ninuna.losttales.character.model.CharacterRoster;
-import com.ninuna.losttales.character.model.CharacterKind;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
@@ -378,14 +377,15 @@ public final class ChatChannelPolicy {
     /**
      * The factions the player reads Faction chat in, each with the time
      * its history starts for them: the earliest any of their identities
-     * reading it came to it, by its making or by its pledge; for the
-     * account, its account character's.
+     * reading it came to it, by its making or by its pledge. A player with
+     * no character yet reads none.
      */
     public static Map<String, Long> selectedFactions(EntityPlayerMP player) {
         Map<String, Long> owned = new HashMap<String, Long>();
         RoleplayCharacter played = ChatIdentitySelection.played(player);
-        owned.put(factionOf(played), Long.valueOf(played != null
-                ? played.getFactionSince() : accountSince(player)));
+        if (played != null) {
+            owned.put(factionOf(played), Long.valueOf(played.getFactionSince()));
+        }
         for (RoleplayCharacter character : ChatIdentitySelection.alsoRead(player)) {
             String factionId = factionOf(character);
             Long since = owned.get(factionId);
@@ -394,19 +394,6 @@ public final class ChatChannelPolicy {
             }
         }
         return owned;
-    }
-
-    /**
-     * When the account character's faction became its own, or 0 when the
-     * roster cannot be read.
-     */
-    private static long accountSince(EntityPlayerMP player) {
-        for (RoleplayCharacter character : charactersOf(player)) {
-            if (character != null && character.getKind() == CharacterKind.DEFAULT) {
-                return character.getFactionSince();
-            }
-        }
-        return 0L;
     }
 
     /**

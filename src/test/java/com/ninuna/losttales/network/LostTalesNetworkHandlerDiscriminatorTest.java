@@ -101,7 +101,6 @@ public final class LostTalesNetworkHandlerDiscriminatorTest {
             "LostTalesChatHistorySyncPacket CLIENT",
             "LostTalesChatConsoleSyncPacket CLIENT",
             "LostTalesChatContextHistoryPacket SERVER",
-            "CharacterTemplateAdoptRequestPacket SERVER",
             "LostTalesChatCommandContextPacket SERVER",
             "LostTalesChatOlderHistoryPacket SERVER",
             "LostTalesChatReactPacket SERVER",

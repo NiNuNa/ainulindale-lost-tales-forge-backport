@@ -132,7 +132,7 @@ public final class SeenAccountNames {
                     }
                     UUID owner = roster == null ? null : roster.getOwnerId();
                     if (owner != null && !owner.equals(this.ownerId)) {
-                        add(names, limit, KnownAccounts.nameOf(owner, roster));
+                        add(names, limit, KnownAccounts.nameOf(owner));
                     }
                 }
             } catch (RuntimeException unreadable) {

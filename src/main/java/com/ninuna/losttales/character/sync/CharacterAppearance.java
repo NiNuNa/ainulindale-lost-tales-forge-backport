@@ -137,37 +137,31 @@ public final class CharacterAppearance {
     }
 
     /**
-     * The account as an identity: a plain human on the Lost Tales body,
-     * wearing the account skin with the arm width the skin declares, and
-     * the cape settings the roster keeps for it.
+     * A player who has not made a character yet: a ghost, drawn faint in
+     * the account's own skin with the arm width the skin declares, and no
+     * cape.
      */
     public static CharacterAppearance forAccount(UUID playerId, String accountName,
-                                                 String bodyTypeId,
-                                                 boolean showMinecraftCape,
-                                                 int cosmeticCapeId) {
+                                                 String bodyTypeId) {
         return new CharacterAppearance(CharacterAppearanceKind.ACCOUNT, playerId,
                 accountName, "", CharacterRaceRegistry.HUMAN, "",
-                CharacterSkinRegistry.ACCOUNT_SKIN_ID, showMinecraftCape,
-                cosmeticCapeId, "", 0, CharacterBodyTypeRegistry.normalizeOrWide(bodyTypeId),
+                CharacterSkinRegistry.ACCOUNT_SKIN_ID, false,
+                CharacterCapeCatalog.NONE_ID, "", 0,
+                CharacterBodyTypeRegistry.normalizeOrWide(bodyTypeId),
                 CharacterChestTypeRegistry.NONE);
     }
 
     /**
      * The identity the roster says is being played: its active character,
-     * else the account with the arm width its skin declares and the
-     * account cape settings the roster keeps. A missing roster is an
-     * account that has not been written yet.
+     * else the ghost a player is until their first character is made. A
+     * missing roster is an account that has not been written yet.
      */
     public static CharacterAppearance fromRoster(UUID playerId, String accountName,
                                                  CharacterRoster roster,
                                                  String accountBodyTypeId) {
         RoleplayCharacter active = roster == null ? null : roster.getActiveCharacter();
         return active == null
-                ? forAccount(playerId, accountName, accountBodyTypeId,
-                        roster == null ? RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE
-                                : roster.isAccountMinecraftCapeVisible(),
-                        roster == null ? RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID
-                                : roster.getAccountCosmeticCapeId())
+                ? forAccount(playerId, accountName, accountBodyTypeId)
                 : new CharacterAppearance(
                         CharacterAppearanceKind.CHARACTER,
                         playerId,

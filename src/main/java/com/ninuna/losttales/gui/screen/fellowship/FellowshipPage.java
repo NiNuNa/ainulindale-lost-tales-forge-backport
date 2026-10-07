@@ -18,7 +18,6 @@ import com.ninuna.losttales.client.window.PageSearch;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.WindowLists;
-import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -399,7 +398,7 @@ public final class FellowshipPage extends PageContent {
             return;
         }
         ClientFellowshipStateCache.clearOperation(completedRequestId);
-        // The answer stands on the page, over its bar (W2).
+        // The answer stands on the page, over its bar.
         if (feedback.isSuccessful()) {
             sayDone(ClientFellowshipDisplayNames.operationSuccess(
                     feedback.getOperationType()));

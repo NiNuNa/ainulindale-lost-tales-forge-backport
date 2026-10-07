@@ -106,7 +106,8 @@ public final class MenuWindowTest {
         WindowHover closed = menu.hoverAt(box, 20,
                 rowsTop + 2 * MenuWindow.rowHeight() + 5);
         assertNull(closed.menuEntry);
-        assertEquals("it says why", "Not here", closed.tip);
+        assertEquals("greyed: no tip", "", closed.tip);
+        assertEquals("a press says why", "Not here", closed.greyedWhy);
         assertNull("the padding is nobody's",
                 menu.hoverAt(box, 20, 21).menuEntry);
     }

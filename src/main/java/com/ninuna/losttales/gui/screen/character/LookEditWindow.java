@@ -512,7 +512,8 @@ final class LookEditWindow extends SubWindowContent {
         int cancelWidth = WordButton.width(font, cancelLabel());
         double top = box.top + box.height - PADDING_Y
                 - LostTalesUiFramedButton.HEIGHT;
-        double saveLeft = box.left + box.width - PADDING_X - saveWidth;
+        double saveLeft = box.left + box.width - WindowStyle.EDGE_GAP
+                - saveWidth;
         if (SAVE.equals(part)) {
             return new LostTalesUiHitBox(saveLeft, top, saveWidth,
                     LostTalesUiFramedButton.HEIGHT);

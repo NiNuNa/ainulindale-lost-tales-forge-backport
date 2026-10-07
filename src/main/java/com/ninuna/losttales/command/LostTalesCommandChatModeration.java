@@ -120,7 +120,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                 reasonFrom = 3;
             }
         }
-        String reason = joinFrom(args, reasonFrom);
+        String reason = LostTalesCommandSubject.joinFrom(args, reasonFrom);
         ChatMuteEntry entry = new ChatMuteEntry(
                 target != null ? target.getUniqueID() : member.senderId,
                 target != null ? target.getCommandSenderName() : member.label,
@@ -341,19 +341,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
         }
     }
 
-    private static String joinFrom(String[] args, int from) {
-        if (args.length <= from) {
-            return "";
-        }
-        StringBuilder joined = new StringBuilder();
-        for (int index = from; index < args.length; index++) {
-            if (joined.length() > 0) {
-                joined.append(' ');
-            }
-            joined.append(args[index]);
-        }
-        return joined.toString();
-    }
+
 
 
     private World resolveWorld(ICommandSender sender) {

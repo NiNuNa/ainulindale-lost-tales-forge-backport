@@ -228,7 +228,9 @@ public final class TabRow {
      */
     public static final int END_CONTROL_SIZE = 9;
     /** Clear space between the row's end controls, ink edge to ink edge. */
-    static final int END_CONTROL_GAP = 5;
+    static final int END_CONTROL_GAP = WindowStyle.BUTTON_GAP;
+    /** Clear space between a control and the frame or a hairline. */
+    private static final int EDGE_GAP = WindowStyle.EDGE_GAP;
     /**
      * Clear pixels round an end control's ink that answer with it, on
      * every side: a five-pixel glyph is a small thing to hit exactly,
@@ -267,9 +269,10 @@ public final class TabRow {
     private static final int DIVIDER_HEIGHT = END_CONTROL_SIZE;
     /**
      * Clear space kept at the row's right end, which the grip stands
-     * against and no control crosses.
+     * against and no control crosses: the frame's edge gap, the strip
+     * reaching past the row to the window's edge.
      */
-    static final int GRIP_INSET = 3;
+    static final int GRIP_INSET = WindowStyle.EDGE_GAP - 2;
     /*
      * The ink each end control takes. The lock is measured by the room
      * its whole swing needs rather than by the padlock at rest: the
@@ -332,19 +335,14 @@ public final class TabRow {
     public int drawnStripArgb;
     public int drawnToolArgb;
     /**
-     * Clear space either side of the search button: the window's frame
-     * edge, this, the button, this again, and then the first tab.
-     */
-    private static final int SEARCH_MARGIN = 3;
-    /**
      * Where the search button begins, measured from the row's left: the
-     * margin in from the window's edge, the frame standing just outside
+     * edge gap in from the window's edge, the frame standing just outside
      * it.
      */
-    private static final int SEARCH_LEFT = SEARCH_MARGIN - STRIP_INSET;
-    /** Where the row's tabs begin: past the search button and its gaps. */
+    private static final int SEARCH_LEFT = EDGE_GAP - STRIP_INSET;
+    /** Where the row's tabs begin: past the search button and a button's gap. */
     private static final int SEARCH_RUN =
-            SEARCH_LEFT + SEARCH_SIZE + SEARCH_MARGIN;
+            SEARCH_LEFT + SEARCH_SIZE + END_CONTROL_GAP;
     /** Room the grip keeps at the row's right end: its glyph and inset. */
     static final int MIN_GRIP_WIDTH = GRIP_WIDTH + GRIP_INSET;
     /**
@@ -1168,11 +1166,10 @@ public final class TabRow {
                 if (!row.bare && this.windowCloseX >= 0) {
                     drawEndControl(LostTalesUiSheet.CLOSE,
                             LostTalesUiSheet.CLOSE_HOVER,
-                            step(this.windowCloseMotion,
-                                    row.locked ? null : hovered,
+                            step(this.windowCloseMotion, hovered,
                                     HitKind.WINDOW_CLOSE),
                             row.offsetX + this.windowCloseX, bottom,
-                            row.locked);
+                            false);
                 }
                 if (!row.bare && this.secondDividerX >= 0) {
                     drawDivider(row.offsetX + this.secondDividerX, bottom);
@@ -2765,8 +2762,8 @@ public final class TabRow {
         float edge = this.drawnTabsRight;
         int whole = (int)Math.floor(edge);
         this.restoreRunFraction = edge - whole;
-        this.tabDividerX = whole + END_CONTROL_GAP;
-        this.restoreX = this.tabDividerX + DIVIDER_WIDTH + END_CONTROL_GAP;
+        this.tabDividerX = whole + EDGE_GAP;
+        this.restoreX = this.tabDividerX + DIVIDER_WIDTH + EDGE_GAP;
     }
 
     /**
@@ -3098,19 +3095,6 @@ public final class TabRow {
         return new LostTalesUiHitBox(rowLeft + SEARCH_LEFT,
                 centredInStrip(rowBottom, SEARCH_SIZE), SEARCH_SIZE,
                 SEARCH_SIZE);
-    }
-
-    /**
-     * The tab search's left edge in row space, as the row draws it: the
-     * tool strip stands its own first control under it.
-     */
-    static int searchButtonLeft(Row row) {
-        return row.offsetX + (int)searchBox(row.left, row.rowBottom).left;
-    }
-
-    /** The tab search's square. */
-    static int searchButtonSize() {
-        return SEARCH_SIZE;
     }
 
     /** An end control's ink, centred in the strip where it is drawn. */
@@ -3472,7 +3456,8 @@ public final class TabRow {
         for (int at = 0; at < this.cachedTabs.size(); at++) {
             Tab was = this.cachedTabs.get(at);
             if (find(tabs, was.tab) != null
-                    || WindowLayout.windowOf(was.tab) != null) {
+                    || WindowLayout.windowOf(was.tab) != null
+                    || replacedIn(tabs, was.tab)) {
                 continue;
             }
             Tab before = null;
@@ -3516,17 +3501,17 @@ public final class TabRow {
         int controlX = Math.max(leftX - 1,
                 this.endEdge - MIN_GRIP_WIDTH - windowRun);
         this.lockX = controlX;
-        controlX += LOCK_WIDTH + END_CONTROL_GAP;
+        controlX += LOCK_WIDTH + EDGE_GAP;
         this.firstDividerX = controlX;
-        controlX += DIVIDER_WIDTH + END_CONTROL_GAP;
+        controlX += DIVIDER_WIDTH + EDGE_GAP;
         this.windowMenuX = controlX;
         controlX += MORE_WIDTH + END_CONTROL_GAP;
         this.windowFullscreenX = controlX;
         controlX += FULLSCREEN_WIDTH + END_CONTROL_GAP;
         this.windowCloseX = controlX;
-        controlX += CLOSE_WIDTH + END_CONTROL_GAP;
+        controlX += CLOSE_WIDTH + EDGE_GAP;
         this.secondDividerX = controlX;
-        controlX += DIVIDER_WIDTH + END_CONTROL_GAP;
+        controlX += DIVIDER_WIDTH + EDGE_GAP;
         this.controlsRight = controlX;
         this.cachedTabs = Collections.unmodifiableList(tabs);
         this.cachedChannels = new ArrayList<WindowPage>(channels);
@@ -3587,6 +3572,13 @@ public final class TabRow {
         built.toLeft = left - row.left;
         built.exactWidth = tabWidth;
         Tab was = find(this.cachedTabs, channel);
+        boolean turned = false;
+        if (was == null) {
+            // A page picked on a New Page tab is that tab turned into it:
+            // it carries on from where the tab stood, its own name in it.
+            was = find(this.cachedTabs, WindowLayout.replacedBy(channel));
+            turned = was != null;
+        }
         if (was == null) {
             // Opened again while it was still shrinking away: it turns
             // round where it is rather than growing anew.
@@ -3599,6 +3591,10 @@ public final class TabRow {
             // width, it sets out for it from there on a glide of its own,
             // and the tabs the row leaves where they were keep theirs.
             built.carryOn(was);
+            if (turned) {
+                built.marqueeOffset = 0.0F;
+                built.hoverSeconds = 0.0D;
+            }
             if (Math.abs(was.toLeft - built.toLeft) > 1.0E-6D
                     || Math.abs(was.exactWidth - built.exactWidth)
                             > 1.0E-6D) {
@@ -3808,12 +3804,25 @@ public final class TabRow {
 
     /** The tab of a list that stands for {@code channel}, or null. */
     private static Tab find(List<Tab> tabs, WindowPage channel) {
+        if (channel == null) {
+            return null;
+        }
         for (int index = 0; index < tabs.size(); index++) {
             if (tabs.get(index).tab.equals(channel)) {
                 return tabs.get(index);
             }
         }
         return null;
+    }
+
+    /** Whether a tab of {@code tabs} took {@code old}'s place in the row. */
+    private static boolean replacedIn(List<Tab> tabs, WindowPage old) {
+        for (int index = 0; index < tabs.size(); index++) {
+            if (old.equals(WindowLayout.replacedBy(tabs.get(index).tab))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Room the tab's icon and its mark take before the label, with its gap. */
@@ -3828,16 +3837,16 @@ public final class TabRow {
      * by its own gap.
      */
     private static final int WINDOW_CONTROLS_WIDTH = LOCK_WIDTH
-            + END_CONTROL_GAP + DIVIDER_WIDTH + END_CONTROL_GAP + MORE_WIDTH
+            + EDGE_GAP + DIVIDER_WIDTH + EDGE_GAP + MORE_WIDTH
             + END_CONTROL_GAP + FULLSCREEN_WIDTH + END_CONTROL_GAP
-            + CLOSE_WIDTH + END_CONTROL_GAP + DIVIDER_WIDTH + END_CONTROL_GAP;
+            + CLOSE_WIDTH + EDGE_GAP + DIVIDER_WIDTH + EDGE_GAP;
 
     /**
      * Room the hairline, the {@code +} and its mark take after the tabs,
      * the mark's room kept whether or not one shows.
      */
     private static int restoreRunWidth() {
-        return END_CONTROL_GAP + DIVIDER_WIDTH + END_CONTROL_GAP
+        return EDGE_GAP + DIVIDER_WIDTH + EDGE_GAP
                 + PLUS_WIDTH + COUNTER_GAP + RESTORE_MARK_WIDTH;
     }
 

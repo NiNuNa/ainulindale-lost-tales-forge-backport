@@ -11,8 +11,8 @@ import java.util.UUID;
 
 /**
  * The sending of a character's profile. Every profile is readable by
- * anyone at any time, its owner online or not, as a character sheet is
- * (R11 c). A profile goes out only when asked for, so the appearance
+ * anyone at any time, its owner online or not, as a character sheet is.
+ * A profile goes out only when asked for, so the appearance
  * every client is sent stays small.
  */
 public final class CharacterProfileViews {

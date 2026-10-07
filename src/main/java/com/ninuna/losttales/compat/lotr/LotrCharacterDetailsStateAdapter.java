@@ -23,10 +23,10 @@ import java.util.UUID;
  * mount it logged out on, the faction its alignment bar shows (in each
  * region), LOTR's options (friendly fire, hiding the alignment or the
  * map position, hired units' death notices, conquest notices, which
- * waypoints the map shows) and an admin's structure ban
- * ({@code /banStructures}), which bans the character played as it was
- * given. An admin hidden from the map, LOTR's one-time notices and the
- * last time online stay with the account.
+ * waypoints the map shows). An admin hidden from the map, LOTR's one-time
+ * notices and the last time online stay with the account. Structure bans
+ * are the mod's own ({@code LotrStructureBans}), on an account or a
+ * character, and never in LOTR's player data.
  */
 public final class LotrCharacterDetailsStateAdapter {
 
@@ -48,7 +48,6 @@ public final class LotrCharacterDetailsStateAdapter {
     private static final String TAG_REGION_FACTIONS = "PrevRegionFactions";
     private static final String TAG_REGION = "Region";
     private static final String TAG_FACTION = "Faction";
-    private static final String TAG_STRUCTURES_BANNED = "StructuresBanned";
     private static final String[] OPTION_TAGS = {
             "FriendlyFire", "HideAlignment", "HideOnMap",
             "HiredDeathMessages", "ShowWP", "ShowCWP", "ShowHiddenSWP",
@@ -77,8 +76,7 @@ public final class LotrCharacterDetailsStateAdapter {
             TAG_VIEWED_FACTION,
             TAG_REGION_FACTIONS,
             OPTION_TAGS[0], OPTION_TAGS[1], OPTION_TAGS[2], OPTION_TAGS[3],
-            OPTION_TAGS[4], OPTION_TAGS[5], OPTION_TAGS[6], OPTION_TAGS[7],
-            TAG_STRUCTURES_BANNED);
+            OPTION_TAGS[4], OPTION_TAGS[5], OPTION_TAGS[6], OPTION_TAGS[7]);
 
     public NBTTagCompound capture(EntityPlayerMP player) {
         try {
@@ -307,7 +305,7 @@ public final class LotrCharacterDetailsStateAdapter {
         validateTravelAndOptions(details);
     }
 
-    /** The travel state, the mount, the faction shown, the options and the structure ban, each of LOTR's own type and in bounds. */
+    /** The travel state, the mount, the faction shown and the options, each of LOTR's own type and in bounds. */
     private static void validateTravelAndOptions(NBTTagCompound details) {
         if (details.hasKey(TAG_FAST_TRAVEL_SINCE)
                 && requireInteger(details, TAG_FAST_TRAVEL_SINCE) < 0) {
@@ -357,7 +355,6 @@ public final class LotrCharacterDetailsStateAdapter {
         for (String option : OPTION_TAGS) {
             requireSwitch(details, option);
         }
-        requireSwitch(details, TAG_STRUCTURES_BANNED);
     }
 
     private static void requireSwitch(NBTTagCompound details, String key) {

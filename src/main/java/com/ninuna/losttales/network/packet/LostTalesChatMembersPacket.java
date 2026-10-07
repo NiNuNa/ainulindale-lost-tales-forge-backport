@@ -61,6 +61,12 @@ public final class LostTalesChatMembersPacket implements IMessage {
      * every list: no role's or faction's id can be written so.
      */
     public static final String SERVER_GROUP = "server:";
+    /**
+     * The group of those still making their first character, in a list
+     * out of character: here, but faint, after the game's other groups
+     * and before Discord's. No role's or faction's id can be written so.
+     */
+    public static final String GHOST_GROUP = "ghost:";
     public static final int MAX_GROUP_NAME_BYTES = 128;
     private static final int MAX_MEMBER_BYTES = 16 + 5 + MAX_ACCOUNT_BYTES
             + 17 + 5 + MAX_NAME_BYTES + 4 + 5 + MAX_SKIN_ID_BYTES
@@ -213,8 +219,9 @@ public final class LostTalesChatMembersPacket implements IMessage {
     /**
      * The order a list stands its members in: those here first, by
      * group — the Server's own first, then a role's place, or a faction's
-     * name with Unaligned last, the ungrouped after every group, and each
-     * Discord server's members after all of the game's — then by name;
+     * name with Unaligned last, the ungrouped after every group, those
+     * making their first character after them, and each Discord server's
+     * members after all of the game's — then by name;
      * the absent after them, by name. A faction is ordered by the name
      * {@code names} gives its group.
      */
@@ -249,6 +256,10 @@ public final class LostTalesChatMembersPacket implements IMessage {
         boolean oneDiscord = isDiscordGroup(one.getGroupKey());
         if (oneDiscord != isDiscordGroup(other.getGroupKey())) {
             return oneDiscord ? 1 : -1;
+        }
+        boolean oneGhost = GHOST_GROUP.equals(one.getGroupKey());
+        if (oneGhost != GHOST_GROUP.equals(other.getGroupKey())) {
+            return oneGhost ? 1 : -1;
         }
         boolean oneGrouped = one.getGroupKey().length() > 0;
         boolean otherGrouped = other.getGroupKey().length() > 0;

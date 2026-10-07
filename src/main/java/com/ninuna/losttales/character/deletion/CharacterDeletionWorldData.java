@@ -62,12 +62,14 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
         }
         int version = compound.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? compound.getInteger(TAG_DATA_VERSION) : 0;
-        if (version < 0 || version > CURRENT_DATA_VERSION) {
+        // Only this build's version is read; any other is kept as it is
+        // and the store goes read-only, as every character store does.
+        if (version != CURRENT_DATA_VERSION) {
             preserveReadOnly(compound, version);
             return;
         }
 
-        boolean repaired = version < CURRENT_DATA_VERSION;
+        boolean repaired = false;
         if (compound.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_LIST)) {
             NBTTagList quarantine = compound.getTagList(
                     TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND);
@@ -96,9 +98,8 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
             int tombstoneVersion = raw.hasKey(
                     TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                     ? raw.getInteger(TAG_DATA_VERSION) : 0;
-            if (tombstoneVersion < 0
-                    || tombstoneVersion
-                    > CharacterDeletionTombstone.CURRENT_DATA_VERSION) {
+            if (tombstoneVersion
+                    != CharacterDeletionTombstone.CURRENT_DATA_VERSION) {
                 preserveReadOnly(compound, tombstoneVersion);
                 return;
             }
@@ -107,8 +108,7 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
                 int characterVersion = character.hasKey(
                         TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                         ? character.getInteger(TAG_DATA_VERSION) : 0;
-                if (characterVersion < 0
-                        || characterVersion > RoleplayCharacter.CURRENT_DATA_VERSION) {
+                if (characterVersion != RoleplayCharacter.CURRENT_DATA_VERSION) {
                     preserveReadOnly(compound, characterVersion);
                     return;
                 }

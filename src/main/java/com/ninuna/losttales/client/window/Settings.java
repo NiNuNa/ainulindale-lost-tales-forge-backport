@@ -984,19 +984,6 @@ public final class Settings {
                             (int)Math.round(value);
                 }
             });
-            windows.add(new ModChoice("tipDelay", optionName("tipDelay"),
-                    new String[] {"INSTANT", "SHORT", "MEDIUM", "LONG"},
-                    "gui.losttales.window.settings.tip_delay.") {
-                @Override
-                protected String get() {
-                    return LostTalesConfig.tipDelay;
-                }
-
-                @Override
-                protected void set(String word) {
-                    LostTalesConfig.tipDelay = word;
-                }
-            });
             return windows;
         }
     }

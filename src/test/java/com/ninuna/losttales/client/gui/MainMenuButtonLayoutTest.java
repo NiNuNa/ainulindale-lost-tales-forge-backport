@@ -5,7 +5,6 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.List;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class MainMenuButtonLayoutTest {
@@ -20,10 +19,8 @@ public class MainMenuButtonLayoutTest {
                 GuiButton options = button(0, 100, 155, 98);
                 GuiButton quit = button(4, 202, 155, 98);
                 GuiButton language = new LostTalesLanguageButton(5, 76, 155, 20, 20, "");
-                GuiButton character = new LostTalesCharacterMenuButton(99, 304, 80,
-                        44, null, null, "Character");
                 List<GuiButton> buttons = Arrays.asList(single, multi, realms, mods, options, quit,
-                        language, character);
+                        language);
                 MainMenuButtonLayout.arrange(buttons);
                 for (int pass = 0; pass < 2; pass++) {
                     MainMenuButtonLayout.position(buttons, screenWidth, screenHeight);
@@ -31,10 +28,7 @@ public class MainMenuButtonLayoutTest {
                     assertEquals(screenHeight / 4 + 48, single.yPosition);
                     assertTrue(options.yPosition + options.height <= screenHeight - 12);
                     assertEquals(4, single.xPosition - language.xPosition - language.width);
-                    assertEquals(4, character.xPosition - single.xPosition - single.width);
                     assertEquals(4, multi.yPosition - single.yPosition - single.height);
-                    assertEquals(multi.yPosition + multi.height,
-                            character.yPosition + character.height);
                     assertEquals(options.yPosition, language.yPosition);
                     assertEquals(16, options.yPosition - realms.yPosition - realms.height);
                 }
@@ -60,7 +54,7 @@ public class MainMenuButtonLayoutTest {
     }
 
     @Test
-    public void standardMenuSeparatesUtilityRowAndCharacterSpansPlayRows() {
+    public void standardMenuSeparatesUtilityRow() {
         GuiButton single = button(1, 100, 80, 200);
         GuiButton multi = button(2, 100, 104, 200);
         GuiButton realms = button(14, 100, 128, 98);
@@ -87,14 +81,6 @@ public class MainMenuButtonLayoutTest {
             for (GuiButton button : buttons) {
                 assertEquals(20, button.height);
             }
-            CharacterMenuButtonPlacement character = CharacterMenuButtonPlacement.beside(
-                    400, single.xPosition, single.xPosition + single.width,
-                    single.yPosition, multi.yPosition + multi.height);
-            assertNotNull(character);
-            assertEquals(44, character.getHeight());
-            assertEquals(multi.yPosition + multi.height,
-                    character.getY() + character.getHeight());
-            assertEquals(4, character.getX() - single.xPosition - single.width);
         }
     }
 
@@ -126,36 +112,6 @@ public class MainMenuButtonLayoutTest {
     }
 
     @Test
-    public void menuWithoutACharacterReplacesThePlayColumnAndWidensMods() {
-        GuiButton single = button(1, 100, 80, 200);
-        GuiButton multi = button(2, 100, 104, 200);
-        GuiButton realms = button(14, 202, 128, 98);
-        GuiButton mods = button(6, 100, 128, 98);
-        GuiButton options = button(0, 100, 164, 98);
-        GuiButton quit = button(4, 202, 164, 98);
-        List<GuiButton> buttons = Arrays.asList(single, multi, realms, mods, options, quit);
-        MainMenuButtonLayout.withholdPlayButtons(buttons);
-        MainMenuButtonLayout.arrange(buttons);
-        MainMenuButtonLayout.position(buttons, 854, 480);
-        int[] frame = MainMenuButtonLayout.replacePlayButtons(buttons);
-        assertNotNull(frame);
-        assertEquals(false, realms.visible);
-        assertEquals(false, single.visible);
-        assertEquals(false, multi.visible);
-        // The frame is Singleplayer's own row; the rows below close up.
-        assertEquals(single.xPosition, frame[0]);
-        assertEquals(single.yPosition, frame[1]);
-        assertEquals(200, frame[2]);
-        assertEquals(20, frame[3]);
-        // Mods, alone in its row, takes the column's width under it.
-        assertEquals(single.xPosition, mods.xPosition);
-        assertEquals(200, mods.width);
-        assertEquals(4, mods.yPosition - frame[1] - frame[3]);
-        assertEquals(16, options.yPosition - mods.yPosition - mods.height);
-        assertTrue(Math.abs(frame[0] * 2 + frame[2] - 854) <= 1);
-    }
-
-    @Test
     public void shorterColumnIsCentredWhereTheStandardColumnsMiddleFalls() {
         for (int screenHeight : new int[] {349, 480, 1080}) {
             GuiButton single = button(1, 100, 80, 200);
@@ -179,7 +135,9 @@ public class MainMenuButtonLayoutTest {
             GuiButton gatedQuit = button(4, 202, 164, 98);
             List<GuiButton> gated = Arrays.asList(gatedSingle, gatedMulti, gatedRealms,
                     gatedMods, gatedOptions, gatedQuit);
-            MainMenuButtonLayout.withholdPlayButtons(gated);
+            // A menu a mod has taken two buttons out of.
+            gatedMulti.visible = false;
+            gatedRealms.visible = false;
             MainMenuButtonLayout.arrange(gated);
             MainMenuButtonLayout.position(gated, 854, screenHeight);
             int gatedMiddle = (gatedSingle.yPosition
@@ -187,16 +145,6 @@ public class MainMenuButtonLayoutTest {
             assertEquals(standardMiddle, gatedMiddle);
             assertTrue(gatedSingle.yPosition > single.yPosition);
         }
-    }
-
-    @Test
-    public void menuWithoutPlayButtonsIsLeftAsItIs() {
-        GuiButton play = button(11, 100, 80, 200);
-        GuiButton options = button(0, 100, 164, 98);
-        List<GuiButton> buttons = Arrays.asList(play, options);
-        MainMenuButtonLayout.withholdPlayButtons(buttons);
-        assertEquals(null, MainMenuButtonLayout.replacePlayButtons(buttons));
-        assertEquals(true, play.visible);
     }
 
     private static GuiButton button(int id, int x, int y, int width) {

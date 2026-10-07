@@ -50,11 +50,6 @@ final class ProfileSubject {
                 character.getFactionId(), character.getAge(), true);
     }
 
-    static ProfileSubject account(String accountName) {
-        return new ProfileSubject(null, accountName, "", "", "", "", "", "", 0,
-                true);
-    }
-
     /** Another person's character as their appearance shows it. */
     static ProfileSubject of(CharacterAppearance appearance) {
         return new ProfileSubject(appearance.getCharacterId(),

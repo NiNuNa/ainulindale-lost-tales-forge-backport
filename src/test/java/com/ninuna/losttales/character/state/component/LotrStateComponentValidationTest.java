@@ -8,6 +8,7 @@ import net.minecraft.nbt.NBTTagString;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -171,8 +172,7 @@ public final class LotrStateComponentValidationTest {
 
     /**
      * The travel state, the mount, the faction the alignment bar shows and
-     * LOTR's options and the structure ban are the character's too, each
-     * of LOTR's own type.
+     * LOTR's options are the character's too, each of LOTR's own type.
      */
     @Test
     public void travelStateMountAndOptionsAreChecked() {
@@ -195,21 +195,12 @@ public final class LotrStateComponentValidationTest {
         NBTTagCompound biome = detailsPayload();
         biome.setInteger("LastBiome", 3);
         assertRejected(this.details, envelope("Details", biome));
-
-        NBTTagCompound ban = detailsPayload();
-        ban.setInteger("StructuresBanned", 1);
-        assertRejected(this.details, envelope("Details", ban));
     }
 
-    /** An admin's structure ban is the character's, kept as LOTR writes it. */
+    /** A structure ban is the mod's own, never kept in a character's LOTR details. */
     @Test
-    public void theStructureBanIsTheCharacters() {
-        NBTTagCompound fresh = detailsPayload();
-        assertTrue(fresh.hasKey("StructuresBanned", 1));
-        NBTTagCompound banned = detailsPayload();
-        banned.setBoolean("StructuresBanned", true);
-        new com.ninuna.losttales.compat.lotr.LotrCharacterDetailsStateAdapter()
-                .validate(banned);
+    public void noStructureBanTravelsWithACharacter() {
+        assertFalse(detailsPayload().hasKey("StructuresBanned"));
     }
 
     /** All four last-death fields travel together or not at all. */
@@ -242,31 +233,23 @@ public final class LotrStateComponentValidationTest {
     public void emptyCustomWaypointStateIsAccepted()
             throws CharacterStateValidationException {
         this.customWaypoints.validate(
-                envelope("Waypoints", customWaypointPayload(20000)));
+                envelope("Waypoints", customWaypointPayload()));
     }
 
+    /**
+     * The count waypoint numbers are taken from is the account's, one for
+     * all its characters, so a character's state carries none.
+     */
     @Test
-    public void nextCustomWaypointIdBelowTheFirstIdIsRejected() {
-        assertRejected(this.customWaypoints,
-                envelope("Waypoints", customWaypointPayload(19999)));
-    }
-
-    /** The next id has to clear every id already spent, or a save reuses one. */
-    @Test
-    public void nextCustomWaypointIdMustClearRecordedUses()
-            throws CharacterStateValidationException {
-        NBTTagCompound colliding = customWaypointPayload(20000);
-        colliding.setTag("CWPUses", useCounts(20005, 1));
-        assertRejected(this.customWaypoints, envelope("Waypoints", colliding));
-
-        NBTTagCompound accepted = customWaypointPayload(20006);
-        accepted.setTag("CWPUses", useCounts(20005, 1));
-        this.customWaypoints.validate(envelope("Waypoints", accepted));
+    public void aCharactersWaypointsCarryNoCountOfTheirOwn() {
+        NBTTagCompound counted = customWaypointPayload();
+        counted.setInteger("NextCWPID", 20006);
+        assertRejected(this.customWaypoints, envelope("Waypoints", counted));
     }
 
     @Test
     public void negativeCustomWaypointUseCountIsRejected() {
-        NBTTagCompound payload = customWaypointPayload(20002);
+        NBTTagCompound payload = customWaypointPayload();
         payload.setTag("CWPUses", useCounts(20001, -1));
 
         assertRejected(this.customWaypoints, envelope("Waypoints", payload));
@@ -274,7 +257,7 @@ public final class LotrStateComponentValidationTest {
 
     @Test
     public void customWaypointUseIdBelowOneIsRejected() {
-        NBTTagCompound payload = customWaypointPayload(20000);
+        NBTTagCompound payload = customWaypointPayload();
         payload.setTag("CWPUses", useCounts(0, 1));
 
         assertRejected(this.customWaypoints, envelope("Waypoints", payload));
@@ -494,11 +477,10 @@ public final class LotrStateComponentValidationTest {
         return payload;
     }
 
-    private static NBTTagCompound customWaypointPayload(int nextId) {
+    private static NBTTagCompound customWaypointPayload() {
         NBTTagCompound payload = new NBTTagCompound();
         payload.setTag("CustomWaypoints", new NBTTagList());
         payload.setTag("CWPUses", new NBTTagList());
-        payload.setInteger("NextCWPID", nextId);
         return payload;
     }
 

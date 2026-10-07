@@ -3,7 +3,9 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.util.StatCollector;
@@ -180,6 +182,36 @@ public final class ChatMemberListTest {
         assertEquals(Math.round(200 * ChatMemberList.OFFLINE_OPACITY),
                 ChatMemberList.rowAlpha(away, 200, 0.0F));
         assertEquals(200, ChatMemberList.rowAlpha(away, 200, 1.0F));
+    }
+
+    /**
+     * Someone still making their first character stands in a group of
+     * their own out of character, after the game's other groups and
+     * before Discord's, faint as the absent are, under the Online sphere
+     * at half strength.
+     */
+    @Test
+    public void aGhostStandsFaintInItsOwnGroup() {
+        LostTalesChatMembersPacket.Member ghost =
+                new LostTalesChatMembersPacket.Member(UUID.randomUUID(), "newcomer",
+                        null, "newcomer", 0xFFFFFF, "", "", 0xFFFFFF,
+                        LostTalesChatMembersPacket.GHOST_GROUP, "", 0, true);
+        LostTalesChatMembersPacket.Member online = member("Aldric", "", true);
+        LostTalesChatMembersPacket.Member discord = member("Bob",
+                LostTalesChatMembersPacket.DISCORD_GROUP_PREFIX + "1", true);
+        List<LostTalesChatMembersPacket.Member> members =
+                new ArrayList<LostTalesChatMembersPacket.Member>(
+                        Arrays.asList(discord, ghost, online));
+        Collections.sort(members, LostTalesChatMembersPacket.ORDER);
+        assertEquals(Arrays.asList(online, ghost, discord), members);
+        assertEquals(Math.round(200 * ChatMemberList.OFFLINE_OPACITY),
+                ChatMemberList.rowAlpha(ghost, 200, 0.0F));
+        assertEquals(200, ChatMemberList.rowAlpha(ghost, 200, 1.0F));
+        assertEquals(ChatMemberList.HeadingIcon.GHOST,
+                ChatMemberList.headingIconOf(
+                        LostTalesChatMembersPacket.GHOST_GROUP, false));
+        assertEquals(StatCollector.translateToLocal("gui.losttales.character.ghost"),
+                ChatMemberList.groupNameOf(ghost));
     }
 
     @Test

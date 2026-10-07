@@ -21,9 +21,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The private roster: a full one — the nine slots and the account
- * character — goes whole, each character with its faction and without a
- * level, and the deleted characters still to be restored close it.
+ * The private roster: a full one, the nine slots, goes whole, each
+ * character with its faction and without a level, and the deleted
+ * characters still to be restored close it.
  */
 public final class CharacterRosterSyncPacketTest {
 
@@ -33,24 +33,20 @@ public final class CharacterRosterSyncPacketTest {
     @Test
     public void aFullRosterAndItsDeletedCharactersRoundTrip() {
         List<CharacterSummary> characters = new ArrayList<CharacterSummary>();
-        characters.add(summary(OWNER, CharacterRoster.DEFAULT_SLOT_INDEX,
-                "Steve", "lotr:unaligned"));
         for (int slot = 0; slot < CharacterRoster.MAX_SLOTS; slot++) {
             characters.add(summary(UUID.randomUUID(), slot, "Hero " + slot,
                     "lotr:rohan"));
         }
         UUID deletedId = UUID.randomUUID();
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(OWNER,
-                CharacterRoster.MAX_SLOTS, OWNER, 12L, characters,
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
+                CharacterRoster.MAX_SLOTS, null, 12L, characters,
                 Arrays.asList(new DeletedCharacterSummary(deletedId, "Aldric",
                         "losttales:human", "losttales:human_bree_male_0", 12)));
 
         CharacterRosterSyncPacket decoded = roundTrip(snapshot);
         assertFalse(decoded.isMalformed());
         CharacterRosterSnapshot read = decoded.getSnapshot();
-        assertEquals(CharacterRoster.MAX_SLOTS + 1, read.getCharacterCount());
+        assertEquals(CharacterRoster.MAX_SLOTS, read.getCharacterCount());
         assertEquals("lotr:rohan", read.getCharacterAtSlot(3).getFactionId());
         assertEquals(1, read.getDeleted().size());
         DeletedCharacterSummary deleted = read.getDeleted().get(0);
@@ -64,7 +60,6 @@ public final class CharacterRosterSyncPacketTest {
     public void aRosterWithoutItsDeletedCountIsMalformed() {
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(OWNER,
                 1, null, 1L, Collections.<CharacterSummary>emptyList(),
-                true, 0, true,
                 Collections.<DeletedCharacterSummary>emptyList());
         ByteBuf buffer = Unpooled.buffer();
         new CharacterRosterSyncPacket(1, snapshot).toBytes(buffer);
@@ -79,7 +74,7 @@ public final class CharacterRosterSyncPacketTest {
         UUID id = UUID.randomUUID();
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(OWNER,
                 1, null, 1L, Collections.<CharacterSummary>emptyList(),
-                true, 0, true, Arrays.asList(
+                Arrays.asList(
                         new DeletedCharacterSummary(id, "A", "", "", 1),
                         new DeletedCharacterSummary(id, "B", "", "", 2)));
         CharacterRosterSyncPacket decoded = roundTrip(snapshot);

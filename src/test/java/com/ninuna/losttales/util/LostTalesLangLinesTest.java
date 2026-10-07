@@ -51,7 +51,6 @@ public final class LostTalesLangLinesTest {
             "gui.losttales.character.attribute.value.percent",
             "gui.losttales.character.attribute.value.size",
             "gui.losttales.character.error.wait",
-            "gui.losttales.character.room.menu.title",
             "disconnect.losttales.character_recovery",
             "gui.losttales.character.lore.eomer.description",
             "gui.losttales.character.lore.frodo.description",

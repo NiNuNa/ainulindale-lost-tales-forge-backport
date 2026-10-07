@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.WindowLists;
@@ -97,14 +98,16 @@ final class LostTalesChatHoverCard {
                 false, 0, Math.max(40, screenWidth - 8));
         int x = cardX(mouseX, laid.width, screenWidth);
         int y = cardY(mouseY, laid.height, screenHeight);
-        GL11.glPushMatrix();
+        LostTalesTooltipSmoothing.begin(mouseX, mouseY,
+                followsX(x, mouseX, laid.width),
+                followsY(y, mouseY, laid.height));
         try {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
             WindowStyle.drawPopup(x, y, x + laid.width,
                     y + laid.height, 1.0F);
             drawLaid(minecraft, laid, x, y, 255);
         } finally {
-            GL11.glPopMatrix();
+            LostTalesTooltipSmoothing.end();
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
         }
@@ -1153,7 +1156,8 @@ final class LostTalesChatHoverCard {
         int height = WindowStyle.popupLinesHeight(lines.size());
         int x = cardX(mouseX, width, screenWidth);
         int y = cardY(mouseY, height, screenHeight);
-        GL11.glPushMatrix();
+        LostTalesTooltipSmoothing.begin(mouseX, mouseY,
+                followsX(x, mouseX, width), followsY(y, mouseY, height));
         try {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
             WindowStyle.drawPopup(x, y, x + width, y + height,
@@ -1166,7 +1170,7 @@ final class LostTalesChatHoverCard {
                 textY += WindowStyle.LINE_HEIGHT;
             }
         } finally {
-            GL11.glPopMatrix();
+            LostTalesTooltipSmoothing.end();
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
         }
@@ -1179,6 +1183,20 @@ final class LostTalesChatHoverCard {
         }
         return Math.max(4, Math.min(candidate,
                 Math.max(4, screenWidth - width - 4)));
+    }
+
+    /**
+     * Whether a card {@link #cardX} placed stands beside the pointer,
+     * either side, rather than held against the screen's edge: only then
+     * does it keep pace with the pointer between GUI pixels.
+     */
+    private static boolean followsX(int x, int mouseX, int width) {
+        return x == mouseX + 12 || x == mouseX - width - 12;
+    }
+
+    /** As {@link #followsX}, for {@link #cardY}. */
+    private static boolean followsY(int y, int mouseY, int height) {
+        return y == mouseY + 8 || y == mouseY - height - 8;
     }
 
     static int cardY(int mouseY, int height, int screenHeight) {

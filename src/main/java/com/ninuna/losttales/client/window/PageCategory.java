@@ -3,7 +3,7 @@ package com.ninuna.losttales.client.window;
 import net.minecraft.util.StatCollector;
 
 /**
- * What kind of page a page is. The Lost Tales Menu lists the pages by
+ * What kind of page a page is. The New Page lists the pages by
  * category; a key shows its category's pages, its view; a page
  * opens in a window of its category; and a category with no window opens
  * its first window, at the category's own place and locked but the
@@ -16,10 +16,10 @@ import net.minecraft.util.StatCollector;
  */
 public enum PageCategory {
     /**
-     * The Lost Tales Menu, every page's way in: its key's first window
+     * The New Page, every page's way in: its key's first window
      * fills the screen; the {@code +} opens it as a window's new page.
      */
-    MENU("menu", null, true, Window.ScreenFill.FULL, false),
+    NEW_PAGE("new_page", null, true, Window.ScreenFill.FULL, false),
     /** The channels: Global, OOC, a faction's, a fellowship's, a server's own. */
     CHANNELS("channels", null, true, Window.ScreenFill.NONE, true),
     /** The Console and the Server Log, the command key's. */

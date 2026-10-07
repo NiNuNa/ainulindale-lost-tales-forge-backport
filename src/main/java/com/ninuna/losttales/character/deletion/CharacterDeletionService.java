@@ -200,7 +200,7 @@ public final class CharacterDeletionService {
 
     /**
      * An administrator's restore of one of {@code ownerId}'s deleted
-     * characters into its own slot, its player online or not (R15 a):
+     * characters into its own slot, its player online or not:
      * {@code accountName} is the account's own name, which its characters
      * may bear, and {@code online} the player, sent the roster at once, or
      * null while they are away, who finds it on their next visit.
@@ -508,7 +508,7 @@ public final class CharacterDeletionService {
                 return CharacterOperationResult.failure(name, roster);
             }
             int slot = firstFreeOpenSlot(roster);
-            if (slot < 0 || roster.roleplayCharacterCount()
+            if (slot < 0 || roster.characterCount()
                     >= CharacterRoster.MAX_SLOTS) {
                 return CharacterOperationResult.failure(
                         CharacterErrorId.RESTORE_NO_SLOT, roster);

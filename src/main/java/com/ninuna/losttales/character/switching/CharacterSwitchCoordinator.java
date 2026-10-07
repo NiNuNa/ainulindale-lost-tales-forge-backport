@@ -90,9 +90,39 @@ public final class CharacterSwitchCoordinator {
             }
             CharacterOperationResult result = selectLocked(
                     player, requestId, requestEpoch,
-                    expectedRosterRevision, target);
+                    expectedRosterRevision, target, false);
             cache(ownerId, requestEpoch, requestId, result);
             return result;
+        }
+    }
+
+    /**
+     * Plays a player who has just made their first character as it: the
+     * same journaled switch as any other, held back only by the account
+     * and the session ({@link CharacterSwitchPolicy#evaluateFirstCharacter}),
+     * and spending no cooldown.
+     */
+    public CharacterOperationResult joinAs(EntityPlayerMP player, int requestId,
+                                           UUID characterId) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
+            return CharacterOperationResult.failure(CharacterErrorId.INVALID_PLAYER, null);
+        }
+        UUID ownerId = player.getUniqueID();
+        if (characterId == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INVALID_CHARACTER_ID, null);
+        }
+        synchronized (getAccountLock(ownerId)) {
+            long requestEpoch = CharacterLifecycleStateTracker.captureRequestEpoch(player);
+            long revision;
+            try {
+                revision = loadStores(player.worldObj, ownerId).rosters
+                        .getOrCreateRoster(ownerId).getRevision();
+            } catch (RuntimeException exception) {
+                logFailure(player, "join_storage_access", exception);
+                return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
+            }
+            return selectLocked(player, requestId, requestEpoch, revision,
+                    PlayableIdentity.character(ownerId, characterId), true);
         }
     }
 
@@ -499,7 +529,8 @@ public final class CharacterSwitchCoordinator {
                                                     int requestId,
                                                     long requestEpoch,
                                                     long expectedRosterRevision,
-                                                    PlayableIdentity target) {
+                                                    PlayableIdentity target,
+                                                    boolean firstCharacter) {
         Stores stores;
         try {
             stores = loadStores(player.worldObj, player.getUniqueID());
@@ -545,8 +576,9 @@ public final class CharacterSwitchCoordinator {
         long safeNow = account.observeClock(System.currentTimeMillis());
         account.applyDecay(safeNow, getDecayDurationsMillis(),
                 getCooldownDurationsMillis().length - 1);
-        CharacterSwitchPolicyResult policyResult =
-                this.policy.evaluate(player, account, safeNow);
+        CharacterSwitchPolicyResult policyResult = firstCharacter
+                ? this.policy.evaluateFirstCharacter(player, account, safeNow)
+                : this.policy.evaluate(player, account, safeNow);
         if (!policyResult.isAllowed()) {
             stores.switches.saveAccount(account);
             return CharacterOperationResult.failure(
@@ -610,7 +642,8 @@ public final class CharacterSwitchCoordinator {
             CharacterPlayerStateStorage.flush(player.worldObj);
 
             CharacterSwitchAccountState.CooldownCommit cooldown =
-                    DefaultCharacterSwitchPolicy.isCooldownExempt(player)
+                    firstCharacter
+                            || DefaultCharacterSwitchPolicy.isCooldownExempt(player)
                             ? account.planCooldownExemptSwitch(safeNow)
                             : account.planSuccessfulSwitch(
                                     safeNow, getCooldownDurationsMillis());
@@ -643,9 +676,11 @@ public final class CharacterSwitchCoordinator {
             stores.switches.saveAccount(account);
             CharacterSwitchStorage.flush(player.worldObj);
 
-            CharacterSwitchPolicyResult commitPolicy =
-                    this.policy.evaluateDuringOwnedSwitch(player, account,
-                            account.observeClock(System.currentTimeMillis()));
+            long commitNow = account.observeClock(System.currentTimeMillis());
+            CharacterSwitchPolicyResult commitPolicy = firstCharacter
+                    ? CharacterSwitchPolicyResult.allowed()
+                    : this.policy.evaluateDuringOwnedSwitch(player, account,
+                            commitNow);
             if (!commitPolicy.isAllowed()) {
                 transaction.markAborted(System.currentTimeMillis());
                 stores.switches.saveAccount(account);

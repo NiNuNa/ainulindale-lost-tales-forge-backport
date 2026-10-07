@@ -17,6 +17,7 @@ import com.ninuna.losttales.accessory.effect.AccessoryConcealmentEventHandler;
 import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
 import com.ninuna.losttales.block.ELostTalesBlock;
+import com.ninuna.losttales.character.server.CharacterJoin;
 import com.ninuna.losttales.character.server.CharacterPlayerEventHandler;
 import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
@@ -27,6 +28,8 @@ import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferWorldDa
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.server.CharacterSpawnOriginHandler;
 import com.ninuna.losttales.compat.lotr.hired.LotrHiredUnitCustodyHandler;
+import com.ninuna.losttales.compat.lotr.LotrSharedWaypoints;
+import com.ninuna.losttales.compat.lotr.structure.LotrStructureBans;
 import com.ninuna.losttales.character.server.CharacterStateCheckpointHandler;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
@@ -125,7 +128,6 @@ import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.ChatConsoleCommandHandler;
 import com.ninuna.losttales.chat.server.ChatSpeechGate;
 import com.ninuna.losttales.chat.server.ChatArrivals;
-import com.ninuna.losttales.chat.server.ChatLinesAwaitingNames;
 import com.ninuna.losttales.chat.server.ChatWelcome;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.server.ChatCommandContexts;
@@ -137,8 +139,6 @@ import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.chat.server.LostTalesServerBroadcastHook;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
-import com.ninuna.losttales.world.room.CharacterRoomWorldHandler;
-import com.ninuna.losttales.world.room.CharacterRoomWorldType;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneGenerationHandler;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
@@ -168,8 +168,6 @@ public class LostTalesCommonProxy {
         ServerQuestFiles.configure(event.getModConfigurationDirectory());
         GeckoLib.initialize();
         LostTalesNetworkHandler.registerCommonPackets();
-        // Before any world can load: a world names its type by name.
-        CharacterRoomWorldType.register();
         LostTalesQuestRegistry.loadFromClasspath();
         LostTalesQuestPlayerEventHandler questPlayerEventHandler = new LostTalesQuestPlayerEventHandler();
         AccessoryPlayerEventHandler accessoryPlayerEventHandler =
@@ -181,6 +179,7 @@ public class LostTalesCommonProxy {
         CharacterLifecycleStateTracker characterLifecycleStateTracker =
                 new CharacterLifecycleStateTracker();
         CharacterPlayerEventHandler characterPlayerEventHandler = new CharacterPlayerEventHandler();
+        CharacterJoin characterJoin = new CharacterJoin();
         CharacterRaceGameplayHandler characterRaceGameplayHandler = new CharacterRaceGameplayHandler();
         CharacterSpawnOriginHandler characterSpawnOriginHandler = new CharacterSpawnOriginHandler();
         CharacterStateCheckpointHandler characterStateCheckpointHandler =
@@ -207,21 +206,20 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(accessoryConcealmentEventHandler);
         MinecraftForge.EVENT_BUS.register(characterLifecycleStateTracker);
         MinecraftForge.EVENT_BUS.register(characterPlayerEventHandler);
+        MinecraftForge.EVENT_BUS.register(characterJoin);
         MinecraftForge.EVENT_BUS.register(characterRaceGameplayHandler);
         MinecraftForge.EVENT_BUS.register(characterSpawnOriginHandler);
         MinecraftForge.EVENT_BUS.register(new LotrHiredUnitCustodyHandler());
+        MinecraftForge.EVENT_BUS.register(new LotrStructureBans());
         MinecraftForge.EVENT_BUS.register(questObjectiveEventHandler);
         MinecraftForge.EVENT_BUS.register(mobAggroEventHandler);
         MinecraftForge.EVENT_BUS.register(projectileAimHandler);
         MinecraftForge.EVENT_BUS.register(chargeService);
         MinecraftForge.EVENT_BUS.register(waystoneGenerationHandler);
-        MinecraftForge.EVENT_BUS.register(new CharacterRoomWorldHandler());
         MinecraftForge.EVENT_BUS.register(new ChatConsoleCommandHandler());
         MinecraftForge.EVENT_BUS.register(new ChatSpeechGate());
         MinecraftForge.EVENT_BUS.register(new ChatArrivals());
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatWelcome());
-        cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(
-                new ChatLinesAwaitingNames());
         MinecraftForge.TERRAIN_GEN_BUS.register(waystoneGenerationHandler);
         GameRegistry.registerWorldGenerator(
                 waystoneGenerationHandler, 1000);
@@ -231,6 +229,7 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
         FMLCommonHandler.instance().bus().register(characterLifecycleStateTracker);
         FMLCommonHandler.instance().bus().register(characterPlayerEventHandler);
+        FMLCommonHandler.instance().bus().register(characterJoin);
         FMLCommonHandler.instance().bus().register(characterRaceGameplayHandler);
         FMLCommonHandler.instance().bus().register(characterStateCheckpointHandler);
         FMLCommonHandler.instance().bus().register(fellowshipPlayerEventHandler);
@@ -422,6 +421,7 @@ public class LostTalesCommonProxy {
         LostTalesChargeService.clear();
         FellowshipSyncManager.clear();
         FellowshipMirrors.clear();
+        LotrSharedWaypoints.clear();
         FellowshipMemberStatusSyncManager.clear();
         FellowshipTrackingSyncManager.clear();
         FellowshipDeclines.clear();
@@ -441,8 +441,8 @@ public class LostTalesCommonProxy {
         ChatHistoryStorage.restore(event.getServer());
         // Straight after the history, whose kept messages decide which of
         // the save's Discord links come back, and before the bridge
-        // starts below. Every server gets a map of its own, a character
-        // room included, so nothing reaches it from the world before.
+        // starts below. Every server gets a map of its own, so nothing
+        // reaches it from the world before.
         LostTalesDiscordBridge.getInstance().restoreLinks(event.getServer());
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
@@ -459,7 +459,7 @@ public class LostTalesCommonProxy {
         LostTalesServerBroadcastHook.clear();
         ChatArrivals.clear();
         ChatWelcome.clear();
-        ChatLinesAwaitingNames.clear();
+        CharacterJoin.clear();
         ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();
@@ -469,10 +469,7 @@ public class LostTalesCommonProxy {
         LostTalesMobAggroEventHandler.clearAll();
         LotrRaceProfileAdapter.getInstance().clear();
         ELostTalesCommand.initAndRegisterCommands(event);
-        // A character room is a private visit; Discord is not told of it.
-        if (!CharacterRoomWorldType.isRoomServer(event.getServer())) {
-            LostTalesDiscordBridge.getInstance().start();
-        }
+        LostTalesDiscordBridge.getInstance().start();
     }
 
     private static void initializeLoreCharacterOwnership(
@@ -515,9 +512,6 @@ public class LostTalesCommonProxy {
      * fills from its first look.
      */
     public void onServerStarted(FMLServerStartedEvent event) {
-        if (CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())) {
-            return;
-        }
         LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
                 ChatConsoleEvent.Severity.INFO,
                 LostTalesServerBroadcastHook.SERVER_NAME, "Server started");
@@ -529,12 +523,10 @@ public class LostTalesCommonProxy {
         // start records: shown to its readers still online, and kept by
         // the history's snapshot below, so the Console shows it when the
         // server is next up. First, before the ids are reset below.
-        if (!CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())) {
-            LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
-                    ChatConsoleEvent.Severity.INFO,
-                    LostTalesServerBroadcastHook.SERVER_NAME,
-                    "Server shutting down");
-        }
+        LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
+                ChatConsoleEvent.Severity.INFO,
+                LostTalesServerBroadcastHook.SERVER_NAME,
+                "Server shutting down");
         // The offline topic, queued before the stop, which gives the
         // worker a bounded moment to send it.
         LostTalesDiscordBridge.getInstance().onServerStopping();
@@ -558,6 +550,7 @@ public class LostTalesCommonProxy {
         LostTalesChargeService.clear();
         FellowshipSyncManager.clear();
         FellowshipMirrors.clear();
+        LotrSharedWaypoints.clear();
         FellowshipMemberStatusSyncManager.clear();
         FellowshipTrackingSyncManager.clear();
         FellowshipDeclines.clear();
@@ -591,7 +584,7 @@ public class LostTalesCommonProxy {
         LostTalesServerBroadcastHook.clear();
         ChatArrivals.clear();
         ChatWelcome.clear();
-        ChatLinesAwaitingNames.clear();
+        CharacterJoin.clear();
         ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();

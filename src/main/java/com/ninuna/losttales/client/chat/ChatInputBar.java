@@ -90,9 +90,10 @@ public final class ChatInputBar {
             LostTalesColors.rgb(LostTalesColors.SALMON);
     static final float NOTICE_LIFETIME_MILLIS = 1400.0F;
     /**
-     * Clear space between the things standing on the bar, and before
-     * the first of them, save between its tab and identity buttons
-     * ({@link BarLead#BUTTON_GAP}). Measured in ink, like every other gap
+     * Clear space inside the well and beside the counter's words. The
+     * buttons keep a button's gap between them and an edge's gap from the
+     * frame and the hairlines ({@link WindowStyle#BUTTON_GAP},
+     * {@link WindowStyle#EDGE_GAP}). Measured in ink, like every other gap
      * the chat keeps: what the eye reads as the gap is the space between
      * the pixels that were actually drawn, not between the boxes they
      * were drawn in.
@@ -375,10 +376,7 @@ public final class ChatInputBar {
 
     /** Left edge of the bar control in the given slot from the right. */
     static int barSlotLeft(int barRight, int index) {
-        return barRight - ChatPickerPanel.BUTTON_MARGIN
-                - (index + 1) * (ChatPickerPanel.BUTTON_SIZE
-                        + ChatPickerPanel.BUTTON_MARGIN)
-                + ChatPickerPanel.BUTTON_MARGIN;
+        return ChatPickerPanel.slotLeft(barRight, index);
     }
 
     /**
@@ -879,14 +877,14 @@ public final class ChatInputBar {
 
     /**
      * The tab and identity buttons on the bar of a window whose front tab
-     * is {@code channel}, a bar gap in from the window's edge: the name
+     * is {@code channel}, an edge's gap in from the window's edge: the name
      * whole while the field beside them keeps
      * {@link #COMFORTABLE_FIELD_WIDTH}, else giving the field what it
      * lacks of that, down to the icon alone.
      */
     private BarLead.Fit leadFit(int barRight, ConversationPage channel) {
         WindowBar.Measure measure = WindowBar.measure(this.font);
-        int left = this.left + BAR_GAP;
+        int left = this.left + WindowStyle.EDGE_GAP;
         int whole = BarLead.wholeWidth(channel, measure);
         ChatInputLine wholeLine = lineAfter(left + whole, barRight);
         return BarLead.fit(channel, left, leadWidth(whole,

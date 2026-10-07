@@ -165,6 +165,11 @@ public final class BarItem {
 
     /** What the tip says: why it is greyed, else what it does. */
     public String tipText() {
-        return isAvailable() ? this.tip : this.unavailable.trim();
+        return isAvailable() ? this.tip : "";
+    }
+
+    /** Why it cannot be taken now, said over the bar when it is pressed; empty while it can. */
+    public String greyedWhy() {
+        return isAvailable() ? "" : this.unavailable.trim();
     }
 }

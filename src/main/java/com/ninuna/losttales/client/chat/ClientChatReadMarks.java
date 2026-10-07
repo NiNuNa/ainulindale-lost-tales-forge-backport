@@ -54,7 +54,7 @@ public final class ClientChatReadMarks {
      */
     public static synchronized void initialize(File configDirectory) {
         initialize(configDirectory, configDirectory == null ? null
-                : LostTalesClientAccount.templateId());
+                : LostTalesClientAccount.signedInId());
     }
 
     /** As above, for a named account. */

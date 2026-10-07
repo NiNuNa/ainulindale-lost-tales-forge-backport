@@ -604,12 +604,23 @@ public final class ChatLayoutTest {
         assertEquals(1, WindowLayout.order().size());
     }
 
-    /** A whole window closes at once, unless its padlock holds it, and its channels survive it. */
+    /**
+     * A whole window closes at once and its channels survive it. A locked
+     * one only goes out of sight with everything it holds, and comes back
+     * as it was when it is asked for.
+     */
     @Test
     public void closingAWindowKeepsItsChannels() {
         assertFalse(WindowLayout.closeWindow("nope"));
         assertTrue(WindowLayout.setLocked("w1", true));
-        assertFalse("a locked window stays", WindowLayout.closeWindow("w1"));
+        List<ChatChannel> held = ChatLayoutViews.channelsOf(
+                WindowLayout.window("w1"));
+        assertTrue("a locked window closes", WindowLayout.closeWindow("w1"));
+        assertTrue(WindowLayout.window("w1").isClosed());
+        assertEquals(held, ChatLayoutViews.channelsOf(WindowLayout.window("w1")));
+        assertFalse("closed once", WindowLayout.closeWindow("w1"));
+        WindowLayout.raise("w1");
+        assertFalse(WindowLayout.window("w1").isClosed());
         assertTrue(WindowLayout.setLocked("w1", false));
         assertTrue(WindowLayout.closeWindow("w1"));
         assertNull(WindowLayout.window("w1"));
@@ -772,8 +783,8 @@ public final class ChatLayoutTest {
     /**
      * The padlock holds a window's place, its size and its tabs: by hand
      * none of them closes, leaves, arrives or changes places, and the
-     * window neither closes nor resets. What is inside a tab stays the
-     * player's to set.
+     * window does not reset; closed, it keeps them all. What is inside a
+     * tab stays the player's to set.
      */
     @Test
     public void aLockedWindowKeepsItsPlaceItsSizeAndItsTabs() {
@@ -791,9 +802,10 @@ public final class ChatLayoutTest {
         assertFalse("none arrives", WindowLayout.moveTab(operator, "w2", 0));
         assertFalse(WindowLayout.addTab("w2", ConversationPage.whisper("Bilbo", "")));
         assertNull(Tearing.off(ooc, 1.0D, 1.0D));
-        assertFalse(WindowLayout.closeWindow("w2"));
         assertFalse(WindowLayout.resetWindow("w2"));
+        assertTrue(WindowLayout.closeWindow("w2"));
         assertEquals(held, ChatLayoutViews.channelsOf(WindowLayout.window("w2")));
+        WindowLayout.raise("w2");
         ChatLayout.setNotification(ooc, ChatLineChoice.NOTHING);
         assertTrue(ChatLayout.isMuted(ConversationPage.of(ChatChannel.OOC)));
         assertTrue(WindowLayout.setLocked("w2", false));

@@ -30,6 +30,7 @@ import com.ninuna.losttales.chat.share.ChatShareReference;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.character.model.CharacterRoster;
+import com.ninuna.losttales.character.server.CharacterJoin;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.state.CharacterLastSeen;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
@@ -222,6 +223,12 @@ public final class LostTalesChatService {
         // character the sender does not own, or the account while a
         // character is played, is refused rather than sent as someone else.
         boolean roleplaying = ChatRolePresentation.isInCharacter(channel);
+        if (roleplaying && CharacterJoin.isWaiting(sender)) {
+            // Nobody speaks in character before they have a character.
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.identity.first_character"));
+            return;
+        }
         ChatIdentitySelection.Worn named = ChatIdentitySelection.worn(sender,
                 channel, identityKind, identityCharacterId);
         if (roleplaying && (!PlayableIdentityResolver.resolve(sender).isAvailable()

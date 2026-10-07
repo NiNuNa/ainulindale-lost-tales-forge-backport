@@ -2,7 +2,6 @@ package com.ninuna.losttales.gui.screen.character;
 
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
-import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.chat.ChatEmojiIcon;
@@ -11,7 +10,6 @@ import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -101,8 +99,7 @@ final class CharacterProfileColumn {
                            ProfileSubject subject, CharacterProfile profile,
                            boolean unavailable, String accountName,
                            boolean played, boolean lore) {
-        boolean account = subject.characterId == null;
-        String raceId = account ? CharacterRaceRegistry.HUMAN : subject.raceId;
+        String raceId = subject.raceId;
         add(Kind.NAME, subject.name, "", played
                 ? LostTalesColors.rgb(LostTalesColors.HONEY)
                 : LostTalesUiInk.IVORY);
@@ -116,27 +113,16 @@ final class CharacterProfileColumn {
         if (raceId.length() > 0) {
             facts.add(ClientCharacterDisplayNames.race(raceId));
         }
-        if (account) {
-            // The account belongs to no faction until it pledges.
-            facts.add(ClientCharacterDisplayNames.faction(
-                    LotrCharacterAdapter.UNALIGNED_FACTION_ID));
-        } else if (subject.factionId.length() > 0) {
+        if (subject.factionId.length() > 0) {
             facts.add(ClientCharacterDisplayNames.faction(subject.factionId));
         }
         add(Kind.ASIDE, join(facts), "", WindowStyle.asideRgb());
 
-        if (account) {
-            heading("gui.losttales.character.section.about");
-            wrapped(font, width, I18n.format(
-                    "gui.losttales.character.account_detail"),
-                    WindowStyle.asideRgb());
-        } else {
-            if (profile != null) {
-                addGlances(font, width, profile);
-            }
-            addAbout(font, width, subject, profile, unavailable);
-            addFacts(subject, profile);
+        if (profile != null) {
+            addGlances(font, width, profile);
         }
+        addAbout(font, width, subject, profile, unavailable);
+        addFacts(subject, profile);
 
         if (raceId.length() > 0) {
             heading("gui.losttales.character.section.race");

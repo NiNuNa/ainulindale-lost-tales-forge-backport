@@ -18,6 +18,12 @@ public final class Window {
     /** Two of its pages each, shown together while one of them is in front. */
     private final List<WindowSplit> splits = new ArrayList<WindowSplit>();
     private boolean locked;
+    /**
+     * Whether a locked window was closed by hand: it stands as it was,
+     * pages and all, but shows nowhere until its view opens again. For the
+     * session only.
+     */
+    private boolean closed;
     /** Whether the window stays on screen while playing, as part of the HUD. */
     private boolean pinnedToHud;
     /** Whether every view of the window screen shows the window, whichever key opened it. */
@@ -304,6 +310,8 @@ public final class Window {
 
     public String getId() { return this.id; }
     public boolean isLocked() { return this.locked; }
+    /** Whether the window was closed while locked and waits for its view to open again. */
+    public boolean isClosed() { return this.closed; }
     public boolean isPinnedToHud() { return this.pinnedToHud; }
     public boolean isPinnedToGui() { return this.pinnedToGui; }
     public double getOffsetX() { return this.offsetX; }
@@ -367,6 +375,8 @@ public final class Window {
     }
 
     void setLocked(boolean locked) { this.locked = locked; }
+
+    void setClosed(boolean closed) { this.closed = closed; }
 
     void setPinnedToHud(boolean pinned) { this.pinnedToHud = pinned; }
 

@@ -31,6 +31,8 @@ public final class WindowViewTest {
     private static final String PAGE = "view_page";
     private static final String OTHER = "view_other";
     private static final String WORLD = "view_world";
+    private static final String KIND_FIRST = "view_kind_first";
+    private static final String KIND_SECOND = "view_kind_second";
 
     private static final ConversationPage GLOBAL = ConversationPage.of(ChatChannel.GLOBAL);
     private static final ConversationPage OOC = ConversationPage.of(ChatChannel.OOC);
@@ -55,6 +57,14 @@ public final class WindowViewTest {
         if (WindowPages.byId(WORLD) == null) {
             WindowPages.registerWorldPage(WORLD, "gui.test.view.world",
                     new ItemStack(Items.compass), PageCategory.MAP, empty);
+        }
+        if (WindowPages.byId(KIND_FIRST) == null) {
+            WindowPages.register(KIND_FIRST, "gui.test.view.kind_first",
+                    new ItemStack(Items.book), null, PageCategory.PROFILE,
+                    empty);
+            WindowPages.register(KIND_SECOND, "gui.test.view.kind_second",
+                    new ItemStack(Items.book), null, PageCategory.PROFILE,
+                    empty);
         }
     }
 
@@ -331,6 +341,68 @@ public final class WindowViewTest {
         assertEquals("a whisper stands with the channels", whisper,
                 WindowLayout.openInCategory(whisper, chat.getId()));
         assertTrue(chat.contains(whisper));
+    }
+
+    /**
+     * A category's key opens its first window with every page of it; a
+     * page opened by hand opens alone.
+     */
+    @Test
+    public void aCategorysKeyOpensItsFirstWindowWithEveryPageOfIt() {
+        OtherPage first = WindowPages.tab(KIND_FIRST);
+        OtherPage second = WindowPages.tab(KIND_SECOND);
+        Window byHand = WindowLayout.showPage(second);
+        assertEquals(Arrays.<WindowPage>asList(second), byHand.getTabs());
+        WindowLayout.setLocked(byHand.getId(), false);
+        WindowLayout.closeWindow(byHand.getId());
+        assertFalse(WindowLayout.isOpen(second));
+        Window byKey = WindowLayout.showView(second);
+        assertTrue(byKey.contains(first));
+        assertTrue(byKey.contains(second));
+        assertEquals(second, byKey.getActiveTab());
+        assertTrue("the category's first window", byKey.isLocked());
+    }
+
+    /**
+     * Closed while locked, a window keeps its pages out of sight and
+     * comes back as it was when its view opens again.
+     */
+    @Test
+    public void aLockedWindowClosedComesBackWithItsView() {
+        OtherPage page = WindowPages.tab(PAGE);
+        Window journal = WindowLayout.showPage(page);
+        assertTrue(journal.isLocked());
+        WindowView.forPage(page);
+        assertTrue(WindowView.isShown(page));
+        assertTrue(WindowLayout.closeWindow(journal.getId()));
+        assertTrue(journal.isClosed());
+        assertTrue("its pages stay", journal.contains(page));
+        assertFalse(WindowView.isShown(page));
+        assertTrue(WindowFrame.visibleTabs(journal).isEmpty());
+        WindowView.forChat();
+        assertTrue("another view leaves it closed", journal.isClosed());
+        WindowView.forPage(page);
+        assertFalse(journal.isClosed());
+        assertTrue(WindowView.isShown(page));
+    }
+
+    /**
+     * Closing an unlocked window forgets the place a padlock gave its
+     * category, so its next first window stands at the default place,
+     * unless a locked window of it still stands.
+     */
+    @Test
+    public void closingAnUnlockedWindowForgetsItsCategorysPlace() {
+        OtherPage page = WindowPages.tab(PAGE);
+        Window journal = WindowLayout.showPage(page);
+        WindowLayout.setLocked(journal.getId(), false);
+        WindowLayout.setLocked(journal.getId(), true);
+        assertTrue(WindowLayout.categoryPlaces()
+                .containsKey(PageCategory.QUEST_JOURNAL));
+        WindowLayout.setLocked(journal.getId(), false);
+        assertTrue(WindowLayout.closeWindow(journal.getId()));
+        assertFalse(WindowLayout.categoryPlaces()
+                .containsKey(PageCategory.QUEST_JOURNAL));
     }
 
     private static String described() {

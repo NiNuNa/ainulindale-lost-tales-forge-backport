@@ -111,8 +111,8 @@ public final class ChatMemberList {
     static final int GROUP_GAP = 6;
     /** Clear rows at the top and the foot of the list, in the list's units. */
     static final int PAD = 4;
-    /** Clear space between the separator and a row's head or a heading, in the list's units. */
-    static final int INSET = 5;
+    /** Clear space between the separator and a row's head or a heading, in the list's units: an edge's gap, as every list keeps. */
+    static final int INSET = WindowStyle.EDGE_GAP;
     /** Clear space between a head's sphere and the name, in the list's units. */
     static final int NAME_GAP = 3;
     /** A heading's icon: an emoji's box, in the list's units, and the space after it. */
@@ -122,12 +122,15 @@ public final class ChatMemberList {
     static final String NPC_GROUP_PREFIX = "npc:";
 
     /** What the heading of a group of those here stands behind. */
-    enum HeadingIcon { SERVER, ONLINE, NPC, DISCORD, FACTION, ROLE }
+    enum HeadingIcon { SERVER, ONLINE, GHOST, NPC, DISCORD, FACTION, ROLE }
     /** Clear space between the name's capitals and the title's, in the list's units. */
     static final int TITLE_GAP = 3;
     /** Clear space the names keep from the window's edge, in the list's units. */
     static final int RIGHT_GAP = 3;
-    /** How much of its own opacity an absent member is drawn at while the pointer is elsewhere. */
+    /**
+     * How much of its own opacity an absent member, or one still making
+     * their first character, is drawn at while the pointer is elsewhere.
+     */
     static final float OFFLINE_OPACITY = 0.5F;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
 
@@ -429,6 +432,9 @@ public final class ChatMemberList {
         if (LostTalesChatMembersPacket.SERVER_GROUP.equals(key)) {
             return ChatNames.server(LostTalesWords.LANG);
         }
+        if (LostTalesChatMembersPacket.GHOST_GROUP.equals(key)) {
+            return StatCollector.translateToLocal("gui.losttales.character.ghost");
+        }
         if (key.length() == 0) {
             return StatCollector.translateToLocal("gui.losttales.chat.members.online");
         }
@@ -474,13 +480,15 @@ public final class ChatMemberList {
     }
 
     /**
-     * The opacity a member's row is drawn at: an absent member's
-     * {@link #OFFLINE_OPACITY} of the list's, rising to the whole as far as
-     * the pointer lights the row, as {@code lit} says.
+     * The opacity a member's row is drawn at: an absent member's, or one
+     * still making their first character, {@link #OFFLINE_OPACITY} of the
+     * list's, rising to the whole as far as the pointer lights the row, as
+     * {@code lit} says.
      */
     static int rowAlpha(LostTalesChatMembersPacket.Member member, int alpha,
                         float lit) {
-        if (member.isOnline()) {
+        if (member.isOnline() && !LostTalesChatMembersPacket.GHOST_GROUP
+                .equals(member.getGroupKey())) {
             return alpha;
         }
         float light = Math.max(0.0F, Math.min(1.0F, lit));
@@ -747,7 +755,8 @@ public final class ChatMemberList {
     /**
      * The icon over the group {@code groupKey} of those here, in a list
      * that is {@code inCharacter} or not: the Server's own mark over its
-     * group; the green sphere over the plain group, Online, in every list; the face an NPC's conversation wears
+     * group; the green sphere over the plain group, Online, in every list,
+     * and at half strength over those making their first character; the face an NPC's conversation wears
      * over an NPC's own group; the Discord emoji over a Discord server's
      * members; in character a faction's banner, out of character a role's
      * own icon.
@@ -759,6 +768,9 @@ public final class ChatMemberList {
         }
         if (group.length() == 0) {
             return HeadingIcon.ONLINE;
+        }
+        if (LostTalesChatMembersPacket.GHOST_GROUP.equals(group)) {
+            return HeadingIcon.GHOST;
         }
         if (group.startsWith(NPC_GROUP_PREFIX)) {
             return HeadingIcon.NPC;
@@ -790,6 +802,10 @@ public final class ChatMemberList {
             case ONLINE:
                 drawHeadingMark(LostTalesUiSheet.PRESENCE_ONLINE, x, textTop,
                         alpha);
+                return;
+            case GHOST:
+                drawHeadingMark(LostTalesUiSheet.PRESENCE_ONLINE, x, textTop,
+                        Math.round(alpha * OFFLINE_OPACITY));
                 return;
             case NPC:
                 ChatInlineIcons.drawEmoji(minecraft, ChatEmoji.GRINNING, x,

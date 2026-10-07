@@ -101,6 +101,12 @@ public final class LotrCustomWaypointStateComponent
         this.adapter.clearAllRuntimeState();
     }
 
+    /** The waypoint state inside a saved component; null for none. */
+    public static NBTTagCompound waypointsOf(NBTTagCompound component) {
+        return component == null || !component.hasKey(TAG_WAYPOINTS, Constants.NBT.TAG_COMPOUND)
+                ? null : component.getCompoundTag(TAG_WAYPOINTS);
+    }
+
     private static NBTTagCompound wrap(NBTTagCompound waypoints) {
         NBTTagCompound state = new NBTTagCompound();
         state.setInteger(TAG_VERSION, VERSION);

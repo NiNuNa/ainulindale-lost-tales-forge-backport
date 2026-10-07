@@ -51,6 +51,15 @@ public final class WindowView {
     private static void set(PageCategory next) {
         category = next;
         BY_HAND.clear();
+        if (next != null) {
+            // A window closed while locked comes back as its view opens.
+            WindowLayout.reopen(new WindowLayout.TabFilter() {
+                @Override
+                public boolean matches(WindowPage tab) {
+                    return inView(tab);
+                }
+            });
+        }
     }
 
     /**
@@ -93,6 +102,16 @@ public final class WindowView {
         if (tab == null) {
             return false;
         }
+        // A window closed while locked waits out of sight for its view.
+        if ((category != null || pinnedPass)
+                && WindowLayout.isClosedAway(tab)) {
+            return false;
+        }
+        return inView(tab);
+    }
+
+    /** Whether the view stands for the tab, its window closed or not. */
+    private static boolean inView(WindowPage tab) {
         if (pinnedPass) {
             return WindowLayout.isOnHud(tab);
         }

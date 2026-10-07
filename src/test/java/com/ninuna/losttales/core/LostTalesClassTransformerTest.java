@@ -224,6 +224,8 @@ public final class LostTalesClassTransformerTest {
             "com/ninuna/losttales/compat/lotr/LostTalesLotrFellowshipRequestHook";
     private static final String HIRED_UNIT_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/hired/LostTalesLotrHiredUnitHook";
+    private static final String SHARED_WAYPOINT_NAME_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LostTalesLotrSharedWaypointNames";
     private static final String TRADER_NOTICE_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/LostTalesLotrTraderNoticeHook";
     private static final String SERVER_BROADCAST_HOOK_OWNER =
@@ -716,6 +718,27 @@ public final class LostTalesClassTransformerTest {
         assertTrue(beforeReturn);
         assertEquals("true", System.getProperty(
                 LostTalesClassTransformer.LOTR_HIRED_UNIT_ACTIVE_PROPERTY));
+    }
+
+    /** A shared waypoint's copy names its sharer's character, after LOTR has written the account. */
+    @Test
+    public void lotrSharedWaypointsNameTheSharingCharacter() throws Exception {
+        ClassNode waypoint = transform("lotr.common.world.map.LOTRCustomWaypoint");
+        assertTrue(containsStaticHook(waypoint, "setSharingPlayerID",
+                SHARED_WAYPOINT_NAME_HOOK_OWNER, "name"));
+        MethodNode method = findMethod(waypoint, "setSharingPlayerID");
+        boolean beforeReturn = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode
+                    && "name".equals(((MethodInsnNode)instruction).name)) {
+                AbstractInsnNode after = nextCode(instruction);
+                beforeReturn |= after != null && after.getOpcode() == Opcodes.RETURN;
+            }
+        }
+        assertTrue(beforeReturn);
+        assertEquals("true", System.getProperty(
+                LostTalesClassTransformer.LOTR_SHARED_WAYPOINT_NAME_ACTIVE_PROPERTY));
     }
 
     @Test

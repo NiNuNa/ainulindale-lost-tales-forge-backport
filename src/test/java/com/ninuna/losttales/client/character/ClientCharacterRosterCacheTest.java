@@ -78,7 +78,7 @@ public final class ClientCharacterRosterCacheTest {
 
     private static CharacterRosterSnapshot roster(long revision) {
         return new CharacterRosterSnapshot(OWNER, 1, null, revision,
-                Collections.<CharacterSummary>emptyList(), true, 0, true,
+                Collections.<CharacterSummary>emptyList(),
                 Collections.<DeletedCharacterSummary>emptyList());
     }
 }

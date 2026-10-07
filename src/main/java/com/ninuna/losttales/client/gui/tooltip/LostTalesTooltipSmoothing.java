@@ -52,9 +52,20 @@ public final class LostTalesTooltipSmoothing {
      * however the offset works out.
      */
     public static void begin(int mouseX, int mouseY) {
+        begin(mouseX, mouseY, true, true);
+    }
+
+    /**
+     * As {@link #begin(int, int)}, shifted only along an axis where the
+     * popup stands where the pointer put it: one held against the screen's
+     * edge stays still there instead of shifting by a part of a pixel.
+     */
+    public static void begin(int mouseX, int mouseY, boolean followX,
+                             boolean followY) {
         GL11.glPushMatrix();
         try {
-            GL11.glTranslatef(offsetX(mouseX), offsetY(mouseY), 0.0F);
+            GL11.glTranslatef(followX ? offsetX(mouseX) : 0.0F,
+                    followY ? offsetY(mouseY) : 0.0F, 0.0F);
         } catch (RuntimeException unavailable) {
             // No display, no resolution to measure against. The tooltip
             // is drawn where it would have been, and the matrix still

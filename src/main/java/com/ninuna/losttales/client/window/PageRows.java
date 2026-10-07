@@ -134,6 +134,14 @@ public final class PageRows {
     public boolean press(LostTalesUiHitBox box, double x, double y,
                          int button) {
         WindowHover hover = this.menu.hoverAt(box, x, y);
+        if (hover != null && button == 0 && hover.greyedWhy.length() > 0) {
+            // A greyed row has no tip; a press says why over the bar.
+            WindowScreen screen = WindowScreen.current();
+            if (screen != null) {
+                screen.sayWhyGreyedHere(hover.greyedWhy);
+            }
+            return true;
+        }
         if (hover == null || hover.menuEntry == null
                 || (button != 0 && button != 1)) {
             return false;

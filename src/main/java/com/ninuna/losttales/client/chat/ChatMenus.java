@@ -268,7 +268,7 @@ final class ChatMenus {
     /* ---- What the chat offers to open ---- */
 
     /**
-     * The chat's part of the Lost Tales Menu and of Page Search, each row
+     * The chat's part of the New Page and of Page Search, each row
      * under its page's category there ({@link PageCategory}), a row opening
      * a new copy of its conversation: every channel and console the player
      * can read, in their order, a fellowship's conversation for each

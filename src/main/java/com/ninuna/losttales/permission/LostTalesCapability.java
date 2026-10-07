@@ -62,6 +62,9 @@ public final class LostTalesCapability {
     /** Place public waystones and change their settings. */
     public static final LostTalesCapability WAYSTONE_MANAGE =
             register("waystone.manage", OPERATOR);
+    /** Ban an account, a character or everyone from spawning LOTR's structures (/losttales structures). */
+    public static final LostTalesCapability STRUCTURES_BAN =
+            register("structures.ban", OPERATOR);
 
     private final String id;
     private final int requiredOpLevel;

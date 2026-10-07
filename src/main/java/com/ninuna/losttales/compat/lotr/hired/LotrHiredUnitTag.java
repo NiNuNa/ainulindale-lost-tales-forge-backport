@@ -8,12 +8,10 @@ import net.minecraftforge.common.util.Constants;
 import java.util.UUID;
 
 /**
- * Which identity hired a unit, kept in the entity's own persistent data
- * so it travels with the unit through chunk saves: the owning account
- * and, for a character, the character's id. LOTR itself only knows the
- * account. The tag keys on the identity's gameplay id, so a unit the
- * account holds belongs to the account character, whose id is the
- * account's own.
+ * Which character hired a unit, kept in the entity's own persistent data
+ * so it travels with the unit through chunk saves: the owning account and
+ * the character's id. LOTR itself only knows the account. The tag keys on
+ * the identity's gameplay id.
  */
 public final class LotrHiredUnitTag {
 
@@ -52,14 +50,6 @@ public final class LotrHiredUnitTag {
     /** The key of {@code identity}, or null for none. */
     public static String identityKey(PlayableIdentity identity) {
         return identity == null ? null : identity.getGameplayId().toString();
-    }
-
-    /**
-     * The same owner with the character forgotten: what a deleted
-     * character leaves, which the account character takes.
-     */
-    public LotrHiredUnitTag asAccount() {
-        return new LotrHiredUnitTag(this.ownerId, null);
     }
 
     /** The tag on the entity, or null when it carries none it can read. */

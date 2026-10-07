@@ -25,13 +25,14 @@ public final class ChatInputLineTest {
     }
 
     @Test
-    public void theLinesGapsAreThreePixelsSaveTwoBetweenEachDividerAndTheWell() {
+    public void theLinesGapsAreThreePixelsSaveAnEdgesGapBetweenEachDividerAndTheWell() {
         ChatInputLine line = line();
         int gap = ChatInputBar.BAR_GAP;
         int divider = WindowStyle.DIVIDER_WIDTH;
-        assertEquals(2, ChatInputLine.WELL_GAP);
-        // From the controls' last pixel of ink to the first divider.
-        assertEquals(gap, line.leftDividerX - BUTTONS_RIGHT);
+        assertEquals(WindowStyle.EDGE_GAP, ChatInputLine.WELL_GAP);
+        // From the identity button's frame to the first divider: an
+        // edge's gap, the divider counting as an edge.
+        assertEquals(WindowStyle.EDGE_GAP, line.leftDividerX - BUTTONS_RIGHT);
         // From that divider to the well, and from the well's edge to the
         // field's first pixel.
         assertEquals(ChatInputLine.WELL_GAP,

@@ -24,74 +24,7 @@ final class MainMenuButtonLayout {
      */
     static final int BASELINE_COLUMN_HEIGHT = HEIGHT * 4 + GAP * 2 + FOOTER_GAP;
 
-    /** Vanilla's ids for the controls a menu without a character withholds. */
-    static final int SINGLEPLAYER_ID = 1;
-    static final int MULTIPLAYER_ID = 2;
-    static final int REALMS_ID = 14;
-    /** Forge's mod list, which shares Realms' row. */
-    static final int MODS_ID = 6;
-
     private MainMenuButtonLayout() {}
-
-    /**
-     * Takes Multiplayer and Realms out of the menu before the rows are
-     * laid out, so their rows close up: Singleplayer's row is kept to
-     * anchor the column, and Realms' row closes around Mods alone.
-     * Nothing to do for a button the menu does not have.
-     */
-    static void withholdPlayButtons(List<?> buttons) {
-        GuiButton multiplayer = find(buttons, MULTIPLAYER_ID);
-        if (multiplayer != null) {
-            multiplayer.visible = false;
-        }
-        GuiButton realms = find(buttons, REALMS_ID);
-        if (realms != null) {
-            realms.visible = false;
-        }
-    }
-
-    /**
-     * Withholds Singleplayer once the column has been positioned and
-     * answers its frame, as {@code x, y, width, height}, for the one
-     * control that stands in for the play buttons; Mods, left alone in
-     * its row, is widened to the column. Null, with nothing changed,
-     * when the menu has no Singleplayer button.
-     */
-    static int[] replacePlayButtons(List<?> buttons) {
-        GuiButton singleplayer = find(buttons, SINGLEPLAYER_ID);
-        if (singleplayer == null || !singleplayer.visible) {
-            return null;
-        }
-        singleplayer.visible = false;
-        GuiButton mods = find(buttons, MODS_ID);
-        if (mods != null && mods.visible && isAloneInRow(buttons, mods)) {
-            mods.xPosition = singleplayer.xPosition;
-            mods.width = singleplayer.width;
-        }
-        return new int[] {singleplayer.xPosition, singleplayer.yPosition,
-                singleplayer.width, singleplayer.height};
-    }
-
-    private static boolean isAloneInRow(List<?> buttons, GuiButton button) {
-        for (Object value : buttons) {
-            if (value instanceof GuiButton && value != button
-                    && ((GuiButton) value).visible
-                    && ((GuiButton) value).yPosition == button.yPosition
-                    && ((GuiButton) value).id != 5) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static GuiButton find(List<?> buttons, int id) {
-        for (Object value : buttons) {
-            if (value instanceof GuiButton && ((GuiButton) value).id == id) {
-                return (GuiButton) value;
-            }
-        }
-        return null;
-    }
 
     /**
      * Centers the main column and anchors the standard menu's first row a
@@ -105,7 +38,7 @@ final class MainMenuButtonLayout {
         int bottom = Integer.MIN_VALUE;
         for (Object value : buttons) {
             if (!(value instanceof LostTalesButton) || !((GuiButton) value).visible
-                    || value instanceof LostTalesCharacterMenuButton || ((GuiButton) value).id == 5) {
+                    || ((GuiButton) value).id == 5) {
                 continue;
             }
             GuiButton button = (GuiButton) value;
@@ -145,8 +78,7 @@ final class MainMenuButtonLayout {
         Map<Integer, List<GuiButton>> rows = new TreeMap<Integer, List<GuiButton>>();
         int columnLeft = Integer.MAX_VALUE;
         for (Object value : buttons) {
-            if (!(value instanceof LostTalesButton)
-                    || value instanceof LostTalesCharacterMenuButton) {
+            if (!(value instanceof LostTalesButton)) {
                 continue;
             }
             GuiButton button = (GuiButton) value;

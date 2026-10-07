@@ -2,7 +2,6 @@ package com.ninuna.losttales.character.storage;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProfile;
-import com.ninuna.losttales.character.model.CharacterKind;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
@@ -46,15 +45,11 @@ public final class CharacterNbtCodec {
 
     private static final String TAG_OWNER_UUID = "OwnerUUID";
     private static final String TAG_CHARACTER_UUID = "CharacterUUID";
-    private static final String TAG_KIND = "Kind";
     private static final String TAG_ACTIVE_CHARACTER_UUID = "ActiveCharacterUUID";
 
     private static final String TAG_SLOT_INDEX = "SlotIndex";
     private static final String TAG_UNLOCKED_SLOT_COUNT = "UnlockedSlotCount";
     private static final String TAG_REVISION = "Revision";
-    private static final String TAG_ACCOUNT_SHOW_MINECRAFT_CAPE = "AccountShowMinecraftCape";
-    private static final String TAG_ACCOUNT_COSMETIC_CAPE_ID = "AccountCosmeticCapeId";
-    private static final String TAG_TEMPLATE_TAKEN = "TemplateTaken";
     private static final String TAG_NAME = "Name";
     private static final String TAG_RACE_ID = "RaceId";
     private static final String TAG_GENDER_ID = "GenderId";
@@ -242,9 +237,6 @@ public final class CharacterNbtCodec {
         if (roster.getActiveCharacterId() != null) {
             NbtTags.writeUuid(tag, TAG_ACTIVE_CHARACTER_UUID, roster.getActiveCharacterId());
         }
-        tag.setBoolean(TAG_ACCOUNT_SHOW_MINECRAFT_CAPE, roster.isAccountMinecraftCapeVisible());
-        tag.setInteger(TAG_ACCOUNT_COSMETIC_CAPE_ID, roster.getAccountCosmeticCapeId());
-        tag.setBoolean(TAG_TEMPLATE_TAKEN, roster.isTemplateTaken());
 
         NBTTagList characterList = new NBTTagList();
         for (RoleplayCharacter character : roster.getCharacters()) {
@@ -259,7 +251,6 @@ public final class CharacterNbtCodec {
         tag.setInteger(TAG_DATA_VERSION, RoleplayCharacter.CURRENT_DATA_VERSION);
         NbtTags.writeUuid(tag, TAG_CHARACTER_UUID, character.getCharacterId());
         NbtTags.writeUuid(tag, TAG_OWNER_UUID, character.getOwnerId());
-        tag.setString(TAG_KIND, character.getKind().getId());
         tag.setInteger(TAG_SLOT_INDEX, character.getSlotIndex());
         tag.setString(TAG_NAME, character.getName());
         tag.setString(TAG_RACE_ID, character.getRaceId());
@@ -496,27 +487,6 @@ public final class CharacterNbtCodec {
                 activeCharacterId,
                 revision
         );
-        // The account cape keys are newer than the roster layout: a roster
-        // without them wears the defaults, and an unknown cape id is
-        // repaired to none rather than refused.
-        boolean showAccountCape = tag.hasKey(TAG_ACCOUNT_SHOW_MINECRAFT_CAPE, Constants.NBT.TAG_BYTE)
-                ? tag.getBoolean(TAG_ACCOUNT_SHOW_MINECRAFT_CAPE)
-                : RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE;
-        int accountCapeId = tag.hasKey(TAG_ACCOUNT_COSMETIC_CAPE_ID, Constants.NBT.TAG_INT)
-                ? tag.getInteger(TAG_ACCOUNT_COSMETIC_CAPE_ID)
-                : RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
-        if (!CharacterCapeCatalog.isValidSelection(accountCapeId)) {
-            LostTalesLog.warning("Repairing unknown account cape %d for owner %s",
-                    Integer.valueOf(accountCapeId), ownerId);
-            accountCapeId = RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
-            repaired = true;
-        }
-        roster.setAccountCapeSettings(showAccountCape, accountCapeId);
-        // A roster without the key has not read one: such a world takes
-        // the template on the player's next login instead of never.
-        if (tag.getBoolean(TAG_TEMPLATE_TAKEN)) {
-            roster.markTemplateTaken();
-        }
 
         ArrayList<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
         NBTTagList characterList = tag.getTagList(TAG_CHARACTERS, Constants.NBT.TAG_COMPOUND);
@@ -626,21 +596,6 @@ public final class CharacterNbtCodec {
         String genderId = CharacterRaceRegistry.normalizeGenderForRace(
                 raceId, storedGenderId);
         String startingFactionId = tag.getString(TAG_STARTING_FACTION_ID);
-        // A record naming no kind, or one this build does not know, is a
-        // roleplay character.
-        CharacterKind kind = CharacterKind.fromId(tag.getString(TAG_KIND));
-        if ((slotIndex == CharacterRoster.DEFAULT_SLOT_INDEX)
-                != (kind == CharacterKind.DEFAULT)) {
-            // The slot and the kind are two spellings of the same fact,
-            // and everything that reads the roster picks one of them.
-            // A record where they disagree would be the account's own
-            // identity to one reader and a deletable character to
-            // another, so it is quarantined rather than guessed at.
-            LostTalesLog.warning("Skipping character %s for owner %s because slot %d and kind %s disagree",
-                    characterId, rosterOwnerId, Integer.valueOf(slotIndex),
-                    kind.getId());
-            return CharacterReadResult.failed(true, "slot_kind_mismatch");
-        }
         if (isBlank(name) || isBlank(raceId) || isBlank(genderId)
                 || isBlank(startingFactionId)) {
             LostTalesLog.warning("Skipping character %s for owner %s because a required "
@@ -849,7 +804,6 @@ public final class CharacterNbtCodec {
                 .profile(profileResult.profile)
                 .bodyType(bodyTypeId)
                 .chestType(chestTypeId)
-                .kind(kind)
                 .build();
         return CharacterReadResult.success(character, repaired);
     }

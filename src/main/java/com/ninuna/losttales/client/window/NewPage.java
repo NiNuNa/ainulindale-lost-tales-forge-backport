@@ -17,26 +17,26 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
 /**
- * The Lost Tales Menu, the mod's main menu: a page holding every page a
- * player can open, under its category, the categories standing round a
- * centre as a wheel's points — Profile above, the Map below, the Quest
+ * The New Page, as Chrome's new tab: a page holding every page a player
+ * can open, under its category, the categories standing round a centre
+ * as a wheel's points — Profile above, the Map below, the Quest
  * Journal left, the channels right, Fellowships, Settings, the consoles
  * and the whispers on the diagonals — each joined to the centre by a
  * spoke, and the name of the page under the pointer standing under the
  * centre. Each category's rows look, light and scroll as a menu's do.
  *
  * <p>Its key opens it in a window of its own filling the screen,
- * unlocked; the {@code +} of a window opens it there as a new page, as a
- * browser's new tab. A page picked opens a new copy of it in the menu's
- * place ({@link WindowScreen#openFromMenu}). Up and Down walk the pages
+ * unlocked; the {@code +} of a window opens it there. The tab turns into
+ * the page picked on it, a new copy of that page, without closing
+ * ({@link WindowScreen#openFromNewPage}). Up and Down walk the pages
  * in the wheel's order, Left and Right go round the categories, and
  * Return opens the page walked to. A right-click on a category's name opens what
  * reaches all its pages. A window too small for the wheel, or words in
  * the tool strip's well, shows the pages as one list.</p>
  */
-public final class LostTalesMenuPage extends PageContent {
+public final class NewPage extends PageContent {
     /** The code name the page is registered under. */
-    public static final String PAGE_ID = "menu";
+    public static final String PAGE_ID = "new_page";
     /** The item its tab wears: a book of tales. */
     public static final ItemStack ICON = new ItemStack(Items.book);
 
@@ -88,7 +88,7 @@ public final class LostTalesMenuPage extends PageContent {
     private double centreStrength;
     private long centreNanos;
 
-    public LostTalesMenuPage() {
+    public NewPage() {
         for (int index = 0; index < POINTS.length; index++) {
             this.sections[index] = new PageRows(taker());
             this.sections[index].setVisibleRows(MAX_SECTION_ROWS);
@@ -96,7 +96,7 @@ public final class LostTalesMenuPage extends PageContent {
         this.list = new PageRows(taker());
     }
 
-    /** A page's row picked: a new copy of it takes the menu's place. */
+    /** A page's row picked: the tab turns into a new copy of it. */
     private PageRows.Taker taker() {
         return new PageRows.Taker() {
             @Override
@@ -104,7 +104,7 @@ public final class LostTalesMenuPage extends PageContent {
                              LostTalesUiHitBox row) {
                 WindowScreen screen = WindowScreen.current();
                 if (!back && entry.icon != null && screen != null) {
-                    screen.openFromMenu(tab(), entry.icon);
+                    screen.openFromNewPage(tab(), entry.icon);
                 }
             }
         };
@@ -125,7 +125,7 @@ public final class LostTalesMenuPage extends PageContent {
         List<MenuWindow.Entry> own = TabMenus.rowsOf(pages, category);
         if (own.isEmpty()) {
             rows.add(MenuWindow.Entry.passive(StatCollector.translateToLocal(
-                    "gui.losttales.menu.none")));
+                    "gui.losttales.new_page.none")));
         } else {
             rows.addAll(chooseKeyPage(own));
         }
@@ -156,7 +156,7 @@ public final class LostTalesMenuPage extends PageContent {
         }
         if (this.listRows.isEmpty()) {
             this.listRows.add(MenuWindow.Entry.passive(
-                    StatCollector.translateToLocal("gui.losttales.menu.nothing_found")));
+                    StatCollector.translateToLocal("gui.losttales.new_page.nothing_found")));
         }
         this.list.setRows(this.listRows);
     }
@@ -536,14 +536,14 @@ public final class LostTalesMenuPage extends PageContent {
         return true;
     }
 
-    /** Opens the page the arrows walked to in the menu's place; false with none. */
+    /** Turns the tab into the page the arrows walked to; false with none. */
     private boolean openKeyPage() {
         MenuWindow.Entry walked = rowOf(walkable(), this.keyPage);
         WindowScreen screen = WindowScreen.current();
         if (walked == null || screen == null) {
             return false;
         }
-        screen.openFromMenu(tab(), walked.icon);
+        screen.openFromNewPage(tab(), walked.icon);
         return true;
     }
 
@@ -662,7 +662,7 @@ public final class LostTalesMenuPage extends PageContent {
 
     @Override
     public String searchPrompt() {
-        return StatCollector.translateToLocal("gui.losttales.menu.search");
+        return StatCollector.translateToLocal("gui.losttales.new_page.search");
     }
 
     /** Words in the well show the pages that hold them as one list. */

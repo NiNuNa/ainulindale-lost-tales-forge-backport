@@ -145,6 +145,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrTraderNoticeTransformer.active";
     public static final String LOTR_ACHIEVEMENT_HOVER_ACTIVE_PROPERTY =
             "losttales.lotrAchievementHoverTransformer.active";
+    public static final String LOTR_SHARED_WAYPOINT_NAME_ACTIVE_PROPERTY =
+            "losttales.lotrSharedWaypointNameTransformer.active";
     /**
      * Set once the chat's line replacement is guarded against the
      * history laying itself out again; the chat refreshes its drawn
@@ -384,6 +386,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "lotr.common.LOTRPlayerData";
     private static final String LOTR_HIRED_NPC_INFO =
             "lotr.common.entity.npc.LOTRHiredNPCInfo";
+    private static final String LOTR_CUSTOM_WAYPOINT =
+            "lotr.common.world.map.LOTRCustomWaypoint";
+    private static final String LOTR_SHARED_WAYPOINT_NAME_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LostTalesLotrSharedWaypointNames";
     private static final String LOTR_FELLOWSHIP_DO =
             "lotr.common.network.LOTRPacketFellowshipDo";
     private static final String LOTR_FELLOWSHIP_CREATE_HANDLER =
@@ -454,6 +460,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_HIRED_NPC_INFO.equals(transformedName)) {
             return transformLotrHiredUnit(basicClass);
+        }
+        if (LOTR_CUSTOM_WAYPOINT.equals(transformedName)) {
+            return transformLotrSharedWaypointName(basicClass);
         }
         if (LOTR_FELLOWSHIP_DO.equals(transformedName)) {
             return transformLotrFellowshipRequests(basicClass);
@@ -3567,6 +3576,61 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch LOTR unit hiring: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Names who shared a waypoint after the character they play.
+     *
+     * <p>{@code LOTRCustomWaypoint.setSharingPlayerID} is where every copy
+     * of a shared waypoint learns its sharer, and LOTR writes the sharing
+     * account's name there. The waypoint is handed to
+     * {@code LostTalesLotrSharedWaypointNames.name} just before the method
+     * returns, which writes the name of the character the account plays.
+     * Without the patch LOTR's copies name the account.</p>
+     */
+    private static byte[] transformLotrSharedWaypointName(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"setSharingPlayerID".equals(method.name)
+                        || !"(Ljava/util/UUID;)V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, LOTR_SHARED_WAYPOINT_NAME_HOOK_OWNER, "name")) {
+                    System.setProperty(LOTR_SHARED_WAYPOINT_NAME_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                int patched = 0;
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() != Opcodes.RETURN) {
+                        continue;
+                    }
+                    InsnList call = new InsnList();
+                    call.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    call.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                            LOTR_SHARED_WAYPOINT_NAME_HOOK_OWNER, "name",
+                            "(Llotr/common/world/map/LOTRCustomWaypoint;)V"));
+                    method.instructions.insertBefore(instruction, call);
+                    patched++;
+                }
+                if (patched == 0) {
+                    warn("LOTRCustomWaypoint#setSharingPlayerID has no return to patch; "
+                            + "shared waypoints will name the account");
+                    return basicClass;
+                }
+                System.setProperty(LOTR_SHARED_WAYPOINT_NAME_ACTIVE_PROPERTY, "true");
+                info("Patched LOTR shared waypoints to name the sharing character");
+                return write(owner);
+            }
+            warn("Could not locate LOTRCustomWaypoint#setSharingPlayerID; "
+                    + "shared waypoints will name the account");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR shared waypoint names: " + throwable);
             return basicClass;
         }
     }

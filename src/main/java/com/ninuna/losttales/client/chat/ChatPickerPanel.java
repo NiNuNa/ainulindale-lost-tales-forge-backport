@@ -52,8 +52,19 @@ abstract class ChatPickerPanel extends SubWindowContent {
     private final LostTalesUiButtonMotion buttonMotion =
             new LostTalesUiButtonMotion(
                     LostTalesUiButtonMotion.Character.LIFT);
+    /** A bar button's square, round its ten-pixel glyph. */
     static final int BUTTON_SIZE = 12;
-    static final int BUTTON_MARGIN = 2;
+    /** Clear pixels round a ten-pixel glyph inside its square. */
+    private static final int SQUARE_INSET = (BUTTON_SIZE - TabIcons.SIZE) / 2;
+    /** Between two squares, so the glyphs in them stand a button's gap apart. */
+    static final int BUTTON_MARGIN = WindowStyle.BUTTON_GAP - 2 * SQUARE_INSET;
+    /** From the bar's right edge to the send button's square: an edge's gap to its ink. */
+    private static final int EDGE_MARGIN = WindowStyle.EDGE_GAP - SQUARE_INSET;
+    /**
+     * Between the send button's square and the next: the hairline that
+     * parts sending from the inserts, an edge's gap from each glyph.
+     */
+    static final int SEND_ROOM = 2 * EDGE_MARGIN + WindowStyle.DIVIDER_WIDTH;
     /** The buttons stand this far below the anchor the caller passes. */
     static final int BUTTON_ANCHOR_OFFSET = 14;
     /** The menus' clear room round the search and the rows, across and down. */
@@ -227,9 +238,22 @@ abstract class ChatPickerPanel extends SubWindowContent {
 
     /** Button left edge; {@code anchorRight} is the input bar's right edge. */
     int buttonLeft(int anchorRight) {
-        return anchorRight - BUTTON_MARGIN
-                - (this.buttonIndex + 1) * (BUTTON_SIZE + BUTTON_MARGIN)
-                + BUTTON_MARGIN;
+        return slotLeft(anchorRight, this.buttonIndex);
+    }
+
+    /**
+     * Left edge of the bar button in slot {@code index}, counted from the
+     * bar's right edge {@code barRight}: slot 0 the send button, an
+     * edge's gap from the frame, then the hairline and the rest a
+     * button's gap apart, ink to ink.
+     */
+    static int slotLeft(int barRight, int index) {
+        int left = barRight - EDGE_MARGIN - BUTTON_SIZE;
+        if (index > 0) {
+            left -= SEND_ROOM + BUTTON_SIZE
+                    + (index - 1) * (BUTTON_SIZE + BUTTON_MARGIN);
+        }
+        return left;
     }
 
     static int buttonTop(int anchorY) {
@@ -295,7 +319,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
         int height = Math.min(naturalHeight(width),
                 Math.max(minHeight(), anchorY - PANEL_BOTTOM_MARGIN
                         - SubWindow.STRIP_HEIGHT - 2));
-        return new LostTalesUiHitBox(anchorRight - width - BUTTON_MARGIN,
+        return new LostTalesUiHitBox(anchorRight - width - EDGE_MARGIN,
                 anchorY - PANEL_BOTTOM_MARGIN - height, width, height);
     }
 

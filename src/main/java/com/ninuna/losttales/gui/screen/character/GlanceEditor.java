@@ -33,7 +33,7 @@ import org.lwjgl.input.Keyboard;
  */
 final class GlanceEditor extends CreatorControl {
     private static final int SLOT = LostTalesUiFramedButton.HEIGHT;
-    private static final int SLOT_GAP = 3;
+    private static final int SLOT_GAP = WindowStyle.BUTTON_GAP;
     /** Between the slots, the rows, the emoji and Remove. */
     private static final int GAP = MenuWindow.PADDING_Y;
     /** An emoji's place in the grid: its box and a pixel either side. */

@@ -205,7 +205,8 @@ public final class ChatScreenPart extends ScreenPart {
      * first instead. Opened by the command key, the screen shows the
      * consoles, the Console in front, where the command and its
      * answer stand; a closed one opens in a window of the consoles, else
-     * in their first window. The chat's key comes back to the
+     * in their first window, which holds the Server Log beside it where
+     * the player may read it. The chat's key comes back to the
      * conversation last used, since a console is never that.
      */
     @Override
@@ -225,7 +226,7 @@ public final class ChatScreenPart extends ScreenPart {
             front = waiting;
         }
         if (this.screen.isOpenedForCommand()) {
-            ConversationPage console = ChatLayout.openHere(CONSOLE, null);
+            ConversationPage console = ChatLayout.openConsoles(CONSOLE);
             if (ClientChatChannelState.isSelectable(console)) {
                 front = console;
             }
@@ -369,7 +370,9 @@ public final class ChatScreenPart extends ScreenPart {
 
     @Override
     public Window keyWindow() {
-        return WindowLayout.windowOf(ClientChatChannelState.getSelected());
+        Window window = WindowLayout.windowOf(
+                ClientChatChannelState.getSelected());
+        return window == null || window.isClosed() ? null : window;
     }
 
     /** Whether a window shows a conversation, so there is a bar to type into. */
@@ -750,6 +753,7 @@ public final class ChatScreenPart extends ScreenPart {
                         ChatHover.Kind.MESSAGE_TOOLBAR);
                 hover.frame = frame;
                 hover.toolbarKind = kind;
+                hover.greyedWhy = frame.toolbarWhy(kind);
                 return hover;
             }
             if (frame.contains(x, y)) {
@@ -855,14 +859,9 @@ public final class ChatScreenPart extends ScreenPart {
             case REPLY_CHIP:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.message.cancel_reply");
-            case MESSAGE_TOOLBAR: {
-                // A control that cannot be taken on this message says why.
-                String why = chat.frame == null ? ""
-                        : chat.chatFrame().toolbarWhy(chat.toolbarKind);
-                return why.length() > 0 ? why
-                        : StatCollector.translateToLocal(
-                                toolbarLabelKey(chat.toolbarKind));
-            }
+            case MESSAGE_TOOLBAR:
+                return StatCollector.translateToLocal(
+                        toolbarLabelKey(chat.toolbarKind));
             case LINE:
                 // The button beside a message's reactions says what the
                 // toolbar's own React says.
@@ -2157,7 +2156,8 @@ public final class ChatScreenPart extends ScreenPart {
      * or open that menu, hanging from the control. Each acts on the
      * message the toolbar was drawn for rather than on whatever lies
      * under the pointer now, by the id the draw recorded. A control that
-     * cannot be taken on the message does nothing; its tip says why. The
+     * cannot be taken on the message stands greyed with no tip, and a
+     * press says why over the bar. The
      * menu control is a switch: a press with that message's menu out
      * puts it away.
      */

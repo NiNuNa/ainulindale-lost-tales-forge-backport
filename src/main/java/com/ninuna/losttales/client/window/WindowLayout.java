@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.window;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -66,6 +67,15 @@ public final class WindowLayout {
     private static Runnable changeListener;
     /** What lays the windows out for a new player; see {@link #reset}. */
     private static Runnable defaults;
+    /**
+     * Each page that took another tab's place in its row, by the tab it
+     * replaced: a page picked on a New Page tab ({@link #replaceTab}). The
+     * row draws it on from where that tab stood, as Chrome's new tab turns
+     * into the site picked, so nothing closes and nothing opens. Session
+     * state, never stored.
+     */
+    private static final Map<WindowPage, WindowPage> REPLACED =
+            new HashMap<WindowPage, WindowPage>();
     /** The pages a category's first window opens with besides the one asked for. */
     private static final Map<PageCategory, FirstPages> FIRST_PAGES =
             new EnumMap<PageCategory, FirstPages>(PageCategory.class);
@@ -73,6 +83,24 @@ public final class WindowLayout {
     /** The pages a category's first window opens with: the chat's Global and OOC. */
     public interface FirstPages {
         List<? extends WindowPage> pages();
+    }
+
+    /**
+     * Every page of a category a player can open now, in its own order:
+     * what a category's first window holds when its key opens it.
+     */
+    public interface ViewPages {
+        List<? extends WindowPage> pagesOf(PageCategory category);
+    }
+
+    /** What answers for each category's pages: the windows' own pages, the chat's consoles. */
+    private static final List<ViewPages> VIEW_PAGES = new ArrayList<ViewPages>();
+
+    /** Adds what answers for some categories' pages ({@link #openView}). */
+    public static synchronized void addViewPages(ViewPages pages) {
+        if (pages != null && !VIEW_PAGES.contains(pages)) {
+            VIEW_PAGES.add(pages);
+        }
     }
 
     /** Gives a category the pages its first window opens with, besides the one asked for. */
@@ -101,6 +129,7 @@ public final class WindowLayout {
      */
     public static synchronized void reset() {
         CATEGORY_PLACES.clear();
+        REPLACED.clear();
         WINDOWS.clear();
         STACK.clear();
         nextWindowNumber = 1;
@@ -232,7 +261,62 @@ public final class WindowLayout {
      * page.
      */
     public static synchronized Window showPage(OtherPage page) {
-        WindowPage shown = openInCategory(page, null);
+        return bringForward(openInCategory(page, null));
+    }
+
+    /**
+     * Brings a page forward as its key does ({@link #openView}): with no
+     * window of its category, that category's first window opens with
+     * every page of it. Null for no page.
+     */
+    public static synchronized Window showView(OtherPage page) {
+        return bringForward(openView(page));
+    }
+
+    /**
+     * Opens a page as its key does: the copy used last where one stands;
+     * else where its category keeps its pages; and with no window of its
+     * category, in its category's first window holding every page of the
+     * category the player can open now, {@code tab} in front: the two
+     * consoles, the settings pages. The chat's first window keeps Global
+     * and OOC ({@link #setFirstPages}). Answers the page as the layout
+     * holds it; null for none.
+     */
+    public static synchronized WindowPage openView(WindowPage tab) {
+        if (tab == null) {
+            return null;
+        }
+        WindowPage open = lastUsed(tab);
+        if (open != null) {
+            return open;
+        }
+        PageCategory home = tab.category().home();
+        for (Window window : WINDOWS) {
+            if (holdsKindOf(window, tab)) {
+                return placeInCategory(tab, null);
+            }
+        }
+        List<WindowPage> pages = new ArrayList<WindowPage>();
+        for (ViewPages source : VIEW_PAGES) {
+            for (WindowPage page : source.pagesOf(home)) {
+                if (page != null && !isOpen(page) && !pages.contains(page)) {
+                    pages.add(page);
+                }
+            }
+        }
+        for (WindowPage page : firstPagesWith(tab)) {
+            if (!pages.contains(page)) {
+                pages.add(page);
+            }
+        }
+        Window first = addWindow(pages, tab);
+        raise(first.getId());
+        changed();
+        return tab;
+    }
+
+    /** The window holding {@code shown}, with it in front and the window raised; null for none. */
+    private static Window bringForward(WindowPage shown) {
         if (shown == null) {
             return null;
         }
@@ -330,10 +414,11 @@ public final class WindowLayout {
 
     /**
      * Puts a new copy of {@code page}'s page in {@code old}'s place, in
-     * front, and closes {@code old}: a page picked on a menu tab takes the
-     * menu's place, whatever the window's category, as a tab carried there
-     * by hand may. Refused in a locked window and for a tab no window
-     * holds. Answers the copy; null when refused.
+     * front: a New Page tab becomes the page picked on it, whatever the
+     * window's category, as a tab carried there by hand may. The row draws
+     * the copy on from where {@code old} stood ({@link #replacedBy}).
+     * Refused in a locked window and for a tab no window holds. Answers
+     * the copy; null when refused.
      */
     public static synchronized WindowPage replaceTab(WindowPage old,
                                                      WindowPage page) {
@@ -352,8 +437,28 @@ public final class WindowLayout {
         }
         window.setActiveTab(copy);
         settleSplits(window);
+        // Only the newest turn of each tab is worth keeping: what replaced
+        // a tab that came back since, or went, is forgotten.
+        Iterator<Map.Entry<WindowPage, WindowPage>> kept =
+                REPLACED.entrySet().iterator();
+        while (kept.hasNext()) {
+            Map.Entry<WindowPage, WindowPage> entry = kept.next();
+            if (holds(entry.getValue()) || !holds(entry.getKey())) {
+                kept.remove();
+            }
+        }
+        REPLACED.put(copy, old);
         changed();
         return copy;
+    }
+
+    /**
+     * The tab {@code tab} took the place of in its row, by
+     * {@link #replaceTab}, while that tab is open nowhere; null for none.
+     */
+    static synchronized WindowPage replacedBy(WindowPage tab) {
+        WindowPage old = tab == null ? null : REPLACED.get(tab);
+        return old == null || holds(old) ? null : old;
     }
 
     /**
@@ -466,7 +571,7 @@ public final class WindowLayout {
     public static synchronized List<Window> hudWindows() {
         List<Window> result = new ArrayList<Window>();
         for (Window window : stacked()) {
-            if (window.isPinnedToHud()) {
+            if (window.isPinnedToHud() && !window.isClosed()) {
                 result.add(window);
             }
         }
@@ -479,7 +584,8 @@ public final class WindowLayout {
      */
     public static synchronized boolean isOnHud(WindowPage tab) {
         Window window = windowOf(tab);
-        return window != null && window.isPinnedToHud() && staysPut(tab);
+        return window != null && window.isPinnedToHud() && !window.isClosed()
+                && staysPut(tab);
     }
 
     /**
@@ -628,15 +734,31 @@ public final class WindowLayout {
     }
 
     /**
-     * Closes a window by hand, which a locked one refuses: every tab of it
-     * the view shows leaves it, and the window goes with them unless tabs
-     * hidden by the view stay in it for their own view. What stands behind
-     * the tabs is untouched, and closing the last window is allowed.
+     * Closes a window by hand. A locked window keeps everything it holds:
+     * it only goes out of sight, and comes back as it was, where it was,
+     * the next time its view opens or one of its pages is asked for
+     * ({@link #reopen}). An unlocked window lets its pages go: every tab
+     * of it the view shows leaves it, and the window goes with them unless
+     * tabs hidden by the view stay in it for their own view; its category
+     * forgets the place a padlock gave it unless a locked window of it
+     * still stands, so the next first window opens at the default place.
+     * What stands behind the tabs is untouched, and closing the last
+     * window is allowed.
      */
     public static synchronized boolean closeWindow(String windowId) {
         final Window window = window(windowId);
-        if (window == null || window.isLocked()) {
+        if (window == null || window.isClosed()) {
             return false;
+        }
+        if (window.isLocked()) {
+            window.setClosed(true);
+            STACK.remove(window.getId());
+            changed();
+            return true;
+        }
+        PageCategory category = categoryOf(window);
+        if (category != null && !hasLockedWindowOf(category, window)) {
+            CATEGORY_PLACES.remove(category);
         }
         List<WindowPage> leaving = new ArrayList<WindowPage>();
         for (WindowPage tab : window.tabs()) {
@@ -660,6 +782,41 @@ public final class WindowLayout {
         dropWindow(window);
         changed();
         return true;
+    }
+
+    /** Whether a locked window of {@code category} other than {@code but} stands, open or closed. */
+    private static boolean hasLockedWindowOf(PageCategory category, Window but) {
+        for (Window window : WINDOWS) {
+            if (window != but && window.isLocked()
+                    && categoryOf(window) == category) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Brings back every window closed while locked that holds a page
+     * {@code shows} answers for: the windows of a view as it opens.
+     */
+    static synchronized void reopen(TabFilter shows) {
+        for (Window window : WINDOWS) {
+            if (!window.isClosed()) {
+                continue;
+            }
+            for (WindowPage tab : window.tabs()) {
+                if (shows.matches(tab)) {
+                    window.setClosed(false);
+                    break;
+                }
+            }
+        }
+    }
+
+    /** Whether the tab stands in a window closed while locked, out of sight. */
+    public static synchronized boolean isClosedAway(WindowPage tab) {
+        Window window = windowOf(tab);
+        return window != null && window.isClosed();
     }
 
     /** Picks tabs out of the layout; see {@link #removeTabs}. */
@@ -1275,6 +1432,8 @@ public final class WindowLayout {
                 window.setOffsets(clampWindowPercent(spec.offsetX),
                         clampWindowPercent(spec.offsetY));
                 window.setLocked(spec.locked);
+                // Only a locked window is closed and kept.
+                window.setClosed(spec.locked && spec.closed);
                 window.setPinnedToHud(spec.pinnedToHud);
                 window.setPinnedToGui(spec.pinnedToGui);
                 window.setFill(spec.fill);
@@ -1314,7 +1473,7 @@ public final class WindowLayout {
             }
             result.add(new WindowSpec(window.getId(), tabs,
                     active != null && active.isKeptInLayout() ? active : null,
-                    window.isLocked(), window.isPinnedToHud(),
+                    window.isLocked(), window.isClosed(), window.isPinnedToHud(),
                     window.isPinnedToGui(), window.getOffsetX(),
                     window.getOffsetY(), window.getOwnHeight(),
                     window.getOwnWidth(), window.getFill(), splits));
@@ -1328,6 +1487,8 @@ public final class WindowLayout {
         final List<WindowPage> tabs;
         final WindowPage activeTab;
         final boolean locked;
+        /** Closed while locked: out of sight until its view opens. */
+        final boolean closed;
         final boolean pinnedToHud;
         final boolean pinnedToGui;
         final double offsetX;
@@ -1342,7 +1503,7 @@ public final class WindowLayout {
         final List<WindowSplit> splits;
 
         public WindowSpec(String id, List<? extends WindowPage> tabs,
-                          WindowPage activeTab, boolean locked,
+                          WindowPage activeTab, boolean locked, boolean closed,
                           boolean pinnedToHud, boolean pinnedToGui,
                           double offsetX, double offsetY,
                           double height, int width, Window.ScreenFill fill,
@@ -1359,6 +1520,7 @@ public final class WindowLayout {
             this.tabs = kept;
             this.activeTab = activeTab;
             this.locked = locked;
+            this.closed = closed;
             this.pinnedToHud = pinnedToHud;
             this.pinnedToGui = pinnedToGui;
             this.offsetX = offsetX;
@@ -1483,9 +1645,12 @@ public final class WindowLayout {
 
     /** Brings a window to the front of the stack; not a layout change. */
     public static synchronized void raise(String windowId) {
-        if (window(windowId) == null) {
+        Window raised = window(windowId);
+        if (raised == null) {
             return;
         }
+        // A window asked for comes back if it was closed while locked.
+        raised.setClosed(false);
         STACK.remove(windowId);
         STACK.add(windowId);
         // Ids of windows that have since gone are dropped here.

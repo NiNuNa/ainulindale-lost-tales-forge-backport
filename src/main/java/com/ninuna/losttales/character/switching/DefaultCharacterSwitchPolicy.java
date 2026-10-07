@@ -24,41 +24,26 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
         return evaluate(player, accountState, safeNow, true);
     }
 
+    @Override
+    public CharacterSwitchPolicyResult evaluateFirstCharacter(
+            EntityPlayerMP player, CharacterSwitchAccountState accountState,
+            long safeNow) {
+        CharacterSwitchPolicyResult session =
+                sessionRefusal(player, accountState, false);
+        return session != null ? session : CharacterSwitchPolicyResult.allowed();
+    }
+
     private CharacterSwitchPolicyResult evaluate(EntityPlayerMP player,
                                                   CharacterSwitchAccountState accountState,
                                                   long safeNow,
                                                   boolean allowOwnedSwitch) {
-        if (player == null || player.worldObj == null || player.worldObj.isRemote
-                || accountState == null) {
-            return CharacterSwitchPolicyResult.denied(CharacterErrorId.INVALID_PLAYER);
+        CharacterSwitchPolicyResult session =
+                sessionRefusal(player, accountState, allowOwnedSwitch);
+        if (session != null) {
+            return session;
         }
-        CharacterSwitchPolicyResult accountRefusal = accountRefusal(accountState);
-        if (accountRefusal != null) {
-            return accountRefusal;
-        }
-
         CharacterLifecycleStateTracker.Snapshot lifecycle =
                 CharacterLifecycleStateTracker.snapshot(player);
-        if (!lifecycle.isPresent() || !lifecycle.isReady()
-                || lifecycle.isLoggingOut() || lifecycle.isServerStopping()) {
-            return CharacterSwitchPolicyResult.denied(
-                    CharacterErrorId.SWITCH_PLAYER_NOT_READY);
-        }
-        if (lifecycle.isRespawning()) {
-            return CharacterSwitchPolicyResult.denied(
-                    CharacterErrorId.SWITCH_RESPAWNING);
-        }
-        if (lifecycle.isDimensionChanging()) {
-            return CharacterSwitchPolicyResult.denied(
-                    CharacterErrorId.SWITCH_CHANGING_DIMENSION);
-        }
-        if (lifecycle.isSwitching() && !allowOwnedSwitch) {
-            return CharacterSwitchPolicyResult.denied(
-                    CharacterErrorId.SWITCH_ALREADY_IN_PROGRESS);
-        }
-        if (!player.isEntityAlive() || player.isDead || player.getHealth() <= 0.0F) {
-            return CharacterSwitchPolicyResult.denied(CharacterErrorId.PLAYER_DEAD);
-        }
         if (player.isPlayerSleeping()) {
             return CharacterSwitchPolicyResult.denied(CharacterErrorId.PLAYER_SLEEPING);
         }
@@ -124,6 +109,48 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
             return cooldownRefusal;
         }
         return CharacterSwitchPolicyResult.allowed();
+    }
+
+    /**
+     * Why the account or the session refuses a switch, or null when
+     * neither does: the account's own refusals ({@link #accountRefusal}),
+     * a session not ready or ending, a respawn or a change of dimension
+     * under way, another switch, and a player not alive.
+     */
+    private static CharacterSwitchPolicyResult sessionRefusal(
+            EntityPlayerMP player, CharacterSwitchAccountState accountState,
+            boolean allowOwnedSwitch) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote
+                || accountState == null) {
+            return CharacterSwitchPolicyResult.denied(CharacterErrorId.INVALID_PLAYER);
+        }
+        CharacterSwitchPolicyResult accountRefusal = accountRefusal(accountState);
+        if (accountRefusal != null) {
+            return accountRefusal;
+        }
+        CharacterLifecycleStateTracker.Snapshot lifecycle =
+                CharacterLifecycleStateTracker.snapshot(player);
+        if (!lifecycle.isPresent() || !lifecycle.isReady()
+                || lifecycle.isLoggingOut() || lifecycle.isServerStopping()) {
+            return CharacterSwitchPolicyResult.denied(
+                    CharacterErrorId.SWITCH_PLAYER_NOT_READY);
+        }
+        if (lifecycle.isRespawning()) {
+            return CharacterSwitchPolicyResult.denied(
+                    CharacterErrorId.SWITCH_RESPAWNING);
+        }
+        if (lifecycle.isDimensionChanging()) {
+            return CharacterSwitchPolicyResult.denied(
+                    CharacterErrorId.SWITCH_CHANGING_DIMENSION);
+        }
+        if (lifecycle.isSwitching() && !allowOwnedSwitch) {
+            return CharacterSwitchPolicyResult.denied(
+                    CharacterErrorId.SWITCH_ALREADY_IN_PROGRESS);
+        }
+        if (!player.isEntityAlive() || player.isDead || player.getHealth() <= 0.0F) {
+            return CharacterSwitchPolicyResult.denied(CharacterErrorId.PLAYER_DEAD);
+        }
+        return null;
     }
 
     /**

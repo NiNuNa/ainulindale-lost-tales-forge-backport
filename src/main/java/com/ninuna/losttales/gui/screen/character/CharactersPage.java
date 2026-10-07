@@ -4,7 +4,6 @@ import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.CharacterSlotState;
-import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
@@ -57,7 +56,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The Characters page: the account character and every slot in a roster
+ * The Characters page: every slot in a roster
  * the tool strip's left button folds away, the deleted characters still
  * to be restored at its foot, and the picked character's profile beside
  * it in one column, its figure live for the one played and posed from
@@ -167,7 +166,7 @@ public final class CharactersPage extends PageContent {
     }
 
     private List<CharacterRosterRows.Row> rows(CharacterRosterSnapshot snapshot) {
-        return CharacterRosterRows.of(snapshot, accountName(), this.query);
+        return CharacterRosterRows.of(snapshot, this.query);
     }
 
     /** The row picked, the one played until another is. */
@@ -198,9 +197,9 @@ public final class CharactersPage extends PageContent {
         CharacterRosterSnapshot snapshot = snapshot();
         CharacterRosterRows.Row row = snapshot == null ? null
                 : CharacterRosterRows.atKey(CharacterRosterRows.of(snapshot,
-                        accountName(), ""), this.pickedKey);
+                        ""), this.pickedKey);
         if (row != null && row.kind == CharacterRosterRows.Kind.EMPTY
-                && CharacterRoster.isCreatableSlotIndex(row.slot)
+                && CharacterRoster.isValidSlotIndex(row.slot)
                 && snapshot.getSlotState(row.slot)
                         == CharacterSlotState.UNLOCKED) {
             return row.slot;
@@ -233,9 +232,8 @@ public final class CharactersPage extends PageContent {
             this.visit = null;
             if (own != null) {
                 this.query = "";
-                pick(new CharacterRosterRows.Row(own.isDefault()
-                        ? CharacterRosterRows.Kind.ACCOUNT
-                        : CharacterRosterRows.Kind.CHARACTER,
+                pick(new CharacterRosterRows.Row(
+                        CharacterRosterRows.Kind.CHARACTER,
                         own.getSlotIndex(), own).key());
             }
             return;
@@ -586,7 +584,7 @@ public final class CharactersPage extends PageContent {
             return;
         }
         boolean played = CharacterRosterRows.isPlayed(snapshot, row);
-        String name = row.character == null ? accountName()
+        String name = row.character == null ? ""
                 : row.character.getName();
         String aside = asideOf(row, played);
         int asideWidth = aside.length() == 0 ? 0
@@ -603,12 +601,10 @@ public final class CharactersPage extends PageContent {
         }
     }
 
-    /** What stands at a row's right: the account's own, a lore character, the one played. */
+    /** What stands at a row's right: a lore character, the one played. */
     private static String asideOf(CharacterRosterRows.Row row, boolean played) {
         List<String> words = new ArrayList<String>(2);
-        if (row.kind == CharacterRosterRows.Kind.ACCOUNT) {
-            words.add(I18n.format("gui.losttales.character.account_tile"));
-        } else if (isLore(row.character)) {
+        if (isLore(row.character)) {
             words.add(I18n.format("gui.losttales.character.lore"));
         }
         if (played) {
@@ -699,9 +695,7 @@ public final class CharactersPage extends PageContent {
                 : character.getCharacterId();
         ClientCharacterProfileCache.want(characterId);
         CharacterProfileColumn column = new CharacterProfileColumn(this.mc,
-                this.font, (int)words.width, character == null
-                        ? ProfileSubject.account(accountName())
-                        : ProfileSubject.of(character),
+                this.font, (int)words.width, ProfileSubject.of(character),
                 ClientCharacterProfileCache.get(characterId),
                 ClientCharacterProfileCache.isUnavailable(characterId),
                 accountName(), played, isLore(character));
@@ -1075,16 +1069,12 @@ public final class CharactersPage extends PageContent {
     public List<MenuWindow.Entry> find(String words) {
         List<MenuWindow.Entry> found = new ArrayList<MenuWindow.Entry>();
         for (CharacterRosterRows.Row row : CharacterRosterRows.of(snapshot(),
-                accountName(), words)) {
-            if (row.kind == CharacterRosterRows.Kind.ACCOUNT
-                    || row.kind == CharacterRosterRows.Kind.CHARACTER) {
+                words)) {
+            if (row.kind == CharacterRosterRows.Kind.CHARACTER) {
                 found.add(new MenuWindow.Entry(row.key(),
-                        row.character == null ? accountName()
-                                : row.character.getName()).withValue(
+                        row.character.getName()).withValue(
                         ClientCharacterDisplayNames.race(
-                                row.character == null
-                                        ? CharacterRaceRegistry.HUMAN
-                                        : row.character.getRaceId())));
+                                row.character.getRaceId())));
             }
         }
         return found;
@@ -1142,8 +1132,7 @@ public final class CharactersPage extends PageContent {
         CharacterSummary character = picked == null ? null : picked.character;
         boolean played = CharacterRosterRows.isPlayed(snapshot, picked);
         boolean lore = isLore(character);
-        String name = picked == null ? ""
-                : character == null ? accountName() : character.getName();
+        String name = character == null ? "" : character.getName();
         if (picked != null && picked.kind == CharacterRosterRows.Kind.EMPTY) {
             String create = I18n.format("gui.losttales.character.create");
             items.add(orBusy(BarItem.button(CREATE, create,
@@ -1158,47 +1147,33 @@ public final class CharactersPage extends PageContent {
                             "gui.losttales.character.playing_as", name)
                             : I18n.format("gui.losttales.character.play_as_tip",
                                     name));
-            items.add(picked == null ? item.unavailable(I18n.format(
+            items.add(character == null ? item.unavailable(I18n.format(
                     "gui.losttales.character.pick")) : played ? item
-                    : character == null ? item.unavailable(I18n.format(
-                            "gui.losttales.character.not_made"))
                     : orBusy(item, busy));
         }
         String edit = I18n.format("gui.losttales.character.profile_edit.button");
         items.add(orBusy(BarItem.button(EDIT, edit, new ItemStack(
                 Items.feather)).tip(edit), character == null
-                ? I18n.format(picked == null
-                        || picked.kind == CharacterRosterRows.Kind.EMPTY
-                        ? "gui.losttales.character.pick"
-                        : "gui.losttales.character.not_made")
+                ? I18n.format("gui.losttales.character.pick")
                 : lore ? I18n.format(
                         "gui.losttales.character.error.lore_character_cannot_edit")
                 : busy));
         String look = I18n.format("gui.losttales.character.look.button");
         items.add(orBusy(BarItem.button(LOOK, look, new ItemStack(
                 Items.leather_chestplate)).tip(look), character == null
-                ? I18n.format(picked == null
-                        || picked.kind == CharacterRosterRows.Kind.EMPTY
-                        ? "gui.losttales.character.pick"
-                        : "gui.losttales.character.not_made")
+                ? I18n.format("gui.losttales.character.pick")
                 : lore ? I18n.format(
                         "gui.losttales.character.error.lore_character_keeps_look")
                 : busy));
         String capes = I18n.format("gui.losttales.character.cape.button");
         items.add(orBusy(BarItem.button(CAPES, capes, new ItemStack(
-                Items.leather)).tip(capes), picked == null
-                || picked.kind == CharacterRosterRows.Kind.EMPTY
+                Items.leather)).tip(capes), character == null
                 ? I18n.format("gui.losttales.character.pick") : busy));
         String delete = I18n.format("gui.losttales.character.delete");
         items.add(orBusy(BarItem.button(DELETE, delete,
                 LostTalesUiSheet.TRASH, LostTalesUiSheet.TRASH_LIT)
                 .tip(delete).ending(), character == null
-                ? I18n.format(picked == null
-                        || picked.kind == CharacterRosterRows.Kind.EMPTY
-                        ? "gui.losttales.character.pick"
-                        : "gui.losttales.character.error.delete_default_character")
-                : character.isDefault() ? I18n.format(
-                        "gui.losttales.character.error.delete_default_character")
+                ? I18n.format("gui.losttales.character.pick")
                 : lore ? I18n.format(
                         "gui.losttales.character.error.lore_character_cannot_delete")
                 : played ? I18n.format(
@@ -1243,11 +1218,10 @@ public final class CharactersPage extends PageContent {
             openEditor(character);
         } else if (LOOK.equals(id) && character != null && !isLore(character)) {
             openLookEditor(character);
-        } else if (CAPES.equals(id)
-                && picked.kind != CharacterRosterRows.Kind.DELETED) {
+        } else if (CAPES.equals(id) && character != null) {
             openCapes(character);
         } else if (DELETE.equals(id) && character != null
-                && !character.isDefault() && !isLore(character)
+                && !isLore(character)
                 && !CharacterRosterRows.isPlayed(snapshot, picked)) {
             askToDelete(snapshot, character);
         } else if (RESTORE.equals(id)
