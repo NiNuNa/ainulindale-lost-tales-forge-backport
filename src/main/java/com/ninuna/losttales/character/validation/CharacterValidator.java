@@ -379,8 +379,8 @@ public final class CharacterValidator {
     }
 
     /**
-     * A switch target: the roster's own account is always selectable, a
-     * character must belong to the roster. Both check the roster revision.
+     * A switch target: one of the roster's characters, at the roster's
+     * revision. The account itself is never one.
      */
     public static CharacterValidationResult validateSelectionTarget(
             CharacterRoster roster, PlayableIdentity target, long expectedRevision) {
@@ -390,9 +390,6 @@ public final class CharacterValidator {
         }
         if (target == null || !roster.getOwnerId().equals(target.getOwnerId())) {
             return CharacterValidationResult.failure(CharacterErrorId.INVALID_CHARACTER_ID);
-        }
-        if (target.isAccount()) {
-            return CharacterValidationResult.success();
         }
         return validateCharacterReference(roster, target.getCharacterId(), expectedRevision);
     }
@@ -488,6 +485,18 @@ public final class CharacterValidator {
     }
 
     /** A name as stored: NFC, trimmed, one space between words. */
+    /**
+     * Whether a name has a character name's shape: 2-32 characters of the
+     * allowed ones once tidied. What it may not be (a lore figure's, a
+     * taken one, a listed word) only the full check says.
+     */
+    public static boolean isWellFormedName(String input) {
+        String name = normalizeName(input);
+        int length = name.codePointCount(0, name.length());
+        return length >= MIN_NAME_LENGTH && length <= MAX_NAME_LENGTH
+                && containsOnlyAllowedNameCharacters(name);
+    }
+
     public static String normalizeName(String input) {
         return normalizeWhitespace(input);
     }

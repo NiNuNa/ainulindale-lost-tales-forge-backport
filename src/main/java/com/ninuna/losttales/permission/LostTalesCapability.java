@@ -39,6 +39,12 @@ public final class LostTalesCapability {
             register("chat.server_console.read", OPERATOR);
     /** Speak as the Narrator in the roleplaying channels and whispers. */
     public static final LostTalesCapability CHAT_NARRATE = register("chat.narrate", OPERATOR);
+    /**
+     * Copy the ids the server's files and commands name a message, an
+     * account or a character by, from their menus, as Discord's developer
+     * mode does.
+     */
+    public static final LostTalesCapability CHAT_COPY_IDS = register("chat.copy_ids", OPERATOR);
 
     /* ---- The server's own settings ---- */
 

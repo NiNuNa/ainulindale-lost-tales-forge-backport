@@ -30,8 +30,7 @@ import java.util.UUID;
  * <p>It is rendered without an entity. Nothing in
  * {@code ModelBiped.setRotationAngles} reads one, and what this mod adds
  * on top only ever asks {@code instanceof}, so a null stands for "nobody
- * in particular, stood still, looking straight ahead" — the pose a menu
- * wants.</p>
+ * in particular, stood still, looking straight ahead".</p>
  *
  * <p>The transform is vanilla's own, in vanilla's order: what
  * {@code GuiInventory} sets up to stand a living thing in a screen, then
@@ -46,14 +45,10 @@ import java.util.UUID;
  * difference between a figure whose flat front sits at the light model's
  * ambient and one lit like everything else a menu draws.</p>
  *
- * <p>It is drawn at a whole number of pixels per texel — see
- * {@link #scaleFor} — because at this size anything else is visible as
- * unequal pixels across one face. That is also why the race's renderer
- * scale is not applied: it is a fraction, and a fraction of a pixel per
- * texel is exactly what it costs. Races still differ, because their
- * bodies do — a hobbit's limbs are squeezed and its head dropped, a
- * dwarf's torso and legs are wider — and they stand on one baseline, as
- * two people of different heights would.</p>
+ * <p>The race's renderer scale is not applied. Races still differ,
+ * because their bodies do — a hobbit's limbs are squeezed and its head
+ * dropped, a dwarf's torso and legs are wider — and they stand on one
+ * baseline, as two people of different heights would.</p>
  */
 public final class LostTalesCharacterFigureRenderer {
 
@@ -74,54 +69,12 @@ public final class LostTalesCharacterFigureRenderer {
     private LostTalesCharacterFigureRenderer() {}
 
     /**
-     * The largest scale whose figure still fits {@code availableHeight},
-     * in whole pixels per texel.
-     *
-     * <p>A texel drawn over one pixel and its neighbour over two is what
-     * reads as a ragged face at this size, so the scale is always a whole
-     * number of pixels per texel — sixteen of them to a block.</p>
-     */
-    public static int scaleFor(int availableHeight) {
-        int blocks = Math.round(MODEL_HEIGHT_UNITS * MODEL_UNIT);
-        int pixelsPerTexel = availableHeight
-                / (blocks * (int)Math.round(1.0F / MODEL_UNIT));
-        return Math.max(1, pixelsPerTexel) * (int)Math.round(1.0F / MODEL_UNIT);
-    }
-
-    /**
-     * How tall a figure stands at that scale, in pixels: a biped is two
-     * blocks. What a caller centres by, so every race stands on the one
-     * baseline whatever its body does above it.
-     */
-    public static int height(int scale) {
-        return Math.round(MODEL_HEIGHT_UNITS * MODEL_UNIT * scale);
-    }
-
-    /**
-     * Draws the character facing the viewer.
-     *
-     * @param centerX where the middle of the figure stands
-     * @param feetY   where it stands, which is the bottom of it
-     * @param scale   pixels per block; a biped is two blocks tall before
-     *                the race's own scale
-     * @return whether anything was drawn
-     */
-    public static boolean drawFigure(Minecraft minecraft, UUID ownerId,
-                                     CharacterAppearance appearance,
-                                     float centerX, float feetY, int scale,
-                                     float brightness, float alpha) {
-        return drawPosedFigure(minecraft, ownerId, appearance, centerX, feetY,
-                scale, 0.0F, 0.0F, 0.0F, 0.0F, brightness, alpha);
-    }
-
-    /**
      * Draws the character turned, tilted and looking where it is told.
      *
      * <p>The creator's stage: the player turns the figure about its feet
      * and tilts it about its middle, and its head follows the pointer.
-     * The scale may be fractional here — a figure this large is zoomed,
-     * not pixel art — which is the one thing the menu button's overload
-     * does not allow.</p>
+     * The scale may be fractional: a figure this large is zoomed, not
+     * pixel art.</p>
      *
      * @param yaw       degrees the figure is turned; zero faces the viewer
      *                  and positive turns its front toward the viewer's
@@ -172,7 +125,7 @@ public final class LostTalesCharacterFigureRenderer {
                     pitch, headYaw, headPitch, brightness, alpha);
             return true;
         } catch (RuntimeException unavailable) {
-            // A menu is never worth a crash; the button keeps its panel.
+            // A figure is never worth a crash; the stage stays empty.
             return false;
         }
     }
@@ -275,13 +228,10 @@ public final class LostTalesCharacterFigureRenderer {
         }
     }
 
-    /** The signed-in account's profile, which names its skin. */
+    /** The player's profile, which names its skin. */
     private static GameProfile profileOf(Minecraft minecraft) {
-        if (minecraft.thePlayer != null) {
-            return minecraft.thePlayer.getGameProfile();
-        }
-        return minecraft.getSession() == null
-                ? null : minecraft.getSession().func_148256_e();
+        return minecraft.thePlayer == null ? null
+                : minecraft.thePlayer.getGameProfile();
     }
 
     /**

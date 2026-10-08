@@ -26,9 +26,9 @@ final class FellowshipOnlineView implements FellowshipSnapshot.Presence {
     /** One online account. */
     static final class Online {
         final EntityPlayerMP player;
-        /** The identity the account plays: its active character's, else its own. */
+        /** Who the account is in the world: its active character, else the account itself. */
         final UUID gameplayId;
-        /** The active character's name; empty while the account plays as itself. */
+        /** The active character's name; empty while the first is being made. */
         final String characterName;
 
         private Online(EntityPlayerMP player, UUID gameplayId, String characterName) {

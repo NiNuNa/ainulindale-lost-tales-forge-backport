@@ -10,6 +10,7 @@ import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Tessellator;
@@ -65,8 +66,8 @@ final class HudPreview {
             if (!LostTalesGuiRegionBlur.getInstance().drawScreenInto(left,
                     top, right, bottom, alpha / 255.0F)) {
                 LostTalesUiInk.fillRect(left, top, right, bottom,
-                        LostTalesUiInk.argb(LostTalesColors.rgb(
-                                LostTalesColors.PLUM_BLACK), alpha));
+                        LostTalesUiInk.argb(LostTalesUiTheme.primaryRgb(),
+                                alpha));
             }
             GL11.glPushMatrix();
             GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT

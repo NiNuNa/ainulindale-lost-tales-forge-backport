@@ -15,6 +15,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -37,7 +38,7 @@ import org.lwjgl.input.Keyboard;
  *
  * <p>A box is picked by a press and carried while the button is held; it
  * pulls to the screen's middle on either axis within {@link #SNAP_REACH}
- * of the screen's pixels, the guide lit honey while it holds. The arrows
+ * of the screen's pixels, the guide lit in the accent while it holds. The arrows
  * move the box picked a pixel, ten with Shift, as a number in Settings
  * steps ten (Alt with an arrow snaps the window). What it moves is
  * the panel's own place, so the HUD and the preview follow at once; it is
@@ -183,7 +184,7 @@ public final class HudPlacementPage extends PageContent {
         float bottom = top + (float)placed[3];
         double scale = placed[4];
         LostTalesUiInk.fillRect(left, top, right, bottom,
-                LostTalesUiInk.argb(LostTalesColors.rgb(LostTalesColors.PLUM_BLACK),
+                LostTalesUiInk.argb(LostTalesUiTheme.primaryRgb(),
                         Math.round(alpha * 0.6F)));
         drawGrid(left, top, right, bottom, scale, screen, alpha);
         HudPanel pointed = panelAt(minecraft, placed, screen, pointerX, pointerY);
@@ -198,16 +199,16 @@ public final class HudPlacementPage extends PageContent {
                     this.picked == pointed, alpha);
         }
         if (this.carrying) {
-            int honey = LostTalesColors.rgb(LostTalesColors.HONEY);
+            int accent = LostTalesUiTheme.accentRgb();
             float middleX = (float)Math.floor(left + screen[0] / 2 * scale);
             float middleY = (float)Math.floor(top + screen[1] / 2 * scale);
             if (this.heldMiddleX) {
                 LostTalesUiInk.fillRect(middleX, top, middleX + 1.0F, bottom,
-                        LostTalesUiInk.argb(honey, alpha));
+                        LostTalesUiInk.argb(accent, alpha));
             }
             if (this.heldMiddleY) {
                 LostTalesUiInk.fillRect(left, middleY, right, middleY + 1.0F,
-                        LostTalesUiInk.argb(honey, alpha));
+                        LostTalesUiInk.argb(accent, alpha));
             }
         }
     }
@@ -258,7 +259,7 @@ public final class HudPlacementPage extends PageContent {
 
     /**
      * One panel's box on the placement screen: its surface, its edge and
-     * its name, centred and cut to the box. The box picked wears honey, the
+     * its name, centred and cut to the box. The box picked wears the accent, the
      * one pointed at ivory, the rest sand.
      */
     private void drawBox(Minecraft minecraft, HudPanel panel, double[] placed,
@@ -274,8 +275,9 @@ public final class HudPlacementPage extends PageContent {
         int fillAlpha = picked ? 0x99 : pointed ? 0x66 : 0x40;
         LostTalesUiInk.fillRect(left, top, right, bottom, LostTalesUiInk.argb(
                 LostTalesColors.rgb(fill), Math.round(alpha * fillAlpha / 255.0F)));
-        int edge = LostTalesColors.rgb(picked ? LostTalesColors.HONEY
-                : pointed ? LostTalesColors.IVORY : LostTalesColors.SAND);
+        int edge = picked ? LostTalesUiTheme.accentRgb()
+                : LostTalesColors.rgb(pointed ? LostTalesColors.IVORY
+                        : LostTalesColors.SAND);
         int edgeArgb = LostTalesUiInk.argb(edge, picked ? alpha
                 : Math.round(alpha * (pointed ? 0xDD : 0x99) / 255.0F));
         LostTalesUiInk.fillRect(left, top, right, top + 1.0F, edgeArgb);
@@ -471,7 +473,7 @@ public final class HudPlacementPage extends PageContent {
         List<BarItem> items = new ArrayList<BarItem>(2);
         BarItem putBack = BarItem.button(BAR_PUT_BACK,
                 StatCollector.translateToLocal(LANG + "put_back"),
-                LostTalesUiSheet.FORWARD, LostTalesUiSheet.FORWARD_HOVER)
+                LostTalesUiSheet.RESET, LostTalesUiSheet.RESET_LIT)
                 .tip(StatCollector.translateToLocal(LANG + "put_back.tip"));
         if (this.picked == null) {
             items.add(putBack.unavailable(StatCollector.translateToLocal(

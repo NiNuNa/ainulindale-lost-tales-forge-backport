@@ -10,7 +10,7 @@ public enum CharacterAppearanceKind {
     NONE(0),
     /** A roleplay character from the player's roster. */
     CHARACTER(1),
-    /** The Minecraft account itself, played as an identity of its own. */
+    /** The Minecraft account itself, while its first character is being made. */
     ACCOUNT(2);
 
     private final int code;

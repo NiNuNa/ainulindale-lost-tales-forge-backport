@@ -5,12 +5,12 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.Window;
-import com.ninuna.losttales.client.window.WindowFrame;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowPage;
+import com.ninuna.losttales.client.window.WindowView;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -258,30 +258,16 @@ public final class ChatLayout {
         }
     };
 
-    /** Whether a conversation is on screen: in front of a window or not, in a row the view shows. */
-    public static synchronized boolean showsConversation() {
-        for (Window window : WindowLayout.windows()) {
-            for (WindowPage tab : WindowFrame.visibleTabs(window)) {
-                if (ConversationPage.from(tab) != null) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     /** Whether any window holds a channel or a whisper; the consoles keep windows of their own. */
     public static synchronized boolean hasConversationWindow() {
         return firstConversationWindow() != null;
     }
 
-    /** The first window, in layout order, holding a channel or a whisper; null for none. */
+    /** The first window, in layout order, standing in the channels' view; null for none. */
     private static Window firstConversationWindow() {
         for (Window window : WindowLayout.windows()) {
-            for (WindowPage tab : window.getTabs()) {
-                if (tab.category().home() == PageCategory.CHANNELS) {
-                    return window;
-                }
+            if (WindowLayout.standsIn(window, PageCategory.CHANNELS)) {
+                return window;
             }
         }
         return null;
@@ -762,13 +748,16 @@ public final class ChatLayout {
      * conversation, the chat's first window opens with it, the
      * conversation in a window of its own beside it, since the first
      * window opens locked. A console opens among the consoles, in a window
-     * of theirs or their own first window
-     * ({@link WindowLayout#openInCategory}).
+     * of theirs or their own first window. While the screen shows another
+     * view, the Lost Tales Menu's or the map's, it opens in the Lost Tales
+     * Menu's view, as any page opened by hand does
+     * ({@link WindowLayout#openByHand}).
      */
     public static synchronized ConversationPage openHere(ConversationPage tab,
                                                 String preferredWindowId) {
-        if (tab != null && tab.isConsole()) {
-            return ConversationPage.from(WindowLayout.openInCategory(
+        if (tab != null && (tab.isConsole()
+                || WindowView.handView(tab) == PageCategory.MENU)) {
+            return ConversationPage.from(WindowLayout.openByHand(
                     ConversationPage.row(tab), preferredWindowId));
         }
         ConversationPage opened = openTab(tab, preferredWindowId);

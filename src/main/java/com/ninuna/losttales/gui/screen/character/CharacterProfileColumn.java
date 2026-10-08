@@ -13,6 +13,7 @@ import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
@@ -101,8 +102,7 @@ final class CharacterProfileColumn {
                            boolean played, boolean lore) {
         String raceId = subject.raceId;
         add(Kind.NAME, subject.name, "", played
-                ? LostTalesColors.rgb(LostTalesColors.HONEY)
-                : LostTalesUiInk.IVORY);
+                ? LostTalesUiTheme.accentRgb() : LostTalesUiInk.IVORY);
         List<String> facts = new ArrayList<String>(4);
         if (played) {
             facts.add(I18n.format("gui.losttales.character.playing"));
@@ -169,8 +169,7 @@ final class CharacterProfileColumn {
         add(Kind.GAP, "", "", 0);
         for (CharacterProfile.Glance glance : profile.glances()) {
             add(Kind.GLANCE, ClientChatProfanity.filter(glance.getTitle()),
-                    glance.getEmoji(),
-                    LostTalesColors.rgb(LostTalesColors.HONEY));
+                    glance.getEmoji(), LostTalesUiTheme.accentRgb());
             if (glance.getLine().length() > 0) {
                 for (Object line : font.listFormattedStringToWidth(
                         ClientChatProfanity.filter(glance.getLine()),
@@ -277,8 +276,8 @@ final class CharacterProfileColumn {
             LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore
                     .getQuest(progress.getQuestId());
             add(Kind.TEXT, quest == null ? progress.getQuestId()
-                    : LostTalesQuestWords.title(quest), "", LostTalesColors.rgb(
-                            LostTalesColors.HONEY));
+                    : LostTalesQuestWords.title(quest), "",
+                    LostTalesUiTheme.accentRgb());
             wrapped(font, width, objectiveOf(quest, progress),
                     LostTalesUiInk.IVORY);
         }

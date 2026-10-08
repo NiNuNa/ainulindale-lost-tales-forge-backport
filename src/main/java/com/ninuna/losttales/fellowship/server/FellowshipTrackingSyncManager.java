@@ -96,8 +96,8 @@ public final class FellowshipTrackingSyncManager {
         if (receiver == null) {
             return false;
         }
-        // The identity being played owns the marker and travels with the
-        // fellowship, whether it is a character or the account itself.
+        // The character being played owns the marker and travels with the
+        // fellowship.
         Fellowship fellowship = view.fellowshipData.getTravellingFellowship(receiver.gameplayId);
         FellowshipTrackingSnapshot content = fellowship == null
                 ? buildSoloContent(recipient.getUniqueID(),
@@ -130,8 +130,7 @@ public final class FellowshipTrackingSyncManager {
     /**
      * One player, no fellowship: their own marker and nothing else.
      *
-     * <p>{@code markerOwnerId} is the identity being played: the active
-     * character, or the account itself.</p>
+     * <p>{@code markerOwnerId} is the character being played.</p>
      */
     private static FellowshipTrackingSnapshot buildSoloContent(
             UUID recipientOwnerId, UUID markerOwnerId,

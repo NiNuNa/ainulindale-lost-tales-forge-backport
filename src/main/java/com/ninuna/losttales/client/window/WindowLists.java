@@ -7,6 +7,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -18,12 +19,12 @@ import net.minecraft.client.gui.GuiTextField;
 /**
  * What every list in the windows draws alike, a menu's, a picker's or a
  * page's: its headings, the row under the pointer, and where more of it
- * waits, a short honey fade on each edge the rows go on past and a thin
+ * waits, a short accent fade on each edge the rows go on past and a thin
  * scrollbar at its right.
  */
 @SideOnly(Side.CLIENT)
 public final class WindowLists {
-    /** How deep the honey fade on an edge the list goes on past is: half the tab strip's shade. */
+    /** How deep the accent fade on an edge the list goes on past is: half the tab strip's shade. */
     public static final float SCROLL_FADE_DEPTH =
             WindowStyle.TOP_EDGE_FADE_HEIGHT / 2.0F;
     /** How far the scrollbar stands in from the list's right edge. */
@@ -36,8 +37,6 @@ public final class WindowLists {
     private static final int HEADING_RULE_ALPHA = 0xE0;
     /** How far above a row's foot a heading's words stand. */
     private static final int HEADING_TEXT_RISE = 10;
-    private static final int HONEY_RGB =
-            LostTalesColors.rgb(LostTalesColors.HONEY);
     /**
      * Whether the page being drawn reaches the window's frame on its left
      * and on its right: one side of a split meets the divider there, whose
@@ -101,7 +100,7 @@ public final class WindowLists {
      */
     public static void drawFieldRule(int left, int top, int right, int alpha) {
         Gui.drawRect(left, top, right, top + 1,
-                LostTalesUiInk.argb(LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+                LostTalesUiInk.argb(LostTalesUiTheme.secondaryRgb(),
                         Math.min(alpha, 0xA0)));
     }
 
@@ -118,7 +117,7 @@ public final class WindowLists {
                 lit ? LostTalesUiInk.IVORY
                         : LostTalesColors.rgb(LostTalesColors.SAND), alpha);
         Gui.drawRect(left, rowY + rowHeight - 1, right, rowY + rowHeight,
-                LostTalesUiInk.argb(LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+                LostTalesUiInk.argb(LostTalesUiTheme.secondaryRgb(),
                         Math.round(HEADING_RULE_ALPHA * alpha / 255.0F)));
     }
 
@@ -139,20 +138,20 @@ public final class WindowLists {
                                   double left, double top, double right,
                                   double bottom, int surfaceAlpha) {
         WindowStyle.recolourFlat((float)left, (float)top, (float)right,
-                (float)bottom, surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
-                LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+                (float)bottom, surfaceAlpha, LostTalesUiTheme.primaryRgb(),
+                LostTalesUiTheme.secondaryRgb());
         int ring = LostTalesUiWindowFrame.WIDTH;
         if (framedLeft && left <= boxLeft) {
             WindowStyle.recolourFlat((float)(boxLeft - ring), (float)top,
                     (float)boxLeft, (float)bottom, surfaceAlpha,
-                    LostTalesUiInk.SURFACE_RGB,
-                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+                    LostTalesUiTheme.primaryRgb(),
+                    LostTalesUiTheme.secondaryRgb());
         }
         if (framedRight && right >= boxRight) {
             WindowStyle.recolourFlat((float)boxRight, (float)top,
                     (float)(boxRight + ring), (float)bottom, surfaceAlpha,
-                    LostTalesUiInk.SURFACE_RGB,
-                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+                    LostTalesUiTheme.primaryRgb(),
+                    LostTalesUiTheme.secondaryRgb());
         }
     }
 
@@ -175,7 +174,7 @@ public final class WindowLists {
     }
 
     /**
-     * Where more of a list waits. A honey fade hangs from each edge the
+     * Where more of a list waits. An accent fade hangs from each edge the
      * rows go on past, {@code edgeTop} or {@code edgeBottom}: the frame,
      * or the line the rows pass under, so it touches it, as the chat
      * history's shade touches the window's edge; it is drawn over the
@@ -202,12 +201,12 @@ public final class WindowLists {
         if (scroll > 0.5D) {
             LostTalesUiRules.drawEdgeFade(left, right, left, right,
                     (float)edgeTop, (float)edgeBottom, SCROLL_FADE_DEPTH,
-                    fade, HONEY_RGB, false);
+                    fade, LostTalesUiTheme.accentRgb(), false);
         }
         if (scroll < maxScroll - 0.5D) {
             LostTalesUiRules.drawEdgeFade(left, right, left, right,
                     (float)edgeBottom, (float)edgeTop, SCROLL_FADE_DEPTH,
-                    fade, HONEY_RGB, false);
+                    fade, LostTalesUiTheme.accentRgb(), false);
         }
         float thumb = Math.max(MIN_THUMB,
                 (float)(band * band / (band + maxScroll)));
@@ -216,7 +215,7 @@ public final class WindowLists {
                 top + (band - thumb) * share);
         float thumbBottom = Math.min(bottom, thumbTop + thumb);
         float x = right - SCROLLBAR_INSET;
-        int track = LostTalesUiInk.argb(LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+        int track = LostTalesUiInk.argb(LostTalesUiTheme.secondaryRgb(),
                 Math.min(alpha, 120));
         LostTalesUiInk.fillRect(x, top, x + 1, thumbTop, track);
         LostTalesUiInk.fillRect(x, thumbBottom, x + 1, bottom, track);

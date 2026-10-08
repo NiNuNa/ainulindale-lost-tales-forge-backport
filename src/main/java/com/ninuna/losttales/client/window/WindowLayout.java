@@ -14,8 +14,12 @@ import java.util.Set;
  * The one authoritative window layout: which windows exist, which tabs
  * each holds in what order, which tab is in front, whether a window is
  * locked, where each window sits and how big it is, and which window
- * stands in front of which. A tab lives in at most one window, and a page
- * opens in a window of its category ({@link PageCategory}). A page may
+ * stands in front of which. Every window stands in one view: its
+ * category's, or the Lost Tales Menu's, whose windows hold anything
+ * ({@link #viewOf}). A tab lives in at most one window, and a page the
+ * game or a key opens goes to a window of its category's view; one opened
+ * by hand on the screen goes to the view the screen shows
+ * ({@link #openByHand}). A page may
  * stand open more than once, each copy a tab of its own; asked about a
  * page, the layout answers with the copy used last ({@link #lastUsed}).
  * Every window is equal: one that loses its last
@@ -147,7 +151,7 @@ public final class WindowLayout {
      * Adds a window holding {@code tabs}, {@code active} in front, as a
      * category's first window stands: at the default place, filling the
      * part of the screen its category's first window fills
-     * ({@link PageCategory#firstFill}), and locked but the menu's
+     * ({@link PageCategory#firstFill}), and locked but the New Page's
      * ({@link PageCategory#firstLocked}). How a system lays out its windows
      * for a new player, how a category with no window opens one, and how
      * tabs a loaded layout placed nowhere find a home. These are the only
@@ -156,6 +160,16 @@ public final class WindowLayout {
      */
     public static synchronized Window addWindow(List<? extends WindowPage> tabs,
                                                 WindowPage active) {
+        return addWindowIn(null, tabs, active);
+    }
+
+    /**
+     * As {@link #addWindow}, the window standing in {@code view}: the first
+     * window of that view. Null for the view of the page in front.
+     */
+    private static Window addWindowIn(PageCategory view,
+                                      List<? extends WindowPage> tabs,
+                                      WindowPage active) {
         List<WindowPage> fresh = new ArrayList<WindowPage>();
         if (tabs != null) {
             for (WindowPage tab : tabs) {
@@ -170,8 +184,9 @@ public final class WindowLayout {
         Window window = newWindow();
         window.tabs().addAll(fresh);
         window.setActiveTab(active);
-        PageCategory category = categoryOf(window);
-        window.setLocked(category == null || category.firstLocked());
+        window.setView(view != null ? view : derivedView(window));
+        PageCategory category = viewOf(window);
+        window.setLocked(category.firstLocked());
         Place place = CATEGORY_PLACES.get(category);
         if (place == null || !staysPut(window.getActiveTab())) {
             window.setFill(firstFillOf(window));
@@ -217,12 +232,43 @@ public final class WindowLayout {
         }
     }
 
-    /** The category a window stands for: its front page's, else its first page's; null for none. */
-    static PageCategory categoryOf(Window window) {
+    /**
+     * The view a window stands in: the one it was given, else its front
+     * page's category's (the Lost Tales Menu's for a window of New Pages).
+     */
+    public static PageCategory viewOf(Window window) {
+        return window.getView() != null ? window.getView() : derivedView(window);
+    }
+
+    /**
+     * Whether a window stands in {@code view}: one of the Lost Tales Menu's
+     * for its view; for a category's, a window of a category's view holding
+     * a page of it, or of one sharing its windows (the channels and the
+     * whispers), as a window carried pages of two categories by hand does.
+     */
+    public static boolean standsIn(Window window, PageCategory view) {
+        if (view == PageCategory.MENU || viewOf(window) == PageCategory.MENU) {
+            return viewOf(window) == view;
+        }
+        if (viewOf(window) == view) {
+            return true;
+        }
+        for (WindowPage held : window.tabs()) {
+            if (held.category().home() == view) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The view a window's pages stand for: its front page's, else its first page's category's. */
+    private static PageCategory derivedView(Window window) {
         WindowPage front = window.getActiveTab() != null
                 ? window.getActiveTab()
                 : window.tabs().isEmpty() ? null : window.tabs().get(0);
-        return front == null ? null : front.category().home();
+        PageCategory home = front == null ? null : front.category().home();
+        return home == null || home == PageCategory.NEW_PAGE
+                ? PageCategory.MENU : home;
     }
 
     /** Where each category's first window opens, for the layout file. */
@@ -249,19 +295,17 @@ public final class WindowLayout {
                 ? window.getActiveTab()
                 : window.tabs().isEmpty() ? null : window.tabs().get(0);
         return front == null || !staysPut(front) ? Window.ScreenFill.NONE
-                : front.category().home().firstFill();
+                : viewOf(window).firstFill();
     }
 
     /* ---- Pages ---- */
 
     /**
-     * Brings a page forward: in the window holding its tab, the tab put in
-     * front there and the window raised; else where a page opened by hand
-     * opens ({@link #openInCategory}), in front and raised. Null for no
-     * page.
+     * Brings a page forward where a page opened by hand opens
+     * ({@link #openByHand}), in front and raised. Null for no page.
      */
     public static synchronized Window showPage(OtherPage page) {
-        return bringForward(openInCategory(page, null));
+        return bringForward(openByHand(page, null));
     }
 
     /**
@@ -286,14 +330,19 @@ public final class WindowLayout {
         if (tab == null) {
             return null;
         }
-        WindowPage open = lastUsed(tab);
+        PageCategory home = tab.category().home();
+        WindowPage open = lastUsedIn(tab, home);
         if (open != null) {
             return open;
         }
-        PageCategory home = tab.category().home();
+        WindowPage placed = placeable(tab);
+        if (placed == null) {
+            return lastUsed(tab);
+        }
+        tab = placed;
         for (Window window : WINDOWS) {
-            if (holdsKindOf(window, tab)) {
-                return placeInCategory(tab, null);
+            if (standsIn(window, home)) {
+                return placeIn(tab, home, null);
             }
         }
         List<WindowPage> pages = new ArrayList<WindowPage>();
@@ -328,40 +377,68 @@ public final class WindowLayout {
     }
 
     /**
-     * Opens a page by hand or by its key where its category keeps its
-     * pages: in the window asked for while that window holds pages of its
-     * category and takes it; else in the unlocked window of its category
-     * last brought to the front, with room; else in a new window a step on
-     * from the window of its category last in front, unlocked; and with
-     * no window of its category at all, in its category's first window
-     * ({@link #addWindow}). Never in the window of another category: only a
-     * hand carrying a tab mixes them. Answers the page as the layout holds
-     * it; null for none.
+     * Opens a page where its category keeps its pages: the copy standing
+     * in its category's view used last; else in the window asked for while
+     * that window stands in its category's view and takes it; else in the
+     * unlocked window of that view last brought to the front, with room;
+     * else in a new window a step on from the window of that view last in
+     * front, unlocked; and with no window of that view at all, in its
+     * category's first window ({@link #addWindow}). A page that opens once
+     * and stands in another view comes forward there. Answers the page as
+     * the layout holds it; null for none.
      */
     public static synchronized WindowPage openInCategory(WindowPage tab,
                                                          String askedWindowId) {
-        if (tab == null) {
-            return null;
-        }
-        WindowPage open = lastUsed(tab);
-        if (open != null) {
-            return open;
-        }
-        return placeInCategory(tab, askedWindowId);
+        return openIn(tab, tab == null ? null : tab.category().home(),
+                askedWindowId);
     }
 
     /**
-     * Opens a new copy of {@code tab}'s page where a page opened by hand
-     * opens ({@link #openInCategory}), however many copies stand open
-     * already: the menu's way, Page Search's and Duplicate Page's. A page
-     * that opens once is brought forward instead. Answers the copy; null
-     * for none.
+     * Opens a page the player asked for on the screen where the screen
+     * shows it ({@link WindowView#handView}): in its category's view while
+     * that view is shown, else in the Lost Tales Menu's, as
+     * {@link #openInCategory} does for a view. With no screen open, in its
+     * category's view.
+     */
+    public static synchronized WindowPage openByHand(WindowPage tab,
+                                                     String askedWindowId) {
+        return openIn(tab, tab == null ? null : WindowView.handView(tab),
+                askedWindowId);
+    }
+
+    private static WindowPage openIn(WindowPage tab, PageCategory view,
+                                     String askedWindowId) {
+        if (tab == null) {
+            return null;
+        }
+        WindowPage open = lastUsedIn(tab, view);
+        if (open != null) {
+            return open;
+        }
+        WindowPage placed = placeable(tab);
+        return placed == null ? lastUsed(tab)
+                : placeIn(placed, view, askedWindowId);
+    }
+
+    /**
+     * Opens a new copy of {@code tab}'s page where the player asked for it
+     * ({@link #openByHand}), however many copies stand open already: the
+     * New Page's way, Page Search's and Duplicate Page's. A page that opens
+     * once is brought forward instead. Answers the copy; null for none.
      */
     public static synchronized WindowPage openCopy(WindowPage tab,
                                                    String askedWindowId) {
         WindowPage copy = freshCopy(tab);
-        return copy == null ? openInCategory(tab, askedWindowId)
-                : placeInCategory(copy, askedWindowId);
+        return copy == null ? openByHand(tab, askedWindowId)
+                : placeIn(copy, WindowView.handView(copy), askedWindowId);
+    }
+
+    /**
+     * The tab itself to put in a view while no window holds it, else a new
+     * copy of its page; null for a page that opens once and stands open.
+     */
+    private static WindowPage placeable(WindowPage tab) {
+        return holds(tab) ? freshCopy(tab) : tab;
     }
 
     /**
@@ -403,7 +480,7 @@ public final class WindowLayout {
         }
         copy.duplicatedFrom(tab);
         if (!takes(window, Collections.singletonList(copy))) {
-            return placeInCategory(copy, window.getId());
+            return placeIn(copy, viewOf(window), window.getId());
         }
         window.tabs().add(window.tabs().indexOf(tab) + 1, copy);
         window.setActiveTab(copy);
@@ -485,17 +562,22 @@ public final class WindowLayout {
     }
 
     /**
-     * Where a page opened by hand goes: the window asked for while it holds
-     * pages of its category and takes it, else where its category keeps
-     * its pages ({@link #openInCategory}).
+     * Where a page goes in {@code view}: the window asked for while it
+     * stands in that view and takes it, else where the view keeps its pages
+     * ({@link #openInCategory}); with no window of the view, its first
+     * window: a category's with the pages it opens with, the Lost Tales
+     * Menu's with the page alone.
      */
-    private static WindowPage placeInCategory(WindowPage tab,
-                                              String askedWindowId) {
+    private static WindowPage placeIn(WindowPage tab, PageCategory view,
+                                      String askedWindowId) {
         Window asked = window(askedWindowId);
         Window window = receivingWindow(
-                asked != null && holdsKindOf(asked, tab) ? asked : null, tab);
+                asked != null && standsIn(asked, view) ? asked : null, tab,
+                view);
         if (window == null) {
-            Window first = addWindow(firstPagesWith(tab), tab);
+            Window first = view == PageCategory.MENU
+                    ? addWindowIn(view, Collections.singletonList(tab), tab)
+                    : addWindowIn(view, firstPagesWith(tab), tab);
             raise(first.getId());
             changed();
             return tab;
@@ -652,10 +734,18 @@ public final class WindowLayout {
      * reaches. Null with no copy open.
      */
     public static synchronized WindowPage lastUsed(WindowPage tab) {
+        return lastUsedIn(tab, null);
+    }
+
+    /** As {@link #lastUsed}, among the windows of {@code view} alone; every window for null. */
+    static synchronized WindowPage lastUsedIn(WindowPage tab, PageCategory view) {
         if (tab == null) {
             return null;
         }
         for (Window window : byRecency()) {
+            if (view != null && !standsIn(window, view)) {
+                continue;
+            }
             WindowPage active = window.getActiveTab();
             if (active != null && active.isCopyOf(tab)) {
                 return active;
@@ -756,8 +846,8 @@ public final class WindowLayout {
             changed();
             return true;
         }
-        PageCategory category = categoryOf(window);
-        if (category != null && !hasLockedWindowOf(category, window)) {
+        PageCategory category = viewOf(window);
+        if (!hasLockedWindowOf(category, window)) {
             CATEGORY_PLACES.remove(category);
         }
         List<WindowPage> leaving = new ArrayList<WindowPage>();
@@ -784,11 +874,11 @@ public final class WindowLayout {
         return true;
     }
 
-    /** Whether a locked window of {@code category} other than {@code but} stands, open or closed. */
+    /** Whether a locked window of view {@code category} other than {@code but} stands, open or closed. */
     private static boolean hasLockedWindowOf(PageCategory category, Window but) {
         for (Window window : WINDOWS) {
             if (window != but && window.isLocked()
-                    && categoryOf(window) == category) {
+                    && viewOf(window) == category) {
                 return true;
             }
         }
@@ -910,6 +1000,12 @@ public final class WindowLayout {
      * ({@link #openInCategory}).</p>
      */
     private static Window receivingWindow(Window preferred, WindowPage tab) {
+        return receivingWindow(preferred, tab, tab.category().home());
+    }
+
+    /** As above, among the windows of {@code view}. */
+    private static Window receivingWindow(Window preferred, WindowPage tab,
+                                          PageCategory view) {
         // A window whose row cannot hold one more tab at its least — the
         // widest tab whole, every other down to its icon — is full.
         List<WindowPage> candidate = Collections.singletonList(tab);
@@ -919,7 +1015,7 @@ public final class WindowLayout {
         }
         Window kin = null;
         for (Window window : byRecency()) {
-            if (window != preferred && holdsKindOf(window, tab)) {
+            if (window != preferred && standsIn(window, view)) {
                 if (kin == null) {
                     kin = window;
                 }
@@ -932,6 +1028,7 @@ public final class WindowLayout {
             return null;
         }
         Window created = newWindow();
+        created.setView(view);
         cascadeFrom(created, asked ? preferred : kin);
         WINDOWS.add(created);
         raise(created.getId());
@@ -942,19 +1039,6 @@ public final class WindowLayout {
     private static boolean takes(Window window,
                                  List<? extends WindowPage> tabs) {
         return !window.isLocked() && hasRoomFor(window, tabs);
-    }
-
-    /**
-     * Whether the window holds a page of {@code tab}'s category, or of one
-     * sharing its windows: the channels and the whispers.
-     */
-    private static boolean holdsKindOf(Window window, WindowPage tab) {
-        for (WindowPage held : window.tabs()) {
-            if (held.category().home() == tab.category().home()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -1016,8 +1100,11 @@ public final class WindowLayout {
             return null;
         }
         Window created = newWindow();
-        cascadeFrom(created, reference != null && WINDOWS.contains(reference)
-                ? reference : frontWindow());
+        Window from = reference != null && WINDOWS.contains(reference)
+                ? reference : frontWindow();
+        // It stands in the view of the window it steps on from.
+        created.setView(from != null ? viewOf(from) : WindowView.handView(tab));
+        cascadeFrom(created, from);
         created.tabs().add(tab);
         created.setActiveTab(tab);
         WINDOWS.add(created);
@@ -1331,6 +1418,7 @@ public final class WindowLayout {
         List<WindowSplit> carried = splitsWhollyIn(source, moved);
         settleSplits(source);
         Window window = newWindow();
+        window.setView(viewOf(source));
         window.tabs().addAll(moved);
         window.splits().addAll(carried);
         window.setActiveTab(moved.get(moved.size() - 1));
@@ -1420,6 +1508,7 @@ public final class WindowLayout {
                     continue;
                 }
                 Window window = new Window(id);
+                window.setView(spec.view);
                 for (WindowPage tab : spec.tabs) {
                     if (tab != null && tab.isKeptInLayout()
                             && placed.add(tab)) {
@@ -1474,7 +1563,10 @@ public final class WindowLayout {
             result.add(new WindowSpec(window.getId(), tabs,
                     active != null && active.isKeptInLayout() ? active : null,
                     window.isLocked(), window.isClosed(), window.isPinnedToHud(),
-                    window.isPinnedToGui(), window.getOffsetX(),
+                    window.isPinnedToGui(),
+                    // Written only where its pages do not say it already.
+                    viewOf(window) == derivedView(window) ? null : viewOf(window),
+                    window.getOffsetX(),
                     window.getOffsetY(), window.getOwnHeight(),
                     window.getOwnWidth(), window.getFill(), splits));
         }
@@ -1491,6 +1583,8 @@ public final class WindowLayout {
         final boolean closed;
         final boolean pinnedToHud;
         final boolean pinnedToGui;
+        /** The view it stands in; null to take its pages' category's. */
+        final PageCategory view;
         final double offsetX;
         final double offsetY;
         /** The window's own height in GUI pixels; 0 stands at the default place. */
@@ -1505,7 +1599,7 @@ public final class WindowLayout {
         public WindowSpec(String id, List<? extends WindowPage> tabs,
                           WindowPage activeTab, boolean locked, boolean closed,
                           boolean pinnedToHud, boolean pinnedToGui,
-                          double offsetX, double offsetY,
+                          PageCategory view, double offsetX, double offsetY,
                           double height, int width, Window.ScreenFill fill,
                           List<WindowSplit> splits) {
             this.id = id;
@@ -1523,6 +1617,7 @@ public final class WindowLayout {
             this.closed = closed;
             this.pinnedToHud = pinnedToHud;
             this.pinnedToGui = pinnedToGui;
+            this.view = view;
             this.offsetX = offsetX;
             this.offsetY = offsetY;
             this.height = clampWindowHeight(height);
@@ -1733,9 +1828,8 @@ public final class WindowLayout {
             return false;
         }
         window.setLocked(locked);
-        PageCategory category = categoryOf(window);
-        if (locked && category != null && staysPut(window.getActiveTab())) {
-            CATEGORY_PLACES.put(category, Place.of(window));
+        if (locked && staysPut(window.getActiveTab())) {
+            CATEGORY_PLACES.put(viewOf(window), Place.of(window));
         }
         changed();
         return true;
@@ -1756,10 +1850,7 @@ public final class WindowLayout {
         if (window == null || window.isLocked()) {
             return false;
         }
-        PageCategory category = categoryOf(window);
-        if (category != null) {
-            CATEGORY_PLACES.remove(category);
-        }
+        CATEGORY_PLACES.remove(viewOf(window));
         window.setOwnWidth(0);
         window.setOwnHeight(0.0D);
         window.setFill(firstFillOf(window));

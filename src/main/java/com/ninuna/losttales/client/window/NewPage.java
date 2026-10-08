@@ -6,6 +6,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -275,7 +276,7 @@ public final class NewPage extends PageContent {
     /**
      * A spoke from the centre to each category, a pixel staircase in the
      * aside tone, faint; the one to the category under the pointer in
-     * honey.
+     * the accent.
      */
     private static void drawSpokes(LostTalesUiHitBox[] wheel, int centreX,
                                    int centreY, int pointed, int alpha) {
@@ -284,7 +285,7 @@ public final class NewPage extends PageContent {
             int endX = (int)Math.max(at.left, Math.min(at.right() - 1, centreX));
             int endY = (int)Math.max(at.top, Math.min(at.bottom() - 1, centreY));
             int argb = index == pointed
-                    ? LostTalesUiInk.argb(LostTalesColors.rgb(LostTalesColors.HONEY), alpha)
+                    ? LostTalesUiInk.argb(LostTalesUiTheme.accentRgb(), alpha)
                     : LostTalesUiInk.argb(LostTalesColors.rgb(LostTalesColors.ROSE_GRAY),
                             alpha * SPOKE_ALPHA / 0xFF);
             drawSpoke(centreX, centreY, endX, endY, argb);
@@ -376,7 +377,7 @@ public final class NewPage extends PageContent {
                 LostTalesUiInk.IVORY, shown);
     }
 
-    /** The centre: a diamond with the one shadow, lit honey while a category is pointed at. */
+    /** The centre: a diamond with the one shadow, lit in the accent while a category is pointed at. */
     private static void drawCentre(int centreX, int centreY, boolean lit,
                                    int alpha) {
         LostTalesUiInk.beginContent();
@@ -385,8 +386,8 @@ public final class NewPage extends PageContent {
                 LostTalesUiInk.argb(LostTalesUiInk.SHADOW,
                         LostTalesUiInk.shadowAlpha(alpha)));
         LostTalesSkyrimUiStyle.drawDiamond(centreX, centreY,
-                LostTalesUiInk.argb(LostTalesColors.rgb(lit
-                        ? LostTalesColors.HONEY : LostTalesColors.ROSE_GRAY), alpha));
+                LostTalesUiInk.argb(lit ? LostTalesUiTheme.accentRgb()
+                        : LostTalesColors.rgb(LostTalesColors.ROSE_GRAY), alpha));
         LostTalesUiInk.beginContent();
     }
 

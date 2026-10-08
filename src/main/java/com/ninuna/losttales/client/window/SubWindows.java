@@ -55,14 +55,18 @@ public final class SubWindows {
 
     /** Back to front. */
     private final List<SubWindow> stack = new ArrayList<SubWindow>();
-    /** How strongly each sub-window shows under the sub-windows in front of it. */
-    private final StackFade stackFade = new StackFade();
+    /** How strongly each window and sub-window shows under the ones in front of it: the screen's one stack. */
+    private final StackFade stackFade;
     /** What a sub-window others lie over is drawn into, laid back over the world at its strength. */
     private final LostTalesUiLayerFade fade = new LostTalesUiLayerFade();
     private SubWindow focused;
     private Gesture gesture;
     private int screenWidth;
     private int screenHeight;
+
+    SubWindows(StackFade stackFade) {
+        this.stackFade = stackFade;
+    }
 
     /** Takes the screen's size; called on every layout, which also runs on a resize. */
     public void bind(int screenWidth, int screenHeight) {
@@ -151,6 +155,31 @@ public final class SubWindows {
         place(window, room, firstContentBox);
         cascade(window, room);
         return add(window);
+    }
+
+    /**
+     * Opens a window that stands on every screen and cannot be closed, on
+     * the bare screen, locked: where its kind was last locked, else round
+     * {@code firstContentBox}. Open already, it takes that first place
+     * again (the screen may have changed its size) unless its kind has a
+     * place of its own. The window in front stays in front.
+     */
+    void openPermanent(SubWindowKind kind, SubWindowContent content,
+                       LostTalesUiHitBox firstContentBox) {
+        SubWindow window = find(kind, "");
+        if (window != null && window.isOpen()) {
+            if (window.locked && SubWindowPlaces.of(kind) == null) {
+                place(window, screenRoom(), firstContentBox);
+            }
+            return;
+        }
+        SubWindow front = this.focused;
+        open(kind, "", content, null, firstContentBox);
+        if (front != null && front.isOpen()) {
+            focus(front);
+        } else {
+            blur();
+        }
     }
 
     /**
@@ -270,7 +299,8 @@ public final class SubWindows {
      * puts it again.
      */
     public void close(SubWindow window) {
-        if (window == null || !window.isOpen()) {
+        if (window == null || !window.isOpen()
+                || window.content.isPermanent()) {
             return;
         }
         if (!window.locked) {
@@ -335,22 +365,26 @@ public final class SubWindows {
                 && !this.focused.hidden ? this.focused : null;
     }
 
-    /** Closes the window in front; answers whether there was one. */
+    /** Closes the window in front; answers whether there was one that closes. */
     public boolean closeFocused() {
         SubWindow front = focused();
-        if (front == null) {
+        if (front == null || front.content.isPermanent()) {
             return false;
         }
         close(front);
         return true;
     }
 
-    /** The windows open, back to front, and where they stand: what comes back when the screen opens again. */
+    /**
+     * The windows open, back to front, and where they stand: what comes
+     * back when the screen opens again. The permanent ones open with every
+     * screen of their own accord and are not among them.
+     */
     public List<SubWindowPlaces.Reopening> openWindows() {
         List<SubWindowPlaces.Reopening> open =
                 new ArrayList<SubWindowPlaces.Reopening>();
         for (SubWindow window : this.stack) {
-            if (window.isOpen()) {
+            if (window.isOpen() && !window.content.isPermanent()) {
                 open.add(new SubWindowPlaces.Reopening(window.kind,
                         window.key, window.content.sessionState(),
                         window.parentId, window.x, window.y,
@@ -423,7 +457,8 @@ public final class SubWindows {
         }
         for (int index = this.stack.size() - 1; index >= 0; index--) {
             SubWindow window = this.stack.get(index);
-            if (!window.isOpen() || window.hidden || covered(window, x, y)) {
+            if (!window.isOpen() || window.hidden || window.content.isTucked()
+                    || covered(window, x, y)) {
                 continue;
             }
             WindowGestures.ResizeEdge edge = window.edgeAt(x, y);
@@ -477,7 +512,6 @@ public final class SubWindows {
      * undrawn until its window draws it.
      */
     public void beginFrame() {
-        stackSubWindows();
         for (int index = this.stack.size() - 1; index >= 0; index--) {
             SubWindow window = this.stack.get(index);
             if (window.parentId != null
@@ -495,34 +529,23 @@ public final class SubWindows {
     }
 
     /**
-     * How strongly each sub-window shows under the sub-windows drawn in
-     * front of it ({@link StackFade}), from where each stood when last
-     * drawn: back to front as the screen draws them, a window's own with
-     * it in the windows' order and those on the bare screen last. Windows
-     * take no part: a sub-window fades only under other sub-windows.
+     * Adds the sub-windows of window {@code parentId} (null for the bare
+     * screen) to the screen's stack, back to front as they are drawn, each
+     * with the box it stood in when last drawn; one not drawn then neither
+     * fades nor is faded.
      */
-    private void stackSubWindows() {
-        List<SubWindow> order = new ArrayList<SubWindow>(this.stack.size());
-        for (Window window : WindowLayout.stacked()) {
-            for (SubWindow sub : this.stack) {
-                if (sub.belongsTo(window.getId())) {
-                    order.add(sub);
-                }
-            }
-        }
+    void addToStack(String parentId, List<Object> keys,
+                    List<LostTalesUiHitBox> boxes) {
         for (SubWindow sub : this.stack) {
-            if (sub.parentId == null) {
-                order.add(sub);
+            if (!sub.belongsTo(parentId)) {
+                continue;
             }
-        }
-        List<LostTalesUiHitBox> boxes =
-                new ArrayList<LostTalesUiHitBox>(order.size());
-        for (SubWindow sub : order) {
-            boxes.add(sub.hidden || !sub.isOpen() || sub.strip == null ? null
+            keys.add(sub);
+            boxes.add(sub.hidden || !sub.isOpen() || sub.strip == null
+                    || sub.shownShare <= 0.0F ? null
                     : new LostTalesUiHitBox(sub.drawnLeft, sub.drawnTop,
                             sub.width, sub.height));
         }
-        this.stackFade.advance(order, boxes, null, System.nanoTime());
     }
 
     /**
@@ -583,11 +606,13 @@ public final class SubWindows {
             return;
         }
         // Laid on the display's grid, rising the last few pixels into
-        // place as it opens; the content is laid out on whole pixels and
-        // drawn in a matrix moved by the rest.
+        // place as it opens (tucking away and back only fades), and drawn
+        // as far above its place as its content asks; the content is laid
+        // out on whole pixels and drawn in a matrix moved by the rest.
         double exactLeft = LostTalesDisplayPixels.snap(window.left);
         double exactTop = LostTalesDisplayPixels.snap(window.top
-                + (1.0F - share) * SubWindow.RISE);
+                + (1.0F - window.openedShare) * SubWindow.RISE
+                - window.content.drawnAbove());
         int wholeLeft = (int)Math.floor(exactLeft);
         int wholeTop = (int)Math.floor(exactTop);
         window.drawnLeft = exactLeft;
@@ -626,8 +651,8 @@ public final class SubWindows {
                 window.width, window.height);
         WindowDrawing.cutBehind(stands, share);
         WindowDrawing.softenBehind(stands, share);
-        // One the sub-windows in front of it lie over fades as one
-        // picture over the world it now stands on.
+        // One that windows or sub-windows in front of it lie over fades
+        // as one picture over the world it now stands on.
         float strength = this.stackFade.shareOf(window);
         int ring = WindowPlacement.FRAME_WIDTH + LostTalesUiInk.SHADOW_OFFSET;
         boolean fading = strength < 1.0F && this.fade.begin(minecraft,
@@ -638,7 +663,8 @@ public final class SubWindows {
         try {
             window.strip = SubWindowStrip.layOut(font, wholeLeft,
                     wholeLeft + window.width, wholeTop, window.title(),
-                    window.content.stripIcon() != null);
+                    window.content.stripIcon() != null,
+                    !window.content.isPermanent());
             // The strip's surface and the content's side by side, never
             // one over the other, with the frame's ring round them; the
             // frame's edges lie over the ring.

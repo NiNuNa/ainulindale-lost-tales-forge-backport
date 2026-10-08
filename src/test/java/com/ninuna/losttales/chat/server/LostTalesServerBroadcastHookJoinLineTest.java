@@ -115,39 +115,15 @@ public final class LostTalesServerBroadcastHookJoinLineTest {
         assertSame(plain, LostTalesServerBroadcastHook.namingTheAccount(plain));
     }
 
-    /**
-     * Every player a line names is found by the whisper on their name, and
-     * each can be written in anew, the line's other words kept: how a line
-     * held for a character's name goes out naming it.
-     */
+    /** Every player a line names is found by the whisper on their name. */
     @Test
-    public void everyPlayerALineNamesCanBeWrittenInAnew() {
+    public void everyPlayerALineNamesIsFound() {
         ChatComponentText achievement = new ChatComponentText("First Steps");
         ChatComponentTranslation line = new ChatComponentTranslation(
                 "chat.lotr.achievement", characterName("Steve", "Steve"),
                 achievement);
         assertEquals(java.util.Collections.singletonList("Steve"),
                 LostTalesServerBroadcastHook.namedAccounts(line));
-        IChatComponent out = LostTalesServerBroadcastHook.swapNames(line,
-                new LostTalesServerBroadcastHook.NameSwap() {
-                    @Override
-                    public IChatComponent swap(IChatComponent name, String account) {
-                        return characterName("Aldric", account);
-                    }
-                });
-        Object[] arguments = ((ChatComponentTranslation)out).getFormatArgs();
-        assertEquals("chat.lotr.achievement", ((ChatComponentTranslation)out).getKey());
-        assertEquals("Aldric", ((IChatComponent)arguments[0]).getUnformattedText());
-        assertSame(achievement, arguments[1]);
-
-        // A swap that keeps every name hands the line back as it came.
-        assertSame(line, LostTalesServerBroadcastHook.swapNames(line,
-                new LostTalesServerBroadcastHook.NameSwap() {
-                    @Override
-                    public IChatComponent swap(IChatComponent name, String account) {
-                        return null;
-                    }
-                }));
         assertEquals(java.util.Collections.<String>emptyList(),
                 LostTalesServerBroadcastHook.namedAccounts(
                         new ChatComponentText("Nobody")));

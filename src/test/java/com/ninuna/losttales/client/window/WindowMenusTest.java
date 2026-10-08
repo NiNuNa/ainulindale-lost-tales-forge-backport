@@ -74,7 +74,7 @@ public final class WindowMenusTest {
     }
 
     private static SubWindows bound() {
-        SubWindows windows = new SubWindows();
+        SubWindows windows = new SubWindows(new StackFade());
         windows.bind(480, 270);
         return windows;
     }

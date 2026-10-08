@@ -13,6 +13,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -59,10 +60,9 @@ public final class LostTalesChatVisualStyle {
         return ClientChatChannelState.displayColor(ChatChannel.CLIENT_CONSOLE);
     }
 
-    /** The line under the pointer, in the client's chosen palette colour; plum grey until it chooses. */
+    /** The line under the pointer: the windows' secondary colour, as every lit row. */
     static int selectedLineRgb() {
-        return paletteRgb(LostTalesConfig.chatSelectedLineColor,
-                LostTalesColors.PLUM_GRAY);
+        return LostTalesUiTheme.secondaryRgb();
     }
 
     /** A line that @-mentions this player, in the client's chosen palette colour; coral until it chooses. */
@@ -71,13 +71,9 @@ public final class LostTalesChatVisualStyle {
                 LostTalesColors.CORAL);
     }
 
-    /**
-     * What the Server and the Client say, in the client's chosen palette
-     * colour; honey, the colour of a join, until it chooses.
-     */
+    /** What the Server and the Client say: the windows' accent. */
     static int serverTextRgb() {
-        return paletteRgb(LostTalesConfig.chatServerTextColor,
-                LostTalesColors.HONEY);
+        return LostTalesUiTheme.accentRgb();
     }
 
     /** The line a reply's quote jumped to, while it is lit, in the chosen colour. */
@@ -1321,7 +1317,7 @@ public final class LostTalesChatVisualStyle {
                                          boolean hovered, boolean colours) {
         int left = x;
         int top = y - ChatReactionMarker.TEXT_DROP;
-        int accent = LostTalesColors.rgb(LostTalesColors.HONEY);
+        int accent = LostTalesUiTheme.accentRgb();
         float lit = chip.mineFor(ChatReactionMarker.reader()) ? 1.0F
                 : LostTalesChatPresentation.chipHoverFade(chip, hovered);
         GL11.glPushMatrix();
@@ -1470,7 +1466,7 @@ public final class LostTalesChatVisualStyle {
     private static void drawUnknownEmoji(FontRenderer font, int x, int top,
                                          int y, int alpha) {
         int size = ChatReactionMarker.ICON;
-        int tile = LostTalesUiInk.argb(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY), alpha);
+        int tile = LostTalesUiInk.argb(LostTalesUiTheme.secondaryRgb(), alpha);
         Gui.drawRect(x + 1, top, x + size - 1, top + size, tile);
         Gui.drawRect(x, top + 1, x + 1, top + size - 1, tile);
         Gui.drawRect(x + size - 1, top + 1, x + size, top + size - 1, tile);

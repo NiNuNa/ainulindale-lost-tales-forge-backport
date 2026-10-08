@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
@@ -13,6 +14,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -70,12 +72,18 @@ public final class WindowScreen extends GuiChat
 
     /** A page brought forward from outside, which takes the keys once the screen draws. */
     private static OtherPage pageToFocus;
+    /** Whether the next screen made is the Lost Tales Menu key's. */
+    private static boolean menuNext;
 
     private final List<ScreenPart> parts = new ArrayList<ScreenPart>();
     private final PointerRegions regions = new PointerRegions();
     private final ToolStrip toolStrip = new ToolStrip();
     /** Snap assist: the other windows offered for a layout's empty zones. */
     private final SnapAssist snapAssist = new SnapAssist();
+    /** The Views sub-window: a button for every view, at the foot of the screen. */
+    private final ViewsWindow views = new ViewsWindow();
+    /** The snap bar: the layouts, always at the top of the screen. */
+    private final SnapBarWindow snapBar = new SnapBarWindow();
     /** The drags: tabs, windows, resizes, and whatever a window's content drags. */
     private final WindowGestures gestures = new WindowGestures(
             new WindowGestures.Host() {
@@ -111,13 +119,13 @@ public final class WindowScreen extends GuiChat
                 public void lockedMoveTried(Window window) {
                     nudgeLock(window);
                 }
-            }, this.snapAssist);
+            }, this.snapAssist, this.snapBar);
     /** The snap layouts a window's fullscreen control opens. */
     private final SnapLayouts.Flyout snapFlyout = new SnapLayouts.Flyout();
-    /** The pickers' windows, the menus and cards: whatever opens on a click and stays. */
-    private final SubWindows subWindows = new SubWindows();
-    /** How strongly each window shows under the windows in front of it. */
+    /** How strongly each window and sub-window shows under the ones in front of it. */
     private final StackFade stackFade = new StackFade();
+    /** The pickers' windows, the menus and cards: whatever opens on a click and stays. */
+    private final SubWindows subWindows = new SubWindows(this.stackFade);
     /** The pages' input bars. */
     private final WindowBar bar = new WindowBar(new BarLead.Voice() {
         @Override
@@ -214,13 +222,15 @@ public final class WindowScreen extends GuiChat
     private final boolean openedForChat;
     /** Whether the command key opened it: the chat's key with {@link #COMMAND_OPENER} typed. */
     private final boolean openedForCommand;
+    /** Whether the Lost Tales Menu key opened it: the views it was left with. */
+    private final boolean openedForMenu;
 
     /**
      * The screen the chat opens, and a page's: {@link #screenForPage}
      * names its page before it makes one.
      */
     public WindowScreen(String defaultText) {
-        this(defaultText, null, pageToFocus == null);
+        this(defaultText, null, pageToFocus == null && !menuNext);
     }
 
     /** A screen that goes back to {@code parent} as it closes. */
@@ -231,6 +241,8 @@ public final class WindowScreen extends GuiChat
         this.openedForChat = openedForChat;
         this.openedForCommand = this.openedForChat
                 && COMMAND_OPENER.equals(defaultText);
+        this.openedForMenu = menuNext;
+        menuNext = false;
         for (ScreenPart.Maker maker : MAKERS) {
             ScreenPart part = maker.make(this);
             if (part != null) {
@@ -271,13 +283,59 @@ public final class WindowScreen extends GuiChat
 
     /**
      * Opens the screen with a page in front — the journal, the map, a
-     * waystone — in the window holding its tab, else in a window of its
-     * category ({@link WindowLayout#openInCategory}). With the screen
-     * already open the page only comes forward. Nothing opens for a page
-     * no system registered.
+     * waystone — where a page opened by hand opens
+     * ({@link WindowLayout#openByHand}); with the screen open, the screen
+     * swaps to the view it opened in. Nothing opens for a page no system
+     * registered.
      */
     public static void openPage(String pageId) {
         open(screenForPage(pageId, false));
+    }
+
+    /**
+     * The Lost Tales Menu key: opens the screen on the Lost Tales Menu's
+     * view, the windows the player opened there. On that view it closes the
+     * screen; on another it swaps to it.
+     */
+    public static void openMenu() {
+        WindowScreen current = current();
+        if (current != null) {
+            current.menuKey();
+            return;
+        }
+        menuNext = true;
+        open(new WindowScreen(""));
+    }
+
+    private void menuKey() {
+        if (WindowView.isOn(PageCategory.MENU)) {
+            closeScreen();
+            return;
+        }
+        openMenuView();
+        syncTypingFocus();
+    }
+
+    /**
+     * The Lost Tales Menu's view: its windows as the player left them; with
+     * none, a New Page in a window of its own, which takes the keys once
+     * the screen draws.
+     */
+    private void openMenuView() {
+        WindowView.forView(PageCategory.MENU);
+        for (Window window : WindowLayout.windows()) {
+            if (WindowLayout.viewOf(window) == PageCategory.MENU) {
+                return;
+            }
+        }
+        OtherPage newPage = WindowPages.tab(NewPage.PAGE_ID);
+        WindowPage copy = newPage == null ? null
+                : WindowLayout.openCopy(newPage, null);
+        Window window = copy == null ? null : WindowLayout.windowOf(copy);
+        if (copy instanceof OtherPage && window != null) {
+            WindowLayout.raise(window.getId());
+            pageToFocus = (OtherPage)copy;
+        }
     }
 
     /**
@@ -313,15 +371,17 @@ public final class WindowScreen extends GuiChat
     private static GuiScreen screenForPage(String pageId, boolean byKey) {
         Minecraft minecraft = Minecraft.getMinecraft();
         OtherPage page = WindowPages.tab(pageId);
-        if (minecraft == null || page == null
-                || (byKey ? WindowLayout.showView(page)
-                        : WindowLayout.showPage(page)) == null) {
+        Window holding = minecraft == null || page == null ? null : byKey
+                ? WindowLayout.showView(page) : WindowLayout.showPage(page);
+        if (holding == null) {
             return null;
         }
-        pageToFocus = page;
+        WindowPage shown = holding.getActiveTab();
+        pageToFocus = shown instanceof OtherPage ? (OtherPage)shown : page;
         if (minecraft.currentScreen instanceof WindowScreen) {
-            // Opened from the screen, by a click: it joins what is shown.
-            WindowView.show(page);
+            // Opened from the screen, by a click: the screen swaps to the
+            // view it opened in.
+            WindowView.show(pageToFocus);
             return minecraft.currentScreen;
         }
         return new WindowScreen("");
@@ -574,7 +634,13 @@ public final class WindowScreen extends GuiChat
                 return;
             }
         }
-        if (tab instanceof OtherPage) {
+        if (WindowLayout.holds(tab)) {
+            WindowLayout.setActiveTab(tab);
+            Window window = WindowLayout.windowOf(tab);
+            if (window != null) {
+                WindowLayout.raise(window.getId());
+            }
+        } else if (tab instanceof OtherPage) {
             WindowLayout.showPage((OtherPage)tab);
         }
     }
@@ -636,7 +702,9 @@ public final class WindowScreen extends GuiChat
             // screen it replaced has closed: the command key the consoles,
             // the chat's key the channels and whispers, a page's key that
             // page's category; the windows pinned to the GUI always.
-            if (this.openedForCommand) {
+            if (this.openedForMenu) {
+                openMenuView();
+            } else if (this.openedForCommand) {
                 WindowView.forConsole();
             } else if (this.openedForChat || pageToFocus == null) {
                 WindowView.forChat();
@@ -655,9 +723,11 @@ public final class WindowScreen extends GuiChat
         this.gestures.bind(this.mc, this.fontRendererObj, this.width,
                 this.height);
         this.subWindows.bind(this.width, this.height);
+        this.snapBar.bind(this.width, this.height);
         for (ScreenPart part : this.parts) {
             part.init();
         }
+        openMenus();
         // initGui also runs on resize; the entrance only plays once per
         // opening.
         if (!this.openAnimationStarted) {
@@ -684,13 +754,6 @@ public final class WindowScreen extends GuiChat
     @Override
     public void updateScreen() {
         super.updateScreen();
-        // The screen closes once nothing stands on it: the last window
-        // closed, and no sub-window on the bare screen (Settings alone).
-        // Closing every window is closing the screen.
-        if (isEmpty() && this.subWindows.openWindows().isEmpty()) {
-            closeScreen();
-            return;
-        }
         // Every page in front of its window on screen keeps time: a caret,
         // a list that follows the world. A page may close its own tab as
         // it ticks, and its window with it, so the windows are walked
@@ -754,6 +817,12 @@ public final class WindowScreen extends GuiChat
         LostTalesKeyPress press = LostTalesKeyPress.read(typedChar, keyCode);
         syncTypingFocus();
         if (handleSnapKey(press)) {
+            return;
+        }
+        // The Lost Tales Menu key types nothing: it reaches the screen
+        // whatever field holds the keys.
+        if (!press.types && LostTalesKeyBindings.isMenuKey(keyCode)) {
+            menuKey();
             return;
         }
         if (viewKey(press)) {
@@ -1042,12 +1111,11 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * Turns the screen to a page, as its key does: the page's category with
-     * the windows pinned to the GUI beside it, the page in front of its
-     * window; or the screen closed when the page stands shown in its
-     * category's view already. Also what a page's key bound to a mouse
-     * button does, pressed on the page. False for no page, or one that
-     * cannot come forward.
+     * A page's key on the screen: the screen swaps to the page's view, the
+     * page in front of its window with the keys; the key of a page standing
+     * shown in the view the screen shows closes the screen. Also what a
+     * page's key bound to a mouse button does, pressed on the page. False
+     * for no page, or one that cannot come forward.
      */
     public boolean turnTo(OtherPage page) {
         if (page == null || !page.isAvailable()) {
@@ -1057,12 +1125,119 @@ public final class WindowScreen extends GuiChat
             closeScreen();
             return true;
         }
-        if (WindowLayout.showView(page) == null) {
+        Window holding = WindowLayout.showView(page);
+        if (holding == null) {
             return false;
         }
         WindowView.forPage(page);
-        focusPage(page);
+        WindowPage shown = holding.getActiveTab();
+        focusPage(shown instanceof OtherPage ? (OtherPage)shown : page);
         return true;
+    }
+
+    /** What a view's button on the Views sub-window does: swaps the screen to that view. */
+    void swapTo(PageCategory view) {
+        if (WindowView.isOn(view)) {
+            return;
+        }
+        if (view == PageCategory.MENU) {
+            openMenuView();
+            syncTypingFocus();
+            return;
+        }
+        WindowView.forView(view);
+        WindowPage front = openViewWindows(view);
+        if (front != null) {
+            jumpToTab(front);
+        }
+        syncTypingFocus();
+    }
+
+    /**
+     * Gives a view the screen swapped to its windows, and answers the page
+     * to bring forward: the front page of its window in front, else, with
+     * no window of it shown, its first window's, opened as the view's key
+     * opens it. Null where the view has nothing to show.
+     */
+    private WindowPage openViewWindows(PageCategory view) {
+        List<Window> stacked = WindowLayout.stacked();
+        for (int index = stacked.size() - 1; index >= 0; index--) {
+            List<WindowPage> shown = WindowFrame.visibleTabs(stacked.get(index));
+            WindowPage front = WindowFrame.activeTab(stacked.get(index), shown);
+            if (front != null && front.category().home() == view.home()) {
+                return front;
+            }
+        }
+        for (ScreenPart part : this.parts) {
+            WindowPage opened = part.openView(view);
+            if (opened != null) {
+                return opened;
+            }
+        }
+        OtherPage page = WindowPages.viewPage(view);
+        return page == null || WindowLayout.showView(page) == null ? null
+                : page;
+    }
+
+    /**
+     * A New Page where a page opened by hand opens, with no window asked
+     * for: in the view the screen shows, in front with the keys.
+     */
+    void openNewPageWindow() {
+        OtherPage newPage = WindowPages.tab(NewPage.PAGE_ID);
+        WindowPage copy = newPage == null ? null
+                : WindowLayout.openCopy(newPage, null);
+        if (copy != null) {
+            jumpToTab(copy);
+        }
+    }
+
+    /**
+     * The Views sub-window and the snap bar, which stand on every screen
+     * and cannot be closed: opened where they last stood locked, else at
+     * the foot and the top of the screen.
+     */
+    private void openMenus() {
+        LostTalesUiHitBox screen = this.subWindows.screenRoom();
+        this.subWindows.openPermanent(ViewsWindow.KIND, this.views,
+                this.views.firstContentBox(screen));
+        this.subWindows.openPermanent(SnapBarWindow.KIND, this.snapBar,
+                this.snapBar.firstContentBox(screen));
+    }
+
+    /**
+     * The Views sub-window stands aside while a window lies over it and
+     * comes back under the pointer; the snap bar learns where it stands,
+     * to peek from above it as a carried window nears the top, and moves
+     * its peek on.
+     */
+    private void tuckMenus(double pointerX, double pointerY) {
+        SubWindow views = this.subWindows.find(ViewsWindow.KIND, "");
+        if (views != null) {
+            LostTalesUiHitBox box = views.box();
+            this.views.setTucked(windowOver(box)
+                    && !box.grown(WindowGestures.RESIZE_BORDER)
+                            .contains(pointerX, pointerY));
+        }
+        SubWindow bar = this.subWindows.find(SnapBarWindow.KIND, "");
+        if (bar != null) {
+            this.snapBar.standsAt(bar.box(), System.nanoTime());
+        }
+    }
+
+    /** Whether a window drawn this frame lies over {@code box}. */
+    private static boolean windowOver(LostTalesUiHitBox box) {
+        for (Window window : WindowLayout.stacked()) {
+            WindowFrame frame = WindowFrame.find(window.getId());
+            LostTalesUiHitBox drawn = frame == null || !frame.drawn ? null
+                    : frame.drawnBox();
+            if (drawn != null && drawn.left < box.right()
+                    && box.left < drawn.right() && drawn.top < box.bottom()
+                    && box.top < drawn.bottom()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1339,6 +1514,11 @@ public final class WindowScreen extends GuiChat
                     front.toggleMemberList();
                 }
                 return;
+            case INBOX:
+                if (front != null) {
+                    front.openInbox();
+                }
+                return;
             case VIEW:
                 toggleBorderless(press.window);
                 return;
@@ -1366,20 +1546,20 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * A new page in {@code window}, as a browser's new tab: a New Page at its row's end, in front with the keys, where the page picked
-     * on it will stand. A locked window takes no page, so its menu opens in
-     * a new window a step on; with no window, the menu comes as its key
-     * brings it.
+     * A new page in {@code window}, as a browser's new tab: a New Page at
+     * its row's end, in front with the keys, where the page picked on it
+     * will stand. A locked window takes no page, so its New Page opens in a
+     * new window a step on; with no window, in the New Page's own window.
      */
     void openNewPage(Window window) {
-        OtherPage menu = WindowPages.tab(NewPage.PAGE_ID);
-        if (menu == null) {
+        OtherPage newPage = WindowPages.tab(NewPage.PAGE_ID);
+        if (newPage == null) {
             return;
         }
         WindowPage copy = window == null ? null
-                : WindowLayout.openCopyIn(menu, window.getId());
+                : WindowLayout.openCopyIn(newPage, window.getId());
         if (copy == null) {
-            turnTo(menu);
+            openNewPageWindow();
             return;
         }
         jumpToTab(copy);
@@ -1406,29 +1586,52 @@ public final class WindowScreen extends GuiChat
         if (picked == null) {
             return;
         }
-        WindowPage copy = WindowLayout.replaceTab(newPage, picked);
-        if (copy != null) {
-            jumpToTab(copy);
-            return;
+        // The tab turns into the page picked where the page may stand: in a
+        // window of the Lost Tales Menu's view, or of the page's own.
+        Window window = WindowLayout.windowOf(newPage);
+        PageCategory view = window == null ? null : WindowLayout.viewOf(window);
+        if (view == PageCategory.MENU || view == picked.category().home()) {
+            WindowPage copy = WindowLayout.replaceTab(newPage, picked);
+            if (copy != null) {
+                jumpToTab(copy);
+                return;
+            }
         }
-        WindowPage shown = WindowLayout.openInCategory(picked, null);
-        if (shown == null) {
-            return;
+        WindowPage shown = WindowLayout.openByHand(picked, null);
+        if (shown != null) {
+            jumpToTab(shown);
         }
-        WindowView.forCategory(shown.category());
-        jumpToTab(shown);
     }
 
     /**
      * Brings an open tab in front of its window, the window over the
      * others, and gives it the keys: a conversation's bar, or a page.
      */
+    /**
+     * Opens a page by hand — in the window {@code windowId} where the page
+     * may stand there, else where a page opened by hand opens — brings it
+     * forward with the keys, and shows {@code reference} on it
+     * ({@link PageContent#show}) unless that is null.
+     */
+    public void showOnPage(String pageId, String reference, String windowId) {
+        OtherPage tab = WindowPages.tab(pageId);
+        WindowPage shown = tab == null ? null
+                : WindowLayout.openByHand(tab, windowId);
+        if (!(shown instanceof OtherPage)) {
+            return;
+        }
+        jumpToTab(shown);
+        if (reference != null) {
+            ((OtherPage)shown).content().show(reference);
+        }
+    }
+
     public void jumpToTab(WindowPage tab) {
         Window window = tab == null ? null : WindowLayout.windowOf(tab);
         if (window == null) {
             return;
         }
-        // A tab the player goes to by hand joins what is shown.
+        // The screen swaps to the view the tab stands in.
         WindowView.show(tab);
         WindowLayout.raise(window.getId());
         selectTab(tab);
@@ -1689,7 +1892,9 @@ public final class WindowScreen extends GuiChat
             part.beforeWindows(pointerX, pointerY);
         }
         // Every window is drawn with its own bar and sub-windows, back to
-        // front, so a window in front covers all of them.
+        // front, so a window in front covers all of them; how strongly each
+        // shows is read from where all of them stood last frame.
+        stackWindows(WindowLayout.stacked());
         this.subWindows.beginFrame();
         drawWindows(mouseX, mouseY, pointerX, pointerY, partialTicks);
         for (ScreenPart part : this.parts) {
@@ -1702,6 +1907,7 @@ public final class WindowScreen extends GuiChat
         boolean empty = isEmpty();
         boolean typing = !empty && hasField();
         this.menus.refresh();
+        tuckMenus(pointerX, pointerY);
         for (ScreenPart part : this.parts) {
             part.drawUnderSubWindows(empty, typing, pointerX, pointerY);
         }
@@ -1721,7 +1927,6 @@ public final class WindowScreen extends GuiChat
                 this.regions);
         this.gestures.drawLineUpEdge();
         float shownOpacity = WindowOpening.sample().getOpacity();
-        this.gestures.drawSnapBar(shownOpacity);
         this.snapAssist.layOut(this.mc, this.fontRendererObj, this.width,
                 this.height);
         this.snapAssist.draw(this.mc, this.fontRendererObj, this.regions,
@@ -1792,7 +1997,7 @@ public final class WindowScreen extends GuiChat
 
     /**
      * The new player's tip showing now ({@link FirstTips}): its words in
-     * a popup beside what it points at, that thing ringed in honey, and
+     * a popup beside what it points at, that thing ringed in the accent, and
      * under the words which tip of how many it is. The Ctrl+K tip stands
      * in the middle of the window, where the quick switcher opens.
      * Answers whether one was drawn.
@@ -1891,9 +2096,9 @@ public final class WindowScreen extends GuiChat
         return null;
     }
 
-    /** A one-pixel ring in honey round what a tip points at, as a landing edge is lit. */
+    /** A one-pixel ring in the accent round what a tip points at, as a landing edge is lit. */
     private static void drawRing(LostTalesUiHitBox box, float opacity) {
-        int colour = LostTalesUiInk.argb(WindowStyle.LANDING_RGB,
+        int colour = LostTalesUiInk.argb(LostTalesUiTheme.accentRgb(),
                 Math.round(255.0F * opacity));
         float left = (float)box.left;
         float top = (float)box.top;
@@ -1961,7 +2166,6 @@ public final class WindowScreen extends GuiChat
         String typed = !isEmpty() && hasField() ? typedWindowId() : null;
         List<OtherPage> drawnPages = new ArrayList<OtherPage>();
         ContentView.follow();
-        stackWindows(windows);
         for (int index = 0; index < windows.size(); index++) {
             Window window = windows.get(index);
             WindowFrame frame = WindowFrame.of(window);
@@ -2034,22 +2238,26 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * How strongly each window shows under the windows in front of it
-     * ({@link StackFade}), from where each stood when last drawn: a
-     * window off screen this view neither fades nor is faded.
+     * How strongly each window and sub-window shows under the ones in front
+     * of it ({@link StackFade}), from where each stood when last drawn, in
+     * the order they are drawn: each window with its sub-windows after it,
+     * those on the bare screen last. One off screen this view neither
+     * fades nor is faded.
      */
     private void stackWindows(List<Window> windows) {
-        List<String> keys = new ArrayList<String>(windows.size());
-        List<LostTalesUiHitBox> boxes =
-                new ArrayList<LostTalesUiHitBox>(windows.size());
+        List<Object> keys = new ArrayList<Object>();
+        List<LostTalesUiHitBox> boxes = new ArrayList<LostTalesUiHitBox>();
         for (Window window : windows) {
             WindowFrame frame = WindowFrame.find(window.getId());
             keys.add(window.getId());
             boxes.add(frame != null && frame.drawn ? frame.drawnBox() : null);
+            this.subWindows.addToStack(window.getId(), keys, boxes);
         }
-        // The window the pointer rests on shows whole while it does.
-        this.stackFade.advance(keys, boxes, this.hover.window == null ? null
-                : this.hover.window.getId(), System.nanoTime());
+        this.subWindows.addToStack(null, keys, boxes);
+        // What the pointer rests on shows whole while it does.
+        Object pointed = this.hover.subWindow != null ? this.hover.subWindow
+                : this.hover.window == null ? null : this.hover.window.getId();
+        this.stackFade.advance(keys, boxes, pointed, System.nanoTime());
     }
 
     /**

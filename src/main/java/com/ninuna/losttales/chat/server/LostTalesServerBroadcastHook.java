@@ -166,34 +166,6 @@ public final class LostTalesServerBroadcastHook {
                 && kind != ChatSystemLineClassifier.Kind.LEAVE) {
             return message;
         }
-        return swapNames(message, new NameSwap() {
-            @Override
-            public IChatComponent swap(IChatComponent name, String account) {
-                ChatComponentText accountName = new ChatComponentText(account);
-                accountName.setChatStyle(name.getChatStyle().createShallowCopy());
-                return accountName;
-            }
-        });
-    }
-
-    /** Gives a player's name in a line for another way of naming them. */
-    interface NameSwap {
-        /**
-         * What to write in place of {@code name}, which suggests
-         * whispering {@code account}; null keeps the name as it is.
-         */
-        IChatComponent swap(IChatComponent name, String account);
-    }
-
-    /**
-     * The line rebuilt with every player's name among its arguments
-     * swapped: a name is an argument suggesting {@code /msg <account>} on
-     * a click, as vanilla writes every player into a line it builds. A
-     * line that is no translation, or whose names all stay, is handed
-     * back as it came. The rebuilt line keeps the line's style and every
-     * run appended to it.
-     */
-    static IChatComponent swapNames(IChatComponent message, NameSwap swap) {
         if (!(message instanceof ChatComponentTranslation)) {
             return message;
         }
@@ -210,10 +182,10 @@ public final class LostTalesServerBroadcastHook {
             }
             IChatComponent name = (IChatComponent)renamed[index];
             String account = whisperedAccount(name);
-            IChatComponent other = account == null ? null
-                    : swap.swap(name, account);
-            if (other != null) {
-                renamed[index] = other;
+            if (account != null) {
+                ChatComponentText accountName = new ChatComponentText(account);
+                accountName.setChatStyle(name.getChatStyle().createShallowCopy());
+                renamed[index] = accountName;
                 changed = true;
             }
         }

@@ -245,35 +245,6 @@ public final class CharacterPlayerStateService {
         return record.getCurrent();
     }
 
-    /**
-     * The identity's current snapshot. An account with no record yet — one
-     * that has never been played since its characters were made, or whose
-     * state its first character took over before the account had a save of
-     * its own — starts from fresh defaults at the world spawn, saved here so
-     * a journal can reference the generation.
-     */
-    public CharacterPlayerStateSnapshot getOrCreateCurrent(
-            CharacterPlayerStateAccount account,
-            CharacterPlayerStateWorldData data,
-            PlayableIdentity identity)
-            throws CharacterStateValidationException {
-        if (account == null || data == null || identity == null
-                || !account.getOwnerId().equals(identity.getOwnerId())) {
-            throw new CharacterStateValidationException(
-                    "Character state account or identity is missing");
-        }
-        UUID gameplayId = identity.getGameplayId();
-        if (identity.isAccount() && account.getRecord(gameplayId) == null) {
-            CharacterPlayerStateSnapshot defaults = createSnapshot(
-                    gameplayId, 1L, Math.max(1L, System.currentTimeMillis()),
-                    createDefaultComponents(null));
-            account.putRecord(new CharacterPlayerStateRecord(gameplayId, defaults, null));
-            data.saveAccount(account);
-            return defaults;
-        }
-        return getCurrent(account, gameplayId);
-    }
-
     public CharacterPlayerStateSnapshot findGeneration(
             CharacterPlayerStateAccount account,
             UUID characterId,

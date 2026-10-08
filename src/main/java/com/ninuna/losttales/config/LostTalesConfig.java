@@ -180,31 +180,31 @@ public final class LostTalesConfig {
     static final String DEFAULT_CHAT_PING_SOUND = "losttales:chat.ping";
     public static String chatPingSound = DEFAULT_CHAT_PING_SOUND;
     /**
-     * Every window's surface, and the chat's own surfaces, each a palette
-     * entry by name: the windows' background, the line under the
-     * pointer, and a line that mentions this player. Names, not numbers,
-     * so every choice is one of the palette's colours.
+     * The windows' three colours and the chat's own, each a palette entry
+     * by name: the windows' primary, secondary and accent
+     * ({@code LostTalesUiTheme}), a line that mentions this player and a
+     * line a reply jumped to. Names, not numbers, so every choice is one of
+     * the palette's colours.
      */
-    public static final String DEFAULT_WINDOW_BACKGROUND_COLOR = "PLUM_BLACK";
-    public static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "PLUM_GRAY";
+    public static final String DEFAULT_WINDOW_PRIMARY_COLOR = "PLUM_BLACK";
+    public static final String DEFAULT_WINDOW_SECONDARY_COLOR = "PLUM_GRAY";
+    public static final String DEFAULT_WINDOW_ACCENT_COLOR = "HONEY";
     public static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "CORAL";
     public static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
-    public static final String DEFAULT_CHAT_SERVER_TEXT_COLOR = "HONEY";
     /**
      * A colour option's value that follows another colour instead of
      * naming a palette entry: the selected mention's, which is by
      * default the mention colour a shade lighter.
      */
     public static final String CHAT_COLOR_AUTOMATIC = "AUTO";
-    public static String windowBackgroundColor = DEFAULT_WINDOW_BACKGROUND_COLOR;
-    public static String chatSelectedLineColor = DEFAULT_CHAT_SELECTED_LINE_COLOR;
+    public static String windowPrimaryColor = DEFAULT_WINDOW_PRIMARY_COLOR;
+    public static String windowSecondaryColor = DEFAULT_WINDOW_SECONDARY_COLOR;
+    public static String windowAccentColor = DEFAULT_WINDOW_ACCENT_COLOR;
     public static String chatMentionLineColor = DEFAULT_CHAT_MENTION_LINE_COLOR;
     /** A line that mentions this player, under the pointer; automatic until chosen. */
     public static String chatSelectedMentionColor = CHAT_COLOR_AUTOMATIC;
     /** The line a reply's quote jumps to, lit while the eye finds it. */
     public static String chatReplyHighlightColor = DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR;
-    /** What the Server and the Client say, their words' own colour. */
-    public static String chatServerTextColor = DEFAULT_CHAT_SERVER_TEXT_COLOR;
     /** The edges the closed-chat feed's lines may stand against. */
     static final String[] CHAT_FEED_ALIGNMENTS = {"LEFT", "CENTRE", "RIGHT"};
     /** Where the feed's lines stand until chosen: the middle. */
@@ -1187,20 +1187,27 @@ public final class LostTalesConfig {
                     chatPingSound,
                     TIP
             );
-            windowBackgroundColor = paletteName(config.getString(
-                    "windowBackgroundColor",
+            windowPrimaryColor = paletteName(config.getString(
+                    "windowPrimaryColor",
                     CATEGORY_CLIENT,
-                    windowBackgroundColor,
+                    windowPrimaryColor,
                     TIP,
                     LostTalesColors.paletteNames()
-            ), DEFAULT_WINDOW_BACKGROUND_COLOR);
-            chatSelectedLineColor = paletteName(config.getString(
-                    "chatSelectedLineColor",
+            ), DEFAULT_WINDOW_PRIMARY_COLOR);
+            windowSecondaryColor = paletteName(config.getString(
+                    "windowSecondaryColor",
                     CATEGORY_CLIENT,
-                    chatSelectedLineColor,
+                    windowSecondaryColor,
                     TIP,
                     LostTalesColors.paletteNames()
-            ), DEFAULT_CHAT_SELECTED_LINE_COLOR);
+            ), DEFAULT_WINDOW_SECONDARY_COLOR);
+            windowAccentColor = paletteName(config.getString(
+                    "windowAccentColor",
+                    CATEGORY_CLIENT,
+                    windowAccentColor,
+                    TIP,
+                    LostTalesColors.paletteNames()
+            ), DEFAULT_WINDOW_ACCENT_COLOR);
             chatMentionLineColor = paletteName(config.getString(
                     "chatMentionLineColor",
                     CATEGORY_CLIENT,
@@ -1222,13 +1229,6 @@ public final class LostTalesConfig {
                     TIP,
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR);
-            chatServerTextColor = paletteName(config.getString(
-                    "chatServerTextColor",
-                    CATEGORY_CLIENT,
-                    chatServerTextColor,
-                    TIP,
-                    LostTalesColors.paletteNames()
-            ), DEFAULT_CHAT_SERVER_TEXT_COLOR);
             Property feedAlignmentProperty = config.get(
                     CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment, TIP);
             feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
@@ -2057,18 +2057,18 @@ public final class LostTalesConfig {
                 enableChatPings).set(enableChatPings);
         config.get(CATEGORY_CLIENT, "chatPingSound",
                 chatPingSound).set(chatPingSound);
-        config.get(CATEGORY_CLIENT, "windowBackgroundColor",
-                windowBackgroundColor).set(windowBackgroundColor);
-        config.get(CATEGORY_CLIENT, "chatSelectedLineColor",
-                chatSelectedLineColor).set(chatSelectedLineColor);
+        config.get(CATEGORY_CLIENT, "windowPrimaryColor",
+                windowPrimaryColor).set(windowPrimaryColor);
+        config.get(CATEGORY_CLIENT, "windowSecondaryColor",
+                windowSecondaryColor).set(windowSecondaryColor);
+        config.get(CATEGORY_CLIENT, "windowAccentColor",
+                windowAccentColor).set(windowAccentColor);
         config.get(CATEGORY_CLIENT, "chatMentionLineColor",
                 chatMentionLineColor).set(chatMentionLineColor);
         config.get(CATEGORY_CLIENT, "chatSelectedMentionColor",
                 chatSelectedMentionColor).set(chatSelectedMentionColor);
         config.get(CATEGORY_CLIENT, "chatReplyHighlightColor",
                 chatReplyHighlightColor).set(chatReplyHighlightColor);
-        config.get(CATEGORY_CLIENT, "chatServerTextColor",
-                chatServerTextColor).set(chatServerTextColor);
         Property feedAlignmentProperty = config.get(
                 CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment);
         feedAlignmentProperty.set(chatFeedAlignment);
@@ -2399,18 +2399,6 @@ public final class LostTalesConfig {
             }
         }
         return shipped;
-    }
-
-    /** One of {@code words}, case and surrounding space aside; {@code fallback} for anything else. */
-    static String normalizeWord(String value, String[] words, String fallback) {
-        String normalized = value == null
-                ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
-        for (String word : words) {
-            if (word.equals(normalized)) {
-                return word;
-            }
-        }
-        return fallback;
     }
 
     /**

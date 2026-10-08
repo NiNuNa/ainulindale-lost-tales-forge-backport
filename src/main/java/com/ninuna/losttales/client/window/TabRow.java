@@ -14,6 +14,7 @@ import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -1331,14 +1332,14 @@ public final class TabRow {
 
     /**
      * The tool strip's surface as it stands this frame: the selected
-     * tab's plum grey at two thirds, glowing with a tab just put down as
+     * tab's secondary colour at two thirds, glowing with a tab just put down as
      * the tab does, so the tab in front and the strip light as one; the
      * rows the strip's two rules stand on wear it too.
      */
     private int toolSurfaceArgb() {
         return LostTalesUiInk.argb(
                 LostTalesUiInk.blend(
-                        LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+                        LostTalesUiTheme.secondaryRgb(),
                         this.toolGlowRgb, this.toolGlow * GLOW_TINT),
                 scaled(TAB_SURFACE_ALPHA));
     }
@@ -1882,7 +1883,7 @@ public final class TabRow {
                 LostTalesUiRules.drawEdgeFade(left, right, cursor,
                         tabLeft, bottom - 1, rowTop(bottom),
                         WindowStyle.TOP_EDGE_FADE_HEIGHT,
-                        alpha, WindowStyle.backdropRgb(), false);
+                        alpha, LostTalesUiTheme.primaryRgb(), false);
             }
             cursor = tabRight;
         }
@@ -1890,7 +1891,7 @@ public final class TabRow {
             LostTalesUiRules.drawEdgeFade(left, right, cursor,
                     right, bottom - 1, rowTop(bottom),
                     WindowStyle.TOP_EDGE_FADE_HEIGHT, alpha,
-                    WindowStyle.backdropRgb(), false);
+                    LostTalesUiTheme.primaryRgb(), false);
         }
     }
 
@@ -1912,16 +1913,16 @@ public final class TabRow {
     }
 
     /**
-     * The tone of a tab's one surface: the selected tab's lit plum grey,
-     * and a resting one's plum black crossed toward it as far as the
+     * The tone of a tab's one surface: the selected tab's secondary colour,
+     * and a resting one's primary crossed toward it as far as the
      * pointer has lit it. A cut name's side fades are drawn in the same
      * tone, so the name sinks into its own tab.
      */
     private static int tabSurfaceRgb(boolean selected, float lit) {
-        return selected ? LostTalesUiInk.SURFACE_HIGHLIGHT_RGB
+        return selected ? LostTalesUiTheme.secondaryRgb()
                 : LostTalesUiInk.blend(
-                        LostTalesUiInk.SURFACE_RGB,
-                        LostTalesUiInk.SURFACE_HIGHLIGHT_RGB, lit);
+                        LostTalesUiTheme.primaryRgb(),
+                        LostTalesUiTheme.secondaryRgb(), lit);
     }
 
     /**

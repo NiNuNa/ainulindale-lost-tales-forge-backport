@@ -6,9 +6,9 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import java.util.UUID;
 
 /**
- * One identity a player can play as: the Minecraft account itself, or one
- * of the account's roleplay characters. The account is a full identity with
- * saved state of its own, not a gap between characters.
+ * Who a player is in the world: one of the account's roleplay characters,
+ * or the Minecraft account itself while its first character is being made.
+ * The account keeps saved state of its own, which a switch starts from.
  *
  * <p>The gameplay id is what gameplay systems key on — fellowship membership,
  * saved player state, LOTR bounty records: the character's UUID for a

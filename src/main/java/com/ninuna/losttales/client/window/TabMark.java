@@ -64,6 +64,11 @@ public final class TabMark {
         return !this.unread;
     }
 
+    /** How many the tile counts; none for the sphere or nothing. */
+    public int count() {
+        return this.pings;
+    }
+
     /** How wide the mark stands: the tile with its figures, or the sphere. */
     public int width() {
         return this.pings > 0 ? LostTalesUiSheet.countTileWidth(this.pings)

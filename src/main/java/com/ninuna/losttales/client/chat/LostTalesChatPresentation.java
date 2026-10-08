@@ -98,6 +98,9 @@ public final class LostTalesChatPresentation {
             LostTalesChatHistoryHooks.MAX_CAPACITY;
     private static final LinkedHashSet<Integer> pingedChatLineIds =
             new LinkedHashSet<Integer>();
+    /** Lines forwarded to this player in a whisper, as many as the history holds: the inbox's forwards. */
+    private static final LinkedHashSet<Integer> forwardedChatLineIds =
+            new LinkedHashSet<Integer>();
     private static final int[] NO_SHOWCASES = new int[0];
     /**
      * One cue stands for every ping inside this window. A burst of
@@ -306,6 +309,13 @@ public final class LostTalesChatPresentation {
         }
         if (mentioned) {
             markPinged(chatLineId);
+        }
+        // A message somebody forwarded to this player in a whisper waits
+        // in the inbox, as a mention does.
+        if (tab.isWhisper() && packet.getReply() != null
+                && packet.getReply().isForward()
+                && !isLocalAccount(packet.getSenderId())) {
+            markForwarded(chatLineId);
         }
         // The highlight stays for when the tab is read; the cue is the
         // conversation's Notifications alone, a closed tab receiving as
@@ -1762,6 +1772,28 @@ public final class LostTalesChatPresentation {
         return pingedChatLineIds.contains(Integer.valueOf(chatLineId));
     }
 
+    /** The lines that mentioned this player, the oldest first. */
+    static List<Integer> pingedLines() {
+        return new ArrayList<Integer>(pingedChatLineIds);
+    }
+
+    /** Remembers a line forwarded to this player, for the inbox. */
+    private static void markForwarded(int chatLineId) {
+        if (!forwardedChatLineIds.add(Integer.valueOf(chatLineId))) {
+            return;
+        }
+        while (forwardedChatLineIds.size() > MAX_PINGED_LINES) {
+            Iterator<Integer> iterator = forwardedChatLineIds.iterator();
+            iterator.next();
+            iterator.remove();
+        }
+    }
+
+    /** The lines forwarded to this player in a whisper, the oldest first. */
+    static List<Integer> forwardedLines() {
+        return new ArrayList<Integer>(forwardedChatLineIds);
+    }
+
     static long getLastMessageNanos() {
         return lastMessageNanos;
     }
@@ -1790,6 +1822,7 @@ public final class LostTalesChatPresentation {
         hasLastMessage = false;
         lastMessageTab = null;
         pingedChatLineIds.clear();
+        forwardedChatLineIds.clear();
         flashedChatLineId = 0;
         flashedNanos = 0L;
         hoveredChatLineId = 0;
@@ -1815,6 +1848,7 @@ public final class LostTalesChatPresentation {
         lastMessageTab = null;
         nextChatLineId = Integer.MIN_VALUE;
         pingedChatLineIds.clear();
+        forwardedChatLineIds.clear();
         lastPingSoundNanos = 0L;
         flashedChatLineId = 0;
         flashedNanos = 0L;

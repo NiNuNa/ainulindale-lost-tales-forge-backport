@@ -357,8 +357,8 @@ public final class ChatChannelPolicy {
     /**
      * The faction the selected identity speaks and reads Faction chat in:
      * the character's own — its LOTR pledge while it has one, else its
-     * starting faction — or Unaligned for the account and for a character
-     * with neither. Never empty.
+     * starting faction — or Unaligned for a character with neither, and
+     * for none. Never empty.
      */
     public static String factionOf(RoleplayCharacter character) {
         return LotrCharacterAdapter.factionIdOrUnaligned(

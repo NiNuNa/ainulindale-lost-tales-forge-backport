@@ -96,7 +96,7 @@ public final class ChatIdentitySelection {
         ChatPresenceService.refresh(player);
     }
 
-    /** The character the player plays, or null for the account playing as itself. */
+    /** The character the player plays, or null while they make their first. */
     public static RoleplayCharacter played(EntityPlayerMP player) {
         return CharacterActiveResolver.get(player);
     }
@@ -171,10 +171,18 @@ public final class ChatIdentitySelection {
         return false;
     }
 
-    /** The factions the player reads Faction chat in: the played identity's first, then each one read as. */
+    /**
+     * The factions the player reads Faction chat in: the played
+     * character's first, then each one read as. None before the first
+     * character is made: Faction chat is in character.
+     */
     public static Set<String> readFactions(EntityPlayerMP player) {
         Set<String> factions = new LinkedHashSet<String>();
-        factions.add(ChatChannelPolicy.factionOf(played(player)));
+        RoleplayCharacter played = played(player);
+        if (played == null) {
+            return factions;
+        }
+        factions.add(ChatChannelPolicy.factionOf(played));
         for (RoleplayCharacter character : alsoRead(player)) {
             factions.add(ChatChannelPolicy.factionOf(character));
         }

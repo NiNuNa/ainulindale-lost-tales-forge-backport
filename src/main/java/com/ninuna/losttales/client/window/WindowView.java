@@ -1,23 +1,20 @@
 package com.ninuna.losttales.client.window;
 
-import java.util.HashSet;
-import java.util.Set;
-
 /**
- * What the screen shows: the pages of the category whose key opened it —
- * T the channels and whispers, {@code /} the consoles, a page's key or
- * Ctrl+, that page's category ({@link PageCategory#home}) — every page of
- * a window pinned to the GUI ({@link WindowLayout#isOnGui}), and every page
- * the player opened by hand since. The rest wait hidden in their windows
- * for their own key; a window with nothing shown is not drawn. With no
- * screen open every page counts as shown. For the session only: a view
- * ends as the screen closes.
+ * What the screen shows: one view at a time ({@link PageCategory#isView}),
+ * its own windows, and every window pinned to the GUI
+ * ({@link WindowLayout#isOnGui}). A category's key opens the screen on its
+ * view (T the channels and whispers, {@code /} the consoles, M the map);
+ * the Lost Tales Menu key on the Lost Tales Menu's view, whose windows hold
+ * whatever the player opened there. A button on the Views sub-window, or
+ * a key on the screen, swaps the view. The other views' windows wait
+ * hidden; a window with nothing shown is not drawn. With no screen open
+ * every page counts as shown. For the session only: the view ends as the
+ * screen closes.
  */
 public final class WindowView {
-    /** The category the screen shows; null while no screen is open. */
-    private static PageCategory category;
-    /** Tabs the player opened by hand while this view stands. */
-    private static final Set<WindowPage> BY_HAND = new HashSet<WindowPage>();
+    /** The view the screen shows; null while no screen is open. */
+    private static PageCategory current;
     /** Whether the windows pinned to the HUD are being drawn: only what the HUD shows counts. */
     private static boolean pinnedPass;
 
@@ -33,14 +30,14 @@ public final class WindowView {
         set(PageCategory.CONSOLES);
     }
 
-    /** The screen opens for a page, or turns to it by its key: the page's category. */
+    /** The screen opens for a page, or swaps to it by its key: the page's view. */
     public static synchronized void forPage(OtherPage shown) {
         set(shown == null ? PageCategory.CHANNELS : shown.category().home());
     }
 
-    /** The screen turns to a category's pages, as that category's key would. */
-    public static synchronized void forCategory(PageCategory shown) {
-        set(shown == null ? PageCategory.CHANNELS : shown.home());
+    /** The screen swaps to a view: a category's, or the Lost Tales Menu's. */
+    static synchronized void forView(PageCategory view) {
+        set(view == null ? PageCategory.MENU : view.home());
     }
 
     /** The screen closed: every tab counts as shown again. */
@@ -49,8 +46,7 @@ public final class WindowView {
     }
 
     private static void set(PageCategory next) {
-        category = next;
-        BY_HAND.clear();
+        current = next;
         if (next != null) {
             // A window closed while locked comes back as its view opens.
             WindowLayout.reopen(new WindowLayout.TabFilter() {
@@ -79,22 +75,43 @@ public final class WindowView {
         return pinnedPass;
     }
 
-    /** A tab the player opened by hand joins what is shown until the screen closes. */
+    /**
+     * A tab the player went to by hand: the screen swaps to the view that
+     * shows it while the view shown does not: the Lost Tales Menu's for a
+     * page in one of its windows, else the page's category's.
+     */
     public static synchronized void show(WindowPage tab) {
-        if (tab != null && category != null && !shows(tab)) {
-            BY_HAND.add(tab);
+        if (tab == null || current == null || shows(tab)) {
+            return;
         }
+        Window window = WindowLayout.windowOf(tab);
+        if (window == null) {
+            return;
+        }
+        PageCategory view = WindowLayout.viewOf(window);
+        PageCategory home = tab.category().home();
+        set(view == PageCategory.MENU || home == PageCategory.NEW_PAGE
+                ? view : home);
     }
 
-    /** The category the screen shows; null while no screen is open. */
-    public static synchronized PageCategory category() {
-        return category;
+    /**
+     * The view a page opened by hand goes to now: its category's while that
+     * view is shown, else the Lost Tales Menu's, where anything may stand;
+     * its category's with no screen open.
+     */
+    public static synchronized PageCategory handView(WindowPage tab) {
+        PageCategory own = tab.category().home();
+        return current == null || current == own ? own : PageCategory.MENU;
     }
 
-    /** Whether the view stands for this page's category: a key of it turned the screen there. */
+    /** Whether the screen shows this view now: its button on the Views sub-window stands lit. */
+    public static synchronized boolean isOn(PageCategory view) {
+        return current != null && view != null && current == view.home();
+    }
+
+    /** Whether the screen shows this page's category's view. */
     public static synchronized boolean isFor(OtherPage shown) {
-        return category != null && shown != null
-                && shown.category().home() == category;
+        return shown != null && isOn(shown.category());
     }
 
     /** Whether the view shows the tab, whether or not it can be shown now. */
@@ -103,8 +120,7 @@ public final class WindowView {
             return false;
         }
         // A window closed while locked waits out of sight for its view.
-        if ((category != null || pinnedPass)
-                && WindowLayout.isClosedAway(tab)) {
+        if ((current != null || pinnedPass) && WindowLayout.isClosedAway(tab)) {
             return false;
         }
         return inView(tab);
@@ -115,8 +131,20 @@ public final class WindowView {
         if (pinnedPass) {
             return WindowLayout.isOnHud(tab);
         }
-        return category == null || WindowLayout.isOnGui(tab)
-                || BY_HAND.contains(tab) || tab.category().home() == category;
+        if (current == null || WindowLayout.isOnGui(tab)) {
+            return true;
+        }
+        // A window of the Lost Tales Menu's view shows whole there and
+        // nowhere else; in a category's window each page shows in its own
+        // category's view, a New Page in the view of the window it is in.
+        Window window = WindowLayout.windowOf(tab);
+        PageCategory view = window == null ? null : WindowLayout.viewOf(window);
+        if (view == PageCategory.MENU || current == PageCategory.MENU) {
+            return view == current;
+        }
+        PageCategory home = tab.category().home();
+        return current == (home == PageCategory.NEW_PAGE && view != null
+                ? view : home);
     }
 
     /** Whether the tab stands on screen now: the view shows it and it can be shown. */

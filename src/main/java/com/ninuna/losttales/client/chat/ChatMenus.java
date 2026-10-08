@@ -62,6 +62,9 @@ final class ChatMenus {
     private static final String ENTRY_REACT = "react";
     private static final String ENTRY_COPY = "copy";
     static final String ENTRY_COPY_LINK = "copy_link";
+    private static final String ENTRY_COPY_MESSAGE_ID = "copy_message_id";
+    private static final String ENTRY_COPY_ACCOUNT_ID = "copy_account_id";
+    private static final String ENTRY_COPY_CHARACTER_ID = "copy_character_id";
     private static final String ENTRY_EDIT = "edit";
     private static final String ENTRY_DELETE = "delete";
     private static final String ENTRY_REPORT = "report";
@@ -594,7 +597,34 @@ final class ChatMenus {
                 .withLabelColor(OPERATOR_ACTION_COLOR)
                 .withSprite(LostTalesUiSheet.EXCLAMATION,
                         LostTalesUiSheet.EXCLAMATION_REPORT, false));
+        // The id stands last, after a hairline, as Discord's does, for
+        // whoever may copy ids and on a line the server numbered.
+        if (mayCopyIds() && ChatMessageIds.isServerId(aim.messageId)) {
+            entries.add(MenuWindow.Entry.separator());
+            entries.add(copyIdRow(ENTRY_COPY_MESSAGE_ID,
+                    "gui.losttales.chat.message.copy_id"));
+        }
         return entries;
+    }
+
+    /** Whether the server lets this player copy the ids its files and commands name. */
+    private static boolean mayCopyIds() {
+        return ClientChatChannelState.holds(LostTalesCapability.CHAT_COPY_IDS);
+    }
+
+    /** A Copy ID row, wearing the id card. */
+    private static MenuWindow.Entry copyIdRow(String id, String langKey) {
+        return new MenuWindow.Entry(id, StatCollector.translateToLocal(langKey))
+                .withSprite(LostTalesUiSheet.COPY_ID,
+                        LostTalesUiSheet.COPY_ID_LIT, false);
+    }
+
+    /** Copies an id and says so. */
+    private void copyId(String id) {
+        if (LostTalesChatClipboard.copy(id)) {
+            this.notices.showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.copied"));
+        }
     }
 
     /**
@@ -635,6 +665,9 @@ final class ChatMenus {
                 this.notices.showNotice(StatCollector.translateToLocal(
                         "gui.losttales.chat.copied"));
             }
+        } else if (ENTRY_COPY_MESSAGE_ID.equals(entry.id)
+                && ChatMessageIds.isServerId(aim.messageId)) {
+            copyId(Long.toString(aim.messageId));
         } else if (ENTRY_REPORT.equals(entry.id)) {
             this.menus.show(ChatSubWindows.REPORT, aim,
                     WindowMenus.hangingFrom(WindowMenus.inPlaceOf(window)),
@@ -883,8 +916,9 @@ final class ChatMenus {
      * member's row: message them, ignore them. The message's own menu
      * stays with the message body; this one is account and character
      * business, so it opens only over somebody who can be addressed — not
-     * an NPC, not a role mention, and not yourself. A Discord member can
-     * be ignored but not whispered to, so their menu offers no message
+     * an NPC, not a role mention, and not yourself unless you may copy
+     * ids, when it holds your profile and your ids alone. A Discord member
+     * can be ignored but not whispered to, so their menu offers no message
      * row; the bridge's own nameless id is nobody and opens nothing, nor
      * does the Narrator, who is nobody to whisper to, ignore or mute. Its
      * strip names who it is about, as their card's does.
@@ -898,8 +932,7 @@ final class ChatMenus {
                         person.playerId)
                 || ChatNarrator.SENDER_ID.equals(person.playerId)
                 || LostTalesChatMessagePacket.isSystemSender(person.playerId)
-                || (this.mc.thePlayer != null && person.playerId.equals(
-                        this.mc.thePlayer.getUniqueID()))) {
+                || (isSelf(person) && !mayCopyIds())) {
             return false;
         }
         this.menus.show(ChatSubWindows.PERSON, person,
@@ -928,6 +961,13 @@ final class ChatMenus {
         }
     }
 
+    /** Whether the person is the player at this computer. */
+    private static boolean isSelf(LostTalesChatHoverCard.Target person) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        return minecraft.thePlayer != null && person.playerId != null
+                && person.playerId.equals(minecraft.thePlayer.getUniqueID());
+    }
+
     /** The name a person's rows speak of: the identity, else the account. */
     private static String personName(LostTalesChatHoverCard.Target person) {
         return LostTalesChatVisualStyle.removeColorCodes(
@@ -942,6 +982,10 @@ final class ChatMenus {
             entries.add(new MenuWindow.Entry(ENTRY_VIEW_PROFILE,
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.card.view_profile")));
+        }
+        if (isSelf(person)) {
+            addCopyIdRows(entries, person);
+            return entries;
         }
         if (!LostTalesChatMessagePacket.isDiscordSender(person.playerId)) {
             entries.add(new MenuWindow.Entry(ENTRY_MESSAGE,
@@ -994,7 +1038,30 @@ final class ChatMenus {
                             person.accountName))
                     .withLabelColor(OPERATOR_ACTION_COLOR));
         }
+        addCopyIdRows(entries, person);
         return entries;
+    }
+
+    /**
+     * A person's ids, last after a hairline as Discord's are, for whoever
+     * may copy ids: the account's, and the character's where the line or
+     * the row names one. A Discord member has neither.
+     */
+    private static void addCopyIdRows(List<MenuWindow.Entry> entries,
+                                      LostTalesChatHoverCard.Target person) {
+        if (!mayCopyIds()
+                || LostTalesChatMessagePacket.isDiscordSender(person.playerId)) {
+            return;
+        }
+        if (!entries.isEmpty()) {
+            entries.add(MenuWindow.Entry.separator());
+        }
+        entries.add(copyIdRow(ENTRY_COPY_ACCOUNT_ID,
+                "gui.losttales.chat.person.copy_account_id"));
+        if (person.characterId != null && !person.accountIdentity) {
+            entries.add(copyIdRow(ENTRY_COPY_CHARACTER_ID,
+                    "gui.losttales.chat.person.copy_character_id"));
+        }
     }
 
     /** One row of a person's menu: the ignores are switches and stay; the rest are done with it. */
@@ -1020,6 +1087,11 @@ final class ChatMenus {
         } else if (ENTRY_UNMUTE_ACCOUNT.equals(entry.id)) {
             this.host.sendCommand("/losttales chat unmute "
                     + muteTarget(fromDiscord, person.accountName));
+        } else if (ENTRY_COPY_ACCOUNT_ID.equals(entry.id)) {
+            copyId(person.playerId.toString());
+        } else if (ENTRY_COPY_CHARACTER_ID.equals(entry.id)
+                && person.characterId != null) {
+            copyId(person.characterId.toString());
         }
         return false;
     }

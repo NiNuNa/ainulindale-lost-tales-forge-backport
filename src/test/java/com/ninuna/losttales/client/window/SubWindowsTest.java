@@ -311,7 +311,7 @@ public final class SubWindowsTest {
     }
 
     private static SubWindows screen() {
-        SubWindows windows = new SubWindows();
+        SubWindows windows = new SubWindows(new StackFade());
         windows.bind(SCREEN_WIDTH, SCREEN_HEIGHT);
         return windows;
     }

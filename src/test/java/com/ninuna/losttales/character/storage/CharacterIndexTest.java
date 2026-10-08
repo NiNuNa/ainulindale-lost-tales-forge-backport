@@ -45,9 +45,6 @@ public final class CharacterIndexTest {
         assertTrue(data.containsCharacter(CHARACTER));
         assertEquals(1, index.countOf(CHARACTER));
         assertEquals(0, index.countOf(OTHER));
-        assertTrue(index.hasOwner(OWNER_A));
-        assertTrue(index.hasOwner(CHARACTER));
-        assertFalse(index.hasOwner(OTHER));
     }
 
     @Test

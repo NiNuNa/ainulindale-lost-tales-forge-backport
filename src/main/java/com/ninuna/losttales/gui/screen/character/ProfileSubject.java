@@ -6,14 +6,14 @@ import java.util.UUID;
 
 /**
  * Whose profile the Characters page shows, as far as this client knows
- * them: a character of the player's own roster, the account while its
- * record is not made, or another person's character — with everything
+ * them: a character of the player's own roster, or another person's
+ * character — with everything
  * their appearance tells when it is the one they play, and only its name
  * and head when it is the one they speak as in the chat. What is not
  * known is empty, or an age of 0, and the column leaves its line out.
  */
 final class ProfileSubject {
-    /** The character, or null for the account. */
+    /** The character, or null for a player still making their first. */
     final UUID characterId;
     final String name;
     final String raceId;

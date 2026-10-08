@@ -66,7 +66,9 @@ public final class LostTalesClientQuestNotificationStore {
      * advanced, an objective moved or done, a quest finished, failed or
      * given up. The sounds are this player's alone, and play only while
      * their quest sounds are on. The first sync after joining a world is
-     * silent, so old quest state is not played as news.
+     * silent, so old quest state is not played as news. A quest started,
+     * advanced or ended is kept as news for the inbox too
+     * ({@link ClientQuestNews}); an objective moving is the tracker's.
      */
     public static synchronized void notifyForIncomingSync(Collection<LostTalesQuestProgress> newActiveQuests, Collection<LostTalesQuestHistoryEntry> newQuestHistory) {
         if (!LostTalesClientQuestProgressStore.hasReceivedSync()) {
@@ -85,7 +87,9 @@ public final class LostTalesClientQuestNotificationStore {
                     entry.getQuestId());
             if (entry.isCompleted() && (previous == null
                     || previous.getWorldTime() != entry.getWorldTime())) {
-                addComplete(banner("completed", entry.getQuestId()));
+                String line = banner("completed", entry.getQuestId());
+                addComplete(line);
+                ClientQuestNews.record(entry.getQuestId(), line);
                 playQuestSound(SOUND_COMPLETED, 0.45F, 1.0F);
             }
         }
@@ -108,6 +112,7 @@ public final class LostTalesClientQuestNotificationStore {
                             "gui.losttales.quest.banner." + event + ".reason",
                             questTitle(entry.getQuestId()),
                             StatCollector.translateToLocal(entry.getDetail()));
+            ClientQuestNews.record(entry.getQuestId(), line);
             if (entry.isFailed()) {
                 addFailed(line);
                 playQuestSound(SOUND_FAILED, 0.3F, 0.8F);
@@ -123,7 +128,9 @@ public final class LostTalesClientQuestNotificationStore {
 
             if (previous == null) {
                 // A quest taken again after it ended starts as anew.
-                addInfo(banner("started", questId));
+                String line = banner("started", questId);
+                addInfo(line);
+                ClientQuestNews.record(questId, line);
                 playQuestSound(SOUND_PROGRESS, 0.35F, 1.0F);
                 if (next.getDeadlineWorldTime() > next.getAcceptedWorldTime()) {
                     addFailed(StatCollector.translateToLocalFormatted(
@@ -136,7 +143,9 @@ public final class LostTalesClientQuestNotificationStore {
             }
 
             if (stageChanged(previous, next)) {
-                addInfo(banner("advanced", questId));
+                String line = banner("advanced", questId);
+                addInfo(line);
+                ClientQuestNews.record(questId, line);
                 playQuestSound(SOUND_PROGRESS, 0.35F, 1.05F);
             }
 
@@ -157,27 +166,33 @@ public final class LostTalesClientQuestNotificationStore {
             boolean started = before == null || !before.isRunning()
                     && view.isRunning();
             if (view.isRunning() && started) {
-                addInfo(banner("world.started", view.getQuestId()));
+                String line = banner("world.started", view.getQuestId());
+                addInfo(line);
+                ClientQuestNews.record(view.getQuestId(), line);
                 playQuestSound(SOUND_PROGRESS, 0.35F, 1.0F);
                 continue;
             }
             if (before == null || !before.isRunning() || view.isRunning()) {
                 continue;
             }
+            String line;
             switch (view.getState()) {
                 case COMPLETED:
-                    addComplete(banner("world.completed", view.getQuestId()));
+                    line = banner("world.completed", view.getQuestId());
+                    addComplete(line);
                     playQuestSound(SOUND_COMPLETED, 0.45F, 1.0F);
                     break;
                 case FAILED:
-                    addFailed(banner("world.failed", view.getQuestId()));
+                    line = banner("world.failed", view.getQuestId());
+                    addFailed(line);
                     playQuestSound(SOUND_FAILED, 0.3F, 0.8F);
                     break;
                 default:
-                    add(banner("world.stopped", view.getQuestId()),
-                            Type.ABANDONED);
+                    line = banner("world.stopped", view.getQuestId());
+                    add(line, Type.ABANDONED);
                     break;
             }
+            ClientQuestNews.record(view.getQuestId(), line);
         }
     }
 

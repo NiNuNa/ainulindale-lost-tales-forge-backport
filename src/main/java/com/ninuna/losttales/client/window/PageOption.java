@@ -196,7 +196,7 @@ public final class PageOption {
 
     /**
      * Its row in the page's options, or in its pick's sub-window: its
-     * glyph before its name, a switch or a choice marked in honey while it
+     * glyph before its name, a switch or a choice marked in the accent while it
      * is on, a pick's word at the row's end, a choice's tip under the
      * pointer.
      */

@@ -85,7 +85,7 @@ public final class TabMenusTest {
         assertTrue("its own options stand between the two", lastHairline > 2);
         assertEquals(Arrays.asList("settings:CHAT", "split_view",
                 "tab:duplicate", "strip:borderless", "strip:members", "strip:search",
-                "strip:help"), ids.subList(lastHairline + 1, ids.size()));
+                "strip:inbox", "strip:help"), ids.subList(lastHairline + 1, ids.size()));
     }
 
     /**

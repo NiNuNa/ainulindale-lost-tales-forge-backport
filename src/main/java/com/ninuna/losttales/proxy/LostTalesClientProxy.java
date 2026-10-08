@@ -1,5 +1,6 @@
 package com.ninuna.losttales.proxy;
 
+import com.ninuna.losttales.client.chat.InboxPage;
 import com.ninuna.losttales.gui.hud.placement.HudPlacementPage;
 import com.ninuna.losttales.client.chat.ChatLayout;
 import com.ninuna.losttales.client.chat.ChatScreenPart;
@@ -219,11 +220,19 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
      */
     private static void registerPages() {
         WindowPages.register(NewPage.PAGE_ID, "gui.losttales.page.new_page",
-                NewPage.ICON, LostTalesKeyBindings.getNewPageKeyBinding(),
+                NewPage.ICON, null,
                 PageCategory.NEW_PAGE, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new NewPage();
+                    }
+                });
+        WindowPages.register(InboxPage.PAGE_ID, "gui.losttales.page.inbox",
+                InboxPage.ICON, null, PageCategory.CHANNELS,
+                new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new InboxPage();
                     }
                 });
         WindowPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",
@@ -263,6 +272,14 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     }
                 });
         CharacterSubWindows.install();
+        WindowPages.register(ClientSettingsPage.PAGE_ID,
+                "gui.losttales.page.client_settings", ClientSettingsPage.ICON,
+                null, PageCategory.SETTINGS, new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new ClientSettingsPage();
+                    }
+                });
         WindowPages.register(MotionLabPage.PAGE_ID,
                 "gui.losttales.page.motion_lab", MotionLabPage.ICON, null,
                 PageCategory.SETTINGS, new WindowPages.Factory() {
@@ -272,14 +289,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     }
                 });
         MotionLabPage.install();
-        WindowPages.register(ClientSettingsPage.PAGE_ID,
-                "gui.losttales.page.client_settings", ClientSettingsPage.ICON,
-                null, PageCategory.SETTINGS, new WindowPages.Factory() {
-                    @Override
-                    public PageContent create() {
-                        return new ClientSettingsPage();
-                    }
-                });
         WindowPages.register(HudPlacementPage.PAGE_ID,
                 "gui.losttales.page.hud_placement", HudPlacementPage.ICON,
                 null, PageCategory.SETTINGS, new WindowPages.Factory() {

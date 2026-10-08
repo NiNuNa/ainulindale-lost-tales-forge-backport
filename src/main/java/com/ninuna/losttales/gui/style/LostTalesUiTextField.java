@@ -77,6 +77,13 @@ public class LostTalesUiTextField extends GuiTextField {
                 ? this.yPosition + (this.height - 8) / 2 : this.yPosition;
     }
 
+    /** Words shown faintly while the field is empty, an example the first key typed replaces; none while null. */
+    private String hint;
+
+    public void setHint(String hint) {
+        this.hint = hint;
+    }
+
     @Override
     public void drawTextBox() {
         drawTextBox(0xFF);
@@ -120,6 +127,10 @@ public class LostTalesUiTextField extends GuiTextField {
         LostTalesUiInk.beginContent();
         if (visible.length() > 0) {
             drawShadowedText(visible, left, top, LostTalesUiInk.IVORY, alpha);
+        } else if (this.hint != null && this.hint.length() > 0) {
+            drawShadowedText(this.font.trimStringToWidth(this.hint, getWidth()),
+                    left, top, LostTalesColors.rgb(LostTalesColors.TEXT_MUTED),
+                    alpha);
         }
         if (caretShown) {
             LostTalesUiCaret.drawBar(caretX, caretTop,

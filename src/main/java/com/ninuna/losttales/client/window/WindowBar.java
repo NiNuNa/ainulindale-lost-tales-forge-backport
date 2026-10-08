@@ -555,7 +555,7 @@ public final class WindowBar {
     }
 
     /**
-     * The bar's surface: the tool strip's plum grey at two thirds, one
+     * The bar's surface: the tool strip's secondary colour at two thirds, one
      * flat stretch with a hole for each framed button and the well (the
      * well filled with the darker inset), then the window frame's
      * surface beside and under the bar and its edges over it.

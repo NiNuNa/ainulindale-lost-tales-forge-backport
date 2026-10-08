@@ -20,11 +20,11 @@ import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -450,7 +450,7 @@ final class LoreCharactersWindow extends SubWindowContent {
         List<String> text = new ArrayList<String>();
         List<Integer> colours = new ArrayList<Integer>();
         text.add(ClientCharacterDisplayNames.loreCardName(line.character));
-        colours.add(Integer.valueOf(LostTalesColors.rgb(LostTalesColors.HONEY)));
+        colours.add(Integer.valueOf(LostTalesUiTheme.accentRgb()));
         for (Object wrapped : font.listFormattedStringToWidth(description,
                 CARD_WIDTH)) {
             text.add(String.valueOf(wrapped));

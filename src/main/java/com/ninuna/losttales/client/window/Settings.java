@@ -910,7 +910,7 @@ public final class Settings {
         }
     }
 
-    /** The windows' colour, then what else reaches every window. */
+    /** The windows' three colours, then what else reaches every window. */
     private static final class WindowsSection extends Section {
         @Override
         public String titleKey() {
@@ -920,16 +920,40 @@ public final class Settings {
         @Override
         public List<Setting> settings() {
             List<Setting> windows = new ArrayList<Setting>();
-            windows.add(new Colour("windowBackgroundColor",
-                    optionName("windowBackgroundColor")) {
+            windows.add(new Colour("windowPrimaryColor",
+                    optionName("windowPrimaryColor")) {
                 @Override
                 protected String current() {
-                    return LostTalesConfig.windowBackgroundColor;
+                    return LostTalesConfig.windowPrimaryColor;
                 }
 
                 @Override
                 protected void set(String name) {
-                    LostTalesConfig.windowBackgroundColor = name;
+                    LostTalesConfig.windowPrimaryColor = name;
+                }
+            });
+            windows.add(new Colour("windowSecondaryColor",
+                    optionName("windowSecondaryColor")) {
+                @Override
+                protected String current() {
+                    return LostTalesConfig.windowSecondaryColor;
+                }
+
+                @Override
+                protected void set(String name) {
+                    LostTalesConfig.windowSecondaryColor = name;
+                }
+            });
+            windows.add(new Colour("windowAccentColor",
+                    optionName("windowAccentColor")) {
+                @Override
+                protected String current() {
+                    return LostTalesConfig.windowAccentColor;
+                }
+
+                @Override
+                protected void set(String name) {
+                    LostTalesConfig.windowAccentColor = name;
                 }
             });
             // Window Opacity is the game's own chat opacity underneath,
@@ -1074,12 +1098,14 @@ public final class Settings {
     /** A place's Restore Defaults, or the question it asks in its own place. */
     private List<MenuWindow.Entry> restoreRows(Place place) {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>(1);
-        rows.add(this.confirmingRestore.contains(place)
+        rows.add((this.confirmingRestore.contains(place)
                 ? new MenuWindow.Entry(RESTORE_CONFIRM,
                         StatCollector.translateToLocal(
                                 "gui.losttales.window.settings.restore.confirm"))
                 : new MenuWindow.Entry(RESTORE, StatCollector.translateToLocal(
-                        "gui.losttales.window.settings.restore")));
+                        "gui.losttales.window.settings.restore")))
+                .withSprite(LostTalesUiSheet.RESET,
+                        LostTalesUiSheet.RESET_DISCARD, false));
         return rows;
     }
 
@@ -1235,7 +1261,7 @@ public final class Settings {
 
     /**
      * The palette for one colour: every entry as a chip beside its name,
-     * the one in use named in honey and the one the mod ships marked as
+     * the one in use named in the accent and the one the mod ships marked as
      * the default — for a colour with an automatic choice, that choice
      * before them. Choosing one is the whole change: the option is written
      * to the client file and every window is drawn in it from the next
@@ -1381,7 +1407,7 @@ public final class Settings {
 
     /**
      * A few-word setting's words, about the setting itself, named as its
-     * row is: each word a row, the one standing marked in honey and the
+     * row is: each word a row, the one standing marked in the accent and the
      * one shipped marked as the default. A word taken stands at once, and
      * the window stays for another try, as a page option's words do. It
      * closes once the setting no longer stands.

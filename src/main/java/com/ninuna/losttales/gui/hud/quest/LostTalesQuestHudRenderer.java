@@ -14,6 +14,7 @@ import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
@@ -174,12 +175,12 @@ public final class LostTalesQuestHudRenderer {
             int barWidth = right - left - 8;
             int filled = MathHelper.clamp_int(barWidth * Math.min(entry.current, entry.target) / Math.max(1, entry.target), 0, barWidth);
             Gui.drawRect(left + 4, barY, left + 4 + barWidth, barY + 2,
-                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x66));
+                    LostTalesColors.withAlpha(LostTalesUiTheme.primaryRgb(), 0x66));
             if (filled > 0) {
                 Gui.drawRect(left + 4, barY, left + 4 + filled, barY + 2,
                         LostTalesColors.withAlpha(entry.complete
                                 ? LostTalesColors.GREEN
-                                : LostTalesColors.GOLD, 0xAA));
+                                : LostTalesUiTheme.accentRgb(), 0xAA));
             }
             LostTalesSkyrimUiStyle.beginContent();
         }
@@ -409,7 +410,7 @@ public final class LostTalesQuestHudRenderer {
             int y = LostTalesNotificationHud.claim(resolution.getScaledWidth(),
                     resolution.getScaledHeight(), NOTIFICATION_HEIGHT);
             int accent = notification.getType().getColor();
-            int background = LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, a);
+            int background = LostTalesColors.withAlpha(LostTalesUiTheme.primaryRgb(), a);
             int border = LostTalesColors.withAlpha(accent,
                     MathHelper.clamp_int((int) (alpha * 170.0F), 0, 170));
             int textColor = LostTalesColors.withAlpha(LostTalesColors.TEXT_BRIGHT,

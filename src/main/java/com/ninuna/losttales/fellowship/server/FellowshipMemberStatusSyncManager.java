@@ -150,8 +150,7 @@ public final class FellowshipMemberStatusSyncManager {
         if (online == null) {
             return FellowshipMemberStatusSnapshot.offline(identityId);
         }
-        // The owner is online as another identity: a different character,
-        // or the account itself.
+        // The owner is online as another character, or still making one.
         if (!identityId.equals(online.gameplayId)) {
             return FellowshipMemberStatusSnapshot.inactive(identityId);
         }

@@ -26,7 +26,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * skipped and the layout repairs itself on load.
  *
  * <pre>
- * window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
+ * window w1 locked=false view=consoles x=0.00 y=0.00 active=client_console tabs=client_console,operator
  * window w2 locked=true closed=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
  * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00
@@ -181,6 +181,7 @@ public final class WindowLayoutStore {
                 }
             } else if (FirstTips.read(parts) >= 0) {
                 tipsSeen = FirstTips.read(parts);
+
             } else if (parts.length >= 2 && "sub".equals(parts[0])) {
                 SubWindowKind kind = SubWindowKind.fromId(parts[1]);
                 SubWindowPlaces.Placement placement = parseSubWindow(parts);
@@ -297,6 +298,7 @@ public final class WindowLayoutStore {
         boolean closed = false;
         boolean hud = false;
         boolean gui = false;
+        PageCategory view = null;
         double offsetX = 0.0D;
         double offsetY = 0.0D;
         // No size of its own: the window stands at the default place.
@@ -329,6 +331,9 @@ public final class WindowLayoutStore {
                 hud = "true".equalsIgnoreCase(value);
             } else if ("gui".equals(key)) {
                 gui = "true".equalsIgnoreCase(value);
+            } else if ("view".equals(key)) {
+                PageCategory named = PageCategory.fromId(value);
+                view = named != null && named.isView() ? named : null;
             } else if ("x".equals(key)) {
                 offsetX = parsePercent(value);
             } else if ("y".equals(key)) {
@@ -347,7 +352,7 @@ public final class WindowLayoutStore {
             }
         }
         return new WindowLayout.WindowSpec(id, tabs, active, locked, closed, hud, gui,
-                offsetX, offsetY, height, width, fill, splits);
+                view, offsetX, offsetY, height, width, fill, splits);
     }
 
     /**
@@ -410,6 +415,9 @@ public final class WindowLayoutStore {
             }
             if (spec.pinnedToGui) {
                 line.append(" gui=true");
+            }
+            if (spec.view != null) {
+                line.append(" view=").append(spec.view.id());
             }
             line.append(" x=").append(format(spec.offsetX));
             line.append(" y=").append(format(spec.offsetY));

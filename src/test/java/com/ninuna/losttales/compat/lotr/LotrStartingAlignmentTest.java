@@ -27,12 +27,12 @@ public final class LotrStartingAlignmentTest {
     }
 
     /**
-     * A character made in the roster names the faction it starts with. The
-     * account's own default character names none — it is the identity that
-     * was already being played — so what it needs is this blank: progression
-     * with no alignment anywhere and nothing pledged. Anything that makes a
-     * character's starting state has to reach for this one when the
-     * character has no starting faction, rather than asking for a faction's.
+     * A character made in the roster names the faction it starts with. One
+     * that names none (a lore figure whose story names no side) needs this
+     * blank: progression with no alignment anywhere and nothing pledged.
+     * Anything that makes a character's starting state has to reach for
+     * this one when the character has no starting faction, rather than
+     * asking for a faction's.
      */
     @Test
     public void aCharacterWithNoStartingFactionGetsCleanProgression() {

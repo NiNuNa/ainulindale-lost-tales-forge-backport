@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
@@ -8,7 +9,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
-import com.ninuna.losttales.client.motion.Motions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -22,10 +22,9 @@ import net.minecraft.client.Minecraft;
  * four quarters; three thirds; a half between two quarter columns, in
  * the order Windows 11 offers them —
  * each drawn as a small screen cut into its zones, a zone being a part
- * of the screen a window can fill. A window carried near the top of the
- * screen finds them on the snap bar there ({@link Bar}); the pointer
- * resting on a window's fullscreen control finds them in a panel under
- * it ({@link Flyout}). The zone under the pointer is where the window
+ * of the screen a window can fill. The snap bar at the top of the screen
+ * holds them ({@link SnapBarWindow}); the pointer resting on a window's
+ * fullscreen control finds them in a panel under it ({@link Flyout}). The zone under the pointer is where the window
  * goes. A layout is offered only while every one of its zones holds the
  * narrowest window there may be, as a desktop offers fewer layouts on
  * a smaller screen.
@@ -76,7 +75,7 @@ public final class SnapLayouts {
     private static final int FRAME = WindowPlacement.FRAME_WIDTH;
     /**
      * A layout's zones: the palette's rose grey at a third, lighter than
-     * the panel's plum black around them.
+     * the panel's primary colour around them.
      */
     private static final int ZONE_RGB = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
     private static final int ZONE_ALPHA = Math.round(255.0F / 3.0F);
@@ -220,7 +219,7 @@ public final class SnapLayouts {
     }
 
     /** As above among the windows open now, the ones snap assist would offer. */
-    private static List<Suggestion> suggestedFor(
+    static List<Suggestion> suggestedFor(
             List<Window.ScreenFill[]> offered, String windowId) {
         List<String> others = new ArrayList<String>();
         if (windowId != null) {
@@ -515,7 +514,7 @@ public final class SnapLayouts {
      * black at two thirds, what the timestamp area and the member list
      * stand on — in a window's frame, each zone a block of rose grey
      * at a third with its corners rounded off, zone {@code lit} in the
-     * landing's honey at two thirds (-1 for none), and on every zone of a
+     * accent at two thirds (-1 for none), and on every zone of a
      * suggestion its window's icon. The surface and the zones thin with
      * the game's chat opacity, as a window's surfaces do. Every pixel of
      * the surface, the zones and the icons is painted by one layer only,
@@ -538,7 +537,7 @@ public final class SnapLayouts {
         final int resting = LostTalesUiInk.argb(ZONE_RGB,
                 Math.round(ZONE_ALPHA * surfaceShare));
         final int landing = LostTalesUiInk.argb(
-                WindowStyle.LANDING_RGB,
+                LostTalesUiTheme.accentRgb(),
                 Math.round(WindowStyle.INSET_ALPHA * surfaceShare));
         final int icons = Math.round(255.0F * share);
         final float left = (float)panel.box.left;
@@ -576,6 +575,55 @@ public final class SnapLayouts {
                 });
         LostTalesUiWindowFrame.drawEdges(left + FRAME, top + FRAME,
                 right - FRAME, bottom - FRAME, Math.round(255.0F * share));
+    }
+
+    /**
+     * Draws a panel's zones on the surface of the sub-window holding it,
+     * at {@code alpha}: each zone the surface recoloured in place toward
+     * rose grey, a third of the way, zone {@code lit} toward the accent,
+     * two thirds of the way (-1 for none), and on every zone of a
+     * suggestion its window's icon. The surface is recoloured rather than
+     * covered, so no zone lies over it as a second background.
+     */
+    static void drawZones(Minecraft minecraft, Panel panel, int lit,
+                          int alpha, int surfaceAlpha) {
+        if (panel == null || minecraft == null) {
+            return;
+        }
+        int surface = LostTalesUiTheme.primaryRgb();
+        int resting = LostTalesUiInk.blend(surface, ZONE_RGB, 1.0F / 3.0F);
+        int landing = LostTalesUiInk.blend(surface,
+                LostTalesUiTheme.accentRgb(), 2.0F / 3.0F);
+        for (int index = 0; index < panel.zones.size(); index++) {
+            recolourRounded(panel.zones.get(index).box, surfaceAlpha, surface,
+                    index == lit ? landing : resting);
+        }
+        LostTalesUiInk.beginContent();
+        for (Zone zone : panel.zones) {
+            if (zone.windowId != null) {
+                drawWindowIcon(minecraft, zone, alpha);
+            }
+        }
+    }
+
+    /** A block of a surface recoloured in place, its four corner pixels left out. */
+    private static void recolourRounded(LostTalesUiHitBox box, int alpha,
+                                        int fromRgb, int toRgb) {
+        float left = (float)box.left;
+        float top = (float)box.top;
+        float right = (float)box.right();
+        float bottom = (float)box.bottom();
+        if (right - left < 3.0F || bottom - top < 3.0F) {
+            WindowStyle.recolourFlat(left, top, right, bottom, alpha, fromRgb,
+                    toRgb);
+            return;
+        }
+        WindowStyle.recolourFlat(left + 1.0F, top, right - 1.0F, top + 1.0F,
+                alpha, fromRgb, toRgb);
+        WindowStyle.recolourFlat(left, top + 1.0F, right, bottom - 1.0F,
+                alpha, fromRgb, toRgb);
+        WindowStyle.recolourFlat(left + 1.0F, bottom - 1.0F, right - 1.0F,
+                bottom, alpha, fromRgb, toRgb);
     }
 
     /**
@@ -620,262 +668,6 @@ public final class SnapLayouts {
                 bottom - 1.0F, argb);
         LostTalesUiInk.fillRect(left + 1.0F, bottom - 1.0F,
                 right - 1.0F, bottom, argb);
-    }
-
-    /**
-     * The snap bar: every layout the screen has room for in one row at
-     * the top centre of the screen. A window carried near the top brings
-     * it out peeking, only its bottom frame and padding showing, and it
-     * comes a little further down as the pointer nears it, never so far
-     * that it covers the top edge's own snap band. While it peeks it
-     * answers nothing and the screen's edges decide, so the band below
-     * it still snaps the window as the top edge does, most often to the
-     * whole screen. The pointer touching what shows of the bar brings it
-     * all the way down: the zone under the pointer is then where the
-     * window lands, and the bar around the zones lands it nowhere. All
-     * the way down it reaches up to the screen's top edge: a pointer
-     * pressed against the edge above it points at the zone standing
-     * below it, so the edge fills the whole screen only beside the bar.
-     * It stays down while the pointer is within {@link #REACH} of it, peeks
-     * again once the pointer goes further, and goes back up when the
-     * pointer leaves the top of the screen or the carry ends. The
-     * suggestions for the carried window lead it.
-     */
-    static final class Bar {
-        /**
-         * How far below the bar, all the way down, the pointer brings it
-         * out; and how far off the bar the pointer may go while it is all
-         * the way down before it peeks again.
-         */
-        static final int REACH = 24;
-        /** The bar's clearing from the top of the screen, all the way down. */
-        static final int TOP_MARGIN = 2;
-        /** How much of the bar shows as it peeks: its bottom frame and padding. */
-        static final int PEEK = FRAME + PADDING;
-        /**
-         * The most of the bar that shows before the pointer touches it:
-         * half the depth of the top edge's snap band
-         * ({@link WindowGestures#SNAP_REACH}), so a pointer coming up
-         * to the bar crosses the other half of that band first.
-         */
-        static final int PEEK_MOST = (int)(WindowGestures.SNAP_REACH
-                / 2.0D);
-
-        /** Where the bar stands: away, peeking, or all the way down. */
-        enum Stage {
-            HIDDEN,
-            PEEKING,
-            REVEALED
-        }
-
-        /** The bar fading in as it comes out, and out as it goes. */
-        private final MotionTransition shown =
-                new MotionTransition(MotionIds.WINDOW_SNAP_LAYOUTS);
-        /** The bar travelling from its peek all the way down, and back. */
-        private final MotionTransition reveal =
-                new MotionTransition(MotionIds.WINDOW_SNAP_LAYOUTS, true);
-        private Stage stage = Stage.HIDDEN;
-        /** How far down the screen the peeking bar's bottom edge stands. */
-        private double peek;
-        /** How far down the screen the peek is bound for. */
-        private double peekTarget;
-        /** When the peek last moved on; 0 before it first does. */
-        private long peekNanos;
-        /**
-         * The bar laid out all the way down, where it answers the
-         * pointer; null while none of it shows.
-         */
-        private Panel panel;
-        /** The zone the pointer was last on, or -1. */
-        private int lit = -1;
-        /** The window being carried, whose suggestions lead the bar. */
-        private String windowId;
-
-        Bar() {
-            // Away from the start, so the bar comes out the first time too.
-            this.shown.settle(false);
-            this.reveal.settle(false);
-        }
-
-        /**
-         * One frame of the carry of the window {@code windowId} with the
-         * pointer at ({@code x}, {@code y}). Answers the part of the
-         * screen whose zone is under the pointer while the bar is all the
-         * way down, or below it on the top edge above the bar; none on the
-         * bar between zones; and null off the bar or while it peeks or is
-         * away.
-         */
-        Window.ScreenFill follow(Minecraft minecraft, String windowId,
-                                     double x, double y, int screenWidth,
-                                     int screenHeight) {
-            this.windowId = windowId;
-            List<Window.ScreenFill[]> layouts = offered(minecraft,
-                    screenWidth, screenHeight);
-            Panel resting = layBar(suggestedFor(layouts, windowId), layouts,
-                    TOP_MARGIN, screenWidth, screenHeight);
-            if (resting == null) {
-                this.stage = Stage.HIDDEN;
-                putAway();
-                return null;
-            }
-            // The pointer touches the bar where it stands now, before
-            // this frame's pointer moves the peek on.
-            LostTalesUiHitBox drawn = advance(resting.box, System.nanoTime());
-            this.stage = stageFor(this.stage, x, y, resting.box, drawn);
-            if (this.stage != Stage.HIDDEN || this.panel != null) {
-                this.panel = resting;
-            }
-            if (this.stage == Stage.PEEKING) {
-                this.peekTarget = peekDepth(x, y, resting.box.left,
-                        resting.box.right(), resting.box.bottom() + REACH);
-            }
-            boolean down = this.stage == Stage.REVEALED;
-            boolean above = down && y < resting.box.top
-                    && x >= resting.box.left && x < resting.box.right();
-            boolean onBar = above || (down && resting.contains(x, y));
-            this.lit = !onBar ? -1 : above ? resting.zoneInColumn(x)
-                    : resting.zoneAt(x, y);
-            return onBar ? resting.fillOf(this.lit) : null;
-        }
-
-        /**
-         * The stage the bar goes to from {@code stage} with the pointer at
-         * ({@code x}, {@code y}), the bar resting all the way down at
-         * {@code resting} and drawn at {@code drawn}: away once the
-         * pointer is {@link #REACH} or more below where it rests; all the
-         * way down once the pointer touches what shows of it, and for as
-         * long as the pointer stays within {@link #REACH} of where it
-         * rests; peeking anywhere else.
-         */
-        static Stage stageFor(Stage stage, double x, double y,
-                              LostTalesUiHitBox resting,
-                              LostTalesUiHitBox drawn) {
-            if (y >= resting.bottom() + REACH) {
-                return Stage.HIDDEN;
-            }
-            if (drawn.contains(x, y) || (stage == Stage.REVEALED
-                    && resting.grown(REACH).contains(x, y))) {
-                return Stage.REVEALED;
-            }
-            return Stage.PEEKING;
-        }
-
-        /**
-         * How far down the screen the bar peeks with the pointer at
-         * ({@code x}, {@code y}), the bar spanning {@code left} to
-         * {@code right} and coming out above {@code reachBottom}:
-         * {@link #PEEK} where the pointer brings it out, deeper in step
-         * with the pointer's nearness to the line its edge peeks down to
-         * at most, and {@link #PEEK_MOST} on that line.
-         */
-        static double peekDepth(double x, double y, double left,
-                                double right, double reachBottom) {
-            double across = Math.max(0.0D, Math.max(left - x, x - right));
-            double down = Math.max(0.0D, y - PEEK_MOST);
-            double away = Math.min(1.0D, Math.sqrt(across * across
-                    + down * down) / (reachBottom - PEEK_MOST));
-            return PEEK + (PEEK_MOST - PEEK) * (1.0D - away);
-        }
-
-        /** The layout the zone under the pointer is one of, or null. */
-        Window.ScreenFill[] litLayout() {
-            return this.panel == null ? null : this.panel.layoutOf(this.lit);
-        }
-
-        /** The other windows the suggestion under the pointer sends with the carried one. */
-        Map<String, Window.ScreenFill> litCompanions() {
-            return this.panel == null
-                    ? Collections.<String, Window.ScreenFill>emptyMap()
-                    : this.panel.companionsOf(this.lit);
-        }
-
-        /** The carry is over: the bar goes back up. */
-        void hide() {
-            this.stage = Stage.HIDDEN;
-            this.lit = -1;
-        }
-
-        /** Draws the bar where its motions have brought it, at {@code opacity}. */
-        void draw(Minecraft minecraft, int screenWidth, int screenHeight,
-                  float opacity) {
-            if (this.panel == null) {
-                return;
-            }
-            List<Window.ScreenFill[]> layouts = offered(minecraft,
-                    screenWidth, screenHeight);
-            List<Suggestion> suggestions = suggestedFor(layouts,
-                    this.windowId);
-            Panel resting = layBar(suggestions, layouts, TOP_MARGIN,
-                    screenWidth, screenHeight);
-            if (resting == null) {
-                putAway();
-                return;
-            }
-            LostTalesUiHitBox drawn = advance(resting.box, System.nanoTime());
-            float share = this.shown.clamped();
-            if (share <= 0.0F || drawn.bottom() <= 0.0D) {
-                if (this.stage == Stage.HIDDEN) {
-                    putAway();
-                }
-                return;
-            }
-            SnapLayouts.draw(minecraft, layBar(suggestions, layouts,
-                    drawn.top, screenWidth, screenHeight), this.lit,
-                    opacity * share);
-        }
-
-        /**
-         * The bar laid out centred across the screen with its top at
-         * {@code top}, or null where no layout fits.
-         */
-        private static Panel layBar(List<Suggestion> suggestions,
-                                    List<Window.ScreenFill[]> layouts,
-                                    double top, int screenWidth,
-                                    int screenHeight) {
-            if (layouts.isEmpty()) {
-                return null;
-            }
-            int count = suggestions.size() + layouts.size();
-            return lay(suggestions, layouts, count,
-                    Math.floor((screenWidth - panelWidth(count, count))
-                            / 2.0D),
-                    top, screenWidth, screenHeight);
-        }
-
-        /**
-         * Moves the bar's motions on to {@code now} — the fade, the peek
-         * and the way down — and answers where the bar resting at
-         * {@code resting} is drawn: its bottom edge as far down the screen
-         * as it peeks, or on its way from there to where it rests, on
-         * whole display pixels. Away, it fades and goes back up.
-         */
-        private LostTalesUiHitBox advance(LostTalesUiHitBox resting,
-                                          long now) {
-            boolean out = this.stage != Stage.HIDDEN;
-            this.shown.advance(now, out);
-            float down = this.reveal.advance(now,
-                    this.stage == Stage.REVEALED);
-            double elapsed = this.peekNanos == 0L ? 0.0D
-                    : (now - this.peekNanos) / 1.0E9D;
-            this.peekNanos = now;
-            this.peek = Motions.followTravel(MotionIds.WINDOW_SNAP_BAR_PEEK,
-                    this.peek, out ? this.peekTarget : 0.0D, elapsed);
-            double bottom = this.peek + down * (resting.bottom() - this.peek);
-            return new LostTalesUiHitBox(resting.left,
-                    LostTalesDisplayPixels.snap(bottom
-                            - resting.height),
-                    resting.width, resting.height);
-        }
-
-        /** Nothing of the bar shows: it is laid away, to peek in afresh. */
-        private void putAway() {
-            this.panel = null;
-            this.lit = -1;
-            this.peek = 0.0D;
-            this.peekNanos = 0L;
-            this.shown.settle(false);
-            this.reveal.settle(false);
-        }
     }
 
     /**

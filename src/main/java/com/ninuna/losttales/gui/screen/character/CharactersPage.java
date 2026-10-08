@@ -42,6 +42,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -591,7 +592,7 @@ public final class CharactersPage extends PageContent {
                 : this.font.getStringWidth(aside) + MenuWindow.VALUE_GAP;
         LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(name,
                         Math.max(0, right - nameX - asideWidth)), nameX,
-                textTop, played ? LostTalesColors.rgb(LostTalesColors.HONEY)
+                textTop, played ? LostTalesUiTheme.accentRgb()
                         : picked ? LostTalesUiInk.IVORY
                         : LostTalesColors.rgb(LostTalesColors.TEXT), alpha);
         if (aside.length() > 0) {
@@ -691,8 +692,7 @@ public final class CharactersPage extends PageContent {
         boolean played = CharacterRosterRows.isPlayed(snapshot, picked);
         LostTalesUiHitBox words = layout.words();
         CharacterSummary character = picked.character;
-        UUID characterId = character == null ? null
-                : character.getCharacterId();
+        UUID characterId = character.getCharacterId();
         ClientCharacterProfileCache.want(characterId);
         CharacterProfileColumn column = new CharacterProfileColumn(this.mc,
                 this.font, (int)words.width, ProfileSubject.of(character),
@@ -700,8 +700,7 @@ public final class CharactersPage extends PageContent {
                 ClientCharacterProfileCache.isUnavailable(characterId),
                 accountName(), played, isLore(character));
         // While Change Look is open the figure wears the look it holds.
-        LookEditWindow editing = character == null ? null
-                : LookEditWindow.openFor(character.getCharacterId());
+        LookEditWindow editing = LookEditWindow.openFor(characterId);
         CharacterAppearance draft = editing == null ? null
                 : editing.draftLook(snapshot.getOwnerId());
         drawColumn(layout, column, played && draft == null
@@ -1272,7 +1271,7 @@ public final class CharactersPage extends PageContent {
         screen.openOverPage(tab, CharacterSubWindows.LOOK_EDIT, key, editor);
     }
 
-    /** The capes of the character picked; the account's own while its record is not made. */
+    /** The capes of the character picked. */
     private void openCapes(CharacterSummary character) {
         WindowScreen screen = WindowScreen.current();
         if (screen != null) {

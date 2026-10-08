@@ -21,11 +21,12 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A key shows its category's pages and hides the rest in their windows; a
- * page opens in a window of its category, else in its category's first
- * window; a window pinned to the GUI shows in every view, one pinned to the
- * HUD stays while playing; closing a window closes what the view shows of
- * it.
+ * A key shows its category's pages and hides the rest in their windows,
+ * and views switch on and off beside each other; the menu key's views are
+ * remembered; a New Page stands with its window; a page opens in a window
+ * of its category, else in its category's first window; a window pinned
+ * to the GUI shows in every view, one pinned to the HUD stays while
+ * playing; closing a window closes what the view shows of it.
  */
 public final class WindowViewTest {
     private static final String PAGE = "view_page";
@@ -86,7 +87,7 @@ public final class WindowViewTest {
     public void withNoScreenOpenEveryTabCountsAsShown() {
         OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
-        assertNull(WindowView.category());
+        assertFalse(WindowView.isOn(PageCategory.CHANNELS));
         assertTrue(WindowView.shows(GLOBAL));
         assertTrue(WindowView.shows(page));
         assertFalse("no tab is no tab in any view", WindowView.shows(null));
@@ -142,20 +143,94 @@ public final class WindowViewTest {
         assertFalse(WindowView.shows(page));
     }
 
+    /**
+     * A page opened by hand from a view not its own opens in the Lost Tales
+     * Menu's view, as a copy of its own there, and the screen swaps to it.
+     */
     @Test
-    public void aTabOpenedByHandJoinsTheViewUntilTheScreenCloses() {
+    public void aPageOpenedByHandFromAnotherViewOpensInTheMenusView() {
         OtherPage page = WindowPages.tab(PAGE);
-        WindowLayout.showPage(page);
+        Window journal = WindowLayout.showPage(page);
         WindowView.forChat();
-        WindowView.show(page);
-        assertTrue(WindowView.shows(page));
-        assertEquals("the view is still the chat's",
-                PageCategory.CHANNELS, WindowView.category());
-        WindowView.clear();
-        WindowView.forChat();
-        assertFalse("its own key shows it alone next time",
+        Window menu = WindowLayout.showPage(page);
+        assertNotNull(menu);
+        assertFalse("a window of its own", menu == journal);
+        assertEquals(PageCategory.MENU, WindowLayout.viewOf(menu));
+        WindowPage copy = menu.getActiveTab();
+        assertTrue(copy.isCopyOf(page));
+        WindowView.show(copy);
+        assertTrue(WindowView.isOn(PageCategory.MENU));
+        assertTrue(WindowView.shows(copy));
+        assertFalse("the chat's windows wait in theirs", WindowView.shows(GLOBAL));
+        assertFalse(WindowView.shows(page));
+        WindowView.forPage(page);
+        assertTrue("the journal's own copy stays in its view",
                 WindowView.shows(page));
+        assertFalse(WindowView.shows(copy));
     }
+
+    /** A view swaps for another: one view at a time, never two. */
+    @Test
+    public void aViewSwapsForAnother() {
+        OtherPage other = WindowPages.tab(OTHER);
+        WindowLayout.showPage(other);
+        WindowView.forChat();
+        assertTrue(WindowView.isOn(PageCategory.WHISPERS));
+        WindowView.forView(PageCategory.MAP);
+        assertTrue(WindowView.shows(other));
+        assertFalse(WindowView.shows(GLOBAL));
+        assertFalse(WindowView.isOn(PageCategory.CHANNELS));
+        assertEquals(PageCategory.MENU, WindowView.handView(GLOBAL));
+        assertEquals(PageCategory.MAP, WindowView.handView(other));
+    }
+
+    /** A window keeps the view it stands in through the layout file. */
+    @Test
+    public void aWindowsViewRoundTripsThroughTheLayoutFile() {
+        OtherPage page = WindowPages.tab(PAGE);
+        WindowView.forView(PageCategory.MENU);
+        Window menu = WindowLayout.showPage(page);
+        assertEquals(PageCategory.MENU, WindowLayout.viewOf(menu));
+        List<String> described = WindowLayoutStore.describe();
+        assertTrue(described.toString(),
+                described.toString().contains(" view=menu"));
+        TwoWindowLayout.reset();
+        WindowLayoutStore.load(described);
+        assertEquals(PageCategory.MENU, WindowLayout.viewOf(
+                WindowLayout.window(menu.getId())));
+    }
+
+    /**
+     * A New Page stands in the view of the window it is in; one opened by
+     * hand with no window asked for opens in the Lost Tales Menu's view.
+     */
+    @Test
+    public void aNewPageStandsInItsWindowsView() {
+        OtherPage newPage = WindowPages.tab(NewPage.PAGE_ID);
+        if (newPage == null) {
+            WindowPages.register(NewPage.PAGE_ID, "gui.test.view.new_page",
+                    new ItemStack(Items.paper), null, PageCategory.NEW_PAGE,
+                    new WindowPages.Factory() {
+                        @Override
+                        public PageContent create() {
+                            return new EmptyPage();
+                        }
+                    });
+            newPage = WindowPages.tab(NewPage.PAGE_ID);
+        }
+        Window chat = WindowLayout.windowOf(GLOBAL);
+        chat.setLocked(false);
+        WindowPage beside = WindowLayout.openCopyIn(newPage, chat.getId());
+        assertNotNull(beside);
+        WindowView.forChat();
+        assertTrue("it stands with Global", WindowView.shows(beside));
+        WindowView.forPage(WindowPages.tab(OTHER));
+        assertFalse(WindowView.shows(beside));
+        WindowPage alone = WindowLayout.openCopy(newPage, null);
+        assertEquals(PageCategory.MENU,
+                WindowLayout.viewOf(WindowLayout.windowOf(alone)));
+    }
+
 
     @Test
     public void turningToAnotherViewLetsGoOfWhatWasOpenedByHand() {

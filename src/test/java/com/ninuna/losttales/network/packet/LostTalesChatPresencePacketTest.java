@@ -33,8 +33,8 @@ public final class LostTalesChatPresencePacketTest {
         choices.put(ChatPresenceIdentity.ACCOUNT, ChatPresence.DO_NOT_DISTURB);
         choices.put(ChatPresenceIdentity.character(ALDRIC),
                 ChatPresence.INVISIBLE);
-        // The default character's id is the account's own, and it is
-        // still an identity of its own.
+        // A character whose id equals the account's is still an
+        // identity of its own.
         choices.put(ChatPresenceIdentity.character(STEVE), ChatPresence.AWAY);
         Map<ChatPresenceIdentity, String> lines =
                 new LinkedHashMap<ChatPresenceIdentity, String>();

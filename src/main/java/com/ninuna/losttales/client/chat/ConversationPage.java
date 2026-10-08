@@ -14,6 +14,7 @@ import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowMenus;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowPage;
@@ -77,7 +78,7 @@ public final class ConversationPage extends WindowPage {
      * The bell of Notification Settings and the bubble of Chat Feed
      * Settings, one for each word in {@link ChatLineChoice}'s order: green for Everything,
      * ivory for Only Mentions, crimson for Nothing, each lighting to
-     * honey.
+     * the accent.
      */
     private static final OptionGlyph[] BELL_GLYPHS = {
             OptionGlyph.sprite(LostTalesUiSheet.BELL_EVERYTHING,
@@ -627,6 +628,23 @@ public final class ConversationPage extends WindowPage {
     @Override
     public void togglePanel() {
         ChatLayout.setAreaHidden(this, !ChatLayout.isAreaHidden(this));
+    }
+
+    /** Every conversation's strip offers the inbox, marked with what waits there. */
+    @Override
+    public TabMark inboxMark() {
+        return ChatInbox.mark();
+    }
+
+    /** The inbox opens in this conversation's window where it may stand there. */
+    @Override
+    public void openInbox() {
+        WindowScreen screen = WindowScreen.current();
+        Window window = WindowLayout.windowOf(this);
+        if (screen != null) {
+            screen.showOnPage(InboxPage.PAGE_ID, null,
+                    window == null ? null : window.getId());
+        }
     }
 
     @Override

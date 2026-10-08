@@ -41,7 +41,7 @@ import org.lwjgl.opengl.GL11;
  * section away, as the pickers' sections fold — and
  * <em>separators</em>, a lone hairline between two groups of rows that
  * belong together; a list longer than its window scrolls by the wheel, a
- * honey hairline on an edge saying more lies past it.
+ * accent hairline on an edge saying more lies past it.
  *
  * <p>A menu may hold a field above its rows, which takes what is typed
  * while its window is in front and until a row is taken: a search that
@@ -247,7 +247,7 @@ public final class MenuWindow extends SubWindowContent {
         String tip = "";
         /**
          * The colour the value is drawn in; -1 for the aside tone. A
-         * value changed but not yet saved stands in honey.
+         * value changed but not yet saved stands in the accent.
          */
         int valueColor = -1;
 

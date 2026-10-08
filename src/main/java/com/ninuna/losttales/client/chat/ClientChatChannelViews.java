@@ -787,6 +787,26 @@ public final class ClientChatChannelViews {
         return unreadPingCount(tab) + unreadOtherCount(tab) > 0;
     }
 
+    /**
+     * Whether a line still waits unread: a copy reading its conversation
+     * has an unread run that reaches back to it.
+     */
+    static synchronized boolean isUnread(int chatLineId) {
+        ConversationPage tab = TAB_BY_LINE_ID.get(Integer.valueOf(chatLineId));
+        if (tab == null) {
+            return false;
+        }
+        for (ConversationPage view : readersOf(tab)) {
+            UnreadDivider divider = UNREAD_DIVIDERS.get(view);
+            if (divider != null && !divider.seen
+                    && chatLineId >= divider.lineId
+                    && count(UNREAD_PINGS, view) + count(UNREAD_OTHER, view) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The recorded tab, or null for vanilla and untracked lines. */
     public static synchronized ConversationPage tabOf(int chatLineId) {
         return TAB_BY_LINE_ID.get(Integer.valueOf(chatLineId));

@@ -17,6 +17,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -907,7 +908,7 @@ public final class ChatInputField extends GuiTextField {
             found.add(new TokenPreview(hash, link.end, TokenKind.CHANNEL,
                     null, null, "", null, label, rgb, rgb,
                     LostTalesColors.darkestShade(rgb,
-                            LostTalesUiInk.SURFACE_RGB),
+                            LostTalesUiTheme.primaryRgb()),
                     toMessage, ChatRunBackdrops.PAD
                             + this.font.getStringWidth(label)
                             + (toMessage ? ChatInlineIcons.SLOT_WIDTH : 0)
@@ -937,7 +938,7 @@ public final class ChatInputField extends GuiTextField {
             found.add(new TokenPreview(mention.start, mention.end,
                     TokenKind.MENTION, null, null, "", null, label, rgb, rgb,
                     role ? LostTalesColors.darkestShade(rgb,
-                            LostTalesUiInk.SURFACE_RGB)
+                            LostTalesUiTheme.primaryRgb())
                             : ChatRunBackdrops.PLAYER_RGB,
                     false, ChatRunBackdrops.PAD
                             + this.font.getStringWidth(label)
@@ -995,7 +996,7 @@ public final class ChatInputField extends GuiTextField {
         return new TokenPreview(token.start, token.end, TokenKind.SHARE,
                 token.kind, stack, markerIcon, null, name, rgb, iconRgb,
                 LostTalesColors.darkestShade(rgb,
-                        LostTalesUiInk.SURFACE_RGB), false, width);
+                        LostTalesUiTheme.primaryRgb()), false, width);
     }
 
     /** The slot a shared thing's icon takes, as the message lines give it. */

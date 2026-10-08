@@ -37,7 +37,7 @@ public final class LotrHiredUnitTag {
         return this.ownerId;
     }
 
-    /** The hiring character, or null for the account itself. */
+    /** The hiring character, or null for a unit hired before the first character was made. */
     public UUID getCharacterId() {
         return this.characterId;
     }

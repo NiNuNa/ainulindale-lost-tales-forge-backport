@@ -68,8 +68,8 @@ public final class CharacterSwitchCoordinator {
     }
 
     /**
-     * Switches the player to the given identity — one of their characters,
-     * or the account itself. A target owned by another account is refused.
+     * Switches the player to one of their characters. A target owned by
+     * another account is refused.
      */
     public CharacterOperationResult selectIdentity(EntityPlayerMP player,
                                                    int requestId,
@@ -549,8 +549,7 @@ public final class CharacterSwitchCoordinator {
         if (!reference.isValid()) {
             return CharacterOperationResult.failure(reference.getErrorId(), roster);
         }
-        RoleplayCharacter targetCharacter = target.isAccount()
-                ? null : roster.getCharacter(target.getCharacterId());
+        RoleplayCharacter targetCharacter = roster.getCharacter(target.getCharacterId());
         CharacterSwitchAccountState account =
                 stores.switches.getOrCreateAccount(player.getUniqueID());
         CharacterErrorId recovery;
@@ -630,10 +629,9 @@ public final class CharacterSwitchCoordinator {
             // the live LOTR data is still the source's.
             CharacterLotrRecord.refresh(player, stores.rosters, roster,
                     sourceCharacter);
-            // An account never played before starts from fresh defaults; a
-            // character always has a record once the account is bootstrapped.
-            targetSnapshot = this.playerStateService.getOrCreateCurrent(
-                    playerStateAccount, stores.playerStates, target);
+            // A character always has a record once the account is bootstrapped.
+            targetSnapshot = this.playerStateService.getCurrent(
+                    playerStateAccount, target.getCharacterId());
 
             // A journal must never reference a generation that has not reached
             // disk. Persist bootstrap/source state first; an interruption here

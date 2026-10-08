@@ -48,7 +48,7 @@ import org.lwjgl.input.Keyboard;
  * the server checks every request again.
  *
  * <p>Every change waits on the page ({@link ServerSettingsDraft}), its
- * new value in honey, until Save sends them all at once. What the
+ * new value in the accent, until Save sends them all at once. What the
  * server made of them stands over the bar: saved, or the first refusal
  * and its reason, the refused changes still waiting.</p>
  */

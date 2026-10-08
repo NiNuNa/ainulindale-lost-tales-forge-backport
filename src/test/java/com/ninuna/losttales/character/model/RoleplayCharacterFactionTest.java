@@ -43,7 +43,7 @@ public final class RoleplayCharacterFactionTest {
     }
 
     @Test
-    public void theAccountCharacterJoinsAFactionByPledging() {
+    public void aCharacterJoinsAFactionByPledging() {
         RoleplayCharacter account = character(
                 LotrCharacterAdapter.UNALIGNED_FACTION_ID, "");
         assertEquals(LotrCharacterAdapter.UNALIGNED_FACTION_ID,

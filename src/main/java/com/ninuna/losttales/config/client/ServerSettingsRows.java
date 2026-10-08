@@ -7,7 +7,7 @@ import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.config.LostTalesConfigWords;
 import com.ninuna.losttales.config.server.ServerConfigChangeValidator;
 import com.ninuna.losttales.config.server.ServerConfigEntry;
-import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,7 +20,7 @@ import net.minecraft.util.StatCollector;
  * option stepping through its values, a number between chevrons, a
  * typed line, a secret that says only whether it is set — and each list
  * last in its category, its lines as a group with Add a Line under them.
- * A setting whose change waits shows its new value in honey, a list its
+ * A setting whose change waits shows its new value in the accent, a list its
  * name and its new lines. Every setting is named, explained in its row's
  * tip and given its words by the lang file, in the player's language
  * ({@link LostTalesConfigWords}). Numbers and lines are typed in Settings'
@@ -188,9 +188,9 @@ final class ServerSettingsRows {
     }
 
     /**
-     * A list as a group under its name, honey while a change to it
+     * A list as a group under its name, in the accent while a change to it
      * waits: a row for each of its lines, a line the server does not
-     * hold in honey, and Add a Line, greyed once the list is full.
+     * hold in the accent, and Add a Line, greyed once the list is full.
      */
     private void addList(List<MenuWindow.Entry> rows, ServerConfigEntry entry) {
         String name = entry.qualifiedName();
@@ -206,7 +206,7 @@ final class ServerSettingsRows {
             MenuWindow.Entry item = new MenuWindow.Entry(id,
                     items.get(index)).withTip(tip);
             // A line is its own value: one the server does not hold yet
-            // stands in honey whole.
+            // stands in the accent whole.
             rows.add(entry.getValues().contains(items.get(index)) ? item
                     : item.withLabelColor(honey()));
         }
@@ -242,7 +242,7 @@ final class ServerSettingsRows {
     }
 
     private static int honey() {
-        return LostTalesColors.rgb(LostTalesColors.HONEY);
+        return LostTalesUiTheme.accentRgb();
     }
 
     /** Whether a switch's value reads on. */

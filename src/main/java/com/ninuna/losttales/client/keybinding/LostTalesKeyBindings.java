@@ -4,7 +4,6 @@ import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
 import com.ninuna.losttales.client.window.PinnedWindows;
-import com.ninuna.losttales.client.window.NewPage;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.hud.LostTalesHudHelper;
@@ -31,7 +30,7 @@ public class LostTalesKeyBindings {
     public static final String FULL_NAME_PREFIX = "gui.losttales.keys.full.";
     private static final int MIDDLE_MOUSE_KEY_CODE = -98;
 
-    private static final KeyBinding NEW_PAGE = new KeyBinding("key.losttales.new_page", Keyboard.KEY_CAPITAL, CATEGORY);
+    private static final KeyBinding MENU = new KeyBinding("key.losttales.menu", Keyboard.KEY_CAPITAL, CATEGORY);
     private static final KeyBinding QUEST_JOURNAL = new KeyBinding("key.losttales.questJournal", Keyboard.KEY_J, CATEGORY);
     /** Unbound until the player gives it a key. */
     private static final KeyBinding FELLOWSHIP = new KeyBinding("key.losttales.fellowship", Keyboard.KEY_NONE, CATEGORY);
@@ -48,7 +47,7 @@ public class LostTalesKeyBindings {
     private static final KeyBinding CYCLE_TARGET_RIGHT = new KeyBinding("key.losttales.cycleTargetRight", Keyboard.KEY_NONE, CATEGORY);
 
     public void register() {
-        ClientRegistry.registerKeyBinding(NEW_PAGE);
+        ClientRegistry.registerKeyBinding(MENU);
         ClientRegistry.registerKeyBinding(QUEST_JOURNAL);
         ClientRegistry.registerKeyBinding(FELLOWSHIP);
         ClientRegistry.registerKeyBinding(CHARACTERS);
@@ -107,8 +106,8 @@ public class LostTalesKeyBindings {
     private static void handleBindingPresses() {
         Minecraft minecraft = Minecraft.getMinecraft();
 
-        if (NEW_PAGE.isPressed()) {
-            WindowScreen.openView(NewPage.PAGE_ID);
+        if (MENU.isPressed()) {
+            WindowScreen.openMenu();
         }
         if (QUEST_JOURNAL.isPressed()) {
             WindowScreen.openView(QuestJournalPage.PAGE_ID);
@@ -186,8 +185,8 @@ public class LostTalesKeyBindings {
         return MODIFIER;
     }
 
-    public static KeyBinding getNewPageKeyBinding() {
-        return NEW_PAGE;
+    public static KeyBinding getMenuKeyBinding() {
+        return MENU;
     }
 
     public static KeyBinding getQuestJournalKeyBinding() {
@@ -214,8 +213,8 @@ public class LostTalesKeyBindings {
         return getKeyDisplayName(MODIFIER);
     }
 
-    public static boolean isNewPageKey(int keyCode) {
-        return isKeyboardKey(NEW_PAGE, keyCode);
+    public static boolean isMenuKey(int keyCode) {
+        return isKeyboardKey(MENU, keyCode);
     }
 
     public static boolean isQuestJournalKey(int keyCode) {

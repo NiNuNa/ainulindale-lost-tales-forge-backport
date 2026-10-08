@@ -41,6 +41,11 @@ public final class CreatorTextControl extends CreatorControl {
         return this.field.getText();
     }
 
+    /** An example shown faintly while the field is empty. */
+    public void setHint(String hint) {
+        this.field.setHint(hint);
+    }
+
     @Override
     public int height() {
         return inRows() ? CreatorRows.fieldHeight()

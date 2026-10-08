@@ -28,6 +28,11 @@ public final class Window {
     private boolean pinnedToHud;
     /** Whether every view of the window screen shows the window, whichever key opened it. */
     private boolean pinnedToGui;
+    /**
+     * The view the window stands in: its category's, or the Lost Tales
+     * Menu's ({@link PageCategory#MENU}); null until the layout gives it one.
+     */
+    private PageCategory view;
     /** Percent of the available screen travel, see HudPlacementLayout. */
     private double offsetX;
     private double offsetY;
@@ -314,6 +319,8 @@ public final class Window {
     public boolean isClosed() { return this.closed; }
     public boolean isPinnedToHud() { return this.pinnedToHud; }
     public boolean isPinnedToGui() { return this.pinnedToGui; }
+    /** The view it stands in; null until the layout gives it one ({@link WindowLayout#viewOf}). */
+    PageCategory getView() { return this.view; }
     public double getOffsetX() { return this.offsetX; }
     public double getOffsetY() { return this.offsetY; }
     /**
@@ -381,6 +388,7 @@ public final class Window {
     void setPinnedToHud(boolean pinned) { this.pinnedToHud = pinned; }
 
     void setPinnedToGui(boolean pinned) { this.pinnedToGui = pinned; }
+    void setView(PageCategory view) { this.view = view; }
 
     void setOwnHeight(double height) { this.ownHeight = height; }
 

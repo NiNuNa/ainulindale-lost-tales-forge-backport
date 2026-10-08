@@ -14,7 +14,7 @@ import org.junit.Test;
  * A presence travels by its place and is written by its id; Offline is
  * only shown, never chosen, and Invisible is shown to others as Offline.
  * An identity is the account or one character, told apart by kind even
- * where a character's id is the account's own.
+ * where a character's id equals the account's.
  */
 public final class ChatPresenceTest {
 
@@ -67,20 +67,18 @@ public final class ChatPresenceTest {
     }
 
     @Test
-    public void theAccountAndItsDefaultCharacterAreTwoIdentities() {
-        UUID account = UUID.randomUUID();
-        ChatPresenceIdentity defaultCharacter =
-                ChatPresenceIdentity.character(account);
-        assertNotEquals(ChatPresenceIdentity.ACCOUNT, defaultCharacter);
+    public void theAccountAndACharacterAreTwoIdentitiesByKind() {
+        UUID id = UUID.randomUUID();
+        ChatPresenceIdentity character = ChatPresenceIdentity.character(id);
+        assertNotEquals(ChatPresenceIdentity.ACCOUNT, character);
         assertTrue(ChatPresenceIdentity.ACCOUNT.isAccount());
-        assertFalse(defaultCharacter.isAccount());
-        assertEquals(account, defaultCharacter.getCharacterId());
+        assertFalse(character.isAccount());
+        assertEquals(id, character.getCharacterId());
         assertSame(ChatPresenceIdentity.ACCOUNT,
                 ChatPresenceIdentity.character(null));
-        assertEquals(ChatPresenceIdentity.character(account),
-                defaultCharacter);
-        assertEquals(defaultCharacter.hashCode(),
-                ChatPresenceIdentity.character(account).hashCode());
+        assertEquals(ChatPresenceIdentity.character(id), character);
+        assertEquals(character.hashCode(),
+                ChatPresenceIdentity.character(id).hashCode());
     }
 
     @Test

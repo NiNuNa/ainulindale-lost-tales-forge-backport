@@ -34,6 +34,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -527,7 +528,7 @@ final class ProfileEditWindow extends SubWindowContent {
 
     /**
      * One of the window's section buttons: the one shown stands lit with its name in
-     * honey, the others are buttons.
+     * the accent, the others are buttons.
      */
     private void drawSection(FontRenderer font, LostTalesUiHitBox box, Page each,
                          boolean hovered, int alpha, int surfaceAlpha) {
@@ -544,7 +545,7 @@ final class ProfileEditWindow extends SubWindowContent {
                 (int)at.left + LostTalesUiFramedButton.WIDE_INSET,
                 (int)at.top + (LostTalesUiFramedButton.HEIGHT
                         - WindowStyle.LINE_HEIGHT) / 2 + WindowStyle.ROW_TEXT_TOP,
-                LostTalesColors.rgb(LostTalesColors.HONEY), alpha);
+                LostTalesUiTheme.accentRgb(), alpha);
         LostTalesUiFramedButton.drawInk((float)at.left, (float)at.top,
                 (int)at.width, (int)at.height, 1.0F, alpha);
     }

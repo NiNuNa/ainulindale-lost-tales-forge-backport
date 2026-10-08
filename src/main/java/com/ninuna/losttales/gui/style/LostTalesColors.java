@@ -124,6 +124,20 @@ public class LostTalesColors {
             {"MAROON", "RUST", "CLAY", "TAN", "PARCHMENT"},
             {"DARK_MULBERRY", "MULBERRY", "ORCHID", "SALMON"},
             {"WINE", "CRIMSON", "CORAL", "APRICOT", "HONEY"}};
+    /**
+     * For each ramp above, the two dark colours a sprite's background takes
+     * beside plum black when its ink is of that ramp, darker first: what
+     * the window sheet paints round ivory, honey or green ink. The blues,
+     * the browns and the pinks have no sprite of their own yet, so theirs
+     * are picked to match their hue.
+     */
+    private static final String[][] RAMP_DARKS = {
+            {"DUSK_VIOLET", "INDIGO"},
+            {"PLUM_DARK", "PLUM_GRAY"},
+            {"DUSK_VIOLET", "INDIGO"},
+            {"DARK_MULBERRY", "MAROON"},
+            {"DARK_MULBERRY", "MULBERRY"},
+            {"DARK_MULBERRY", "WINE"}};
 
     private static Map<String, Integer> paletteByName() {
         Map<String, Integer> byName = new HashMap<String, Integer>();
@@ -165,15 +179,61 @@ public class LostTalesColors {
      * palette's. Case and surrounding space do not count.
      */
     public static String lighterStep(String name) {
-        if (!isPaletteName(name)) {
+        return step(name, 1);
+    }
+
+    /**
+     * The name of the palette entry one shade darker than {@code name} on
+     * its own ramp — mulberry for orchid — or null for a ramp's darkest
+     * entry and for a name that is not the palette's.
+     */
+    public static String darkerStep(String name) {
+        return step(name, -1);
+    }
+
+    private static String step(String name, int by) {
+        int ramp = rampOf(name);
+        if (ramp < 0) {
             return null;
         }
-        String key = name.trim().toUpperCase(Locale.ROOT);
-        for (String[] ramp : RAMPS) {
-            for (int index = 0; index < ramp.length; index++) {
-                if (ramp[index].equals(key)) {
-                    return index + 1 < ramp.length ? ramp[index + 1] : null;
-                }
+        int index = java.util.Arrays.asList(RAMPS[ramp]).indexOf(normalise(name)) + by;
+        return index >= 0 && index < RAMPS[ramp].length ? RAMPS[ramp][index] : null;
+    }
+
+    /**
+     * The two dark colours, darker first, a sprite's background takes
+     * beside plum black when its ink is {@code name}'s ramp; the plums'
+     * for a name that is not the palette's.
+     */
+    public static String[] spriteDarks(String name) {
+        int ramp = rampOf(name);
+        return RAMP_DARKS[ramp < 0 ? 1 : ramp].clone();
+    }
+
+    /** The index of the ramp {@code name} stands on; -1 for none. */
+    private static int rampOf(String name) {
+        if (!isPaletteName(name)) {
+            return -1;
+        }
+        String key = normalise(name);
+        for (int ramp = 0; ramp < RAMPS.length; ramp++) {
+            if (java.util.Arrays.asList(RAMPS[ramp]).contains(key)) {
+                return ramp;
+            }
+        }
+        return -1;
+    }
+
+    private static String normalise(String name) {
+        return name.trim().toUpperCase(Locale.ROOT);
+    }
+
+    /** The name of the palette entry that is exactly {@code rgb}; null for a colour off the palette. */
+    public static String nameOf(int rgb) {
+        int wanted = rgb & 0xFFFFFF;
+        for (int index = 0; index < PALETTE_VALUES.length; index++) {
+            if ((PALETTE_VALUES[index] & 0xFFFFFF) == wanted) {
+                return PALETTE_NAMES[index];
             }
         }
         return null;

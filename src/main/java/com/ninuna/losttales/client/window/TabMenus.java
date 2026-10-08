@@ -46,13 +46,14 @@ final class TabMenus {
     private static final String SETTINGS_NONE = "settings";
     /**
      * The rows of a page's options that stand for the tool strip's own
-     * buttons: the panel, borderless, the member list, the search and
-     * the help.
+     * buttons: the panel, borderless, the member list, the search, the
+     * inbox and the help.
      */
     private static final String STRIP_PANEL = "strip:panel";
     private static final String STRIP_BORDERLESS = "strip:borderless";
     private static final String STRIP_MEMBERS = "strip:members";
     private static final String STRIP_SEARCH = "strip:search";
+    private static final String STRIP_INBOX = "strip:inbox";
     private static final String STRIP_HELP = "strip:help";
     /** The row of a page's options that opens another copy of it right after it. */
     private static final String TAB_DUPLICATE = "tab:duplicate";
@@ -98,8 +99,9 @@ final class TabMenus {
      * A page's options as rows: everything its tool strip holds, in the
      * strip's order read from its left, a hairline wherever the strip
      * has one. The panel's row; the page's own options, a hairline
-     * between two groups; then the cog's row, Split View, Borderless,
-     * the member list's row (conversations), the search and the help.
+     * between two groups; then the cog's row, Split View, Duplicate Page,
+     * Borderless, the member list's row and the search, the inbox's
+     * (conversations) and the help.
      * What the strip greys stands greyed here, saying the same.
      */
     static List<MenuWindow.Entry> stripRows(WindowPage tab) {
@@ -146,9 +148,18 @@ final class TabMenus {
                 .withKeys(PageKeys.keysOf(PageKeys.COMMAND, PageKeys.PLUS,
                         Keyboard.KEY_F))
                 .unavailable(tab.searchUnavailable()));
+        TabMark inbox = tab.inboxMark();
+        if (inbox != null) {
+            rows.add(new MenuWindow.Entry(STRIP_INBOX,
+                    StatCollector.translateToLocal("gui.losttales.window.inbox"))
+                    .withSprite(LostTalesUiSheet.INBOX,
+                            LostTalesUiSheet.INBOX_LIT, false)
+                    .withValue(inbox.count() > 0
+                            ? Integer.toString(inbox.count()) : ""));
+        }
         rows.add(new MenuWindow.Entry(STRIP_HELP,
-                StatCollector.translateToLocalFormatted(
-                        "gui.losttales.window.option.help", tab.title()))
+                StatCollector.translateToLocal(
+                        "gui.losttales.window.option.help"))
                 .withSprite(LostTalesUiSheet.QUESTION,
                         LostTalesUiSheet.QUESTION_LIT, false)
                 .withKeys(PageKeys.keysOf(Keyboard.KEY_F1)));
@@ -770,6 +781,10 @@ final class TabMenus {
                 TabMenus.this.screen.duplicate(tab);
                 return false;
             }
+            if (STRIP_INBOX.equals(entry.id)) {
+                tab.openInbox();
+                return false;
+            }
             Window held = WindowLayout.windowOf(tab);
             if (STRIP_BORDERLESS.equals(entry.id)) {
                 TabMenus.this.screen.toggleBorderless(held);
@@ -1015,8 +1030,8 @@ final class TabMenus {
         @Override
         public void rebuild(MenuWindow menu) {
             WindowPage tab = (WindowPage)menu.about();
-            menu.setTitle(StatCollector.translateToLocalFormatted(
-                    "gui.losttales.window.help.title", tab.title()),
+            menu.setTitle(StatCollector.translateToLocal(
+                    "gui.losttales.window.help.title"),
                     LostTalesUiSheet.QUESTION);
             PageHelp help = tab.help();
             List<PageKeys.Area> areas =
@@ -1079,7 +1094,10 @@ final class TabMenus {
                 entries.add(MenuWindow.Entry.separator());
                 entries.add(heldWhileLocked(new MenuWindow.Entry(
                         ENTRY_WINDOW_RESET, StatCollector.translateToLocal(
-                                "gui.losttales.window.menu.reset")), window));
+                                "gui.losttales.window.menu.reset"))
+                        .withSprite(LostTalesUiSheet.RESET,
+                                LostTalesUiSheet.RESET_DISCARD, false),
+                        window));
                 entries.add(MenuWindow.Entry.separator());
                 entries.add(settingsRow(Settings.Place.WINDOWS));
             }
@@ -1244,7 +1262,7 @@ final class TabMenus {
             if (CATEGORY_OPEN_ALL.equals(entry.id)) {
                 WindowPage last = null;
                 for (WindowPage page : closedPagesOf(category)) {
-                    WindowPage opened = WindowLayout.openInCategory(page, null);
+                    WindowPage opened = WindowLayout.openByHand(page, null);
                     last = opened == null ? last : opened;
                 }
                 if (last != null) {
@@ -1452,16 +1470,9 @@ final class TabMenus {
      */
     private void showFound(String windowId, String pageAndId) {
         int colon = pageAndId.indexOf(':');
-        OtherPage tab = colon < 0 ? null
-                : WindowPages.tab(pageAndId.substring(0, colon));
-        if (tab == null) {
-            return;
+        if (colon >= 0) {
+            this.screen.showOnPage(pageAndId.substring(0, colon),
+                    pageAndId.substring(colon + 1), windowId);
         }
-        WindowPage shown = WindowLayout.openInCategory(tab, windowId);
-        if (!(shown instanceof OtherPage)) {
-            return;
-        }
-        this.screen.jumpToTab(shown);
-        ((OtherPage)shown).content().show(pageAndId.substring(colon + 1));
     }
 }

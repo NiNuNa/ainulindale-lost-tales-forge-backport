@@ -9,7 +9,7 @@ import net.minecraft.client.renderer.Tessellator;
  * <p>The chat settled these rules first and they are not the chat's:
  * one ivory for words, one plum-black shadow a pixel down and right at
  * two thirds of what it follows, one surface tone that lights toward
- * plum grey, and one way of laying a flat colour over a rectangle. A
+ * the secondary colour ({@link LostTalesUiTheme}), and one way of laying a flat colour over a rectangle. A
  * screen that wants to look like the rest of the mod draws from here
  * rather than choosing again.</p>
  *
@@ -35,12 +35,6 @@ public final class LostTalesUiInk {
      * flash at full strength. Anything under this is not drawn at all.
      */
     public static final int MIN_VISIBLE_ALPHA = 4;
-    /** A surface at rest. */
-    public static final int SURFACE_RGB =
-            LostTalesColors.rgb(LostTalesColors.PLUM_BLACK);
-    /** A surface fully lit. */
-    public static final int SURFACE_HIGHLIGHT_RGB =
-            LostTalesColors.rgb(LostTalesColors.PLUM_GRAY);
     /**
      * White as the tint a texture is drawn with: it multiplies the art by
      * one, so the art shows as painted. A tint, never a colour drawn.

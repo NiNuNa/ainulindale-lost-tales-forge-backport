@@ -43,9 +43,8 @@ final class LostTalesChatPresentationResolver {
 
     /**
      * The title a character shows after its name, by LOTR's lang key:
-     * LOTR's live one for the character the player plays (and the account
-     * playing as itself), the one its record kept for any other character
-     * the player speaks as.
+     * LOTR's live one for the character the player plays, the one its
+     * record kept for any other character the player speaks as.
      */
     private static String titleOf(EntityPlayerMP player,
                                   RoleplayCharacter character) {

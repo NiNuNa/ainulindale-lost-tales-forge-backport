@@ -14,9 +14,8 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import java.util.UUID;
 
 /**
- * Client request to atomically play as one owned character, the account
- * character included. The server takes the owner from the live player and
- * never from the wire.
+ * Client request to atomically play as one owned character. The server
+ * takes the owner from the live player and never from the wire.
  */
 public final class CharacterSelectRequestPacket implements IMessage {
 

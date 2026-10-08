@@ -68,7 +68,7 @@ public final class DiscordSlashCommandsTest {
     public void whoFindsByAccountOrCharacterAndDescribes() {
         assertEquals("**Aragorn** — steve's character: Human, of Gondor.",
                 DiscordSlashCommands.who(ENGLISH, PLAYERS, "aragorn"));
-        assertEquals("**Alex** is online, playing as themselves.",
+        assertEquals("**Alex** is online, making a character.",
                 DiscordSlashCommands.who(ENGLISH, PLAYERS, "ALEX"));
         assertEquals("Nobody online is called **Bob**.",
                 DiscordSlashCommands.who(ENGLISH, PLAYERS, "Bob"));

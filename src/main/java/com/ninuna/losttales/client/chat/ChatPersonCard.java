@@ -9,12 +9,12 @@ import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WordButton;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Collections;
 import java.util.List;
@@ -228,7 +228,7 @@ final class ChatPersonCard extends SubWindowContent {
 
     /**
      * A glance's title and line beside the pointer, as every tip is
-     * drawn: a popup of lines, its title in honey on the first and its
+     * drawn: a popup of lines, its title in the accent on the first and its
      * line under it in ivory, broken where a tip breaks.
      */
     @Override
@@ -263,7 +263,7 @@ final class ChatPersonCard extends SubWindowContent {
             int textX = x + WindowStyle.POPUP_INSET;
             int lineY = y + WindowStyle.POPUP_INSET;
             LostTalesUiInk.drawText(font, title, textX, lineY,
-                    LostTalesColors.rgb(LostTalesColors.HONEY), alpha);
+                    LostTalesUiTheme.accentRgb(), alpha);
             for (String line : words) {
                 lineY += WindowStyle.LINE_HEIGHT;
                 LostTalesUiInk.drawText(font, line, textX, lineY,

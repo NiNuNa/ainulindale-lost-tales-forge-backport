@@ -61,7 +61,7 @@ public final class MotionIds {
     public static final String WINDOW_TAB_MARQUEE = "window.tab.marquee";
     /** The snap assist's panes. */
     public static final String WINDOW_SNAP_ASSIST = "window.snap.assist";
-    /** The snap layouts' flyout, and the snap bar's fade and its way down. */
+    /** The snap layouts' flyout, and the snap bar's way down from its peek. */
     public static final String WINDOW_SNAP_LAYOUTS = "window.snap.layouts";
     /** The frosted preview of where a window will snap. */
     public static final String WINDOW_SNAP_PREVIEW = "window.snap.preview";

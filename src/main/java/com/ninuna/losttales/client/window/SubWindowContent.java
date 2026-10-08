@@ -20,6 +20,33 @@ public abstract class SubWindowContent {
         return null;
     }
 
+    /**
+     * Whether the window is always there while the screen is open and
+     * cannot be closed: the main menu and the snap bar. Its strip has no
+     * cross, and it keeps its own size.
+     */
+    public boolean isPermanent() {
+        return false;
+    }
+
+    /**
+     * Whether the window stands hidden for now, to show again by itself:
+     * the Views sub-window while a window lies over it, the snap bar while
+     * no carried window nears the top. A tucked window fades out whole and
+     * answers no pointer.
+     */
+    public boolean isTucked() {
+        return false;
+    }
+
+    /**
+     * How far above where it stands the window is drawn now, in pixels:
+     * the snap bar peeking down from above the screen. None for most.
+     */
+    public double drawnAbove() {
+        return 0.0D;
+    }
+
     /** The glyph before the window's name on its strip; null for none. */
     public abstract LostTalesUiSheet stripIcon();
 
@@ -37,7 +64,7 @@ public abstract class SubWindowContent {
 
     /**
      * Draws the content in {@code box} at {@code alpha} (0-255), on the
-     * window's surface, plum black at {@code surfaceAlpha}, which a
+     * window's surface, the primary colour at {@code surfaceAlpha}, which a
      * highlight recolours rather than covers.
      * {@code pointerX}/{@code pointerY} is the pointer while it is on the
      * content, in the box's own space, else {@link WindowHover#AWAY}.

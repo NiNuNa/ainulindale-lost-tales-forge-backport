@@ -139,6 +139,8 @@ public final class FellowshipPage extends PageContent {
     /** Ticks since the page last asked, while the state is not there. */
     private int ticksSinceAsked;
     private UUID knownActiveIdentityId;
+    /** The invitation the inbox asked to show, until the page picks it; null for none. */
+    private UUID pendingInvitation;
 
     /** The row picked: what kind, in which fellowship, and whose id; null kind for none. */
     private Kind pickedKind;
@@ -422,6 +424,10 @@ public final class FellowshipPage extends PageContent {
             stopNaming();
             clearAnswer();
         }
+        if (snapshot != null && this.pendingInvitation != null) {
+            pick(Kind.INCOMING, null, this.pendingInvitation);
+            this.pendingInvitation = null;
+        }
         if (snapshot == null || picked(rows(snapshot)) != null) {
             return;
         }
@@ -436,6 +442,19 @@ public final class FellowshipPage extends PageContent {
             this.pickedKind = null;
             this.pickedFellowshipId = null;
             this.pickedId = null;
+        }
+    }
+
+    /**
+     * An invitation the inbox goes to: picked as the page next keeps its
+     * pick, while it still stands.
+     */
+    @Override
+    public void show(String invitationId) {
+        try {
+            this.pendingInvitation = UUID.fromString(invitationId);
+        } catch (IllegalArgumentException malformed) {
+            this.pendingInvitation = null;
         }
     }
 

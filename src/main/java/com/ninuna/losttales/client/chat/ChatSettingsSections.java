@@ -1,13 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.Settings;
-import com.ninuna.losttales.client.window.Window;
-import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowScreen;
-import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.placement.HudPlacementPage;
 import java.util.ArrayList;
@@ -110,18 +106,6 @@ public final class ChatSettingsSections {
         @Override
         public List<Settings.Setting> settings() {
             List<Settings.Setting> look = new ArrayList<Settings.Setting>();
-            look.add(new Settings.Colour("chatSelectedLineColor",
-                    Settings.optionName("chatSelectedLineColor")) {
-                @Override
-                protected String current() {
-                    return LostTalesConfig.chatSelectedLineColor;
-                }
-
-                @Override
-                protected void set(String name) {
-                    LostTalesConfig.chatSelectedLineColor = name;
-                }
-            });
             look.add(new Settings.Colour("chatMentionLineColor",
                     Settings.optionName("chatMentionLineColor")) {
                 @Override
@@ -169,18 +153,6 @@ public final class ChatSettingsSections {
                 @Override
                 protected void set(String name) {
                     LostTalesConfig.chatReplyHighlightColor = name;
-                }
-            });
-            look.add(new Settings.Colour("chatServerTextColor",
-                    Settings.optionName("chatServerTextColor")) {
-                @Override
-                protected String current() {
-                    return LostTalesConfig.chatServerTextColor;
-                }
-
-                @Override
-                protected void set(String name) {
-                    LostTalesConfig.chatServerTextColor = name;
                 }
             });
             look.add(new Settings.GamePercent("chatScale",

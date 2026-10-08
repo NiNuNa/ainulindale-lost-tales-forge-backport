@@ -14,11 +14,11 @@ import java.util.UUID;
 /**
  * Public projection of an online player's active identity: what other
  * clients need to render it and to describe it in the chat player card
- * (name, race, gender, body and chest type, faction, age). The account
- * is an identity too: it wears the account skin on the plain human body,
- * with the arm width its skin declares and the cape settings kept on the
- * roster. Nothing here is private roster state — slots, waypoints and the
- * switch state stay with the owner.
+ * (name, race, gender, body and chest type, faction, age). A player still
+ * making their first character shows as the account: the account skin on
+ * the plain human body, with the arm width its skin declares, and no cape.
+ * Nothing here is private roster state — slots, waypoints and the switch
+ * state stay with the owner.
  */
 public final class CharacterAppearance {
 
@@ -263,7 +263,7 @@ public final class CharacterAppearance {
         return this.characterId;
     }
 
-    /** Whether the identity is the Minecraft account played as itself. */
+    /** Whether it is the account itself: a player still making their first character. */
     public boolean isAccount() {
         return this.kind == CharacterAppearanceKind.ACCOUNT;
     }

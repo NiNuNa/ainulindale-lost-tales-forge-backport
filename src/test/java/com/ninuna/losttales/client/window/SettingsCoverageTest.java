@@ -52,7 +52,7 @@ public final class SettingsCoverageTest {
 
     /** Settings as every screen makes it: the windows', the chat's, then every client option's. */
     private static Settings everySection() {
-        Settings settings = new Settings(new WindowMenus(new SubWindows()));
+        Settings settings = new Settings(new WindowMenus(new SubWindows(new StackFade())));
         ChatSettingsSections.SECTIONS.addTo(settings);
         ClientSettingsSections.SECTIONS.addTo(settings);
         return settings;

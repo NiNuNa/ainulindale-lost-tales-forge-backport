@@ -11,9 +11,10 @@ import net.minecraft.client.gui.FontRenderer;
 
 /**
  * The strip across a sub-window's top: a window's tool strip, its height
- * and its plum grey, with the rule on its last row. The icon and the name
+ * and its secondary colour, with the rule on its last row. The icon and the name
  * stand at its left; at its right, as a window's tab row keeps them, the
- * padlock, a hairline, the cross, another hairline and the grip. Under it
+ * padlock, a hairline, the cross, another hairline and the grip; a window
+ * that cannot be closed has the padlock, one hairline and the grip. Under it
  * the content stands on the inset surface, and the frame's ring wears
  * whichever of the two it runs beside.
  */
@@ -42,11 +43,19 @@ final class SubWindowStrip {
     private static final int CONTROLS_WIDTH = LockAnimation.WIDTH + EDGE_GAP
             + DIVIDER_WIDTH + EDGE_GAP + CLOSE_WIDTH + EDGE_GAP + DIVIDER_WIDTH
             + EDGE_GAP + GRIP_WIDTH + EDGE_GAP;
+    /** The same run with no cross: the padlock, one hairline and the grip. */
+    private static final int CROSSLESS_CONTROLS_WIDTH = LockAnimation.WIDTH
+            + EDGE_GAP + DIVIDER_WIDTH + EDGE_GAP + GRIP_WIDTH + EDGE_GAP;
 
     final String label;
     final boolean icon;
+    /** Whether it has a cross: false for a window that cannot be closed. */
+    final boolean closable;
     final int textX;
-    /** What the padlock and the cross answer on: their ink and the end controls' clearing. */
+    /**
+     * What the padlock and the cross answer on: their ink and the end
+     * controls' clearing; the cross's is null on a strip without one.
+     */
     final LostTalesUiHitBox lockBox;
     final LostTalesUiHitBox closeBox;
     /** What the grip answers on: the strip from the second hairline to the edge. */
@@ -61,16 +70,20 @@ final class SubWindowStrip {
     private final int gripX;
     private final int gripTop;
 
-    private SubWindowStrip(String label, boolean icon, int textX, int top,
-                           int right) {
+    private SubWindowStrip(String label, boolean icon, boolean closable,
+                           int textX, int top, int right) {
         this.label = label;
         this.icon = icon;
+        this.closable = closable;
         this.textX = textX;
         int textTop = top + TEXT_TOP;
         this.gripX = right - EDGE_GAP - GRIP_WIDTH;
         this.secondDividerX = this.gripX - EDGE_GAP - DIVIDER_WIDTH;
-        this.closeX = this.secondDividerX - EDGE_GAP - CLOSE_WIDTH;
-        this.firstDividerX = this.closeX - EDGE_GAP - DIVIDER_WIDTH;
+        this.closeX = closable
+                ? this.secondDividerX - EDGE_GAP - CLOSE_WIDTH
+                : this.secondDividerX + DIVIDER_WIDTH + EDGE_GAP;
+        this.firstDividerX = closable
+                ? this.closeX - EDGE_GAP - DIVIDER_WIDTH : this.secondDividerX;
         this.lockX = this.firstDividerX - EDGE_GAP - LockAnimation.WIDTH;
         this.gripTop = textTop + WindowStyle.centredBoxTop(GRIP_HEIGHT);
         this.closeTop = textTop + WindowStyle.centredBoxTop(CLOSE_HEIGHT);
@@ -83,8 +96,9 @@ final class SubWindowStrip {
         this.lockBox = new LostTalesUiHitBox(this.lockX, this.lockTop,
                 LockAnimation.WIDTH, LockAnimation.HEIGHT)
                 .grown(TabRow.END_CONTROL_SLACK);
-        this.closeBox = new LostTalesUiHitBox(this.closeX, this.closeTop,
-                CLOSE_WIDTH, CLOSE_HEIGHT).grown(TabRow.END_CONTROL_SLACK);
+        this.closeBox = closable ? new LostTalesUiHitBox(this.closeX,
+                this.closeTop, CLOSE_WIDTH, CLOSE_HEIGHT)
+                .grown(TabRow.END_CONTROL_SLACK) : null;
         int gripLeft = this.secondDividerX + DIVIDER_WIDTH;
         this.gripBox = new LostTalesUiHitBox(gripLeft, top, right - gripLeft,
                 HEIGHT - 1);
@@ -93,16 +107,23 @@ final class SubWindowStrip {
     /**
      * Lays the strip out across {@code left} to {@code right} from
      * {@code top}, whole pixels: the icon when {@code icon}, the name cut
-     * to the room the controls leave it, and the controls.
+     * to the room the controls leave it, and the controls, the cross
+     * among them while {@code closable}.
      */
     static SubWindowStrip layOut(FontRenderer font, int left, int right,
-                                 int top, String title, boolean icon) {
+                                 int top, String title, boolean icon,
+                                 boolean closable) {
         int textX = left + EDGE_GAP
                 + (icon ? TabIcons.SLOT + TabIcons.GAP : 0);
-        int room = Math.max(0, right - CONTROLS_WIDTH - NAME_GAP - textX);
+        int room = Math.max(0, right - controlsWidth(closable) - NAME_GAP
+                - textX);
         String shown = font.getStringWidth(title) <= room ? title
                 : LostTalesSkyrimUiStyle.trimToWidth(font, title, room);
-        return new SubWindowStrip(shown, icon, textX, top, right);
+        return new SubWindowStrip(shown, icon, closable, textX, top, right);
+    }
+
+    private static int controlsWidth(boolean closable) {
+        return closable ? CONTROLS_WIDTH : CROSSLESS_CONTROLS_WIDTH;
     }
 
     /**
@@ -187,11 +208,13 @@ final class SubWindowStrip {
             LostTalesUiButton.endPose();
         }
         int divider = Math.round(WindowStyle.DIVIDER_ALPHA * alpha / 255.0F);
-        WindowStyle.drawDivider(this.firstDividerX, this.dividerTop,
-                DIVIDER_HEIGHT, divider);
-        LostTalesUiButton.drawGlyph(LostTalesUiSheet.CLOSE,
-                LostTalesUiSheet.CLOSE_HOVER, window.closeMotion,
-                this.closeX, this.closeTop, alpha);
+        if (this.closable) {
+            WindowStyle.drawDivider(this.firstDividerX, this.dividerTop,
+                    DIVIDER_HEIGHT, divider);
+            LostTalesUiButton.drawGlyph(LostTalesUiSheet.CLOSE,
+                    LostTalesUiSheet.CLOSE_HOVER, window.closeMotion,
+                    this.closeX, this.closeTop, alpha);
+        }
         WindowStyle.drawDivider(this.secondDividerX, this.dividerTop,
                 DIVIDER_HEIGHT, divider);
         // A locked sub-window's grip moves nothing: greyed, as the

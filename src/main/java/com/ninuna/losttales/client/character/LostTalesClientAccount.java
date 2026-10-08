@@ -9,10 +9,9 @@ import java.util.UUID;
  * Which account this client is playing as.
  *
  * <p>Two answers, which agree on an online server and in single player.
- * {@link #id()} is the account the game files data under right now: in a
- * world, the id the server gave the player, which an offline-mode server
- * or a proxy derives from the name; before any world is joined, the
- * session's own id. {@link #signedInId()} is always the signed-in
+ * {@link #id()} is the account the game files data under in a world: the
+ * id the server gave the player, which an offline-mode server or a proxy
+ * derives from the name. {@link #signedInId()} is always the signed-in
  * session's account, the one this installation's per-account files are
  * named after, so every world reads the same file whatever id a server
  * hands out.</p>
@@ -30,19 +29,11 @@ public final class LostTalesClientAccount {
 
     private LostTalesClientAccount() {}
 
-    /** The account the game files data under right now, or null when nothing says. */
+    /** The account the server accepted, which its data is filed under; null outside a world. */
     public static UUID id() {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft == null) {
-            return null;
-        }
-        // In world the player is the answer: it is the account the server
-        // accepted, which is what its data is filed under.
-        if (minecraft.thePlayer != null
-                && minecraft.thePlayer.getUniqueID() != null) {
-            return minecraft.thePlayer.getUniqueID();
-        }
-        return sessionId(minecraft);
+        return minecraft == null || minecraft.thePlayer == null ? null
+                : minecraft.thePlayer.getUniqueID();
     }
 
     /** The account signed in on this installation, which its per-account files are named after; null when the session does not say. */
@@ -58,34 +49,6 @@ public final class LostTalesClientAccount {
             }
             GameProfile profile = minecraft.getSession().func_148256_e();
             return profile == null ? null : profile.getId();
-        } catch (RuntimeException unavailable) {
-            return null;
-        }
-    }
-
-    /**
-     * The name the session is signed in under, or null. Vanilla's skin
-     * lookup is keyed by name as well as id, so a portrait drawn before
-     * any world is joined needs both.
-     */
-    public static String name() {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft == null) {
-            return null;
-        }
-        if (minecraft.thePlayer != null) {
-            String playerName = minecraft.thePlayer.getCommandSenderName();
-            if (playerName != null && playerName.trim().length() > 0) {
-                return playerName.trim();
-            }
-        }
-        try {
-            if (minecraft.getSession() == null) {
-                return null;
-            }
-            String sessionName = minecraft.getSession().getUsername();
-            return sessionName == null || sessionName.trim().length() == 0
-                    ? null : sessionName.trim();
         } catch (RuntimeException unavailable) {
             return null;
         }

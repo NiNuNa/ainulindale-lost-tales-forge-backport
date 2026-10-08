@@ -8,17 +8,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * How strongly each window shows while others lie over it, as a stack of
- * papers reads: the window in front shows whole, and a window shows an
- * eighth less for each window in front of it that overlaps it, never less
- * than half. Windows count only windows, and sub-windows only sub-windows:
- * a sub-window never fades a window, nor a window a sub-window. The window
- * the pointer rests on shows whole, so what you point at reads, and fades
- * back as the pointer leaves. A window glides to its new strength as
- * windows come and go over it, and one seen for the first time stands at
- * its strength at once.
+ * How strongly each window and sub-window shows while others lie over it,
+ * as a stack of papers reads: the one in front shows whole, and each shows
+ * an eighth less for each one in front of it that overlaps it, never less
+ * than half. Windows and sub-windows are one stack, in the order they are
+ * drawn: a window, then its sub-windows, then the next window, and the
+ * sub-windows on the bare screen last. A menu over its own window fades
+ * that window too. The one the pointer rests on shows whole, so what you
+ * point at reads, and fades back as the pointer leaves. Each glides to its
+ * new strength as others come and go over it, and one seen for the first
+ * time stands at its strength at once.
  *
- * <p>A window fades as one picture ({@link WindowDrawing#beginStackFade}),
+ * <p>Each fades as one picture ({@link WindowDrawing#beginStackFade}),
  * over the world it cut itself onto, so the world shows through a faded
  * window and another window never does.</p>
  */

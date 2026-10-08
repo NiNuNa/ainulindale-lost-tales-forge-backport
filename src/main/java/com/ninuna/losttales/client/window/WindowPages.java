@@ -266,6 +266,20 @@ public final class WindowPages {
         return page == null ? null : page.tab();
     }
 
+    /**
+     * The page a view swapped to opens with no window of its own: its
+     * first page the player can open, in the order the pages were
+     * registered. Null for none.
+     */
+    static synchronized OtherPage viewPage(PageCategory view) {
+        for (Page page : PAGES.values()) {
+            if (page.category().home() == view && isOffered(page)) {
+                return page.tab();
+            }
+        }
+        return null;
+    }
+
     /** The tab of the page whose key is bound to the keyboard's {@code keyCode}; null for none. */
     public static synchronized OtherPage tabForKey(int keyCode) {
         for (Page page : PAGES.values()) {

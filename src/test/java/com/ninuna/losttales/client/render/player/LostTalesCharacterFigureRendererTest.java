@@ -3,51 +3,13 @@ package com.ninuna.losttales.client.render.player;
 import net.minecraft.client.model.ModelBiped;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * How large the figure is drawn, which is the part that decides whether
- * it reads as pixel art or as a smear. The drawing itself is a model
- * render and needs a screen; the scale is arithmetic.
+ * The figure is a model render and needs a screen; what it relies on of
+ * vanilla's model is checked here.
  */
 public final class LostTalesCharacterFigureRendererTest {
-    private static final int VANILLA_BUTTON_HEIGHT = 44;
-
-    /** Sixteen texels to a block, so a scale must be a multiple of it. */
-    private static final int TEXELS_PER_BLOCK = 16;
-
-    @Test
-    public void everyScaleIsAWholeNumberOfPixelsPerTexel() {
-        for (int available = 1; available <= 400; available++) {
-            int scale = LostTalesCharacterFigureRenderer.scaleFor(available);
-            assertEquals("ragged pixels at " + available,
-                    0, scale % TEXELS_PER_BLOCK);
-            assertTrue("no figure at all at " + available, scale > 0);
-        }
-    }
-
-    @Test
-    public void theFigureIsAsLargeAsItsRoomAllows() {
-        for (int available = 32; available <= 400; available++) {
-            int scale = LostTalesCharacterFigureRenderer.scaleFor(available);
-            int height = LostTalesCharacterFigureRenderer.height(scale);
-            assertTrue("overflows " + available + " at scale " + scale,
-                    height <= available);
-            // One step larger would not have fitted.
-            int larger = LostTalesCharacterFigureRenderer.height(
-                    scale + TEXELS_PER_BLOCK);
-            assertTrue("room to spare at " + available, larger > available);
-        }
-    }
-
-    @Test
-    public void theSmallestRoomStillDrawsSomething() {
-        // Below one pixel per texel there is nothing to round down to, so
-        // the figure overflows rather than vanishing.
-        int scale = LostTalesCharacterFigureRenderer.scaleFor(4);
-        assertEquals(TEXELS_PER_BLOCK, scale);
-    }
 
     /**
      * A model is a child until a renderer says otherwise, and the only
@@ -62,20 +24,5 @@ public final class LostTalesCharacterFigureRendererTest {
     public void aModelDrawnWithoutAnEntityIsNotAChild() {
         ModelBiped model = new ModelBiped();
         assertTrue("vanilla still defaults this to true", model.isChild);
-    }
-
-    /**
-     * The menu's own button, at the height vanilla's spacing gives it:
-     * buttons twenty tall and twenty-four apart, so the top of
-     * Singleplayer to the bottom of Multiplayer is forty-four.
-     */
-    @Test
-    public void theMenuButtonHoldsAFigureOfMoreThanOnePixelPerTexel() {
-        int scale = LostTalesCharacterFigureRenderer.scaleFor(
-                VANILLA_BUTTON_HEIGHT - 6);
-        assertTrue("the button is too short to be worth a figure",
-                scale >= TEXELS_PER_BLOCK);
-        assertTrue(LostTalesCharacterFigureRenderer.height(scale)
-                <= VANILLA_BUTTON_HEIGHT);
     }
 }

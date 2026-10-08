@@ -21,31 +21,19 @@ public final class CharacterIndex {
 
     private final Map<UUID, RoleplayCharacter> characters;
     private final Set<UUID> ambiguousCharacterIds;
-    /**
-     * The players who own a roster. A personal marker may be filed under
-     * one of these instead of under a character, because a player who has
-     * no character selected owns their marker themselves.
-     */
-    private final Set<UUID> rosterOwnerIds;
 
     private CharacterIndex(Map<UUID, RoleplayCharacter> characters,
-                           Set<UUID> ambiguousCharacterIds,
-                           Set<UUID> rosterOwnerIds) {
+                           Set<UUID> ambiguousCharacterIds) {
         this.characters = Collections.unmodifiableMap(characters);
         this.ambiguousCharacterIds = Collections.unmodifiableSet(ambiguousCharacterIds);
-        this.rosterOwnerIds = Collections.unmodifiableSet(rosterOwnerIds);
     }
 
     static CharacterIndex build(Collection<CharacterRoster> rosters) {
         Map<UUID, RoleplayCharacter> characters = new HashMap<UUID, RoleplayCharacter>();
         Set<UUID> ambiguous = new HashSet<UUID>();
-        Set<UUID> rosterOwners = new HashSet<UUID>();
         for (CharacterRoster roster : rosters) {
             if (roster == null) {
                 continue;
-            }
-            if (roster.getOwnerId() != null) {
-                rosterOwners.add(roster.getOwnerId());
             }
             for (RoleplayCharacter character : roster.getCharacters()) {
                 UUID characterId = character.getCharacterId();
@@ -60,7 +48,7 @@ public final class CharacterIndex {
                 }
             }
         }
-        return new CharacterIndex(characters, ambiguous, rosterOwners);
+        return new CharacterIndex(characters, ambiguous);
     }
 
     /** The character with this id, or null when there is none or more than one. */
@@ -81,13 +69,6 @@ public final class CharacterIndex {
     /** How many rosters hold the id: zero, one, or "more than one" as two. */
     public int countOf(UUID characterId) {
         return isAmbiguous(characterId) ? 2 : find(characterId) == null ? 0 : 1;
-    }
-
-    /** Whether a personal marker filed under this id still has an owner. */
-    public boolean hasOwner(UUID ownerId) {
-        return ownerId != null
-                && (this.characters.containsKey(ownerId)
-                        || this.rosterOwnerIds.contains(ownerId));
     }
 
 }

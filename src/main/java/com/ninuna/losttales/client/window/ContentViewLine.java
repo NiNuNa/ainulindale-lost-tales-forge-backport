@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.motion.MotionTransition;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -85,7 +86,7 @@ final class ContentViewLine {
             line.box = at;
             WindowStyle.drawPopupLine(font, words,
                     frame.windowId.equals(pointedId)
-                            ? WindowStyle.LANDING_RGB : LostTalesUiInk.IVORY,
+                            ? LostTalesUiTheme.accentRgb() : LostTalesUiInk.IVORY,
                     left, top, opacity);
             regions.add(left, top, left + width,
                     top + WindowStyle.POPUP_LINE_HEIGHT);

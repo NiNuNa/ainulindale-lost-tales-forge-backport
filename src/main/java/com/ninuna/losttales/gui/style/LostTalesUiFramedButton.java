@@ -10,8 +10,9 @@ import org.lwjgl.opengl.GL11;
  * innermost column and row stretched along, so a frame of any width or
  * height keeps the artwork's own tones and never scales a texel across.
  *
- * <p>The button paints one surface under the frame's ink — plum black at
- * the inset surface's two thirds, crossing to plum grey as it lights — in
+ * <p>The button paints one surface under the frame's ink — the primary
+ * colour at the inset surface's two thirds, crossing to the secondary as
+ * it lights — in
  * a hole whatever it stands on leaves for it, so the two never lie one
  * over the other. The footprint's four corner pixels lie outside the
  * frame's rounding and stay with the surface around it
@@ -57,8 +58,8 @@ public final class LostTalesUiFramedButton {
     /** The surface's tone as far as the button has lit. */
     public static int surfaceRgb(float lit) {
         return LostTalesUiInk.blend(
-                LostTalesUiInk.SURFACE_RGB,
-                LostTalesUiInk.SURFACE_HIGHLIGHT_RGB, lit);
+                LostTalesUiTheme.primaryRgb(),
+                LostTalesUiTheme.secondaryRgb(), lit);
     }
 
     /**

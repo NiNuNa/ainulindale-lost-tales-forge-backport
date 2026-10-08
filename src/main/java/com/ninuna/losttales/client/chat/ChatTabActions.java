@@ -188,9 +188,17 @@ public final class ChatTabActions {
      */
     public void selectChannel(WindowPage picked) {
         if (picked instanceof OtherPage) {
-            // A page is never typed into: it comes in front of its
-            // window, and the input moves off it.
-            WindowLayout.showPage((OtherPage)picked);
+            // A page is never typed into: the copy picked comes in front
+            // of its window, and the input moves off it. One no window
+            // holds opens where a page opened by hand does.
+            Window holding = WindowLayout.holds(picked)
+                    ? WindowLayout.windowOf(picked) : null;
+            if (holding != null) {
+                WindowLayout.setActiveTab(picked);
+                WindowLayout.raise(holding.getId());
+            } else {
+                WindowLayout.showPage((OtherPage)picked);
+            }
             syncSelection();
             return;
         }

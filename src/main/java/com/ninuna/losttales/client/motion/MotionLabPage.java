@@ -28,6 +28,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -57,7 +58,7 @@ import org.lwjgl.opengl.GL11;
  * over the mod's own file; closing the Lab's tab or the window screen
  * lets what was not saved go. In the list a motion tuned and not saved
  * wears the draft pen, and one the Lab's saved version plays reads in
- * honey.</p>
+ * the accent.</p>
  */
 public final class MotionLabPage extends PageContent {
     /** The code name the page is registered and remembered under. */
@@ -506,7 +507,7 @@ public final class MotionLabPage extends PageContent {
         boolean unsaved = Motions.isPreviewed(id);
         LostTalesUiSheet mark = LostTalesUiSheet.DRAFT;
         int markRoom = unsaved ? mark.getWidth() + TabIcons.GAP : 0;
-        int rgb = Motions.isSaved(id) ? LostTalesColors.rgb(LostTalesColors.HONEY)
+        int rgb = Motions.isSaved(id) ? LostTalesUiTheme.accentRgb()
                 : LostTalesUiInk.IVORY;
         LostTalesUiInk.drawText(this.font, LostTalesSkyrimUiStyle.trimToWidth(
                         this.font, MotionLabList.shortName(id),
@@ -1033,7 +1034,7 @@ public final class MotionLabPage extends PageContent {
                 && (Motions.isPreviewed(this.picked)
                         || Motions.isSaved(this.picked));
         items.add(orWhy(BarItem.button(RESET, word("reset"),
-                LostTalesUiSheet.REPLY, LostTalesUiSheet.REPLY_HOVER)
+                LostTalesUiSheet.RESET, LostTalesUiSheet.RESET_DISCARD)
                 .tip(word("reset.tip")), none.length() > 0 ? none
                 : tuned ? "" : word("why.nothing_to_reset")));
         int unsaved = Motions.previewed().size();

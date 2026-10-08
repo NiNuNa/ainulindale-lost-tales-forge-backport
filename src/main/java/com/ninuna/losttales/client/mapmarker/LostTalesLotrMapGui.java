@@ -8,11 +8,9 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
-import com.ninuna.losttales.client.window.NewPage;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
-import com.ninuna.losttales.fellowship.model.FellowshipPersonalMarkerOwner;
 import com.ninuna.losttales.fellowship.sync.FellowshipSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
@@ -2427,18 +2425,15 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     }
 
     /**
-     * Who this player's "go here" marker belongs to: their active character,
-     * or the player themselves when they have none.
+     * Who this player's "go here" marker belongs to: the character they
+     * play; null before they have one.
      *
      * <p>The server resolves the same thing independently for every request;
      * this only decides what to ask for and where to look for the answer.</p>
      */
     private UUID personalMarkerOwnerId(FellowshipStateSnapshot state) {
-        UUID characterId = state != null && state.isAvailable()
+        return state != null && state.isAvailable()
                 ? state.getActiveIdentityId() : null;
-        UUID playerId = this.mc == null || this.mc.thePlayer == null
-                ? null : this.mc.thePlayer.getUniqueID();
-        return FellowshipPersonalMarkerOwner.resolve(characterId, playerId);
     }
 
     private String getLocalGoHereMarkerId(FellowshipStateSnapshot state) {
@@ -2967,8 +2962,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         clearSearchSelectionFrame();
-        if (LostTalesKeyBindings.isNewPageKey(keyCode)) {
-            WindowScreen.openView(NewPage.PAGE_ID);
+        if (LostTalesKeyBindings.isMenuKey(keyCode)) {
+            WindowScreen.openMenu();
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {

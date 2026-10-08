@@ -31,6 +31,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -569,7 +570,7 @@ public final class ChatInputBar {
 
     /**
      * The active window's input bar in the tool strip's surface — the
-     * tab in front's plum grey at two thirds, one flat stretch of it, so
+     * tab in front's secondary colour at two thirds, one flat stretch of it, so
      * the history stands between two bands of one tone — exactly
      * as wide as the window,
      * with holes cut in it for the tab and identity buttons' frames and
@@ -619,7 +620,7 @@ public final class ChatInputBar {
         int frameTop = framedButtonTop();
         float opacity = fadedShare(WindowStyle.opacity(this.mc));
         int surface = LostTalesUiInk.argb(
-                LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+                LostTalesUiTheme.secondaryRgb(),
                 Math.round(WindowStyle.INSET_ALPHA * opacity));
         // Holes for the tab and identity buttons' frames and the typing
         // well; each frame's corner pixels are the bar's, outside the

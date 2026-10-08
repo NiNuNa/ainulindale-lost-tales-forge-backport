@@ -20,7 +20,8 @@ public final class ChatSmallTextTest {
 
     @After
     public void resetColours() {
-        LostTalesConfig.chatSelectedLineColor = "MAUVE";
+        LostTalesConfig.windowSecondaryColor =
+                LostTalesConfig.DEFAULT_WINDOW_SECONDARY_COLOR;
         LostTalesConfig.chatMentionLineColor = "MULBERRY";
         LostTalesConfig.chatSelectedMentionColor =
                 LostTalesConfig.CHAT_COLOR_AUTOMATIC;
@@ -74,9 +75,9 @@ public final class ChatSmallTextTest {
     }
 
     @Test
-    public void aRampsLightestMentionTakesTheSelectedLineColour() {
+    public void aRampsLightestMentionTakesTheWindowsSecondaryColour() {
         LostTalesConfig.chatMentionLineColor = "SALMON";
-        assertEquals(LostTalesColors.rgb(LostTalesColors.MAUVE),
+        assertEquals(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY),
                 LostTalesChatVisualStyle.selectedMentionLineRgb());
     }
 
@@ -92,7 +93,7 @@ public final class ChatSmallTextTest {
         assertEquals(LostTalesColors.rgb(LostTalesColors.HONEY),
                 LostTalesChatVisualStyle.selectedReplyHighlightRgb());
         LostTalesConfig.chatReplyHighlightColor = "HONEY";
-        assertEquals(LostTalesColors.rgb(LostTalesColors.MAUVE),
+        assertEquals(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY),
                 LostTalesChatVisualStyle.selectedReplyHighlightRgb());
     }
 }

@@ -29,6 +29,7 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatPresence;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.util.LostTalesWords;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
@@ -237,14 +238,8 @@ public final class LostTalesChatOverlayRenderer {
             }
             if (minecraft.currentScreen instanceof WindowScreen) {
                 // The screen draws its windows after the HUD, each one
-                // whole; vanilla's chat pass is still cancelled here.
-                // While its view shows no conversation (the map's, a
-                // page's), the feed goes on under the windows as it does
-                // while playing, so nothing said is missed.
-                if (!ChatLayout.showsConversation()) {
-                    drawFeed(minecraft, chat, drawn, screenWidth,
-                            screenHeight, partialTicks);
-                }
+                // whole; vanilla's chat pass is still cancelled here. The
+                // feed is for playing: whatever view is open, it waits.
                 ChatFrame.feed().drawn = false;
                 return true;
             }
@@ -704,7 +699,7 @@ public final class LostTalesChatOverlayRenderer {
                     alignment.bandWeights(), originX, rowBottom, scale,
                     alpha / 255.0F);
             drawChatBackdrop(panelLeft, -LINE_HEIGHT, panelRight, 0.0F,
-                    alpha / 2, WindowStyle.backdropRgb(),
+                    alpha / 2, LostTalesUiTheme.primaryRgb(),
                     alignment.bandWeights());
             GL11.glEnable(GL11.GL_BLEND);
             // The row stands against the feed's edge by its ink, as a
@@ -1256,7 +1251,10 @@ public final class LostTalesChatOverlayRenderer {
         try {
             GL11.glTranslatef(originX, originY, 0.0F);
             GL11.glScalef(scale, scale, 1.0F);
-            masked = beginHoles(panelLeft, topEdge, panelRight, bottomEdge,
+            // The mask lies over the whole window, its member list and its
+            // frame's ring included: what the list draws is tested against
+            // it too, never against what an earlier window left there.
+            masked = beginHoles(ringLeft, topEdge, ringRight, bottomEdge,
                     holes);
             if (open) {
                 // One backdrop for the whole message area between the
@@ -1268,10 +1266,10 @@ public final class LostTalesChatOverlayRenderer {
                 // same with the timestamp column or without it.
                 drawChatBackdrop(panelLeft, messageLeft, topEdge,
                         panelRight, bottomEdge, panelAlpha,
-                        WindowStyle.backdropRgb());
+                        LostTalesUiTheme.primaryRgb());
                 if (columns.shows()) {
                     // The timestamp area's own surface: the chat's inset
-                    // surface, plum black at two thirds, the typing
+                    // surface, the primary at two thirds, the typing
                     // well's and a resting tab's, so the avatars and the
                     // times read as a margin rather than as part of the
                     // messages.
@@ -1280,7 +1278,7 @@ public final class LostTalesChatOverlayRenderer {
                     // with the game's chat opacity as the panel does.
                     LostTalesUiInk.fillRect(panelLeft, topEdge, messageLeft, bottomEdge,
                             LostTalesUiInk.argb(
-                                    LostTalesUiInk.SURFACE_RGB,
+                                    LostTalesUiTheme.primaryRgb(),
                                     columnAlpha));
                 }
                 // The window's frame beside the history continues exactly
@@ -1291,14 +1289,14 @@ public final class LostTalesChatOverlayRenderer {
                 // far as it does. A highlighted line recolours its
                 // stretches with its row, and a lit member its own.
                 int areaArgb = LostTalesUiInk.argb(
-                        LostTalesUiInk.SURFACE_RGB, columnAlpha);
+                        LostTalesUiTheme.primaryRgb(), columnAlpha);
                 int panelArgb = LostTalesUiInk.argb(
-                        WindowStyle.backdropRgb(), panelAlpha);
+                        LostTalesUiTheme.primaryRgb(), panelAlpha);
                 LostTalesUiInk.fillRect(ringLeft, topEdge, panelLeft, bottomEdge,
                         columns.shows() ? areaArgb : panelArgb);
                 LostTalesUiInk.fillRect(windowRight, topEdge, ringRight, bottomEdge,
                         panelRight < windowRight ? areaArgb
-                                : LostTalesUiInk.argb(WindowStyle.backdropRgb(),
+                                : LostTalesUiInk.argb(LostTalesUiTheme.primaryRgb(),
                                         panelEndAlpha(panelAlpha)));
                 // What the history's top and bottom edges touch, stretch by
                 // stretch, for the ring over and under a window the
@@ -1480,7 +1478,7 @@ public final class LostTalesChatOverlayRenderer {
                         continue;
                     }
                     boolean dividerHere = lineIndex == dividerIndex;
-                    int backdropRgb = WindowStyle.backdropRgb();
+                    int backdropRgb = LostTalesUiTheme.primaryRgb();
                     boolean pinged = LostTalesChatPresentation.isPingedLine(
                             line.getChatLineID());
                     int mentionRgb = LostTalesChatVisualStyle.mentionLineRgb();
@@ -1546,7 +1544,7 @@ public final class LostTalesChatOverlayRenderer {
                             // two thirds, crossing in with the line. The
                             // pointer lights a line from the area as well.
                             int areaRgb = lineBandRgb(
-                                    LostTalesUiInk.SURFACE_RGB,
+                                    LostTalesUiTheme.primaryRgb(),
                                     LostTalesChatVisualStyle.selectedLineRgb(),
                                     pinged, mentionRgb,
                                     LostTalesChatVisualStyle
@@ -1556,13 +1554,13 @@ public final class LostTalesChatOverlayRenderer {
                                     LostTalesChatVisualStyle
                                             .selectedReplyHighlightRgb(),
                                     hoverFade);
-                            if (areaRgb != LostTalesUiInk.SURFACE_RGB) {
+                            if (areaRgb != LostTalesUiTheme.primaryRgb()) {
                                 // The window's frame beside the area takes
                                 // the row's highlight with it.
                                 recolour(ringLeft, ringLeft,
                                         y - rowHeight - headroom / scale,
                                         messageLeft, y, columnAlpha,
-                                        LostTalesUiInk.SURFACE_RGB,
+                                        LostTalesUiTheme.primaryRgb(),
                                         areaRgb, FLAT_WEIGHTS);
                             }
                         } else if (bandRgb != backdropRgb) {
@@ -1911,7 +1909,7 @@ public final class LostTalesChatOverlayRenderer {
                 // Over and under a window the conversation fills, the
                 // frame's ring continues the shades at the edge's own
                 // strength, as the rows next to it wear them.
-                int shadeArgb = LostTalesUiInk.argb(WindowStyle.backdropRgb(),
+                int shadeArgb = LostTalesUiInk.argb(LostTalesUiTheme.primaryRgb(),
                         fadeAlpha);
                 frame.contentShade.first(shadeArgb,
                         originX + panelLeft * scale,
@@ -2107,7 +2105,7 @@ public final class LostTalesChatOverlayRenderer {
     static void drawEdgeFade(float left, float right, float edge,
                              float limit, float height, int alpha) {
         LostTalesUiRules.drawEdgeFade(left, right, left, right, edge, limit, height, alpha,
-                WindowStyle.backdropRgb(), true);
+                LostTalesUiTheme.primaryRgb(), true);
     }
 
     /** The shades' ramp across the panel: full at its left end, nothing at its right. */
@@ -2123,10 +2121,10 @@ public final class LostTalesChatOverlayRenderer {
                                           int alpha) {
         LostTalesUiRules.drawEdgeFade(left, right, left, right, topEdge,
                 bottomEdge, WindowStyle.TOP_EDGE_FADE_HEIGHT, alpha,
-                WindowStyle.backdropRgb(), false);
+                LostTalesUiTheme.primaryRgb(), false);
         LostTalesUiRules.drawEdgeFade(left, right, left, right, bottomEdge,
                 topEdge, WindowStyle.BOTTOM_EDGE_FADE_HEIGHT, alpha,
-                WindowStyle.backdropRgb(), false);
+                LostTalesUiTheme.primaryRgb(), false);
     }
 
     /**
@@ -2353,10 +2351,10 @@ public final class LostTalesChatOverlayRenderer {
         float thumbTop = thumbBottom - thumbHeight;
         LostTalesUiInk.fillRect(left, topEdge, right, bottomEdge,
                 (Math.round(alpha * 0.35F) << 24)
-                        | LostTalesUiInk.SURFACE_RGB);
+                        | LostTalesUiTheme.primaryRgb());
         LostTalesUiInk.fillRect(left, thumbTop, right, thumbBottom,
                 (alpha << 24)
-                        | LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+                        | LostTalesUiTheme.secondaryRgb());
         frame.scrollbarLeft = originX + (left - 2.0F) * scale;
         frame.scrollbarRight = originX + (right + 1.0F) * scale;
         frame.scrollbarTrackTop = originY + topEdge * scale;

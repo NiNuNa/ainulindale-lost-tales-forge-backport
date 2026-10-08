@@ -113,7 +113,7 @@ public final class CharacterAppearanceSyncManager {
      * The arm width the account's profile skin declares. An offline-mode
      * profile carries no textures and reads as the wide body.
      */
-    static String accountBodyType(EntityPlayerMP player) {
+    private static String accountBodyType(EntityPlayerMP player) {
         AccountSkinProfile profile = ProfileTexturesDecoder.decode(
                 player.getGameProfile());
         return profile != null && profile.isSlim()

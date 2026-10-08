@@ -19,6 +19,7 @@ import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.window.BarLead;
 import com.ninuna.losttales.client.window.FirstTips;
 import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.ScreenPart;
@@ -240,6 +241,25 @@ public final class ChatScreenPart extends ScreenPart {
         if (window != null) {
             WindowLayout.raise(window.getId());
         }
+    }
+
+    /**
+     * The channels' view with no conversation window opens the chat's
+     * first window, as T does; the consoles' view opens theirs, as
+     * {@code /} does.
+     */
+    @Override
+    public WindowPage openView(PageCategory view) {
+        if (view == PageCategory.CONSOLES) {
+            return ChatLayout.openConsoles(CONSOLE);
+        }
+        if (view != PageCategory.CHANNELS) {
+            return null;
+        }
+        if (!ChatLayout.hasConversationWindow()) {
+            ChatLayout.openFirstWindow();
+        }
+        return ClientChatChannelState.lastUsed();
     }
 
     @Override
@@ -2371,6 +2391,28 @@ public final class ChatScreenPart extends ScreenPart {
         this.tabActions.selectChannel(tab);
         LostTalesChatPresentation.requestJump(chatLineId);
         return true;
+    }
+
+    /**
+     * Goes to a line from the inbox: the copy showing its conversation
+     * comes forward, or one opened for it, the screen swapping to its
+     * view, and the next draw lands on the line. Where the line is gone
+     * it says so.
+     */
+    void jumpFromInbox(int chatLineId) {
+        ConversationPage tab = ClientChatChannelViews.tabOf(chatLineId);
+        if (tab != null) {
+            tab = ChatLayout.openReader(tab,
+                    LostTalesChatPresentation.windowIdOfSelection(), true);
+        }
+        WindowScreen screen = WindowScreen.current();
+        if (tab == null || screen == null) {
+            showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.message.gone"));
+            return;
+        }
+        screen.jumpToTab(tab);
+        LostTalesChatPresentation.requestJump(chatLineId);
     }
 
     /**

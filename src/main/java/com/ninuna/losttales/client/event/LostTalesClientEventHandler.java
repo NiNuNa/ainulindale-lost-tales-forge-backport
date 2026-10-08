@@ -8,6 +8,7 @@ import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.client.LostTalesClientThread;
 import com.ninuna.losttales.client.chat.ChatFeedPlacement;
 import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.quest.ClientQuestNews;
 import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.ClientServerConfigCache;
@@ -88,6 +89,7 @@ import com.ninuna.losttales.gui.hud.fellowship.LostTalesFellowshipHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesWorldQuestMarkerRenderer;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
+import com.ninuna.losttales.gui.style.LostTalesUiThemedSheet;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.weapon.LostTalesItemBattleaxe;
 import com.ninuna.losttales.item.weapon.LostTalesItemDagger;
@@ -149,6 +151,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesMapOverlay.applyClientMap();
         LostTalesClientMapMarkerStore.reloadFromResources(resManager);
         LostTalesClientQuestDefinitionStore.reloadFromResources(resManager);
+        // The repainted window sheet is made again from the sheet as it now loads.
+        LostTalesUiThemedSheet.forget(Minecraft.getMinecraft());
     }
 
     /**
@@ -171,6 +175,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         WindowSession.clear();
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
+        ClientQuestNews.clear();
         LostTalesClientQuestDefinitionStore.clearServerSentDefinitions();
         ClientWorldQuests.clear();
         ClientQuestCatalog.forget();

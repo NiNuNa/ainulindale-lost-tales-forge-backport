@@ -3,9 +3,8 @@ package com.ninuna.losttales.fellowship.model;
 import java.util.UUID;
 
 /**
- * One member of a fellowship: an identity, which is a character or the account
- * playing as itself, with its owner and name as last seen, when it joined,
- * and the colour it wears.
+ * One member of a fellowship: a character, with its owner and name as last
+ * seen, when it joined, and the colour it wears.
  */
 public final class FellowshipMember {
 

@@ -220,8 +220,8 @@ public final class LostTalesChatService {
         }
 
         // The line names who it speaks as: the copy it was typed in. A
-        // character the sender does not own, or the account while a
-        // character is played, is refused rather than sent as someone else.
+        // character the sender does not own is refused rather than sent
+        // as someone else.
         boolean roleplaying = ChatRolePresentation.isInCharacter(channel);
         if (roleplaying && CharacterJoin.isWaiting(sender)) {
             // Nobody speaks in character before they have a character.

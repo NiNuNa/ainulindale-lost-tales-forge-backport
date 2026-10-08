@@ -16,6 +16,7 @@ import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipStatusSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipTrackedMemberSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipTrackingSnapshot;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -104,8 +105,11 @@ public final class LostTalesFellowshipHudRenderer {
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         try {
-            LostTalesSkyrimUiStyle.drawPanelSoft(
-                    bounds.x, bounds.y, bounds.width, bounds.height);
+            // The panel wears the windows' primary colour, as every HUD
+            // panel does.
+            LostTalesSkyrimUiStyle.drawPanel(bounds.x, bounds.y, bounds.width,
+                    bounds.height, LostTalesColors.withAlpha(
+                            LostTalesUiTheme.primaryRgb(), 0x90));
             for (int index = 0;
                  index < others.size() && index < bounds.rowCount;
                  index++) {
@@ -169,7 +173,7 @@ public final class LostTalesFellowshipHudRenderer {
         if (heldItem != null) {
             Gui.drawRect(heldItemX - 1, y + 8,
                     heldItemX + 17, y + 26,
-                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x66));
+                    LostTalesColors.withAlpha(LostTalesUiTheme.primaryRgb(), 0x66));
             renderStack(minecraft, heldItem, heldItemX, y + 9, 1.0F, true);
         }
 
@@ -188,7 +192,7 @@ public final class LostTalesFellowshipHudRenderer {
         if (leader) {
             LostTalesSkyrimUiStyle.drawDiamond(
                     leaderX, y + 7,
-                    LostTalesSkyrimUiStyle.GOLD);
+                    LostTalesColors.withAlpha(LostTalesUiTheme.accentRgb(), 0xFF));
         }
 
         int contentRight = heldItem == null
@@ -339,7 +343,7 @@ public final class LostTalesFellowshipHudRenderer {
                 minecraft, ownerId, x, y, HEAD_SIZE,
                 brightness, 1.0F)) {
             Gui.drawRect(x, y, x + HEAD_SIZE, y + HEAD_SIZE,
-                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xAA));
+                    LostTalesColors.withAlpha(LostTalesUiTheme.primaryRgb(), 0xAA));
         }
     }
 

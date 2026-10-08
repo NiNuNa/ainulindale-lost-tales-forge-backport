@@ -3,12 +3,15 @@ package com.ninuna.losttales.client.window;
 import net.minecraft.util.StatCollector;
 
 /**
- * What kind of page a page is. The New Page lists the pages by
- * category; a key shows its category's pages, its view; a page
- * opens in a window of its category; and a category with no window opens
- * its first window, at the category's own place and locked but the
- * menu's: the map and the menu filling the screen, every other category in
- * the middle at two thirds.
+ * What kind of page a page is, and the views the screen swaps between. The
+ * New Page lists the pages by category; a category's key, or its button on
+ * the Views sub-window, swaps the screen to its view, its own windows; a
+ * page opens in a window of its category; and a category with no window
+ * opens its first window, at the category's own place and locked but the
+ * New Page's: the map filling the screen, every other category in the
+ * middle at two thirds. The Lost Tales Menu ({@link #MENU}) is a view and
+ * no page's category: its windows hold whatever the player opens there.
+ * The New Page is a category and no view.
  *
  * <p>Whispers and the consoles are the channels' subcategories. Whispers
  * stand with the channels, in their view and their windows; the consoles
@@ -16,10 +19,17 @@ import net.minecraft.util.StatCollector;
  */
 public enum PageCategory {
     /**
-     * The New Page, every page's way in: its key's first window
-     * fills the screen; the {@code +} opens it as a window's new page.
+     * The Lost Tales Menu's view, which its key opens: windows of its own
+     * holding whatever the player opened there, any category mixed. No
+     * page is of it.
      */
-    NEW_PAGE("new_page", null, true, Window.ScreenFill.FULL, false),
+    MENU("menu", null, true, Window.ScreenFill.NONE, false),
+    /**
+     * The New Page, every page's way in: the {@code +} opens it as a
+     * window's new page, and the main menu's first button in a window of
+     * its own.
+     */
+    NEW_PAGE("new_page", null, true, Window.ScreenFill.NONE, false),
     /** The channels: Global, OOC, a faction's, a fellowship's, a server's own. */
     CHANNELS("channels", null, true, Window.ScreenFill.NONE, true),
     /** The Console and the Server Log, the command key's. */
@@ -79,17 +89,39 @@ public enum PageCategory {
         return this.ownView ? this : this.parent;
     }
 
-    /** The part of the screen its first window fills: the whole of it for the map and the menu, none for the rest. */
+    /** The part of the screen its first window fills: the whole of it for the map, none for the rest. */
     public Window.ScreenFill firstFill() {
         return this.firstFill;
     }
 
     /**
      * Whether its first window opens locked: every category's but the
-     * menu's, whose page picked takes the menu's place there.
+     * New Page's, whose page picked takes the New Page's place there.
      */
     public boolean firstLocked() {
         return this.firstLocked;
+    }
+
+    /**
+     * Whether it is a view of its own, which a key and a button on the
+     * Views sub-window swap the screen to: the Lost Tales Menu and every
+     * category but the New Page and the whispers, which stand with the
+     * channels.
+     */
+    public boolean isView() {
+        return this.ownView && this != NEW_PAGE;
+    }
+
+    /** Every view, in the order the Views sub-window shows their buttons: the Lost Tales Menu first. */
+    public static java.util.List<PageCategory> views() {
+        java.util.List<PageCategory> views =
+                new java.util.ArrayList<PageCategory>();
+        for (PageCategory category : values()) {
+            if (category.isView()) {
+                views.add(category);
+            }
+        }
+        return views;
     }
 
     /** Its name, as the {@code +} heads its pages. */

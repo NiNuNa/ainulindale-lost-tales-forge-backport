@@ -19,7 +19,6 @@ import com.ninuna.losttales.fellowship.model.FellowshipGoHereMarker;
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipIcon;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
-import com.ninuna.losttales.fellowship.model.FellowshipPersonalMarkerOwner;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.storage.FellowshipGoHereMarkerStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipGoHereMarkerWorldData;
@@ -1357,17 +1356,15 @@ public final class FellowshipService {
     }
 
     /**
-     * Why a go-here marker no longer stands: its owner's id is held by two
-     * rosters or by nobody, or its dimension is gone. A marker filed under
-     * an account stands while that account has a roster, as a character's
-     * stands while the character exists. Null while it stands.
+     * Why a go-here marker no longer stands: its character is held by two
+     * rosters or by nobody, or its dimension is gone. Null while it stands.
      */
     private static String markerRemovalReason(FellowshipGoHereMarker marker,
                                               CharacterIndex characters) {
         if (characters.isAmbiguous(marker.getOwnerIdentityId())) {
             return "ambiguous_owner_character";
         }
-        if (!characters.hasOwner(marker.getOwnerIdentityId())) {
+        if (characters.find(marker.getOwnerIdentityId()) == null) {
             return "missing_owner_character";
         }
         if (!DimensionManager.isDimensionRegistered(marker.getDimensionId())) {
@@ -1407,21 +1404,19 @@ public final class FellowshipService {
     }
 
     /**
-     * Resolves who a personal marker belongs to: the identity being played,
-     * which is the account itself when no character is. Unreadable storage,
-     * an ambiguous or stolen character id are still refusals, because those
-     * say the request cannot be trusted rather than who owns the marker.
+     * Resolves who a personal marker belongs to: the character being
+     * played. No character, unreadable storage, an ambiguous or stolen
+     * character id are refusals.
      */
     PersonalMarkerContext resolvePersonalMarkerOwner(EntityPlayerMP player) {
         ActiveIdentityContext active = resolveActiveIdentity(player);
         if (!active.isValid()) {
             return PersonalMarkerContext.failure(active.errorId);
         }
-        return PersonalMarkerContext.owned(FellowshipPersonalMarkerOwner.resolve(
-                active.identity.getCharacterId(), player.getUniqueID()));
+        return PersonalMarkerContext.owned(active.identity.getCharacterId());
     }
 
-    /** Who a personal marker is filed under, and which character if any. */
+    /** The character a personal marker is filed under. */
     static final class PersonalMarkerContext {
         final UUID ownerId;
         final FellowshipErrorId errorId;
@@ -1446,14 +1441,13 @@ public final class FellowshipService {
     }
 
     /**
-     * The identity a player is acting as in the fellowship system: one of their
-     * characters, or the account itself. Fellowships key members by the
-     * identity's gameplay id, so the account is a member like any other.
+     * The character a player is acting as in the fellowship system.
+     * Fellowships key members by its id.
      */
     static final class ActiveIdentityContext {
         final CharacterWorldData characterData;
         final PlayableIdentity identity;
-        /** The name the identity goes by: the character's, else the account's. */
+        /** The name the character goes by. */
         final String displayName;
         final FellowshipErrorId errorId;
 

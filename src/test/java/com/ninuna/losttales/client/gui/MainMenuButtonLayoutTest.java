@@ -37,7 +37,7 @@ public class MainMenuButtonLayoutTest {
     }
 
     @Test
-    public void centersMenusWithoutACharacterAndIgnoresHiddenControls() {
+    public void centersMenusAndIgnoresHiddenControls() {
         GuiButton options = button(0, 100, 164, 98);
         GuiButton quit = button(4, 202, 164, 98);
         GuiButton hidden = button(1, -1000, -1000, 200);
@@ -127,23 +127,23 @@ public class MainMenuButtonLayoutTest {
             assertEquals(MainMenuButtonLayout.BASELINE_COLUMN_HEIGHT,
                     quit.yPosition + quit.height - single.yPosition);
 
-            GuiButton gatedSingle = button(1, 100, 80, 200);
-            GuiButton gatedMulti = button(2, 100, 104, 200);
-            GuiButton gatedRealms = button(14, 202, 128, 98);
-            GuiButton gatedMods = button(6, 100, 128, 98);
-            GuiButton gatedOptions = button(0, 100, 164, 98);
-            GuiButton gatedQuit = button(4, 202, 164, 98);
-            List<GuiButton> gated = Arrays.asList(gatedSingle, gatedMulti, gatedRealms,
-                    gatedMods, gatedOptions, gatedQuit);
+            GuiButton shortSingle = button(1, 100, 80, 200);
+            GuiButton shortMulti = button(2, 100, 104, 200);
+            GuiButton shortRealms = button(14, 202, 128, 98);
+            GuiButton shortMods = button(6, 100, 128, 98);
+            GuiButton shortOptions = button(0, 100, 164, 98);
+            GuiButton shortQuit = button(4, 202, 164, 98);
+            List<GuiButton> shortened = Arrays.asList(shortSingle, shortMulti, shortRealms,
+                    shortMods, shortOptions, shortQuit);
             // A menu a mod has taken two buttons out of.
-            gatedMulti.visible = false;
-            gatedRealms.visible = false;
-            MainMenuButtonLayout.arrange(gated);
-            MainMenuButtonLayout.position(gated, 854, screenHeight);
-            int gatedMiddle = (gatedSingle.yPosition
-                    + gatedQuit.yPosition + gatedQuit.height) / 2;
-            assertEquals(standardMiddle, gatedMiddle);
-            assertTrue(gatedSingle.yPosition > single.yPosition);
+            shortMulti.visible = false;
+            shortRealms.visible = false;
+            MainMenuButtonLayout.arrange(shortened);
+            MainMenuButtonLayout.position(shortened, 854, screenHeight);
+            int shortMiddle = (shortSingle.yPosition
+                    + shortQuit.yPosition + shortQuit.height) / 2;
+            assertEquals(standardMiddle, shortMiddle);
+            assertTrue(shortSingle.yPosition > single.yPosition);
         }
     }
 

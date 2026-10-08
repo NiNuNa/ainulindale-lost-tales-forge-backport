@@ -16,6 +16,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -538,7 +539,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
         Gui.drawRect(layout.left + PADDING_X, layout.bodyTop - 1,
                 layout.left + layout.width - PADDING_X, layout.bodyTop,
                 LostTalesUiInk.argb(
-                        LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+                        LostTalesUiTheme.secondaryRgb(),
                         Math.min(alpha, 0xA0)));
         LostTalesUiInk.beginContent();
         LostTalesUiSheet.SEARCH.drawWithShadow(layout.left + PADDING_X,

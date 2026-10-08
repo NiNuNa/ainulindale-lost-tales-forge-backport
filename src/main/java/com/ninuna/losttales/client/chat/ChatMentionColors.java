@@ -17,7 +17,7 @@ import net.minecraft.client.gui.GuiPlayerInfo;
  * <p>Only the mention itself is coloured, never the words around it: a
  * line reads as ordinary text with the names in it standing out, the way
  * a mention does anywhere else. A mention of a player wears the one
- * mention colour, the palette's honey, whoever it names — an account or a
+ * mention colour, seafoam, whoever it names — an account or a
  * character, with a role or without — and a mention of a role wears that
  * role's own colour exactly: what marks a mention is
  * its colour, never the colour of the identity it reaches. The completion

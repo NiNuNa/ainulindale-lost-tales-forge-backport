@@ -197,8 +197,23 @@ public enum LostTalesUiSheet {
      * The tool strip's split view button, ivory at rest and honey lit; it
      * rests lit while its page shares the window.
      */
-    SPLIT(56, 29, 7, 5),
-    SPLIT_LIT(64, 29, 7, 5),
+    SPLIT(28, 29, 7, 5),
+    SPLIT_LIT(36, 29, 7, 5),
+    /**
+     * Two arrows turning back: a reset. Ivory at rest; lit in crimson
+     * where the reset throws away what the player made (Restore Defaults,
+     * Reset Window Layout, a motion's tuning), in honey where it only puts
+     * one thing back where it first stood.
+     */
+    RESET(44, 29, 7, 5),
+    RESET_DISCARD(52, 29, 7, 5),
+    RESET_LIT(60, 29, 7, 5),
+    /** A tray: the tool strip's inbox button. Ivory at rest, honey lit. */
+    INBOX(75, 29, 6, 5),
+    INBOX_LIT(82, 29, 6, 5),
+    /** An id card: the menus' Copy ID rows. Ivory at rest, honey lit. */
+    COPY_ID(89, 29, 6, 5),
+    COPY_ID_LIT(96, 29, 6, 5),
     GRIP(0, 35, 6, 8),
     GRIP_HOVER(7, 35, 6, 8),
     /**
@@ -315,6 +330,26 @@ public enum LostTalesUiSheet {
     CHEVRON_5_MUTED(12, 56, 5, 3);
 
     /**
+     * The lit glyphs painted in honey: the ones repainted for another
+     * accent ({@link LostTalesUiAccentInk}). Lit glyphs painted green or
+     * crimson, and Away's honey crescent, mean something and stay; so do
+     * the emoji and item buttons under the pointer, which turn into the
+     * picture itself, an emoji and an item, rather than lighting.
+     */
+    private static final java.util.EnumSet<LostTalesUiSheet> ACCENT_LIT =
+            java.util.EnumSet.of(PLUS_LIT, MINUS_LIT,
+                    COG_HOVER, COPY_LINK_HOVER, AREA_HOVER, MEMBERS_HOVER,
+                    FULLSCREEN_EXIT_HOVER, FULLSCREEN_HOVER, PIN_LIT,
+                    MORE_HOVER, COPY_HOVER, REPLY_HOVER, FORWARD_HOVER,
+                    EXCLAMATION_LIT, TOGGLE_1_HOVER, TOGGLE_2_HOVER,
+                    TOGGLE_3_HOVER, TOGGLE_4_HOVER, TOGGLE_5_HOVER, BELL_LIT,
+                    FEED_LIT, SPLIT_LIT, RESET_LIT, INBOX_LIT, COPY_ID_LIT,
+                    SEARCH_HOVER,
+                    SPEECH_BUBBLE_HOVER,
+                    CHEVRON_1_HOVER, CHEVRON_2_HOVER, CHEVRON_3_HOVER,
+                    CHEVRON_4_HOVER, CHEVRON_5_HOVER);
+
+    /**
      * What a frame or tab piece must clear to be drawn: the artwork
      * previews the surface behind its ink at a low alpha, and only the
      * ink itself is wanted. A property of the sheet, so everything drawn
@@ -337,6 +372,16 @@ public enum LostTalesUiSheet {
         this.v = v;
         this.width = width;
         this.height = height;
+    }
+
+    /** Whether it is a lit glyph painted in honey, which takes the accent. */
+    public boolean isAccentLit() {
+        return ACCENT_LIT.contains(this);
+    }
+
+    /** The sheet as painted, or its copy repainted for the accent ({@link LostTalesUiThemedSheet}). */
+    private static ResourceLocation texture(Minecraft minecraft) {
+        return LostTalesUiThemedSheet.location(minecraft, TEXTURE);
     }
 
     public int getTextureU() { return this.u; }
@@ -583,7 +628,7 @@ public enum LostTalesUiSheet {
                 || safeAlpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
-        minecraft.getTextureManager().bindTexture(TEXTURE);
+        minecraft.getTextureManager().bindTexture(texture(minecraft));
         LostTalesUiInk.beginContent();
         GL11.glShadeModel(GL11.GL_SMOOTH);
         // The GUI draws under an alpha test that throws away nearly
@@ -663,7 +708,7 @@ public enum LostTalesUiSheet {
                 || alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
-        minecraft.getTextureManager().bindTexture(TEXTURE);
+        minecraft.getTextureManager().bindTexture(texture(minecraft));
         LostTalesUiInk.beginContent();
         GL11.glColor4f(1.0F, 1.0F, 1.0F,
                 MathHelper.clamp_float(alpha / 255.0F, 0.0F, 1.0F));
@@ -705,7 +750,7 @@ public enum LostTalesUiSheet {
                 || Math.max(start, end) < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
-        minecraft.getTextureManager().bindTexture(TEXTURE);
+        minecraft.getTextureManager().bindTexture(texture(minecraft));
         LostTalesUiInk.beginContent();
         GL11.glShadeModel(GL11.GL_SMOOTH);
         // The GUI's alpha test throws away nearly transparent fragments,
@@ -745,7 +790,7 @@ public enum LostTalesUiSheet {
                 || alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
-        minecraft.getTextureManager().bindTexture(TEXTURE);
+        minecraft.getTextureManager().bindTexture(texture(minecraft));
         LostTalesUiInk.beginContent();
         GL11.glColor4f(1.0F, 1.0F, 1.0F,
                 MathHelper.clamp_float(alpha / 255.0F, 0.0F, 1.0F));

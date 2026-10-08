@@ -30,9 +30,9 @@ public final class ClientConfigChoicesTest {
                 client.get("chatFeedAlignment").getValidValues());
         assertArrayEquals(LostTalesConfig.HUD_PRESET_VALUES,
                 client.get("hudPlacementPreset").getValidValues());
-        for (String colour : new String[] {"windowBackgroundColor",
-                "chatSelectedLineColor", "chatMentionLineColor",
-                "chatReplyHighlightColor"}) {
+        for (String colour : new String[] {"windowPrimaryColor",
+                "windowSecondaryColor", "windowAccentColor",
+                "chatMentionLineColor", "chatReplyHighlightColor"}) {
             assertArrayEquals(LostTalesColors.paletteNames(),
                     client.get(colour).getValidValues());
         }

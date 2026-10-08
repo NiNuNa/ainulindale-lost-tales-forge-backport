@@ -35,10 +35,6 @@ public class LostTalesButton extends GuiButton {
         }
     }
 
-    public boolean isHovered() {
-        return this.visible && this.field_146123_n;
-    }
-
     @Override
     public void drawButton(Minecraft minecraft, int mouseX, int mouseY) {
         if (!this.visible) {

@@ -10,7 +10,7 @@ import java.util.UUID;
 
 /**
  * Who a won world quest pays: each account once. A part is counted per
- * identity, the character played or the account's own; among one
+ * character played; among one
  * account's identities that added at least the quest's {@code least}, the
  * one that added most is paid, and on a tie the one that joined the run
  * first. Pure logic; the server says which account an identity is.

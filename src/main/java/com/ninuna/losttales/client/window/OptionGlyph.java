@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -17,7 +18,6 @@ public abstract class OptionGlyph {
     /** Ink of a struck option's stroke. */
     private static final int STRIKE_RGB = LostTalesColors.rgb(LostTalesColors.CRIMSON);
     /** Ink a pattern lights to. */
-    private static final int LIT_RGB = LostTalesColors.rgb(LostTalesColors.HONEY);
 
     public abstract int width();
 
@@ -98,7 +98,7 @@ public abstract class OptionGlyph {
     /**
      * A pattern of pixels, one string a row, {@code #} for ink: artwork
      * that waits to be painted. It rests in {@code rgb} and lights to
-     * honey.
+     * the accent.
      */
     public static OptionGlyph pattern(int rgb, String... rows) {
         return new Pattern(rgb, rows);
@@ -209,7 +209,7 @@ public abstract class OptionGlyph {
                 }
             }
             int color = LostTalesUiInk.argb(
-                    LostTalesUiInk.blend(this.rgb, LIT_RGB, lit), alpha);
+                    LostTalesUiInk.blend(this.rgb, LostTalesUiTheme.accentRgb(), lit), alpha);
             for (int row = 0; row < this.ink.length; row++) {
                 for (int column = 0; column < this.width; column++) {
                     if (this.ink[row][column]) {

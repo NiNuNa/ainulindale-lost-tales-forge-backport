@@ -20,9 +20,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The server refuses a race nobody may choose, and the client never
- * offering it is not what makes that true: a crafted request, or a
- * template written before the race was withdrawn, has to be refused by
- * the server on its own.
+ * offering it is not what makes that true: a crafted request has to be
+ * refused by the server on its own.
  *
  * <p>What it refuses is <em>taking</em> the race. A character who already
  * is one keeps it, which is what stops an ordinary change to their

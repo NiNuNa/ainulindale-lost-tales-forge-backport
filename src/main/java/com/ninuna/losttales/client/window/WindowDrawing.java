@@ -3,10 +3,12 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
+import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiLayerFade;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import java.util.HashMap;
 import java.util.List;
@@ -104,6 +106,31 @@ public final class WindowDrawing {
             LostTalesGuiRegionBlur.getInstance().cutFramedRegion(box.left,
                     box.top, box.left + box.width, box.top + box.height,
                     WindowPlacement.FRAME_WIDTH, opacity);
+            clearDepth(box);
+        }
+    }
+
+    /**
+     * Clears the depth under a box and its frame's ring, so nothing an
+     * earlier window drew there with a depth (a flat picture, an item)
+     * holds back what this one draws.
+     */
+    private static void clearDepth(LostTalesUiHitBox box) {
+        float ring = WindowPlacement.FRAME_WIDTH;
+        boolean clipped = LostTalesUiClip.beginLocal(Minecraft.getMinecraft(),
+                (float)box.left - ring, (float)box.top - ring,
+                (float)(box.left + box.width) + ring,
+                (float)(box.top + box.height) + ring);
+        if (!clipped) {
+            return;
+        }
+        GL11.glPushAttrib(GL11.GL_DEPTH_BUFFER_BIT);
+        try {
+            GL11.glDepthMask(true);
+            GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+        } finally {
+            GL11.glPopAttrib();
+            LostTalesUiClip.end(true);
         }
     }
 
@@ -388,7 +415,7 @@ public final class WindowDrawing {
         float top = (float)frame.drawnBaseline()
                 + WindowPlacement.lineHeight(minecraft);
         LostTalesUiInk.fillRect(left, top, right, top + 1.0F, LostTalesUiInk.argb(
-                LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+                LostTalesUiTheme.secondaryRgb(),
                 Math.round(WindowStyle.INSET_ALPHA
                         * WindowStyle.opacity(minecraft)
                         * opening.getOpacity())));

@@ -13,6 +13,7 @@ import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -165,11 +166,11 @@ final class LostTalesLotrMapLegend {
                 continue;
             }
             WindowStyle.recolourFlat(left, litTop, right, litBottom,
-                    surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
-                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+                    surfaceAlpha, LostTalesUiTheme.primaryRgb(),
+                    LostTalesUiTheme.secondaryRgb());
             WindowStyle.recolourRingBeside(left, right, left, litTop, right,
-                    litBottom, surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
-                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+                    litBottom, surfaceAlpha, LostTalesUiTheme.primaryRgb(),
+                    LostTalesUiTheme.secondaryRgb());
         }
     }
 

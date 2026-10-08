@@ -6,6 +6,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.Collections;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -386,7 +387,7 @@ public final class LostTalesSpeechBubbleRenderer {
     /** The chat's own black, behind one row of speech. */
     private static void drawBackdrop(float left, float top, float right,
                                      float bottom, float opacity) {
-        fillQuad(left, top, right, bottom, LostTalesUiInk.SURFACE_RGB,
+        fillQuad(left, top, right, bottom, LostTalesUiTheme.primaryRgb(),
                 Math.round(BACKDROP_ALPHA * opacity));
     }
 

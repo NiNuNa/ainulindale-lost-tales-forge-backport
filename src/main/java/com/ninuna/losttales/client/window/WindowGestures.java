@@ -4,6 +4,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -148,13 +149,16 @@ public final class WindowGestures {
     private FillResize fillResize;
     private ContentDrag contentDrag;
     private final SnapPreview snapPreview = new SnapPreview();
-    private final SnapLayouts.Bar snapBar = new SnapLayouts.Bar();
+    /** The snap bar at the top of the screen, which a carried window lands on. */
+    private final SnapBarWindow snapBar;
     /** What a window let go in a zone of a layout offers the other windows. */
     private final SnapAssist snapAssist;
 
-    public WindowGestures(Host host, SnapAssist snapAssist) {
+    public WindowGestures(Host host, SnapAssist snapAssist,
+                          SnapBarWindow snapBar) {
         this.host = host;
         this.snapAssist = snapAssist;
+        this.snapBar = snapBar;
     }
 
     /** Called from {@code initGui}, which also runs on every resize. */
@@ -271,7 +275,7 @@ public final class WindowGestures {
         float top = (float)(target.boxTop + target.motionY);
         float bottom = (float)(target.boxBottom + target.motionY);
         int colour = LostTalesUiInk.argb(
-                WindowStyle.LANDING_RGB, 0xFF);
+                LostTalesUiTheme.accentRgb(), 0xFF);
         switch (landing.edge) {
             case ABOVE:
                 LostTalesUiInk.fillRect(left - ring, top - ring,
@@ -294,12 +298,6 @@ public final class WindowGestures {
     /** The pane showing where a carried window goes, for the screen to draw under it. */
     public SnapPreview snapPreview() {
         return this.snapPreview;
-    }
-
-    /** Draws the snap bar where its motion has brought it, at {@code opacity}. */
-    public void drawSnapBar(float opacity) {
-        this.snapBar.draw(this.mc, this.screenWidth, this.screenHeight,
-                opacity);
     }
 
     /** Where the window being carried right now would land, or null while none is. */
@@ -1264,20 +1262,18 @@ public final class WindowGestures {
                 this.screenWidth);
         double pointerY = WindowPlacement.preciseMouseY(this.mc,
                 this.screenHeight);
-        // On the snap bar all the way down, and on the top edge above
-        // it, its zones decide, and its padding lands the window nowhere;
-        // anywhere else, the bar peeking included, the screen's edges and
-        // corners.
+        // On the snap bar all the way down its zones decide, and its padding
+        // lands the window nowhere; anywhere else, the bar peeking
+        // included, the screen's edges and corners.
         Window.ScreenFill onBar = this.snapBar.follow(this.mc,
-                window.getId(), pointerX, pointerY, this.screenWidth,
-                this.screenHeight);
+                window.getId(), pointerX, pointerY);
         landing.screenFill = onBar != null ? onBar
                 : snapZoneAt(pointerX, pointerY, this.screenWidth,
                         this.screenHeight, SnapLayouts.offersThirds(
                                 this.mc, this.screenWidth, this.screenHeight));
-        landing.layout = onBar != null ? this.snapBar.litLayout()
+        landing.layout = onBar != null ? this.snapBar.litLayout(this.mc)
                 : SnapLayouts.layoutFor(landing.screenFill);
-        landing.companions = onBar != null ? this.snapBar.litCompanions()
+        landing.companions = onBar != null ? this.snapBar.litCompanions(this.mc)
                 : Collections.<String, Window.ScreenFill>emptyMap();
         if (landing.screenFill != Window.ScreenFill.NONE) {
             landing.snapTargetId = null;

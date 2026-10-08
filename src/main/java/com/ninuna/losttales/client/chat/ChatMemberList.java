@@ -23,6 +23,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.client.motion.Motions;
@@ -629,7 +630,7 @@ public final class ChatMemberList {
         // area wears on the other side, standing beside the history's
         // panel rather than over it.
         LostTalesUiInk.fillRect(left, top, windowRight, bottom,
-                LostTalesUiInk.argb(LostTalesUiInk.SURFACE_RGB,
+                LostTalesUiInk.argb(LostTalesUiTheme.primaryRgb(),
                         surfaceAlpha));
         // The rows' own space starts past the separator, on the display's
         // grid, so its whole units land on whole display pixels while the
@@ -665,13 +666,13 @@ public final class ChatMemberList {
                 }
                 float lit = row.member == state.lit ? state.hoverFade : 0.0F;
                 if (lit > 0.0F) {
-                    litRgb = LostTalesUiInk.blend(LostTalesUiInk.SURFACE_RGB,
+                    litRgb = LostTalesUiInk.blend(LostTalesUiTheme.primaryRgb(),
                             LostTalesChatVisualStyle.selectedLineRgb(), lit);
                     litTop = rowTop;
                     litBottom = rowBottom;
                     LostTalesChatOverlayRenderer.recolourSurface(rowsLeft,
                             rowTop, windowRight, rowBottom, surfaceAlpha,
-                            LostTalesUiInk.SURFACE_RGB, litRgb);
+                            LostTalesUiTheme.primaryRgb(), litRgb);
                 }
                 drawMember(minecraft, font, state, row.member, rowsLeft,
                         rowTop, unit, roomRight, rowsOriginX, scale, clipTop,
@@ -698,7 +699,7 @@ public final class ChatMemberList {
             try {
                 LostTalesChatOverlayRenderer.recolourSurface(windowRight,
                         litTop, windowRight + WindowPlacement.FRAME_WIDTH / scale,
-                        litBottom, surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
+                        litBottom, surfaceAlpha, LostTalesUiTheme.primaryRgb(),
                         litRgb);
             } finally {
                 LostTalesUiClip.end(ringClipped);

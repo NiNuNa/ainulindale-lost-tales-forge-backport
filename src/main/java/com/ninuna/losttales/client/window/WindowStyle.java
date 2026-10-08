@@ -2,12 +2,12 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import java.util.Collections;
 import java.util.List;
@@ -113,13 +113,6 @@ public final class WindowStyle {
     public static final int SURFACE_ALPHA = 0x80;
 
     /**
-     * Where a carried window will land, lit: the edge of the window it
-     * lines up with, and the zone of a snap layout it fills. Honey, the
-     * palette's yellow.
-     */
-    public static final int LANDING_RGB = LostTalesColors.rgb(LostTalesColors.HONEY);
-
-    /**
      * The frame a popup wears inside its footprint: a window's, a
      * pixel of surface with the ink inside it.
      */
@@ -148,17 +141,6 @@ public final class WindowStyle {
     public static final int INSET_ALPHA = Math.round(255.0F * 2.0F / 3.0F);
 
     /**
-     * A window's panel and the rows framing it, in the
-     * palette colour the client chose; plum black until it chooses.
-     * Read on every draw, so a choice made in a window's menu shows the
-     * same frame.
-     */
-    public static int backdropRgb() {
-        return LostTalesColors.rgb(LostTalesColors.paletteColor(LostTalesConfig.windowBackgroundColor,
-                LostTalesColors.PLUM_BLACK));
-    }
-
-    /**
      * The game's chat opacity as the chat applies it, never below a
      * tenth: what the panel and every surface beside it are thinned by.
      */
@@ -172,7 +154,8 @@ public final class WindowStyle {
      * stretch of exactly what its history is drawn in.
      */
     public static int surfaceArgb(float share) {
-        return LostTalesUiInk.argb(backdropRgb(), Math.round(SURFACE_ALPHA * share));
+        return LostTalesUiInk.argb(LostTalesUiTheme.primaryRgb(),
+                Math.round(SURFACE_ALPHA * share));
     }
 
     /**
@@ -244,15 +227,15 @@ public final class WindowStyle {
 
     /** The inset surface at {@code share} of its opacity. */
     public static int insetArgb(float share) {
-        return LostTalesUiInk.argb(LostTalesUiInk.SURFACE_RGB, Math.round(INSET_ALPHA * share));
+        return LostTalesUiInk.argb(LostTalesUiTheme.primaryRgb(), Math.round(INSET_ALPHA * share));
     }
 
     /**
-     * The tool strip's surface at {@code share} of its opacity: plum grey
+     * The tool strip's surface at {@code share} of its opacity: the secondary colour
      * at two thirds, as the bar and a sub-window's strip wear it too.
      */
     public static int stripArgb(float share) {
-        return LostTalesUiInk.argb(LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+        return LostTalesUiInk.argb(LostTalesUiTheme.secondaryRgb(),
                 Math.round(INSET_ALPHA * share));
     }
 
@@ -294,7 +277,7 @@ public final class WindowStyle {
      * A popup's surface over {@code [left, right)} by {@code [top,
      * bottom)}: what follows the pointer or the caret and never moves
      * cuts away what lies behind it, stands on the softened world, and
-     * wears the sub-windows' surface — the inset plum black at two
+     * wears the sub-windows' surface — the inset primary at two
      * thirds, thinned by the game's chat opacity and by {@code opacity} —
      * and a window's frame inside its footprint, as the snap panels
      * do. The lit row — {@code [rowLeft, rowRight)} by
@@ -324,14 +307,14 @@ public final class WindowStyle {
                 boxRight - boxLeft, boxBottom - boxTop);
         WindowDrawing.cutBehind(stands, share);
         WindowDrawing.softenBehind(stands, share);
-        int surface = LostTalesUiInk.argb(LostTalesUiInk.SURFACE_RGB, surfaceAlpha);
+        int surface = LostTalesUiInk.argb(LostTalesUiTheme.primaryRgb(), surfaceAlpha);
         float litLeft = Math.max(boxLeft, rowLeft);
         float litTop = Math.max(boxTop, rowTop);
         float litRight = Math.min(boxRight, rowRight);
         float litBottom = Math.min(boxBottom, rowBottom);
         fillAround(boxLeft, boxTop, boxRight, boxBottom, litLeft, litTop,
                 litRight, litBottom, surface);
-        int lit = LostTalesUiInk.argb(LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+        int lit = LostTalesUiInk.argb(LostTalesUiTheme.secondaryRgb(),
                 surfaceAlpha);
         boolean rowLit = litRight > litLeft && litBottom > litTop;
         if (rowLit) {
@@ -343,8 +326,8 @@ public final class WindowStyle {
             // The ring beside the lit row wears its colour, as the ring
             // beside anything wears what it touches.
             recolourRingBeside(boxLeft, boxRight, litLeft, litTop, litRight,
-                    litBottom, surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
-                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+                    litBottom, surfaceAlpha, LostTalesUiTheme.primaryRgb(),
+                    LostTalesUiTheme.secondaryRgb());
         }
         LostTalesUiWindowFrame.drawEdges(boxLeft, boxTop, boxRight,
                 boxBottom, Math.round(255.0F * share));

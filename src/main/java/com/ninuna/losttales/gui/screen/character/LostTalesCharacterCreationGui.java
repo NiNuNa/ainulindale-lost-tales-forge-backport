@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.character;
 
+import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
@@ -176,8 +177,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private final CharacterStagePose pose = new CharacterStagePose();
     /**
      * Whether the stage is the world seen through the borrowed camera
-     * rather than a drawn figure. True in a world whose camera seams are
-     * patched; false at the main menu, where there is no world to show.
+     * rather than a drawn figure: true where the camera seams are patched.
      */
     private boolean worldCamera;
     /**
@@ -580,6 +580,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         this.nameControl = new CreatorTextControl(this.context,
                 I18n.format("gui.losttales.character.name"), this.draftName,
                 CharacterValidator.MAX_NAME_LENGTH, true);
+        this.nameControl.setHint(accountNameHint());
         this.controls.add(this.nameControl);
         this.controls.add(new CreatorSlider(this.context,
                 I18n.format("gui.losttales.character.age"), new CreatorSlider.IntValue() {
@@ -1107,14 +1108,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 this.showMinecraftCape, selectedCapeId());
     }
 
-    /** The account the figure is built for: the signed-in one, else the player. */
+    /** The account the figure is built for: the player's. */
     private UUID figureOwner() {
-        UUID account = LostTalesClientAccount.id();
-        if (account != null) {
-            return account;
-        }
-        return this.mc != null && this.mc.thePlayer != null
-                ? this.mc.thePlayer.getUniqueID() : null;
+        return LostTalesClientAccount.id();
     }
 
     private void drawStage(int mouseX, int mouseY) {
@@ -1272,8 +1268,35 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 right - factsWidth, y, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
     }
 
+    /** The name typed, or the account's name shown as the example while nothing is. */
     private String currentName() {
-        return this.nameControl != null ? this.nameControl.getText() : this.draftName;
+        String typed = this.nameControl != null ? this.nameControl.getText()
+                : this.draftName;
+        return CharacterValidator.normalizeName(typed).length() > 0 ? typed
+                : accountNameHint();
+    }
+
+    /**
+     * The account's own name, offered faintly in the empty name field as
+     * the name a character takes when none is typed: while it has a
+     * character name's shape and none of the player's characters goes by
+     * it. Empty otherwise.
+     */
+    private String accountNameHint() {
+        String account = this.mc == null || this.mc.thePlayer == null ? ""
+                : this.mc.thePlayer.getCommandSenderName();
+        if (account == null || !CharacterValidator.isWellFormedName(account)) {
+            return "";
+        }
+        CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
+        if (snapshot != null) {
+            for (CharacterSummary character : snapshot.getCharacters()) {
+                if (account.equalsIgnoreCase(character.getName())) {
+                    return "";
+                }
+            }
+        }
+        return CharacterValidator.normalizeName(account);
     }
 
     // ------------------------------------------------------------------
@@ -1603,6 +1626,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             return;
         }
         String normalizedName = CharacterValidator.normalizeName(this.draftName);
+        if (normalizedName.length() == 0) {
+            normalizedName = accountNameHint();
+        }
         if (normalizedName.length() == 0) {
             setStatus(ClientCharacterDisplayNames.error(
                     CharacterErrorId.INVALID_NAME_EMPTY), true);
