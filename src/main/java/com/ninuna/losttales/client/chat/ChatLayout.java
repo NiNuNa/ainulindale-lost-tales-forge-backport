@@ -1,16 +1,20 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.PinnedWindows;
+import com.ninuna.losttales.client.window.View;
+import com.ninuna.losttales.client.window.ViewDefaults;
+import com.ninuna.losttales.client.window.Views;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
+import com.ninuna.losttales.client.window.WindowMenus;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowPage;
-import com.ninuna.losttales.client.window.WindowView;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,8 +34,9 @@ import java.util.Set;
  * {@link WindowLayout}'s; this keeps what only the chat means by them.
  *
  * <ul>
- * <li>The window a new player starts with: Global and OOC, Global in
- * front, in the middle of the screen at two thirds of it.</li>
+ * <li>The pages the Chat view opens with: Global and OOC, Global in
+ * front, and the conversations waiting for a window; and the Fellowships
+ * view's conversations ({@link ViewDefaults}).</li>
  * <li>Each conversation's two choices ({@link ChatLineChoice}):
  * which of its lines chime, and which reach the closed feed.</li>
  * <li>The NPC conversations of the session: only the last few stay open
@@ -53,12 +58,12 @@ import java.util.Set;
  * {@link ClientChatChannelState}.</p>
  */
 public final class ChatLayout {
-    /** The tabs a new player's window holds, the first in front. */
+    /** The tabs the Chat view's window opens with, the first in front. */
     private static final List<ConversationPage> FIRST_TABS =
             Collections.unmodifiableList(Arrays.asList(
                     ConversationPage.of(ChatChannel.GLOBAL),
                     ConversationPage.of(ChatChannel.OOC)));
-    /** The two consoles, in the order their first window holds them. */
+    /** The two consoles, in the order the Consoles view's window holds them. */
     private static final List<ConversationPage> CONSOLES =
             Collections.unmodifiableList(Arrays.asList(
                     ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
@@ -122,14 +127,14 @@ public final class ChatLayout {
      * Each conversation's timestamp area and member list, by its id, only
      * where they differ from how they first are.
      */
-    private static final Map<String, View> VIEWS = new HashMap<String, View>();
+    private static final Map<String, Panels> VIEWS = new HashMap<String, Panels>();
     /** The channels the file said were closed, while it is read. */
     private static final Set<ChatChannel> CLOSED_READ =
             new LinkedHashSet<ChatChannel>();
     /**
-     * Conversations that tried to open by themselves while no window held
-     * a conversation: the chat's next opening brings them in its first
-     * window. For the session only.
+     * Conversations that tried to open by themselves while the Chat view
+     * had no window: the view's window brings them as it opens. For the
+     * session only.
      */
     private static final Set<ConversationPage> WAITING = new LinkedHashSet<ConversationPage>();
     /**
@@ -151,7 +156,7 @@ public final class ChatLayout {
     private static boolean installed;
 
     /** A conversation's timestamp area and member list, as the player left them. */
-    private static final class View {
+    private static final class Panels {
         boolean areaHidden;
         boolean membersHidden;
         /** The member list's width in the chat's pixels; 0 for its own. */
@@ -190,18 +195,22 @@ public final class ChatLayout {
             }
         });
         WindowLayout.setDefaults(DEFAULT_WINDOWS);
-        // A conversation opening the channels' first window opens it with
-        // Global and OOC, as a new player's first window stands.
-        WindowLayout.setFirstPages(PageCategory.CHANNELS,
-                new WindowLayout.FirstPages() {
+        WindowMenus.registerShared(ChatSubWindows.INBOX, ChatInbox.SOURCE);
+        ViewDefaults.addPages(ViewDefaults.CHAT, new ViewDefaults.Pages() {
+            @Override
+            public List<? extends WindowPage> pages() {
+                return chatViewPages();
+            }
+        });
+        ViewDefaults.addPages(ViewDefaults.FELLOWSHIP_CHATS,
+                new ViewDefaults.Pages() {
                     @Override
                     public List<? extends WindowPage> pages() {
-                        return FIRST_TABS;
+                        return fellowshipConversations();
                     }
                 });
-        // The command key opens the consoles' first window with both
-        // consoles the player may read: the Server Log only with its
-        // capability.
+        // The Consoles view opens with both consoles the player may read:
+        // the Server Log only with its capability.
         WindowLayout.addViewPages(new WindowLayout.ViewPages() {
             @Override
             public List<? extends WindowPage> pagesOf(PageCategory category) {
@@ -244,29 +253,55 @@ public final class ChatLayout {
     }
 
     /**
-     * A new player's window: Global and OOC, Global in front, in the
-     * middle of the screen at two thirds of it and locked, the one window
-     * that opens locked. Every other channel starts closed; Proximity, Faction
-     * and Fellowship open with their first line, and Operator and the consoles
-     * wait in the {@code +} until opened by hand. From then on the layout
-     * is whatever the player makes of it.
+     * A new player's windows: the Chat view's, Global and OOC in the
+     * bottom-left quarter, locked. Every other channel starts closed;
+     * Proximity, Faction and Fellowship open with their first line, and
+     * Operator and the consoles wait in the {@code +} until opened by hand.
+     * From then on the layout is whatever the player makes of it.
      */
     static final Runnable DEFAULT_WINDOWS = new Runnable() {
         @Override
         public void run() {
-            WindowLayout.addWindow(FIRST_TABS, FIRST_TABS.get(0));
+            WindowLayout.buildView(Views.of(PageCategory.CHANNELS));
         }
     };
 
-    /** Whether any window holds a channel or a whisper; the consoles keep windows of their own. */
-    public static synchronized boolean hasConversationWindow() {
-        return firstConversationWindow() != null;
+    /**
+     * What the Chat view's window opens with: Global and OOC, then every
+     * conversation that tried to open while the view had no window.
+     */
+    private static synchronized List<ConversationPage> chatViewPages() {
+        List<ConversationPage> pages = new ArrayList<ConversationPage>(FIRST_TABS);
+        Iterator<ConversationPage> waiting = WAITING.iterator();
+        while (waiting.hasNext()) {
+            ConversationPage tab = waiting.next();
+            if (WindowLayout.isOpen(tab)) {
+                waiting.remove();
+            } else if (!pages.contains(tab)) {
+                pages.add(tab);
+            }
+        }
+        return pages;
     }
 
-    /** The first window, in layout order, standing in the channels' view; null for none. */
+    /** The conversation of every fellowship of the character played, as the Fellowships view opens with them. */
+    private static List<ConversationPage> fellowshipConversations() {
+        List<ConversationPage> conversations = new ArrayList<ConversationPage>();
+        for (ChatFellowship fellowship : ClientChatIdentitySelection.fellowships()) {
+            ConversationPage tab = ConversationPage.of(ChatChannel.FELLOWSHIP,
+                    ConversationPage.ownerKeyOf(fellowship.getId()));
+            if (tab != null && tab.isFellowship()) {
+                conversations.add(tab);
+            }
+        }
+        return conversations;
+    }
+
+    /** The first window, in layout order, standing in the Chat view; null for none. */
     private static Window firstConversationWindow() {
+        View chat = Views.of(PageCategory.CHANNELS);
         for (Window window : WindowLayout.windows()) {
-            if (WindowLayout.standsIn(window, PageCategory.CHANNELS)) {
+            if (WindowLayout.viewOf(window) == chat) {
                 return window;
             }
         }
@@ -274,26 +309,20 @@ public final class ChatLayout {
     }
 
     /**
-     * The chat's first window again, as a new player's opens: Global and
-     * OOC, Global in front, with every conversation that tried to open
-     * while no window held one. What the chat opens with once every
-     * conversation window was closed. Null when all of them are open
-     * already.
+     * The conversation in front of the window of {@code view} brought to
+     * the front last that has one in front; null for none.
      */
-    public static synchronized Window openFirstWindow() {
-        List<ConversationPage> tabs = new ArrayList<ConversationPage>(FIRST_TABS);
-        for (ConversationPage waiting : WAITING) {
-            if (!tabs.contains(waiting)) {
-                tabs.add(waiting);
+    public static synchronized ConversationPage frontIn(View view) {
+        List<Window> stacked = WindowLayout.stacked();
+        for (int index = stacked.size() - 1; index >= 0; index--) {
+            Window window = stacked.get(index);
+            ConversationPage front = ConversationPage.frontOf(window);
+            if (WindowLayout.viewOf(window) == view && front != null
+                    && ClientChatChannelState.isSelectable(front)) {
+                return front;
             }
         }
-        WAITING.clear();
-        Window window = WindowLayout.addWindow(tabs, FIRST_TABS.get(0));
-        if (window != null) {
-            WindowLayout.raise(window.getId());
-            WindowLayout.persist();
-        }
-        return window;
+        return null;
     }
 
     /* ---- Where channels stand ---- */
@@ -463,9 +492,9 @@ public final class ChatLayout {
      * the row entry where no copy of it stands, else a new copy beside the
      * others, either speaking as the identity the conversation is held as
      * ({@link ClientChatIdentities#holdAs}). One the player {@code asked}
-     * for opens the chat's first window where no window holds a
-     * conversation ({@link #openHere}); a line's waits for the next
-     * opening ({@link #openTab}). Null where no window takes it.
+     * for opens in the view the screen shows ({@link #openHere}); a line's
+     * opens in the Chat view, or waits for it to open ({@link #openTab}).
+     * Null where no window takes it.
      */
     public static synchronized ConversationPage openReader(ConversationPage conversation,
                                                            String windowId,
@@ -677,13 +706,12 @@ public final class ChatLayout {
     /**
      * Opens a conversation's tab where it belongs
      * ({@link WindowLayout#openTab}): the window asked for, else another
-     * that holds conversations, never a locked one, else a window of its
-     * own; and answers it as the layout holds it. The row holds one entry
-     * per channel and per person, so a
-     * conversation held as one character opens as its row entry: a line's
-     * own tab never stands in a window beside the one that shows it. Null
-     * while no window holds a conversation: the tab waits for the chat's
-     * next opening.
+     * of the Chat view, never a locked one, else a window of its own; and
+     * answers it as the layout holds it. The row holds one entry per
+     * channel and per person, so a conversation held as one character
+     * opens as its row entry: a line's own tab never stands in a window
+     * beside the one that shows it. Null while the Chat view has no
+     * window: the tab waits for the view to open.
      */
     public static synchronized ConversationPage openTab(ConversationPage tab,
                                                String preferredWindowId) {
@@ -732,40 +760,27 @@ public final class ChatLayout {
     }
 
     /**
-     * Opens a console as the command key does: where the consoles keep
-     * their pages, or with no window of them, their first window holding
-     * both consoles the player may read ({@link WindowLayout#openView}).
+     * Opens a console as the command key does, in the Consoles view: the
+     * view opening with its defaults where it has no window, and the
+     * console opening there again where the view no longer holds it
+     * ({@link WindowLayout#openInView}).
      */
     public static synchronized ConversationPage openConsoles(
             ConversationPage console) {
-        return ConversationPage.from(WindowLayout.openView(
-                ConversationPage.row(console)));
+        return ConversationPage.from(WindowLayout.openInView(
+                ConversationPage.row(console),
+                Views.of(PageCategory.CONSOLES)));
     }
 
     /**
      * Opens a conversation the player asked for — a whisper, a link, a
-     * jump to a line — as {@link #openTab} does; when no window holds a
-     * conversation, the chat's first window opens with it, the
-     * conversation in a window of its own beside it, since the first
-     * window opens locked. A console opens among the consoles, in a window
-     * of theirs or their own first window. While the screen shows another
-     * view, the Lost Tales Menu's or the map's, it opens in the Lost Tales
-     * Menu's view, as any page opened by hand does
-     * ({@link WindowLayout#openByHand}).
+     * jump to a line — where a page opened by hand opens: in the view the
+     * screen shows ({@link WindowLayout#openByHand}).
      */
     public static synchronized ConversationPage openHere(ConversationPage tab,
                                                 String preferredWindowId) {
-        if (tab != null && (tab.isConsole()
-                || WindowView.handView(tab) == PageCategory.MENU)) {
-            return ConversationPage.from(WindowLayout.openByHand(
-                    ConversationPage.row(tab), preferredWindowId));
-        }
-        ConversationPage opened = openTab(tab, preferredWindowId);
-        if (opened != null || tab == null) {
-            return opened;
-        }
-        Window first = openFirstWindow();
-        return first == null ? null : openTab(tab, first.getId());
+        return ConversationPage.from(WindowLayout.openByHand(
+                ConversationPage.row(tab), preferredWindowId));
     }
 
     /* ---- Whisper and fellowship tabs per place ---- */
@@ -1079,7 +1094,7 @@ public final class ChatLayout {
     }
 
     /** A view as its line writes it: what is put away, then the list's width. */
-    private static String describeView(View view) {
+    private static String describeView(Panels view) {
         StringBuilder line = new StringBuilder();
         if (view.areaHidden) {
             line.append(" area=").append(PUT_AWAY);
@@ -1111,16 +1126,16 @@ public final class ChatLayout {
     static final int MAX_VIEWS = 256;
 
     /** The conversation's view to change, made where it has none; null for no conversation. */
-    private static View view(ConversationPage tab) {
+    private static Panels view(ConversationPage tab) {
         if (tab == null) {
             return null;
         }
-        View view = VIEWS.get(viewKey(tab));
+        Panels view = VIEWS.get(viewKey(tab));
         if (view == null) {
             if (VIEWS.size() >= MAX_VIEWS) {
                 return null;
             }
-            view = new View();
+            view = new Panels();
             VIEWS.put(viewKey(tab), view);
         }
         return view;
@@ -1136,12 +1151,12 @@ public final class ChatLayout {
     }
 
     /** A conversation's view as it stands; null while it stands as it first was. */
-    private static View viewOf(ConversationPage tab) {
+    private static Panels viewOf(ConversationPage tab) {
         return tab == null ? null : VIEWS.get(viewKey(tab));
     }
 
     /** Drops a view that stands as it first was, so only changed ones are kept. */
-    private static void settle(ConversationPage tab, View view) {
+    private static void settle(ConversationPage tab, Panels view) {
         if (view.isAsFirst()) {
             VIEWS.remove(viewKey(tab));
         }
@@ -1149,19 +1164,19 @@ public final class ChatLayout {
 
     /** Whether the conversation's timestamp area is driven out. */
     public static synchronized boolean isAreaHidden(ConversationPage tab) {
-        View view = viewOf(tab);
+        Panels view = viewOf(tab);
         return view != null && view.areaHidden;
     }
 
     /** Whether the conversation's member list is put away. */
     public static synchronized boolean isMembersHidden(ConversationPage tab) {
-        View view = viewOf(tab);
+        Panels view = viewOf(tab);
         return view != null && view.membersHidden;
     }
 
     /** The width the player gave the conversation's member list, in the chat's pixels; 0 for its own. */
     public static synchronized double getMembersWidth(ConversationPage tab) {
-        View view = viewOf(tab);
+        Panels view = viewOf(tab);
         return view == null ? 0.0D : view.membersWidth;
     }
 
@@ -1173,7 +1188,7 @@ public final class ChatLayout {
      */
     public static synchronized boolean setAreaHidden(ConversationPage tab,
                                                      boolean hidden) {
-        View view = isAreaHidden(tab) == hidden ? null : view(tab);
+        Panels view = isAreaHidden(tab) == hidden ? null : view(tab);
         if (view == null) {
             return false;
         }
@@ -1190,7 +1205,7 @@ public final class ChatLayout {
      */
     public static synchronized boolean setMembersHidden(ConversationPage tab,
                                                         boolean hidden) {
-        View view = isMembersHidden(tab) == hidden ? null : view(tab);
+        Panels view = isMembersHidden(tab) == hidden ? null : view(tab);
         if (view == null) {
             return false;
         }
@@ -1218,7 +1233,7 @@ public final class ChatLayout {
     public static synchronized boolean setMembersWidth(ConversationPage tab,
                                                        double width,
                                                        boolean persist) {
-        View view = view(tab);
+        Panels view = view(tab);
         if (view == null) {
             return false;
         }
@@ -1257,7 +1272,7 @@ public final class ChatLayout {
     private static final String CONVERSATION = "conversation";
     private static final String CLOSED_CONVERSATION = "closedconversation";
     /** A conversation's timestamp area and member list, where they differ from how they first are. */
-    private static final String VIEW = "view";
+    private static final String PANELS = "panels";
     /** What a view line says of an area or member list put away. */
     private static final String PUT_AWAY = "hidden";
 
@@ -1331,7 +1346,7 @@ public final class ChatLayout {
                 readFeedChoice(line.split("\t"));
                 return true;
             }
-            if (line.startsWith(VIEW + "\t")) {
+            if (line.startsWith(PANELS + "\t")) {
                 readView(line.split("\t"));
                 return true;
             }
@@ -1386,7 +1401,7 @@ public final class ChatLayout {
         private void readView(String[] fields) {
             ConversationPage tab = fields.length == 3
                     ? ConversationPage.row(ConversationPage.fromId(fields[1])) : null;
-            View view = tab == null || tab.isNpc() ? null : view(tab);
+            Panels view = tab == null || tab.isNpc() ? null : view(tab);
             if (view == null) {
                 return;
             }
@@ -1440,9 +1455,9 @@ public final class ChatLayout {
 
         /**
          * Every plain channel the file neither placed nor closed goes to
-         * the first window holding a conversation, so a channel added
-         * after the file was written is never silently lost; with no such
-         * window, one opens for them. Staff talk and the consoles are the
+         * the Chat view's first window, so a channel added after the file
+         * was written is never silently lost; with no such window, one
+         * opens for them. Staff talk and the consoles are the
          * exception: they open only by hand, and wait in the {@code +}. A file
          * that names no window and closes every channel describes the
          * empty layout and is loaded as one.
@@ -1490,10 +1505,10 @@ public final class ChatLayout {
                 lines.add(FEED_CHOICE + "\t" + feedChoice(tab).id() + "\t"
                         + tab.id());
             }
-            for (Map.Entry<String, View> each : VIEWS.entrySet()) {
+            for (Map.Entry<String, Panels> each : VIEWS.entrySet()) {
                 ConversationPage tab = ConversationPage.fromId(each.getKey());
                 if (tab != null && !tab.isNpc()) {
-                    lines.add(VIEW + "\t" + each.getKey() + "\t"
+                    lines.add(PANELS + "\t" + each.getKey() + "\t"
                             + describeView(each.getValue()));
                 }
             }

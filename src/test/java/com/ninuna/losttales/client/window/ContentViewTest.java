@@ -17,7 +17,9 @@ import static org.junit.Assert.assertTrue;
  * A page filling its window: the window is laid out with its row, strip
  * and bar past its edges while the page fills it, its own fill untouched;
  * each window has its own, and gives it up once another page comes in
- * front there or the window is gone.
+ * front there or the window is gone. Held by its dent's padlock, it is
+ * kept whatever comes in front and through the screen closing, until it
+ * is let go.
  */
 public final class ContentViewTest {
     private final BarLeadTest.Tab map = new BarLeadTest.Tab("Map", true);
@@ -83,7 +85,7 @@ public final class ContentViewTest {
         assertTrue(ContentView.enter(first));
         assertTrue(ContentView.enter(second));
         assertTrue(ContentView.isOn(first));
-        assertTrue(ContentView.isOn(second.getId()));
+        assertTrue(ContentView.isOn(second));
         assertTrue(ContentView.leave(first));
         assertFalse("given back once", ContentView.leave(first));
         assertTrue("the other keeps its own", ContentView.isOn(second));
@@ -100,5 +102,28 @@ public final class ContentViewTest {
         assertFalse(ContentView.isOn(window));
         assertFalse("nothing to fill", ContentView.enter(null));
         assertFalse(ContentView.leave(null));
+    }
+
+    @Test
+    public void aHeldPageKeepsFillingItsWindowUntilLetGo() {
+        Window window = WindowLayout.addWindow(row(this.map, this.journal),
+                this.map);
+        ContentView.hold(window, true);
+        assertFalse("nothing to hold while the page does not fill it",
+                window.isBorderlessHeld());
+        assertTrue(ContentView.enter(window));
+        ContentView.hold(window, true);
+        assertTrue(window.isBorderlessHeld());
+        assertFalse("Escape and the exit leave it", ContentView.leave(window));
+        ContentView.leaveAll();
+        WindowLayout.setActiveTab(this.journal);
+        ContentView.follow();
+        assertTrue("kept through the screen closing and another page",
+                ContentView.isOn(window));
+        ContentView.hold(window, false);
+        assertFalse(window.isBorderlessHeld());
+        assertTrue("let go, it still fills the window", ContentView.isOn(window));
+        assertTrue(ContentView.leave(window));
+        assertFalse(ContentView.isOn(window));
     }
 }

@@ -4,6 +4,8 @@ import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
 import com.ninuna.losttales.client.window.PinnedWindows;
+import com.ninuna.losttales.client.window.View;
+import com.ninuna.losttales.client.window.Views;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.hud.LostTalesHudHelper;
@@ -30,7 +32,6 @@ public class LostTalesKeyBindings {
     public static final String FULL_NAME_PREFIX = "gui.losttales.keys.full.";
     private static final int MIDDLE_MOUSE_KEY_CODE = -98;
 
-    private static final KeyBinding MENU = new KeyBinding("key.losttales.menu", Keyboard.KEY_CAPITAL, CATEGORY);
     private static final KeyBinding QUEST_JOURNAL = new KeyBinding("key.losttales.questJournal", Keyboard.KEY_J, CATEGORY);
     /** Unbound until the player gives it a key. */
     private static final KeyBinding FELLOWSHIP = new KeyBinding("key.losttales.fellowship", Keyboard.KEY_NONE, CATEGORY);
@@ -47,7 +48,6 @@ public class LostTalesKeyBindings {
     private static final KeyBinding CYCLE_TARGET_RIGHT = new KeyBinding("key.losttales.cycleTargetRight", Keyboard.KEY_NONE, CATEGORY);
 
     public void register() {
-        ClientRegistry.registerKeyBinding(MENU);
         ClientRegistry.registerKeyBinding(QUEST_JOURNAL);
         ClientRegistry.registerKeyBinding(FELLOWSHIP);
         ClientRegistry.registerKeyBinding(CHARACTERS);
@@ -91,6 +91,24 @@ public class LostTalesKeyBindings {
         }
     }
 
+    /**
+     * While playing, a custom view's own key opens the screen on that view
+     * (Caps Lock the Lost Tales Menu's at first). The keys are the views',
+     * kept with the layout and read as keys: they are no bindings of
+     * Controls.
+     */
+    @SubscribeEvent
+    public void onViewKey(InputEvent.KeyInputEvent event) {
+        if (!Keyboard.getEventKeyState() || Keyboard.isRepeatEvent()
+                || Minecraft.getMinecraft().currentScreen != null) {
+            return;
+        }
+        View view = Views.byKey(Keyboard.getEventKey());
+        if (view != null) {
+            WindowScreen.openView(view);
+        }
+    }
+
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event) {
         handleBindingPresses();
@@ -106,9 +124,6 @@ public class LostTalesKeyBindings {
     private static void handleBindingPresses() {
         Minecraft minecraft = Minecraft.getMinecraft();
 
-        if (MENU.isPressed()) {
-            WindowScreen.openMenu();
-        }
         if (QUEST_JOURNAL.isPressed()) {
             WindowScreen.openView(QuestJournalPage.PAGE_ID);
         }
@@ -185,10 +200,6 @@ public class LostTalesKeyBindings {
         return MODIFIER;
     }
 
-    public static KeyBinding getMenuKeyBinding() {
-        return MENU;
-    }
-
     public static KeyBinding getQuestJournalKeyBinding() {
         return QUEST_JOURNAL;
     }
@@ -211,10 +222,6 @@ public class LostTalesKeyBindings {
 
     public static String getModifierKeyDisplayName() {
         return getKeyDisplayName(MODIFIER);
-    }
-
-    public static boolean isMenuKey(int keyCode) {
-        return isKeyboardKey(MENU, keyCode);
     }
 
     public static boolean isQuestJournalKey(int keyCode) {

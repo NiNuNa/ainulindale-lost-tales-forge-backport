@@ -46,14 +46,13 @@ final class TabMenus {
     private static final String SETTINGS_NONE = "settings";
     /**
      * The rows of a page's options that stand for the tool strip's own
-     * buttons: the panel, borderless, the member list, the search, the
-     * inbox and the help.
+     * buttons: the panel, borderless, the member list, the search and the
+     * help.
      */
     private static final String STRIP_PANEL = "strip:panel";
     private static final String STRIP_BORDERLESS = "strip:borderless";
     private static final String STRIP_MEMBERS = "strip:members";
     private static final String STRIP_SEARCH = "strip:search";
-    private static final String STRIP_INBOX = "strip:inbox";
     private static final String STRIP_HELP = "strip:help";
     /** The row of a page's options that opens another copy of it right after it. */
     private static final String TAB_DUPLICATE = "tab:duplicate";
@@ -100,8 +99,7 @@ final class TabMenus {
      * strip's order read from its left, a hairline wherever the strip
      * has one. The panel's row; the page's own options, a hairline
      * between two groups; then the cog's row, Split View, Duplicate Page,
-     * Borderless, the member list's row and the search, the inbox's
-     * (conversations) and the help.
+     * Borderless, the member list's row, the search and the help.
      * What the strip greys stands greyed here, saying the same.
      */
     static List<MenuWindow.Entry> stripRows(WindowPage tab) {
@@ -148,15 +146,6 @@ final class TabMenus {
                 .withKeys(PageKeys.keysOf(PageKeys.COMMAND, PageKeys.PLUS,
                         Keyboard.KEY_F))
                 .unavailable(tab.searchUnavailable()));
-        TabMark inbox = tab.inboxMark();
-        if (inbox != null) {
-            rows.add(new MenuWindow.Entry(STRIP_INBOX,
-                    StatCollector.translateToLocal("gui.losttales.window.inbox"))
-                    .withSprite(LostTalesUiSheet.INBOX,
-                            LostTalesUiSheet.INBOX_LIT, false)
-                    .withValue(inbox.count() > 0
-                            ? Integer.toString(inbox.count()) : ""));
-        }
         rows.add(new MenuWindow.Entry(STRIP_HELP,
                 StatCollector.translateToLocal(
                         "gui.losttales.window.option.help"))
@@ -399,20 +388,44 @@ final class TabMenus {
     }
 
     /**
-     * The words one of the tab's options picks from, in a sub-window of
-     * their own at {@code place}: a switch, as the option's button is.
+     * What one of the tab's options opens, at {@code place}: the words a
+     * pick picks from, or the sub-window an option that opens opens (the
+     * Inbox). A switch, as the option's button is.
      */
-    void togglePick(WindowPage tab, PageOption option,
-                    WindowMenus.FirstPlace place) {
-        if (tab != null && option != null && option.kind == PageOption.Kind.PICK) {
+    void toggleOption(WindowPage tab, PageOption option,
+                      WindowMenus.FirstPlace place) {
+        if (tab == null || option == null) {
+            return;
+        }
+        if (option.kind == PageOption.Kind.PICK) {
             this.menus.show(SubWindowKind.PICK, new Picking(tab, option.id),
                     place, true);
+        } else if (option.kind == PageOption.Kind.OPENS) {
+            this.menus.show(option.opens(), tab, place, true);
         }
     }
 
-    /** The option of the tab whose words are out, which lights its button; empty for none. */
-    String pickOut(WindowPage tab) {
-        if (tab == null || !this.menus.isOpen(SubWindowKind.PICK)) {
+    /** Whether a press on the option opens something rather than doing it: a pick, or an option that opens. */
+    static boolean opensSomething(PageOption option) {
+        return option != null && (option.kind == PageOption.Kind.PICK
+                || option.kind == PageOption.Kind.OPENS);
+    }
+
+    /**
+     * The option of the tab whose words or sub-window are out, which
+     * lights its button; empty for none.
+     */
+    String optionOut(WindowPage tab) {
+        if (tab == null) {
+            return "";
+        }
+        for (PageOption option : tab.options()) {
+            if (option.kind == PageOption.Kind.OPENS
+                    && this.menus.isOpenFor(option.opens(), tab)) {
+                return option.id;
+            }
+        }
+        if (!this.menus.isOpen(SubWindowKind.PICK)) {
             return "";
         }
         Object about = this.menus.menu(SubWindowKind.PICK).about();
@@ -781,10 +794,6 @@ final class TabMenus {
                 TabMenus.this.screen.duplicate(tab);
                 return false;
             }
-            if (STRIP_INBOX.equals(entry.id)) {
-                tab.openInbox();
-                return false;
-            }
             Window held = WindowLayout.windowOf(tab);
             if (STRIP_BORDERLESS.equals(entry.id)) {
                 TabMenus.this.screen.toggleBorderless(held);
@@ -797,8 +806,8 @@ final class TabMenus {
                 return false;
             }
             PageOption option = optionOf(tab, entry.id);
-            if (option != null && option.kind == PageOption.Kind.PICK) {
-                togglePick(tab, option, WindowMenus.besideWindow(window));
+            if (opensSomething(option)) {
+                toggleOption(tab, option, WindowMenus.besideWindow(window));
                 return true;
             }
             return tab.takeOption(entry.id);
@@ -831,8 +840,8 @@ final class TabMenus {
                            SubWindow window, boolean back) {
             WindowPage tab = (WindowPage)menu.about();
             PageOption option = optionOf(tab, entry.id);
-            if (option != null && option.kind == PageOption.Kind.PICK) {
-                togglePick(tab, option, WindowMenus.besideWindow(window));
+            if (opensSomething(option)) {
+                toggleOption(tab, option, WindowMenus.besideWindow(window));
                 return true;
             }
             return tab.takeOption(entry.id);

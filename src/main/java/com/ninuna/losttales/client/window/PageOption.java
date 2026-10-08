@@ -19,7 +19,10 @@ import net.minecraft.util.StatCollector;
  * colour; the one chosen rests lit;</li>
  * <li>a <em>pick</em> of a few words, each a choice of its own, in a
  * sub-window the option opens: a conversation's Notification Settings;
- * its glyph says which word stands.</li>
+ * its glyph says which word stands;</li>
+ * <li>an option that <em>opens</em> a sub-window of its own, hung from
+ * its button: a conversation's Inbox, its glyph marked with what
+ * waits.</li>
  * </ul>
  *
  * <p>An option that cannot be taken stays in both places, greyed, and
@@ -29,14 +32,14 @@ import net.minecraft.util.StatCollector;
  */
 public final class PageOption {
     /** What a press on the option does. */
-    public enum Kind { ACTION, SWITCH, CHOICE, PICK }
+    public enum Kind { ACTION, SWITCH, CHOICE, PICK, OPENS }
 
     public final String id;
     public final String label;
     public final Kind kind;
     /** A switch's state, or a choice chosen. */
     public final boolean on;
-    /** The word a pick reads now; empty for every other kind. */
+    /** The word a pick reads now, or what waits behind an option that opens; empty for the rest. */
     public final String value;
     public final OptionGlyph glyph;
     /** A pick's words, each a choice taken by its own id; empty for every other kind. */
@@ -51,6 +54,8 @@ public final class PageOption {
     private String headingKey = "";
     /** The settings a pick's sub-window shows under its words; null for none. */
     private Settings.Place settings;
+    /** The kind of sub-window an option that opens opens; null for every other kind. */
+    private SubWindowKind opens;
     /**
      * What it is called when taken for every page of its category at once,
      * from the {@code +}; empty while it cannot be.
@@ -97,6 +102,24 @@ public final class PageOption {
         option.choices = Collections.unmodifiableList(
                 new ArrayList<PageOption>(choices));
         return option;
+    }
+
+    /**
+     * Opens a sub-window of {@code kind} about the page, hung from its
+     * button, a switch as the button is; {@code value} says what waits
+     * there, at its row's end.
+     */
+    public static PageOption opens(String id, String label, String value,
+                                   OptionGlyph glyph, SubWindowKind kind) {
+        PageOption option = new PageOption(id, label, Kind.OPENS, false,
+                value, glyph);
+        option.opens = kind;
+        return option;
+    }
+
+    /** The kind of sub-window an option that opens opens; null for every other kind. */
+    SubWindowKind opens() {
+        return this.opens;
     }
 
     /** The same choice saying {@code words} under the pointer in its pick's sub-window. */
@@ -210,7 +233,7 @@ public final class PageOption {
         MenuWindow.Entry entry = new MenuWindow.Entry(this.id, this.label,
                 false, -1, null).withPicture(this.glyph.asPicture())
                 .chosen(marked);
-        if (this.kind == Kind.PICK) {
+        if (this.kind == Kind.PICK || this.kind == Kind.OPENS) {
             entry.withValue(this.value);
         }
         return entry.withTip(this.tip).unavailable(this.unavailable);

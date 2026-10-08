@@ -20,6 +20,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public final class ClientChatChannelStateTest {
@@ -219,9 +220,11 @@ public final class ClientChatChannelStateTest {
         assertTrue(ClientChatChannelState.isClosable(ConversationPage.of(ChatChannel.GLOBAL)));
         assertTrue(ClientChatChannelState.close(ConversationPage.of(ChatChannel.GLOBAL)));
         assertFalse(ChatLayout.isOpen(ChatChannel.GLOBAL));
-        // Reopening one makes the chat visible again, and closing the
-        // selected tab moves the selection to what is left.
-        assertTrue(ChatLayoutViews.reopen(ChatChannel.GLOBAL));
+        // Reopening one by hand makes the chat visible again, the next
+        // joins it, and closing the selected tab moves the selection to
+        // what is left.
+        assertNotNull(ChatLayout.openHere(ConversationPage.of(ChatChannel.GLOBAL),
+                null));
         assertTrue(ChatLayoutViews.reopen(ChatChannel.OOC));
         ClientChatChannelState.select(ConversationPage.of(ChatChannel.OOC));
         assertTrue(ClientChatChannelState.close(ConversationPage.of(ChatChannel.OOC)));

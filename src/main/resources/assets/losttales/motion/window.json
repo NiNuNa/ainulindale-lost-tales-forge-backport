@@ -84,12 +84,6 @@
     "off": { "duration": 250, "curve": "ease_in" },
     "params": { "hold": 3000, "rise": 3 }
   },
-  "window.view.line": {
-    "duration": 150,
-    "curve": "ease_out",
-    "off": { "duration": 250, "curve": "ease_in" },
-    "params": { "hold": 2500 }
-  },
   "window.bar.grow": {
     "follow": 0.05
   }

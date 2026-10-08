@@ -14,7 +14,6 @@ import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
-import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowMenus;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowPage;
@@ -63,6 +62,7 @@ public final class ConversationPage extends WindowPage {
     private static final String MENU_JUMP_UNREAD = "jump_unread";
     private static final String MENU_NOTIFY = "notify";
     private static final String MENU_FEED = "feed";
+    private static final String MENU_INBOX = "inbox";
     /** The options' two groups: reading, and the conversation's own settings. */
     private static final String GROUP_READING = "reading";
     private static final String GROUP_SETTINGS = "settings";
@@ -74,6 +74,8 @@ public final class ConversationPage extends WindowPage {
             ".#...");
     private static final OptionGlyph JUMP_GLYPH = OptionGlyph.sprite(
             LostTalesUiSheet.CHEVRON_5, LostTalesUiSheet.CHEVRON_5_HOVER);
+    private static final OptionGlyph INBOX_GLYPH = OptionGlyph.sprite(
+            LostTalesUiSheet.INBOX, LostTalesUiSheet.INBOX_LIT);
     /**
      * The bell of Notification Settings and the bubble of Chat Feed
      * Settings, one for each word in {@link ChatLineChoice}'s order: green for Everything,
@@ -630,23 +632,6 @@ public final class ConversationPage extends WindowPage {
         ChatLayout.setAreaHidden(this, !ChatLayout.isAreaHidden(this));
     }
 
-    /** Every conversation's strip offers the inbox, marked with what waits there. */
-    @Override
-    public TabMark inboxMark() {
-        return ChatInbox.mark();
-    }
-
-    /** The inbox opens in this conversation's window where it may stand there. */
-    @Override
-    public void openInbox() {
-        WindowScreen screen = WindowScreen.current();
-        Window window = WindowLayout.windowOf(this);
-        if (screen != null) {
-            screen.showOnPage(InboxPage.PAGE_ID, null,
-                    window == null ? null : window.getId());
-        }
-    }
-
     @Override
     public boolean hasMemberList() {
         return true;
@@ -768,6 +753,13 @@ public final class ConversationPage extends WindowPage {
         options.add(pick(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
                 ChatLayout.notification(conversation), BELL_GLYPHS)
                 .reachesEveryPage(word("gui.losttales.chat.tab.notify_all")));
+        // What is addressed to the player, counted beside its button.
+        TabMark waiting = ChatInbox.mark();
+        options.add(PageOption.opens(MENU_INBOX,
+                word("gui.losttales.window.inbox"),
+                waiting.count() > 0 ? Integer.toString(waiting.count()) : "",
+                OptionGlyph.withMark(INBOX_GLYPH, waiting),
+                ChatSubWindows.INBOX).inGroup(GROUP_SETTINGS, ""));
         return options;
     }
 

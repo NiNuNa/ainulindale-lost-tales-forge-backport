@@ -1,30 +1,28 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
-import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
-import java.util.ArrayList;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Mouse;
 
 /**
  * The Views sub-window: a row of square buttons at the foot of every
- * screen, as Steam's overlay keeps its bar. The Lost Tales Menu's view
- * first, a hairline, then each category's view ({@link PageCategory#views});
- * a press swaps the screen to that view, and the one shown stands lit. It
- * cannot be closed. While a window lies over it, it stands aside, and
- * comes back under the pointer.
+ * screen, as Steam's overlay keeps its bar. Each category's view first, a
+ * hairline, then the custom views, the Lost Tales Menu's first, and the
+ * {@code +} that makes another. A press swaps the screen to that view,
+ * and the one shown stands lit; a right-click opens the view's menu
+ * (rename, key, reset, delete). It cannot be closed, stands in front of
+ * every window and sub-window, and never fades.
  */
 final class ViewsWindow extends SubWindowContent {
     /** The kind the screen opens it as, and the layout file keeps its place by. */
@@ -36,24 +34,16 @@ final class ViewsWindow extends SubWindowContent {
     private static final int GAP = WindowStyle.BUTTON_GAP;
     private static final int EDGE = WindowStyle.EDGE_GAP;
     private static final int DIVIDER = WindowStyle.DIVIDER_WIDTH;
+    /** The index the {@code +} answers to among the buttons, after every view. */
+    private static final int MAKE = -2;
 
-    /** The views, in the order their buttons stand: the Lost Tales Menu's first. */
-    private final List<PageCategory> views = PageCategory.views();
-    private final List<LostTalesUiButtonMotion> motions =
-            new ArrayList<LostTalesUiButtonMotion>();
+    /** Each view's button's motion, by the view's id; the {@code +}'s under its own key. */
+    private final Map<String, LostTalesUiButtonMotion> motions =
+            new HashMap<String, LostTalesUiButtonMotion>();
     /** Where the content stood when last drawn, in its own whole pixels. */
     private LostTalesUiHitBox drawnBox;
-    /** The button under the pointer when last drawn; -1 for none. */
+    /** The button under the pointer when last drawn: a view's index, {@link #MAKE}, or -1. */
     private int pointed = -1;
-    /** Whether it stands aside for now: a window lies over it, and the pointer is away. */
-    private boolean tucked;
-
-    ViewsWindow() {
-        for (int index = 0; index < this.views.size(); index++) {
-            this.motions.add(new LostTalesUiButtonMotion(
-                    LostTalesUiButtonMotion.Character.LIFT));
-        }
-    }
 
     @Override
     public boolean isPermanent() {
@@ -61,12 +51,8 @@ final class ViewsWindow extends SubWindowContent {
     }
 
     @Override
-    public boolean isTucked() {
-        return this.tucked;
-    }
-
-    void setTucked(boolean tucked) {
-        this.tucked = tucked;
+    public boolean standsInFront() {
+        return true;
     }
 
     @Override
@@ -76,9 +62,10 @@ final class ViewsWindow extends SubWindowContent {
 
     @Override
     public int naturalWidth() {
-        int categories = this.views.size() - 1;
-        return EDGE + BUTTON + EDGE + DIVIDER + EDGE
-                + categories * BUTTON + (categories - 1) * GAP + EDGE;
+        int own = Views.all().size() - Views.custom().size();
+        int custom = Views.custom().size();
+        return EDGE + own * BUTTON + (own - 1) * GAP + EDGE + DIVIDER + EDGE
+                + custom * BUTTON + custom * GAP + BUTTON + EDGE;
     }
 
     @Override
@@ -96,48 +83,70 @@ final class ViewsWindow extends SubWindowContent {
         return naturalHeight(naturalWidth());
     }
 
-    /** Where button {@code index} stands in a content box whose top left is {@code left}, {@code top}. */
-    private LostTalesUiHitBox buttonBox(double left, double top, int index) {
-        double x = left + EDGE;
-        if (index > 0) {
-            x += BUTTON + EDGE + DIVIDER + EDGE + (index - 1) * (BUTTON + GAP);
+    /** Where the hairline stands, after the categories' views. */
+    private static int dividerX(double left) {
+        int own = Views.all().size() - Views.custom().size();
+        return (int)left + EDGE + own * BUTTON + (own - 1) * GAP + EDGE;
+    }
+
+    /**
+     * Where button {@code index} of {@code views} stands in a content box
+     * whose top left is {@code left}, {@code top}; {@link #MAKE} for the
+     * {@code +}, after the last view.
+     */
+    private static LostTalesUiHitBox buttonBox(double left, double top,
+                                               int index, List<View> views) {
+        int own = views.size() - Views.custom().size();
+        int at = index == MAKE ? views.size() : index;
+        double x = left + EDGE + at * (BUTTON + GAP);
+        if (at >= own) {
+            x += EDGE + DIVIDER + EDGE - GAP;
         }
         return new LostTalesUiHitBox(x, top + EDGE, BUTTON, BUTTON);
     }
 
-    private int buttonAt(double x, double y) {
+    private int buttonAt(double x, double y, List<View> views) {
         if (this.drawnBox == null) {
             return -1;
         }
-        for (int index = 0; index < this.views.size(); index++) {
-            if (buttonBox(this.drawnBox.left, this.drawnBox.top, index)
+        for (int index = 0; index < views.size(); index++) {
+            if (buttonBox(this.drawnBox.left, this.drawnBox.top, index, views)
                     .contains(x, y)) {
                 return index;
             }
         }
-        return -1;
+        return buttonBox(this.drawnBox.left, this.drawnBox.top, MAKE, views)
+                .contains(x, y) ? MAKE : -1;
+    }
+
+    private LostTalesUiButtonMotion motion(String key) {
+        LostTalesUiButtonMotion motion = this.motions.get(key);
+        if (motion == null) {
+            motion = new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+            this.motions.put(key, motion);
+        }
+        return motion;
     }
 
     @Override
     public void draw(Minecraft minecraft, LostTalesUiHitBox box, double clipX,
                      double clipY, double pointerX, double pointerY,
                      int alpha, int surfaceAlpha) {
+        List<View> views = Views.all();
         this.drawnBox = box;
-        this.pointed = buttonAt(pointerX, pointerY);
+        this.pointed = buttonAt(pointerX, pointerY, views);
         long now = System.nanoTime();
         boolean pressed = Mouse.isButtonDown(0);
-        Map<PageCategory, WindowPage> icons = viewIcons();
-        for (int index = 0; index < this.views.size(); index++) {
-            PageCategory view = this.views.get(index);
-            LostTalesUiHitBox at = buttonBox(box.left, box.top, index);
+        for (int index = 0; index < views.size(); index++) {
+            View view = views.get(index);
             boolean under = index == this.pointed;
-            LostTalesUiButtonMotion motion = this.motions.get(index);
+            LostTalesUiHitBox at = buttonBox(box.left, box.top, index, views);
+            LostTalesUiButtonMotion motion = motion(view.id());
             motion.advance(now, WindowView.isOn(view) || under, under,
                     under && pressed);
-            float lit = motion.lit();
-            LostTalesUiFramedButton.drawSurface((float)at.left, (float)at.top,
-                    (float)at.width, (float)at.height, lit, surfaceAlpha);
-            WindowPage icon = icons.get(view);
+            drawSurface(at, motion.lit(), surfaceAlpha);
+            WindowPage icon = iconOf(view);
             if (icon != null) {
                 float iconX = (float)at.left + LostTalesUiFramedButton.WIDE_INSET;
                 float iconY = (float)at.top + LostTalesUiFramedButton.WIDE_INSET;
@@ -151,94 +160,141 @@ final class ViewsWindow extends SubWindowContent {
                 }
             }
             LostTalesUiFramedButton.drawInk((float)at.left, (float)at.top,
-                    (int)at.width, (int)at.height, lit, alpha);
+                    (int)at.width, (int)at.height, motion.lit(), alpha);
         }
+        drawMakeButton(box, views, now, pressed, alpha, surfaceAlpha);
         int divider = Math.round(WindowStyle.DIVIDER_ALPHA * alpha / 255.0F);
-        WindowStyle.drawDivider((int)box.left + EDGE + BUTTON + EDGE,
-                (int)box.top + EDGE, BUTTON, divider);
+        WindowStyle.drawDivider(dividerX(box.left), (int)box.top + EDGE,
+                BUTTON, divider);
+    }
+
+    private static void drawSurface(LostTalesUiHitBox at, float lit,
+                                    int surfaceAlpha) {
+        LostTalesUiFramedButton.drawSurface((float)at.left, (float)at.top,
+                (float)at.width, (float)at.height, lit, surfaceAlpha);
     }
 
     /**
-     * The icon each view's button wears: the New Page's for the Lost Tales
-     * Menu, and each category's first page's among every page that can be
-     * opened; a view none of whose pages can be opened now has none.
+     * The {@code +}: a framed button with the plus in its middle, greyed
+     * once there are as many custom views as there may be.
      */
-    private Map<PageCategory, WindowPage> viewIcons() {
-        Map<PageCategory, WindowPage> icons =
-                new EnumMap<PageCategory, WindowPage>(PageCategory.class);
-        OtherPage newPage = WindowPages.tab(NewPage.PAGE_ID);
-        if (newPage != null) {
-            icons.put(PageCategory.MENU, newPage);
+    private void drawMakeButton(LostTalesUiHitBox box, List<View> views,
+                                long now, boolean pressed, int alpha,
+                                int surfaceAlpha) {
+        LostTalesUiHitBox at = buttonBox(box.left, box.top, MAKE, views);
+        boolean can = Views.canMake();
+        boolean under = can && this.pointed == MAKE;
+        LostTalesUiButtonMotion motion = motion("+");
+        motion.advance(now, under, under, under && pressed);
+        drawSurface(at, motion.lit(), surfaceAlpha);
+        int glyph = LostTalesUiSheet.PLUS.getWidth();
+        float x = (float)at.left + LostTalesUiInk.centredStart((int)at.width,
+                glyph);
+        float y = (float)at.top + LostTalesUiInk.centredStart((int)at.height,
+                LostTalesUiSheet.PLUS.getHeight());
+        int ink = can ? alpha
+                : Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY);
+        LostTalesUiButton.beginPose(motion, x, y, glyph,
+                LostTalesUiSheet.PLUS.getHeight());
+        try {
+            LostTalesUiInk.beginContent();
+            LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.PLUS,
+                    LostTalesUiSheet.PLUS_LIT, can ? motion.lit() : 0.0F, x, y,
+                    ink);
+        } finally {
+            LostTalesUiButton.endPose();
+        }
+        LostTalesUiFramedButton.drawInk((float)at.left, (float)at.top,
+                (int)at.width, (int)at.height, motion.lit(), alpha);
+    }
+
+    /**
+     * The icon a view's button wears: a category's view its first page's
+     * among every page that can be opened; a custom view the page in front
+     * of its window brought forward last, else the New Page's. Null where
+     * none can be shown.
+     */
+    private static WindowPage iconOf(View view) {
+        if (view.isCustom()) {
+            WindowPage front = null;
+            List<Window> stacked = WindowLayout.stacked();
+            for (int index = stacked.size() - 1; index >= 0 && front == null;
+                    index--) {
+                if (WindowLayout.viewOf(stacked.get(index)) == view) {
+                    front = stacked.get(index).getActiveTab();
+                }
+            }
+            return front != null ? front : WindowPages.tab(NewPage.PAGE_ID);
         }
         for (MenuWindow.Entry entry : TabMenus.everyPage(
                 WindowScreen.current(), "")) {
-            if (entry.icon != null && entry.icon.category().home() != null
-                    && !icons.containsKey(entry.icon.category().home())) {
-                icons.put(entry.icon.category().home(), entry.icon);
+            if (entry.icon != null
+                    && Views.of(entry.icon.category()) == view) {
+                return entry.icon;
             }
         }
-        return icons;
+        return null;
     }
 
     @Override
     public boolean pressed(WindowHover hover, double x, double y, int button) {
-        int index = buttonAt(x, y);
+        List<View> views = Views.all();
+        int index = buttonAt(x, y, views);
         WindowScreen screen = WindowScreen.current();
-        if (index >= 0 && button == 0 && screen != null) {
-            screen.swapTo(this.views.get(index));
+        if (index == -1 || screen == null) {
+            return false;
         }
-        return index >= 0;
+        LostTalesUiHitBox at = buttonBox(this.drawnBox.left, this.drawnBox.top,
+                index, views);
+        if (index == MAKE) {
+            if (button == 0) {
+                screen.makeView();
+            }
+            return true;
+        }
+        View view = views.get(index);
+        if (button == 0) {
+            screen.swapTo(view);
+        } else if (button == 1) {
+            screen.showViewMenu(view, new SubWindowAnchor(
+                    (int)Math.floor(at.left), (int)Math.floor(at.top),
+                    (int)Math.ceil(at.right()), (int)Math.ceil(at.bottom()),
+                    false, false, null));
+        }
+        return true;
     }
 
     @Override
     public String tipKey() {
-        return this.pointed < 0 ? "" : tip();
+        return this.pointed == -1 ? "" : tip();
     }
 
-    /** The view's name with its key: {@code Lost Tales Menu (Caps Lock)}, {@code Map (M)}. */
+    /** The view's name with its key, {@code Map (M)}; the {@code +}'s, {@code New View}. */
     private String tip() {
-        PageCategory view = this.views.get(this.pointed);
-        String name = view == PageCategory.MENU
-                ? StatCollector.translateToLocal("key.losttales.menu")
-                : view.title();
-        if (view == PageCategory.SETTINGS) {
+        if (this.pointed == MAKE) {
+            return Views.canMake() ? StatCollector.translateToLocal(
+                    "gui.losttales.window.views.new") : "";
+        }
+        List<View> views = Views.all();
+        if (this.pointed < 0 || this.pointed >= views.size()) {
+            return "";
+        }
+        View view = views.get(this.pointed);
+        if (view.category() == PageCategory.SETTINGS) {
             return StatCollector.translateToLocalFormatted(
-                    "gui.losttales.window.views.settings_key", name);
+                    "gui.losttales.window.views.settings_key", view.title());
         }
-        KeyBinding key = keyOf(view);
-        return key == null ? name : WindowBar.withKey(name, key.getKeyCode());
-    }
-
-    /** The key that opens a view; null for the settings, whose key is Ctrl+,. */
-    private static KeyBinding keyOf(PageCategory view) {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        switch (view) {
-            case MENU:
-                return LostTalesKeyBindings.getMenuKeyBinding();
-            case CHANNELS:
-                return minecraft.gameSettings.keyBindChat;
-            case CONSOLES:
-                return minecraft.gameSettings.keyBindCommand;
-            case MAP:
-                return LostTalesKeyBindings.getMapKeyBinding();
-            case QUEST_JOURNAL:
-                return LostTalesKeyBindings.getQuestJournalKeyBinding();
-            case FELLOWSHIPS:
-                return LostTalesKeyBindings.getFellowshipKeyBinding();
-            case PROFILE:
-                return LostTalesKeyBindings.getCharactersKeyBinding();
-            default:
-                return null;
-        }
+        return view.key() <= 0 ? view.title()
+                : WindowBar.withKey(view.title(), view.key());
     }
 
     @Override
     public void drawTip(Minecraft minecraft, int tipX, int tipY,
                         int screenWidth, float share) {
-        if (this.pointed < 0) {
+        String label = tip();
+        if (label.length() == 0) {
             return;
         }
-        String label = tip();
         FontRenderer font = minecraft.fontRenderer;
         int width = WindowStyle.popupLineWidth(font, label);
         int x = Math.max(2, Math.min(screenWidth - width - 2,

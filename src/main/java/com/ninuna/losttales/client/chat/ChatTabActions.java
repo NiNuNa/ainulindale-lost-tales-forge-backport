@@ -7,6 +7,7 @@ import com.ninuna.losttales.client.window.WindowDrawing;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowSplit;
 import com.ninuna.losttales.client.window.WindowPage;
+import com.ninuna.losttales.client.window.WindowView;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
@@ -85,15 +86,15 @@ public final class ChatTabActions {
         // the selection just changed or the layout came back from its
         // file with another tab in front; setting what is already set
         // changes nothing.
-        // A page brought in front of the tab typed in, or its locked
-        // window closed, lends the input to the conversation in front of
-        // the window last brought forward, which stays where it stands;
-        // with none, the input waits with no bar. The covered tab stays
-        // the last used.
+        // A page brought in front of the tab typed in, or its window in a
+        // view the screen does not show, lends the input to the
+        // conversation in front of the window last brought forward, which
+        // stays where it stands; with none, the input waits with no bar.
+        // The covered tab stays the last used.
         boolean moved = false;
         Window holding = WindowLayout.windowOf(selected);
         if (WindowLayout.showsPage(holding)
-                || holding != null && holding.isClosed()) {
+                || holding != null && !WindowView.shows(selected)) {
             ConversationPage elsewhere = frontConversationElsewhere();
             if (elsewhere != null) {
                 ClientChatChannelState.lendInput(elsewhere);
@@ -255,8 +256,8 @@ public final class ChatTabActions {
     /**
      * Closes a whole window: its tabs leave it and the window goes. The
      * channels behind them keep receiving, so nothing is lost — the
-     * {@code +} offers them back, and with no conversation left open the
-     * chat's next opening brings its first window back.
+     * {@code +} offers them back, and a view left with no window opens
+     * with its defaults the next time.
      */
     void closeWindow(Window window) {
         if (window == null

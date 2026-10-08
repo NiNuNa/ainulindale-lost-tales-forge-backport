@@ -34,15 +34,12 @@ public final class ToolStripTest {
     private static final int HELP_WIDTH = LostTalesUiSheet.QUESTION.getWidth();
     private static final int SPLIT_WIDTH = LostTalesUiSheet.SPLIT.getWidth();
     private static final int DUPLICATE_WIDTH = LostTalesUiSheet.COPY.getWidth();
-    private static final int INBOX_WIDTH = LostTalesUiSheet.INBOX.getWidth();
-    /** The inbox button and its gap: a conversation's strip has them, a page's has not. */
-    private static final int INBOX_RUN = INBOX_WIDTH + END_GAP;
 
     /** A conversation's strip, the timestamp area's person at its left. */
     private static ToolStrip.Layout conversation(int right,
                                                      ToolStrip.Count count) {
         return ToolStrip.layOut(0, right, 30, AREA_WIDTH,
-                AREA_HEIGHT, true, TabMark.NONE, count, COUNT_WIDTH);
+                AREA_HEIGHT, true, count, COUNT_WIDTH);
     }
 
     @Test
@@ -51,9 +48,7 @@ public final class ToolStripTest {
         assertTrue(laid.hasWell);
         assertFalse(laid.counting);
         assertEquals(400 - EDGE_GAP - HELP_WIDTH, laid.helpX);
-        // The inbox between the help and the well, as Discord's stands.
-        assertEquals(laid.helpX - END_GAP - INBOX_WIDTH, laid.inboxX);
-        assertEquals(laid.inboxX - END_GAP, laid.wellRight);
+        assertEquals(laid.helpX - END_GAP, laid.wellRight);
         assertEquals(400 / 3, laid.wellRight - laid.wellLeft);
         // The icon at the well's right end, two clear pixels inside it.
         assertEquals(laid.wellRight - 2 - LostTalesUiSheet.SEARCH.getWidth(),
@@ -106,8 +101,8 @@ public final class ToolStripTest {
     @Test
     public void aNarrowStripPutsTheLastOptionsBehindItsOverflow() {
         // As narrow as the strip was before the duplicate button, plus its room.
-        ToolStrip.Layout narrow = conversation(100 + DUPLICATE_WIDTH + END_GAP
-                + INBOX_RUN, ToolStrip.Count.NONE);
+        ToolStrip.Layout narrow = conversation(100 + DUPLICATE_WIDTH + END_GAP,
+                ToolStrip.Count.NONE);
         int after = narrow.panelX + narrow.panelWidth;
         ToolStrip.layOptions(narrow, threeOptions(), after, true);
         assertTrue(narrow.options.length < 3);
@@ -143,16 +138,21 @@ public final class ToolStripTest {
         assertEquals(-1, bare.overflowX);
     }
 
-    /** What waits stands beside the inbox button, which makes room for it. */
+    /**
+     * An option marked with what waits behind it (the inbox) stands its
+     * mark beside its glyph, as the {@code +} does, and the strip makes
+     * room for both; with nothing waiting it is its glyph alone.
+     */
     @Test
-    public void theInboxsMarkStandsBesideIt() {
+    public void aMarkedOptionStandsItsMarkBesideIt() {
+        OptionGlyph inbox = OptionGlyph.sprite(LostTalesUiSheet.INBOX,
+                LostTalesUiSheet.INBOX_LIT);
         TabMark three = TabMark.pings(3);
-        ToolStrip.Layout laid = ToolStrip.layOut(0, 400, 30, AREA_WIDTH,
-                AREA_HEIGHT, true, three, ToolStrip.Count.NONE, COUNT_WIDTH);
-        assertEquals(laid.helpX - END_GAP - INBOX_WIDTH - ToolStrip.MARK_GAP
-                - three.width(), laid.inboxX);
-        assertEquals(laid.inboxX - END_GAP, laid.wellRight);
-        assertEquals(3, three.count());
+        OptionGlyph marked = OptionGlyph.withMark(inbox, three);
+        assertEquals(inbox.width() + OptionGlyph.MARK_GAP + three.width(),
+                marked.width());
+        assertEquals(inbox.height(), marked.height());
+        assertTrue(OptionGlyph.withMark(inbox, TabMark.NONE) == inbox);
     }
 
     private static List<PageOption> threeOptions() {
@@ -180,8 +180,7 @@ public final class ToolStripTest {
 
     @Test
     public void aTightWellKeepsItsFieldAndLeavesTheCountOut() {
-        ToolStrip.Layout laid = conversation(170 + INBOX_RUN,
-                ToolStrip.Count.WALK);
+        ToolStrip.Layout laid = conversation(170, ToolStrip.Count.WALK);
         assertTrue(laid.hasWell);
         assertFalse(laid.counting);
         assertFalse(laid.walking);
@@ -193,8 +192,7 @@ public final class ToolStripTest {
         assertFalse(laid.hasWell);
         assertFalse(laid.counting);
         assertEquals(120 - EDGE_GAP - HELP_WIDTH, laid.helpX);
-        assertEquals(laid.helpX - END_GAP - INBOX_WIDTH, laid.inboxX);
-        assertEquals(laid.inboxX - END_GAP
+        assertEquals(laid.helpX - END_GAP
                 - LostTalesUiSheet.MEMBERS.getWidth(), laid.membersX);
         assertEquals(laid.membersX - END_GAP
                 - LostTalesUiSheet.FULLSCREEN.getWidth(), laid.viewX);
@@ -204,17 +202,17 @@ public final class ToolStripTest {
     public void aPagesStripHasItsOwnPanelButtonAndNoMemberList() {
         int questWidth = LostTalesUiSheet.QUEST.getWidth();
         ToolStrip.Layout page = ToolStrip.layOut(0, 400, 30,
-                questWidth, LostTalesUiSheet.QUEST.getHeight(), false, null,
+                questWidth, LostTalesUiSheet.QUEST.getHeight(), false,
                 ToolStrip.Count.NONE, COUNT_WIDTH);
         ToolStrip.Layout chat = conversation(400, ToolStrip.Count.NONE);
         assertFalse(page.hasMembers);
-        // The same help and a well as wide, against the help where the
-        // conversation's stands against its inbox; the borderless button
-        // stands where the member list's button would, and the duplicate
-        // button, the split view button, the cog and the options follow it.
+        // The same help and a well as wide against it; the borderless
+        // button stands where the member list's button would, and the
+        // duplicate button, the split view button, the cog and the options
+        // follow it.
         assertEquals(chat.helpX, page.helpX);
         assertEquals(page.helpX - END_GAP, page.wellRight);
-        assertEquals(chat.inboxX - END_GAP, chat.wellRight);
+        assertEquals(chat.wellRight, page.wellRight);
         assertEquals(chat.wellRight - chat.wellLeft,
                 page.wellRight - page.wellLeft);
         assertEquals(page.wellLeft - END_GAP
@@ -229,7 +227,7 @@ public final class ToolStripTest {
     @Test
     public void aPagesCountStandsAgainstTheIconWithoutChevrons() {
         ToolStrip.Layout found = ToolStrip.layOut(0, 400, 30,
-                0, 0, false, null, ToolStrip.Count.FOUND, COUNT_WIDTH);
+                0, 0, false, ToolStrip.Count.FOUND, COUNT_WIDTH);
         assertTrue(found.counting);
         assertFalse(found.walking);
         assertEquals(found.iconSlotLeft - ToolStrip.GAP, found.countRight);

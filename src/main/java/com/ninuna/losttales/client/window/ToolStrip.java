@@ -82,8 +82,6 @@ public final class ToolStrip {
         /** The borderless button: the tab in front filling its window. */
         VIEW,
         MEMBERS_TOGGLE,
-        /** The inbox button before the help: what is addressed to the player, a conversation's. */
-        INBOX,
         /** The question mark at the strip's right end: the page's help. */
         HELP,
         FIELD,
@@ -151,10 +149,6 @@ public final class ToolStrip {
     private static final int DIVIDER_ROOM = EDGE_GAP + DIVIDER_WIDTH + EDGE_GAP;
     private static final int HELP_WIDTH = LostTalesUiSheet.QUESTION.getWidth();
     private static final int HELP_HEIGHT = LostTalesUiSheet.QUESTION.getHeight();
-    private static final int INBOX_WIDTH = LostTalesUiSheet.INBOX.getWidth();
-    private static final int INBOX_HEIGHT = LostTalesUiSheet.INBOX.getHeight();
-    /** Between the inbox button and the mark beside it, as between the + and its mark. */
-    static final int MARK_GAP = 3;
     private static final int MEMBERS_WIDTH = LostTalesUiSheet.MEMBERS.getWidth();
     private static final int MEMBERS_HEIGHT =
             LostTalesUiSheet.MEMBERS.getHeight();
@@ -205,12 +199,9 @@ public final class ToolStrip {
         int duplicateX;
         int viewX;
         int membersX;
-        int inboxX;
         int helpX;
         /** Whether the strip has a member list button: a page's has none. */
         boolean hasMembers;
-        /** The inbox button's mark; null for a strip with no inbox button, a page's. */
-        TabMark inboxMark;
         /** Whether the count stands in the well; the query and the room decide. */
         boolean counting;
         /** Whether the chevrons stand beside the count: a conversation's search. */
@@ -236,8 +227,6 @@ public final class ToolStrip {
         final LostTalesUiButtonMotion settingsMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion membersMotion =
-                new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
-        final LostTalesUiButtonMotion inboxMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion splitMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
@@ -324,7 +313,7 @@ public final class ToolStrip {
                 row.rowBottom,
                 panel == null ? 0 : panel.glyph.getWidth(),
                 panel == null ? 0 : panel.glyph.getHeight(),
-                front.hasMemberList(), front.inboxMark(),
+                front.hasMemberList(),
                 !typed ? Count.NONE : front.walksSearch() ? Count.WALK
                         : Count.FOUND,
                 font.getStringWidth(front.searchCount()));
@@ -348,21 +337,19 @@ public final class ToolStrip {
      * Where everything on a strip stands: the panel button, a glyph
      * {@code panelWidth} by {@code panelHeight} (none for a width of 0),
      * {@link #EDGE_GAP} in from the strip's left end; the help button
-     * against the strip's right end, as far in; the inbox button before it
-     * where the strip has one ({@code inbox}, its mark beside it); the well
-     * before that, a third of the strip wide; before the well the member
-     * list's button where the strip has one, the borderless button, the
-     * duplicate button, the split view button and the cog. A
-     * strip whose third is too narrow for a well, or leaves the buttons no
-     * room, keeps none, and the buttons stand before the inbox and help
-     * buttons. A
+     * against the strip's right end, as far in; the well before it, a
+     * third of the strip wide; before the well the member list's button
+     * where the strip has one, the borderless button, the duplicate
+     * button, the split view button and the cog. A strip whose third is
+     * too narrow for a well, or leaves the buttons no room, keeps none, and
+     * the buttons stand before the help button. A
      * {@code count} stands its text, {@code countWidth} wide, inside the
      * well before its icon, with the chevrons before the icon for a
      * {@link Count#WALK}, where the field leaves them room. Row space.
      */
     static Layout layOut(int stripLeft, int stripRight, int stripTop,
                          int panelWidth, int panelHeight, boolean members,
-                         TabMark inbox, Count count, int countWidth) {
+                         Count count, int countWidth) {
         Layout laid = new Layout();
         laid.wellTop = stripTop
                 + (WindowPlacement.TOOL_STRIP_HEIGHT - 1 - WELL_HEIGHT) / 2;
@@ -372,11 +359,8 @@ public final class ToolStrip {
         laid.panelHeight = panelHeight;
         laid.panelX = stripLeft + EDGE_GAP;
         laid.hasMembers = members;
-        laid.inboxMark = inbox;
         laid.helpX = stripRight - EDGE_GAP - HELP_WIDTH;
-        laid.inboxX = inbox == null ? laid.helpX
-                : laid.helpX - END_GAP - inboxRun(inbox);
-        laid.wellRight = laid.inboxX - END_GAP;
+        laid.wellRight = laid.helpX - END_GAP;
         laid.wellLeft = laid.wellRight
                 - Math.floorDiv(stripRight - stripLeft, 3);
         int buttons = COG_WIDTH + END_GAP + SPLIT_WIDTH + END_GAP
@@ -387,7 +371,7 @@ public final class ToolStrip {
         laid.hasWell = laid.wellRight - laid.wellLeft >= MIN_WELL_WIDTH
                 && laid.wellLeft - buttons >= floor;
         int buttonsRight = laid.hasWell ? laid.wellLeft - END_GAP
-                : laid.inboxX - END_GAP;
+                : laid.helpX - END_GAP;
         laid.membersX = buttonsRight - MEMBERS_WIDTH;
         laid.viewX = (members ? laid.membersX - END_GAP : buttonsRight)
                 - VIEW_WIDTH;
@@ -412,11 +396,6 @@ public final class ToolStrip {
                 : laid.iconSlotLeft - GAP;
         laid.fieldWidth = fieldRight - LostTalesUiCaret.WIDTH - laid.fieldX;
         return laid;
-    }
-
-    /** How wide the inbox button stands with its mark beside it. */
-    static int inboxRun(TabMark mark) {
-        return INBOX_WIDTH + (mark.isNone() ? 0 : MARK_GAP + mark.width());
     }
 
     /**
@@ -562,7 +541,7 @@ public final class ToolStrip {
                     state.panelMotion, laid.panelX,
                     glyphTop(laid, laid.panelHeight), ink);
         }
-        drawOptions(state, laid, underOption, out == null ? "" : out.pick,
+        drawOptions(state, laid, underOption, out == null ? "" : out.option,
                 now, ink);
         if (laid.overflowX >= 0) {
             drawButton(state.overflowMotion, true,
@@ -600,15 +579,6 @@ public final class ToolStrip {
                     Part.MEMBERS_TOGGLE, LostTalesUiSheet.MEMBERS,
                     LostTalesUiSheet.MEMBERS_HOVER, laid.membersX,
                     glyphTop(laid, MEMBERS_HEIGHT), now, ink);
-        }
-        if (laid.inboxMark != null) {
-            drawButton(state.inboxMotion, true, false, under, Part.INBOX,
-                    LostTalesUiSheet.INBOX, LostTalesUiSheet.INBOX_LIT,
-                    laid.inboxX, glyphTop(laid, INBOX_HEIGHT), now, ink);
-            // What waits, marked beside the button as the + marks what
-            // waits behind it.
-            laid.inboxMark.drawAt(laid.inboxX + INBOX_WIDTH + MARK_GAP,
-                    glyphTop(laid, laid.inboxMark.height()), ink);
         }
         drawButton(state.helpMotion, true, out != null && out.help, under,
                 Part.HELP, LostTalesUiSheet.QUESTION,
@@ -742,12 +712,12 @@ public final class ToolStrip {
     }
 
     /**
-     * The page's option buttons: each resting lit while it is on or its
-     * words are out ({@code pickOut}), lifting under the pointer; one that
-     * cannot be taken greyed and still.
+     * The page's option buttons: each resting lit while it is on or what
+     * it opens is out ({@code optionOut}), lifting under the pointer; one
+     * that cannot be taken greyed and still.
      */
     private static void drawOptions(State state, Layout laid,
-                                    PageOption under, String pickOut,
+                                    PageOption under, String optionOut,
                                     long now, int ink) {
         for (int index = 0; index < laid.options.length; index++) {
             PageOption option = laid.options[index];
@@ -766,7 +736,7 @@ public final class ToolStrip {
                 state.optionMotions.put(option.id, motion);
             }
             boolean hovered = under != null && under.id.equals(option.id);
-            boolean lit = option.on || hovered || option.id.equals(pickOut);
+            boolean lit = option.on || hovered || option.id.equals(optionOut);
             motion.advance(now, lit, hovered,
                     hovered && Mouse.isButtonDown(0));
             LostTalesUiButton.beginPose(motion, x, y, glyph.width(),
@@ -782,22 +752,22 @@ public final class ToolStrip {
     /**
      * Which of what the tab in front opens is out: its settings, its split
      * view, its help, the options left out of the strip, and the option
-     * whose words are out ({@code pick}, empty for none).
+     * whose words or sub-window are out ({@code option}, empty for none).
      */
     public static final class Out {
         final boolean settings;
         final boolean split;
         final boolean help;
         final boolean overflow;
-        final String pick;
+        final String option;
 
         public Out(boolean settings, boolean split, boolean help,
-                   boolean overflow, String pick) {
+                   boolean overflow, String option) {
             this.settings = settings;
             this.split = split;
             this.help = help;
             this.overflow = overflow;
-            this.pick = pick == null ? "" : pick;
+            this.option = option == null ? "" : option;
         }
     }
 
@@ -900,10 +870,6 @@ public final class ToolStrip {
         if (laid.hasMembers && glyphBox(laid, laid.membersX, MEMBERS_WIDTH,
                 MEMBERS_HEIGHT).contains(x, y)) {
             return Part.MEMBERS_TOGGLE;
-        }
-        if (laid.inboxMark != null && glyphBox(laid, laid.inboxX,
-                inboxRun(laid.inboxMark), INBOX_HEIGHT).contains(x, y)) {
-            return Part.INBOX;
         }
         if (glyphBox(laid, laid.helpX, HELP_WIDTH, HELP_HEIGHT).contains(x, y)) {
             return Part.HELP;
@@ -1010,9 +976,6 @@ public final class ToolStrip {
             case HELP:
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.help");
-            case INBOX:
-                return StatCollector.translateToLocal(
-                        "gui.losttales.window.inbox");
             case MEMBERS_TOGGLE:
                 return StatCollector.translateToLocal(
                         front.isMemberListOut()

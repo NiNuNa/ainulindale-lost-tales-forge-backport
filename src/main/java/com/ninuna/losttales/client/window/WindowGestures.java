@@ -1189,7 +1189,7 @@ public final class WindowGestures {
      */
     public void armWindowDrag(WindowFrame frame, int mouseX, int mouseY) {
         WindowLayout.raise(frame.windowId);
-        if (ContentView.isOn(frame.windowId)) {
+        if (ContentView.isOn(WindowLayout.window(frame.windowId))) {
             // A window its page fills stands where it is until it has its
             // row, strip and bar back.
             return;

@@ -4,9 +4,9 @@ package com.ninuna.losttales.client.window;
  * What the window system lets go of as the player leaves a world: the
  * pages that stood for things in it, every page's content, the screen's
  * entrance, the marked tabs, the search, the pages filling their
- * windows, the sub-windows open as the screen last closed, the view, and
- * what the pinned windows were showing. The layout itself is the account's
- * and stays.
+ * windows but those held there, the sub-windows open as the screen last
+ * closed, the view, and what the pinned windows were showing. The layout
+ * itself is the account's and stays, the views with it.
  */
 public final class WindowSession {
     private WindowSession() {}

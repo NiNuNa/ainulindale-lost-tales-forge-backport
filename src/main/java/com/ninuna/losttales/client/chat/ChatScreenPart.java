@@ -19,7 +19,7 @@ import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.window.BarLead;
 import com.ninuna.losttales.client.window.FirstTips;
 import com.ninuna.losttales.client.window.MenuWindow;
-import com.ninuna.losttales.client.window.PageCategory;
+import com.ninuna.losttales.client.window.View;
 import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.ScreenPart;
@@ -38,6 +38,7 @@ import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowSearch;
 import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.client.window.WindowView;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
@@ -58,7 +59,6 @@ import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.GuiConfirmOpenLink;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
@@ -199,37 +199,39 @@ public final class ChatScreenPart extends ScreenPart {
     /* ---- Life ---- */
 
     /**
-     * Opened by the chat's key, the screen brings back the conversation
-     * last used: in front of its window, over a page there, and the window
-     * over the others. A conversation that opened by itself in a window of
-     * its own, since no window would take it, and waits there unread comes
-     * first instead. Opened by the command key, the screen shows the
-     * consoles, the Console in front, where the command and its
-     * answer stand; a closed one opens in a window of the consoles, else
-     * in their first window, which holds the Server Log beside it where
-     * the player may read it. The chat's key comes back to the
-     * conversation last used, since a console is never that.
+     * Opened by the chat's key, the screen shows the Chat view and brings
+     * back the conversation last used there: in front of its window, over
+     * a page there, and the window over the others; with none there, the
+     * conversation last used opens there. A conversation that opened by
+     * itself in a window of its own, since no window would take it, and
+     * waits there unread comes first instead. Opened by the command key,
+     * the screen shows the Consoles view, the Console in front, where the
+     * command and its answer stand; one closed there opens there again.
+     * The chat's key comes back to the conversation last used, since a
+     * console is never that.
      */
     @Override
     public void opening(OtherPage forPage) {
         if (forPage != null || !this.screen.isOpenedForChat()) {
             return;
         }
-        // With every conversation window closed, the chat opens as a new
-        // player's does: its first window, in the middle.
-        if (!ChatLayout.hasConversationWindow()) {
-            ChatLayout.openFirstWindow();
-        }
-        ConversationPage last = ClientChatChannelState.lastUsed();
-        ConversationPage front = last;
-        ConversationPage waiting = ChatLayout.waitingInOwnWindow();
-        if (waiting != null && !this.screen.isOpenedForCommand()) {
-            front = waiting;
-        }
+        View view = WindowView.current();
+        ConversationPage front;
         if (this.screen.isOpenedForCommand()) {
             ConversationPage console = ChatLayout.openConsoles(CONSOLE);
-            if (ClientChatChannelState.isSelectable(console)) {
-                front = console;
+            front = ClientChatChannelState.isSelectable(console) ? console : null;
+        } else {
+            front = ChatLayout.waitingInOwnWindow();
+            ConversationPage last = ClientChatChannelState.lastUsed();
+            if (front == null && last != null) {
+                front = ConversationPage.from(WindowLayout.lastUsedIn(last, view));
+            }
+            if (front == null) {
+                front = ChatLayout.frontIn(view);
+            }
+            if (front == null && last != null) {
+                front = ConversationPage.from(WindowLayout.openInView(
+                        ConversationPage.row(last), view));
             }
         }
         if (front == null) {
@@ -241,25 +243,6 @@ public final class ChatScreenPart extends ScreenPart {
         if (window != null) {
             WindowLayout.raise(window.getId());
         }
-    }
-
-    /**
-     * The channels' view with no conversation window opens the chat's
-     * first window, as T does; the consoles' view opens theirs, as
-     * {@code /} does.
-     */
-    @Override
-    public WindowPage openView(PageCategory view) {
-        if (view == PageCategory.CONSOLES) {
-            return ChatLayout.openConsoles(CONSOLE);
-        }
-        if (view != PageCategory.CHANNELS) {
-            return null;
-        }
-        if (!ChatLayout.hasConversationWindow()) {
-            ChatLayout.openFirstWindow();
-        }
-        return ClientChatChannelState.lastUsed();
     }
 
     @Override
@@ -392,7 +375,7 @@ public final class ChatScreenPart extends ScreenPart {
     public Window keyWindow() {
         Window window = WindowLayout.windowOf(
                 ClientChatChannelState.getSelected());
-        return window == null || window.isClosed() ? null : window;
+        return window;
     }
 
     /** Whether a window shows a conversation, so there is a bar to type into. */

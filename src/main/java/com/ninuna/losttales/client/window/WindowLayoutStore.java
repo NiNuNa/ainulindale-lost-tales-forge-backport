@@ -18,19 +18,20 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * file named after the account and never synchronized or cleared
  * between worlds. Two people sharing a machine keep their own windows,
  * and one person with two accounts keeps an arrangement for each. The
- * file is a few plain lines — one per window, one per sub-window the
- * player has placed and one per category whose window was locked where it
- * stands — and the lines of each system with windows of its own ({@link Part}: the chat
- * keeps its closed channels and preferences here), so a hand edit or a
- * stale entry cannot corrupt anything: whatever does not parse is
- * skipped and the layout repairs itself on load.
+ * file is a few plain lines — one per custom view, one per window, one
+ * per sub-window the player has placed — and the lines of each system with
+ * windows of its own ({@link Part}: the chat keeps its closed channels and
+ * preferences here), so a hand edit or a stale entry cannot corrupt
+ * anything: whatever does not parse is skipped and the layout repairs
+ * itself on load.
  *
  * <pre>
- * window w1 locked=false view=consoles x=0.00 y=0.00 active=client_console tabs=client_console,operator
- * window w2 locked=true closed=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
+ * view menu key=58
+ * view v1 key=34 name=Hunting
+ * window w1 view=consoles locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
+ * window w2 view=v1 locked=true borderless=held hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
  * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00
- * category map x=50.00 y=50.00 height=0.00 width=0 fill=left
  * tips seen=3
  * </pre>
  */
@@ -94,6 +95,8 @@ public final class WindowLayoutStore {
 
     /** As above, for a named account. */
     static synchronized void initialize(File configDirectory, UUID accountId) {
+        // Nothing is written while the layout is read or laid out afresh.
+        WindowLayout.setChangeListener(null);
         storeFile = fileFor(configDirectory, accountId);
         List<String> lines = readLines(storeFile);
         if (lines != null) {
@@ -104,6 +107,7 @@ public final class WindowLayoutStore {
             for (Part part : PARTS) {
                 part.clear();
             }
+            Views.reset();
             WindowLayout.reset();
             SubWindowPlaces.load(null);
             FirstTips.load(0);
@@ -159,8 +163,8 @@ public final class WindowLayoutStore {
                 new ArrayList<WindowLayout.WindowSpec>();
         Map<SubWindowKind, SubWindowPlaces.Placement> placed =
                 new LinkedHashMap<SubWindowKind, SubWindowPlaces.Placement>();
-        Map<PageCategory, WindowLayout.Place> categories =
-                new LinkedHashMap<PageCategory, WindowLayout.Place>();
+        List<View> views = new ArrayList<View>();
+        List<String[]> windows = new ArrayList<String[]>();
         int tipsSeen = 0;
         for (String raw : lines) {
             String line = raw == null ? "" : raw.trim();
@@ -169,15 +173,11 @@ public final class WindowLayoutStore {
             }
             String[] parts = line.split("\\s+");
             if (parts.length >= 2 && "window".equals(parts[0])) {
-                WindowLayout.WindowSpec spec = parseWindow(parts);
-                if (spec != null) {
-                    specs.add(spec);
-                }
-            } else if (parts.length >= 2 && "category".equals(parts[0])) {
-                PageCategory category = PageCategory.fromId(parts[1]);
-                WindowLayout.Place place = parseCategoryPlace(parts);
-                if (category != null && place != null) {
-                    categories.put(category, place);
+                windows.add(parts);
+            } else if (parts.length >= 2 && Views.LINE.equals(parts[0])) {
+                View view = Views.parse(parts);
+                if (view != null) {
+                    views.add(view);
                 }
             } else if (FirstTips.read(parts) >= 0) {
                 tipsSeen = FirstTips.read(parts);
@@ -196,50 +196,20 @@ public final class WindowLayoutStore {
                 }
             }
         }
+        // The views first: every window names the one it stands in.
+        Views.load(views);
+        for (String[] window : windows) {
+            WindowLayout.WindowSpec spec = parseWindow(window);
+            if (spec != null) {
+                specs.add(spec);
+            }
+        }
         WindowLayout.load(specs);
         SubWindowPlaces.load(placed);
-        WindowLayout.loadCategoryPlaces(categories);
         FirstTips.load(tipsSeen);
         for (Part part : PARTS) {
             part.loaded();
         }
-    }
-
-    /**
-     * Where a category's first window opens: its place, its size, a size
-     * of 0 standing for the default place's, and the part of the screen it
-     * fills; null for a line that cannot be read, which leaves the category
-     * at its shipped defaults.
-     */
-    private static WindowLayout.Place parseCategoryPlace(String[] parts) {
-        double x = Double.NaN;
-        double y = Double.NaN;
-        double height = Double.NaN;
-        int width = -1;
-        Window.ScreenFill fill = Window.ScreenFill.NONE;
-        for (int index = 2; index < parts.length; index++) {
-            String part = parts[index];
-            try {
-                if (part.startsWith("fill=")) {
-                    fill = Window.ScreenFill.fromId(part.substring(5));
-                } else if (part.startsWith("x=")) {
-                    x = parsePercent(part.substring(2));
-                } else if (part.startsWith("y=")) {
-                    y = parsePercent(part.substring(2));
-                } else if (part.startsWith("height=")) {
-                    height = Double.parseDouble(part.substring(7));
-                } else if (part.startsWith("width=")) {
-                    width = Integer.parseInt(part.substring(6));
-                }
-            } catch (NumberFormatException unreadable) {
-                return null;
-            }
-        }
-        if (Double.isNaN(x) || Double.isNaN(y) || Double.isNaN(height)
-                || height < 0.0D || width < 0 || fill == null) {
-            return null;
-        }
-        return new WindowLayout.Place(x, y, height, width, fill);
     }
 
     /**
@@ -295,10 +265,10 @@ public final class WindowLayoutStore {
         // A line that says nothing of them: unlocked, as a window opens
         // that is not a new player's first, and pinned nowhere.
         boolean locked = false;
-        boolean closed = false;
+        boolean held = false;
         boolean hud = false;
         boolean gui = false;
-        PageCategory view = null;
+        View view = null;
         double offsetX = 0.0D;
         double offsetY = 0.0D;
         // No size of its own: the window stands at the default place.
@@ -325,15 +295,14 @@ public final class WindowLayoutStore {
                 active = WindowPage.fromId(value);
             } else if ("locked".equals(key)) {
                 locked = "true".equalsIgnoreCase(value);
-            } else if ("closed".equals(key)) {
-                closed = "true".equalsIgnoreCase(value);
+            } else if ("borderless".equals(key)) {
+                held = "held".equalsIgnoreCase(value);
             } else if ("hud".equals(key)) {
                 hud = "true".equalsIgnoreCase(value);
             } else if ("gui".equals(key)) {
                 gui = "true".equalsIgnoreCase(value);
             } else if ("view".equals(key)) {
-                PageCategory named = PageCategory.fromId(value);
-                view = named != null && named.isView() ? named : null;
+                view = Views.byId(value);
             } else if ("x".equals(key)) {
                 offsetX = parsePercent(value);
             } else if ("y".equals(key)) {
@@ -351,8 +320,8 @@ public final class WindowLayoutStore {
                 }
             }
         }
-        return new WindowLayout.WindowSpec(id, tabs, active, locked, closed, hud, gui,
-                view, offsetX, offsetY, height, width, fill, splits);
+        return new WindowLayout.WindowSpec(id, tabs, active, locked, held,
+                hud, gui, view, offsetX, offsetY, height, width, fill, splits);
     }
 
     /**
@@ -404,20 +373,19 @@ public final class WindowLayoutStore {
     public static List<String> describe() {
         List<String> lines = new ArrayList<String>();
         lines.add("# Lost Tales window layout");
+        Views.describe(lines);
         for (WindowLayout.WindowSpec spec : WindowLayout.describe()) {
             StringBuilder line = new StringBuilder("window ").append(spec.id);
+            line.append(" view=").append(spec.view.id());
             line.append(" locked=").append(spec.locked);
-            if (spec.closed) {
-                line.append(" closed=true");
+            if (spec.borderlessHeld) {
+                line.append(" borderless=held");
             }
             if (spec.pinnedToHud) {
                 line.append(" hud=true");
             }
             if (spec.pinnedToGui) {
                 line.append(" gui=true");
-            }
-            if (spec.view != null) {
-                line.append(" view=").append(spec.view.id());
             }
             line.append(" x=").append(format(spec.offsetX));
             line.append(" y=").append(format(spec.offsetY));
@@ -456,17 +424,6 @@ public final class WindowLayoutStore {
                     + " dy=" + format(placement.dy)
                     + (placement.isSized() ? " w=" + placement.width
                             + " h=" + placement.height : ""));
-        }
-        for (Map.Entry<PageCategory, WindowLayout.Place> entry
-                : WindowLayout.categoryPlaces().entrySet()) {
-            WindowLayout.Place place = entry.getValue();
-            lines.add("category " + entry.getKey().id()
-                    + " x=" + format(place.x)
-                    + " y=" + format(place.y)
-                    + " height=" + format(place.height)
-                    + " width=" + place.width
-                    + (place.fill != Window.ScreenFill.NONE
-                            ? " fill=" + place.fill.id() : ""));
         }
         if (FirstTips.seen() > 0) {
             lines.add(FirstTips.describe());

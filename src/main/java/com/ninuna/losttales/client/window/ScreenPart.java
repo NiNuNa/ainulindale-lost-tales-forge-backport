@@ -34,15 +34,6 @@ public abstract class ScreenPart {
     /* ---- Life ---- */
 
     /**
-     * A view of the part's own switched on with no window of it shown: the
-     * part opens its first window as the view's key does, and answers the
-     * page to bring forward; null for a view that is not the part's.
-     */
-    public WindowPage openView(PageCategory view) {
-        return null;
-    }
-
-    /**
      * The screen is opening, before anything else is asked: for the page
      * whose key or button opened it, or for no page (null) when the chat's
      * key did. Not asked on a resize, nor when the screen comes back from

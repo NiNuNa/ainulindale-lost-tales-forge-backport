@@ -22,18 +22,26 @@ public abstract class SubWindowContent {
 
     /**
      * Whether the window is always there while the screen is open and
-     * cannot be closed: the main menu and the snap bar. Its strip has no
-     * cross, and it keeps its own size.
+     * cannot be closed: the Views sub-window and the snap bar. Its strip
+     * has no cross, and it keeps its own size.
      */
     public boolean isPermanent() {
         return false;
     }
 
     /**
+     * Whether the window stands in front of every window and sub-window,
+     * drawn after them and answering the pointer first, and never fades
+     * under them, nor makes them fade: the Views sub-window.
+     */
+    public boolean standsInFront() {
+        return false;
+    }
+
+    /**
      * Whether the window stands hidden for now, to show again by itself:
-     * the Views sub-window while a window lies over it, the snap bar while
-     * no carried window nears the top. A tucked window fades out whole and
-     * answers no pointer.
+     * the snap bar while no carried window nears the top. A tucked window
+     * fades out whole and answers no pointer.
      */
     public boolean isTucked() {
         return false;

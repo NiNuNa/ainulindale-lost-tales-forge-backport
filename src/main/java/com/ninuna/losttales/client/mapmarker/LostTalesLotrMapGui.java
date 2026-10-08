@@ -8,6 +8,8 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
+import com.ninuna.losttales.client.window.View;
+import com.ninuna.losttales.client.window.Views;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
@@ -2962,8 +2964,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         clearSearchSelectionFrame();
-        if (LostTalesKeyBindings.isMenuKey(keyCode)) {
-            WindowScreen.openMenu();
+        View view = Views.byKey(keyCode);
+        if (view != null) {
+            WindowScreen.openView(view);
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {

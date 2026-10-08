@@ -29,7 +29,9 @@ import org.lwjgl.opengl.GL11;
  * forgets that place too: its kind opens where its opener puts it again,
  * locked. Every sub-window is drawn just over its own window, the one
  * being typed in too, so a window in front covers it; one opened with no
- * window open stands on the bare screen.</p>
+ * window open stands on the bare screen, over every window. The Views
+ * sub-window stands in front of everything ({@link
+ * SubWindowContent#standsInFront}).</p>
  *
  * <p>A window closes by its cross, by Escape while it is the one in front,
  * or by the control that opened it; it closes with its window, too.
@@ -443,8 +445,26 @@ public final class SubWindows {
      * is not there; null where no sub-window is.
      */
     public WindowHover hoverAt(double x, double y) {
-        for (int index = this.stack.size() - 1; index >= 0; index--) {
-            SubWindow window = this.stack.get(index);
+        return hoverAt(x, y, frontToBack());
+    }
+
+    /**
+     * What a point is on among the sub-windows standing in front of
+     * everything ({@link SubWindowContent#standsInFront}), which the
+     * pointer meets before anything else on the screen; null off them.
+     */
+    public WindowHover hoverInFront(double x, double y) {
+        List<SubWindow> front = new ArrayList<SubWindow>();
+        for (SubWindow window : this.stack) {
+            if (window.content.standsInFront()) {
+                front.add(window);
+            }
+        }
+        return hoverAt(x, y, front);
+    }
+
+    private WindowHover hoverAt(double x, double y, List<SubWindow> frontFirst) {
+        for (SubWindow window : frontFirst) {
             if (!window.isOpen() || window.hidden) {
                 continue;
             }
@@ -455,8 +475,7 @@ public final class SubWindows {
                 return popup;
             }
         }
-        for (int index = this.stack.size() - 1; index >= 0; index--) {
-            SubWindow window = this.stack.get(index);
+        for (SubWindow window : frontFirst) {
             if (!window.isOpen() || window.hidden || window.content.isTucked()
                     || covered(window, x, y)) {
                 continue;
@@ -492,6 +511,26 @@ public final class SubWindows {
             return hover;
         }
         return null;
+    }
+
+    /**
+     * The windows front to back as the pointer meets them: those standing
+     * in front of everything first, then the rest, the last brought in
+     * front first.
+     */
+    private List<SubWindow> frontToBack() {
+        List<SubWindow> order = new ArrayList<SubWindow>(this.stack.size());
+        for (int index = this.stack.size() - 1; index >= 0; index--) {
+            if (this.stack.get(index).content.standsInFront()) {
+                order.add(this.stack.get(index));
+            }
+        }
+        for (int index = this.stack.size() - 1; index >= 0; index--) {
+            if (!this.stack.get(index).content.standsInFront()) {
+                order.add(this.stack.get(index));
+            }
+        }
+        return order;
     }
 
     /**
@@ -537,7 +576,7 @@ public final class SubWindows {
     void addToStack(String parentId, List<Object> keys,
                     List<LostTalesUiHitBox> boxes) {
         for (SubWindow sub : this.stack) {
-            if (!sub.belongsTo(parentId)) {
+            if (!sub.belongsTo(parentId) || sub.content.standsInFront()) {
                 continue;
             }
             keys.add(sub);
@@ -555,11 +594,32 @@ public final class SubWindows {
      * their fields open, over them. {@code hover} says what the pointer
      * is on, at {@code pointerX}/{@code pointerY}. With {@code barless}
      * no window is open, and a window that works on the input bar waits
-     * undrawn.
+     * undrawn. Those standing in front of everything wait for
+     * {@link #drawInFront}.
      */
     public void draw(Minecraft minecraft, FontRenderer font,
               PointerRegions regions, WindowHover hover, double pointerX,
               double pointerY, boolean barless, String parentId) {
+        draw(minecraft, font, regions, hover, pointerX, pointerY, barless,
+                parentId, false);
+    }
+
+    /**
+     * Draws the sub-windows standing in front of everything
+     * ({@link SubWindowContent#standsInFront}): the last thing on the
+     * screen but the tips.
+     */
+    public void drawInFront(Minecraft minecraft, FontRenderer font,
+                            PointerRegions regions, WindowHover hover,
+                            double pointerX, double pointerY) {
+        draw(minecraft, font, regions, hover, pointerX, pointerY, false,
+                null, true);
+    }
+
+    private void draw(Minecraft minecraft, FontRenderer font,
+                      PointerRegions regions, WindowHover hover,
+                      double pointerX, double pointerY, boolean barless,
+                      String parentId, boolean inFront) {
         LostTalesUiHitBox room = roomOf(parentId);
         if (room == null) {
             return;
@@ -567,9 +627,9 @@ public final class SubWindows {
         LostTalesUiHitBox screen = screenRoom();
         long now = System.nanoTime();
         List<SubWindow> drawn = new ArrayList<SubWindow>();
-        for (SubWindow window
-                : new ArrayList<SubWindow>(this.stack)) {
+        for (SubWindow window : new ArrayList<SubWindow>(this.stack)) {
             if (!window.belongsTo(parentId)
+                    || window.content.standsInFront() != inFront
                     || (barless && window.content.needsInputBar())) {
                 continue;
             }
@@ -653,7 +713,8 @@ public final class SubWindows {
         WindowDrawing.softenBehind(stands, share);
         // One that windows or sub-windows in front of it lie over fades
         // as one picture over the world it now stands on.
-        float strength = this.stackFade.shareOf(window);
+        float strength = window.content.standsInFront() ? 1.0F
+                : this.stackFade.shareOf(window);
         int ring = WindowPlacement.FRAME_WIDTH + LostTalesUiInk.SHADOW_OFFSET;
         boolean fading = strength < 1.0F && this.fade.begin(minecraft,
                 exactLeft - ring, exactTop - ring, window.width + 2 * ring,

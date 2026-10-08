@@ -68,11 +68,14 @@ public final class ConversationPageTest {
             ids.add(option.id);
         }
         assertEquals(Arrays.asList("mark_read", "jump_unread", "feed",
-                "notify"), ids);
+                "notify", "inbox"), ids);
         assertFalse(ooc.options().get(0).isAvailable());
         assertFalse(ooc.options().get(1).isAvailable());
         assertFalse(ooc.options().get(1).group().equals(
                 ooc.options().get(2).group()));
+        // The inbox stands beside the two settings, and opens a sub-window.
+        assertEquals(ooc.options().get(3).group(), ooc.options().get(4).group());
+        assertEquals(PageOption.Kind.OPENS, ooc.options().get(4).kind);
         assertEquals(ChatLineChoice.EVERYTHING.labelKey(),
                 ooc.options().get(2).value);
         assertEquals(ChatLineChoice.ONLY_MENTIONS.labelKey(),

@@ -7,7 +7,6 @@ import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowFrame;
 import com.ninuna.losttales.client.window.WindowLayout;
-import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowPage;
@@ -103,12 +102,12 @@ public final class ChatPagesTest {
     }
 
     /**
-     * A page whose category has no window opens its category's first
-     * window: at the default place, locked, in front of the others, never
-     * a step on from the chat's window.
+     * A page opened where its view has no window opens a window of its
+     * own: at the default place, unlocked, in front of the others, never a
+     * step on from the chat's window.
      */
     @Test
-    public void aPageOpensItsCategorysFirstWindow() {
+    public void aPageOpensAWindowOfItsOwnInAnEmptyView() {
         OtherPage page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
         assertNotNull(window);
@@ -117,21 +116,20 @@ public final class ChatPagesTest {
         assertTrue(WindowPlacement.atDefaultPlace(window));
         List<Window> stacked = WindowLayout.stacked();
         assertSame(window, stacked.get(stacked.size() - 1));
-        assertTrue(window.isLocked());
+        assertFalse(window.isLocked());
         assertEquals(Window.ScreenFill.NONE, window.getFill());
         assertSame("shown again, the same window comes forward", window,
                 WindowLayout.showPage(page));
     }
 
     /**
-     * A page closed comes back as its category's first window stands,
-     * wherever its window was moved: nothing of that window is kept.
+     * A page closed comes back at the default place, wherever its window
+     * was moved: nothing of that window is kept.
      */
     @Test
-    public void aClosedPageComesBackInItsCategorysFirstWindow() {
+    public void aClosedPageComesBackAtTheDefaultPlace() {
         OtherPage page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
-        WindowLayout.setLocked(window.getId(), false);
         WindowLayout.setWindowWidth(window.getId(), 320, false);
         WindowLayout.setWindowHeight(window.getId(), 250.0D, false);
         WindowLayout.setPosition(window.getId(), 20.0D, 30.0D, false);
@@ -139,10 +137,7 @@ public final class ChatPagesTest {
         assertNull(WindowLayout.windowOf(page));
         Window again = WindowLayout.showPage(page);
         assertTrue(WindowPlacement.atDefaultPlace(again));
-        assertTrue(again.isLocked());
-        List<String> described = WindowLayoutStore.describe();
-        assertFalse(described.toString(), described.toString().contains(
-                "place "));
+        assertFalse(again.isLocked());
     }
 
     @Test
@@ -153,7 +148,7 @@ public final class ChatPagesTest {
         OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.setLocked(window.getId(), false);
         WindowLayout.openTab(page, window.getId());
-        WindowLayout.showPage(page);
+        WindowLayout.setActiveTab(page);
         assertTrue(WindowLayout.showsPage(window));
 
         ChatTabActions actions = new ChatTabActions(new ChatInputBar(),
@@ -177,7 +172,7 @@ public final class ChatPagesTest {
         OtherPage page = WindowPages.tab(PAGE);
         WindowLayout.setLocked(window.getId(), false);
         WindowLayout.openTab(page, window.getId());
-        WindowLayout.showPage(page);
+        WindowLayout.setActiveTab(page);
 
         ChatTabActions actions = new ChatTabActions(new ChatInputBar(),
                 new ChatInputCompletion(null), new ChatComposer());
@@ -219,58 +214,6 @@ public final class ChatPagesTest {
         assertNotNull(WindowLayout.showPage(WindowPages.tab(PAGE)));
     }
 
-    /**
-     * Locking a window by hand makes where it stands its category's first
-     * place: the category's next first window opens there, the file keeps
-     * it, and Reset Window Layout forgets it, back to the shipped defaults.
-     */
-    @Test
-    public void lockingAWindowKeepsItsPlaceForItsCategory() {
-        OtherPage page = WindowPages.tab(PAGE);
-        Window window = WindowLayout.showPage(page);
-        WindowLayout.setLocked(window.getId(), false);
-        WindowLayout.setWindowWidth(window.getId(), 320, false);
-        WindowLayout.setWindowHeight(window.getId(), 250.0D, false);
-        WindowLayout.setPosition(window.getId(), 20.0D, 30.0D, false);
-        assertTrue(WindowLayout.setLocked(window.getId(), true));
-        WindowLayout.setLocked(window.getId(), false);
-        WindowLayout.close(page);
-        Window again = WindowLayout.showPage(page);
-        assertTrue(again.isLocked());
-        assertEquals(20.0D, again.getOffsetX(), 1.0E-9D);
-        assertEquals(30.0D, again.getOffsetY(), 1.0E-9D);
-        assertEquals(320, again.getOwnWidth());
-        List<String> described = WindowLayoutStore.describe();
-        assertTrue(described.toString(), described.contains(
-                "category quest_journal x=20.00 y=30.00 height=250.00 width=320"));
-        WindowLayoutStore.load(described);
-        assertEquals(described, WindowLayoutStore.describe());
-        Window loaded = WindowLayout.windowOf(page);
-        WindowLayout.setLocked(loaded.getId(), false);
-        assertTrue(WindowLayout.resetWindow(loaded.getId()));
-        assertTrue(WindowPlacement.atDefaultPlace(loaded));
-        WindowLayout.setLocked(loaded.getId(), false);
-        WindowLayout.close(page);
-        assertTrue("forgotten: the shipped defaults again",
-                WindowPlacement.atDefaultPlace(WindowLayout.showPage(page)));
-    }
-
-    /**
-     * The map's category opens its first window filling the screen, locked;
-     * reset, an unlocked map window fills it again.
-     */
-    @Test
-    public void aMapLikePageOpensFillingTheScreen() {
-        OtherPage page = WindowPages.tab(FILLING);
-        Window window = WindowLayout.showPage(page);
-        assertEquals(Window.ScreenFill.FULL, window.getFill());
-        assertTrue(window.isLocked());
-        WindowLayout.setLocked(window.getId(), false);
-        WindowLayout.setFill(window.getId(), Window.ScreenFill.LEFT, false);
-        assertTrue(WindowLayout.resetWindow(window.getId()));
-        assertEquals(Window.ScreenFill.FULL, window.getFill());
-    }
-
     @Test
     public void aPageOutOfReachWaitsUnseen() {
         OtherPage page = WindowPages.tab(FILLING);
@@ -308,14 +251,13 @@ public final class ChatPagesTest {
     /**
      * A page taken out of its window by itself — a world page walked
      * away from, even out of a locked window — leaves nothing behind: it
-     * comes back in its category's first window, as a page closed by hand
-     * does.
+     * comes back at the default place, as a page closed by hand does.
      */
     @Test
-    public void aPageTakenOutByItselfComesBackInItsCategorysFirstWindow() {
+    public void aPageTakenOutByItselfComesBackAtTheDefaultPlace() {
         final OtherPage page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
-        assertTrue(window.isLocked());
+        WindowLayout.setLocked(window.getId(), true);
         WindowLayout.removeTabs(new WindowLayout.TabFilter() {
             @Override
             public boolean matches(WindowPage tab) {
@@ -324,7 +266,7 @@ public final class ChatPagesTest {
         });
         assertNull(WindowLayout.windowOf(page));
         Window again = WindowLayout.showPage(page);
-        assertTrue(again.isLocked());
+        assertFalse(again.isLocked());
         assertTrue(WindowPlacement.atDefaultPlace(again));
     }
 

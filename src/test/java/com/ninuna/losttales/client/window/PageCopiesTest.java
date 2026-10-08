@@ -117,7 +117,8 @@ public final class PageCopiesTest {
         assertTrue("the second copy keeps the page open", WindowLayout.isOpen(page));
         assertSame(second, WindowLayout.lastUsed(page));
         assertSame("a key brings the copy open forward, opening none",
-                second, WindowLayout.openInCategory(page, null));
+                second, WindowLayout.openInView(page,
+                        WindowLayout.viewOf(WindowLayout.windowOf(second))));
         assertEquals(1, WindowLayout.copiesOf(page).size());
     }
 

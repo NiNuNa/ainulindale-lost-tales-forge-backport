@@ -261,18 +261,6 @@ public abstract class WindowPage {
     public void toggleMemberList() {}
 
     /**
-     * The mark the strip's inbox button wears beside it, counting what
-     * waits for the player; null for a page whose strip has no inbox
-     * button.
-     */
-    public TabMark inboxMark() {
-        return null;
-    }
-
-    /** Opens the inbox the strip's button stands for. */
-    public void openInbox() {}
-
-    /**
      * Puts back what the page lays out as it first was — its panel, its
      * member list and that list's width — as its window's layout is reset.
      */

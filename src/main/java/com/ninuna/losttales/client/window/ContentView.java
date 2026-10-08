@@ -13,29 +13,22 @@ import java.util.Map;
  * screen within its frame. The other windows stay as they are.
  *
  * <p>The tool strip's button or Alt+Enter brings it for the window the
- * keys are in. Escape, Alt+Enter again or the line at the window's top
- * end it, and so do the page leaving the front of its window, the window
- * closing, a snap key and the screen closing. Each window has its own;
- * nothing of it is saved.</p>
+ * keys are in. Escape, Alt+Enter again or the exit on the dent at the
+ * window's top ({@link ContentViewDent}) end it, and so do the page
+ * leaving the front of its window, the window closing, a snap key and the
+ * screen closing. Each window has its own. The dent's padlock holds it
+ * ({@link Window#isBorderlessHeld}): held, nothing but letting go of the
+ * padlock ends it, whatever page is in front, and the layout keeps
+ * it.</p>
  *
  * <p>While playing, a window pinned to the HUD always shows its page
  * filling it: nothing on its row, strip or bar can be pressed there. They
  * slide out as the screen closes and back in as it opens.</p>
  */
 public final class ContentView {
-    /** By window id, the page filling the window and when it came to. */
-    private static final Map<String, Filled> FILLED =
-            new LinkedHashMap<String, Filled>();
-
-    private static final class Filled {
-        final WindowPage page;
-        final long enteredNanos;
-
-        Filled(WindowPage page, long enteredNanos) {
-            this.page = page;
-            this.enteredNanos = enteredNanos;
-        }
-    }
+    /** By window id, the page filling the window while it is not held. */
+    private static final Map<String, WindowPage> FILLED =
+            new LinkedHashMap<String, WindowPage>();
 
     private ContentView() {}
 
@@ -45,34 +38,42 @@ public final class ContentView {
         if (front == null) {
             return false;
         }
-        FILLED.put(window.getId(), new Filled(front, System.nanoTime()));
+        FILLED.put(window.getId(), front);
         return true;
     }
 
-    /** Gives {@code window} its row, strip and bar back; false while its page did not fill it. */
+    /**
+     * Gives {@code window} its row, strip and bar back; false while its
+     * page did not fill it, or is held there.
+     */
     public static synchronized boolean leave(Window window) {
-        return window != null && FILLED.remove(window.getId()) != null;
+        return window != null && !window.isBorderlessHeld()
+                && FILLED.remove(window.getId()) != null;
     }
 
-    /** Gives every window its row, strip and bar back: the screen closes. */
+    /** Gives every window its row, strip and bar back but those held: the screen closes. */
     public static synchronized void leaveAll() {
         FILLED.clear();
     }
 
-    /** Whether {@code window}'s page fills it now. */
+    /** Whether {@code window}'s page fills it now, held there or not. */
     public static synchronized boolean isOn(Window window) {
-        return window != null && FILLED.containsKey(window.getId());
+        return window != null && (window.isBorderlessHeld()
+                || FILLED.containsKey(window.getId()));
     }
 
-    /** Whether the window of that id has its page filling it. */
-    public static synchronized boolean isOn(String id) {
-        return id != null && FILLED.containsKey(id);
-    }
-
-    /** When the window's page came to fill it, for the line saying how to leave; 0 for none. */
-    static synchronized long enteredNanos(String id) {
-        Filled filled = id == null ? null : FILLED.get(id);
-        return filled == null ? 0L : filled.enteredNanos;
+    /**
+     * Holds the page filling {@code window} there, or lets it go: let go,
+     * the page still fills the window, until the exit or Escape ends it.
+     */
+    static synchronized void hold(Window window, boolean held) {
+        if (window == null || !isOn(window)) {
+            return;
+        }
+        if (!held && window.getActiveTab() != null) {
+            FILLED.put(window.getId(), window.getActiveTab());
+        }
+        WindowLayout.setBorderlessHeld(window.getId(), held);
     }
 
     /**
@@ -90,13 +91,13 @@ public final class ContentView {
      * filled it has left the front of the window, or the window is gone.
      */
     static synchronized void follow() {
-        Iterator<Map.Entry<String, Filled>> each =
+        Iterator<Map.Entry<String, WindowPage>> each =
                 FILLED.entrySet().iterator();
         while (each.hasNext()) {
-            Map.Entry<String, Filled> entry = each.next();
+            Map.Entry<String, WindowPage> entry = each.next();
             Window window = WindowLayout.window(entry.getKey());
             if (window == null
-                    || !entry.getValue().page.equals(window.getActiveTab())) {
+                    || !entry.getValue().equals(window.getActiveTab())) {
                 each.remove();
             }
         }

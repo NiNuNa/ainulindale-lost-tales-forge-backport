@@ -45,7 +45,8 @@ public final class WindowResizeTest {
         assertTrue(WindowLayout.resetWindow(window.getId()));
         assertTrue(WindowPlacement.atDefaultPlace(window));
         assertTrue("reset, it is locked again", window.isLocked());
-        assertEquals(Window.ScreenFill.NONE, window.getFill());
+        assertEquals("where its view opens it: the consoles' quarter",
+                Window.ScreenFill.TOP_LEFT, window.getFill());
         WindowLayout.setWindowHeight(window.getId(), 180.0D, true);
         assertFalse("locked, it stays as it is",
                 WindowLayout.resetWindow(window.getId()));

@@ -1165,12 +1165,15 @@ public final class TabRow {
                             row.offsetX + this.windowFullscreenX, bottom);
                 }
                 if (!row.bare && this.windowCloseX >= 0) {
+                    // A locked window keeps its pages: its cross stays,
+                    // greyed and still.
                     drawEndControl(LostTalesUiSheet.CLOSE,
                             LostTalesUiSheet.CLOSE_HOVER,
-                            step(this.windowCloseMotion, hovered,
+                            step(this.windowCloseMotion,
+                                    row.locked ? null : hovered,
                                     HitKind.WINDOW_CLOSE),
                             row.offsetX + this.windowCloseX, bottom,
-                            false);
+                            row.locked);
                 }
                 if (!row.bare && this.secondDividerX >= 0) {
                     drawDivider(row.offsetX + this.secondDividerX, bottom);
@@ -2267,6 +2270,48 @@ public final class TabRow {
         } finally {
             // The threshold vanilla's GUI runs under, as the item
             // renderer also leaves it.
+            GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
+        }
+    }
+
+    /** How tall a dent stands: the selected tab's pieces. */
+    static final int DENT_HEIGHT =
+            LostTalesUiSheet.TAB_SELECTED_LEFT.getHeight();
+    /** The rows of a dent above its tip line and chamfered row: where its controls stand. */
+    static final int DENT_BODY_HEIGHT = DENT_HEIGHT - TIP_ROW - 1;
+    /** A dent's border pieces' width, inside which its controls stand. */
+    static final int DENT_BORDER = BORDER_WIDTH;
+
+    /**
+     * The selected tab's shape turned upside down, hanging from
+     * {@code top} between {@code left} and {@code right}: a dent in a
+     * window's top edge, its feet spread on the edge and its tip line at
+     * its foot. One surface, the selected tab's, then the pieces' ink.
+     */
+    static void drawDentShape(float left, float right, int top,
+                              int spriteAlpha, int interiorAlpha) {
+        int surface = LostTalesUiInk.argb(tabSurfaceRgb(true, 0.0F),
+                interiorAlpha);
+        int bottom = top + DENT_HEIGHT;
+        LostTalesUiInk.fillRect(left, top, right, bottom - 1, surface);
+        LostTalesUiInk.fillRect(left + 1, bottom - 1, right - 1, bottom,
+                surface);
+        float spanLeft = left + BORDER_WIDTH;
+        float spanRight = right - BORDER_WIDTH;
+        if (spanRight > spanLeft) {
+            LostTalesUiInk.fillRect(spanLeft, bottom - 1 - TIP_ROW, spanRight,
+                    bottom - TIP_ROW, LostTalesUiInk.argb(TIP_LIT_RGB,
+                            spriteAlpha));
+        }
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        try {
+            GL11.glAlphaFunc(GL11.GL_GREATER,
+                    TAB_INK_THRESHOLD * spriteAlpha / 255.0F);
+            LostTalesUiSheet.drawFlipped(LostTalesUiSheet.TAB_SELECTED_LEFT,
+                    left - SELECTED_FOOT, top, spriteAlpha);
+            LostTalesUiSheet.drawFlipped(LostTalesUiSheet.TAB_SELECTED_RIGHT,
+                    spanRight, top, spriteAlpha);
+        } finally {
             GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
         }
     }

@@ -83,9 +83,11 @@ public final class TabMenusTest {
         assertEquals("-", ids.get(1));
         int lastHairline = ids.lastIndexOf("-");
         assertTrue("its own options stand between the two", lastHairline > 2);
+        assertEquals("the inbox last of its own options, beside its settings",
+                "inbox", ids.get(lastHairline - 1));
         assertEquals(Arrays.asList("settings:CHAT", "split_view",
                 "tab:duplicate", "strip:borderless", "strip:members", "strip:search",
-                "strip:inbox", "strip:help"), ids.subList(lastHairline + 1, ids.size()));
+                "strip:help"), ids.subList(lastHairline + 1, ids.size()));
     }
 
     /**

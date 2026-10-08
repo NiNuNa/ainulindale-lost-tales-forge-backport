@@ -157,8 +157,8 @@ public final class WindowPages {
                         ? tab(id.substring(OtherPage.ID_PREFIX.length())) : null;
             }
         });
-        // A category's key opens its first window with every page of it
-        // the player can open, in the order they were registered.
+        // A view holding a whole category opens with every page of it the
+        // player can open, in the order they were registered.
         WindowLayout.addViewPages(new WindowLayout.ViewPages() {
             @Override
             public List<? extends WindowPage> pagesOf(PageCategory category) {
@@ -178,9 +178,9 @@ public final class WindowPages {
     /**
      * Registers a page under {@code id}, a code name as a channel's is:
      * lower-case letters, digits and underscores, of a {@code category}. A
-     * second page under an id already taken is refused. It opens in a
-     * window of its category, and its {@code key}, when it has one, turns
-     * the screen to its category's view and closes it from there.
+     * second page under an id already taken is refused. The game opens it
+     * in its category's view, and its {@code key}, when it has one, swaps
+     * the screen to that view and closes it from there.
      */
     public static synchronized void register(String id, String titleKey,
                                              ItemStack icon, KeyBinding key,
@@ -264,20 +264,6 @@ public final class WindowPages {
     public static synchronized OtherPage tab(String id) {
         Page page = byId(id);
         return page == null ? null : page.tab();
-    }
-
-    /**
-     * The page a view swapped to opens with no window of its own: its
-     * first page the player can open, in the order the pages were
-     * registered. Null for none.
-     */
-    static synchronized OtherPage viewPage(PageCategory view) {
-        for (Page page : PAGES.values()) {
-            if (page.category().home() == view && isOffered(page)) {
-                return page.tab();
-            }
-        }
-        return null;
     }
 
     /** The tab of the page whose key is bound to the keyboard's {@code keyCode}; null for none. */

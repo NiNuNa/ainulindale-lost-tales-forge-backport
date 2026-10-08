@@ -1,6 +1,5 @@
 package com.ninuna.losttales.proxy;
 
-import com.ninuna.losttales.client.chat.InboxPage;
 import com.ninuna.losttales.gui.hud.placement.HudPlacementPage;
 import com.ninuna.losttales.client.chat.ChatLayout;
 import com.ninuna.losttales.client.chat.ChatScreenPart;
@@ -225,14 +224,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     @Override
                     public PageContent create() {
                         return new NewPage();
-                    }
-                });
-        WindowPages.register(InboxPage.PAGE_ID, "gui.losttales.page.inbox",
-                InboxPage.ICON, null, PageCategory.CHANNELS,
-                new WindowPages.Factory() {
-                    @Override
-                    public PageContent create() {
-                        return new InboxPage();
                     }
                 });
         WindowPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",

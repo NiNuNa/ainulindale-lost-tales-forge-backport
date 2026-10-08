@@ -5,10 +5,11 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * One window in the client layout: an ordered row of tabs, the tab
- * currently in front, the splits that show two of its pages together, a
- * lock, its two pins, a position, its own size, and whether it fills a
- * part of the screen. Instances are owned and mutated only by
+ * One window in the client layout: the view it stands in, an ordered
+ * row of tabs, the tab currently in front, the splits that show two of
+ * its pages together, a lock, its two pins, a position, its own size,
+ * whether it fills a part of the screen, and whether its page is held
+ * filling it. Instances are owned and mutated only by
  * {@link WindowLayout}; everyone else reads them.
  */
 public final class Window {
@@ -18,21 +19,18 @@ public final class Window {
     /** Two of its pages each, shown together while one of them is in front. */
     private final List<WindowSplit> splits = new ArrayList<WindowSplit>();
     private boolean locked;
-    /**
-     * Whether a locked window was closed by hand: it stands as it was,
-     * pages and all, but shows nowhere until its view opens again. For the
-     * session only.
-     */
-    private boolean closed;
     /** Whether the window stays on screen while playing, as part of the HUD. */
     private boolean pinnedToHud;
     /** Whether every view of the window screen shows the window, whichever key opened it. */
     private boolean pinnedToGui;
     /**
-     * The view the window stands in: its category's, or the Lost Tales
-     * Menu's ({@link PageCategory#MENU}); null until the layout gives it one.
+     * Whether its page fills it and is held there ({@link ContentView}):
+     * Escape and the dent's exit no longer end it, and it is kept with
+     * the layout.
      */
-    private PageCategory view;
+    private boolean borderlessHeld;
+    /** The view the window stands in; null until the layout gives it one. */
+    private View view;
     /** Percent of the available screen travel, see HudPlacementLayout. */
     private double offsetX;
     private double offsetY;
@@ -315,12 +313,12 @@ public final class Window {
 
     public String getId() { return this.id; }
     public boolean isLocked() { return this.locked; }
-    /** Whether the window was closed while locked and waits for its view to open again. */
-    public boolean isClosed() { return this.closed; }
     public boolean isPinnedToHud() { return this.pinnedToHud; }
     public boolean isPinnedToGui() { return this.pinnedToGui; }
+    /** Whether its page fills it and is held there until the player lets it go. */
+    public boolean isBorderlessHeld() { return this.borderlessHeld; }
     /** The view it stands in; null until the layout gives it one ({@link WindowLayout#viewOf}). */
-    PageCategory getView() { return this.view; }
+    View getView() { return this.view; }
     public double getOffsetX() { return this.offsetX; }
     public double getOffsetY() { return this.offsetY; }
     /**
@@ -383,12 +381,13 @@ public final class Window {
 
     void setLocked(boolean locked) { this.locked = locked; }
 
-    void setClosed(boolean closed) { this.closed = closed; }
-
     void setPinnedToHud(boolean pinned) { this.pinnedToHud = pinned; }
 
     void setPinnedToGui(boolean pinned) { this.pinnedToGui = pinned; }
-    void setView(PageCategory view) { this.view = view; }
+
+    void setBorderlessHeld(boolean held) { this.borderlessHeld = held; }
+
+    void setView(View view) { this.view = view; }
 
     void setOwnHeight(double height) { this.ownHeight = height; }
 

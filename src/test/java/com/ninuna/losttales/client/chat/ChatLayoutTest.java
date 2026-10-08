@@ -1,7 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.window.PageCategory;
 import com.ninuna.losttales.client.window.Tearing;
+import com.ninuna.losttales.client.window.View;
+import com.ninuna.losttales.client.window.Views;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
@@ -74,8 +77,8 @@ public final class ChatLayoutTest {
     }
 
     /**
-     * A new player starts with one window of Global and OOC, Global in
-     * front, in the middle of the screen at two thirds of it. The conversations left
+     * A new player starts with the Chat view's window of Global and OOC,
+     * Global in front, in the bottom-left quarter. The conversations left
      * closed open with their first line; Operator and the consoles wait
      * to be opened by hand. The file written from it reads back the same.
      */
@@ -87,8 +90,8 @@ public final class ChatLayoutTest {
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC),
                 ChatLayoutViews.channelsOf(window));
         assertEquals(ChatChannel.GLOBAL, ChatLayoutViews.frontChannelOf(window));
-        assertEquals(Window.ScreenFill.NONE, window.getFill());
-        assertTrue("in the middle, at two thirds",
+        assertEquals(Window.ScreenFill.BOTTOM_LEFT, window.getFill());
+        assertTrue("its own box the default place's",
                 WindowPlacement.atDefaultPlace(window));
         assertTrue(window.isLocked());
         assertEquals(Arrays.asList(ChatChannel.PROXIMITY, ChatChannel.FACTION,
@@ -606,8 +609,7 @@ public final class ChatLayoutTest {
 
     /**
      * A whole window closes at once and its channels survive it. A locked
-     * one only goes out of sight with everything it holds, and comes back
-     * as it was when it is asked for.
+     * one keeps everything it holds and stays.
      */
     @Test
     public void closingAWindowKeepsItsChannels() {
@@ -615,12 +617,8 @@ public final class ChatLayoutTest {
         assertTrue(WindowLayout.setLocked("w1", true));
         List<ChatChannel> held = ChatLayoutViews.channelsOf(
                 WindowLayout.window("w1"));
-        assertTrue("a locked window closes", WindowLayout.closeWindow("w1"));
-        assertTrue(WindowLayout.window("w1").isClosed());
+        assertFalse("a locked window stays", WindowLayout.closeWindow("w1"));
         assertEquals(held, ChatLayoutViews.channelsOf(WindowLayout.window("w1")));
-        assertFalse("closed once", WindowLayout.closeWindow("w1"));
-        WindowLayout.raise("w1");
-        assertFalse(WindowLayout.window("w1").isClosed());
         assertTrue(WindowLayout.setLocked("w1", false));
         assertTrue(WindowLayout.closeWindow("w1"));
         assertNull(WindowLayout.window("w1"));
@@ -782,9 +780,9 @@ public final class ChatLayoutTest {
 
     /**
      * The padlock holds a window's place, its size and its tabs: by hand
-     * none of them closes, leaves, arrives or changes places, and the
-     * window does not reset; closed, it keeps them all. What is inside a
-     * tab stays the player's to set.
+     * none of them closes, leaves, arrives or changes places, the window
+     * does not reset and cannot be closed. What is inside a tab stays the
+     * player's to set.
      */
     @Test
     public void aLockedWindowKeepsItsPlaceItsSizeAndItsTabs() {
@@ -803,9 +801,8 @@ public final class ChatLayoutTest {
         assertFalse(WindowLayout.addTab("w2", ConversationPage.whisper("Bilbo", "")));
         assertNull(Tearing.off(ooc, 1.0D, 1.0D));
         assertFalse(WindowLayout.resetWindow("w2"));
-        assertTrue(WindowLayout.closeWindow("w2"));
+        assertFalse(WindowLayout.closeWindow("w2"));
         assertEquals(held, ChatLayoutViews.channelsOf(WindowLayout.window("w2")));
-        WindowLayout.raise("w2");
         ChatLayout.setNotification(ooc, ChatLineChoice.NOTHING);
         assertTrue(ChatLayout.isMuted(ConversationPage.of(ChatChannel.OOC)));
         assertTrue(WindowLayout.setLocked("w2", false));
@@ -823,11 +820,13 @@ public final class ChatLayoutTest {
      */
     @Test
     public void aTabOpeningPassesLockedWindowsBy() {
+        Window w3 = Tearing.off(ConversationPage.of(ChatChannel.OOC), 10.0D,
+                10.0D);
         WindowLayout.setLocked("w2", true);
         ConversationPage bilbo = ConversationPage.whisper("Bilbo", "");
         assertNotNull(WindowLayout.openTab(bilbo, "w2"));
-        assertEquals("w1", WindowLayout.windowOf(bilbo).getId());
-        WindowLayout.setLocked("w1", true);
+        assertEquals(w3, WindowLayout.windowOf(bilbo));
+        WindowLayout.setLocked(w3.getId(), true);
         WindowLayout.raise("w2");
         int before = WindowLayout.windows().size();
         ConversationPage frodo = ChatLayout.openTab(ConversationPage.whisper("Frodo", ""),
@@ -879,6 +878,8 @@ public final class ChatLayoutTest {
      */
     @Test
     public void aConversationOpeningByItselfJoinsAnUnlockedConversationWindow() {
+        Window w3 = Tearing.off(ConversationPage.of(ChatChannel.OOC), 10.0D,
+                10.0D);
         int before = WindowLayout.windows().size();
         WindowLayout.raise("w2");
         ConversationPage whisper = ChatLayout.openWhisper("Bilbo", "", null);
@@ -886,54 +887,64 @@ public final class ChatLayoutTest {
         assertEquals("w2", WindowLayout.windowOf(whisper).getId());
         WindowLayout.setLocked("w2", true);
         ConversationPage frodo = ChatLayout.openWhisper("Frodo", "", null);
-        assertEquals("the front one locked, the other takes it", "w1",
-                WindowLayout.windowOf(frodo).getId());
+        assertEquals("the front one locked, the other takes it", w3,
+                WindowLayout.windowOf(frodo));
         assertEquals(before, WindowLayout.windows().size());
     }
 
     /**
-     * With no window holding a conversation, one that opens by itself
-     * waits; the chat's first window brings it back with Global and OOC.
-     * One the player asks for opens that first window at once.
+     * With no window in the Chat view, a conversation that opens by itself
+     * waits; the view opening with its defaults brings it, beside Global
+     * and OOC in the bottom-left quarter, locked. One the player asks for
+     * opens a window of its own at once.
      */
     @Test
-    public void withNoConversationWindowAConversationWaitsForTheFirstWindow() {
+    public void withNoChatWindowAConversationWaitsForTheChatView() {
         assertTrue(WindowLayout.closeWindow("w1"));
         assertTrue(WindowLayout.closeWindow("w2"));
-        assertFalse(ChatLayout.hasConversationWindow());
+        View chat = Views.of(PageCategory.CHANNELS);
+        assertFalse(WindowLayout.hasWindowIn(chat));
         assertNull(ChatLayout.openTab(ConversationPage.of(ChatChannel.PROXIMITY), null));
-        Window first = ChatLayout.openFirstWindow();
+        assertTrue(WindowLayout.buildView(chat));
+        Window first = WindowLayout.windowOf(ConversationPage.of(ChatChannel.GLOBAL));
         assertNotNull(first);
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC,
                 ChatChannel.PROXIMITY), ChatLayoutViews.channelsOf(first));
         assertEquals(ChatChannel.GLOBAL, ChatLayoutViews.frontChannelOf(first));
-        assertTrue(WindowPlacement.atDefaultPlace(first));
+        assertEquals(Window.ScreenFill.BOTTOM_LEFT, first.getFill());
         assertTrue(first.isLocked());
+        assertFalse("built once", WindowLayout.buildView(chat));
         WindowLayout.setLocked(first.getId(), false);
         assertTrue(WindowLayout.closeWindow(first.getId()));
         ConversationPage whisper = ChatLayout.openWhisper("Frodo", "", null);
-        assertNotNull("asked for, it opens the first window", whisper);
-        assertTrue(ChatLayout.hasConversationWindow());
+        assertNotNull("asked for, it opens a window of its own", whisper);
+        assertEquals(chat, WindowLayout.viewOf(WindowLayout.windowOf(whisper)));
     }
 
     /**
-     * A conversation opens in the window it was asked for, else in the
-     * window last brought to the front that has room.
+     * A conversation opens in the window of the Chat view it was asked
+     * for, else in the one of that view last brought to the front that has
+     * room; never in another view's window, the consoles' among them.
      */
     @Test
     public void anArrivingConversationPrefersTheWindowLastBroughtToTheFront() {
-        WindowLayout.raise("w1");
-        assertEquals("w1", WindowLayout.windowOf(
-                ChatLayout.openWhisper("Bilbo", "", null)).getId());
+        Window w3 = Tearing.off(ConversationPage.of(ChatChannel.OOC), 10.0D,
+                10.0D);
+        WindowLayout.raise(w3.getId());
+        assertEquals(w3, WindowLayout.windowOf(
+                ChatLayout.openWhisper("Bilbo", "", null)));
         WindowLayout.raise("w2");
         assertEquals("w2", WindowLayout.windowOf(
                 ChatLayout.openWhisper("Frodo", "", null)).getId());
         // The window asked for wins over the front one, while unlocked.
-        assertEquals("w1", WindowLayout.windowOf(
-                ChatLayout.openWhisper("Sam", "", "w1")).getId());
-        assertTrue(WindowLayout.setLocked("w1", true));
+        assertEquals(w3, WindowLayout.windowOf(
+                ChatLayout.openWhisper("Sam", "", w3.getId())));
+        assertEquals("the consoles' window is another view's", "w2",
+                WindowLayout.windowOf(ChatLayout.openWhisper("Pippin", "",
+                        "w1")).getId());
+        assertTrue(WindowLayout.setLocked(w3.getId(), true));
         assertEquals("w2", WindowLayout.windowOf(
-                ChatLayout.openWhisper("Merry", "", "w1")).getId());
+                ChatLayout.openWhisper("Merry", "", w3.getId())).getId());
     }
 
     /**

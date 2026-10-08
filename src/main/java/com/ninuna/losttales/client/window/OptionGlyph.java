@@ -34,6 +34,50 @@ public abstract class OptionGlyph {
         return null;
     }
 
+    /** Between a glyph and the mark beside it, as between the {@code +} and its mark. */
+    static final int MARK_GAP = 3;
+
+    /**
+     * {@code glyph} with {@code mark} beside it, as the {@code +} marks
+     * what waits behind it: the inbox's count. The mark stands after the
+     * glyph, centred on it, the odd pixel up. Before a row in a menu the
+     * glyph stands alone; the row says the count.
+     */
+    public static OptionGlyph withMark(final OptionGlyph glyph,
+                                       final TabMark mark) {
+        if (mark == null || mark.isNone()) {
+            return glyph;
+        }
+        return new OptionGlyph() {
+            @Override
+            public LostTalesUiSheet sprite() {
+                return glyph.sprite();
+            }
+
+            @Override
+            public int width() {
+                return glyph.width() + MARK_GAP + mark.width();
+            }
+
+            @Override
+            public int height() {
+                return glyph.height();
+            }
+
+            @Override
+            public void draw(float x, float y, float lit, int alpha) {
+                glyph.draw(x, y, lit, alpha);
+                mark.drawAt(x + glyph.width() + MARK_GAP, y + Math.floorDiv(
+                        glyph.height() - mark.height(), 2), alpha);
+            }
+
+            @Override
+            MenuWindow.Picture asPicture() {
+                return glyph.asPicture();
+            }
+        };
+    }
+
     /** A sprite of the UI sheet and its lit artwork. */
     public static OptionGlyph sprite(final LostTalesUiSheet resting,
                                      final LostTalesUiSheet litSprite) {

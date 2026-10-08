@@ -188,7 +188,6 @@ public final class MotionFilesTest {
         params.put(MotionIds.WINDOW_TAB_MARQUEE, new String[] {"speed", "pause"});
         params.put(MotionIds.WINDOW_NOTICE, new String[] {"hold", "rise"});
         params.put(MotionIds.WINDOW_ANSWER, new String[] {"hold", "rise"});
-        params.put(MotionIds.WINDOW_VIEW_LINE, new String[] {"hold"});
         for (Map.Entry<String, String[]> entry : params.entrySet()) {
             for (String name : entry.getValue()) {
                 assertFalse(entry.getKey() + " " + name, Float.isNaN(

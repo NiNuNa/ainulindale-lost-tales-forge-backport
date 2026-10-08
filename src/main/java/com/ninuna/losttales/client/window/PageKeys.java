@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -246,6 +245,7 @@ public final class PageKeys {
                         window("pages.help", Keyboard.KEY_F1, OR, CLICK),
                         window("pages.search", COMMAND, PLUS, Keyboard.KEY_F),
                         window("pages.borderless", alt, PLUS, enter, OR, CLICK),
+                        window("pages.borderless_lock", CLICK),
                         window("pages.split", CLICK),
                         window("pages.split_drop", DRAG),
                         window("pages.split_divider", DRAG, OR, DOUBLE_CLICK),
@@ -277,9 +277,10 @@ public final class PageKeys {
                         window("windows.members", DRAG),
                         window("windows.scrollbar", DRAG, OR, CLICK)),
                 area("gui.losttales.window.keys.area.menus",
-                        window("menus.lost_tales_menu",
-                                LostTalesKeyBindings.getMenuKeyBinding().getKeyCode()),
+                        window("menus.lost_tales_menu", Views.menu().key()),
                         window("menus.views", CLICK),
+                        window("menus.view_menu", RIGHT_CLICK),
+                        window("menus.new_view", CLICK),
                         window("menus.settings", COMMAND, PLUS, Keyboard.KEY_COMMA),
                         window("menus.open", COMMAND, PLUS, Keyboard.KEY_N),
                         window("menus.tab_search", COMMAND, PLUS, shift, PLUS, Keyboard.KEY_A),

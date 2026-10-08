@@ -87,8 +87,6 @@ public final class MotionIds {
     public static final String WINDOW_NOTICE = "window.notice";
     /** A page's answer over its bar coming up, standing while it is read and fading. */
     public static final String WINDOW_ANSWER = "window.answer";
-    /** The line saying how to leave a page filling its window, coming and going. */
-    public static final String WINDOW_VIEW_LINE = "window.view.line";
     /** An input bar growing a row taller as the words typed in it wrap, and back. */
     public static final String WINDOW_BAR_GROW = "window.bar.grow";
 

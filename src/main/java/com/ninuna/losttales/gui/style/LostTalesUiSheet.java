@@ -785,6 +785,22 @@ public enum LostTalesUiSheet {
     /** Any cell of the sheet at its own size, 1:1, at the given opacity. */
     public static void draw(int u, int v, int width, int height,
                      float x, float y, int alpha) {
+        drawRows(u, v, width, height, x, y, alpha, false);
+    }
+
+    /**
+     * A sprite turned upside down, its top left at {@code (x, y)}, a texel
+     * to a pixel: a tab's piece hanging as a dent in a window's top edge.
+     */
+    public static void drawFlipped(LostTalesUiSheet sprite, float x, float y,
+                                   int alpha) {
+        drawRows(sprite.getTextureU(), sprite.getTextureV(), sprite.getWidth(),
+                sprite.getHeight(), x, y, alpha, true);
+    }
+
+    private static void drawRows(int u, int v, int width, int height,
+                                 float x, float y, int alpha,
+                                 boolean flipped) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null
                 || alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
@@ -797,8 +813,10 @@ public enum LostTalesUiSheet {
         try {
             float u0 = u / (float)SHEET_WIDTH;
             float u1 = (u + width) / (float)SHEET_WIDTH;
-            float v0 = v / (float)SHEET_HEIGHT;
-            float v1 = (v + height) / (float)SHEET_HEIGHT;
+            float top = v / (float)SHEET_HEIGHT;
+            float bottom = (v + height) / (float)SHEET_HEIGHT;
+            float v0 = flipped ? bottom : top;
+            float v1 = flipped ? top : bottom;
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawingQuads();
             tessellator.addVertexWithUV(x, y + height, 0.0D, u0, v1);

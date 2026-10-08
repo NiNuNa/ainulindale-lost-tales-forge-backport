@@ -3,9 +3,13 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.quest.ClientQuestNews;
 import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.TabMark;
+import com.ninuna.losttales.client.window.WindowMenus;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.client.window.WindowPages;
+import com.ninuna.losttales.client.window.WindowScreen;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.fellowship.sync.FellowshipInvitationSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
 import com.ninuna.losttales.gui.screen.fellowship.FellowshipPage;
@@ -18,13 +22,18 @@ import java.util.Locale;
 import net.minecraft.util.StatCollector;
 
 /**
- * What is addressed to the player, as the inbox lists it: the fellowship
- * invitations waiting for the character played, the lines that mentioned
- * the player, the messages forwarded to them in a whisper, and this
- * session's quest news. Each kind is read where it is kept; the inbox
- * keeps nothing of its own. The inbox button counts what waits:
- * invitations not yet answered, mentions and forwards not yet read in
- * their conversation, quest news the inbox has not shown.
+ * What is addressed to the player, as the Inbox lists it, as Discord's
+ * inbox: the fellowship invitations waiting for the character played,
+ * the lines that mentioned the player, the messages forwarded to them in a
+ * whisper, and this session's quest news, each under its heading and the
+ * newest first, narrowed by its field. A sub-window hung from the inbox
+ * button every conversation's tool strip has beside its Notification
+ * Settings; a press on a row goes where it names: a line in its
+ * conversation, an invitation on the Fellowships page, a quest in the
+ * journal. Each kind is read where it is kept; the inbox keeps nothing of
+ * its own. The button counts what waits: invitations not yet answered,
+ * mentions and forwards not yet read in their conversation, quest news
+ * the inbox has not shown.
  */
 final class ChatInbox {
     /** What a row's id starts with, for what a press on it goes to. */
@@ -40,7 +49,65 @@ final class ChatInbox {
     private static long countedAt;
     private static boolean everCounted;
 
+    /** The Inbox's rows and what a press on one does, for the sub-window ({@link ChatSubWindows#INBOX}). */
+    static final WindowMenus.Source SOURCE = new WindowMenus.Source() {
+        @Override
+        public void prepare(MenuWindow menu) {
+            menu.openField(StatCollector.translateToLocal(
+                    "gui.losttales.inbox.search"), null,
+                    LostTalesUiSheet.SEARCH, MenuWindow.MAX_FILTER_LENGTH,
+                    false);
+        }
+
+        @Override
+        public void rebuild(MenuWindow menu) {
+            menu.setTitle(null, LostTalesUiSheet.INBOX);
+            menu.setRows(rows(menu.filter()));
+            // Shown, the quest news has been seen.
+            ClientQuestNews.markSeen();
+        }
+
+        @Override
+        public boolean readsAsTyped() {
+            return true;
+        }
+
+        @Override
+        public MenuWindow.Entry firstFound(MenuWindow menu) {
+            return WindowMenus.firstTyped(menu);
+        }
+
+        @Override
+        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
+                           SubWindow window, boolean back) {
+            goTo(entry.id);
+            return false;
+        }
+    };
+
     private ChatInbox() {}
+
+    /** Goes where a row names. */
+    private static void goTo(String id) {
+        WindowScreen screen = WindowScreen.current();
+        if (screen == null || id == null) {
+            return;
+        }
+        if (id.startsWith(LINE)) {
+            // The inbox numbers its rows itself: a line's is its line id.
+            ChatScreenPart chat = screen.part(ChatScreenPart.class);
+            if (chat != null) {
+                chat.jumpFromInbox(Integer.parseInt(
+                        id.substring(LINE.length())));
+            }
+        } else if (id.startsWith(INVITATION)) {
+            screen.showOnPage(FellowshipPage.PAGE_ID,
+                    id.substring(INVITATION.length()), null);
+        } else if (id.startsWith(QUEST)) {
+            screen.showOnPage(QuestJournalPage.PAGE_ID,
+                    id.substring(QUEST.length()), null);
+        }
+    }
 
     /** The mark the inbox button wears: the tile counting what waits, nothing when nothing does. */
     static TabMark mark() {

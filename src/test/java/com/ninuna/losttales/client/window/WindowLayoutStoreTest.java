@@ -70,26 +70,44 @@ public final class WindowLayoutStoreTest {
         List<String> described = WindowLayoutStore.describe();
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());
-        assertTrue(described.get(1).contains(" split=ooc,global,down,0.6000 "));
+        assertTrue(described.get(2).contains(" split=ooc,global,down,0.6000 "));
     }
 
     /**
-     * A locked window closed stays closed through the file and comes
-     * back with its pages; an unlocked one is never kept closed.
+     * Every window names the view it stands in, and a page held filling
+     * its window is kept as held; custom views come first, with their
+     * keys and the names the player gave them.
      */
     @Test
-    public void aClosedLockedWindowStaysClosed() {
+    public void viewsAndHeldPagesRoundTrip() {
         WindowLayoutStore.load(Arrays.asList(
-                "window w1 locked=true closed=true x=10.00 y=20.00 active=global tabs=global,ooc",
-                "window w2 locked=false closed=true x=0.00 y=0.00 active=client_console tabs=client_console"));
-        assertTrue(WindowLayout.window("w1").isClosed());
-        assertFalse(WindowLayout.window("w2").isClosed());
+                "view menu key=0",
+                "view v2 key=34 name=Hunting%20Party",
+                "window w1 view=v2 locked=true borderless=held x=10.00 y=20.00 active=global tabs=global,ooc",
+                "window w2 view=consoles locked=false x=0.00 y=0.00 active=client_console tabs=client_console"));
+        assertEquals("Hunting Party", Views.byId("v2").title());
+        assertEquals(34, Views.byId("v2").key());
+        assertEquals(0, Views.menu().key());
+        assertEquals(Views.byId("v2"), WindowLayout.viewOf(WindowLayout.window("w1")));
+        assertTrue(WindowLayout.window("w1").isBorderlessHeld());
+        assertFalse(WindowLayout.window("w2").isBorderlessHeld());
         List<String> described = WindowLayoutStore.describe();
-        assertTrue(described.toString(),
-                described.get(1).startsWith("window w1 locked=true closed=true "));
-        assertFalse(described.get(2).contains("closed="));
+        assertEquals("view menu key=0", described.get(1));
+        assertEquals("view v2 key=34 name=Hunting+Party", described.get(2));
+        assertTrue(described.toString(), described.get(3).startsWith(
+                "window w1 view=v2 locked=true borderless=held "));
+        assertFalse(described.get(4).contains("borderless="));
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());
+    }
+
+    /** A window naming a view that is no longer there stands in its front page's category's view. */
+    @Test
+    public void aWindowOfAViewGoneStandsInItsPagesView() {
+        WindowLayoutStore.load(Arrays.asList(
+                "window w1 view=v7 locked=false x=0.00 y=0.00 active=global tabs=global"));
+        assertEquals(Views.of(PageCategory.CHANNELS),
+                WindowLayout.viewOf(WindowLayout.window("w1")));
     }
 
     /**
@@ -149,14 +167,15 @@ public final class WindowLayoutStoreTest {
         assertEquals(Window.ScreenFill.NONE,
                 WindowLayout.window("w4").getFill());
         List<String> described = WindowLayoutStore.describe();
-        assertTrue(described.get(1).contains(" fill=full"));
-        assertFalse(described.get(2).contains("fill"));
-        assertTrue(described.get(3).contains(" fill=top_right"));
-        assertFalse(described.get(4).contains("fill"));
+        // After the heading and the Lost Tales Menu's view line.
+        assertTrue(described.get(2).contains(" fill=full"));
+        assertFalse(described.get(3).contains("fill"));
+        assertTrue(described.get(4).contains(" fill=top_right"));
+        assertFalse(described.get(5).contains("fill"));
         // A part the player shaped keeps its edges.
         assertEquals(Window.ScreenFill.free(0.25D, 0.0D, 0.75D, 1.0D),
                 WindowLayout.window("w5").getFill());
-        assertTrue(described.get(5).contains(
+        assertTrue(described.get(6).contains(
                 " fill=free:0.25000,0.00000,0.75000,1.00000"));
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());
@@ -224,8 +243,8 @@ public final class WindowLayoutStoreTest {
     }
 
     /**
-     * An account with no file yet starts with the first window, and its
-     * first change writes the file under the account's name.
+     * An account with no file yet starts with the Chat view's window, and
+     * its first change writes the file under the account's name.
      */
     @Test
     public void aNewAccountsFirstChangeWritesItsFile() throws IOException {
@@ -243,8 +262,11 @@ public final class WindowLayoutStoreTest {
             assertTrue("the change is written", own.isFile());
             List<String> written = Files.readAllLines(own.toPath(),
                     Charset.forName("UTF-8"));
-            assertTrue(written.toString(), written.get(1).startsWith(
-                    "window " + window.getId() + " locked=true x=10.00 y=20.00"));
+            assertEquals("view menu key=58", written.get(1));
+            assertTrue(written.toString(), written.get(2).startsWith(
+                    "window " + window.getId()
+                            + " view=channels locked=true x=10.00 y=20.00"
+                            + " fill=bottom_left active=global tabs=global,ooc"));
         } finally {
             WindowLayoutStore.initialize(null);
             deleteTree(folder);
@@ -395,14 +417,15 @@ public final class WindowLayoutStoreTest {
         List<String> lines = WindowLayoutStore.describe();
         assertTrue(lines.contains("feed x=12.25 y=88.00"));
         assertTrue(lines.contains("toolbar collapsed=true"));
-        assertTrue(lines.toString(), lines.contains("window w1 locked=false"
-                + " x=50.00 y=50.00 active=client_console"
+        assertTrue(lines.toString(), lines.contains("window w1 view=consoles"
+                + " locked=false x=50.00 y=50.00 active=client_console"
                 + " tabs=client_console,server_console"));
-        assertTrue(lines.toString(), lines.contains("window w2 locked=false"
-                + " x=3.00 y=97.50 active=ooc tabs=global,proximity,ooc"));
-        assertTrue(lines.toString(), lines.contains("window w3 locked=true"
-                + " x=62.50 y=8.00 height=200.00 width=300 active=faction"
-                + " tabs=fellowship,faction"));
+        assertTrue(lines.toString(), lines.contains("window w2 view=channels"
+                + " locked=false x=3.00 y=97.50 active=ooc"
+                + " tabs=global,proximity,ooc"));
+        assertTrue(lines.toString(), lines.contains("window w3 view=channels"
+                + " locked=true x=62.50 y=8.00 height=200.00 width=300"
+                + " active=faction tabs=fellowship,faction"));
         assertTrue(lines.contains("closed operator"));
         assertTrue(lines.contains("notify\tnothing\tooc"));
         assertTrue(lines.contains("notify\teverything\tfellowship"));
@@ -555,7 +578,7 @@ public final class WindowLayoutStoreTest {
         ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         WindowLayoutStore.load(Arrays.asList(
                 "window w1 locked=false x=0.00 y=0.00 active=global tabs=global,ooc",
-                "view\tglobal\tarea=hidden members=hidden members_width=90.00"));
+                "panels\tglobal\tarea=hidden members=hidden members_width=90.00"));
         assertTrue(ChatLayout.isAreaHidden(global));
         assertTrue(ChatLayout.isMembersHidden(global));
         assertEquals(90.0D, ChatLayout.getMembersWidth(global), 1.0E-9D);
@@ -563,12 +586,12 @@ public final class WindowLayoutStoreTest {
         assertFalse(ChatLayout.isMembersHidden(ooc));
         boolean globalLine = false;
         for (String line : WindowLayoutStore.describe()) {
-            if (line.startsWith("view\tglobal\t")) {
+            if (line.startsWith("panels\tglobal\t")) {
                 globalLine = line.contains("area=hidden")
                         && line.contains("members=hidden")
                         && line.contains("members_width=90.00");
             }
-            assertFalse(line, line.startsWith("view\tooc"));
+            assertFalse(line, line.startsWith("panels\tooc"));
             assertFalse(line, line.startsWith("window") && line.contains("area="));
         }
         assertTrue(globalLine);

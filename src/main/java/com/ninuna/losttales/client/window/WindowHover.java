@@ -63,8 +63,8 @@ public class WindowHover {
         OVERLAY,
         /** What a screen part draws: its hover says what. */
         CONTENT,
-        /** The line at the top of a window its page fills, which gives it its row, strip and bar back. */
-        VIEW_LEAVE
+        /** The dent at the top of a window its page fills: its exit, its padlock, or the bare dent. */
+        DENT
     }
 
     public static final WindowHover NONE = new WindowHover(Kind.NONE);
@@ -80,6 +80,8 @@ public class WindowHover {
     public PageOption stripOption;
     /** On a sub-window, the sub-window; null anywhere else. */
     public SubWindow subWindow;
+    /** The control of a dent the point is on; null for the bare dent. */
+    ContentViewDent.Part dentPart;
     /** On a page, whether it is the split's other page rather than the one in front. */
     public boolean otherSide;
     /** On a sub-window's resize band, the edge. */
@@ -128,8 +130,9 @@ public class WindowHover {
         switch (this.kind) {
             case SUB_WINDOW_CLOSE:
             case SUB_WINDOW_LOCK:
-            case VIEW_LEAVE:
                 return true;
+            case DENT:
+                return this.dentPart != null;
             case SUB_WINDOW_STRIP:
             case SUB_WINDOW_GRIP:
                 // A strip carries its sub-window only while it is not

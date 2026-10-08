@@ -73,6 +73,16 @@ public final class WindowMenus implements MenuWindow.Owner {
         public boolean takesBack() {
             return false;
         }
+
+        /**
+         * A key pressed while its menu, in {@code window}, is in front,
+         * before the screen hears of it: a menu waiting for a key to bind
+         * takes it. Answers whether it was taken.
+         */
+        public boolean capturesKey(MenuWindow menu, SubWindow window,
+                                   LostTalesKeyPress press) {
+            return false;
+        }
     }
 
     /** Where a menu's window first opens, before the player has placed its kind. */
@@ -292,6 +302,26 @@ public final class WindowMenus implements MenuWindow.Owner {
         if (menu.edit(press) && source.readsAsTyped()) {
             source.rebuild(menu);
         }
+    }
+
+    /**
+     * A key for the menu in front, before anything else on the screen:
+     * what a menu waiting for a key to bind takes. Answers whether it was
+     * taken.
+     */
+    public boolean capture(SubWindow window, LostTalesKeyPress press) {
+        if (window == null || !(window.content instanceof MenuWindow)) {
+            return false;
+        }
+        MenuWindow menu = (MenuWindow)window.content;
+        Source source = sourceOf(menu.kind);
+        if (source == null || !source.capturesKey(menu, window, press)) {
+            return false;
+        }
+        if (window.isOpen()) {
+            source.rebuild(menu);
+        }
+        return true;
     }
 
     /**

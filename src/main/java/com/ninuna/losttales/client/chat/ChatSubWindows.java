@@ -26,6 +26,8 @@ public final class ChatSubWindows {
     public static final SubWindowKind REPORT = kind("report");
     /** The conversations a message can be forwarded to. */
     public static final SubWindowKind FORWARD = kind("forward");
+    /** What is addressed to the player, behind a conversation's inbox button. */
+    public static final SubWindowKind INBOX = kind("inbox");
 
     private ChatSubWindows() {}
 
