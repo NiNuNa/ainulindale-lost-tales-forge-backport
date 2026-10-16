@@ -31,7 +31,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
                         "losttales:player/test", "Aldric", owner,
                         100, 10, 65, 20, token).toBuilder()
                         .visibility(LostTalesMapMarkerVisibility.SHARED)
-                        .sharedPlayerIds(new LinkedHashSet<UUID>(
+                        .sharedCharacterIds(new LinkedHashSet<UUID>(
                                 Collections.singleton(shared)))
                         .sharedFellowshipIds(new LinkedHashSet<UUID>(
                                 Collections.singleton(
@@ -62,7 +62,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
         assertEquals(17, decoded.getPriority());
         assertEquals(LostTalesMapMarkerVisibility.SHARED,
                 decoded.getVisibility());
-        assertTrue(decoded.getSharedPlayerIds().contains(shared));
+        assertTrue(decoded.getSharedCharacterIds().contains(shared));
         assertTrue(decoded.getSharedFellowshipIds().contains(
                 sharedFellowship));
     }

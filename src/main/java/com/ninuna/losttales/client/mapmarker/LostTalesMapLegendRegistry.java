@@ -111,9 +111,7 @@ public final class LostTalesMapLegendRegistry {
             return null;
         }
         String id = marker.getId() == null ? "" : marker.getId();
-        if (id.startsWith("fellowship_go_here:")
-                || id.startsWith(FellowshipMark.MARKER_ID_PREFIX)
-                || "Go Here".equalsIgnoreCase(marker.getCategoryName())) {
+        if (id.startsWith(FellowshipMark.MARKER_ID_PREFIX)) {
             return FELLOWSHIP;
         }
         // A custom waypoint is drawn as a Lost Tales marker but filtered as

@@ -52,7 +52,8 @@ final class WaystoneRows {
 
         String markerId();
 
-        int sharedPlayers();
+        /** The characters it is shared with. */
+        int sharedCharacters();
 
         int sharedFellowships();
 
@@ -201,11 +202,11 @@ final class WaystoneRows {
             }
         };
         this.target = new Typed("waystone_share_target",
-                LANG + "share_target.player", true, MAX_SHARE_NAME) {
+                LANG + "share_target.character", true, MAX_SHARE_NAME) {
             @Override
             public String label() {
                 return word(WaystoneRows.this.host.sharesWithFellowship()
-                        ? "share_target.fellowship" : "share_target.player");
+                        ? "share_target.fellowship" : "share_target.character");
             }
 
             @Override
@@ -345,7 +346,7 @@ final class WaystoneRows {
         rows.add(new MenuWindow.Entry(SHARE_KIND, word("share_with"))
                 .withValue(word(this.host.sharesWithFellowship()
                         ? "share_target.fellowship"
-                        : "share_target.player"))
+                        : "share_target.character"))
                 .unavailable(readOnly));
         rows.add(typedRow(this.target, readOnly));
         String why = first(readOnly,
@@ -356,8 +357,8 @@ final class WaystoneRows {
                 .unavailable(why));
         rows.add(new MenuWindow.Entry(UNSHARE, word("unshare"))
                 .unavailable(why));
-        rows.add(quiet(word("shared.players"),
-                String.valueOf(this.host.sharedPlayers())));
+        rows.add(quiet(word("shared.characters"),
+                String.valueOf(this.host.sharedCharacters())));
         rows.add(quiet(word("shared.fellowships"),
                 String.valueOf(this.host.sharedFellowships())));
         return rows;

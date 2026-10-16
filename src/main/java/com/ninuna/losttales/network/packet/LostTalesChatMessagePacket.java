@@ -159,7 +159,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
             + 4 + MAX_BODY_BYTES
             + LostTalesChatNamedPlayerCodec.MAX_BYTES
             // The reactions on the line as this reader is shown them.
-            + LostTalesChatReactionCodec.MAX_BYTES;
+            + LostTalesChatReactionCodec.MAX_BYTES
+            // The roles the line calls, after the tab a command's answer is filed under.
+            + LostTalesChatRoleMentionCodec.MAX_BYTES;
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_IDENTITY_BYTES = 256;
     private static final int MAX_ACCOUNT_NAME_BYTES = 64;
@@ -198,7 +200,11 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * the title in its own words; empty when untitled.
      */
     private String factionId = "";
-    /** For a whisper, the other party's account name as this recipient sees it. */
+    /**
+     * For a whisper, the other party as this recipient files the
+     * conversation under: their account's name, or for a reader not shown
+     * accounts the name of the character they speak as.
+     */
     private String partner = "";
     /**
      * For a whisper, the identity of that other party the conversation
@@ -303,6 +309,12 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * part of what it keeps, since "is it mine" is each reader's own.
      */
     private ChatReactionSummary reactions = ChatReactionSummary.EMPTY;
+    /**
+     * The roles a player's line calls with an {@code @}, by id, as the
+     * server read them: what a client pings its player by when they hold
+     * one, whatever language the writer typed the role's name in.
+     */
+    private List<String> mentionedRoles = Collections.emptyList();
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -435,7 +447,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.factionId = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_FACTION_ID_BYTES);
             this.partner = LostTalesPacketCodec.readUtf8String(
-                    buffer, MAX_ACCOUNT_NAME_BYTES).trim();
+                    buffer, MAX_IDENTITY_BYTES).trim();
             this.accountLine = buffer.readBoolean();
             this.messageId = buffer.readLong();
             long replyTo = buffer.readLong();
@@ -557,6 +569,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.reactions = LostTalesChatReactionCodec.read(buffer);
             this.tabId = LostTalesPacketCodec.readUtf8String(buffer,
                     MAX_TAB_ID_BYTES);
+            this.mentionedRoles = LostTalesChatRoleMentionCodec.read(buffer);
             LostTalesPacketCodec.requireFinished(buffer);
             validate(false);
         } catch (RuntimeException exception) {
@@ -575,6 +588,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.partnerCharacterId = null;
             this.scopeValue = "";
             this.tabId = "";
+            this.mentionedRoles = Collections.emptyList();
             this.messageId = ChatMessageIds.NONE;
             this.reply = ChatReplyReference.NONE;
             this.partnerIdentity = "";
@@ -804,7 +818,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.factionId, MAX_FACTION_ID_BYTES);
         LostTalesPacketCodec.writeUtf8String(
-                buffer, this.partner, MAX_ACCOUNT_NAME_BYTES);
+                buffer, this.partner, MAX_IDENTITY_BYTES);
         buffer.writeBoolean(this.accountLine);
         buffer.writeLong(this.messageId);
         buffer.writeLong(this.reply.getMessageId());
@@ -851,6 +865,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         LostTalesChatNamedPlayerCodec.write(buffer, this.namedPlayers);
         LostTalesChatReactionCodec.write(buffer, this.reactions);
         LostTalesPacketCodec.writeUtf8String(buffer, this.tabId, MAX_TAB_ID_BYTES);
+        LostTalesChatRoleMentionCodec.write(buffer, this.mentionedRoles);
     }
 
     /** A presence flag and a UUID, 17 bytes whether the id is there or not. */
@@ -903,7 +918,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || this.identityName.length() == 0
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.identityName, MAX_IDENTITY_BYTES)
-                || this.accountName.length() == 0
+                // Only a character's line may name no account: what a
+                // reader not shown accounts is sent of it.
+                || (this.accountName.length() == 0
+                        && this.identityCharacterId == null)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.accountName, MAX_ACCOUNT_NAME_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
@@ -914,7 +932,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.factionId, MAX_FACTION_ID_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
-                        this.partner, MAX_ACCOUNT_NAME_BYTES)
+                        this.partner, MAX_IDENTITY_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.reply.getSkinId(),
                         ChatReplyReference.MAX_SKIN_ID_BYTES)
@@ -937,6 +955,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || !ChatConsoleEvent.isContext(this.tabId)
                 || (this.tabId.length() > 0 && !isSystemSender(this.senderId))
                 || this.namedPlayers.size() > ChatNamedPlayer.MAX_PER_LINE
+                || !LostTalesChatRoleMentionCodec.isValid(this.mentionedRoles)
                 || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
                         && this.partner.length() == 0)
                 || this.timestampMillis <= 0L
@@ -1042,6 +1061,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         copy.namedPlayers = this.namedPlayers;
         copy.reactions = this.reactions;
         copy.tabId = this.tabId;
+        copy.mentionedRoles = this.mentionedRoles;
         return copy;
     }
 
@@ -1077,6 +1097,32 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /** The tab a command's answer is filed under; empty for every other line. */
     public String getTabId() { return this.tabId; }
+
+    /**
+     * The same line calling {@code roleIds}: at most
+     * {@link ChatAccountRole#MAX_MENTIONS_PER_LINE}, each a role's id,
+     * once. A line of the Server's, the Client's or a Discord member's
+     * calls none, whatever it is handed.
+     */
+    public LostTalesChatMessagePacket withMentionedRoles(List<String> roleIds) {
+        LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
+        List<String> ids = new ArrayList<String>();
+        if (!isSystemSender(this.senderId) && !isDiscordSender(this.senderId)) {
+            for (int index = 0; roleIds != null && index < roleIds.size()
+                    && ids.size() < ChatAccountRole.MAX_MENTIONS_PER_LINE; index++) {
+                String id = roleIds.get(index);
+                if (ChatAccountRole.isWellFormedId(id) && !ids.contains(id)) {
+                    ids.add(id);
+                }
+            }
+        }
+        copy.mentionedRoles = ids.isEmpty() ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(ids);
+        return copy;
+    }
+
+    /** The roles the line calls, by id; never null. */
+    public List<String> getMentionedRoles() { return this.mentionedRoles; }
 
     /** The same line wearing {@code reactions}, as one reader is shown them. */
     public LostTalesChatMessagePacket withReactions(ChatReactionSummary reactions) {
@@ -1200,6 +1246,44 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 "", this.partner, 0, false, this.messageId,
                 this.reply, this.partnerIdentity, this.echoNonce, null,
                 this.ownCharacterId, this.partnerCharacterId, this.scopeValue));
+    }
+
+    /**
+     * The same line as {@code reader}, who is not shown which account plays
+     * a character, is sent it: a line worn by a character names no account
+     * unless it is the reader's own; a player it names as a character is
+     * named without the account unless it is the reader; a whisper with a
+     * character is filed under that character's name rather than the
+     * account behind it. An account's line names its account as before:
+     * out of character the account is who speaks.
+     */
+    public LostTalesChatMessagePacket withoutAccountsFor(UUID reader) {
+        boolean own = reader != null && reader.equals(this.senderId);
+        String account = this.identityCharacterId != null && !own ? "" : this.accountName;
+        String partnerName = this.partnerCharacterId != null
+                && this.partnerIdentity.length() > 0 ? this.partnerIdentity : this.partner;
+        List<ChatNamedPlayer> named = new ArrayList<ChatNamedPlayer>(this.namedPlayers.size());
+        boolean namedChanged = false;
+        for (ChatNamedPlayer player : this.namedPlayers) {
+            ChatNamedPlayer shown = reader != null && reader.equals(player.getPlayerId())
+                    ? player : player.withoutAccount();
+            namedChanged |= shown != player;
+            named.add(shown);
+        }
+        if (account.equals(this.accountName) && partnerName.equals(this.partner)
+                && !namedChanged) {
+            return this;
+        }
+        LostTalesChatMessagePacket copy = carrying(new LostTalesChatMessagePacket(getChannel(),
+                this.senderId, this.identityName, account, this.title,
+                this.titleColor, this.nameColor, this.message,
+                this.timestampMillis, this.skinId, this.showcases,
+                this.factionId, partnerName, this.roles,
+                this.accountLine, this.messageId, this.reply,
+                this.partnerIdentity, this.echoNonce, this.identityCharacterId,
+                this.ownCharacterId, this.partnerCharacterId, this.scopeValue));
+        copy.namedPlayers = Collections.unmodifiableList(named);
+        return copy;
     }
 
     /** Whether the channel is as many conversations as it has scope values. */

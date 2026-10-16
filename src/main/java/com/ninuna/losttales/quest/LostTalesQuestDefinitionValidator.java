@@ -22,7 +22,8 @@ import java.util.Set;
  * bytes, a start mode of the four words, and stages. Each stage needs an
  * id of its own and at least one objective; each objective an id no other
  * objective of the quest has, a type of the six words, and what its type
- * asks for. Every journal line names a stage.</p>
+ * asks for. Only a required gather says {@code take}, and only true or
+ * false. Every journal line names a stage.</p>
  */
 public final class LostTalesQuestDefinitionValidator {
     private LostTalesQuestDefinitionValidator() {}
@@ -128,6 +129,7 @@ public final class LostTalesQuestDefinitionValidator {
     private static void validateObjective(LostTalesQuestDefinition quest, LostTalesQuestStageDefinition stage, LostTalesQuestObjectiveDefinition objective, Warnings out) {
         Map<String, String> params = objective.getParams();
         LostTalesQuestObjectiveType type = LostTalesQuestObjectiveType.of(objective);
+        validateTake(out, quest, stage, objective, type);
         switch (type) {
             case GATHER:
             case CRAFT:
@@ -164,6 +166,32 @@ public final class LostTalesQuestDefinitionValidator {
                 return;
             default:
                 warn(out, quest, stage, objective, "uses unknown objective type '%s'", objective.getType());
+        }
+    }
+
+    /**
+     * {@code take} is a required gather's, and says {@code true} or
+     * {@code false}: any other objective, and an optional gather, would
+     * never hand anything over.
+     */
+    private static void validateTake(Warnings out, LostTalesQuestDefinition quest,
+            LostTalesQuestStageDefinition stage, LostTalesQuestObjectiveDefinition objective,
+            LostTalesQuestObjectiveType type) {
+        if (!objective.getParams().containsKey(LostTalesQuestParams.TAKE)) {
+            return;
+        }
+        String take = LostTalesQuestParams.value(objective.getParams(),
+                LostTalesQuestParams.TAKE);
+        if (type != LostTalesQuestObjectiveType.GATHER) {
+            warn(out, quest, stage, objective,
+                    "names 'take', which only a gather objective reads");
+        } else if (objective.isOptional()) {
+            warn(out, quest, stage, objective,
+                    "is optional and names 'take'; an optional objective never hands anything over");
+        }
+        if (!"true".equals(take) && !"false".equals(take)) {
+            warn(out, quest, stage, objective,
+                    "has 'take' %s; it is true or false", take);
         }
     }
 

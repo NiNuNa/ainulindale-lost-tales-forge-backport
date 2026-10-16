@@ -58,6 +58,9 @@ public final class LostTalesCapability {
     /** Inspect, restore and purge the roleplay characters of any account. */
     public static final LostTalesCapability CHARACTER_ADMIN =
             register("character.admin", OPERATOR);
+    /** See which account plays a character, and its other characters, while Show Accounts is off. */
+    public static final LostTalesCapability CHARACTER_SEE_ACCOUNTS =
+            register("character.see_accounts", OPERATOR);
     /** Grant, revoke and inspect quest progress. */
     public static final LostTalesCapability QUEST_ADMIN = register("quest.admin", OPERATOR);
     /** Check and repair the fellowship stores, and clear the combat markers (/losttales fellowship). */

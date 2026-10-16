@@ -23,6 +23,7 @@ public final class WindowSession {
         ContentView.leaveAll();
         SubWindowPlaces.forgetOpen();
         WindowView.clear();
+        WindowView.forgetPrevious();
         PinnedWindows.clear();
     }
 }

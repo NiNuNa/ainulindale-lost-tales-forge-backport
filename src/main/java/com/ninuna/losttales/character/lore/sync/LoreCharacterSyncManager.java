@@ -8,6 +8,7 @@ import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStora
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferStorage;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferWorldData;
+import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -50,13 +51,16 @@ public final class LoreCharacterSyncManager {
                 LoreCharacterTransferStorage.get(player.worldObj);
         List<LoreCharacterSummary> summaries =
                 new ArrayList<LoreCharacterSummary>();
+        boolean seesAccounts = AccountVisibility.seesAccounts(player);
         for (LoreCharacterDefinition definition : LoreCharacterRegistry.getAll()) {
             LoreCharacterOwnershipRecord record = ownership.getRecord(
                     definition.getId());
             boolean claimed = record != null && record.isClaimed();
             boolean owned = claimed && player.getUniqueID().equals(
                     record.getOwnerId());
-            String ownerName = claimed
+            // The holder's account is named only to a player shown
+            // accounts; anyone else reads the figure as held.
+            String ownerName = claimed && (owned || seesAccounts)
                     ? RoleplayCharacterIdentityHook.resolveGameplayName(
                     record.getOwnerId()) : "";
             LoreCharacterDefinition.Appearance appearance =

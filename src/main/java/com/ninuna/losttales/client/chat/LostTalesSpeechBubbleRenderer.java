@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
+import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
@@ -352,7 +353,10 @@ public final class LostTalesSpeechBubbleRenderer {
             return false;
         }
         String account = speaker.getCommandSenderName();
-        String character = ClientCharacterAppearanceCache.characterNameFor(account);
+        CharacterAppearance appearance = ClientCharacterAppearanceCache.get(
+                speaker.getUniqueID());
+        String character = appearance == null || !appearance.hasCharacter() ? null
+                : appearance.getCharacterName();
         return (character != null
                 && ClientChatTypingState.isTypingInCharacter(character, nowNanos))
                 || ClientChatTypingState.isTypingInCharacter(account, nowNanos);

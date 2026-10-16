@@ -5,6 +5,8 @@ import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
+import com.ninuna.losttales.quest.QuestStartGate;
+import com.ninuna.losttales.quest.QuestStartProof;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -31,9 +33,9 @@ public class LostTalesQuestActionPacket implements IMessage {
     public static final String ACTION_CLEAR = "clear";
     /**
      * Taking a quest that was offered in conversation. The client names
-     * the quest; the server checks that somebody the quest names as its
-     * giver is within reach and that the quest may be started that way,
-     * so a client that never spoke to anybody starts nothing.
+     * the quest; the start gate checks that the quest's giver is within
+     * reach and in sight and that the quest starts that way, so a client
+     * that never spoke to anybody starts nothing.
      */
     public static final String ACTION_ACCEPT = "accept";
     /**
@@ -132,7 +134,8 @@ public class LostTalesQuestActionPacket implements IMessage {
         } else if (ACTION_CLEAR.equals(action)) {
             LostTalesQuestManager.clearFinishedQuest(player, questId);
         } else if (ACTION_ACCEPT.equals(action)) {
-            LostTalesQuestManager.acceptFromConversation(player, questId);
+            QuestStartGate.start(player, questId,
+                    QuestStartProof.conversation());
         } else if (ACTION_HAND_IN.equals(action)) {
             LostTalesQuestManager.handInFromConversation(player, questId);
         }

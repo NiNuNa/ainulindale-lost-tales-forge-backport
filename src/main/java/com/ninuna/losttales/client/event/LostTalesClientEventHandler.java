@@ -69,6 +69,7 @@ import com.ninuna.losttales.client.fellowship.ClientFellowshipIcons;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipMemberStatusCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipMarks;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientWorldQuests;
 import com.ninuna.losttales.client.quest.LostTalesQuestDialogueHooks;
@@ -211,6 +212,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ChatFellowshipInvitationAnswers.clear();
         ClientFellowshipMemberStatusCache.clear();
         ClientFellowshipTrackingCache.clear();
+        ClientFellowshipMarks.clear();
         // Words over a head belong to the world they were spoken in.
         ChatSpeechBubbles.clear();
         ClientServerConfigCache.clear();
@@ -545,7 +547,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             }
         } else if (event.gui != null
                 && event.gui.getClass() == LOTRGuiRedBook.class) {
-            // LOTR's quest book is the journal, a page of the chat.
+            // LOTR's quest book is the journal, a page of the windows.
             GuiScreen journal = WindowScreen.screenForPage(
                     QuestJournalPage.PAGE_ID);
             if (journal != null) {
@@ -575,10 +577,11 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     /**
-     * Touching somebody a Lost Tales quest is about opens the
-     * conversation. The interaction itself is left alone, so anything
-     * else the entity does still happens; the server refuses to start or
-     * hand in a quest that is talked about until a reply says so.
+     * Touching somebody a running quest waits on opens its hand-in
+     * conversation; a giver's offer comes from the server instead. The
+     * interaction itself is left alone, so anything else the entity does
+     * still happens; the server hands in nothing that is talked about
+     * until a reply says so.
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void openQuestConversation(EntityInteractEvent event) {
@@ -598,7 +601,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 minecraft.displayGuiScreen(conversation);
             } else {
                 // With the conversation screen switched off, the person's
-                // words go to the chat and the quest is taken or handed in.
+                // words go to the chat and a ready hand-in is given over.
                 LostTalesQuestDialogueHooks.answerWithoutScreen(event.target);
             }
         } catch (RuntimeException failed) {

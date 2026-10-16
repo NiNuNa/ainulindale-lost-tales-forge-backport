@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.character.server.CharacterJoin;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
+import com.ninuna.losttales.chat.server.ChatPresenceService;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import com.ninuna.losttales.util.LostTalesWords;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -40,7 +41,9 @@ import net.minecraft.util.IChatComponent;
  * click event, which vanilla puts on every player name it announces, so
  * the picture follows the account and never a guess from the text. No
  * account there — a name a mod built by hand — means no picture and
- * nothing else lost.</p>
+ * nothing else lost. With the server's Show Accounts off a death or an
+ * achievement, posted to Global's Discord channels, carries no head: the
+ * head's URL names the account behind the character the line names.</p>
  *
  * <p>Every method here runs on the server thread and does nothing but
  * build a notice and queue it; the bridge's worker posts it. A notice of
@@ -63,12 +66,13 @@ public final class DiscordGameEventRelay {
     /**
      * A player logging in, announced unless they are still waiting for
      * their first character, who is announced as they join
-     * ({@link #announceJoin}).
+     * ({@link #announceJoin}), or come Invisible.
      */
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event == null || !(event.player instanceof EntityPlayerMP)
-                || CharacterJoin.isWaiting(event.player)) {
+                || CharacterJoin.isWaiting(event.player)
+                || ChatPresenceService.playsInvisible((EntityPlayerMP)event.player)) {
             return;
         }
         announceJoin((EntityPlayerMP)event.player);
@@ -86,11 +90,15 @@ public final class DiscordGameEventRelay {
                         ChatSystemLineClassifier.Kind.JOIN));
     }
 
-    /** A player leaving, unless they never joined: one still waiting goes unannounced. */
+    /**
+     * A player leaving, unless they never joined or go Invisible: one
+     * still waiting goes unannounced, and so does one nobody sees.
+     */
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event == null || !(event.player instanceof EntityPlayerMP)
-                || CharacterJoin.isWaiting(event.player)) {
+                || CharacterJoin.isWaiting(event.player)
+                || ChatPresenceService.playsInvisible((EntityPlayerMP)event.player)) {
             return;
         }
         EntityPlayerMP player = (EntityPlayerMP)event.player;
@@ -195,7 +203,9 @@ public final class DiscordGameEventRelay {
         if (text == null || text.trim().length() == 0) {
             return null;
         }
-        String icon = DiscordAvatarUrl.forPlayer(subject);
+        String icon = DiscordAvatarUrl.shownIn(
+                ChatSystemLineClassifier.channelOf(kind),
+                DiscordAvatarUrl.forPlayer(subject));
         return kind == ChatSystemLineClassifier.Kind.DEATH
                 ? DiscordServerNotices.playerDied(text, icon)
                 : DiscordServerNotices.achievement(text, icon);

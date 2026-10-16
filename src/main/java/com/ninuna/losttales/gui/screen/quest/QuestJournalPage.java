@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.quest;
 
+import com.ninuna.losttales.client.chat.ChatInbox;
 import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.client.window.OptionGlyph;
 import com.ninuna.losttales.client.window.PageOption;
@@ -20,7 +21,6 @@ import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
@@ -61,8 +61,9 @@ import com.ninuna.losttales.quest.LostTalesQuestRewardText;
 /**
  * The quest journal, a page a window holds: the quests on the left, the
  * one being read on the right. The window holds the rest: the list's
- * button at its tool strip's left, the filters behind its three dots, the search
- * in its well, and the quest's actions on its input bar, where
+ * button at its tool strip's left, the filters on the strip and in its
+ * options, the search in its well, and the quest's actions on its input
+ * bar, where
  * Abandon and Clear ask first. It reads the shared presentation assembled
  * from Lost Tales and LOTR's synchronized quest state, and draws itself
  * in the box its window gives it.
@@ -331,6 +332,8 @@ public final class QuestJournalPage extends PageContent {
                     translate(each.labelKey), each == this.filter, each.glyph)
                     .inGroup("filters", "gui.losttales.quest.menu.show"));
         }
+        // The quest news, counted beside its button, a group of its own.
+        options.add(ChatInbox.option(ChatInbox.Kind.QUEST_NEWS).inGroup("inbox", ""));
         return options;
     }
 

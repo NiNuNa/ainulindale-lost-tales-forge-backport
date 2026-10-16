@@ -18,7 +18,7 @@ import net.minecraftforge.common.util.Constants;
 
 /** Versioned, defensive NBT codec for authoritative marker records. */
 public final class LostTalesMapMarkerNbtCodec {
-    public static final int CURRENT_DATA_VERSION = 5;
+    public static final int CURRENT_DATA_VERSION = 6;
     private static final int MAX_RECORDS = 16384;
     private static final int MAX_QUARANTINE = 4096;
 
@@ -156,12 +156,12 @@ public final class LostTalesMapMarkerNbtCodec {
         tag.setString("Visibility",
                 record.getVisibility().getSerializedName());
         NBTTagList shared = new NBTTagList();
-        for (UUID playerId : record.getSharedPlayerIds()) {
+        for (UUID characterId : record.getSharedCharacterIds()) {
             NBTTagCompound entry = new NBTTagCompound();
-            NbtTags.writeUuid(entry, "Player", playerId);
+            NbtTags.writeUuid(entry, "Character", characterId);
             shared.appendTag(entry);
         }
-        tag.setTag("SharedPlayers", shared);
+        tag.setTag("SharedCharacters", shared);
         NBTTagList sharedFellowships = new NBTTagList();
         for (UUID fellowshipId : record.getSharedFellowshipIds()) {
             NBTTagCompound entry = new NBTTagCompound();
@@ -243,7 +243,7 @@ public final class LostTalesMapMarkerNbtCodec {
                                             source == LostTalesMapMarkerSource.PLAYER_CREATED
                                                     ? LostTalesMapMarkerVisibility.PRIVATE
                                                     : LostTalesMapMarkerVisibility.PUBLIC))
-                            .sharedPlayerIds(readSharedPlayers(tag))
+                            .sharedCharacterIds(readSharedCharacters(tag))
                             .sharedFellowshipIds(
                                     readSharedFellowships(tag))
                             .generationState(
@@ -277,23 +277,23 @@ public final class LostTalesMapMarkerNbtCodec {
         }
     }
 
-    private static Set<UUID> readSharedPlayers(NBTTagCompound tag) {
-        LinkedHashSet<UUID> players = new LinkedHashSet<UUID>();
-        if (!tag.hasKey("SharedPlayers", Constants.NBT.TAG_LIST)) {
-            return players;
+    private static Set<UUID> readSharedCharacters(NBTTagCompound tag) {
+        LinkedHashSet<UUID> characters = new LinkedHashSet<UUID>();
+        if (!tag.hasKey("SharedCharacters", Constants.NBT.TAG_LIST)) {
+            return characters;
         }
         NBTTagList list = tag.getTagList(
-                "SharedPlayers", Constants.NBT.TAG_COMPOUND);
-        int count = Math.min(
-                list.tagCount(), LostTalesMapMarkerRecord.MAX_SHARED_PLAYERS);
+                "SharedCharacters", Constants.NBT.TAG_COMPOUND);
+        int count = Math.min(list.tagCount(),
+                LostTalesMapMarkerRecord.MAX_SHARED_CHARACTERS);
         for (int index = 0; index < count; index++) {
-            UUID playerId = NbtTags.readUuid(
-                    list.getCompoundTagAt(index), "Player");
-            if (playerId != null) {
-                players.add(playerId);
+            UUID characterId = NbtTags.readUuid(
+                    list.getCompoundTagAt(index), "Character");
+            if (characterId != null) {
+                characters.add(characterId);
             }
         }
-        return players;
+        return characters;
     }
 
     private static Set<UUID> readSharedFellowships(

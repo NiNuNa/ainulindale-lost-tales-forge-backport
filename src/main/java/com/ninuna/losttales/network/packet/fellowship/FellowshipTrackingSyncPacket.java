@@ -4,7 +4,6 @@ import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
-import com.ninuna.losttales.fellowship.sync.FellowshipGoHereMarkerSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipTrackedMemberSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipTrackingSnapshot;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -18,7 +17,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Bounded server-authoritative fellowship positions and Go Here markers. */
+/** Bounded server-authoritative positions of the members of the fellowship travelled with. */
 public final class FellowshipTrackingSyncPacket implements IMessage {
 
     private FellowshipTrackingSnapshot snapshot;
@@ -88,46 +87,13 @@ public final class FellowshipTrackingSyncPacket implements IMessage {
                 }
             }
 
-            int markerCount = buffer.readUnsignedByte();
-            if (markerCount > Fellowship.MAX_MEMBERS) {
-                throw new FellowshipPacketCodec.DecodeException(
-                        "too many Go Here markers");
-            }
-            List<FellowshipGoHereMarkerSnapshot> markers =
-                    new ArrayList<FellowshipGoHereMarkerSnapshot>(markerCount);
-            Set<UUID> markerOwners = new HashSet<UUID>();
-            for (int index = 0; index < markerCount; index++) {
-                UUID identityId = LostTalesPacketCodec.readUuid(buffer);
-                if (!markerOwners.add(identityId)) {
-                    throw new FellowshipPacketCodec.DecodeException(
-                            "duplicate marker owner identity");
-                }
-                String name = FellowshipPacketCodec.shownName(
-                        LostTalesPacketCodec.readUtf8String(
-                                buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
-                FellowshipColor color = FellowshipColor.fromNetworkId(
-                        buffer.readUnsignedByte());
-                if (color == null) {
-                    throw new FellowshipPacketCodec.DecodeException(
-                            "invalid marker owner color");
-                }
-                markers.add(new FellowshipGoHereMarkerSnapshot(
-                        identityId,
-                        name,
-                        color,
-                        buffer.readInt(),
-                        buffer.readDouble(),
-                        buffer.readDouble(),
-                        buffer.readDouble(),
-                        buffer.readLong()));
-            }
             LostTalesPacketCodec.requireFinished(buffer);
             this.snapshot = hasFellowship
                     ? new FellowshipTrackingSnapshot(
                     ownerId, sequence, activeIdentityId,
-                    fellowshipId, fellowshipRevision, members, markers)
+                    fellowshipId, fellowshipRevision, members)
                     : FellowshipTrackingSnapshot.noFellowship(
-                    ownerId, sequence, activeIdentityId, markers);
+                    ownerId, sequence, activeIdentityId);
         } catch (RuntimeException exception) {
             this.snapshot = null;
             this.malformed = true;
@@ -160,21 +126,6 @@ public final class FellowshipTrackingSyncPacket implements IMessage {
                 buffer.writeDouble(member.getY());
                 buffer.writeDouble(member.getZ());
             }
-        }
-        buffer.writeByte(this.snapshot.getGoHereMarkers().size());
-        for (FellowshipGoHereMarkerSnapshot marker
-                : this.snapshot.getGoHereMarkers()) {
-            LostTalesPacketCodec.writeUuid(
-                    buffer, marker.getOwnerIdentityId());
-            LostTalesPacketCodec.writeUtf8String(buffer,
-                    marker.getOwnerCharacterName(),
-                    FellowshipPacketCodec.MAX_NAME_BYTES);
-            buffer.writeByte(marker.getOwnerColor().getNetworkId());
-            buffer.writeInt(marker.getDimensionId());
-            buffer.writeDouble(marker.getX());
-            buffer.writeDouble(marker.getY());
-            buffer.writeDouble(marker.getZ());
-            buffer.writeLong(marker.getUpdatedAt());
         }
     }
 

@@ -124,12 +124,12 @@ public final class ChatTranslatedWordsReadingTest {
                 discordLine(""));
         LostTalesChatMessagePacket edited = LostTalesChatPresentation.edited(held,
                 LostTalesChatUpdatePacket.edited(held.getMessageId(), SERVER_WORDS,
-                        STICKER_BODY, BEREN));
+                        STICKER_BODY, BEREN, null));
         assertEquals("look *[Aufkleber: Wave]*", edited.getMessage());
         assertEquals("", edited.getBodyJson());
         LostTalesChatMessagePacket plain = LostTalesChatPresentation.edited(edited,
                 LostTalesChatUpdatePacket.edited(held.getMessageId(), "just words", "",
-                        BEREN));
+                        BEREN, null));
         assertEquals("just words", plain.getMessage());
         assertEquals("", plain.getBodyJson());
         assertEquals("Beren", plain.getNamedPlayers().get(0).getIdentityName());

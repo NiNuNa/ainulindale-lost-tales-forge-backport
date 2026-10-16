@@ -253,8 +253,8 @@ public final class ChatLayout {
     }
 
     /**
-     * A new player's windows: the Chat view's, Global and OOC in the
-     * bottom-left quarter, locked. Every other channel starts closed;
+     * A new player's windows: the Chat view's, Global and OOC at the
+     * default place, locked. Every other channel starts closed;
      * Proximity, Faction and Fellowship open with their first line, and
      * Operator and the consoles wait in the {@code +} until opened by hand.
      * From then on the layout is whatever the player makes of it.
@@ -813,6 +813,7 @@ public final class ChatLayout {
         }
         CONVERSATIONS.put(serverKey, open);
         CLOSED_CONVERSATIONS.put(serverKey, closed);
+        ClientChatIdentities.rememberVoices(serverKey);
     }
 
     /**
@@ -845,6 +846,7 @@ public final class ChatLayout {
                 }
             }
         }
+        ClientChatIdentities.restoreVoices(conversationsPlace);
     }
 
     /**
@@ -882,10 +884,12 @@ public final class ChatLayout {
      * whisper and fellowship tabs are remembered first, open and closed by
      * hand alike, and come back on the next visit, each with its choices. The NPC
      * conversations of the session go, with their choices. A window left
-     * empty goes, the last one included.
+     * empty goes, the last one included. The place is left behind with
+     * them, so the save that follows keeps what was remembered of it.
      */
     public static synchronized void closeConversations() {
         rememberConversations(conversationsPlace);
+        conversationsPlace = "";
         WAITING.clear();
         collectingWindowId = null;
         forgetNpcConversations();
@@ -1270,6 +1274,7 @@ public final class ChatLayout {
      */
     private static final String FEED_CHOICE = "feedchoice";
     private static final String CONVERSATION = "conversation";
+    private static final String VOICE = ClientChatIdentities.VOICE_LINE;
     private static final String CLOSED_CONVERSATION = "closedconversation";
     /** A conversation's timestamp area and member list, where they differ from how they first are. */
     private static final String PANELS = "panels";
@@ -1284,7 +1289,7 @@ public final class ChatLayout {
      * The chat's lines in the layout file:
      *
      * <pre>
-     * view global area=hidden members=hidden members_width=90.00
+     * panels	global	area=hidden members=hidden members_width=90.00
      * feed x=50.00 y=88.00
      * toolbar collapsed=false
      * closed faction
@@ -1294,7 +1299,7 @@ public final class ChatLayout {
      * </pre>
      *
      * <p>A conversation's timestamp area and member list, where either
-     * differs from how it first is, stand on a {@code view} line: the tab
+     * differs from how it first is, stand on a {@code panels} line: the tab
      * id, then the area or the list put away and the list's width. Never
      * an NPC conversation's, whose view ends with the session.</p>
      *
@@ -1311,8 +1316,11 @@ public final class ChatLayout {
      * fellowship tab is remembered per place on a line of its own: {@code conversation}, the place, the
      * window and the tab id for one that was open;
      * {@code closedconversation}, the place and the tab id for one closed
-     * by hand. These lines are tab-separated, since a name or a place may
-     * hold spaces.</p>
+     * by hand. Who a copy speaks as stands on a {@code voice} line per
+     * place: the place, the copy's tab id, the character's id or {@code -},
+     * and {@code narrator} or {@code -} ({@link ClientChatIdentities#describeVoices}).
+     * These lines are tab-separated, since a name or a place may hold
+     * spaces.</p>
      */
     private static final WindowLayoutStore.Part PART = new WindowLayoutStore.Part() {
         @Override
@@ -1322,6 +1330,7 @@ public final class ChatLayout {
             CLOSED_BY_HAND.clear();
             CONVERSATIONS.clear();
             CLOSED_CONVERSATIONS.clear();
+            ClientChatIdentities.clearKept();
             conversationsPlace = "";
             VIEWS.clear();
             CLOSED_READ.clear();
@@ -1340,6 +1349,10 @@ public final class ChatLayout {
             }
             if (line.startsWith(NOTIFY + "\t")) {
                 readNotification(line.split("\t"));
+                return true;
+            }
+            if (line.startsWith(VOICE + "\t")) {
+                ClientChatIdentities.readVoice(line.split("\t", -1));
                 return true;
             }
             if (line.startsWith(FEED_CHOICE + "\t")) {
@@ -1527,6 +1540,7 @@ public final class ChatLayout {
                             + "\t" + id);
                 }
             }
+            ClientChatIdentities.describeVoices(lines);
         }
     };
 }

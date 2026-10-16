@@ -1,9 +1,12 @@
 package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestDialogue;
 import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
+import com.ninuna.losttales.quest.QuestStartGate;
+import com.ninuna.losttales.quest.QuestStartProof;
 import com.ninuna.losttales.quest.ServerQuestFiles;
 import com.ninuna.losttales.quest.ServerQuestSync;
 import com.ninuna.losttales.quest.world.WorldQuestRules;
@@ -206,7 +209,8 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     }
 
     private void startQuest(ICommandSender sender, EntityPlayerMP player, String questId) {
-        LostTalesQuestManager.StartResult result = LostTalesQuestManager.startQuest(player, questId);
+        QuestStartGate.StartResult result = QuestStartGate.start(player,
+                questId, QuestStartProof.command());
         String name = player.getCommandSenderName();
         switch (result) {
             case STARTED:
@@ -265,8 +269,8 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
         ItemStack stack = new ItemStack(Items.paper);
         NBTTagCompound tag = new NBTTagCompound();
-        tag.setString("LostTalesQuestId", questId);
-        tag.setBoolean("LostTalesQuestConsume", consume);
+        tag.setString(QuestStartGate.TAG_QUEST_ID, questId);
+        tag.setBoolean(QuestStartGate.TAG_CONSUME, consume);
         stack.setTagCompound(tag);
         // An item's name is kept as written, so it is written in the
         // server's language.
@@ -282,7 +286,9 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         player.inventory.markDirty();
 
         say(sender, WHITE, SAY + "starter.given", questId, player.getCommandSenderName());
-        if (!quest.canStartFromItem()) {
+        if (LostTalesQuestDialogue.of(quest).isOffered()) {
+            say(sender, WHITE, SAY + "starter.offered");
+        } else if (!quest.canStartFromItem()) {
             say(sender, WHITE, SAY + "starter.note", quest.getStartMode());
         }
     }
@@ -303,10 +309,13 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         }
     }
 
-    /** Reads the server's own quest files again and sends them to everyone online. */
+    /**
+     * Reads the server's own quest files again; each player online is sent
+     * afresh the ones their client holds or their log names.
+     */
     private void reloadServerQuests(ICommandSender sender) {
         ServerQuestFiles.Result result = LostTalesQuestRegistry.loadServerQuests();
-        ServerQuestSync.sendToAll(MinecraftServer.getServer());
+        ServerQuestSync.resendAfterReload(MinecraftServer.getServer());
         say(sender, WHITE, "chat.losttales.quest.reload.done",
                 Integer.valueOf(result.quests.size()),
                 Integer.valueOf(result.problems.size()));

@@ -1,6 +1,9 @@
 package com.ninuna.losttales.character.validation;
 
+import com.ninuna.losttales.character.model.CharacterRoster;
+import com.ninuna.losttales.character.model.RoleplayCharacter;
 import java.text.Normalizer;
+import java.util.Collection;
 
 /**
  * When two names are the same name, for every check that asks: letters and
@@ -33,6 +36,33 @@ public final class CharacterNames {
     public static boolean same(String first, String second) {
         String key = key(first);
         return key.length() > 0 && key.equals(key(second));
+    }
+
+    /**
+     * The one character in {@code rosters} that goes by the name, as names
+     * are compared ({@link #same}); null for none, for a name two
+     * characters share, and for one whose roster names another owner.
+     */
+    public static RoleplayCharacter named(Collection<CharacterRoster> rosters, String name) {
+        if (rosters == null || key(name).length() == 0) {
+            return null;
+        }
+        RoleplayCharacter found = null;
+        for (CharacterRoster roster : rosters) {
+            if (roster == null) {
+                continue;
+            }
+            for (RoleplayCharacter character : roster.getCharacters()) {
+                if (character == null || !same(name, character.getName())) {
+                    continue;
+                }
+                if (found != null || !character.getOwnerId().equals(roster.getOwnerId())) {
+                    return null;
+                }
+                found = character;
+            }
+        }
+        return found;
     }
 
     /** Whether the name is one of the chat's own voices: Server, Client, Narrator, Discord. */

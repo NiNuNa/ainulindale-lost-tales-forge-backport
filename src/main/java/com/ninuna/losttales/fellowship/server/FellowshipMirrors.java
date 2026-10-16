@@ -221,7 +221,6 @@ public final class FellowshipMirrors {
         return new LotrFellowshipMirror.Shape(fellowship.getName(), fellowship.getIcon(),
                 fellowship.isOn(FellowshipSwitch.NO_FIGHTING),
                 fellowship.isOn(FellowshipSwitch.NO_HIRED_HARM),
-                fellowship.isOn(FellowshipSwitch.SHOWN_ON_MAP),
                 owner, present, guides);
     }
 

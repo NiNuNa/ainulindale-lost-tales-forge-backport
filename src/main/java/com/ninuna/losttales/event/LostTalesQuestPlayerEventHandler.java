@@ -49,11 +49,9 @@ public final class LostTalesQuestPlayerEventHandler {
 
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerLoggedInEvent event) {
-        // The server's own quests first, so the quest log that follows
-        // finds every quest it names.
-        if (event.player instanceof EntityPlayerMP) {
-            ServerQuestSync.sendTo((EntityPlayerMP)event.player);
-        }
+        // A client that joins holds none of the server's own quests; the
+        // log that follows sends those it names.
+        ServerQuestSync.forget(event.player.getUniqueID());
         refreshAndSyncIfServerPlayer(event.player);
     }
 
@@ -65,6 +63,7 @@ public final class LostTalesQuestPlayerEventHandler {
             LostTalesLotrWaystoneTravelAdapter.clearPending(
                     (EntityPlayerMP)event.player);
             WorldQuests.forget(event.player.getUniqueID());
+            ServerQuestSync.forget(event.player.getUniqueID());
             // The missives only this player's log held leave the server's
             // list with them.
             LostTalesQuestManager.forgetUnheldMissives(event.player);

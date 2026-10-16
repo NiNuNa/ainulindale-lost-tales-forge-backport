@@ -69,9 +69,13 @@ public final class FellowshipPlayerEventHandler {
         if (overworld != null) {
             FellowshipSyncManager.AudienceSnapshot affectedAudience =
                     FellowshipSyncManager.captureAllInvitationAudience(overworld);
-            int removed = FellowshipService.getInstance()
-                    .pruneInvalidInvitations(overworld);
-            if (removed > 0) {
+            FellowshipIntegrityReport removed = FellowshipService.getInstance()
+                    .pruneStale(overworld);
+            // A mark is seen by members of several fellowships, so a mark
+            // taken away sends everyone their state.
+            if (removed != null && removed.getMarks() > 0) {
+                FellowshipSyncManager.sendStateToEveryone();
+            } else if (removed != null && removed.getInvitations() > 0) {
                 FellowshipSyncManager.sendStateToAudience(affectedAudience, null);
             }
         }

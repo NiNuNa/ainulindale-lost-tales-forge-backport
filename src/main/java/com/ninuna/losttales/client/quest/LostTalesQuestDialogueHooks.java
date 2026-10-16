@@ -33,11 +33,13 @@ import com.ninuna.losttales.quest.LostTalesQuestRewardText;
 /**
  * Where a quest conversation is opened from.
  *
- * <p>Two ways in: LOTR opening its own offer screen, which is read and
- * shown in this mod's dress instead; and touching somebody a Lost Tales
- * quest names, which the client answers from the definitions and the
- * progress it already holds. Neither decides anything the server owns —
- * a reply is a request, and the server checks the whole of it again.</p>
+ * <p>Three ways in: LOTR opening its own offer screen, which is read and
+ * shown in this mod's dress instead; a Lost Tales giver's offer, which
+ * the server sends as the player touches the giver ({@link #offerFrom});
+ * and touching somebody a running quest waits on for its hand-in, which
+ * the client answers from the definitions and the progress it already
+ * holds. None decides anything the server owns — a reply is a request,
+ * and the server checks the whole of it again.</p>
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesQuestDialogueHooks {
@@ -162,31 +164,79 @@ public final class LostTalesQuestDialogueHooks {
     }
 
     /**
-     * The conversation touching {@code target} opens, or null where
-     * there is none, or while the conversation screen is switched off.
+     * The hand-in conversation touching {@code target} opens, or null
+     * where there is none, or while the conversation screen is switched
+     * off.
      */
     public static GuiScreen forEntity(Entity target) {
         if (target == null || !LostTalesQuestDialogueGui.isEnabled()) {
             return null;
         }
-        Exchange exchange = exchangeWith(target);
+        Exchange exchange = handInWith(target);
         return exchange == null ? null : conversation(exchange);
     }
 
     /**
      * Touching a person with the conversation screen switched off: their
-     * words go to the chat, and an offer is taken or a ready hand-in
-     * given over at once, as the screen's first answer would. A progress
-     * line is only said. Answers whether the person had anything to say.
+     * words go to the chat, and a ready hand-in is given over at once, as
+     * the screen's first answer would. A progress line is only said.
+     * Answers whether the person had anything to say.
      */
     public static boolean answerWithoutScreen(Entity target) {
         if (target == null || LostTalesQuestDialogueGui.isEnabled()) {
             return false;
         }
-        Exchange exchange = exchangeWith(target);
+        Exchange exchange = handInWith(target);
         if (exchange == null) {
             return false;
         }
+        answer(exchange);
+        return true;
+    }
+
+    /**
+     * A giver's offer, sent by the server as the player touched them: the
+     * conversation opens on it, or with the conversation screen switched
+     * off the giver's line goes to the chat and the offer is taken at
+     * once. An offer whose speaker or quest this client cannot find, or
+     * one that comes while another screen is open, is let go.
+     */
+    public static void offerFrom(int entityId, String questId) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.theWorld == null
+                || minecraft.thePlayer == null
+                || minecraft.currentScreen != null) {
+            return;
+        }
+        Entity speaker = minecraft.theWorld.getEntityByID(entityId);
+        LostTalesQuestDefinition quest =
+                LostTalesClientQuestDefinitionStore.getQuest(questId);
+        if (speaker == null || quest == null) {
+            return;
+        }
+        LostTalesQuestDialogue dialogue = LostTalesQuestDialogue.of(quest);
+        if (!dialogue.isOffered()) {
+            return;
+        }
+        Exchange exchange = exchange(quest, dialogue, speaker,
+                QuestDialogueModel.Mood.OFFER,
+                dialogue.line(LostTalesQuestDialogue.OFFER),
+                firstObjective(quest));
+        if (exchange == null) {
+            return;
+        }
+        if (LostTalesQuestDialogueGui.isEnabled()) {
+            minecraft.displayGuiScreen(conversation(exchange));
+        } else {
+            answer(exchange);
+        }
+    }
+
+    /**
+     * An exchange without the screen: the words go to the chat, an offer
+     * is taken and a ready hand-in given over.
+     */
+    private static void answer(Exchange exchange) {
         LostTalesNpcChatHook.sayToPlayer(exchange.speaker, exchange.said,
                 LostTalesColors.rgb(LostTalesColors.HONEY), "");
         LostTalesQuestDialogueGui.Action requests =
@@ -196,50 +246,29 @@ public final class LostTalesQuestDialogueHooks {
         } else if (exchange.mood == QuestDialogueModel.Mood.HAND_IN) {
             requests.handOver();
         }
-        return true;
     }
 
     /**
-     * What touching {@code target} comes to, or null where it comes to
-     * nothing: a quest this person offers and the player may take, or one
-     * under way whose hand-in they are waiting for. Only a quest that wrote
-     * dialogue is talked about.
+     * The hand-in touching {@code target} comes to, or null: a quest
+     * under way whose hand-in this person waits for. Only a quest that
+     * wrote dialogue is talked about.
      */
-    private static Exchange exchangeWith(Entity target) {
-        for (LostTalesQuestDefinition quest
-                : LostTalesClientQuestDefinitionStore.getQuests()) {
+    private static Exchange handInWith(Entity target) {
+        for (LostTalesQuestProgress progress
+                : LostTalesClientQuestProgressStore.getActiveQuests()) {
+            LostTalesQuestDefinition quest =
+                    LostTalesClientQuestDefinitionStore.getQuest(
+                            progress.getQuestId());
             LostTalesQuestDialogue dialogue = LostTalesQuestDialogue.of(quest);
-            if (!dialogue.exists()) {
+            if (quest == null || !dialogue.exists()) {
                 continue;
             }
-            LostTalesQuestProgress progress =
-                    LostTalesClientQuestProgressStore.getActiveQuest(quest.getId());
-            Exchange exchange = progress == null
-                    ? offer(quest, dialogue, target)
-                    : handIn(quest, dialogue, progress, target);
+            Exchange exchange = handIn(quest, dialogue, progress, target);
             if (exchange != null) {
                 return exchange;
             }
         }
         return null;
-    }
-
-    /**
-     * The offer, when this person gives the quest and the player may take
-     * it: never taken, or taken again as the quest allows.
-     */
-    private static Exchange offer(LostTalesQuestDefinition quest,
-                                  LostTalesQuestDialogue dialogue,
-                                  Entity target) {
-        if (!dialogue.isOffered()
-                || !quest.mayTakeAgain(LostTalesClientQuestProgressStore
-                        .getQuestHistoryEntry(quest.getId()))
-                || !matches(quest.getInteraction(), target)) {
-            return null;
-        }
-        return exchange(quest, dialogue, target,
-                QuestDialogueModel.Mood.OFFER, dialogue.line(
-                        LostTalesQuestDialogue.OFFER), firstObjective(quest));
     }
 
     /**

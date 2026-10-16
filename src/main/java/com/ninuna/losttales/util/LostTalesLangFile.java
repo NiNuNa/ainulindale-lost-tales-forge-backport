@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IllegalFormatException;
 import java.util.Map;
 
 /**
@@ -18,6 +19,28 @@ import java.util.Map;
 public final class LostTalesLangFile {
     /** Where the English lines are, among the mod's resources. */
     public static final String ENGLISH = "/assets/losttales/lang/en_US.lang";
+
+    /**
+     * The English lines as words, whatever the game's language: a key
+     * the file has no line for reads as itself.
+     */
+    public static final LostTalesWords ENGLISH_WORDS = new LostTalesWords() {
+        @Override
+        public String format(String key, Object... arguments) {
+            String line = english().get(key);
+            if (line == null) {
+                return key;
+            }
+            if (arguments == null || arguments.length == 0) {
+                return line;
+            }
+            try {
+                return String.format(line, arguments);
+            } catch (IllegalFormatException wrong) {
+                return line;
+            }
+        }
+    };
 
     /** The English lines, read once; the file is part of the mod and does not change. */
     private static Map<String, String> english;

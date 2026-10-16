@@ -120,8 +120,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private static final float FIGURE_HEIGHT_BLOCKS = 2.0F;
     /** The face drawn when there is no account to build a body for. */
     private static final int FACE_FALLBACK_SIZE = 64;
-    /** The lines the History's box shows at once. */
-    private static final int HISTORY_LINES = 4;
+    /** The lines the History's box shows at once, as many as Edit Profile's. */
+    private static final int HISTORY_LINES = 8;
     /** Lights the character in a world; a key of this screen's, not a control of the game's. */
     private static final int LIGHT_KEY = Keyboard.KEY_L;
 
@@ -596,8 +596,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         // keeps its paragraphs.
         this.historyControl = new CreatorTextArea(this.context,
                 I18n.format("gui.losttales.character.profile.history"),
-                this.draftHistory, CharacterProfile.MAX_SECTION_LENGTH,
-                HISTORY_LINES);
+                this.draftHistory,
+                CharacterProfile.Section.HISTORY.getMaxLength(), HISTORY_LINES);
         this.controls.add(this.historyControl);
         this.controls.add(new CreatorNote(this.context,
                 I18n.format("gui.losttales.character.profile.history.hint")));

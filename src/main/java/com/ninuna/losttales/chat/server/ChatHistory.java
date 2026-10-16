@@ -541,13 +541,15 @@ public final class ChatHistory {
      * words. {@code bodyJson} is the new words' component, empty for
      * none: a player's edit has none, a Discord member's has one when its
      * words hold a mark, and the old one never stays, since it said the
-     * old words. The reactions stay with the message.
+     * old words. {@code named} and {@code roleIds} are whom and which
+     * roles the new words call. The reactions stay with the message.
      */
     public static synchronized Set<UUID> applyEdit(long messageId,
                                                    UUID editor,
                                                    String message,
                                                    String bodyJson,
-                                                   List<ChatNamedPlayer> named) {
+                                                   List<ChatNamedPlayer> named,
+                                                   List<String> roleIds) {
         Entry entry = authored(messageId, editor);
         if (entry == null || message == null) {
             return null;
@@ -556,9 +558,9 @@ public final class ChatHistory {
         LostTalesChatMessagePacket forOthers;
         try {
             forSender = entry.forSender.withMessage(message)
-                    .withServerBody(bodyJson, named);
+                    .withServerBody(bodyJson, named).withMentionedRoles(roleIds);
             forOthers = entry.forOthers.withMessage(message)
-                    .withServerBody(bodyJson, named);
+                    .withServerBody(bodyJson, named).withMentionedRoles(roleIds);
         } catch (RuntimeException refused) {
             // The caller validated the text; a line that still cannot be
             // rebuilt is left as it was rather than half-changed.
@@ -842,10 +844,16 @@ public final class ChatHistory {
                         requester.identityIds));
     }
 
-    /** The copy of a kept line meant for the requester: its author's own, else everyone else's. */
+    /**
+     * The copy of a kept line meant for the requester: its author's own,
+     * else everyone else's, without the accounts behind characters for a
+     * requester not shown them.
+     */
     private static LostTalesChatMessagePacket copyFor(Requester requester, Entry entry) {
-        return requester.accountId != null && requester.accountId.equals(entry.authorId)
+        LostTalesChatMessagePacket copy = requester.accountId != null
+                && requester.accountId.equals(entry.authorId)
                 ? entry.forSender : entry.forOthers;
+        return requester.seesAccounts ? copy : copy.withoutAccountsFor(requester.accountId);
     }
 
     /** The conversation a whisper copy is held in, as the reader's tab names it. */
@@ -1218,11 +1226,14 @@ public final class ChatHistory {
          * theirs: what a reaction of theirs may have been made as.
          */
         final Set<UUID> identityIds;
+        /** Whether the player is shown which account plays a character. */
+        final boolean seesAccounts;
 
         public Requester(UUID accountId, Map<String, Long> ownedFactions,
                          Collection<UUID> fellowshipIds, Collection<ChatChannel> readable,
-                         Collection<UUID> identityIds) {
+                         Collection<UUID> identityIds, boolean seesAccounts) {
             this.accountId = accountId;
+            this.seesAccounts = seesAccounts;
             Set<UUID> identities = new HashSet<UUID>();
             if (accountId != null) {
                 identities.add(accountId);

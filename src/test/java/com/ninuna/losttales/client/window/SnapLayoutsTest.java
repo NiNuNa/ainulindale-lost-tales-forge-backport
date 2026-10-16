@@ -296,29 +296,6 @@ public final class SnapLayoutsTest {
     }
 
     /**
-     * The panel under a fullscreen control opens as a menu does: toward
-     * the middle, its right edge lined up with the control's near the
-     * right of the screen, below a control near the top and above one
-     * near the bottom.
-     */
-    @Test
-    public void theFlyoutOpensTowardTheMiddle() {
-        List<Window.ScreenFill[]> layouts = SnapLayouts.offered(null,
-                960, 540);
-        List<SnapLayouts.Suggestion> none =
-                Collections.<SnapLayouts.Suggestion>emptyList();
-        SnapLayouts.Panel below = SnapLayouts.Flyout.hangFrom(none,
-                layouts, new LostTalesUiHitBox(900.0D, 10.0D, 11.0D, 11.0D),
-                null, 960, 540);
-        assertBox(747, 23, 164, 70, below.box);
-        SnapLayouts.Panel above = SnapLayouts.Flyout.hangFrom(none,
-                layouts, new LostTalesUiHitBox(900.0D, 520.0D, 11.0D, 11.0D),
-                null, 960, 540);
-        assertBox(747, 448, 164, 70, above.box);
-        assertFalse(above.contains(900.0D, 525.0D));
-    }
-
-    /**
      * The suggested layouts hold the windows in front beside the one in
      * hand: the halves with the window in front on the right once there
      * is one, and a half with the two in front stacked on the right once

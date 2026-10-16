@@ -33,16 +33,9 @@
     "duration": 180,
     "curve": "ease_in_out"
   },
-  "window.snap.layouts": {
-    "duration": 180,
-    "curve": "ease_in_out"
-  },
   "window.snap.preview": {
     "duration": 180,
     "curve": "ease_in_out"
-  },
-  "window.snap.bar.peek": {
-    "follow": 0.06
   },
   "window.search.clear": {
     "duration": 180,

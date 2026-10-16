@@ -18,6 +18,27 @@ import org.lwjgl.input.Mouse;
 public final class WordButton {
     private WordButton() {}
 
+    /**
+     * Where a foot's two buttons stand in {@code box}, at its right,
+     * {@code paddingY} above its bottom: the one holding {@code lastLabel}
+     * last, the other before it, a framed button's gap apart. {@code last}
+     * asks for the last one's box, else the other's.
+     */
+    public static LostTalesUiHitBox footBox(FontRenderer font, LostTalesUiHitBox box,
+                                            String lastLabel, String otherLabel,
+                                            int paddingY, boolean last) {
+        int lastWidth = width(font, lastLabel);
+        double top = box.top + box.height - paddingY - LostTalesUiFramedButton.HEIGHT;
+        double lastLeft = box.left + box.width - WindowStyle.EDGE_GAP - lastWidth;
+        if (last) {
+            return new LostTalesUiHitBox(lastLeft, top, lastWidth,
+                    LostTalesUiFramedButton.HEIGHT);
+        }
+        int otherWidth = width(font, otherLabel);
+        return new LostTalesUiHitBox(lastLeft - WindowBar.BUTTON_GAP - otherWidth, top,
+                otherWidth, LostTalesUiFramedButton.HEIGHT);
+    }
+
     /** How wide a button holding {@code label} is. */
     public static int width(FontRenderer font, String label) {
         return 2 * LostTalesUiFramedButton.WIDE_INSET

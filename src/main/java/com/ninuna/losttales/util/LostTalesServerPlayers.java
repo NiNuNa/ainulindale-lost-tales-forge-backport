@@ -2,16 +2,28 @@ package com.ninuna.losttales.util;
 
 import java.util.List;
 import java.util.UUID;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
 
 /**
  * The players of the running server: whether a player is one the server
- * holds, and the online ones looked up by name or id.
+ * holds, the online ones looked up by name or id, and the part of a
+ * player's saved data the mod keeps its own marks in.
  */
 public final class LostTalesServerPlayers {
 
     private LostTalesServerPlayers() {}
+
+    /** The part of a player's saved data Forge keeps across deaths. */
+    public static NBTTagCompound persistedData(EntityPlayer player) {
+        NBTTagCompound data = player.getEntityData();
+        if (!data.hasKey(EntityPlayer.PERSISTED_NBT_TAG)) {
+            data.setTag(EntityPlayer.PERSISTED_NBT_TAG, new NBTTagCompound());
+        }
+        return data.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG);
+    }
 
     /** Whether the player is one the server holds: present, with an id, in a server world. */
     public static boolean isServerPlayer(EntityPlayerMP player) {

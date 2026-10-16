@@ -20,7 +20,8 @@ import static org.junit.Assert.assertNotNull;
  * A character's profile is kept with its record: every part round-trips,
  * a record without one reads as saying nothing, and a part that is no
  * longer valid as stored is read as empty — a glance that no longer is
- * one, or one past the fifth, is left out.
+ * one, or one past the fifth, is left out. Each About text is held to its
+ * own length.
  */
 public final class CharacterProfileStorageTest {
 
@@ -68,12 +69,8 @@ public final class CharacterProfileStorageTest {
         NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
                 character(profile()));
         NBTTagCompound stored = record.getCompoundTag("Profile");
-        StringBuilder tooLong = new StringBuilder();
-        for (int index = 0; index <= CharacterProfile.MAX_SECTION_LENGTH;
-             index++) {
-            tooLong.append('a');
-        }
-        stored.setString("Personality", tooLong.toString());
+        stored.setString("Personality", repeat(
+                CharacterProfile.Section.PERSONALITY.getMaxLength() + 1));
         NBTTagList glances = stored.getTagList("Glances",
                 Constants.NBT.TAG_COMPOUND);
         glances.getCompoundTagAt(0).setString("Emoji", "not_an_emoji");
@@ -94,6 +91,40 @@ public final class CharacterProfileStorageTest {
                 read.section(CharacterProfile.Section.APPEARANCE));
         assertEquals(CharacterProfile.MAX_GLANCES, read.glances().size());
         assertEquals("Scarred", read.glances().get(0).getTitle());
+    }
+
+    @Test
+    public void eachAboutTextKeepsItsOwnLength() {
+        String history = repeat(CharacterProfile.Section.HISTORY.getMaxLength());
+        CharacterProfile full = profile().withSection(
+                CharacterProfile.Section.HISTORY, history);
+        RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(
+                CharacterNbtCodec.writeCharacterRecord(character(full)), OWNER);
+        assertNotNull(loaded);
+        assertEquals("a History of 2,048 characters is kept whole", full,
+                loaded.getProfile());
+
+        NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
+                character(profile()));
+        NBTTagCompound stored = record.getCompoundTag("Profile");
+        stored.setString("History", history + "a");
+        stored.setString("Appearance", repeat(
+                CharacterProfile.Section.APPEARANCE.getMaxLength() + 1));
+        CharacterProfile read = CharacterNbtCodec.readCharacterRecord(
+                record, OWNER).getProfile();
+        assertEquals("", read.section(CharacterProfile.Section.HISTORY));
+        assertEquals("an Appearance is not as long as a History", "",
+                read.section(CharacterProfile.Section.APPEARANCE));
+        assertEquals("Patient.",
+                read.section(CharacterProfile.Section.PERSONALITY));
+    }
+
+    private static String repeat(int count) {
+        StringBuilder text = new StringBuilder();
+        for (int index = 0; index < count; index++) {
+            text.append('a');
+        }
+        return text.toString();
     }
 
     private static RoleplayCharacter character(CharacterProfile profile) {

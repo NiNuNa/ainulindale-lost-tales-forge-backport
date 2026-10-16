@@ -17,8 +17,9 @@ import java.util.UUID;
 
 /**
  * LOTR's fellowship behind one of ours. LOTR's own fellowship carries out
- * the three rules, shows members on its map, and shares waypoints and
- * banners, so each of ours keeps one in step with it. The fellowship is
+ * the two rules on harm and shares waypoints and banners, so each of ours
+ * keeps one in step with it. Its own *show map locations* stays off: it
+ * would only show members who hide on LOTR's map. The fellowship is
  * changed through its own methods; of a player's LOTR data only the list of
  * fellowships is touched, never the methods that send LOTR's notices, so
  * nobody is told anything in LOTR's words.
@@ -36,7 +37,6 @@ public final class LotrFellowshipMirror {
         final FellowshipIcon icon;
         final boolean noFighting;
         final boolean noHiredHarm;
-        final boolean shownOnMap;
         final UUID owner;
         final List<UUID> members;
         final Set<UUID> admins;
@@ -46,7 +46,7 @@ public final class LotrFellowshipMirror {
          * it, {@code admins} those of them who are guides.
          */
         public Shape(String name, FellowshipIcon icon, boolean noFighting,
-                     boolean noHiredHarm, boolean shownOnMap, UUID owner,
+                     boolean noHiredHarm, UUID owner,
                      List<UUID> members, Set<UUID> admins) {
             if (name == null || owner == null) {
                 throw new IllegalArgumentException("a mirror needs a name and an owner");
@@ -55,7 +55,6 @@ public final class LotrFellowshipMirror {
             this.icon = icon;
             this.noFighting = noFighting;
             this.noHiredHarm = noHiredHarm;
-            this.shownOnMap = shownOnMap;
             this.owner = owner;
             List<UUID> others = new ArrayList<UUID>();
             if (members != null) {
@@ -146,8 +145,8 @@ public final class LotrFellowshipMirror {
             if (fellowship.getPreventHiredFriendlyFire() != shape.noHiredHarm) {
                 fellowship.setPreventHiredFriendlyFire(shape.noHiredHarm);
             }
-            if (fellowship.getShowMapLocations() != shape.shownOnMap) {
-                fellowship.setShowMapLocations(shape.shownOnMap);
+            if (fellowship.getShowMapLocations()) {
+                fellowship.setShowMapLocations(false);
             }
             return fellowship.getFellowshipID();
         } catch (RuntimeException failure) {

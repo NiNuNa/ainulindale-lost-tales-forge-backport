@@ -13,31 +13,32 @@ public final class LostTalesMapMarkerVisibilityPolicyTest {
     public void ownerSharedPublicAndOperatorAccessAreDistinct() {
         UUID owner = UUID.randomUUID();
         UUID guest = UUID.randomUUID();
+        UUID aldric = UUID.randomUUID();
+        UUID beren = UUID.randomUUID();
         UUID stranger = UUID.randomUUID();
         LostTalesMapMarkerRecord privateRecord = playerRecord(owner);
 
-        assertTrue(LostTalesMapMarkerVisibilityPolicy.canView(
-                privateRecord, owner, false));
-        assertFalse(LostTalesMapMarkerVisibilityPolicy.canView(
-                privateRecord, guest, false));
-        assertTrue(LostTalesMapMarkerVisibilityPolicy.canView(
-                privateRecord, stranger, true));
+        assertTrue("the owner's account, whoever it plays",
+                canView(privateRecord, owner, UUID.randomUUID(), false));
+        assertFalse(canView(privateRecord, guest, aldric, false));
+        assertTrue(canView(privateRecord, stranger, null, true));
 
         LostTalesMapMarkerRecord shared =
-                privateRecord.withSharedPlayers(
-                        Collections.singleton(guest),
+                privateRecord.withSharedCharacters(
+                        Collections.singleton(aldric),
                         LostTalesMapMarkerVisibility.SHARED);
-        assertTrue(LostTalesMapMarkerVisibilityPolicy.canView(
-                shared, guest, false));
-        assertFalse(LostTalesMapMarkerVisibilityPolicy.canView(
-                shared, stranger, false));
+        assertTrue(canView(shared, guest, aldric, false));
+        assertFalse("a share holds for the character, not its account's others",
+                canView(shared, guest, beren, false));
+        assertFalse(canView(shared, guest, null, false));
+        assertTrue("whoever plays the character, a lore figure's next holder too",
+                canView(shared, stranger, aldric, false));
 
         LostTalesMapMarkerRecord publicRecord =
                 shared.toBuilder()
                         .visibility(LostTalesMapMarkerVisibility.PUBLIC)
                         .build();
-        assertTrue(LostTalesMapMarkerVisibilityPolicy.canView(
-                publicRecord, stranger, false));
+        assertTrue(canView(publicRecord, stranger, null, false));
     }
 
     @Test
@@ -52,14 +53,21 @@ public final class LostTalesMapMarkerVisibilityPolicyTest {
                         LostTalesMapMarkerVisibility.SHARED);
 
         assertTrue(LostTalesMapMarkerVisibilityPolicy.canView(
-                shared, member, false,
+                shared, member, null, false,
                 Collections.singleton(fellowship)));
         assertFalse(LostTalesMapMarkerVisibilityPolicy.canView(
-                shared, member, false,
+                shared, member, null, false,
                 Collections.singleton(otherFellowship)));
         assertFalse(LostTalesMapMarkerVisibilityPolicy.canView(
-                shared, member, false,
+                shared, member, null, false,
                 Collections.<UUID>emptySet()));
+    }
+
+    private static boolean canView(LostTalesMapMarkerRecord record,
+                                   UUID account, UUID character,
+                                   boolean operator) {
+        return LostTalesMapMarkerVisibilityPolicy.canView(record, account,
+                character, operator, Collections.<UUID>emptySet());
     }
 
     private static LostTalesMapMarkerRecord playerRecord(UUID owner) {

@@ -1,14 +1,14 @@
 package com.ninuna.losttales.event;
 
-import com.ninuna.losttales.quest.LostTalesQuestInteractionHelper;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
+import com.ninuna.losttales.quest.QuestStartGate;
+import com.ninuna.losttales.quest.QuestStartProof;
 import com.ninuna.losttales.fellowship.quest.FellowshipQuestProgressCoordinator;
 import com.ninuna.losttales.quest.world.WorldQuests;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
-import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.passive.EntityTameable;
@@ -22,9 +22,10 @@ import net.minecraftforge.event.entity.player.EntityInteractEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 /**
  * The game events quests count by, on the server: kills, pickups, crafts,
- * right-clicks on items, blocks and creatures, and a look once a second
- * at deadlines, places and markers. Registered on both Forge's bus and
- * FML's, since the events come from both.
+ * right-clicks on items, blocks and creatures, every tick the hand-overs
+ * due, and a look once a second at deadlines, places and markers.
+ * Registered on both Forge's bus and FML's, since the events come from
+ * both.
  */
 public final class LostTalesQuestObjectiveEventHandler {
 
@@ -76,15 +77,17 @@ public final class LostTalesQuestObjectiveEventHandler {
             return;
         }
 
-        ItemStack held = event.entityPlayer.inventory == null ? null : event.entityPlayer.inventory.getCurrentItem();
-        if (held != null && held.hasTagCompound() && held.getTagCompound().hasKey("LostTalesQuestId")) {
-            LostTalesQuestManager.startQuestFromItem((EntityPlayerMP) event.entityPlayer, held);
+        EntityPlayerMP player = (EntityPlayerMP) event.entityPlayer;
+        ItemStack held = player.inventory == null ? null : player.inventory.getCurrentItem();
+        if (held != null && held.hasTagCompound()
+                && held.getTagCompound().hasKey(QuestStartGate.TAG_QUEST_ID)) {
+            QuestStartGate.start(player,
+                    held.getTagCompound().getString(QuestStartGate.TAG_QUEST_ID),
+                    QuestStartProof.item(held));
         }
 
         if (event.action == PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK) {
-            Block block = event.world == null ? null : event.world.getBlock(event.x, event.y, event.z);
-            int metadata = event.world == null ? 0 : event.world.getBlockMetadata(event.x, event.y, event.z);
-            LostTalesQuestInteractionHelper.handleBlockInteraction((EntityPlayerMP) event.entityPlayer, block, metadata, event.x, event.y, event.z);
+            QuestStartGate.touchedBlock(player, event.x, event.y, event.z);
         }
     }
 
@@ -93,7 +96,7 @@ public final class LostTalesQuestObjectiveEventHandler {
         if (event == null || !(event.entityPlayer instanceof EntityPlayerMP) || event.entityPlayer.worldObj == null || event.entityPlayer.worldObj.isRemote) {
             return;
         }
-        LostTalesQuestInteractionHelper.handleEntityInteraction((EntityPlayerMP) event.entityPlayer, event.target);
+        QuestStartGate.touchedCreature((EntityPlayerMP) event.entityPlayer, event.target);
     }
 
     @SubscribeEvent
@@ -114,6 +117,10 @@ public final class LostTalesQuestObjectiveEventHandler {
             return;
         }
 
+        // A stage that ended inside a click (a craft is counted in the
+        // middle of the inventory's own handling) hands its items over
+        // here, on the tick after.
+        LostTalesQuestManager.settleHandOvers((EntityPlayerMP) event.player);
         if (event.player.ticksExisted % 20 != 0) {
             return;
         }

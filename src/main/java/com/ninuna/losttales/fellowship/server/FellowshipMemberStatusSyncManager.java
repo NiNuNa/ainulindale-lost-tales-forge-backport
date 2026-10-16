@@ -1,13 +1,17 @@
 package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
+import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
+import com.ninuna.losttales.compat.lotr.LotrMapLocations;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipMemberStatusSyncPacket;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
+import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberStatusSnapshot;
@@ -25,8 +29,9 @@ import java.util.UUID;
 
 /**
  * Sends each player the health and availability of the members of the
- * fellowship they travel with, and of no other. The logical server is the
- * sole source of runtime status data.
+ * fellowship they travel with, and of no other. A member's world goes with
+ * it only while the member's place is shared ({@link FellowshipPlaces}).
+ * The logical server is the sole source of runtime status data.
  */
 public final class FellowshipMemberStatusSyncManager {
 
@@ -96,7 +101,8 @@ public final class FellowshipMemberStatusSyncManager {
                 recipient.getUniqueID(), 1L,
                 receiver.gameplayId)
                 : buildFellowshipContent(recipient.getUniqueID(),
-                receiver.gameplayId, fellowship, view.online);
+                receiver.gameplayId, fellowship, view,
+                AccountVisibility.seesAccounts(recipient));
 
         SentState sent = SENT_STATES.get(recipient.getUniqueID());
         if (!content.hasFellowship() && !force
@@ -129,11 +135,14 @@ public final class FellowshipMemberStatusSyncManager {
             UUID recipientOwnerId,
             UUID activeIdentityId,
             Fellowship fellowship,
-            FellowshipOnlineView online) {
+            ServerView view,
+            boolean seesAccounts) {
         ArrayList<FellowshipMemberStatusSnapshot> statuses =
                 new ArrayList<FellowshipMemberStatusSnapshot>(fellowship.getMemberCount());
+        boolean ruleOn = fellowship.isOn(FellowshipSwitch.SHOWN_ON_MAP);
         for (FellowshipMember member : fellowship.getMembers()) {
-            statuses.add(buildMemberStatus(member, online.get(member.getOwnerId())));
+            statuses.add(buildMemberStatus(member,
+                    view.online.get(member.getOwnerId()), ruleOn, view, seesAccounts));
         }
         return new FellowshipStatusSnapshot(
                 recipientOwnerId,
@@ -145,14 +154,17 @@ public final class FellowshipMemberStatusSyncManager {
     }
 
     private static FellowshipMemberStatusSnapshot buildMemberStatus(
-            FellowshipMember member, FellowshipOnlineView.Online online) {
+            FellowshipMember member, FellowshipOnlineView.Online online,
+            boolean ruleOn, ServerView view, boolean seesAccounts) {
         UUID identityId = member.getIdentityId();
         if (online == null) {
             return FellowshipMemberStatusSnapshot.offline(identityId);
         }
-        // The owner is online as another character, or still making one.
+        // The owner is online as another character, or still making one:
+        // to a recipient not shown accounts the member is simply offline.
         if (!identityId.equals(online.gameplayId)) {
-            return FellowshipMemberStatusSnapshot.inactive(identityId);
+            return seesAccounts ? FellowshipMemberStatusSnapshot.inactive(identityId)
+                    : FellowshipMemberStatusSnapshot.offline(identityId);
         }
 
         EntityPlayerMP player = online.player;
@@ -176,7 +188,8 @@ public final class FellowshipMemberStatusSyncManager {
         return FellowshipMemberStatusSnapshot.online(
                 identityId,
                 dead,
-                player.dimension,
+                view.placeShared(player, ruleOn)
+                        ? player.dimension : FellowshipMemberStatusSnapshot.NO_DIMENSION,
                 health,
                 maximumHealth,
                 player.getEquipmentInSlot(4),
@@ -231,11 +244,28 @@ public final class FellowshipMemberStatusSyncManager {
     private static final class ServerView {
         private final FellowshipWorldData fellowshipData;
         private final FellowshipOnlineView online;
+        /** Whether each player's place is shared under a rule that is on, read once a pass. */
+        private final Map<UUID, Boolean> sharedByOwner = new HashMap<UUID, Boolean>();
 
         private ServerView(FellowshipWorldData fellowshipData,
                            FellowshipOnlineView online) {
             this.fellowshipData = fellowshipData;
             this.online = online;
+        }
+
+        /** Whether the player's place goes to a fellowship whose map rule is {@code ruleOn}. */
+        private boolean placeShared(EntityPlayerMP player, boolean ruleOn) {
+            if (!ruleOn) {
+                return false;
+            }
+            Boolean shared = this.sharedByOwner.get(player.getUniqueID());
+            if (shared == null) {
+                shared = Boolean.valueOf(FellowshipPlaces.shared(ruleOn,
+                        AccessoryEffectService.isConcealed(player),
+                        LotrMapLocations.hides(player)));
+                this.sharedByOwner.put(player.getUniqueID(), shared);
+            }
+            return shared.booleanValue();
         }
     }
 

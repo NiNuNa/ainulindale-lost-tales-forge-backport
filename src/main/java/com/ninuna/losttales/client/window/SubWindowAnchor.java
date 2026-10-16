@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.window;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 
 /**
@@ -80,6 +81,55 @@ public final class SubWindowAnchor {
         return inward(x - 4, row.rowBottom, x + 4,
                 row.rowBottom + WindowPlacement.TOOL_STRIP_HEIGHT, frame,
                 screenWidth, screenHeight);
+    }
+
+    /**
+     * The content box of a sub-window {@code width} by {@code height}, its
+     * strip not counted, hung from this box in {@code room}: on the side it
+     * opens toward, or the other side where only that one has room for it;
+     * lined up with this box's left edge, or its right edge growing
+     * leftward; and kept in the room.
+     */
+    public LostTalesUiHitBox contentBoxFor(int width, int height,
+                                           LostTalesUiHitBox room) {
+        int whole = height + SubWindow.STRIP_HEIGHT;
+        double roomRight = room.left + room.width;
+        double roomBottom = room.top + room.height;
+        double belowTop = this.bottom + REACH;
+        double aboveTop = this.top - REACH - whole;
+        boolean fitsBelow = belowTop + whole <= roomBottom;
+        boolean fitsAbove = aboveTop >= room.top;
+        boolean opensBelow = this.below ? fitsBelow || !fitsAbove
+                : !fitsAbove && fitsBelow;
+        double left = Math.max(room.left, Math.min(roomRight - width,
+                this.fromRight ? this.right - width : this.left));
+        double top = Math.max(room.top, Math.min(roomBottom - whole,
+                opensBelow ? belowTop : aboveTop));
+        return new LostTalesUiHitBox(Math.floor(left),
+                Math.floor(top) + SubWindow.STRIP_HEIGHT, width, height);
+    }
+
+    /**
+     * The content box of a sub-window {@code width} by {@code height}, its
+     * strip not counted, opening in {@code room} beside {@code sibling},
+     * the sub-window whose row opened it: to its right with the gap
+     * windows keep, or to its left where the right has no room, its top
+     * on the other's, kept in the room.
+     */
+    public static LostTalesUiHitBox contentBoxBeside(LostTalesUiHitBox sibling,
+                                                     int width, int height,
+                                                     LostTalesUiHitBox room) {
+        int whole = height + SubWindow.STRIP_HEIGHT;
+        int gap = WindowPlacement.WINDOW_GAP;
+        double roomRight = room.left + room.width;
+        double right = sibling.left + sibling.width + gap;
+        double left = right + width <= roomRight ? right
+                : sibling.left - gap - width;
+        left = Math.max(room.left, Math.min(roomRight - width, left));
+        double top = Math.max(room.top, Math.min(room.top + room.height
+                - whole, sibling.top));
+        return new LostTalesUiHitBox(Math.floor(left),
+                Math.floor(top) + SubWindow.STRIP_HEIGHT, width, height);
     }
 
     /**

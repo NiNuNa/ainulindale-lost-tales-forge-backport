@@ -36,11 +36,12 @@ import net.minecraft.entity.player.EntityPlayerMP;
  */
 public final class LostTalesChatMembersRequestPacket implements IMessage {
     private static final int MAX_CHANNEL_ID_BYTES = 64;
-    private static final int MAX_ACCOUNT_BYTES = 64;
+    /** The other party a whisper is filed under: an account's name, or a character's. */
+    private static final int MAX_PARTNER_BYTES = 128;
     private static final int MAX_IDENTITY_BYTES = 128;
     private static final int MAX_PACKET_BYTES = 5 + MAX_CHANNEL_ID_BYTES
             + 5 + LostTalesChatMembersPacket.MAX_CONVERSATION_KEY_BYTES
-            + 5 + MAX_ACCOUNT_BYTES + 5 + MAX_IDENTITY_BYTES + 17 + 17 + 8;
+            + 5 + MAX_PARTNER_BYTES + 5 + MAX_IDENTITY_BYTES + 17 + 17 + 8;
 
     private String channelId = "";
     private String conversationKey = "";
@@ -91,7 +92,7 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
             this.conversationKey = LostTalesPacketCodec.readUtf8String(buffer,
                     LostTalesChatMembersPacket.MAX_CONVERSATION_KEY_BYTES);
             this.partnerAccount = LostTalesPacketCodec.readUtf8String(buffer,
-                    MAX_ACCOUNT_BYTES);
+                    MAX_PARTNER_BYTES);
             this.partnerIdentity = LostTalesPacketCodec.readUtf8String(buffer,
                     MAX_IDENTITY_BYTES);
             this.partnerCharacterId = LostTalesPacketCodec.readNullableUuid(buffer);
@@ -120,7 +121,7 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(buffer, this.conversationKey,
                 LostTalesChatMembersPacket.MAX_CONVERSATION_KEY_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, this.partnerAccount,
-                MAX_ACCOUNT_BYTES);
+                MAX_PARTNER_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, this.partnerIdentity,
                 MAX_IDENTITY_BYTES);
         LostTalesPacketCodec.writeNullableUuid(buffer, this.partnerCharacterId);
@@ -137,7 +138,7 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
                 || !LostTalesPacketCodec.isUtf8WithinLimit(this.conversationKey,
                         LostTalesChatMembersPacket.MAX_CONVERSATION_KEY_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(this.partnerAccount,
-                        MAX_ACCOUNT_BYTES)
+                        MAX_PARTNER_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(this.partnerIdentity,
                         MAX_IDENTITY_BYTES)
                 || (getChannel() != ChatChannel.WHISPER

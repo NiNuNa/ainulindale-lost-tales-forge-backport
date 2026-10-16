@@ -267,12 +267,11 @@ public final class ChatHistoryNbtCodecTest {
     }
 
     /**
-     * A kept line cut short of its last part is quarantined rather than
-     * shown: the save is read through the one line codec, which reads one
-     * layout.
+     * A kept line missing one of its fields is quarantined rather than
+     * shown: nothing is filled in for it.
      */
     @Test
-    public void aKeptLineCutShortIsQuarantined() {
+    public void aKeptLineMissingAFieldIsQuarantined() {
         long id = ChatMessageIdAllocator.next();
         ChatHistory.record(id, ALICE, "Aldric", null,
                 line(id, ChatChannel.GLOBAL, ALICE, "hail", ""),
@@ -283,9 +282,8 @@ public final class ChatHistoryNbtCodecTest {
                 ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
         NBTTagCompound shortened = (NBTTagCompound)written.getTagList("Entries",
                 Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0).copy();
-        byte[] whole = shortened.getByteArray("ForOthers");
-        // Without the tab a command's answer is filed under: one byte.
-        shortened.setByteArray("ForOthers", Arrays.copyOf(whole, whole.length - 1));
+        // Without the tab a command's answer is filed under.
+        shortened.getCompoundTag("ForOthers").removeTag("Tab");
         NBTTagList rewritten = new NBTTagList();
         rewritten.appendTag(shortened);
         written.setTag("Entries", rewritten);
@@ -311,13 +309,13 @@ public final class ChatHistoryNbtCodecTest {
         NBTTagList entries = written.getTagList("Entries", Constants.NBT.TAG_COMPOUND);
         NBTTagCompound good = entries.getCompoundTagAt(0);
 
-        // The same line again under another id: the bytes name the first.
+        // The same line again under another id: the line names the first.
         NBTTagCompound wrongId = (NBTTagCompound)good.copy();
         wrongId.setLong("MessageId", id + 1);
-        // A line whose bytes decode to nothing.
+        // A line that holds nothing.
         NBTTagCompound garbage = (NBTTagCompound)good.copy();
         garbage.setLong("MessageId", id + 2);
-        garbage.setByteArray("ForOthers", new byte[] {1, 2, 3});
+        garbage.setTag("ForOthers", new NBTTagCompound());
         // A line with no audience at all, under the good line's own id:
         // the line itself is sound, so it is the audience that fails it.
         NBTTagCompound noAudience = (NBTTagCompound)good.copy();

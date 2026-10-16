@@ -21,7 +21,7 @@ public final class LostTalesMapMarkerRecord {
     public static final int MAX_NAME_LENGTH = 256;
     public static final int MAX_TEXT_LENGTH = 1024;
     public static final int MAX_STRUCTURE_ID_LENGTH = 128;
-    public static final int MAX_SHARED_PLAYERS = 256;
+    public static final int MAX_SHARED_CHARACTERS = 256;
     public static final int MAX_SHARED_FELLOWSHIPS = 64;
     public static final double MAX_ABSOLUTE_COORDINATE = 30000000.0D;
     public static final double MAX_RADIUS = 1000000.0D;
@@ -49,7 +49,7 @@ public final class LostTalesMapMarkerRecord {
     private final int priority;
     private final UUID ownerPlayerId;
     private final LostTalesMapMarkerVisibility visibility;
-    private final Set<UUID> sharedPlayerIds;
+    private final Set<UUID> sharedCharacterIds;
     private final Set<UUID> sharedFellowshipIds;
     private final LostTalesWaystoneGenerationState generationState;
     private final String generationMessage;
@@ -110,17 +110,17 @@ public final class LostTalesMapMarkerRecord {
         this.visibility = builder.visibility == null
                 ? LostTalesMapMarkerVisibility.PRIVATE : builder.visibility;
         LinkedHashSet<UUID> shared = new LinkedHashSet<UUID>();
-        if (builder.sharedPlayerIds != null) {
-            for (UUID playerId : builder.sharedPlayerIds) {
-                if (playerId != null && !playerId.equals(this.ownerPlayerId)) {
-                    shared.add(playerId);
+        if (builder.sharedCharacterIds != null) {
+            for (UUID characterId : builder.sharedCharacterIds) {
+                if (characterId != null) {
+                    shared.add(characterId);
                 }
-                if (shared.size() >= MAX_SHARED_PLAYERS) {
+                if (shared.size() >= MAX_SHARED_CHARACTERS) {
                     break;
                 }
             }
         }
-        this.sharedPlayerIds = Collections.unmodifiableSet(shared);
+        this.sharedCharacterIds = Collections.unmodifiableSet(shared);
         LinkedHashSet<UUID> sharedFellowships =
                 new LinkedHashSet<UUID>();
         if (builder.sharedFellowshipIds != null) {
@@ -196,11 +196,11 @@ public final class LostTalesMapMarkerRecord {
 
     /**
      * A waystone a player just placed: unnamed, called after
-     * {@code ownerName} ({@code Nils's Waystone}), with no category or
+     * {@code placerName} ({@code Nils's Waystone}), with no category or
      * description of its own, until its owner gives it some.
      */
     public static LostTalesMapMarkerRecord createPlayerMarker(
-            String id, String ownerName, UUID ownerPlayerId,
+            String id, String placerName, UUID ownerPlayerId,
             int dimensionId, double x, double y, double z,
             UUID linkToken) {
         if (ownerPlayerId == null) {
@@ -209,7 +209,7 @@ public final class LostTalesMapMarkerRecord {
         }
         return builder(id, LostTalesMapMarkerSource.PLAYER_CREATED)
                 .name("")
-                .namedAfter(LostTalesMapMarkerNamedAfter.player(ownerName))
+                .namedAfter(LostTalesMapMarkerNamedAfter.player(placerName))
                 .iconName("fort")
                 .colorName("white")
                 .categoryName("")
@@ -291,11 +291,11 @@ public final class LostTalesMapMarkerRecord {
                 .build();
     }
 
-    public LostTalesMapMarkerRecord withSharedPlayers(
-            Set<UUID> sharedPlayerIds,
+    public LostTalesMapMarkerRecord withSharedCharacters(
+            Set<UUID> sharedCharacterIds,
             LostTalesMapMarkerVisibility visibility) {
         return toBuilder()
-                .sharedPlayerIds(sharedPlayerIds)
+                .sharedCharacterIds(sharedCharacterIds)
                 .visibility(visibility)
                 .revision(this.revision + 1L)
                 .build();
@@ -344,7 +344,8 @@ public final class LostTalesMapMarkerRecord {
     public int getPriority() { return this.priority; }
     public UUID getOwnerPlayerId() { return this.ownerPlayerId; }
     public LostTalesMapMarkerVisibility getVisibility() { return this.visibility; }
-    public Set<UUID> getSharedPlayerIds() { return this.sharedPlayerIds; }
+    /** The characters it is shared with: a share holds for that character alone, whoever plays it. */
+    public Set<UUID> getSharedCharacterIds() { return this.sharedCharacterIds; }
     public Set<UUID> getSharedFellowshipIds() {
         return this.sharedFellowshipIds;
     }
@@ -438,7 +439,7 @@ public final class LostTalesMapMarkerRecord {
         private UUID ownerPlayerId;
         private LostTalesMapMarkerVisibility visibility =
                 LostTalesMapMarkerVisibility.PRIVATE;
-        private Set<UUID> sharedPlayerIds = Collections.emptySet();
+        private Set<UUID> sharedCharacterIds = Collections.emptySet();
         private Set<UUID> sharedFellowshipIds =
                 Collections.emptySet();
         private LostTalesWaystoneGenerationState generationState;
@@ -480,7 +481,7 @@ public final class LostTalesMapMarkerRecord {
             this.priority = record.priority;
             this.ownerPlayerId = record.ownerPlayerId;
             this.visibility = record.visibility;
-            this.sharedPlayerIds = record.sharedPlayerIds;
+            this.sharedCharacterIds = record.sharedCharacterIds;
             this.sharedFellowshipIds =
                     record.sharedFellowshipIds;
             this.generationState = record.generationState;
@@ -537,7 +538,7 @@ public final class LostTalesMapMarkerRecord {
         }
         public Builder ownerPlayerId(UUID value) { this.ownerPlayerId = value; return this; }
         public Builder visibility(LostTalesMapMarkerVisibility value) { this.visibility = value; return this; }
-        public Builder sharedPlayerIds(Set<UUID> value) { this.sharedPlayerIds = value; return this; }
+        public Builder sharedCharacterIds(Set<UUID> value) { this.sharedCharacterIds = value; return this; }
         public Builder sharedFellowshipIds(Set<UUID> value) {
             this.sharedFellowshipIds = value;
             return this;

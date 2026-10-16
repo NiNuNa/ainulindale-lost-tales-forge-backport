@@ -78,7 +78,7 @@ public final class ChatLayoutTest {
 
     /**
      * A new player starts with the Chat view's window of Global and OOC,
-     * Global in front, in the bottom-left quarter. The conversations left
+     * Global in front, at the default place. The conversations left
      * closed open with their first line; Operator and the consoles wait
      * to be opened by hand. The file written from it reads back the same.
      */
@@ -90,7 +90,7 @@ public final class ChatLayoutTest {
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC),
                 ChatLayoutViews.channelsOf(window));
         assertEquals(ChatChannel.GLOBAL, ChatLayoutViews.frontChannelOf(window));
-        assertEquals(Window.ScreenFill.BOTTOM_LEFT, window.getFill());
+        assertEquals(Window.ScreenFill.NONE, window.getFill());
         assertTrue("its own box the default place's",
                 WindowPlacement.atDefaultPlace(window));
         assertTrue(window.isLocked());
@@ -895,7 +895,7 @@ public final class ChatLayoutTest {
     /**
      * With no window in the Chat view, a conversation that opens by itself
      * waits; the view opening with its defaults brings it, beside Global
-     * and OOC in the bottom-left quarter, locked. One the player asks for
+     * and OOC at the default place, locked. One the player asks for
      * opens a window of its own at once.
      */
     @Test
@@ -911,7 +911,7 @@ public final class ChatLayoutTest {
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC,
                 ChatChannel.PROXIMITY), ChatLayoutViews.channelsOf(first));
         assertEquals(ChatChannel.GLOBAL, ChatLayoutViews.frontChannelOf(first));
-        assertEquals(Window.ScreenFill.BOTTOM_LEFT, first.getFill());
+        assertEquals(Window.ScreenFill.NONE, first.getFill());
         assertTrue(first.isLocked());
         assertFalse("built once", WindowLayout.buildView(chat));
         WindowLayout.setLocked(first.getId(), false);

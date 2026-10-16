@@ -119,13 +119,13 @@ public final class FellowshipNetworkRequestHandler {
                             service.setTravelling(player, fellowshipId, revision));
                     return;
                 case SET_GO_HERE_MARKER:
-                    finish(player, requestId, operationType, before,
-                            service.setGoHereMarker(player, hasMarkerPosition,
+                    finishGoHere(player, requestId, operationType, expectedActiveIdentityId,
+                            service.setGoHere(player, hasMarkerPosition,
                                     markerDimensionId, markerX, markerZ));
                     return;
                 case REMOVE_GO_HERE_MARKER:
-                    finish(player, requestId, operationType, before,
-                            service.removeGoHereMarker(player));
+                    finishGoHere(player, requestId, operationType, expectedActiveIdentityId,
+                            service.removeGoHere(player));
                     return;
                 case PLACE_MARK:
                     finishMark(player, requestId, operationType, before,
@@ -143,7 +143,7 @@ public final class FellowshipNetworkRequestHandler {
                     return;
                 case INVITE_PLAYER: {
                     FellowshipInvitationOperationResult invited =
-                            service.invitePlayer(player, fellowshipId, revision, targetId);
+                            service.invitePlayer(player, fellowshipId, revision, name);
                     finish(player, requestId, operationType, before, invited);
                     tellInvited(invited);
                     return;
@@ -176,7 +176,9 @@ public final class FellowshipNetworkRequestHandler {
 
     /**
      * Tells the invited player in a Server line, with Accept and Decline
-     * to click, after their fellowship state has shown the invitation.
+     * to click, after their fellowship state has shown the invitation:
+     * only while they are online playing the character invited. Otherwise
+     * the invitation waits for them on the page and in the Inbox.
      */
     private static void tellInvited(FellowshipInvitationOperationResult result) {
         FellowshipInvitation invitation = result.isSuccessful()
@@ -184,18 +186,16 @@ public final class FellowshipNetworkRequestHandler {
         Fellowship fellowship = result.getFellowship();
         EntityPlayerMP invited = invitation == null ? null
                 : LostTalesServerPlayers.findOnline(invitation.getTargetOwnerId());
-        if (invited != null && fellowship != null) {
+        FellowshipService.ActiveIdentityContext playing = invited == null ? null
+                : FellowshipService.getInstance().resolveActiveIdentity(invited);
+        if (playing != null && playing.isValid()
+                && playing.gameplayId().equals(invitation.getTargetIdentityId())
+                && fellowship != null) {
             invited.addChatMessage(FellowshipInvitationNotice.line(
                     FellowshipNames.component(
                             invitation.getInvitingCharacterName()),
                     fellowship.getName(), invitation.getInvitationId()));
         }
-    }
-
-    /** Operations on the requester's own marker, which needs no character. */
-    private static boolean isPersonalMarkerOperation(FellowshipOperationType operationType) {
-        return operationType == FellowshipOperationType.SET_GO_HERE_MARKER
-                || operationType == FellowshipOperationType.REMOVE_GO_HERE_MARKER;
     }
 
     private static FellowshipErrorId validateRequestContext(
@@ -204,20 +204,6 @@ public final class FellowshipNetworkRequestHandler {
             UUID expectedActiveIdentityId,
             UUID expectedFellowshipId) {
         FellowshipService service = FellowshipService.getInstance();
-        if (isPersonalMarkerOperation(operationType)) {
-            // A personal marker may be owned by the player when they have no
-            // character, so this operation is checked against whoever the
-            // server says owns it rather than against a character alone.
-            FellowshipService.PersonalMarkerContext owner =
-                    service.resolvePersonalMarkerOwner(player);
-            if (!owner.isValid()) {
-                return owner.errorId;
-            }
-            return expectedActiveIdentityId != null
-                    && expectedActiveIdentityId.equals(owner.ownerId)
-                    ? FellowshipErrorId.NONE
-                    : FellowshipErrorId.ACTIVE_CHARACTER_CHANGED;
-        }
         FellowshipService.ActiveIdentityContext active = service.resolveActiveIdentity(player);
         if (!active.isValid()) {
             return active.errorId;
@@ -266,6 +252,24 @@ public final class FellowshipNetworkRequestHandler {
                     before, result.getFellowship(), result.getAffectedMember(),
                     result.getInvitation()), player.getUniqueID());
             mirror(player, result.getFellowship());
+        }
+    }
+
+    /**
+     * As {@link #finish}, for the player's own go-here mark: everyone in a
+     * fellowship with the character is sent their state, since whoever
+     * travels with one of them sees it.
+     */
+    private static void finishGoHere(EntityPlayerMP player, int requestId,
+                                     FellowshipOperationType operationType,
+                                     UUID ownerIdentityId,
+                                     FellowshipOperationResult result) {
+        FellowshipSyncManager.sendResultAndState(player, requestId, operationType, result);
+        if (result.wasChanged()) {
+            FellowshipSyncManager.sendStateToAudience(
+                    FellowshipSyncManager.captureCharacterFellowshipAudience(
+                            player.worldObj, ownerIdentityId),
+                    player.getUniqueID());
         }
     }
 

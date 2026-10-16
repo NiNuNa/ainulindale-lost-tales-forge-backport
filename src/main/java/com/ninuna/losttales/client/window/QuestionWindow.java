@@ -126,19 +126,8 @@ public final class QuestionWindow extends SubWindowContent {
     /** The two buttons at the foot's right, the action last, a framed button's gap apart. */
     private LostTalesUiHitBox buttonBox(FontRenderer font, LostTalesUiHitBox box,
                                         String part) {
-        int confirmWidth = WordButton.width(font, this.confirmLabel);
-        int cancelWidth = WordButton.width(font, cancelLabel());
-        double top = box.top + box.height - PADDING_Y
-                - LostTalesUiFramedButton.HEIGHT;
-        double confirmLeft = box.left + box.width - WindowStyle.EDGE_GAP
-                - confirmWidth;
-        if (CONFIRM.equals(part)) {
-            return new LostTalesUiHitBox(confirmLeft, top, confirmWidth,
-                    LostTalesUiFramedButton.HEIGHT);
-        }
-        return new LostTalesUiHitBox(confirmLeft - WindowBar.BUTTON_GAP
-                - cancelWidth, top, cancelWidth,
-                LostTalesUiFramedButton.HEIGHT);
+        return WordButton.footBox(font, box, this.confirmLabel, cancelLabel(),
+                PADDING_Y, CONFIRM.equals(part));
     }
 
 

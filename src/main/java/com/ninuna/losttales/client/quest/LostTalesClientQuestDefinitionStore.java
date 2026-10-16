@@ -17,10 +17,10 @@ import java.util.Map;
 import net.minecraft.client.resources.IResourceManager;
 /**
  * Every quest definition the client knows, from three places: the quests
- * bundled with the mod, read from its own resources; the quests the server
- * wrote in its own folder, sent as the player joins; and the missives the
- * player took, sent with their quest log. A bundled quest's id is never
- * taken by the other two.
+ * bundled with the mod, read from its own resources; those of the quests
+ * the server wrote in its own folder that this client was sent, as it
+ * came to need them; and the missives the player took, sent with their
+ * quest log. A bundled quest's id is never taken by the other two.
  */
 public final class LostTalesClientQuestDefinitionStore {
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS = new LinkedHashMap<String, LostTalesQuestDefinition>();
@@ -77,14 +77,13 @@ public final class LostTalesClientQuestDefinitionStore {
     }
 
     /**
-     * The server's own quests, as one packet of them carries them:
-     * {@code first} starts the list afresh. A quest that takes a bundled
-     * quest's id is left out, and so is every quest past as many as a
-     * server may write.
+     * Server quests, as one packet of them carries them: {@code replace}
+     * starts the list afresh. A quest that takes a bundled quest's id is
+     * left out, and so is every quest past as many as a server may write.
      */
-    public static synchronized void addServerQuestDefinitions(boolean first,
+    public static synchronized void addServerQuestDefinitions(boolean replace,
             Collection<LostTalesQuestDefinition> serverQuests) {
-        if (first) {
+        if (replace) {
             SERVER_QUESTS.clear();
         }
         if (serverQuests != null) {

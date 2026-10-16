@@ -32,18 +32,18 @@ public final class LostTalesServerBroadcastHookJoinLineTest {
         ChatComponentText name = new ChatComponentText("[Gondor] Elf");
         name.getChatStyle().setChatClickEvent(new ClickEvent(
                 ClickEvent.Action.SUGGEST_COMMAND, "/msg Elf "));
-        assertEquals("Elf", LostTalesServerBroadcastHook.joinerAccount(
+        assertEquals("Elf", LostTalesServerBroadcastHook.announcedAccount(
                 new ChatComponentTranslation("multiplayer.player.joined", name)));
         // Without the click, the name's own words stand in.
-        assertEquals("Plain", LostTalesServerBroadcastHook.joinerAccount(
+        assertEquals("Plain", LostTalesServerBroadcastHook.announcedAccount(
                 new ChatComponentTranslation("multiplayer.player.joined",
                         new ChatComponentText(" Plain "))));
-        assertEquals("Renamed", LostTalesServerBroadcastHook.joinerAccount(
+        assertEquals("Renamed", LostTalesServerBroadcastHook.announcedAccount(
                 new ChatComponentTranslation(
                         "multiplayer.player.joined.renamed", "Renamed", "Old")));
-        assertNull(LostTalesServerBroadcastHook.joinerAccount(
+        assertNull(LostTalesServerBroadcastHook.announcedAccount(
                 new ChatComponentText("Elf joined the game")));
-        assertNull(LostTalesServerBroadcastHook.joinerAccount(
+        assertNull(LostTalesServerBroadcastHook.announcedAccount(
                 new ChatComponentTranslation("multiplayer.player.joined")));
     }
 

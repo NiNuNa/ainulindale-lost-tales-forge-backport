@@ -3,16 +3,17 @@ package com.ninuna.losttales.chat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Finds {@code @Name} mentions in conversation text. Matching is
  * case-insensitive and requires word boundaries on both sides so
  * {@code mail@Nameson} or {@code @Namesake} cannot ping {@code Name}.
  * The server finds whom a line's mentions reach among the conversation's
- * members and keeps them with the line ({@link #reached}); every client
- * shows and pings from that record, never from the sender's word. A
- * role's mention, and text a client writes itself, are matched by name
- * where they are shown ({@link #mentionsAny}).
+ * members, and which roles it calls, and keeps both with the line
+ * ({@link #reached}, {@link #reachedRoles}); every client shows and pings
+ * from that record, never from the sender's word. Text a client writes
+ * itself is matched by name where it is shown ({@link #mentionsAny}).
  */
 public final class ChatMentions {
     private ChatMentions() {}
@@ -150,6 +151,42 @@ public final class ChatMentions {
             at = message.indexOf('@', hit == null ? at + 1 : hit.end);
         }
         return named;
+    }
+
+    /**
+     * The roles a message's {@code @names} call, by id: each at-sign that
+     * opens a word read against every role's names ({@code namesById}, in
+     * precedence order), the longest name winning as in {@link #nameAt}.
+     * At most {@code most}, each once, in the order the message calls them.
+     */
+    public static List<String> reachedRoles(String message,
+                                            Map<String, List<String>> namesById,
+                                            int most) {
+        List<String> called = new ArrayList<String>();
+        if (message == null || namesById == null || namesById.isEmpty()) {
+            return called;
+        }
+        int at = message.indexOf('@');
+        while (at >= 0 && called.size() < most) {
+            String best = null;
+            int bestLength = 0;
+            if (at == 0 || !isNameCharacter(message.charAt(at - 1))) {
+                for (Map.Entry<String, List<String>> role : namesById.entrySet()) {
+                    for (String name : role.getValue()) {
+                        int length = nameLength(message, at + 1, name);
+                        if (length > bestLength) {
+                            best = role.getKey();
+                            bestLength = length;
+                        }
+                    }
+                }
+            }
+            if (best != null && !called.contains(best)) {
+                called.add(best);
+            }
+            at = message.indexOf('@', at + 1 + bestLength);
+        }
+        return called;
     }
 
     /**

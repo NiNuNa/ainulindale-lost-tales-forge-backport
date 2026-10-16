@@ -19,8 +19,9 @@ import net.minecraft.server.MinecraftServer;
  * <p>A change only marks who needs a fresh snapshot; every
  * {@link #FLUSH_TICKS} the marked players are sent one each, so however
  * many changes come in, a player is sent at most one snapshot a second.
- * A player who logs in, respawns or changes world is sent theirs at once.
- * Static state, cleared as the server starts and stops.</p>
+ * A player who logs in, respawns, changes world or plays another
+ * character is sent theirs at once. Static state, cleared as the server
+ * starts and stops.</p>
  */
 public final class LostTalesMapMarkerSyncManager {
     /** The ticks between two sends of the marked players' snapshots. */
@@ -42,9 +43,11 @@ public final class LostTalesMapMarkerSyncManager {
                 LostTalesMapMarkerStorage.get(player.worldObj);
         ArrayList<LostTalesMapMarkerDefinition> visible =
                 new ArrayList<LostTalesMapMarkerDefinition>();
+        LostTalesMapMarkerVisibilityPolicy.Viewer viewer =
+                LostTalesMapMarkerVisibilityPolicy.Viewer.of(player);
         for (LostTalesMapMarkerRecord record : data.getRecords()) {
             if (LostTalesMapMarkerVisibilityPolicy.canView(
-                    record, player)) {
+                    record, viewer)) {
                 visible.add(record.toDefinition());
             }
         }
@@ -66,8 +69,10 @@ public final class LostTalesMapMarkerSyncManager {
     public static void syncViewersOf(
             LostTalesMapMarkerRecord before, LostTalesMapMarkerRecord after) {
         for (EntityPlayerMP player : onlinePlayers()) {
-            if ((before != null && LostTalesMapMarkerVisibilityPolicy.canView(before, player))
-                    || (after != null && LostTalesMapMarkerVisibilityPolicy.canView(after, player))) {
+            LostTalesMapMarkerVisibilityPolicy.Viewer viewer =
+                    LostTalesMapMarkerVisibilityPolicy.Viewer.of(player);
+            if (LostTalesMapMarkerVisibilityPolicy.canView(before, viewer)
+                    || LostTalesMapMarkerVisibilityPolicy.canView(after, viewer)) {
                 mark(player);
             }
         }

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.packet.character;
 
+import com.ninuna.losttales.character.lore.LoreCharacterDefinition;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
@@ -20,8 +21,9 @@ import java.util.List;
 final class CharacterPacketCodec {
 
     static final int MAX_NAME_BYTES = 128;
-    /** An About text, the longest a character's words take in UTF-8. */
-    static final int MAX_SECTION_BYTES = CharacterProfile.MAX_SECTION_LENGTH * 4;
+    /** A lore figure's description, the longest its words take in UTF-8. */
+    static final int MAX_DESCRIPTION_BYTES =
+            LoreCharacterDefinition.MAX_DESCRIPTION_LENGTH * 4;
     static final int MAX_FACT_BYTES = CharacterProfile.MAX_FACT_LENGTH * 4;
     static final int MAX_GLANCE_EMOJI_BYTES = 64;
     static final int MAX_GLANCE_TITLE_BYTES =
@@ -35,6 +37,11 @@ final class CharacterPacketCodec {
 
     private CharacterPacketCodec() {}
 
+    /** An About text, the longest its words take in UTF-8: four bytes a character. */
+    static int maxSectionBytes(CharacterProfile.Section section) {
+        return section.getMaxLength() * 4;
+    }
+
     /**
      * A profile on the wire: the About texts in order, the facts in
      * order, a count of glances and each one's emoji, title and line. The
@@ -43,7 +50,8 @@ final class CharacterPacketCodec {
      */
     static void writeProfile(ByteBuf buffer, CharacterProfile profile) {
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
-            LostTalesPacketCodec.writeUtf8String(buffer, profile.section(section), MAX_SECTION_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, profile.section(section),
+                    maxSectionBytes(section));
         }
         for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
             LostTalesPacketCodec.writeUtf8String(buffer, profile.fact(fact), MAX_FACT_BYTES);
@@ -60,7 +68,8 @@ final class CharacterPacketCodec {
         CharacterProfile profile = CharacterProfile.EMPTY;
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
             profile = profile.withSection(section,
-                    LostTalesPacketCodec.readUtf8String(buffer, MAX_SECTION_BYTES));
+                    LostTalesPacketCodec.readUtf8String(buffer,
+                            maxSectionBytes(section)));
         }
         for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
             profile = profile.withFact(fact, LostTalesPacketCodec.readUtf8String(buffer, MAX_FACT_BYTES));
@@ -87,7 +96,7 @@ final class CharacterPacketCodec {
             return false;
         }
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
-            if (bytes(profile.section(section)) > MAX_SECTION_BYTES) {
+            if (bytes(profile.section(section)) > maxSectionBytes(section)) {
                 return false;
             }
         }

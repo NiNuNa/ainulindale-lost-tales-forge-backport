@@ -13,7 +13,8 @@ import static org.junit.Assert.assertTrue;
  * Creation and a later edit hold a character's profile and age to one
  * set of bounds: each About text, fact and glance to its length and to
  * printable characters, a glance to one of the chat's emoji and a title,
- * and the profile is judged as it is stored.
+ * and the profile is judged as it is stored. Each About text has its own
+ * length: the History 2,048 characters, Appearance and Personality 512.
  */
 public final class CharacterProfileValidationTest {
 
@@ -23,8 +24,7 @@ public final class CharacterProfileValidationTest {
                 CharacterValidator.MIN_AGE).isValid());
         CharacterProfile full = CharacterProfile.EMPTY;
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
-            full = full.withSection(section,
-                    repeat(CharacterProfile.MAX_SECTION_LENGTH));
+            full = full.withSection(section, repeat(section.getMaxLength()));
         }
         for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
             full = full.withFact(fact, repeat(CharacterProfile.MAX_FACT_LENGTH));
@@ -53,7 +53,8 @@ public final class CharacterProfileValidationTest {
     @Test
     public void aTextTooLongOrCarryingCodesIsRefused() {
         assertEquals(CharacterErrorId.INVALID_PROFILE_TEXT, error(
-                history(repeat(CharacterProfile.MAX_SECTION_LENGTH + 1))));
+                history(repeat(CharacterProfile.Section.HISTORY
+                        .getMaxLength() + 1))));
         assertEquals(CharacterErrorId.INVALID_PROFILE_TEXT,
                 error(history("§cRed")));
         assertEquals(CharacterErrorId.INVALID_PROFILE_TEXT,
@@ -66,6 +67,30 @@ public final class CharacterProfileValidationTest {
                         CharacterProfile.Fact.HOME, "Bree\nShire")));
         assertTrue("an About text keeps its paragraphs", CharacterValidator
                 .validateProfile(history("One.\n\nTwo."), 20).isValid());
+    }
+
+    @Test
+    public void eachAboutTextIsHeldToItsOwnLength() {
+        assertEquals(2048, CharacterProfile.Section.HISTORY.getMaxLength());
+        assertEquals(512, CharacterProfile.Section.APPEARANCE.getMaxLength());
+        assertEquals(512, CharacterProfile.Section.PERSONALITY.getMaxLength());
+        assertTrue(CharacterValidator.validateProfile(history(repeat(2048)),
+                20).isValid());
+        for (CharacterProfile.Section section : new CharacterProfile.Section[] {
+                CharacterProfile.Section.APPEARANCE,
+                CharacterProfile.Section.PERSONALITY}) {
+            assertTrue(section.getId(), CharacterValidator.validateProfile(
+                    CharacterProfile.EMPTY.withSection(section, repeat(512)),
+                    20).isValid());
+            assertEquals("a History's length is not " + section.getId() + "'s",
+                    CharacterErrorId.INVALID_PROFILE_TEXT, error(
+                            CharacterProfile.EMPTY.withSection(section,
+                                    repeat(513))));
+        }
+        assertTrue("the length counts characters, not UTF-16 units",
+                CharacterValidator.isValidSection(
+                        CharacterProfile.Section.HISTORY, repeat("\uD83D\uDE00",
+                                CharacterProfile.Section.HISTORY.getMaxLength())));
     }
 
     @Test
@@ -103,8 +128,8 @@ public final class CharacterProfileValidationTest {
         assertEquals("smiley", stored.glances().get(0).getEmoji());
         assertEquals("Tired out", stored.glances().get(0).getTitle());
         assertEquals("after the road", stored.glances().get(0).getLine());
-        String padded = "   " + repeat(CharacterProfile.MAX_SECTION_LENGTH)
-                + "\t\t";
+        String padded = "   " + repeat(CharacterProfile.Section.HISTORY
+                .getMaxLength()) + "\t\t";
         assertTrue("space that folds away does not count against the limit",
                 CharacterValidator.validateProfile(CharacterValidator
                         .normalizeProfile(history(padded)), 20).isValid());
@@ -126,9 +151,13 @@ public final class CharacterProfileValidationTest {
     }
 
     private static String repeat(int count) {
+        return repeat("a", count);
+    }
+
+    private static String repeat(String unit, int count) {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < count; i++) {
-            text.append('a');
+            text.append(unit);
         }
         return text.toString();
     }

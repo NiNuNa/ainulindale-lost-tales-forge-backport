@@ -21,7 +21,7 @@ public final class LostTalesWaystoneSettingsRequestPacket
     private static final int MAX_TEXT_BYTES = 1024;
     private static final int MAX_DESCRIPTION_BYTES = 4096;
     private static final int MAX_STRUCTURE_ID_BYTES = 512;
-    private static final int MAX_PLAYER_NAME_BYTES = 64;
+    private static final int MAX_TARGET_NAME_BYTES = 128;
 
     private LostTalesWaystoneSettingsOperation operation;
     private int x;
@@ -30,7 +30,8 @@ public final class LostTalesWaystoneSettingsRequestPacket
     private String markerId = "";
     private long expectedRevision;
     private LostTalesMapMarkerEditableSettings settings;
-    private String targetPlayerName = "";
+    /** The character or fellowship a share names. */
+    private String targetName = "";
     private boolean malformed;
 
     public LostTalesWaystoneSettingsRequestPacket() {}
@@ -54,19 +55,19 @@ public final class LostTalesWaystoneSettingsRequestPacket
     public static LostTalesWaystoneSettingsRequestPacket share(
             boolean remove, int x, int y, int z,
             String markerId, long expectedRevision,
-            String playerName) {
+            String characterName) {
         LostTalesWaystoneSettingsRequestPacket packet =
                 new LostTalesWaystoneSettingsRequestPacket();
         packet.operation = remove
-                ? LostTalesWaystoneSettingsOperation.UNSHARE_PLAYER
-                : LostTalesWaystoneSettingsOperation.SHARE_PLAYER;
+                ? LostTalesWaystoneSettingsOperation.UNSHARE_CHARACTER
+                : LostTalesWaystoneSettingsOperation.SHARE_CHARACTER;
         packet.x = x;
         packet.y = y;
         packet.z = z;
         packet.markerId = markerId == null ? "" : markerId;
         packet.expectedRevision = expectedRevision;
-        packet.targetPlayerName =
-                playerName == null ? "" : playerName;
+        packet.targetName =
+                characterName == null ? "" : characterName;
         packet.validate();
         return packet;
     }
@@ -88,7 +89,7 @@ public final class LostTalesWaystoneSettingsRequestPacket
         packet.z = z;
         packet.markerId = markerId == null ? "" : markerId;
         packet.expectedRevision = expectedRevision;
-        packet.targetPlayerName =
+        packet.targetName =
                 fellowshipName == null ? "" : fellowshipName;
         packet.validate();
         return packet;
@@ -154,11 +155,11 @@ public final class LostTalesWaystoneSettingsRequestPacket
                                 hiddenUntilDiscovered, discoverable,
                                 requiresRegionUnlock, hasWaystone,
                                 structureType, priority, visibility);
-                this.targetPlayerName = "";
+                this.targetName = "";
             } else {
-                this.targetPlayerName =
+                this.targetName =
                         LostTalesPacketCodec.readUtf8String(
-                                buffer, MAX_PLAYER_NAME_BYTES);
+                                buffer, MAX_TARGET_NAME_BYTES);
                 this.settings = null;
             }
             LostTalesPacketCodec.requireFinished(buffer);
@@ -211,8 +212,8 @@ public final class LostTalesWaystoneSettingsRequestPacket
             buffer.writeByte(value.getVisibility().ordinal());
         } else {
             LostTalesPacketCodec.writeUtf8String(
-                    buffer, this.targetPlayerName,
-                    MAX_PLAYER_NAME_BYTES);
+                    buffer, this.targetName,
+                    MAX_TARGET_NAME_BYTES);
         }
     }
 
@@ -232,10 +233,10 @@ public final class LostTalesWaystoneSettingsRequestPacket
                 throw new IllegalArgumentException(
                         "invalid waystone settings");
             }
-        } else if (this.targetPlayerName == null
-                || this.targetPlayerName.trim().length() == 0
+        } else if (this.targetName == null
+                || this.targetName.trim().length() == 0
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
-                        this.targetPlayerName, MAX_PLAYER_NAME_BYTES)) {
+                        this.targetName, MAX_TARGET_NAME_BYTES)) {
             throw new IllegalArgumentException(
                     "missing or overlong shared name");
         }
@@ -252,8 +253,8 @@ public final class LostTalesWaystoneSettingsRequestPacket
     public LostTalesMapMarkerEditableSettings getSettings() {
         return this.settings;
     }
-    public String getTargetPlayerName() {
-        return this.targetPlayerName;
+    public String getTargetName() {
+        return this.targetName;
     }
     public boolean isMalformed() { return this.malformed; }
 

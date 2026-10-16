@@ -10,8 +10,11 @@ import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.gui.style.FoldRule;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
@@ -29,6 +32,7 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.world.World;
+import org.lwjgl.opengl.GL11;
 
 /**
  * The words of a character's profile, one column like a
@@ -39,9 +43,10 @@ import net.minecraft.world.World;
  * the one played, and the Account behind one of the player's own. Another
  * person's shows what this client knows of them. The profile's words
  * pass the profanity filter as this client has it set, as the chat's do.
- * Laid out as lines of
- * known heights, so the column scrolls by whole lines and knows how tall
- * it is.
+ * A long History folds as a long chat message does ({@link FoldRule}),
+ * its folded rows shown as far as the page has opened them. Laid out as
+ * lines of known heights, so the column scrolls by whole lines and knows
+ * how tall it is.
  */
 final class CharacterProfileColumn {
     private static final int LINE = 10;
@@ -55,9 +60,12 @@ final class CharacterProfileColumn {
     /** How many tracked quests the Quests section names at most. */
     private static final int TRACKED_SHOWN = 5;
 
-    /** What a line is. */
-    private enum Kind { NAME, ASIDE, HEADING, LABEL, PAIR, TEXT, GLANCE,
-        GLANCE_LINE, GAP }
+    /**
+     * What a line is. A FOLDED line is a History row past the ones a fold
+     * keeps; FOLD is the Read more or Show less under them.
+     */
+    private enum Kind { NAME, ASIDE, HEADING, LABEL, PAIR, TEXT, FOLDED, FOLD,
+        GLANCE, GLANCE_LINE, GAP }
 
     /** One line: its kind, its words, and for a pair its value. */
     private static final class Line {
@@ -90,16 +98,20 @@ final class CharacterProfileColumn {
     }
 
     private final List<Line> lines = new ArrayList<Line>();
+    /** Pixels of the History's folded rows shown: none while it is folded, all of them open. */
+    private double revealed;
 
     /**
      * The profile of {@code subject}: {@code profile} as the server last
      * sent it, null while it is on its way or, with {@code unavailable},
-     * when the server will not show it here.
+     * when the server will not show it here. A long History says Show
+     * less under it while {@code historyOpen}, else Read more.
      */
     CharacterProfileColumn(Minecraft minecraft, FontRenderer font, int width,
                            ProfileSubject subject, CharacterProfile profile,
                            boolean unavailable, String accountName,
-                           boolean played, boolean lore) {
+                           boolean played, boolean lore,
+                           boolean historyOpen) {
         String raceId = subject.raceId;
         add(Kind.NAME, subject.name, "", played
                 ? LostTalesUiTheme.accentRgb() : LostTalesUiInk.IVORY);
@@ -121,7 +133,7 @@ final class CharacterProfileColumn {
         if (profile != null) {
             addGlances(font, width, profile);
         }
-        addAbout(font, width, subject, profile, unavailable);
+        addAbout(font, width, subject, profile, unavailable, historyOpen);
         addFacts(subject, profile);
 
         if (raceId.length() > 0) {
@@ -183,7 +195,8 @@ final class CharacterProfileColumn {
 
     /** About: Appearance, Personality and History, each under its name, or a word on why there is nothing. */
     private void addAbout(FontRenderer font, int width, ProfileSubject subject,
-                          CharacterProfile profile, boolean unavailable) {
+                          CharacterProfile profile, boolean unavailable,
+                          boolean historyOpen) {
         heading("gui.losttales.character.section.about");
         if (profile == null) {
             wrapped(font, width, I18n.format(unavailable
@@ -202,13 +215,38 @@ final class CharacterProfileColumn {
             add(Kind.LABEL, I18n.format("gui.losttales.character.profile."
                     + section.getId()), "", LostTalesColors.rgb(
                             LostTalesColors.TEXT));
-            wrapped(font, width, ClientChatProfanity.filter(text),
-                    LostTalesUiInk.IVORY);
+            if (section == CharacterProfile.Section.HISTORY) {
+                addHistory(font, width, ClientChatProfanity.filter(text),
+                        historyOpen);
+            } else {
+                wrapped(font, width, ClientChatProfanity.filter(text),
+                        LostTalesUiInk.IVORY);
+            }
         }
         if (!written) {
             wrapped(font, width, I18n.format(subject.own
                     ? "gui.losttales.character.profile.empty_own"
                     : "gui.losttales.character.profile.empty"),
+                    WindowStyle.asideRgb());
+        }
+    }
+
+    /**
+     * The History's rows: past five rows the first four stand, the rest
+     * wait under them as folded rows, and Read more or Show less stands
+     * under all of them.
+     */
+    private void addHistory(FontRenderer font, int width, String text,
+                            boolean open) {
+        List<?> rows = font.listFormattedStringToWidth(text,
+                Math.max(1, width));
+        int kept = FoldRule.shownRows(rows.size(), false);
+        for (int index = 0; index < rows.size(); index++) {
+            add(index < kept ? Kind.TEXT : Kind.FOLDED,
+                    String.valueOf(rows.get(index)), "", LostTalesUiInk.IVORY);
+        }
+        if (FoldRule.folds(rows.size())) {
+            add(Kind.FOLD, I18n.format(FoldRule.toggleKey(open)), "",
                     WindowStyle.asideRgb());
         }
     }
@@ -365,66 +403,180 @@ final class CharacterProfileColumn {
         }
     }
 
-    /** How tall the column is. */
-    int height() {
+    /** How tall the History's folded rows stand, all of them shown; 0 for a History that does not fold. */
+    int foldedHeight() {
         int total = 0;
         for (Line line : this.lines) {
-            total += line.height();
+            if (line.kind == Kind.FOLDED) {
+                total += line.height();
+            }
         }
         return total;
     }
 
-    /** Draws the column from {@code left}, {@code top}, {@code width} wide, at {@code alpha}. */
+    /** Shows {@code pixels} of the History's folded rows; what stands under them stands that much lower. */
+    void reveal(double pixels) {
+        this.revealed = Math.max(0.0D, Math.min(foldedHeight(), pixels));
+    }
+
+    /** How tall the column is, as much of the History's folded rows as is shown. */
+    int height() {
+        int total = 0;
+        for (Line line : this.lines) {
+            if (line.kind != Kind.FOLDED) {
+                total += line.height();
+            }
+        }
+        return total + (int)Math.ceil(this.revealed);
+    }
+
+    /**
+     * Where Read more or Show less stands for the column drawn from
+     * {@code left}, {@code top}: its words' width and a line's height.
+     * Null for a History that does not fold.
+     */
+    LostTalesUiHitBox foldBox(FontRenderer font, double left, double top) {
+        double y = top;
+        boolean passedFolded = false;
+        for (Line line : this.lines) {
+            if (line.kind == Kind.FOLDED) {
+                if (!passedFolded) {
+                    y += this.revealed;
+                    passedFolded = true;
+                }
+                continue;
+            }
+            if (line.kind == Kind.FOLD) {
+                return new LostTalesUiHitBox(left, y,
+                        font.getStringWidth(line.text), line.height());
+            }
+            y += line.height();
+        }
+        return null;
+    }
+
+    /**
+     * Draws the column from {@code left}, {@code top}, {@code width} wide,
+     * at {@code alpha}. The History's folded rows are cut to as much of
+     * them as is shown, and what stands under them is drawn that much
+     * lower, its fraction of a pixel through the matrix.
+     */
     void draw(FontRenderer font, int left, int top, int width, int alpha) {
         int y = top;
         int labelWidth = labelWidth(font, width);
-        for (Line line : this.lines) {
-            switch (line.kind) {
-                case NAME:
-                case ASIDE:
-                case TEXT:
-                    LostTalesUiInk.drawText(font,
-                            font.trimStringToWidth(line.text, width), left, y,
-                            line.rgb, alpha);
-                    break;
-                case LABEL:
-                    LostTalesUiInk.drawText(font,
-                            font.trimStringToWidth(line.text, width), left,
-                            y + 2, line.rgb, alpha);
-                    break;
-                case GLANCE:
-                    ChatEmojiIcon.draw(Minecraft.getMinecraft(),
-                            ChatEmoji.fromName(line.value), left, y, alpha);
-                    LostTalesUiInk.drawText(font, font.trimStringToWidth(
-                                    line.text, width - GLANCE_INDENT),
-                            left + GLANCE_INDENT, y + 1, line.rgb, alpha);
-                    break;
-                case GLANCE_LINE:
-                    LostTalesUiInk.drawText(font, line.text,
-                            left + GLANCE_INDENT, y, line.rgb, alpha);
-                    break;
-                case HEADING: {
-                    int textTop = y + LostTalesUiInk.centredStart(HEADING, 7);
-                    LostTalesUiInk.drawText(font, line.text, left, textTop,
-                            line.rgb, alpha);
-                    int ruleLeft = left + font.getStringWidth(line.text) + 5;
-                    if (ruleLeft < left + width) {
-                        Gui.drawRect(ruleLeft, textTop + 3, left + width,
-                                textTop + 4, LostTalesColors.BORDER_DIM);
+        boolean lowered = false;
+        try {
+            int index = 0;
+            while (index < this.lines.size()) {
+                Line line = this.lines.get(index);
+                if (line.kind == Kind.FOLDED) {
+                    index = drawFolded(font, index, left, y, width, alpha);
+                    int whole = (int)Math.floor(this.revealed);
+                    y += whole;
+                    if (!lowered) {
+                        GL11.glPushMatrix();
+                        lowered = true;
+                        GL11.glTranslatef(0.0F,
+                                (float)(this.revealed - whole), 0.0F);
                     }
-                    break;
+                    continue;
                 }
-                case PAIR:
-                    LostTalesUiInk.drawText(font, line.text, left, y,
-                            WindowStyle.asideRgb(), alpha);
-                    LostTalesUiInk.drawText(font, font.trimStringToWidth(
-                                    line.value, Math.max(0, width - labelWidth)),
-                            left + labelWidth, y, line.rgb, alpha);
-                    break;
-                default:
-                    break;
+                drawLine(font, line, left, y, width, labelWidth, alpha);
+                y += line.height();
+                index++;
             }
-            y += line.height();
+        } finally {
+            if (lowered) {
+                GL11.glPopMatrix();
+            }
+        }
+    }
+
+    /**
+     * The run of folded rows from {@code first}, from {@code top}, cut to
+     * as much of them as is shown; answers the line after the run.
+     */
+    private int drawFolded(FontRenderer font, int first, int left, int top,
+                           int width, int alpha) {
+        int end = first;
+        while (end < this.lines.size()
+                && this.lines.get(end).kind == Kind.FOLDED) {
+            end++;
+        }
+        if (this.revealed <= 0.0D) {
+            return end;
+        }
+        boolean whole = this.revealed >= foldedHeight();
+        // A text's shadow falls a pixel right; the cut leaves it room.
+        boolean clipped = !whole && LostTalesUiClip.beginLocal(
+                Minecraft.getMinecraft(), left, top, left + width + 1.0F,
+                (float)(top + this.revealed));
+        if (!whole && !clipped) {
+            return end;
+        }
+        try {
+            int y = top;
+            for (int index = first; index < end && y < top + this.revealed;
+                 index++) {
+                Line line = this.lines.get(index);
+                drawLine(font, line, left, y, width, 0, alpha);
+                y += line.height();
+            }
+        } finally {
+            LostTalesUiClip.end(clipped);
+        }
+        return end;
+    }
+
+    /** One line from {@code y}; a pair's value stands at {@code labelWidth}. */
+    private void drawLine(FontRenderer font, Line line, int left, int y,
+                          int width, int labelWidth, int alpha) {
+        switch (line.kind) {
+            case NAME:
+            case ASIDE:
+            case TEXT:
+            case FOLDED:
+            case FOLD:
+                LostTalesUiInk.drawText(font,
+                        font.trimStringToWidth(line.text, width), left, y,
+                        line.rgb, alpha);
+                break;
+            case LABEL:
+                LostTalesUiInk.drawText(font,
+                        font.trimStringToWidth(line.text, width), left,
+                        y + 2, line.rgb, alpha);
+                break;
+            case GLANCE:
+                ChatEmojiIcon.draw(Minecraft.getMinecraft(),
+                        ChatEmoji.fromName(line.value), left, y, alpha);
+                LostTalesUiInk.drawText(font, font.trimStringToWidth(
+                                line.text, width - GLANCE_INDENT),
+                        left + GLANCE_INDENT, y + 1, line.rgb, alpha);
+                break;
+            case GLANCE_LINE:
+                LostTalesUiInk.drawText(font, line.text,
+                        left + GLANCE_INDENT, y, line.rgb, alpha);
+                break;
+            case HEADING: {
+                int textTop = y + LostTalesUiInk.centredStart(HEADING, 7);
+                LostTalesUiInk.drawText(font, line.text, left, textTop,
+                        line.rgb, alpha);
+                int ruleLeft = left + font.getStringWidth(line.text) + 5;
+                if (ruleLeft < left + width) {
+                    Gui.drawRect(ruleLeft, textTop + 3, left + width,
+                            textTop + 4, LostTalesColors.BORDER_DIM);
+                }
+                break;
+            }
+            case PAIR:
+                LostTalesUiInk.drawText(font, line.text, left, y,
+                        WindowStyle.asideRgb(), alpha);
+                LostTalesUiInk.drawText(font, font.trimStringToWidth(
+                                line.value, Math.max(0, width - labelWidth)),
+                        left + labelWidth, y, line.rgb, alpha);
+                break;
+            default:
+                break;
         }
     }
 

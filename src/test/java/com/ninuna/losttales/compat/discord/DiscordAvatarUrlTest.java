@@ -25,4 +25,15 @@ public final class DiscordAvatarUrlTest {
         assertEquals("https://x/", DiscordAvatarUrl.of("https://x/{uuid}",
                 "Steve", null));
     }
+
+    /** A head names its account: an in-character post shows none while accounts are hidden. */
+    @Test
+    public void anInCharacterPostWearsNoHeadWhileAccountsAreHidden() {
+        String head = "https://mc-heads.net/avatar/Steve/64";
+        assertEquals("", DiscordAvatarUrl.shown(true, false, head));
+        assertEquals(head, DiscordAvatarUrl.shown(true, true, head));
+        assertEquals(head, DiscordAvatarUrl.shown(false, false, head));
+        assertEquals(head, DiscordAvatarUrl.shown(false, true, head));
+        assertEquals("", DiscordAvatarUrl.shown(false, true, null));
+    }
 }

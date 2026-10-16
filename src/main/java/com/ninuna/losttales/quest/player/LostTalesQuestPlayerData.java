@@ -66,6 +66,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private final Map<String, LostTalesQuestDefinition> dynamicQuestDefinitions = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private final Set<String> pinnedQuestIds = new LinkedHashSet<String>();
     private String pinnedMapMarkerId = "";
+    /**
+     * The quests whose stage ended on a hand-over still to be made, on
+     * the player's next tick. Never saved: a stage still full asks again.
+     */
+    private final Set<String> handOversDue = new LinkedHashSet<String>();
     private boolean readOnlyForNewerVersion;
     private NBTBase preservedReadOnlyData;
 
@@ -373,6 +378,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     /** Replaces the live player's quest state from an already detached payload. */
     public void replaceCharacterState(NBTTagCompound characterState) {
         NBTTagCompound validated = validateCharacterState(characterState);
+        this.handOversDue.clear();
         loadCharacterState(validated, true, true);
         if (isReadOnlyForNewerVersion()) {
             throw new IllegalArgumentException(
@@ -416,6 +422,32 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
 
     public LostTalesQuestHistoryEntry getQuestHistoryEntry(String questId) {
         return questId == null ? null : this.questHistory.get(questId);
+    }
+
+    /** Marks the quest's hand-over due: its stage ended, and its items go on the player's next tick. */
+    public void markHandOverDue(String questId) {
+        if (questId != null && this.activeQuests.containsKey(questId)) {
+            this.handOversDue.add(questId);
+        }
+    }
+
+    public boolean hasHandOversDue() {
+        return !this.handOversDue.isEmpty();
+    }
+
+    /** The quests whose hand-over is due, no longer marked once taken. */
+    public Set<String> takeHandOversDue() {
+        Set<String> due = new LinkedHashSet<String>(this.handOversDue);
+        this.handOversDue.clear();
+        return due;
+    }
+
+    /** Every quest the log names: running, in the History, and tracked. */
+    public Set<String> getQuestIdsInLog() {
+        Set<String> named = new LinkedHashSet<String>(this.activeQuests.keySet());
+        named.addAll(this.questHistory.keySet());
+        named.addAll(this.pinnedQuestIds);
+        return named;
     }
 
     public Set<String> getDiscoveredMarkerIds() {

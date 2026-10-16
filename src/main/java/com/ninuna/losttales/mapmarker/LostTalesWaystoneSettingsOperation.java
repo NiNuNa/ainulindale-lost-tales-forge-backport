@@ -2,8 +2,8 @@ package com.ninuna.losttales.mapmarker;
 
 public enum LostTalesWaystoneSettingsOperation {
     SAVE(0),
-    SHARE_PLAYER(1),
-    UNSHARE_PLAYER(2),
+    SHARE_CHARACTER(1),
+    UNSHARE_CHARACTER(2),
     SHARE_FELLOWSHIP(3),
     UNSHARE_FELLOWSHIP(4);
 

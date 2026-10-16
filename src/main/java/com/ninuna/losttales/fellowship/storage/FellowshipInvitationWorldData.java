@@ -15,7 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Persistent server-owned collection of pending fellowship invitations. */
+/**
+ * Persistent server-owned collection of pending fellowship invitations, at
+ * most {@link FellowshipInvitation#MAX_PER_FELLOWSHIP} open for a
+ * fellowship and {@link FellowshipInvitation#MAX_PER_TARGET_ACCOUNT}
+ * waiting for one account.
+ */
 public final class FellowshipInvitationWorldData extends WorldSavedData {
 
     public static final String DATA_NAME = "losttales_fellowship_invitations";
@@ -132,12 +137,33 @@ public final class FellowshipInvitationWorldData extends WorldSavedData {
         return this.invitations.size();
     }
 
+    /** How many invitations wait for the characters of one account. */
+    public synchronized int getInvitationCountForTargetAccount(UUID targetOwnerId) {
+        int count = 0;
+        for (FellowshipInvitation invitation : this.invitations.values()) {
+            if (invitation.getTargetOwnerId().equals(targetOwnerId)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Keeps an invitation. Refused for a second one of a fellowship to one
+     * character, and for a new one past either cap.
+     */
     public synchronized void saveInvitation(FellowshipInvitation invitation) {
         ensureWritable();
         validateInvitation(invitation);
 
         FellowshipInvitation existing =
                 this.invitations.get(invitation.getInvitationId());
+        if (existing == null && (getInvitationsForFellowship(
+                invitation.getFellowshipId()).size() >= FellowshipInvitation.MAX_PER_FELLOWSHIP
+                || getInvitationCountForTargetAccount(invitation.getTargetOwnerId())
+                >= FellowshipInvitation.MAX_PER_TARGET_ACCOUNT)) {
+            throw new IllegalStateException("Too many invitations are open already");
+        }
         if (existing != null) {
             removeFromIndexes(existing);
         }

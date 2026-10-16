@@ -95,9 +95,16 @@ public final class LostTalesChatAccessRolesTest {
         ByteBuf buffer = Unpooled.buffer();
         statement(0, 0, Collections.<UUID, Integer>emptyMap(), null, 64)
                 .toBytes(buffer);
-        // The radius is the last thing written.
-        buffer.setShort(buffer.writerIndex() - 2,
-                LostTalesChatAccessPacket.MAX_PROXIMITY_RADIUS + 1);
+        // Where the radius stands: the one byte two statements differing
+        // only in it differ by, the low byte of its short.
+        ByteBuf other = Unpooled.buffer();
+        statement(0, 0, Collections.<UUID, Integer>emptyMap(), null, 65)
+                .toBytes(other);
+        int at = 0;
+        while (buffer.getByte(at) == other.getByte(at)) {
+            at++;
+        }
+        buffer.setShort(at - 1, LostTalesChatAccessPacket.MAX_PROXIMITY_RADIUS + 1);
         LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());

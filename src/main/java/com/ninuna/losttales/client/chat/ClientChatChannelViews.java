@@ -1005,12 +1005,13 @@ public final class ClientChatChannelViews {
         ChatWindowLines.clear();
         ChatFrame.clear();
         ClientChatAccountRoles.clear();
-        ClientChatIdentities.clear();
         ClientChatIdentitySelection.clear();
         ClientChatConsoleEvents.clear();
         // The history is gone with the world, and so are its conversations
-        // and what was said in them.
+        // and what was said in them. Who each copy spoke as is remembered
+        // with the place's conversations first.
         ChatLayout.closeConversations();
+        ClientChatIdentities.clear();
         ClientChatChannelState.forgetConversationHistory();
         ChatChannelIcons.forgetPortraits();
         ChatChannelIcons.forgetChannelIcons();

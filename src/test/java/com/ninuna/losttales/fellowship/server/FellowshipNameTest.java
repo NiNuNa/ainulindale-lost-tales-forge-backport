@@ -27,41 +27,41 @@ public final class FellowshipNameTest {
     @Test
     public void anOrdinaryNameIsAllowedAndNoNameIsMissing() {
         assertEquals(FellowshipErrorId.NONE,
-                FellowshipService.checkName("The Grey Company", BUNDLED));
+                FellowshipNames.nameError("The Grey Company", BUNDLED));
         assertEquals(FellowshipErrorId.NAME_MISSING,
-                FellowshipService.checkName("", BUNDLED));
+                FellowshipNames.nameError("", BUNDLED));
     }
 
     @Test
     public void thirtyTwoCharactersIsTheMost() {
         String longest = "abcdefghijklmnopqrstuvwxyz012345";
         assertEquals(Fellowship.MAX_NAME_LENGTH, longest.length());
-        assertEquals(FellowshipErrorId.NONE, FellowshipService.checkName(longest, BUNDLED));
+        assertEquals(FellowshipErrorId.NONE, FellowshipNames.nameError(longest, BUNDLED));
         assertEquals(FellowshipErrorId.NAME_TOO_LONG,
-                FellowshipService.checkName(longest + "y", BUNDLED));
+                FellowshipNames.nameError(longest + "y", BUNDLED));
     }
 
     @Test
     public void formattingCodesAndControlCharactersAreRefused() {
         assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
-                FellowshipService.checkName("§cRed Company", BUNDLED));
+                FellowshipNames.nameError("§cRed Company", BUNDLED));
         assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
-                FellowshipService.checkName("Grey\nCompany", BUNDLED));
+                FellowshipNames.nameError("Grey\nCompany", BUNDLED));
         assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
-                FellowshipService.checkName("Grey‮Company", BUNDLED));
+                FellowshipNames.nameError("Grey‮Company", BUNDLED));
     }
 
     @Test
     public void aWordOfTheProfanityListIsRefused() {
         assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
-                FellowshipService.checkName("Shitty Company", BUNDLED));
+                FellowshipNames.nameError("Shitty Company", BUNDLED));
         ChatProfanityWords server = ChatProfanityWords.parse(
                 new String[] {"grumbold=grumpy"}, ChatProfanityWords.MAX_WORDS, null);
         assertEquals(FellowshipErrorId.NONE,
-                FellowshipService.checkName("Grumbold's Band", BUNDLED));
+                FellowshipNames.nameError("Grumbold's Band", BUNDLED));
         assertEquals("the server's own words count too",
                 FellowshipErrorId.NAME_NOT_ALLOWED,
-                FellowshipService.checkName("Grumbold Band", BUNDLED.plus(server)));
+                FellowshipNames.nameError("Grumbold Band", BUNDLED.plus(server)));
     }
 
     @Test

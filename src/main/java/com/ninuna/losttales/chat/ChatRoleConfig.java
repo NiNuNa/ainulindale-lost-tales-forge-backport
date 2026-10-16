@@ -70,7 +70,6 @@ public final class ChatRoleConfig {
         }
     };
 
-    private static final Pattern ROLE_ID = Pattern.compile("[a-z0-9_]{1,32}");
     /** What a granted id and a permission id may be made of. */
     private static final Pattern GRANT_ID = Pattern.compile("[a-z0-9_.]{1,64}");
     private static final Pattern COLOR = Pattern.compile("#?[0-9a-fA-F]{6}");
@@ -137,7 +136,7 @@ public final class ChatRoleConfig {
                 continue;
             }
             String id = keyOf(entry);
-            if (!ROLE_ID.matcher(id).matches()) {
+            if (!ChatAccountRole.isWellFormedId(id)) {
                 out.warn("Chat role entry '" + entry + "' has no usable id "
                         + "(letters, digits and underscores, up to 32); skipped");
                 continue;

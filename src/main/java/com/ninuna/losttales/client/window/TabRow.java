@@ -314,11 +314,12 @@ public final class TabRow {
             LostTalesUiSheet.CHEVRON_3, LostTalesUiSheet.CHEVRON_4,
             LostTalesUiSheet.CHEVRON_5};
     /**
-     * The search button's square: the chevron's width with the strips'
-     * wide inset either side. Square, so the chevron's three rows stand
-     * in its middle exactly, four clear rows above and below them.
+     * The square of each of the two buttons at the row's left end, Views
+     * and Page Search: the chevron's width with the strips' wide inset
+     * either side. Square, so the chevron's three rows stand in its middle
+     * exactly, four clear rows above and below them.
      */
-    private static final int SEARCH_SIZE = SEARCH_FRAMES[0].getWidth()
+    private static final int LEAD_SIZE = SEARCH_FRAMES[0].getWidth()
             + 2 * LostTalesUiFramedButton.WIDE_INSET;
     /**
      * How far the strip reaches left of {@link Row#left}: the row is
@@ -336,14 +337,17 @@ public final class TabRow {
     public int drawnStripArgb;
     public int drawnToolArgb;
     /**
-     * Where the search button begins, measured from the row's left: the
+     * Where the Views button begins, measured from the row's left: the
      * edge gap in from the window's edge, the frame standing just outside
      * it.
      */
-    private static final int SEARCH_LEFT = EDGE_GAP - STRIP_INSET;
-    /** Where the row's tabs begin: past the search button and a button's gap. */
-    private static final int SEARCH_RUN =
-            SEARCH_LEFT + SEARCH_SIZE + END_CONTROL_GAP;
+    private static final int VIEWS_LEFT = EDGE_GAP - STRIP_INSET;
+    /** Where the Page Search button begins: past the Views button and a button's gap. */
+    private static final int SEARCH_LEFT = VIEWS_LEFT + LEAD_SIZE
+            + END_CONTROL_GAP;
+    /** Where the row's tabs begin: past both buttons and a button's gap. */
+    private static final int LEAD_RUN =
+            SEARCH_LEFT + LEAD_SIZE + END_CONTROL_GAP;
     /** Room the grip keeps at the row's right end: its glyph and inset. */
     static final int MIN_GRIP_WIDTH = GRIP_WIDTH + GRIP_INSET;
     /**
@@ -436,6 +440,9 @@ public final class TabRow {
      * each keeps its own beat ({@link LostTalesUiButtonMotion}). The grip is not
      * a button and only lights.
      */
+    private final LostTalesUiButtonMotion viewsMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
     private final LostTalesUiButtonMotion searchMotion =
             new LostTalesUiButtonMotion(
                     LostTalesUiButtonMotion.Character.LIFT);
@@ -546,7 +553,7 @@ public final class TabRow {
      * act on the window.
      */
     public enum HitKind {
-        TAB, CLOSE, OPTIONS, DRAFT, SEARCH, LOCK, RESTORE, WINDOW_MENU,
+        TAB, CLOSE, OPTIONS, DRAFT, VIEWS, SEARCH, LOCK, RESTORE, WINDOW_MENU,
         WINDOW_FULLSCREEN, WINDOW_CLOSE, GRIP
     }
 
@@ -637,6 +644,8 @@ public final class TabRow {
          * to its inward ones with it.
          */
         public float fullscreenShare;
+        /** Whether the Views sub-window is open right now. */
+        public boolean viewsOpen;
         /** Whether this row's tab search panel is open right now. */
         public boolean searchOpen;
         /** The tab of this row whose options are out right now; null for none. */
@@ -689,12 +698,12 @@ public final class TabRow {
 
     /**
      * How far inside a window's left edge its first tab begins: the
-     * strip's own inset and the search control's run. A tab carried out
+     * strip's own inset and the run of the Views and Page Search buttons. A tab carried out
      * of one row and into a window of its own lands here, so a drag has
      * to allow for it to keep the cursor on the pixel it grabbed.
      */
     public static int tabRunLeftInset() {
-        return STRIP_INSET + SEARCH_RUN;
+        return STRIP_INSET + LEAD_RUN;
     }
 
     /** Highest pixel any tab can reach (the selected tab fully lifted). */
@@ -828,6 +837,9 @@ public final class TabRow {
                 return new Hit(HitKind.DRAFT, tab.tab);
             }
             return new Hit(HitKind.TAB, tab.tab);
+        }
+        if (viewsBox(row.left, bottom).contains(localX, localY)) {
+            return new Hit(HitKind.VIEWS, null);
         }
         if (searchBox(row.left, bottom).contains(localX, localY)) {
             return new Hit(HitKind.SEARCH, null);
@@ -995,11 +1007,13 @@ public final class TabRow {
                 + STRIP_INSET;
         // Every tab's footprint is left out of it: a tab wears its own
         // surface in a single layer, never over this one.
-        // The search button stands in a hole of its own, in the box it
-        // answers on.
+        // The Views and Page Search buttons each stand in a hole of their
+        // own, in the box they answer on.
+        LostTalesUiHitBox views = viewsBox(row.left, bottom);
+        int viewsLeft = row.offsetX + (int)views.left;
         LostTalesUiHitBox search = searchBox(row.left, bottom);
         int searchLeft = row.offsetX + (int)search.left;
-        int searchTop = (int)search.top;
+        int leadTop = (int)search.top;
         this.drawnStripArgb = WindowStyle.surfaceArgb(
                 surfaceShare());
         // Every split's two pages stand as one tab, its seam theirs; the
@@ -1012,9 +1026,9 @@ public final class TabRow {
             }
         }
         drawStripAround(row, drawnTabs, row.offsetX + row.left - STRIP_INSET,
-                rowTop(bottom), stripRight, bottom - 1, searchLeft,
-                searchTop, searchLeft + SEARCH_SIZE,
-                searchTop + SEARCH_SIZE, this.drawnStripArgb);
+                rowTop(bottom), stripRight, bottom - 1,
+                new float[] {viewsLeft, searchLeft}, leadTop,
+                this.drawnStripArgb);
         // Everything else the strip draws stops short of the rule it
         // ends on: a sprite's shadow falls a pixel down and right, and
         // the rule is a hairline the window is bounded by, not something
@@ -1133,11 +1147,13 @@ public final class TabRow {
                 }
             }
             GL11.glPopMatrix();
-            // The tab search sits at the row's left end, before the
-            // first tab, where a browser keeps it.
+            // The Views button and the tab search sit at the row's left
+            // end, before the first tab, where a browser keeps its search.
+            step(this.viewsMotion, hovered, HitKind.VIEWS, row.viewsOpen);
             step(this.searchMotion, hovered, HitKind.SEARCH, row.searchOpen);
             if (!row.bare) {
-                drawSearch(searchLeft, searchTop, row.searchOpen,
+                drawViews(viewsLeft, leadTop);
+                drawSearch(searchLeft, leadTop, row.searchOpen,
                         hovered != null && hovered.kind == HitKind.SEARCH);
             }
             // The window's own controls, in the order a title bar
@@ -1390,20 +1406,21 @@ public final class TabRow {
      * risen off the row reaches up as far as it has risen. Read
      * column by column, so wherever tabs overlap — a carried one over
      * its neighbours — the highest of them decides where the strip stops.
-     * The search button's footprint, a box standing in the strip, is left
-     * out too, all but its four corner pixels, which the frame's rounding
-     * leaves to the strip.
+     * The footprints of the buttons at its left end, each a
+     * {@link #LEAD_SIZE} square from {@code holeLefts} and
+     * {@code holeTop}, are left out too, all but their four corner pixels,
+     * which the frame's rounding leaves to the strip.
      */
     private void drawStripAround(Row row, List<Tab> tabs, float left,
                                  float top, float right, float bottom,
-                                 float holeLeft, float holeTop,
-                                 float holeRight, float holeBottom,
+                                 float[] holeLefts, float holeTop,
                                  int argb) {
         int count = tabs.size();
         float[] lefts = new float[count];
         float[] rights = new float[count];
         float[] tops = new float[count];
-        float[] edges = new float[count * 4 + 6];
+        float[] edges = new float[count * 4 + holeLefts.length * 4 + 2];
+        float holeBottom = holeTop + LEAD_SIZE;
         int edgeCount = 0;
         edges[edgeCount++] = left;
         edges[edgeCount++] = right;
@@ -1429,11 +1446,13 @@ public final class TabRow {
                 }
             }
         }
-        float[] holeEdges = {holeLeft, holeLeft + 1.0F, holeRight - 1.0F,
-                holeRight};
-        for (float edge : holeEdges) {
-            if (edge > left && edge < right) {
-                edges[edgeCount++] = edge;
+        for (float holeLeft : holeLefts) {
+            float[] holeEdges = {holeLeft, holeLeft + 1.0F,
+                    holeLeft + LEAD_SIZE - 1.0F, holeLeft + LEAD_SIZE};
+            for (float edge : holeEdges) {
+                if (edge > left && edge < right) {
+                    edges[edgeCount++] = edge;
+                }
             }
         }
         java.util.Arrays.sort(edges, 0, edgeCount);
@@ -1453,11 +1472,12 @@ public final class TabRow {
                         || middle >= rights[tabIndex] - 1.0F;
                 cover = Math.min(cover, tops[tabIndex] + (chamfer ? 1 : 0));
             }
-            if (middle >= holeLeft && middle < holeRight) {
+            float holeLeft = holeUnder(holeLefts, middle);
+            if (!Float.isNaN(holeLeft)) {
                 // Above and below the button; its corner pixels stay the
                 // strip's.
                 boolean corner = middle < holeLeft + 1.0F
-                        || middle >= holeRight - 1.0F;
+                        || middle >= holeLeft + LEAD_SIZE - 1.0F;
                 float cutTop = holeTop + (corner ? 1.0F : 0.0F);
                 float cutBottom = holeBottom - (corner ? 1.0F : 0.0F);
                 if (Math.min(cover, cutTop) > top) {
@@ -1475,6 +1495,16 @@ public final class TabRow {
                         argb);
             }
         }
+    }
+
+    /** The left of the button hole a column of the strip falls in; NaN for none. */
+    private static float holeUnder(float[] holeLefts, float x) {
+        for (float holeLeft : holeLefts) {
+            if (x >= holeLeft && x < holeLeft + LEAD_SIZE) {
+                return holeLeft;
+            }
+        }
+        return Float.NaN;
     }
 
     private void drawTab(FontRenderer font, Tab tab, Row row,
@@ -2683,7 +2713,7 @@ public final class TabRow {
      * where its tabs would have begun.
      */
     private float drawnTabsRight(List<Tab> tabs, Row row) {
-        float right = row.left + SEARCH_RUN;
+        float right = row.left + LEAD_RUN;
         boolean pushing = isPushingControls(tabs, row);
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
@@ -2824,7 +2854,7 @@ public final class TabRow {
      */
     private int draggedRunLeft(Row row) {
         int wanted = row.draggedLeft - this.draggedPressedOffset;
-        return Math.max(row.left + SEARCH_RUN,
+        return Math.max(row.left + LEAD_RUN,
                 Math.min(carryLimit(row) - this.draggedRunWidth, wanted));
     }
 
@@ -2906,7 +2936,7 @@ public final class TabRow {
     private double drawnRunLeft(Row row) {
         double pointer = Double.isNaN(row.draggedLeftExact)
                 ? row.draggedLeft : row.draggedLeftExact;
-        return Math.max(row.left + SEARCH_RUN, Math.min(
+        return Math.max(row.left + LEAD_RUN, Math.min(
                 carryLimit(row) - this.draggedRunWidth,
                 pointer - this.draggedPressedOffset));
     }
@@ -2954,7 +2984,7 @@ public final class TabRow {
         int[] restLeft = new int[others];
         int[] widths = new int[others];
         int[] held = new int[others];
-        int cursor = row.left + SEARCH_RUN;
+        int cursor = row.left + LEAD_RUN;
         int at = 0;
         int runAt = -1;
         for (int index = 0; index < tabs.size(); index++) {
@@ -3134,13 +3164,19 @@ public final class TabRow {
     /* ---- The boxes the strip's controls are drawn in and answer on ---- */
 
     /**
-     * The search button's frame, where it is drawn: a framed button
+     * The Views button's frame, where it is drawn: a framed button
      * answers on its frame and nowhere else.
      */
+    static LostTalesUiHitBox viewsBox(int rowLeft, int rowBottom) {
+        return new LostTalesUiHitBox(rowLeft + VIEWS_LEFT,
+                centredInStrip(rowBottom, LEAD_SIZE), LEAD_SIZE, LEAD_SIZE);
+    }
+
+    /** The Page Search button's frame, where it is drawn. */
     static LostTalesUiHitBox searchBox(int rowLeft, int rowBottom) {
         return new LostTalesUiHitBox(rowLeft + SEARCH_LEFT,
-                centredInStrip(rowBottom, SEARCH_SIZE), SEARCH_SIZE,
-                SEARCH_SIZE);
+                centredInStrip(rowBottom, LEAD_SIZE), LEAD_SIZE,
+                LEAD_SIZE);
     }
 
     /** An end control's ink, centred in the strip where it is drawn. */
@@ -3323,6 +3359,33 @@ public final class TabRow {
     }
 
     /**
+     * The Views button: a framed button in the hole the strip leaves for
+     * it, its glyph centred in the frame, lit while the pointer is on it
+     * or the Views sub-window is out, as the search button beside it is.
+     */
+    private void drawViews(int left, int top) {
+        float lit = this.viewsMotion.lit();
+        LostTalesUiFramedButton.drawSurface(left, top, LEAD_SIZE, LEAD_SIZE,
+                lit, scaled(TAB_SURFACE_ALPHA));
+        LostTalesUiSheet glyph = ViewsWindow.ICON;
+        float x = left + LostTalesUiInk.centredStart(LEAD_SIZE,
+                glyph.getWidth());
+        float y = top + LostTalesUiInk.centredStart(LEAD_SIZE,
+                glyph.getHeight());
+        LostTalesUiButton.beginPose(this.viewsMotion, x, y,
+                glyph.getWidth(), glyph.getHeight());
+        try {
+            LostTalesUiInk.beginContent();
+            LostTalesUiSheet.drawPairWithShadow(glyph, ViewsWindow.ICON_LIT,
+                    lit, x, y, scaled(0xFF));
+        } finally {
+            LostTalesUiButton.endPose();
+        }
+        LostTalesUiFramedButton.drawInk(left, top, LEAD_SIZE, LEAD_SIZE,
+                lit, scaled(0xFF));
+    }
+
+    /**
      * The tab search control: a framed button in the hole the strip
      * leaves for it, lit while the pointer is on it or its panel is out —
      * the way a main-menu button lights while it is hovered or chosen —
@@ -3332,21 +3395,21 @@ public final class TabRow {
     private void drawSearch(int left, int top, boolean open,
                             boolean hovered) {
         float lit = this.searchMotion.lit();
-        LostTalesUiFramedButton.drawSurface(left, top, SEARCH_SIZE, SEARCH_SIZE,
+        LostTalesUiFramedButton.drawSurface(left, top, LEAD_SIZE, LEAD_SIZE,
                 lit, scaled(TAB_SURFACE_ALPHA));
         this.searchChevron.advance(open, hovered || open);
         // The frame keeps its place and the chevron moves inside it, so
         // the button reads as a socket holding something rather than one
         // piece sliding about the strip.
-        LostTalesUiButton.beginPose(this.searchMotion, left, top, SEARCH_SIZE,
-                SEARCH_SIZE);
+        LostTalesUiButton.beginPose(this.searchMotion, left, top, LEAD_SIZE,
+                LEAD_SIZE);
         try {
-            this.searchChevron.draw(left, top, SEARCH_SIZE, SEARCH_SIZE,
+            this.searchChevron.draw(left, top, LEAD_SIZE, LEAD_SIZE,
                     scaled(0xFF));
         } finally {
             LostTalesUiButton.endPose();
         }
-        LostTalesUiFramedButton.drawInk(left, top, SEARCH_SIZE, SEARCH_SIZE,
+        LostTalesUiFramedButton.drawInk(left, top, LEAD_SIZE, LEAD_SIZE,
                 lit, scaled(0xFF));
     }
 
@@ -3390,7 +3453,7 @@ public final class TabRow {
             this.tabDividerX = -1;
             this.firstDividerX = -1;
             this.secondDividerX = -1;
-            this.tabsRight = row == null ? 0 : row.left + SEARCH_RUN;
+            this.tabsRight = row == null ? 0 : row.left + LEAD_RUN;
             this.controlsRight = this.tabsRight;
             return this.cachedTabs;
         }
@@ -3419,7 +3482,7 @@ public final class TabRow {
         this.endFraction = (float)snapped(edge - this.endEdge, displayStep());
         int limit = this.endEdge - endControls;
         this.tabsLimit = limit;
-        double rowRoom = edge - endControls - row.left - SEARCH_RUN;
+        double rowRoom = edge - endControls - row.left - LEAD_RUN;
         int[] labelWidths = new int[count];
         for (int index = 0; index < count; index++) {
             labelWidths[index] = font.getStringWidth(
@@ -3476,7 +3539,7 @@ public final class TabRow {
         // row's end is the total rounded once rather than every width
         // rounded apart — which could overrun the room by a pixel a tab
         // and push the end controls off their edge.
-        double cursor = row.left + SEARCH_RUN;
+        double cursor = row.left + LEAD_RUN;
         for (int at = first; at <= last; at++) {
             int[] place = places.get(at);
             if (place[0] == place[1]) {
@@ -3510,7 +3573,7 @@ public final class TabRow {
             for (int back = at - 1; back >= 0 && before == null; back--) {
                 before = find(tabs, this.cachedTabs.get(back).tab);
             }
-            was.toLeft = before == null ? SEARCH_RUN
+            was.toLeft = before == null ? LEAD_RUN
                     : before.toLeft + before.exactWidth + TAB_GAP;
             was.exactWidth = -TAB_GAP;
             was.leavingWidth = Math.max(0.0D, was.widthExact);
@@ -3531,7 +3594,7 @@ public final class TabRow {
             this.sharedLeg.settle(false);
         }
         this.tabsRight = tabs.isEmpty()
-                ? row.left + SEARCH_RUN : (int)Math.round(cursor - TAB_GAP);
+                ? row.left + LEAD_RUN : (int)Math.round(cursor - TAB_GAP);
         // The + opens a channel into this row, so it stands with the
         // tabs; everything that acts on the window itself stands with
         // the grip, against the row's right edge.
@@ -3656,7 +3719,7 @@ public final class TabRow {
             // edge where the tab before it ends as drawn now, its width a
             // seam short of nothing, so its neighbours meet it all the
             // way along the glide.
-            double start = previous == null ? SEARCH_RUN
+            double start = previous == null ? LEAD_RUN
                     : previous.leftExact + previous.widthExact + TAB_GAP;
             built.standAt(start, -TAB_GAP, displayStep());
             built.joining = true;
@@ -3930,7 +3993,7 @@ public final class TabRow {
         if (tabs.isEmpty()) {
             return 0;
         }
-        int rowWidth = SEARCH_RUN + endControlsWidth()
+        int rowWidth = LEAD_RUN + endControlsWidth()
                 + TAB_GAP * (tabs.size() - 1) + reservedRowWidth(tabs);
         return Math.max(WindowPlacement.MIN_BOX_WIDTH,
                 rowWidth + STRIP_INSET * 2);
@@ -4025,7 +4088,7 @@ public final class TabRow {
                 resolution.getScaledHeight());
         // The row spans the window minus the two-pixel insets the screen
         // lays it out with.
-        int rowWidth = box.width - 4 - SEARCH_RUN;
+        int rowWidth = box.width - 4 - LEAD_RUN;
         int available = rowWidth - endControlsWidth()
                 - TAB_GAP * (tabs.size() - 1);
         return reservedRowWidth(tabs) <= available;

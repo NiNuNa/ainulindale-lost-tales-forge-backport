@@ -61,6 +61,14 @@ public final class LostTalesChatAccessPacketTest {
         assertTrue(decoded.getProfanityWords().isEmpty());
     }
 
+    /** Whether this player is shown accounts travels last; nobody is until told so. */
+    @Test
+    public void whetherAccountsAreShownRoundTrips() {
+        assertTrue(roundTrip(ChatPacketFixtures.access(0).build().withSeesAccounts(true))
+                .seesAccounts());
+        assertFalse(roundTrip(ChatPacketFixtures.access(0).build()).seesAccounts());
+    }
+
     /** Whether Discord members wear their status travels with the links. */
     @Test
     public void theDiscordStatusFlagRoundTrips() {
@@ -297,11 +305,18 @@ public final class LostTalesChatAccessPacketTest {
         assertFalse(decoded.isMalformed());
         assertEquals(words.entries(), decoded.getProfanityWords().entries());
 
+        // The tail: the words' count, then the private commands' count,
+        // the Discord links' count, the status flag and whether accounts
+        // are shown.
         ByteBuf broken = Unpooled.buffer();
         ChatPacketFixtures.access(0).build().toBytes(broken);
-        broken.writerIndex(broken.writerIndex() - 2);
+        broken.writerIndex(broken.writerIndex() - 6);
         broken.writeShort(1);
         writeString(broken, "not a word=x");
+        broken.writeByte(0);
+        broken.writeByte(0);
+        broken.writeBoolean(false);
+        broken.writeBoolean(false);
         LostTalesChatAccessPacket refused = new LostTalesChatAccessPacket();
         refused.fromBytes(broken);
         assertTrue(refused.isMalformed());
@@ -309,8 +324,43 @@ public final class LostTalesChatAccessPacketTest {
 
         ByteBuf tooMany = Unpooled.buffer();
         ChatPacketFixtures.access(0).build().toBytes(tooMany);
-        tooMany.writerIndex(tooMany.writerIndex() - 2);
+        tooMany.writerIndex(tooMany.writerIndex() - 6);
         tooMany.writeShort(ChatProfanityWords.MAX_WORDS + 1);
+        LostTalesChatAccessPacket overfull = new LostTalesChatAccessPacket();
+        overfull.fromBytes(tooMany);
+        assertTrue(overfull.isMalformed());
+    }
+
+    /**
+     * The commands the server keeps private travel by name; a name that
+     * is no command's, a repeat, or one past the bound refuses the whole.
+     */
+    @Test
+    public void theServersPrivateCommandsRoundTrip() {
+        LostTalesChatAccessPacket decoded = roundTrip(ChatPacketFixtures.access(0).build()
+                .withPrivateCommands(Arrays.asList("vault", "bank", "vault", "Not One")));
+        assertFalse(decoded.isMalformed());
+        assertEquals(Arrays.asList("vault", "bank"), decoded.getPrivateCommands());
+
+        // The tail: the commands' count, the Discord links' count, the
+        // status flag and whether accounts are shown.
+        ByteBuf badName = Unpooled.buffer();
+        ChatPacketFixtures.access(0).build().toBytes(badName);
+        badName.writerIndex(badName.writerIndex() - 4);
+        badName.writeByte(1);
+        writeString(badName, "two words");
+        badName.writeByte(0);
+        badName.writeBoolean(false);
+        badName.writeBoolean(false);
+        LostTalesChatAccessPacket refused = new LostTalesChatAccessPacket();
+        refused.fromBytes(badName);
+        assertTrue(refused.isMalformed());
+        assertTrue(refused.getPrivateCommands().isEmpty());
+
+        ByteBuf tooMany = Unpooled.buffer();
+        ChatPacketFixtures.access(0).build().toBytes(tooMany);
+        tooMany.writerIndex(tooMany.writerIndex() - 4);
+        tooMany.writeByte(com.ninuna.losttales.chat.ChatCommandText.MAX_LISTED_NAMES + 1);
         LostTalesChatAccessPacket overfull = new LostTalesChatAccessPacket();
         overfull.fromBytes(tooMany);
         assertTrue(overfull.isMalformed());

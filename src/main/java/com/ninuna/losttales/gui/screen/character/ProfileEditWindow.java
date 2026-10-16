@@ -83,8 +83,10 @@ final class ProfileEditWindow extends SubWindowContent {
     private static final int PADDING_Y = MenuWindow.PADDING_Y;
     /** The rows the window shows at least; a shorter one cannot be made. */
     private static final int MIN_ROWS = 4;
-    /** The lines an About text shows at once. */
+    /** The lines Appearance and Personality show at once. */
     private static final int ABOUT_LINES = 4;
+    /** The lines the History shows at once: it holds four times as much. */
+    private static final int HISTORY_LINES = 8;
     /** How often the rows keep time, as a screen's ticks would. */
     private static final long TICK_NANOS = 50L * 1000000L;
     /** Closer than this to the target and the drawn scroll arrives. */
@@ -176,7 +178,9 @@ final class ProfileEditWindow extends SubWindowContent {
             CreatorTextArea area = new CreatorTextArea(this.context,
                     I18n.format("gui.losttales.character.profile."
                             + section.getId()), profile.section(section),
-                    CharacterProfile.MAX_SECTION_LENGTH, ABOUT_LINES);
+                    section.getMaxLength(),
+                    section == CharacterProfile.Section.HISTORY
+                            ? HISTORY_LINES : ABOUT_LINES);
             this.sections.put(section, area);
             about.add(area);
         }

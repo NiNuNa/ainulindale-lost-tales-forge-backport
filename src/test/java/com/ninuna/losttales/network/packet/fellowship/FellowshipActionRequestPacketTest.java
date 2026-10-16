@@ -14,9 +14,10 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A new fellowship and a rename carry a name, and only they do; a guide
- * made or unmade and a switch carry a value byte, and only they do. A
- * payload of any other shape is malformed.
+ * A new fellowship, a rename, a mark placed and an invitation carry a
+ * name, and only they do; an invitation names its character by name, never
+ * by id. A guide made or unmade and a switch carry a value byte, and only
+ * they do. A payload of any other shape is malformed.
  */
 public final class FellowshipActionRequestPacketTest {
 
@@ -45,6 +46,21 @@ public final class FellowshipActionRequestPacketTest {
                 "Rangers", -1));
         assertFalse(decoded.isMalformed());
         assertEquals("Rangers", decoded.getName());
+    }
+
+    /** An invitation carries the name of the character invited, and no id the server would have to trust. */
+    @Test
+    public void anInvitationCarriesTheCharactersName() {
+        FellowshipActionRequestPacket decoded = roundTrip(request(
+                FellowshipOperationType.INVITE_PLAYER, FELLOWSHIP, 3L, null, "Hurin", -1));
+        assertFalse(decoded.isMalformed());
+        assertEquals(FellowshipOperationType.INVITE_PLAYER, decoded.getOperationType());
+        assertEquals("Hurin", decoded.getName());
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void anInvitationByIdIsRefused() {
+        request(FellowshipOperationType.INVITE_PLAYER, FELLOWSHIP, 3L, MEMBER, null, -1);
     }
 
     @Test

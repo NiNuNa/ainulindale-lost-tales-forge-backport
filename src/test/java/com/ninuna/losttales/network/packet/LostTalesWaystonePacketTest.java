@@ -69,7 +69,7 @@ public final class LostTalesWaystonePacketTest {
                         .SHARE_FELLOWSHIP,
                 decoded.getOperation());
         assertEquals("The Prancing Ponies",
-                decoded.getTargetPlayerName());
+                decoded.getTargetName());
     }
 
     @Test
@@ -79,6 +79,8 @@ public final class LostTalesWaystonePacketTest {
                         "losttales:player/state", "Aldric",
                         UUID.randomUUID(), 0, 4, 65, 9,
                         UUID.randomUUID()).toBuilder()
+                        .sharedCharacterIds(Collections.singleton(
+                                UUID.randomUUID()))
                         .sharedFellowshipIds(Collections.singleton(
                                 UUID.randomUUID()))
                         .priority(73)
@@ -106,6 +108,7 @@ public final class LostTalesWaystonePacketTest {
                 decoded.getSettings().getDescription());
         assertEquals(record.getDimensionId(),
                 decoded.getSettings().getDimensionId());
+        assertEquals(1, decoded.getSharedCharacterCount());
         assertEquals(1, decoded.getSharedFellowshipCount());
         assertEquals(73, decoded.getSettings().getPriority());
         assertTrue("using the waystone opens its page", decoded.isOpening());
@@ -171,10 +174,10 @@ public final class LostTalesWaystonePacketTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void aShareNameTooLongForTheWireIsRefusedBeforeItIsSent() {
-        // Thirty-three letters of two bytes each: 66 bytes, past the
-        // wire's 64, though far fewer characters.
+        // Sixty-five letters of two bytes each: 130 bytes, past the
+        // wire's 128, though far fewer characters.
         StringBuilder name = new StringBuilder();
-        for (int index = 0; index < 33; index++) {
+        for (int index = 0; index < 65; index++) {
             name.append((char)0xE9);
         }
         LostTalesWaystoneSettingsRequestPacket.share(false, 12, 70, -8,
@@ -188,8 +191,8 @@ public final class LostTalesWaystonePacketTest {
                         "losttales:player/reason", "Aldric",
                         UUID.randomUUID(), 0, 4, 65, 9,
                         UUID.randomUUID());
-        return new LostTalesWaystoneStatePacket(0, 4, 65, 9, record, true,
-                false, reason);
+        return new LostTalesWaystoneStatePacket(0, 4, 65, 9, record,
+                true, false, reason);
     }
 
     private static LostTalesWaystoneStatePacket roundTrip(

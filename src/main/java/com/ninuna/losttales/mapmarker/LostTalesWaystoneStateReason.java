@@ -16,7 +16,7 @@ public enum LostTalesWaystoneStateReason {
     DENIED(3, "chat.losttales.waystone.denied"),
     INVALID_SETTINGS(4, "chat.losttales.waystone.invalid_settings"),
     PUBLIC_DENIED(5, "chat.losttales.waystone.public_denied"),
-    PLAYER_NOT_FOUND(6, "chat.losttales.waystone.player_not_found"),
+    CHARACTER_NOT_FOUND(6, "chat.losttales.waystone.character_not_found"),
     INVALID_SHARE(7, "chat.losttales.waystone.invalid_share"),
     SHARE_LIMIT(8, "chat.losttales.waystone.share_limit"),
     FELLOWSHIP_NOT_FOUND(9,

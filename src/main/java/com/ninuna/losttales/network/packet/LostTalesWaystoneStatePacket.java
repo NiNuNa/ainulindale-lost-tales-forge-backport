@@ -36,7 +36,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     private boolean playerPlaced;
     private long revision;
     private LostTalesMapMarkerEditableSettings settings;
-    private int sharedPlayerCount;
+    private int sharedCharacterCount;
     private int sharedFellowshipCount;
     private boolean canEdit;
     private boolean canMakePublic;
@@ -47,8 +47,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
 
     public LostTalesWaystoneStatePacket(
             int dimensionId, int x, int y, int z,
-            LostTalesMapMarkerRecord record,
-            boolean canEdit, boolean canMakePublic,
+            LostTalesMapMarkerRecord record, boolean canEdit, boolean canMakePublic,
             LostTalesWaystoneStateReason reason) {
         if (record == null) {
             throw new IllegalArgumentException(
@@ -65,7 +64,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         this.revision = record.getRevision();
         this.settings =
                 LostTalesMapMarkerEditableSettings.fromRecord(record);
-        this.sharedPlayerCount = record.getSharedPlayerIds().size();
+        this.sharedCharacterCount = record.getSharedCharacterIds().size();
         this.sharedFellowshipCount =
                 record.getSharedFellowshipIds().size();
         this.canEdit = canEdit;
@@ -131,7 +130,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                     hiddenUntilDiscovered, discoverable,
                     requiresRegionUnlock, hasWaystone,
                     structureType, priority, visibility);
-            this.sharedPlayerCount = buffer.readInt();
+            this.sharedCharacterCount = buffer.readInt();
             this.sharedFellowshipCount = buffer.readInt();
             this.canEdit = buffer.readBoolean();
             this.canMakePublic = buffer.readBoolean();
@@ -187,7 +186,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 MAX_STRUCTURE_ID_BYTES);
         buffer.writeInt(value.getPriority());
         buffer.writeByte(value.getVisibility().ordinal());
-        buffer.writeInt(this.sharedPlayerCount);
+        buffer.writeInt(this.sharedCharacterCount);
         buffer.writeInt(this.sharedFellowshipCount);
         buffer.writeBoolean(this.canEdit);
         buffer.writeBoolean(this.canMakePublic);
@@ -206,9 +205,9 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 || !isValidSettings(this.settings)
                 || this.settings.getName().trim().length() == 0
                         && this.namedAfter.length() == 0
-                || this.sharedPlayerCount < 0
-                || this.sharedPlayerCount
-                        > LostTalesMapMarkerRecord.MAX_SHARED_PLAYERS
+                || this.sharedCharacterCount < 0
+                || this.sharedCharacterCount
+                        > LostTalesMapMarkerRecord.MAX_SHARED_CHARACTERS
                 || this.sharedFellowshipCount < 0
                 || this.sharedFellowshipCount
                         > LostTalesMapMarkerRecord
@@ -235,8 +234,9 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     public boolean hasFastTravel() {
         return this.settings.hasFastTravel();
     }
-    public int getSharedPlayerCount() {
-        return this.sharedPlayerCount;
+    /** The characters it is shared with. */
+    public int getSharedCharacterCount() {
+        return this.sharedCharacterCount;
     }
     public int getSharedFellowshipCount() {
         return this.sharedFellowshipCount;

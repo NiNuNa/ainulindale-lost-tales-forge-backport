@@ -356,9 +356,9 @@ public final class CharacterNbtCodec {
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
             String key = sectionKey(section);
             String text = readBoundedString(stored, key,
-                    CharacterProfile.MAX_SECTION_LENGTH);
+                    section.getMaxLength());
             String kept = CharacterValidator.normalizeSection(text);
-            if (!CharacterValidator.isValidSection(kept)) {
+            if (!CharacterValidator.isValidSection(section, kept)) {
                 kept = "";
             }
             if (!stored.hasKey(key, Constants.NBT.TAG_STRING)

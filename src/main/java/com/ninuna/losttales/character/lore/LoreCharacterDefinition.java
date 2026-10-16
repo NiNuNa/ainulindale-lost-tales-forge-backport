@@ -11,6 +11,8 @@ public final class LoreCharacterDefinition {
     public static final int CURRENT_DATA_VERSION = 1;
     /** The age of a lore character whose file gives none. */
     public static final int DEFAULT_AGE = 18;
+    /** A description, in characters. */
+    public static final int MAX_DESCRIPTION_LENGTH = 512;
 
     private final String id;
     private final String name;

@@ -1,7 +1,9 @@
 package com.ninuna.losttales.fellowship.storage;
 
 import com.ninuna.losttales.fellowship.model.FellowshipInvitation;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -13,8 +15,9 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Invitations read back as written, and the codec fails closed: data of
- * another version keeps the store read-only, and an invitation missing a
- * key it needs goes to the quarantine rather than being filled in.
+ * another version keeps the store read-only, an invitation missing a key it
+ * needs goes to the quarantine rather than being filled in, and so does one
+ * past the most a fellowship has open or the most waiting for one account.
  */
 public final class FellowshipInvitationNbtCodecTest {
 
@@ -56,6 +59,54 @@ public final class FellowshipInvitationNbtCodecTest {
         NBTTagList list = entry.getTagList("Invitations", 10);
         list.getCompoundTagAt(0).setInteger("DataVersion", 0);
         assertTrue(FellowshipInvitationNbtCodec.read(entry).isReadOnly());
+    }
+
+    /** The oldest invitations of a fellowship stand; one past its cap goes to the quarantine. */
+    @Test
+    public void anInvitationPastAFellowshipsCapIsQuarantined() {
+        UUID fellowship = new UUID(2L, 2L);
+        List<FellowshipInvitation> invitations = new ArrayList<FellowshipInvitation>();
+        for (int index = 0; index <= FellowshipInvitation.MAX_PER_FELLOWSHIP; index++) {
+            invitations.add(invitation(index, fellowship, new UUID(500L, index)));
+        }
+        FellowshipInvitationNbtCodec.ReadResult read =
+                FellowshipInvitationNbtCodec.read(written(invitations));
+
+        assertEquals(FellowshipInvitation.MAX_PER_FELLOWSHIP, read.getInvitations().size());
+        assertTrue(read.wasRepaired());
+        assertEquals("too_many_invitations_for_fellowship",
+                read.getQuarantineEntriesCopy().get(0).getString("Reason"));
+        assertTrue("the newest goes", !read.getInvitations().containsKey(
+                new UUID(900L, FellowshipInvitation.MAX_PER_FELLOWSHIP)));
+    }
+
+    /** One account has at most so many invitations waiting, from every fellowship together. */
+    @Test
+    public void anInvitationPastAnAccountsCapIsQuarantined() {
+        UUID account = new UUID(6L, 6L);
+        List<FellowshipInvitation> invitations = new ArrayList<FellowshipInvitation>();
+        for (int index = 0; index <= FellowshipInvitation.MAX_PER_TARGET_ACCOUNT; index++) {
+            invitations.add(invitation(index, new UUID(300L, index), account));
+        }
+        FellowshipInvitationNbtCodec.ReadResult read =
+                FellowshipInvitationNbtCodec.read(written(invitations));
+
+        assertEquals(FellowshipInvitation.MAX_PER_TARGET_ACCOUNT, read.getInvitations().size());
+        assertEquals("too_many_invitations_for_account",
+                read.getQuarantineEntriesCopy().get(0).getString("Reason"));
+    }
+
+    private static FellowshipInvitation invitation(int index, UUID fellowship, UUID targetAccount) {
+        return new FellowshipInvitation(new UUID(900L, index), fellowship,
+                new UUID(100L, 1L), new UUID(100L, 2L), "Aldric",
+                new UUID(700L, index), targetAccount, "Beren", 1000L + index, 90000L);
+    }
+
+    private static NBTTagCompound written(List<FellowshipInvitation> invitations) {
+        NBTTagCompound root = new NBTTagCompound();
+        FellowshipInvitationNbtCodec.write(root, invitations,
+                Collections.<NBTTagCompound>emptyList());
+        return root;
     }
 
     @Test

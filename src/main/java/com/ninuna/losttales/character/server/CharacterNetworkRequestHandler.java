@@ -8,6 +8,7 @@ import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.fellowship.server.FellowshipSyncManager;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSyncManager;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
 import cpw.mods.fml.common.FMLLog;
@@ -208,6 +209,16 @@ public final class CharacterNetworkRequestHandler {
                                 CharacterOperationType operationType,
                                 Operation operation,
                                 FellowshipSyncManager.AudienceSnapshot affectedAudience) {
+        // A player waiting for their first character makes it in the
+        // creator, and nothing else: no lore figure claimed, nothing played,
+        // restored or changed before it.
+        if (CharacterJoin.isWaiting(player)
+                && operationType != CharacterOperationType.REQUEST_ROSTER
+                && operationType != CharacterOperationType.CREATE) {
+            CharacterSyncManager.sendFailure(player, requestId, operationType,
+                    CharacterErrorId.FIRST_CHARACTER_PENDING);
+            return;
+        }
         CharacterOperationResult result;
         try {
             result = operation.run();
@@ -252,6 +263,9 @@ public final class CharacterNetworkRequestHandler {
                     FellowshipSyncManager.sendStateToAudience(
                             affectedAudience, player.getUniqueID());
                     FellowshipSyncManager.presenceChanged(player.getUniqueID());
+                    // A waystone shared with a character shows only while
+                    // it is played, and fellowships follow the character.
+                    LostTalesMapMarkerSyncManager.sync(player);
                 }
                 if (operationType == CharacterOperationType.SELECT) {
                     // The roles a line is signed with and the channels the

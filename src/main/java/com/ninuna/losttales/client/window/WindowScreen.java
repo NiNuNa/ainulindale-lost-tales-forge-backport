@@ -79,10 +79,22 @@ public final class WindowScreen extends GuiChat
     private final ToolStrip toolStrip = new ToolStrip();
     /** Snap assist: the other windows offered for a layout's empty zones. */
     private final SnapAssist snapAssist = new SnapAssist();
-    /** The Views sub-window: a button for every view, at the foot of the screen. */
+    /** The Views sub-window: a button for every view, opened from every tab row. */
     private final ViewsWindow views = new ViewsWindow();
-    /** The snap bar: the layouts, always at the top of the screen. */
-    private final SnapBarWindow snapBar = new SnapBarWindow();
+    /** The Snap Layouts sub-window of the window it is aimed at. */
+    private final SnapLayoutsWindow snapLayouts = new SnapLayoutsWindow();
+    /** The window whose fullscreen control the pointer rests on, and since when; null for none. */
+    private String snapRestingOn;
+    private long snapRestingSince;
+    /** Since when the pointer has been off the control and the Snap Layouts it opened; 0 while on them. */
+    private long snapAwaySince;
+    /** Whether a press came while the pointer rests on the control: they wait until it leaves. */
+    private boolean snapRestPressed;
+    /**
+     * Whether the view shown had a window on screen at the last tick: one
+     * that has none now was emptied, and the screen closes.
+     */
+    private boolean showedWindows;
     /** The drags: tabs, windows, resizes, and whatever a window's content drags. */
     private final WindowGestures gestures = new WindowGestures(
             new WindowGestures.Host() {
@@ -118,9 +130,7 @@ public final class WindowScreen extends GuiChat
                 public void lockedMoveTried(Window window) {
                     nudgeLock(window);
                 }
-            }, this.snapAssist, this.snapBar);
-    /** The snap layouts a window's fullscreen control opens. */
-    private final SnapLayouts.Flyout snapFlyout = new SnapLayouts.Flyout();
+            }, this.snapAssist);
     /** How strongly each window and sub-window shows under the ones in front of it. */
     private final StackFade stackFade = new StackFade();
     /** The pickers' windows, the menus and cards: whatever opens on a click and stays. */
@@ -296,16 +306,22 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * A custom view's key: opens the screen on that view, as the player
-     * left it. On that view it closes the screen; on another it swaps to
-     * it.
+     * A custom view's key, by the view's number: opens the screen on that
+     * view, as the player left it, making it first where it does not stand
+     * yet. On that view it closes the screen; on another it swaps to it.
      */
-    public static void openView(View view) {
+    public static void openCustomView(int number) {
+        View view = Views.numbered(number);
         if (view == null) {
-            return;
+            view = Views.make(number);
+            if (view == null) {
+                return;
+            }
+            WindowLayout.persist();
         }
         WindowScreen current = current();
         if (current != null) {
+            current.viewsChanged();
             current.viewKey(view);
             return;
         }
@@ -587,8 +603,8 @@ public final class WindowScreen extends GuiChat
 
     /**
      * Whether no window has a tab on screen: every window closed, or none
-     * holding a tab the view shows. The screen then closes, unless
-     * Settings stands on it alone.
+     * holding a tab the view shows. Once the view shown is emptied so,
+     * the screen closes ({@link #updateScreen}).
      */
     public static boolean isEmpty() {
         for (Window window : WindowLayout.windows()) {
@@ -719,11 +735,10 @@ public final class WindowScreen extends GuiChat
         this.gestures.bind(this.mc, this.fontRendererObj, this.width,
                 this.height);
         this.subWindows.bind(this.width, this.height);
-        this.snapBar.bind(this.width, this.height);
+        this.snapLayouts.bind(this.width, this.height);
         for (ScreenPart part : this.parts) {
             part.init();
         }
-        openMenus();
         // initGui also runs on resize; the entrance only plays once per
         // opening.
         if (!this.openAnimationStarted) {
@@ -778,6 +793,15 @@ public final class WindowScreen extends GuiChat
         for (ScreenPart part : this.parts) {
             part.tick();
         }
+        // Closing the last window of the view shown closes the screen, as
+        // closing a browser's last tab closes the browser; the view opens
+        // with its defaults the next time.
+        boolean showing = !isEmpty();
+        if (this.showedWindows && !showing) {
+            closeScreen();
+            return;
+        }
+        this.showedWindows = showing;
     }
 
     @Override
@@ -824,11 +848,12 @@ public final class WindowScreen extends GuiChat
         if (handleSnapKey(press)) {
             return;
         }
-        // A custom view's key that types nothing (Caps Lock at first)
-        // reaches the screen whatever field holds the keys.
-        View keyed = press.command || press.alt ? null : Views.byKey(keyCode);
-        if (!press.types && keyed != null) {
-            viewKey(keyed);
+        // A custom view's key that types nothing reaches the screen
+        // whatever field holds the keys.
+        int keyed = press.command || press.alt ? 0
+                : Views.numberForKey(keyCode);
+        if (!press.types && keyed > 0) {
+            openCustomView(keyed);
             return;
         }
         if (viewKey(press)) {
@@ -868,9 +893,9 @@ public final class WindowScreen extends GuiChat
                 return;
             }
             if (content != null && !content.holdsKeys()
-                    && (pressPageKey(press) || keyed != null)) {
-                if (keyed != null) {
-                    viewKey(keyed);
+                    && (pressPageKey(press) || keyed > 0)) {
+                if (keyed > 0) {
+                    openCustomView(keyed);
                 }
                 return;
             }
@@ -894,8 +919,10 @@ public final class WindowScreen extends GuiChat
         for (ScreenPart part : this.parts) {
             part.keyPassing(press);
         }
-        if (keyCode == Keyboard.KEY_ESCAPE && this.snapFlyout.isOpen()) {
-            this.snapFlyout.close();
+        SubWindow pointerLayouts = snapLayoutsOut();
+        if (keyCode == Keyboard.KEY_ESCAPE && pointerLayouts != null
+                && this.snapLayouts.goesWithPointer()) {
+            this.subWindows.close(pointerLayouts);
             return;
         }
         if (keyCode == Keyboard.KEY_ESCAPE && this.snapAssist.isOpen()) {
@@ -1146,6 +1173,7 @@ public final class WindowScreen extends GuiChat
         }
         WindowView.forPage(page);
         Window holding = WindowLayout.showView(page);
+        this.showedWindows = !isEmpty();
         if (holding == null) {
             return false;
         }
@@ -1167,6 +1195,7 @@ public final class WindowScreen extends GuiChat
         }
         WindowView.forView(view);
         WindowLayout.buildView(view);
+        this.showedWindows = !isEmpty();
         WindowPage front = viewFront(view);
         if (front != null) {
             jumpToTab(front);
@@ -1210,36 +1239,28 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * The Views sub-window and the snap bar, which stand on every screen
-     * and cannot be closed: opened where they last stood locked, else at
-     * the foot and the top of the screen.
+     * The Views button on a tab row: opens the Views sub-window hung from
+     * it, or closes it where it is out. It belongs to the screen, so it
+     * stays open as the views swap.
      */
-    private void openMenus() {
-        LostTalesUiHitBox screen = this.subWindows.screenRoom();
-        this.subWindows.openPermanent(ViewsWindow.KIND, this.views,
-                this.views.firstContentBox(screen));
-        this.subWindows.openPermanent(SnapBarWindow.KIND, this.snapBar,
-                this.snapBar.firstContentBox(screen));
+    void toggleViews(SubWindowAnchor anchor) {
+        this.subWindows.toggle(ViewsWindow.KIND, "", this.views, null,
+                this.views.firstContentBox(anchor,
+                        this.subWindows.screenRoom()));
     }
 
-    /**
-     * The snap bar learns where it stands, to peek from above it as a
-     * carried window nears the top, and moves its peek on.
-     */
-    private void followSnapBar() {
-        SubWindow bar = this.subWindows.find(SnapBarWindow.KIND, "");
-        if (bar != null) {
-            this.snapBar.standsAt(bar.box(), System.nanoTime());
-        }
+    /** Whether the Views sub-window is out: every Views button stands lit. */
+    private boolean viewsOut() {
+        SubWindow out = this.subWindows.find(ViewsWindow.KIND, "");
+        return out != null && out.isOpen();
     }
 
     /**
      * The window's own menus from the keyboard, from anywhere on the
-     * screen: Ctrl+Shift+A the tab search, Ctrl+N a new page, the Lost
-     * Tales Menu as the {@code +} opens it — both mean something with
-     * nothing open — Ctrl+K the quick switcher in the middle of the window
-     * the keys are in, and Ctrl+, the Client Settings page, as a page's
-     * key turns the screen to its page. The search, the switcher and
+     * screen: Ctrl+Shift+A the tab search, Ctrl+N a New Page as the
+     * {@code +} opens it, Ctrl+K the quick switcher in the middle of the
+     * window the keys are in, and Ctrl+, the Client Settings page, as a
+     * page's key turns the screen to its page. The search, the switcher and
      * Ctrl+, are switches, as their controls are: pressed again, they put
      * the window away, or close the screen turned to the page.
      */
@@ -1703,7 +1724,6 @@ public final class WindowScreen extends GuiChat
      * the layout file is written.
      */
     void viewsChanged() {
-        openMenus();
         this.subWindows.refit(this.subWindows.find(ViewsWindow.KIND, ""));
         WindowLayout.persist();
     }
@@ -1727,7 +1747,11 @@ public final class WindowScreen extends GuiChat
                 });
     }
 
-    /** Asks before a view the player made goes, its windows and their pages with it. */
+    /**
+     * Asks before a view the player made goes, its windows and their pages
+     * with it, and its key with them; the screen showing it swaps back to
+     * the view shown before it, else to the Chat view.
+     */
     void askDeleteView(final View view) {
         askOnScreen("view_delete:" + view.id(),
                 StatCollector.translateToLocal("gui.losttales.window.views.delete"),
@@ -1745,7 +1769,7 @@ public final class WindowScreen extends GuiChat
                         WindowLayout.forgetView(view);
                         viewsChanged();
                         if (shown) {
-                            swapTo(Views.menu());
+                            swapTo(WindowView.shownBefore(view));
                         }
                     }
                 });
@@ -1779,29 +1803,23 @@ public final class WindowScreen extends GuiChat
      * Snapping from the keyboard, on the window the keys are in: Alt with
      * an arrow sends it on through the parts of the screen as the
      * desktop's Windows key does ({@link SnapKeys}), and Alt+Z opens its
-     * snap layouts, which the arrows then walk, Enter takes and Escape —
-     * or Alt+Z again — puts away. A press that types a character, as Alt
-     * Gr and a Mac's Option do, is typing, not snapping.
+     * Snap Layouts, whose zones the arrows then walk and Return takes;
+     * Escape, or Alt+Z again, puts them away. A press that types a
+     * character, as Alt Gr and a Mac's Option do, is typing, not snapping.
      */
     private boolean handleSnapKey(LostTalesKeyPress press) {
         int keyCode = press.key;
-        if (this.snapFlyout.isKeyboardOpen()) {
+        SubWindow layouts = snapLayoutsOut();
+        if (layouts != null && this.snapLayouts.isByKeys()
+                && !press.alt && !press.command) {
             SnapKeys.Direction walk = SnapKeys.direction(keyCode);
             if (walk != null) {
-                this.snapFlyout.step(walk);
+                this.snapLayouts.step(walk);
                 return true;
             }
             if (keyCode == Keyboard.KEY_RETURN
                     || keyCode == Keyboard.KEY_NUMPADENTER) {
-                int zone = this.snapFlyout.keyZone();
-                Window window = WindowLayout.window(
-                        this.snapFlyout.windowId());
-                if (zone >= 0 && window != null && !window.isLocked()) {
-                    sendWindowTo(window, this.snapFlyout.fillOf(zone),
-                            this.snapFlyout.layoutOf(zone),
-                            this.snapFlyout.companionsOf(zone));
-                }
-                this.snapFlyout.close();
+                this.snapLayouts.takeKeyZone();
                 return true;
             }
         }
@@ -1829,18 +1847,12 @@ public final class WindowScreen extends GuiChat
             return true;
         }
         if (keyCode == Keyboard.KEY_Z) {
-            if (this.snapFlyout.isKeyboardOpen()) {
-                this.snapFlyout.close();
+            if (layouts != null && this.snapLayouts.isByKeys()
+                    && window.getId().equals(this.snapLayouts.windowId())) {
+                this.subWindows.close(layouts);
                 return true;
             }
-            WindowFrame frame = WindowFrame.find(window.getId());
-            TabRow.Row row = frame == null || !frame.drawn ? null
-                    : rowFor(window, frame, WindowOpening.sample());
-            if (row != null) {
-                this.snapFlyout.openFromKeyboard(window,
-                        frame.tabBar.fullscreenControlBox(row), frame,
-                        this.mc, this.width, this.height);
-            }
+            openSnapLayouts(window, null, false, true);
             return true;
         }
         SnapKeys.Direction direction = SnapKeys.direction(keyCode);
@@ -1848,6 +1860,19 @@ public final class WindowScreen extends GuiChat
         sendWindowTo(window, next, SnapLayouts.layoutFor(next),
                 Collections.<String, Window.ScreenFill>emptyMap());
         return true;
+    }
+
+    /**
+     * A zone taken on the Snap Layouts: the window goes there, unless its
+     * padlock holds it, and the sub-window closes.
+     */
+    void snapFromLayouts(Window window, Window.ScreenFill fill,
+                         Window.ScreenFill[] layout,
+                         Map<String, Window.ScreenFill> companions) {
+        if (!heldByLock(window)) {
+            sendWindowTo(window, fill, layout, companions);
+        }
+        this.subWindows.close(snapLayoutsOut());
     }
 
     /**
@@ -1872,28 +1897,137 @@ public final class WindowScreen extends GuiChat
         }
     }
 
+    /** The Snap Layouts sub-window while it is out; null while it is not. */
+    private SubWindow snapLayoutsOut() {
+        SubWindow out = this.subWindows.find(SnapLayoutsWindow.KIND, "");
+        return out != null && out.isOpen() ? out : null;
+    }
+
     /**
-     * The snap layouts under a window's fullscreen control: they open
-     * once the pointer has rested on the control, and stay while it is on
-     * the control or on them. A drag puts them away.
+     * Opens a window's Snap Layouts beside {@code menu}, the Window
+     * Options that opened them, or hung from the window's fullscreen
+     * control with none; {@code byPointer} when the pointer resting on
+     * the control opened them, {@code byKeys} when Alt+Z did. Out for
+     * another window, they move over. Nothing opens while the window or
+     * its row is not drawn.
      */
-    private void followSnapFlyout() {
-        Window window = null;
-        LostTalesUiHitBox control = null;
-        if (this.hover.is(WindowHover.Kind.TAB_ROW)
+    private void openSnapLayouts(Window window, SubWindow menu,
+                                 boolean byPointer, boolean byKeys) {
+        LostTalesUiHitBox room = window == null ? null
+                : this.subWindows.roomOf(window.getId());
+        SubWindowAnchor control = window == null || menu != null ? null
+                : fullscreenControl(window);
+        if (room == null || (menu == null && control == null)) {
+            return;
+        }
+        this.snapLayouts.aim(window.getId(), byPointer, byKeys);
+        this.snapLayouts.takeNewSize();
+        int width = this.snapLayouts.naturalWidth();
+        int height = this.snapLayouts.naturalHeight(width);
+        this.snapAwaySince = 0L;
+        // Opened by the pointer, they leave the keys where they were.
+        SubWindow front = this.subWindows.focused();
+        SubWindow opened = this.subWindows.open(SnapLayoutsWindow.KIND, "",
+                this.snapLayouts, window.getId(), menu != null
+                        ? SubWindowAnchor.contentBoxBeside(menu.box(), width,
+                                height, room)
+                        : control.contentBoxFor(width, height, room));
+        this.subWindows.refit(opened);
+        if (byPointer) {
+            if (front != null && front != opened) {
+                this.subWindows.focus(front);
+            } else {
+                this.subWindows.blur();
+            }
+        }
+    }
+
+    /** What a window's Snap Layouts hang from: its fullscreen control; null while its row is not drawn. */
+    private SubWindowAnchor fullscreenControl(Window window) {
+        WindowFrame frame = WindowFrame.find(window.getId());
+        TabRow.Row row = frame == null || !frame.drawn ? null
+                : rowFor(window, frame, WindowOpening.sample());
+        if (row == null) {
+            return null;
+        }
+        LostTalesUiHitBox control = frame.tabBar.fullscreenControlBox(row);
+        return SubWindowAnchor.inward((int)Math.floor(control.left),
+                (int)Math.floor(control.top), (int)Math.ceil(control.right()),
+                (int)Math.ceil(control.bottom()), frame, this.width,
+                this.height);
+    }
+
+    /**
+     * The Snap Layouts row of Window Options: the window's Snap Layouts
+     * open beside the menu, or go where they are out for it. A locked
+     * window keeps its place, and its padlock says so.
+     */
+    void toggleSnapLayouts(Window window, SubWindow menu) {
+        if (heldByLock(window)) {
+            return;
+        }
+        SubWindow out = snapLayoutsOut();
+        if (out != null && window.getId().equals(this.snapLayouts.windowId())) {
+            this.subWindows.close(out);
+            return;
+        }
+        openSnapLayouts(window, menu, false, false);
+    }
+
+    /**
+     * The Snap Layouts the pointer opens: resting on an unlocked window's
+     * fullscreen control, they open hung from it; opened so, they go a
+     * moment after the pointer has left both the control and them,
+     * unless something held them. A drag puts them away. Out, they take
+     * their new size as a suggestion comes or goes.
+     */
+    private void followSnapLayouts() {
+        long now = System.nanoTime();
+        SubWindow out = snapLayoutsOut();
+        if (out != null && this.snapLayouts.takeNewSize()) {
+            this.subWindows.refit(out);
+        }
+        Window control = null;
+        if (!this.gestures.isDragging() && !isEmpty()
+                && this.hover.is(WindowHover.Kind.TAB_ROW)
                 && this.hover.tabHit != null
                 && this.hover.tabHit.kind == TabRow.HitKind.WINDOW_FULLSCREEN
-                && this.hover.window != null && this.hover.frame != null
+                && this.hover.window != null
                 && !this.hover.window.isLocked()) {
-            window = this.hover.window;
-            control = this.hover.frame.tabBar.fullscreenControlBox(
-                    this.hover.row);
+            control = this.hover.window;
         }
-        this.snapFlyout.follow(window, control,
-                window == null ? null : this.hover.frame,
-                this.hover.is(WindowHover.Kind.SNAP_LAYOUT),
-                !this.gestures.isDragging() && !isEmpty(),
-                this.mc, this.width, this.height);
+        if (this.gestures.isDragging() && out != null
+                && this.snapLayouts.goesWithPointer()) {
+            this.subWindows.close(out);
+            out = null;
+        }
+        String resting = control == null ? null : control.getId();
+        if (resting == null) {
+            this.snapRestingOn = null;
+            this.snapRestPressed = false;
+        } else if (!resting.equals(this.snapRestingOn)) {
+            this.snapRestingOn = resting;
+            this.snapRestingSince = now;
+            this.snapRestPressed = false;
+        }
+        boolean aimedHere = out != null && resting != null
+                && resting.equals(this.snapLayouts.windowId());
+        if (out != null && this.snapLayouts.goesWithPointer()) {
+            boolean near = aimedHere || this.hover.subWindow == out;
+            if (near) {
+                this.snapAwaySince = 0L;
+            } else if (this.snapAwaySince == 0L) {
+                this.snapAwaySince = now;
+            } else if (now - this.snapAwaySince
+                    >= SnapLayoutsWindow.CLOSE_NANOS) {
+                this.subWindows.close(out);
+                out = null;
+            }
+        }
+        if (control != null && !aimedHere && !this.snapRestPressed
+                && now - this.snapRestingSince >= SnapLayoutsWindow.OPEN_NANOS) {
+            openSnapLayouts(control, null, true, false);
+        }
     }
 
     /* ---- The wheel ---- */
@@ -2004,7 +2138,7 @@ public final class WindowScreen extends GuiChat
         double pointerX = pointerX();
         double pointerY = pointerY();
         this.hover = hoverAt(pointerX, pointerY);
-        followSnapFlyout();
+        followSnapLayouts();
         for (ScreenPart part : this.parts) {
             part.hovered(this.hover);
         }
@@ -2041,7 +2175,6 @@ public final class WindowScreen extends GuiChat
         boolean empty = isEmpty();
         boolean typing = !empty && hasField();
         this.menus.refresh();
-        followSnapBar();
         for (ScreenPart part : this.parts) {
             part.drawUnderSubWindows(empty, typing, pointerX, pointerY);
         }
@@ -2061,13 +2194,6 @@ public final class WindowScreen extends GuiChat
         this.snapAssist.draw(this.mc, this.fontRendererObj, this.regions,
                 this.hover.is(WindowHover.Kind.SNAP_ASSIST)
                         ? this.hover.assistCard : null, shownOpacity);
-        this.snapFlyout.draw(this.mc, this.regions,
-                this.hover.is(WindowHover.Kind.SNAP_LAYOUT)
-                        && this.hover.snapZone >= 0 ? this.hover.snapZone
-                        : this.snapFlyout.keyZone(), shownOpacity);
-        // The Views sub-window stands in front of everything but the tips.
-        this.subWindows.drawInFront(this.mc, this.fontRendererObj,
-                this.regions, this.hover, pointerX, pointerY);
         // One tip at a time: the screen's own, else a sub-window's, each
         // after the pointer has rested on it.
         String tipKey = this.hoverTip.length() > 0 ? "screen:" + this.hoverTip
@@ -2078,12 +2204,11 @@ public final class WindowScreen extends GuiChat
                     tipShare);
         }
         // A new player's tip stands over everything, and quiets the
-        // pointer's own; so do the snap layouts, which own their tips.
+        // pointer's own.
         if (drawFirstTip()) {
             return;
         }
-        if (this.hoverTip.length() > 0 && !this.snapFlyout.isShown()
-                && tipShare > 0.0F) {
+        if (this.hoverTip.length() > 0 && tipShare > 0.0F) {
             drawHoverTip(tipShare);
         }
     }
@@ -2252,6 +2377,17 @@ public final class WindowScreen extends GuiChat
     private void restoreSubWindows() {
         for (SubWindowPlaces.Reopening open : SubWindowPlaces.openAtClose()) {
             if (this.menus.restore(open)) {
+                continue;
+            }
+            if (open.kind == ViewsWindow.KIND) {
+                this.subWindows.reopen(open, this.views);
+                continue;
+            }
+            if (open.kind == SnapLayoutsWindow.KIND) {
+                if (open.state instanceof String) {
+                    this.snapLayouts.aim((String)open.state, false, false);
+                    this.subWindows.reopen(open, this.snapLayouts);
+                }
                 continue;
             }
             for (ScreenPart part : this.parts) {
@@ -2563,9 +2699,7 @@ public final class WindowScreen extends GuiChat
 
     /**
      * The pane showing where a carried window goes, drawn under that
-     * window and over every window behind it, and on a suggestion a pane
-     * for each other window it sends along, growing out of that window
-     * with its tab icon in the middle. Like a window, each pane cuts away
+     * window and over every window behind it. Like a window, it cuts away
      * what lies behind it and softens the world under its glass.
      */
     private void drawSnapPreview(Window window,
@@ -2578,28 +2712,6 @@ public final class WindowScreen extends GuiChat
         if (pane != null) {
             SnapPreview.draw(this.mc, pane,
                     preview.opacity() * opening.getOpacity());
-        }
-        List<SnapPreview.Shown> companions = preview.advanceCompanions(
-                this.mc, new SnapPreview.Boxes() {
-                    @Override
-                    public WindowPlacement.Box of(String windowId) {
-                        Window other = WindowLayout.window(windowId);
-                        if (other == null) {
-                            return null;
-                        }
-                        WindowFrame.of(other).advanceFill(
-                                ContentView.fillOf(other));
-                        return WindowPlacement.windowBounds(other,
-                                WindowScreen.this.mc,
-                                WindowScreen.this.width,
-                                WindowScreen.this.height);
-                    }
-                }, this.width, this.height);
-        for (SnapPreview.Shown shown : companions) {
-            float opacity = shown.opacity * opening.getOpacity();
-            SnapPreview.draw(this.mc, shown.pane, opacity);
-            SnapPreview.drawIcon(this.mc, shown.windowId, shown.pane,
-                    opacity);
         }
     }
 
@@ -2625,8 +2737,9 @@ public final class WindowScreen extends GuiChat
         row.closable = WindowLayout.isOpen(row.selected);
         row.fullscreenShare = frame.fullShare();
         row.closedMark = restorableMark();
-        // The search control says whether this row's own tab search is
-        // out, so a control and its window can never disagree.
+        // The Views button and the search control say whether what they
+        // open is out, so a control and its window can never disagree.
+        row.viewsOpen = viewsOut();
         row.searchOpen = this.menus.isOpenFor(SubWindowKind.TAB_SEARCH,
                 window.getId());
         row.optionsOpen = null;
@@ -2907,6 +3020,62 @@ public final class WindowScreen extends GuiChat
                 question) != null;
     }
 
+    /* ---- Naming ---- */
+
+    /**
+     * The naming window to ask with under {@code key}: the one out there
+     * already, which takes the new question in its place, or a new one.
+     */
+    public NamingWindow naming(String key) {
+        SubWindow out = this.subWindows.find(NamingWindow.KIND, key);
+        return out != null && out.content instanceof NamingWindow
+                ? (NamingWindow)out.content : new NamingWindow();
+    }
+
+    /** Whether the naming window under {@code key} is out, asking about {@code about}. */
+    public boolean isNaming(String key, Object about) {
+        SubWindow out = this.subWindows.find(NamingWindow.KIND, key);
+        return out != null && out.isOpen() && out.content instanceof NamingWindow
+                && about != null && about.equals(((NamingWindow)out.content).about());
+    }
+
+    /** Puts away the naming window under {@code key}, keeping nothing. */
+    public void stopNaming(String key) {
+        SubWindow out = this.subWindows.find(NamingWindow.KIND, key);
+        if (out != null && out.isOpen()) {
+            this.subWindows.close(out);
+        }
+    }
+
+    /** Opens {@code naming} beside the sub-window {@code sibling}, in its window, and gives it the keys. */
+    public void nameBeside(SubWindow sibling, String key, NamingWindow naming) {
+        int width = naming.naturalWidth();
+        LostTalesUiHitBox box = SubWindowAnchor.contentBoxBeside(sibling.box(), width,
+                naming.naturalHeight(width), this.subWindows.roomOf(sibling.parentId));
+        openNaming(key, naming, sibling.parentId, box);
+    }
+
+    /** Opens {@code naming} hanging from {@code control} in the window {@code windowId}, and gives it the keys. */
+    public void nameFrom(SubWindowAnchor control, String windowId, String key,
+                         NamingWindow naming) {
+        int width = naming.naturalWidth();
+        LostTalesUiHitBox box = control.contentBoxFor(width, naming.naturalHeight(width),
+                this.subWindows.roomOf(windowId));
+        openNaming(key, naming, windowId, box);
+    }
+
+    /** Opens {@code naming} over a page's middle and gives it the keys; false while the page's window is not drawn. */
+    public boolean nameOverPage(OtherPage page, String key, NamingWindow naming) {
+        return openOverPage(page, NamingWindow.KIND, key, naming) != null;
+    }
+
+    private void openNaming(String key, NamingWindow naming, String windowId,
+                            LostTalesUiHitBox box) {
+        this.subWindows.open(NamingWindow.KIND, key, naming, windowId, box);
+        leavePage();
+        syncTypingFocus();
+    }
+
     /**
      * A page's answer over its window's bar, drawn as a notice is: done
      * in ivory, refused and faults in red, on its way in the aside tone.
@@ -3057,8 +3226,8 @@ public final class WindowScreen extends GuiChat
 
     /**
      * What is under a GUI-space point, from the top of what is drawn
-     * down, in the order a press is handled: snap assist, the snap
-     * layouts, what a part stands over everything, the sub-windows front
+     * down, in the order a press is handled: snap assist, a window's
+     * dent, what a part stands over everything, the sub-windows front
      * to back, a window's edge, the tab rows, a page, what a part stands
      * under the rows, anything else painted over the windows, and what a
      * part's windows hold. Each is asked with the one hit test its
@@ -3070,21 +3239,10 @@ public final class WindowScreen extends GuiChat
         if (this.gestures.isDragging() || this.subWindows.isDragging()) {
             return WindowHover.NONE;
         }
-        // The Views sub-window stands in front of everything.
-        WindowHover inFront = this.subWindows.hoverInFront(x, y);
-        if (inFront != null) {
-            return inFront;
-        }
         SnapAssist.Card card = this.snapAssist.cardAt(x, y);
         if (card != null) {
             WindowHover hover = new WindowHover(WindowHover.Kind.SNAP_ASSIST);
             hover.assistCard = card;
-            return hover;
-        }
-        if (this.snapFlyout.contains(x, y)) {
-            WindowHover hover = new WindowHover(WindowHover.Kind.SNAP_LAYOUT);
-            hover.snapZone = this.snapFlyout.zoneAt(x, y);
-            hover.window = WindowLayout.window(this.snapFlyout.windowId());
             return hover;
         }
         ContentViewDent.Hit dented = this.dent.hitAt(x, y);
@@ -3319,6 +3477,9 @@ public final class WindowScreen extends GuiChat
                 return StatCollector.translateToLocal(window.isLocked()
                         ? "gui.losttales.window.tab.unlock"
                         : "gui.losttales.window.tab.lock");
+            case VIEWS:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.window.views.tip");
             case SEARCH:
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.search.tip");
@@ -3326,7 +3487,10 @@ public final class WindowScreen extends GuiChat
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.menu");
             case WINDOW_FULLSCREEN:
-                return window.isLocked() ? "" : StatCollector.translateToLocal(
+                // Once its Snap Layouts hang from it, they speak for it.
+                return window.isLocked() || snapLayoutsOut() != null
+                        && window.getId().equals(this.snapLayouts.windowId())
+                        ? "" : StatCollector.translateToLocal(
                         window.isFullscreen()
                                 ? "gui.losttales.window.exit_fullscreen"
                                 : "gui.losttales.window.fullscreen");
@@ -3410,26 +3574,15 @@ public final class WindowScreen extends GuiChat
             }
             this.snapAssist.close();
         }
-        // The snap layouts take a press on themselves: a zone lets the
-        // window fill that part of the screen. A press anywhere else
-        // puts them away and goes on to whatever is under it.
-        if (this.snapFlyout.isOpen()) {
-            if (this.snapFlyout.contains(x, y)) {
-                int zone = this.snapFlyout.zoneAt(x, y);
-                Window snapped = WindowLayout.window(
-                        this.snapFlyout.windowId());
-                if (button == 0 && zone >= 0 && snapped != null
-                        && !snapped.isLocked()) {
-                    sendWindowTo(snapped, this.snapFlyout.fillOf(zone),
-                            this.snapFlyout.layoutOf(zone),
-                            this.snapFlyout.companionsOf(zone));
-                    this.snapFlyout.close();
-                }
-                return;
-            }
-            this.snapFlyout.close();
-        }
         WindowHover press = hoverAt(x, y);
+        // Snap Layouts the pointer opened go with a press anywhere off
+        // them, and wait until the pointer leaves the control.
+        this.snapRestPressed = true;
+        SubWindow pointerLayouts = snapLayoutsOut();
+        if (pointerLayouts != null && this.snapLayouts.goesWithPointer()
+                && press.subWindow != pointerLayouts) {
+            this.subWindows.close(pointerLayouts);
+        }
         if (button == 0 && press.greyedWhy.length() > 0) {
             sayWhyGreyed(press);
             return;
@@ -3452,6 +3605,10 @@ public final class WindowScreen extends GuiChat
             leavePage();
         }
         if (press.subWindow != null) {
+            // Snap Layouts the pointer opened stay once they are pressed.
+            if (press.subWindow.content == this.snapLayouts) {
+                this.snapLayouts.hold();
+            }
             // A sub-window is part of its window: pressing it brings that
             // window forward and types into it.
             Window parent = press.subWindow.parentId == null ? null
@@ -3796,6 +3953,10 @@ public final class WindowScreen extends GuiChat
                 // at the row's end. A locked window takes no page, so its
                 // menu opens in another window.
                 openNewPage(window);
+                return;
+            case VIEWS:
+                toggleViews(SubWindowAnchor.onRow(frame, row, mouseX,
+                        this.width, this.height));
                 return;
             case SEARCH:
                 this.tabMenus.toggleSearch(window, SubWindowAnchor.onRow(

@@ -6,6 +6,7 @@ import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.model.FellowshipIcon;
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
+import com.ninuna.losttales.fellowship.model.FellowshipMarkKind;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
 import com.ninuna.losttales.fellowship.sync.FellowshipInvitationSnapshot;
@@ -28,8 +29,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Everything one client may see of its fellowships, whole, each time. The
- * server's member limit rides in every state, the unavailable one too.
+ * Everything one client may see of its fellowships, whole, each time, with
+ * every mark it sees. The server's member limit rides in every state, the
+ * unavailable one too.
  */
 public final class FellowshipStateSyncPacket implements IMessage {
 
@@ -92,6 +94,11 @@ public final class FellowshipStateSyncPacket implements IMessage {
             }
             UUID travellingFellowshipId = fellowshipCount == 0 ? null
                     : LostTalesPacketCodec.readUuid(buffer);
+            int markCount = buffer.readUnsignedByte();
+            if (markCount > FellowshipStateSnapshot.MAX_MARKS) {
+                throw new FellowshipPacketCodec.DecodeException("too many marks");
+            }
+            List<FellowshipMark> marks = readMarks(buffer, markCount);
             boolean incomingTruncated = buffer.readBoolean();
             int incomingCount = buffer.readUnsignedShort();
             if (incomingCount > FellowshipStateSnapshot.MAX_INCOMING_INVITATIONS) {
@@ -126,6 +133,7 @@ public final class FellowshipStateSyncPacket implements IMessage {
                     activeIdentityId,
                     fellowships,
                     travellingFellowshipId,
+                    marks,
                     createRefusal,
                     incoming,
                     outgoing,
@@ -133,7 +141,8 @@ public final class FellowshipStateSyncPacket implements IMessage {
                     outgoingTruncated,
                     inviteTargets,
                     inviteTargetsTruncated);
-            if (decoded.getIncomingInvitations().size() != incomingCount
+            if (decoded.getMarks().size() != markCount
+                    || decoded.getIncomingInvitations().size() != incomingCount
                     || decoded.getOutgoingInvitations().size() != outgoingCount
                     || decoded.getInviteTargets().size() != inviteTargetCount) {
                 throw new FellowshipPacketCodec.DecodeException(
@@ -174,6 +183,10 @@ public final class FellowshipStateSyncPacket implements IMessage {
         if (!this.snapshot.getFellowships().isEmpty()) {
             LostTalesPacketCodec.writeUuid(buffer,
                     this.snapshot.getTravellingFellowship().getFellowshipId());
+        }
+        buffer.writeByte(this.snapshot.getMarks().size());
+        for (FellowshipMark mark : this.snapshot.getMarks()) {
+            writeMark(buffer, mark);
         }
         buffer.writeBoolean(this.snapshot.isIncomingTruncated());
         buffer.writeShort(this.snapshot.getIncomingInvitations().size());
@@ -277,30 +290,59 @@ public final class FellowshipStateSyncPacket implements IMessage {
                 throw new FellowshipPacketCodec.DecodeException("invalid fellowship guide");
             }
         }
-        int markCount = buffer.readUnsignedByte();
-        if (markCount > FellowshipMark.MAX_PER_FELLOWSHIP) {
-            throw new FellowshipPacketCodec.DecodeException("too many fellowship marks");
-        }
-        List<FellowshipMark> marks = new ArrayList<FellowshipMark>(markCount);
+        return new FellowshipSnapshot(fellowshipId, leaderIdentityId, name, icon,
+                switchesOn, guides, createdAt, revision, dataVersion, members);
+    }
+
+    /** The marks the client sees, each whole; any one not well formed fails the state. */
+    private static List<FellowshipMark> readMarks(ByteBuf buffer, int count) {
+        List<FellowshipMark> marks = new ArrayList<FellowshipMark>(count);
         Set<UUID> markIds = new HashSet<UUID>();
-        for (int index = 0; index < markCount; index++) {
+        for (int index = 0; index < count; index++) {
             UUID markId = LostTalesPacketCodec.readUuid(buffer);
-            String markName = LostTalesPacketCodec.readUtf8String(buffer,
-                    FellowshipPacketCodec.MAX_FELLOWSHIP_NAME_BYTES);
+            FellowshipMarkKind kind = FellowshipMarkKind.fromNetworkId(
+                    buffer.readUnsignedByte());
+            if (kind == null || !markIds.add(markId)) {
+                throw new FellowshipPacketCodec.DecodeException("invalid mark");
+            }
+            UUID fellowshipId = null;
+            String markName = "";
+            if (kind == FellowshipMarkKind.FELLOWSHIP) {
+                fellowshipId = LostTalesPacketCodec.readUuid(buffer);
+                markName = LostTalesPacketCodec.readUtf8String(buffer,
+                        FellowshipPacketCodec.MAX_FELLOWSHIP_NAME_BYTES);
+            }
             UUID placedBy = LostTalesPacketCodec.readUuid(buffer);
             int dimensionId = buffer.readInt();
             double x = buffer.readDouble();
             double z = buffer.readDouble();
             long placedAt = buffer.readLong();
-            if (!markIds.add(markId) || !FellowshipMark.isValidName(markName)
-                    || !FellowshipMark.isValidPosition(x, z) || placedAt < 0L) {
-                throw new FellowshipPacketCodec.DecodeException("invalid fellowship mark");
+            if (placedAt < 0L || !FellowshipMark.isValidPosition(x, z)
+                    || kind == FellowshipMarkKind.FELLOWSHIP
+                    && !FellowshipMark.isValidName(markName)) {
+                throw new FellowshipPacketCodec.DecodeException("invalid mark");
             }
-            marks.add(new FellowshipMark(markId, fellowshipId, markName, placedBy,
-                    dimensionId, x, z, placedAt));
+            marks.add(kind == FellowshipMarkKind.GO_HERE
+                    ? FellowshipMark.goHere(markId, placedBy, dimensionId, x, z, placedAt)
+                    : FellowshipMark.ofFellowship(markId, fellowshipId, markName, placedBy,
+                            dimensionId, x, z, placedAt));
         }
-        return new FellowshipSnapshot(fellowshipId, leaderIdentityId, name, icon,
-                switchesOn, guides, createdAt, revision, dataVersion, members, marks);
+        return marks;
+    }
+
+    private static void writeMark(ByteBuf buffer, FellowshipMark mark) {
+        LostTalesPacketCodec.writeUuid(buffer, mark.getMarkId());
+        buffer.writeByte(mark.getKind().getNetworkId());
+        if (!mark.isGoHere()) {
+            LostTalesPacketCodec.writeUuid(buffer, mark.getFellowshipId());
+            LostTalesPacketCodec.writeUtf8String(buffer, mark.getName(),
+                    FellowshipPacketCodec.MAX_FELLOWSHIP_NAME_BYTES);
+        }
+        LostTalesPacketCodec.writeUuid(buffer, mark.getPlacedBy());
+        buffer.writeInt(mark.getDimensionId());
+        buffer.writeDouble(mark.getX());
+        buffer.writeDouble(mark.getZ());
+        buffer.writeLong(mark.getPlacedAt());
     }
 
     private static void writeFellowship(ByteBuf buffer, FellowshipSnapshot fellowship) {
@@ -338,17 +380,6 @@ public final class FellowshipStateSyncPacket implements IMessage {
         buffer.writeByte(fellowship.getGuides().size());
         for (UUID guide : fellowship.getGuides()) {
             LostTalesPacketCodec.writeUuid(buffer, guide);
-        }
-        buffer.writeByte(fellowship.getMarks().size());
-        for (FellowshipMark mark : fellowship.getMarks()) {
-            LostTalesPacketCodec.writeUuid(buffer, mark.getMarkId());
-            LostTalesPacketCodec.writeUtf8String(buffer, mark.getName(),
-                    FellowshipPacketCodec.MAX_FELLOWSHIP_NAME_BYTES);
-            LostTalesPacketCodec.writeUuid(buffer, mark.getPlacedBy());
-            buffer.writeInt(mark.getDimensionId());
-            buffer.writeDouble(mark.getX());
-            buffer.writeDouble(mark.getZ());
-            buffer.writeLong(mark.getPlacedAt());
         }
     }
 

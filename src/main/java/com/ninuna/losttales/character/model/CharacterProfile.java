@@ -14,8 +14,6 @@ import java.util.List;
  * bounds and to the profanity list.
  */
 public final class CharacterProfile {
-    /** An About text, in characters. */
-    public static final int MAX_SECTION_LENGTH = 512;
     /** A fact's value, in characters. */
     public static final int MAX_FACT_LENGTH = 24;
     public static final int MAX_GLANCES = 5;
@@ -24,20 +22,31 @@ public final class CharacterProfile {
     /** A glance's line, in characters; it may have none. */
     public static final int MAX_GLANCE_LINE_LENGTH = 120;
 
-    /** The About texts, in the order the profile shows them. */
+    /**
+     * The About texts, in the order the profile shows them, each with its
+     * own length: the History, a character's story, holds four times what
+     * the other two do.
+     */
     public enum Section {
-        APPEARANCE("appearance"),
-        PERSONALITY("personality"),
-        HISTORY("history");
+        APPEARANCE("appearance", 512),
+        PERSONALITY("personality", 512),
+        HISTORY("history", 2048);
 
         private final String id;
+        private final int maxLength;
 
-        Section(String id) {
+        Section(String id, int maxLength) {
             this.id = id;
+            this.maxLength = maxLength;
         }
 
         public String getId() {
             return this.id;
+        }
+
+        /** The longest the text may be, in characters. */
+        public int getMaxLength() {
+            return this.maxLength;
         }
     }
 

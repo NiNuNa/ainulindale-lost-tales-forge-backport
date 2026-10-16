@@ -2,13 +2,9 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
-import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
-import com.ninuna.losttales.client.motion.MotionIds;
-import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -22,12 +18,11 @@ import net.minecraft.client.Minecraft;
  * four quarters; three thirds; a half between two quarter columns, in
  * the order Windows 11 offers them —
  * each drawn as a small screen cut into its zones, a zone being a part
- * of the screen a window can fill. The snap bar at the top of the screen
- * holds them ({@link SnapBarWindow}); the pointer resting on a window's
- * fullscreen control finds them in a panel under it ({@link Flyout}). The zone under the pointer is where the window
- * goes. A layout is offered only while every one of its zones holds the
- * narrowest window there may be, as a desktop offers fewer layouts on
- * a smaller screen.
+ * of the screen a window can fill. The Snap Layouts sub-window holds
+ * them ({@link SnapLayoutsWindow}); a press on a zone sends the window
+ * there. A layout is offered only while every one of its zones holds the
+ * narrowest window there may be, as a desktop offers fewer layouts on a
+ * smaller screen.
  *
  * <p>Ahead of the plain layouts stand the suggested ones, as a desktop
  * suggests them: the halves and the half with two quarters, already
@@ -78,7 +73,6 @@ public final class SnapLayouts {
      * the panel's primary colour around them.
      */
     private static final int ZONE_RGB = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
-    private static final int ZONE_ALPHA = Math.round(255.0F / 3.0F);
 
     private SnapLayouts() {}
 
@@ -510,74 +504,6 @@ public final class SnapLayouts {
     }
 
     /**
-     * Draws a panel at {@code opacity}: the windows' inset surface — plum
-     * black at two thirds, what the timestamp area and the member list
-     * stand on — in a window's frame, each zone a block of rose grey
-     * at a third with its corners rounded off, zone {@code lit} in the
-     * accent at two thirds (-1 for none), and on every zone of a
-     * suggestion its window's icon. The surface and the zones thin with
-     * the game's chat opacity, as a window's surfaces do. Every pixel of
-     * the surface, the zones and the icons is painted by one layer only,
-     * so the panel fades as one picture and no zone lies over the surface
-     * as a second background; the frame's edges lie over its ring,
-     * as on a window.
-     */
-    static void draw(final Minecraft minecraft, final Panel panel,
-                     final int lit, final float opacity) {
-        final float share = Math.max(0.0F, Math.min(1.0F, opacity));
-        if (panel == null || minecraft == null) {
-            return;
-        }
-        float surfaceShare = share
-                * WindowStyle.opacity(minecraft);
-        final int surface = WindowStyle.insetArgb(surfaceShare);
-        if ((surface >>> 24) < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
-            return;
-        }
-        final int resting = LostTalesUiInk.argb(ZONE_RGB,
-                Math.round(ZONE_ALPHA * surfaceShare));
-        final int landing = LostTalesUiInk.argb(
-                LostTalesUiTheme.accentRgb(),
-                Math.round(WindowStyle.INSET_ALPHA * surfaceShare));
-        final int icons = Math.round(255.0F * share);
-        final float left = (float)panel.box.left;
-        final float top = (float)panel.box.top;
-        final float right = (float)panel.box.right();
-        final float bottom = (float)panel.box.bottom();
-        // Like a window, the panel cuts away what lies behind it and
-        // stands on the softened world.
-        LostTalesUiHitBox stands = new LostTalesUiHitBox(left + FRAME,
-                top + FRAME, right - left - 2 * FRAME,
-                bottom - top - 2 * FRAME);
-        WindowDrawing.cutBehind(stands, share);
-        WindowDrawing.softenBehind(stands, share);
-        LostTalesUiFlatLayers.draw(surface >>> 24, left, top, right, bottom,
-                new LostTalesUiFlatLayers.Layers() {
-                    @Override
-                    public void draw() {
-                        // The surface, the frame's ring with it, its four
-                        // outermost corner pixels left out.
-                        fillRounded(panel.box, surface);
-                        LostTalesUiFlatLayers.nextLayer();
-                        for (int index = 0; index < panel.zones.size();
-                                index++) {
-                            fillRounded(panel.zones.get(index).box,
-                                    index == lit ? landing : resting);
-                        }
-                        LostTalesUiFlatLayers.nextLayer();
-                        LostTalesUiInk.beginContent();
-                        for (Zone zone : panel.zones) {
-                            if (zone.windowId != null) {
-                                drawWindowIcon(minecraft, zone, icons);
-                            }
-                        }
-                    }
-                });
-        LostTalesUiWindowFrame.drawEdges(left + FRAME, top + FRAME,
-                right - FRAME, bottom - FRAME, Math.round(255.0F * share));
-    }
-
-    /**
      * Draws a panel's zones on the surface of the sub-window holding it,
      * at {@code alpha}: each zone the surface recoloured in place toward
      * rose grey, a third of the way, zone {@code lit} toward the accent,
@@ -649,271 +575,5 @@ public final class SnapLayouts {
                 (float)LostTalesDisplayPixels.snap(zone.box.top
                         + LostTalesUiInk.centredStart(height, size)),
                 alpha, TabMark.NONE);
-    }
-
-    /** A block with its four corner pixels left out. */
-    private static void fillRounded(LostTalesUiHitBox box, int argb) {
-        float left = (float)box.left;
-        float top = (float)box.top;
-        float right = (float)box.right();
-        float bottom = (float)box.bottom();
-        if (right - left < 3.0F || bottom - top < 3.0F) {
-            LostTalesUiInk.fillRect(left, top, right, bottom,
-                    argb);
-            return;
-        }
-        LostTalesUiInk.fillRect(left + 1.0F, top, right - 1.0F,
-                top + 1.0F, argb);
-        LostTalesUiInk.fillRect(left, top + 1.0F, right,
-                bottom - 1.0F, argb);
-        LostTalesUiInk.fillRect(left + 1.0F, bottom - 1.0F,
-                right - 1.0F, bottom, argb);
-    }
-
-    /**
-     * The layouts in a panel hanging from a window's fullscreen control:
-     * opened by the pointer resting on the control, kept while the
-     * pointer is on the control, on the panel or crossing between them,
-     * and put away a moment after it leaves all three. A press on a zone
-     * lets the window fill that part of the screen; the suggestions for
-     * the window lead the panel.
-     */
-    public static final class Flyout {
-        /** How long the pointer rests on the control before the panel opens. */
-        static final long OPEN_NANOS = 400L * 1000000L;
-        /** How long the pointer may be away before the panel goes. */
-        static final long CLOSE_NANOS = 200L * 1000000L;
-        /** Layouts in a row of the panel. */
-        static final int COLUMNS = 3;
-
-        private final MotionTransition shown =
-                new MotionTransition(MotionIds.WINDOW_SNAP_LAYOUTS);
-        /** The window the panel belongs to while it is open or going. */
-        private String windowId;
-        private boolean open;
-        private Panel panel;
-        /** The control the pointer is resting on, and since when. */
-        private String restingOn;
-        private long restingSince;
-        /** When the pointer last left the control and the panel; 0 while on them. */
-        private long awaySince;
-        /**
-         * Whether the panel was opened from the keyboard, and the zone
-         * its arrows stand on: it stays open wherever the pointer goes
-         * until a zone is taken or it is put away.
-         */
-        private boolean keyboard;
-        private int keyZone = -1;
-
-        public Flyout() {
-            // Closed from the start, so the panel fades in the first time too.
-            this.shown.settle(false);
-        }
-
-        /** Whether the panel is open for a window: it answers the pointer. */
-        public boolean isOpen() {
-            return this.open && this.panel != null;
-        }
-
-        /** Whether any of the panel shows, opening, open or going. */
-        public boolean isShown() {
-            return this.panel != null && this.shown.clamped() > 0.0F;
-        }
-
-        /** The window the panel belongs to, or null. */
-        public String windowId() {
-            return this.windowId;
-        }
-
-        /** Whether the open panel is under the point. */
-        public boolean contains(double x, double y) {
-            return isOpen() && this.panel.contains(x, y);
-        }
-
-        /** Which zone of the open panel is under the point, or -1. */
-        public int zoneAt(double x, double y) {
-            return isOpen() ? this.panel.zoneAt(x, y) : -1;
-        }
-
-        /** The part of the screen zone {@code index} of the open panel stands for. */
-        public Window.ScreenFill fillOf(int index) {
-            return isOpen() ? this.panel.fillOf(index)
-                    : Window.ScreenFill.NONE;
-        }
-
-        /** The layout zone {@code index} of the open panel is one of, or null. */
-        public Window.ScreenFill[] layoutOf(int index) {
-            return isOpen() ? this.panel.layoutOf(index) : null;
-        }
-
-        /** The other windows a suggestion sends along with the window taking zone {@code index}. */
-        public Map<String, Window.ScreenFill> companionsOf(int index) {
-            return isOpen() ? this.panel.companionsOf(index)
-                    : Collections.<String, Window.ScreenFill>emptyMap();
-        }
-
-        /**
-         * One frame of the pointer. {@code controlWindow} is the window
-         * whose fullscreen control the pointer is on, with {@code control}
-         * that control's box, or null; {@code onPanel} whether it is on
-         * the open panel; {@code allowed} false while something else owns
-         * the screen — a menu, a drag — which puts the panel away.
-         */
-        public void follow(Window controlWindow, LostTalesUiHitBox control,
-                    WindowFrame frame, boolean onPanel, boolean allowed,
-                    Minecraft minecraft, int screenWidth, int screenHeight) {
-            long now = System.nanoTime();
-            if (!allowed) {
-                close();
-                this.restingOn = null;
-                return;
-            }
-            if (this.keyboard && this.open) {
-                return;
-            }
-            String id = controlWindow == null || control == null ? null
-                    : controlWindow.getId();
-            if (id == null) {
-                this.restingOn = null;
-            } else if (!id.equals(this.restingOn)) {
-                this.restingOn = id;
-                this.restingSince = now;
-            }
-            if (this.open) {
-                boolean near = onPanel
-                        || (id != null && id.equals(this.windowId));
-                if (near) {
-                    this.awaySince = 0L;
-                } else if (this.awaySince == 0L) {
-                    this.awaySince = now;
-                } else if (now - this.awaySince >= CLOSE_NANOS) {
-                    close();
-                }
-            }
-            if (!this.open && id != null
-                    && now - this.restingSince >= OPEN_NANOS) {
-                List<Window.ScreenFill[]> layouts = offered(minecraft,
-                        screenWidth, screenHeight);
-                if (!layouts.isEmpty()) {
-                    this.windowId = id;
-                    this.open = true;
-                    this.awaySince = 0L;
-                    this.panel = hangFrom(suggestedFor(layouts, id), layouts,
-                            control, frame, screenWidth, screenHeight);
-                }
-            }
-        }
-
-        /** Puts the panel away: it fades where it stands. */
-        public void close() {
-            this.open = false;
-            this.awaySince = 0L;
-            this.keyboard = false;
-            this.keyZone = -1;
-        }
-
-        /**
-         * Opens the panel from the keyboard for a window, hanging from
-         * its fullscreen control's box {@code control}, its first zone
-         * under the arrows; answers whether it opened.
-         */
-        public boolean openFromKeyboard(Window window, LostTalesUiHitBox control,
-                                 WindowFrame frame, Minecraft minecraft,
-                                 int screenWidth, int screenHeight) {
-            List<Window.ScreenFill[]> layouts = offered(minecraft,
-                    screenWidth, screenHeight);
-            if (window == null || control == null || layouts.isEmpty()) {
-                return false;
-            }
-            this.windowId = window.getId();
-            this.open = true;
-            this.keyboard = true;
-            this.keyZone = 0;
-            this.awaySince = 0L;
-            this.panel = hangFrom(suggestedFor(layouts, window.getId()),
-                    layouts, control, frame, screenWidth, screenHeight);
-            return true;
-        }
-
-        /** Whether the panel was opened from the keyboard and is open. */
-        public boolean isKeyboardOpen() {
-            return this.keyboard && isOpen();
-        }
-
-        /** The zone the arrows stand on, or -1. */
-        public int keyZone() {
-            return isKeyboardOpen() ? this.keyZone : -1;
-        }
-
-        /** Walks the arrows' zone one step. */
-        public void step(SnapKeys.Direction direction) {
-            if (isKeyboardOpen()) {
-                this.keyZone = this.panel.step(this.keyZone, direction);
-            }
-        }
-
-        /**
-         * Draws the panel at {@code opacity}, zone {@code lit} lit (-1 for
-         * none), and keeps its rectangle in {@code regions} while it is
-         * open.
-         */
-        public void draw(Minecraft minecraft, PointerRegions regions, int lit,
-                  float opacity) {
-            float share = this.shown.advance(System.nanoTime(), this.open);
-            if (this.panel == null) {
-                return;
-            }
-            if (!this.open && share <= 0.0F) {
-                this.panel = null;
-                this.windowId = null;
-                return;
-            }
-            SnapLayouts.draw(minecraft, this.panel,
-                    this.open ? lit : -1, opacity * share);
-            if (this.open && regions != null) {
-                regions.addScreen((int)Math.floor(this.panel.box.left),
-                        (int)Math.floor(this.panel.box.top),
-                        (int)Math.ceil(this.panel.box.right()),
-                        (int)Math.ceil(this.panel.box.bottom()));
-            }
-        }
-
-        /**
-         * The panel laid out from the control it hangs from, the way a
-         * menu opens from its button: toward the middle of the window,
-         * turned round only where that side of the screen has less room
-         * than the other, and kept on the screen.
-         */
-        static Panel hangFrom(List<Suggestion> suggestions,
-                              List<Window.ScreenFill[]> layouts,
-                              LostTalesUiHitBox control,
-                              WindowFrame frame, int screenWidth,
-                              int screenHeight) {
-            int count = suggestions.size() + layouts.size();
-            int width = panelWidth(count, COLUMNS);
-            int height = panelHeight(count, COLUMNS,
-                    thumbHeight(screenWidth, screenHeight));
-            SubWindowAnchor anchor = SubWindowAnchor.inward(
-                    (int)Math.floor(control.left),
-                    (int)Math.floor(control.top),
-                    (int)Math.ceil(control.right()),
-                    (int)Math.ceil(control.bottom()), frame, screenWidth,
-                    screenHeight);
-            int gap = SubWindowAnchor.GAP;
-            int roomBelow = screenHeight - (anchor.bottom + gap);
-            int roomAbove = anchor.top - gap;
-            boolean below = anchor.below;
-            if ((below ? roomBelow : roomAbove) < height
-                    && (below ? roomAbove : roomBelow)
-                            > (below ? roomBelow : roomAbove)) {
-                below = !below;
-            }
-            int x = anchor.fromRight ? anchor.right - width : anchor.left;
-            x = Math.max(0, Math.min(screenWidth - width, x));
-            int y = below ? anchor.bottom + gap : anchor.top - gap - height;
-            y = Math.max(0, Math.min(screenHeight - height, y));
-            return lay(suggestions, layouts, COLUMNS, x, y, screenWidth,
-                    screenHeight);
-        }
     }
 }

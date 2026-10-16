@@ -9,6 +9,11 @@ import java.util.Map;
  * Every value is read trimmed, and a blank one counts as absent.
  */
 public final class LostTalesQuestParams {
+    /**
+     * A gather objective's {@code take}: {@code true} hands over what it
+     * counted as its stage ends; {@code false}, or none, keeps it.
+     */
+    public static final String TAKE = "take";
 
     private LostTalesQuestParams() {}
 

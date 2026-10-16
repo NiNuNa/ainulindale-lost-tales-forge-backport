@@ -85,9 +85,16 @@ public final class CharacterUnconventionalCreationValidationTest {
     public void overlongHistoryIsRejected() {
         StringBuilder description = new StringBuilder();
         for (int index = 0;
-             index <= CharacterProfile.MAX_SECTION_LENGTH; index++) {
+             index < CharacterProfile.Section.HISTORY.getMaxLength(); index++) {
             description.append('a');
         }
+        CharacterCreationValidationResult whole = validate(
+                request(humanSkin(), SHIRE_WAYPOINT, true,
+                        description.toString()));
+        assertTrue("a History of its full length is made",
+                whole.isValid());
+
+        description.append('a');
         CharacterCreationValidationResult result = validate(
                 request(humanSkin(), SHIRE_WAYPOINT, true,
                         description.toString()));

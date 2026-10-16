@@ -58,9 +58,6 @@ public final class SubWindow {
     private boolean open = true;
     private final MotionTransition openness =
             new MotionTransition(MotionIds.WINDOW_SUB_OPEN);
-    /** How far it shows while it may be tucked away ({@link SubWindowContent#isTucked}). */
-    private final MotionTransition untucked =
-            new MotionTransition(MotionIds.WINDOW_SUB_OPEN);
     final LostTalesUiButtonMotion closeMotion = new LostTalesUiButtonMotion(
             LostTalesUiButtonMotion.Character.SNAP);
     final LostTalesUiButtonMotion lockMotion = new LostTalesUiButtonMotion(
@@ -80,10 +77,8 @@ public final class SubWindow {
     public float fractionY;
     /** The strip as it was drawn this frame; null before the first draw. */
     SubWindowStrip strip;
-    /** How far it had opened as it was drawn this frame, tucked away or not. */
+    /** How far it had opened as it was drawn this frame: what it fades and rises by. */
     float shownShare;
-    /** How far it had opened as it was drawn this frame, leaving its tucking aside: what it rises by. */
-    float openedShare;
     /**
      * Whether the player has given the window its size, in this opening
      * or an earlier one of its kind. One they have not takes its
@@ -103,7 +98,6 @@ public final class SubWindow {
         this.key = key == null ? "" : key;
         this.content = content;
         this.parentId = parentId;
-        this.untucked.settle(!content.isTucked());
     }
 
     public boolean isOpen() {
@@ -120,11 +114,9 @@ public final class SubWindow {
         this.open = open;
     }
 
-    /** How far it shows now, 0 to 1, stepping its fades: opening and closing, tucking away and back. */
+    /** How far it shows now, 0 to 1, stepping its fade as it opens and closes. */
     float advanceShare(long nanos) {
-        this.openedShare = this.openness.advance(nanos, this.open);
-        return this.openedShare
-                * this.untucked.advance(nanos, !this.content.isTucked());
+        return this.openness.advance(nanos, this.open);
     }
 
     /** Whether it has faded out altogether and can go. */
@@ -229,11 +221,11 @@ public final class SubWindow {
      * The edge or corner of the window the point is on: the band
      * {@link WindowGestures#RESIZE_BORDER} wide just outside the box,
      * a corner reaching {@link WindowGestures#RESIZE_CORNER} along
-     * both its edges, as a window's do; null anywhere else, anywhere while
-     * it is locked, and on a permanent window, which keeps its own size.
+     * both its edges, as a window's do; null anywhere else, and anywhere
+     * while it is locked.
      */
     WindowGestures.ResizeEdge edgeAt(double x, double y) {
-        if (!this.open || this.locked || this.content.isPermanent()) {
+        if (!this.open || this.locked) {
             return null;
         }
         LostTalesUiHitBox box = drawnBox();

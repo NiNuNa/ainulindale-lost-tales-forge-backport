@@ -44,7 +44,7 @@ public final class WaystoneRowsTest {
         @Override public boolean canEdit() { return this.canEdit; }
         @Override public boolean isWaiting() { return this.waiting; }
         @Override public String markerId() { return "losttales:player/bree"; }
-        @Override public int sharedPlayers() { return 3; }
+        @Override public int sharedCharacters() { return 3; }
         @Override public int sharedFellowships() { return 1; }
         @Override public boolean sharesWithFellowship() { return this.fellowship; }
         @Override public String shareTarget() { return this.target; }
@@ -106,10 +106,10 @@ public final class WaystoneRowsTest {
                 row(rows, LANG + "visibility").value);
         assertEquals("losttales:player/bree",
                 row(rows, LANG + "marker_id").value);
-        assertEquals("3", row(rows, LANG + "shared.players").value);
+        assertEquals("3", row(rows, LANG + "shared.characters").value);
         assertEquals("1", row(rows, LANG + "shared.fellowships").value);
         assertTrue("a count only reads", row(rows,
-                LANG + "shared.players").passive);
+                LANG + "shared.characters").passive);
         assertTrue(row(rows, LANG + "name").isTakeable());
         assertTrue(row(rows, LANG + "fast_travel").isTakeable());
     }
@@ -162,7 +162,7 @@ public final class WaystoneRowsTest {
                 "category", "description", "compass_radius", "radius",
                 "relevance", "discoverable", "hidden", "region",
                 "fast_travel", "visibility", "share_with",
-                "share_target.player", "share", "unshare"}) {
+                "share_target.character", "share", "unshare"}) {
             MenuWindow.Entry entry = row(rows, LANG + label);
             assertNotNull(label, entry);
             assertFalse(label, entry.isTakeable());

@@ -13,7 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentTranslation;
@@ -45,7 +44,8 @@ public final class ChatWelcome {
     public void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.player instanceof EntityPlayerMP)
                 || lines(LostTalesConfig.chatWelcomeLines).isEmpty()
-                || persisted(event.player).getBoolean(WELCOMED_TAG)) {
+                || LostTalesServerPlayers.persistedData(event.player)
+                        .getBoolean(WELCOMED_TAG)) {
             return;
         }
         noteArrival(event.player.getUniqueID());
@@ -66,7 +66,7 @@ public final class ChatWelcome {
 
     /** Sends the welcome and remembers it, unless the player has had it. */
     private static void welcome(EntityPlayerMP player) {
-        NBTTagCompound saved = persisted(player);
+        NBTTagCompound saved = LostTalesServerPlayers.persistedData(player);
         if (saved.getBoolean(WELCOMED_TAG)) {
             return;
         }
@@ -105,15 +105,6 @@ public final class ChatWelcome {
             }
         }
         return lines;
-    }
-
-    /** The part of a player's saved data Forge keeps across deaths. */
-    private static NBTTagCompound persisted(EntityPlayer player) {
-        NBTTagCompound data = player.getEntityData();
-        if (!data.hasKey(EntityPlayer.PERSISTED_NBT_TAG)) {
-            data.setTag(EntityPlayer.PERSISTED_NBT_TAG, new NBTTagCompound());
-        }
-        return data.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG);
     }
 
     static synchronized void noteArrival(UUID player) {

@@ -65,6 +65,7 @@ import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
+import com.ninuna.losttales.client.quest.LostTalesQuestDialogueHooks;
 import com.ninuna.losttales.client.render.player.LostTalesRaceAwarePlayerRenderer;
 import com.ninuna.losttales.client.render.renderer.item.LostTalesItemRendererArmor3D;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererLamp;
@@ -91,6 +92,7 @@ import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestOfferPacket;
 import com.ninuna.losttales.network.packet.LostTalesWorldQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
@@ -424,10 +426,18 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     @Override
+    public void handleQuestOffer(LostTalesQuestOfferPacket packet) {
+        if (packet != null) {
+            LostTalesQuestDialogueHooks.offerFrom(packet.getEntityId(),
+                    packet.getQuestId());
+        }
+    }
+
+    @Override
     public void handleServerQuestSync(LostTalesServerQuestSyncPacket packet) {
         if (packet != null) {
             LostTalesClientQuestDefinitionStore.addServerQuestDefinitions(
-                    packet.isFirst(), packet.getQuests());
+                    packet.replaces(), packet.getQuests());
         }
     }
 
@@ -603,7 +613,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         }
         ClientFellowshipStateCache.acceptState(
                 packet.getRequestId(), packet.getSnapshot());
-        ClientFellowshipTrackingCache.validateFellowshipState(packet.getSnapshot());
     }
 
     @Override
@@ -634,8 +643,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             return;
         }
         ClientFellowshipTrackingCache.accept(packet.getSnapshot());
-        ClientFellowshipTrackingCache.validateFellowshipState(
-                ClientFellowshipStateCache.getSnapshot());
     }
 
     @Override
@@ -740,11 +747,13 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     packet.getProximityRadius());
             ClientChatChannelState.setChannelIcons(packet.getChannelIcons());
             ClientChatChannelState.setDiscordLinks(packet.getDiscordLinks());
+            ClientChatChannelState.setSeesAccounts(packet.seesAccounts());
             com.ninuna.losttales.client.chat.ClientChatPresence.setDiscordStatuses(
                     packet.showsDiscordStatuses());
             // The words the server adds to the profanity list, over the
             // bundled ones, for as long as this server is the place.
             ChatProfanityCatalog.installServerWords(packet.getProfanityWords());
+            ClientChatChannelState.setPrivateCommands(packet.getPrivateCommands());
             java.util.LinkedHashMap<String, Integer> holders =
                     new java.util.LinkedHashMap<String, Integer>();
             java.util.HashMap<String, Integer> accountRoles =

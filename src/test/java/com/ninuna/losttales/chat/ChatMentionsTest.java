@@ -96,6 +96,27 @@ public final class ChatMentionsTest {
         assertEquals("ask @ in #", signs.toString());
     }
 
+    /**
+     * The roles a line calls, by id: by any of each role's names, whole,
+     * the longest name first, each role once and at most as many as asked.
+     */
+    @Test
+    public void reachedRolesFindsEachRoleByAnyOfItsNames() {
+        java.util.Map<String, java.util.List<String>> roles =
+                new java.util.LinkedHashMap<String, java.util.List<String>>();
+        roles.put("operator", java.util.Arrays.asList("operator", "Betreiber"));
+        roles.put("guard", java.util.Arrays.asList("guard"));
+        roles.put("guard_captain", java.util.Arrays.asList("Guard Captain"));
+        assertEquals(java.util.Arrays.asList("operator", "guard_captain"),
+                ChatMentions.reachedRoles(
+                        "@betreiber, ask the @Guard Captain and @OPERATOR", roles, 4));
+        assertEquals(java.util.Arrays.asList("guard"),
+                ChatMentions.reachedRoles("@guard @guards mail@operator", roles, 4));
+        assertEquals(java.util.Arrays.asList("operator"),
+                ChatMentions.reachedRoles("@operator @guard", roles, 1));
+        assertTrue(ChatMentions.reachedRoles("no call here", roles, 4).isEmpty());
+    }
+
     @Test
     public void mentionNamesTagsBareNamesAtWordBoundaries() {
         java.util.List<String> names = java.util.Arrays.asList(

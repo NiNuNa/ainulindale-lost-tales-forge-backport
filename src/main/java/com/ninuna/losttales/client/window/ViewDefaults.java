@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.window;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -9,25 +8,21 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The windows each view opens with: as a new player first sees it, once
- * every window of it has been closed, and after Reset View. Every
- * category's view opens its windows locked, each filling its part of the
- * screen; a custom view opens a New Page in an unlocked window at the
- * default place, so the page picked there takes its tab.
+ * The window each view opens with: as a new player first sees it, once
+ * every window of it has been closed, and after Reset View. Every view
+ * opens one window at the default place, its pages as tabs, the first in
+ * front: a category's view locked, a custom view's New Page unlocked, so
+ * the page picked there takes its tab.
  *
  * <ul>
- * <li>Chat: Global and OOC in one window, the bottom-left quarter.</li>
- * <li>Consoles: every console the player may read in one window, the
- * top-left quarter.</li>
- * <li>Map: the map, the whole screen.</li>
- * <li>Quest Journal: the journal on the left half, the map on the
- * right.</li>
- * <li>Fellowships: the fellowships' conversations in the left quarter
- * column, the Fellowships page in the middle half, the map in the right
- * quarter column.</li>
- * <li>Profile: the Characters page, the whole screen.</li>
- * <li>Settings: every settings page in one window at the default
- * place.</li>
+ * <li>Chat: Global and OOC, and the conversations waiting for a window.</li>
+ * <li>Consoles: every console the player may read.</li>
+ * <li>Map: the map.</li>
+ * <li>Quest Journal: the journal, then the map.</li>
+ * <li>Fellowships: the Fellowships page, the map, then the conversation
+ * of every fellowship of the character played.</li>
+ * <li>Profile: the Characters page.</li>
+ * <li>Settings: every settings page.</li>
  * </ul>
  *
  * <p>A page another view holds already opens here as a copy of its own.
@@ -49,45 +44,34 @@ public final class ViewDefaults {
         List<? extends WindowPage> pages();
     }
 
-    /** One window a view opens with: its pages, the part of the screen it fills, and its padlock. */
-    static final class Slot {
+    /** The window a view opens with: its pages, the first in front, and its padlock. */
+    static final class Defaults {
         final Pages pages;
-        final Window.ScreenFill fill;
         final boolean locked;
 
-        Slot(Pages pages, Window.ScreenFill fill, boolean locked) {
+        Defaults(Pages pages, boolean locked) {
             this.pages = pages;
-            this.fill = fill;
             this.locked = locked;
         }
     }
 
-    private static final Map<PageCategory, List<Slot>> OWN =
-            new EnumMap<PageCategory, List<Slot>>(PageCategory.class);
+    private static final Map<PageCategory, Defaults> OWN =
+            new EnumMap<PageCategory, Defaults>(PageCategory.class);
     /** The sets the systems give by name: the chat's. */
     private static final Map<String, Pages> NAMED = new HashMap<String, Pages>();
-    /** A custom view's one window. */
-    private static final List<Slot> CUSTOM = Collections.singletonList(
-            new Slot(page(NewPage.PAGE_ID), Window.ScreenFill.NONE, false));
+    /** A custom view's window. */
+    private static final Defaults CUSTOM = new Defaults(page(NewPage.PAGE_ID),
+            false);
 
     static {
-        declare(PageCategory.CHANNELS,
-                locked(named(CHAT), Window.ScreenFill.BOTTOM_LEFT));
-        declare(PageCategory.CONSOLES, locked(category(PageCategory.CONSOLES),
-                Window.ScreenFill.TOP_LEFT));
-        declare(PageCategory.MAP, locked(page(MAP), Window.ScreenFill.FULL));
-        // The window that should take the keys goes last: it is raised last.
-        declare(PageCategory.QUEST_JOURNAL,
-                locked(page(MAP), Window.ScreenFill.RIGHT),
-                locked(page(JOURNAL), Window.ScreenFill.LEFT));
-        declare(PageCategory.FELLOWSHIPS,
-                locked(named(FELLOWSHIP_CHATS), Window.ScreenFill.LEFT_QUARTER),
-                locked(page(MAP), Window.ScreenFill.RIGHT_QUARTER),
-                locked(page(FELLOWSHIPS), Window.ScreenFill.CENTRE_HALF));
-        declare(PageCategory.PROFILE,
-                locked(page(CHARACTERS), Window.ScreenFill.FULL));
-        declare(PageCategory.SETTINGS, locked(category(PageCategory.SETTINGS),
-                Window.ScreenFill.NONE));
+        declare(PageCategory.CHANNELS, named(CHAT));
+        declare(PageCategory.CONSOLES, category(PageCategory.CONSOLES));
+        declare(PageCategory.MAP, page(MAP));
+        declare(PageCategory.QUEST_JOURNAL, page(JOURNAL), page(MAP));
+        declare(PageCategory.FELLOWSHIPS, page(FELLOWSHIPS), page(MAP),
+                named(FELLOWSHIP_CHATS));
+        declare(PageCategory.PROFILE, page(CHARACTERS));
+        declare(PageCategory.SETTINGS, category(PageCategory.SETTINGS));
     }
 
     private ViewDefaults() {}
@@ -99,44 +83,26 @@ public final class ViewDefaults {
         }
     }
 
-    /** The windows {@code view} opens with, in the order they open: the last stands in front. */
-    static synchronized List<Slot> slotsOf(View view) {
+    /** The window {@code view} opens with; null for none. */
+    static synchronized Defaults of(View view) {
         if (view == null) {
-            return Collections.emptyList();
+            return null;
         }
-        if (view.isCustom()) {
-            return CUSTOM;
-        }
-        List<Slot> slots = OWN.get(view.category());
-        return slots == null ? Collections.<Slot>emptyList() : slots;
+        return view.isCustom() ? CUSTOM : OWN.get(view.category());
     }
 
-    /**
-     * The part of the screen filled by the window of {@code view}'s
-     * defaults that holds one of {@code tabs}' pages, the first of them
-     * one holds; none where none does. Where Reset Window Layout puts a
-     * window back.
-     */
-    static synchronized Window.ScreenFill homeFillOf(View view,
-                                                     List<WindowPage> tabs) {
-        for (WindowPage tab : tabs) {
-            for (Slot slot : slotsOf(view)) {
-                for (WindowPage page : slot.pages.pages()) {
-                    if (page != null && page.isCopyOf(tab)) {
-                        return slot.fill;
-                    }
+    /** A category's view's window, locked, holding {@code sets} one after the other. */
+    private static void declare(PageCategory category, final Pages... sets) {
+        OWN.put(category, new Defaults(new Pages() {
+            @Override
+            public List<? extends WindowPage> pages() {
+                List<WindowPage> pages = new ArrayList<WindowPage>();
+                for (Pages set : sets) {
+                    pages.addAll(set.pages());
                 }
+                return pages;
             }
-        }
-        return Window.ScreenFill.NONE;
-    }
-
-    private static void declare(PageCategory category, Slot... slots) {
-        OWN.put(category, Collections.unmodifiableList(Arrays.asList(slots)));
-    }
-
-    private static Slot locked(Pages pages, Window.ScreenFill fill) {
-        return new Slot(pages, fill, true);
+        }, true));
     }
 
     /** A page by the id it was registered under. */

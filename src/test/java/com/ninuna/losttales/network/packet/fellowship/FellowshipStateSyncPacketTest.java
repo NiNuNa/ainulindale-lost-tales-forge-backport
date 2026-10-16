@@ -26,10 +26,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The fellowship state carries the server's member limit and every
- * fellowship of the character whole: its name, icon, switches, guides,
- * and each member's presence. A fellowship is offered nobody an account
- * of whose is already in it.
+ * The fellowship state carries the server's member limit, every
+ * fellowship of the character whole (its name, icon, switches, guides,
+ * and each member's presence) and every mark the character sees. A
+ * fellowship is offered nobody an account of whose is already in it.
  */
 public final class FellowshipStateSyncPacketTest {
 
@@ -44,6 +44,7 @@ public final class FellowshipStateSyncPacketTest {
     private static final UUID FELLOWSHIP =
             UUID.fromString("30000000-0000-0000-0000-000000000008");
     private static final UUID MARK = new UUID(9L, 9L);
+    private static final UUID GO_HERE = new UUID(10L, 10L);
 
     @Test
     public void theStateCarriesEveryFellowshipWhole() {
@@ -89,6 +90,25 @@ public final class FellowshipStateSyncPacketTest {
         assertEquals(strangerOwner, offered.get(0).getOwnerId());
     }
 
+    /**
+     * An offer that names no account went to a reader not shown accounts:
+     * leaving the friend's other character out would say whose it is, so
+     * it is offered and the server's neutral refusal answers it.
+     */
+    @Test
+    public void aReaderNotShownAccountsIsOfferedEveryCharacter() {
+        List<FellowshipInviteTargetSnapshot> targets =
+                new ArrayList<FellowshipInviteTargetSnapshot>();
+        targets.add(new FellowshipInviteTargetSnapshot(FRIEND_OWNER,
+                UUID.fromString("20000000-0000-0000-0000-000000000005"),
+                "", "Beren"));
+        FellowshipStateSnapshot snapshot = roundTrip(state(4, targets));
+        List<FellowshipInviteTargetSnapshot> offered =
+                snapshot.getInviteTargets(snapshot.getTravellingFellowship());
+        assertEquals(1, offered.size());
+        assertEquals("Beren", offered.get(0).getCharacterName());
+    }
+
     @Test
     public void anUnavailableStateCarriesTheLimitToo() {
         FellowshipStateSnapshot decoded = roundTrip(FellowshipStateSnapshot.failure(
@@ -121,13 +141,18 @@ public final class FellowshipStateSyncPacketTest {
         }
     }
 
-    /** A fellowship's marks travel with it, each as its guide placed it. */
+    /** The marks travel with the state, each whole: a fellowship's as its guide placed it, a go-here mark as its owner did. */
     @Test
-    public void aFellowshipsMarksTravelWithIt() {
+    public void theMarksTravelWithTheState() {
         FellowshipStateSnapshot decoded = roundTrip(state(10,
                 Collections.<FellowshipInviteTargetSnapshot>emptyList()));
-        List<FellowshipMark> marks = decoded.getFellowships().get(0).getMarks();
+        List<FellowshipMark> marks = decoded.getFellowshipMarks(FELLOWSHIP);
         assertEquals(1, marks.size());
+        assertEquals(2, decoded.getMarks().size());
+        FellowshipMark goHere = decoded.getGoHereOf(FRIEND);
+        assertEquals(GO_HERE, goHere.getMarkId());
+        assertEquals(-22000.25D, goHere.getX(), 0.0D);
+        assertEquals("", goHere.getName());
         FellowshipMark mark = marks.get(0);
         assertEquals(MARK, mark.getMarkId());
         assertEquals(FELLOWSHIP, mark.getFellowshipId());
@@ -149,11 +174,13 @@ public final class FellowshipStateSyncPacketTest {
         FellowshipSnapshot fellowship = new FellowshipSnapshot(FELLOWSHIP, LEADER,
                 "The Grey Company", new FellowshipIcon("minecraft:compass", 0),
                 EnumSet.of(FellowshipSwitch.NO_FIGHTING, FellowshipSwitch.NO_HIRED_HARM),
-                Collections.singletonList(FRIEND), 1L, 4L, 2, members,
-                Collections.singletonList(new FellowshipMark(MARK, FELLOWSHIP,
-                        "Weathertop", FRIEND, 100, 1200.25D, -340.5D, 9L)));
+                Collections.singletonList(FRIEND), 1L, 4L, 2, members);
+        List<FellowshipMark> marks = new ArrayList<FellowshipMark>();
+        marks.add(FellowshipMark.ofFellowship(MARK, FELLOWSHIP,
+                "Weathertop", FRIEND, 100, 1200.25D, -340.5D, 9L));
+        marks.add(FellowshipMark.goHere(GO_HERE, FRIEND, 100, -22000.25D, -7278.5D, 12L));
         return new FellowshipStateSnapshot(OWNER, 2L, FellowshipErrorId.NONE, limit,
-                LEADER, Collections.singletonList(fellowship), FELLOWSHIP,
+                LEADER, Collections.singletonList(fellowship), FELLOWSHIP, marks,
                 FellowshipErrorId.NONE,
                 Collections.<FellowshipInvitationSnapshot>emptyList(),
                 Collections.<FellowshipInvitationSnapshot>emptyList(),

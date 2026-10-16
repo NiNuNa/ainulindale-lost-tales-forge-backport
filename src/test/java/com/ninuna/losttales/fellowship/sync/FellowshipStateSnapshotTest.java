@@ -1,6 +1,7 @@
 package com.ninuna.losttales.fellowship.sync;
 
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
 import java.util.ArrayList;
@@ -12,13 +13,14 @@ import java.util.UUID;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
  * What one account is shown of the fellowships of the character it plays:
  * the one it travels with is one of them, it sees the invitations only of
- * the fellowships it leads or guides, and whom to invite only while one of
- * those has room.
+ * the fellowships it leads or guides, whom to invite only while one of
+ * those has room, and only the marks it may see.
  */
 public final class FellowshipStateSnapshotTest {
     private static final UUID OWNER = new UUID(1L, 1L);
@@ -69,12 +71,62 @@ public final class FellowshipStateSnapshotTest {
                 .getInviteTargets().size());
     }
 
+    /**
+     * The go-here marks of the character played and of the members of the
+     * fellowship it travels with; a fellowship's marks, at most the most it
+     * holds, for its fellowships only.
+     */
+    @Test
+    public void onlyTheMarksTheCharacterMaySeeAreKept() {
+        UUID stranger = new UUID(9L, 9L);
+        List<FellowshipMark> marks = new ArrayList<FellowshipMark>();
+        marks.add(FellowshipMark.goHere(new UUID(20L, 1L), PLAYED, 0, 1.0D, 1.0D, 1L));
+        marks.add(FellowshipMark.goHere(new UUID(20L, 2L), OTHER, 0, 2.0D, 2.0D, 1L));
+        marks.add(FellowshipMark.goHere(new UUID(20L, 3L), stranger, 0, 3.0D, 3.0D, 1L));
+        for (int index = 0; index <= FellowshipMark.MAX_PER_FELLOWSHIP; index++) {
+            marks.add(FellowshipMark.ofFellowship(new UUID(30L, index), LED, "Camp " + index,
+                    PLAYED, 0, index, index, 1L));
+        }
+        marks.add(FellowshipMark.ofFellowship(new UUID(40L, 1L), new UUID(99L, 99L), "Bree",
+                PLAYED, 0, 5.0D, 5.0D, 1L));
+        FellowshipStateSnapshot state = new FellowshipStateSnapshot(OWNER, 1L,
+                FellowshipErrorId.NONE, 8, PLAYED, Arrays.asList(fellowship(LED, PLAYED)), LED,
+                marks, FellowshipErrorId.NONE,
+                Collections.<FellowshipInvitationSnapshot>emptyList(),
+                Collections.<FellowshipInvitationSnapshot>emptyList(),
+                false, false, Collections.<FellowshipInviteTargetSnapshot>emptyList(), false);
+
+        assertEquals(2 + FellowshipMark.MAX_PER_FELLOWSHIP, state.getMarks().size());
+        assertEquals(new UUID(20L, 2L), state.getGoHereOf(OTHER).getMarkId());
+        assertNull(state.getGoHereOf(stranger));
+        assertEquals(FellowshipMark.MAX_PER_FELLOWSHIP, state.getFellowshipMarks(LED).size());
+        assertEquals(state.getMarks().size(), state.getCompassMarks().size());
+    }
+
+    /** Travelling with none, the character sees its own go-here mark and no member's. */
+    @Test
+    public void withoutAFellowshipTravelledWithOnlyTheOwnGoHereMarkIsKept() {
+        List<FellowshipMark> marks = Arrays.asList(
+                FellowshipMark.goHere(new UUID(20L, 1L), PLAYED, 0, 1.0D, 1.0D, 1L),
+                FellowshipMark.goHere(new UUID(20L, 2L), OTHER, 0, 2.0D, 2.0D, 1L));
+        FellowshipStateSnapshot state = new FellowshipStateSnapshot(OWNER, 1L,
+                FellowshipErrorId.NONE, 8, PLAYED, Collections.<FellowshipSnapshot>emptyList(),
+                null, marks, FellowshipErrorId.NONE,
+                Collections.<FellowshipInvitationSnapshot>emptyList(),
+                Collections.<FellowshipInvitationSnapshot>emptyList(),
+                false, false, Collections.<FellowshipInviteTargetSnapshot>emptyList(), false);
+
+        assertEquals(1, state.getMarks().size());
+        assertEquals(PLAYED, state.getMarks().get(0).getPlacedBy());
+    }
+
     private static FellowshipStateSnapshot state(List<FellowshipSnapshot> fellowships,
                                                  UUID travelling, int limit,
                                                  List<FellowshipInvitationSnapshot> sent,
                                                  List<FellowshipInviteTargetSnapshot> targets) {
         return new FellowshipStateSnapshot(OWNER, 1L, FellowshipErrorId.NONE, limit, PLAYED,
-                fellowships, travelling, FellowshipErrorId.NONE,
+                fellowships, travelling, Collections.<FellowshipMark>emptyList(),
+                FellowshipErrorId.NONE,
                 Collections.<FellowshipInvitationSnapshot>emptyList(), sent,
                 false, false, targets, false);
     }
@@ -88,8 +140,7 @@ public final class FellowshipStateSnapshotTest {
                 FellowshipColor.BLUE, FellowshipMemberPresence.AWAY, ""));
         return new FellowshipSnapshot(id, leader, "Company " + id.getLeastSignificantBits(),
                 null, EnumSet.allOf(FellowshipSwitch.class),
-                Collections.<UUID>emptyList(), 1L, 1L, 2, members,
-                Collections.<com.ninuna.losttales.fellowship.model.FellowshipMark>emptyList());
+                Collections.<UUID>emptyList(), 1L, 1L, 2, members);
     }
 
     private static FellowshipInvitationSnapshot invitation(UUID fellowshipId) {

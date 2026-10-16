@@ -43,6 +43,7 @@ public final class ClientChatIdentitiesTest {
     public void tearDown() {
         ClientChatIdentities.clear();
         ClientCharacterRosterCache.clear();
+        ClientChatChannelState.setCapabilities(Collections.<String>emptySet());
     }
 
     @Test
@@ -118,7 +119,7 @@ public final class ClientChatIdentitiesTest {
     }
 
     @Test
-    public void disconnectDropsEveryChoiceAndCopiesFollowThePlayedCharacter() {
+    public void arrivingElsewhereDropsEveryChoiceAndCopiesFollowThePlayedCharacter() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
         ClientChatIdentities.select(global, identityOf(LEGOLAS));
         ClientChatIdentities.clear();
@@ -144,6 +145,7 @@ public final class ClientChatIdentitiesTest {
     @Test
     public void theNarratorsVoiceIsTakenUpPerCopy() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
+        ClientChatChannelState.setCapabilities(Collections.singleton("chat.narrate"));
         ClientChatIdentities.setNarrating(global, true);
         assertTrue(ClientChatIdentities.narratesOn(global));
         assertTrue(ClientChatIdentities.wireNarrating(global));
@@ -154,6 +156,17 @@ public final class ClientChatIdentitiesTest {
         ClientChatIdentities.select(global, identityOf(LEGOLAS));
         assertFalse("choosing a character puts the voice down",
                 ClientChatIdentities.narratesOn(global));
+    }
+
+    /** A voice whose Narrator the player may no longer take up speaks as the character. */
+    @Test
+    public void theNarratorFallsBackWithoutItsCapability() {
+        roster(ARAGORN, ARAGORN, LEGOLAS);
+        ClientChatChannelState.setCapabilities(Collections.singleton("chat.narrate"));
+        ClientChatIdentities.setNarrating(global, true);
+        ClientChatChannelState.setCapabilities(Collections.<String>emptySet());
+        assertFalse(ClientChatIdentities.narratesOn(global));
+        assertFalse(ClientChatIdentities.wireNarrating(global));
     }
 
     private static ClientChatIdentities.Identity identityOf(UUID characterId) {

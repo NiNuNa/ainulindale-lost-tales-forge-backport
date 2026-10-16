@@ -3,6 +3,7 @@ package com.ninuna.losttales.quest.missive;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.LostTalesItemMissiveLetter;
+import com.ninuna.losttales.quest.LostTalesQuestParams;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Random;
@@ -17,7 +18,7 @@ import net.minecraft.world.World;
  * ({@link MissiveWords}), so each player reads it in their own language.
  */
 public final class LostTalesMissiveGenerator {
-    /** Which generator wrote a letter, kept in its context; letters of another kind of words are not read. */
+    /** Which generator wrote a letter, kept in its context. */
     private static final String GENERATOR_VERSION = "2";
     private static final long ONE_INGAME_DAY_TICKS = 24000L;
 
@@ -144,6 +145,8 @@ public final class LostTalesMissiveGenerator {
         Map<String, String> params = new LinkedHashMap<String, String>();
         params.put("item", template.itemId);
         params.put("count", String.valueOf(count));
+        // A notice's gathering is handed over, so one stack pays one notice.
+        params.put(LostTalesQuestParams.TAKE, "true");
 
         LostTalesMissiveObjectiveData objective = new LostTalesMissiveObjectiveData(
                 "gather_" + normalizeId(template.itemId),

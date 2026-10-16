@@ -78,6 +78,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestOfferPacket;
 import com.ninuna.losttales.network.packet.LostTalesWorldQuestSyncPacket;
 import com.ninuna.losttales.quest.ServerQuestFiles;
 import com.ninuna.losttales.quest.ServerQuestSync;
@@ -130,6 +131,7 @@ import com.ninuna.losttales.chat.server.ChatSpeechGate;
 import com.ninuna.losttales.chat.server.ChatArrivals;
 import com.ninuna.losttales.chat.server.ChatWelcome;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatCommandText;
 import com.ninuna.losttales.chat.server.ChatCommandContexts;
 import com.ninuna.losttales.chat.server.ChatConsoleStream;
 import com.ninuna.losttales.chat.server.ChatHistory;
@@ -313,6 +315,8 @@ public class LostTalesCommonProxy {
 
     public void handleServerQuestSync(LostTalesServerQuestSyncPacket packet) {}
 
+    public void handleQuestOffer(LostTalesQuestOfferPacket packet) {}
+
     public void handleWorldQuestSync(LostTalesWorldQuestSyncPacket packet) {}
 
     public void handleMobAggroSync(LostTalesMobAggroSyncPacket packet) {}
@@ -404,6 +408,7 @@ public class LostTalesCommonProxy {
         // take them straight back out again. Every other static store
         // below holds nothing the reload puts there.
         ChatChannel.resetToBuiltIn();
+        ChatCommandText.resetServerNames();
         // Then the config, so the roles, gates, channels and settings
         // everything below reads are the ones on disk now: the files may
         // have been edited since pre-init, and a client hosting a world
@@ -565,6 +570,7 @@ public class LostTalesCommonProxy {
         ChatChannel.resetToBuiltIn();
         ChatChannelIconCatalog.resetToDefaults();
         ChatProfanityCatalog.resetToBundled();
+        ChatCommandText.resetServerNames();
         ChatMessageIdAllocator.reset();
         // The save takes the history's last state before the store is
         // cleared: the worlds are saved after this event, and what

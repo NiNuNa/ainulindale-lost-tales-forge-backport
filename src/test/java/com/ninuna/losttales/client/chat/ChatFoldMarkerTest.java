@@ -68,8 +68,7 @@ public final class ChatFoldMarkerTest {
 
     private static List<IChatComponent> wrap(int words, boolean open) {
         return ChatLineWrapper.wrap(METRICS, message(words), 200, true,
-                1.0F, 1.0F, 1.0F, null, new ChatLineWrapper.Fold(
-                        ChatFoldMarker.KEPT_ROWS, open,
+                1.0F, 1.0F, 1.0F, null, new ChatLineWrapper.Fold(open,
                         ChatFoldMarker.toggle(LINE_ID, open)));
     }
 
@@ -159,8 +158,7 @@ public final class ChatFoldMarkerTest {
         six.appendSibling(ChatLayoutMarker.bodyBreak(0xFFFFFF));
         six.appendSibling(text("a\nb\nc\nd\ne\nf"));
         List<IChatComponent> folded = ChatLineWrapper.wrap(METRICS, six, 200,
-                true, 1.0F, 1.0F, 1.0F, null, new ChatLineWrapper.Fold(
-                        ChatFoldMarker.KEPT_ROWS, false,
+                true, 1.0F, 1.0F, 1.0F, null, new ChatLineWrapper.Fold(false,
                         ChatFoldMarker.toggle(LINE_ID, false)));
         assertEquals("the name, four paragraphs and Read more", 6,
                 folded.size());

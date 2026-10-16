@@ -4,10 +4,10 @@ import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.fellowship.server.FellowshipIntegrityReport;
 import com.ninuna.losttales.fellowship.server.FellowshipService;
 import com.ninuna.losttales.fellowship.server.FellowshipSyncManager;
-import com.ninuna.losttales.fellowship.storage.FellowshipGoHereMarkerStorage;
-import com.ninuna.losttales.fellowship.storage.FellowshipGoHereMarkerWorldData;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationWorldData;
+import com.ninuna.losttales.fellowship.storage.FellowshipMarkStorage;
+import com.ninuna.losttales.fellowship.storage.FellowshipMarkWorldData;
 import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import com.ninuna.losttales.permission.LostTalesCapability;
@@ -21,8 +21,7 @@ import net.minecraft.world.World;
 /**
  * The fellowship stores for an operator: status counts them, validate says what
  * no longer stands without changing anything, repair removes it (members,
- * stale invitations, go-here markers), clearcombat forgets the combat
- * markers.
+ * stale invitations, marks), clearcombat forgets the combat markers.
  */
 public final class LostTalesCommandFellowshipAdmin extends LostTalesCommandBase {
 
@@ -91,27 +90,27 @@ public final class LostTalesCommandFellowshipAdmin extends LostTalesCommandBase 
     private static IChatComponent describe(FellowshipIntegrityReport report) {
         return words(SAY + "counts", Integer.valueOf(report.getMembers()),
                 Integer.valueOf(report.getInvitations()),
-                Integer.valueOf(report.getMarkers()));
+                Integer.valueOf(report.getMarks()));
     }
 
     private void reportStatus(ICommandSender sender, World world) {
         try {
             FellowshipWorldData fellowships = FellowshipStorage.get(world);
             FellowshipInvitationWorldData invitations = FellowshipInvitationStorage.get(world);
-            FellowshipGoHereMarkerWorldData markers = FellowshipGoHereMarkerStorage.get(world);
+            FellowshipMarkWorldData marks = FellowshipMarkStorage.get(world);
             say(sender, EnumChatFormatting.GOLD, SAY + "status.header");
             say(sender, EnumChatFormatting.GRAY, SAY + "status.counts",
                     Integer.valueOf(fellowships.getFellowshipCount()),
                     Integer.valueOf(invitations.getInvitationCount()),
-                    Integer.valueOf(markers.getMarkers().size()));
+                    Integer.valueOf(marks.getMarkCount()));
             say(sender, EnumChatFormatting.GRAY, SAY + "status.quarantine",
                     Integer.valueOf(fellowships.getQuarantinedEntryCount()),
                     Integer.valueOf(invitations.getQuarantinedEntryCount()),
-                    Integer.valueOf(markers.getQuarantinedEntryCount()));
+                    Integer.valueOf(marks.getQuarantinedEntryCount()));
             say(sender, EnumChatFormatting.GRAY, SAY + "status.read_only",
                     Boolean.valueOf(fellowships.isReadOnlyForNewerVersion()),
                     Boolean.valueOf(invitations.isReadOnlyForNewerVersion()),
-                    Boolean.valueOf(markers.isReadOnlyForNewerVersion()));
+                    Boolean.valueOf(marks.isReadOnlyForNewerVersion()));
         } catch (RuntimeException exception) {
             say(sender, EnumChatFormatting.RED, SAY + "status.failed",
                     exception.getClass().getSimpleName());

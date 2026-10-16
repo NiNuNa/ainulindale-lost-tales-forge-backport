@@ -5,6 +5,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache.TrackedEnemy;
 import com.ninuna.losttales.client.character.ClientRoleplayCharacterIdentityHook;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipMarks;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
@@ -2654,7 +2655,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
 
     private static List<LostTalesMapMarkerData> getVisibleStandaloneMarkers() {
         List<LostTalesMapMarkerData> fellowship =
-                ClientFellowshipTrackingCache.getMapMarkers();
+                ClientFellowshipMarks.getMapMarkers();
         return LostTalesClientMapMarkerStore.getMapMarkers(fellowship);
     }
 

@@ -29,8 +29,6 @@ public class WindowHover {
     public enum Kind {
         /** Nothing that answers. */
         NONE,
-        /** The snap layouts under a fullscreen control: a zone, or the panel round them. */
-        SNAP_LAYOUT,
         /** A card of snap assist, offering a window for an empty zone. */
         SNAP_ASSIST,
         /** A page in a window: the journal, the map, a waystone, any tab that is not a conversation. */
@@ -86,8 +84,6 @@ public class WindowHover {
     public boolean otherSide;
     /** On a sub-window's resize band, the edge. */
     public WindowGestures.ResizeEdge subEdge;
-    /** On the snap layouts, which zone of the panel; -1 on the panel round them. */
-    public int snapZone = -1;
     /** On snap assist, the card under the pointer. */
     public SnapAssist.Card assistCard;
     public WindowGestures.ResizeTarget resize;
@@ -156,8 +152,6 @@ public class WindowHover {
                         && !ToolStrip.heldByPadlock(this.stripPart, this.window)
                         && ToolStrip.greyedWhy(this.stripPart,
                                 this.window).length() == 0;
-            case SNAP_LAYOUT:
-                return this.snapZone >= 0;
             case SNAP_ASSIST:
                 return this.assistCard != null;
             case PAGE:

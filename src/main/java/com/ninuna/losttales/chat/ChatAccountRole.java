@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.util.LostTalesLangFile;
 import com.ninuna.losttales.util.LostTalesWords;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
@@ -12,6 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * A role an account holds on the account-identity channels — OOC,
@@ -44,12 +46,19 @@ import java.util.Set;
  * an operator named is shown as they wrote it, and one named nothing by
  * its id. A mention reaches a role by the name this game shows it by or by
  * its id ({@link #mentionNames}), so {@code @operator} reaches the
- * operators whatever language each of them reads.</p>
+ * operators whatever language each of them reads. The server reads which
+ * roles a line calls ({@link #serverMentionNames}) and the line keeps
+ * them by id, so a client pings its player for a role whatever language
+ * the writer typed its name in.</p>
  */
 public final class ChatAccountRole {
 
     public static final String TEAM_ID = "team";
     public static final int MAX_ID_LENGTH = 32;
+    /** The most roles one line's mentions call. */
+    public static final int MAX_MENTIONS_PER_LINE = 4;
+    /** What a role's id is made of. */
+    private static final Pattern ID = Pattern.compile("[a-z0-9_]{1," + MAX_ID_LENGTH + "}");
     public static final int MAX_TEXT_LENGTH = 64;
     public static final int MAX_DESCRIPTION_LENGTH = 256;
     /** What a role's lang line begins with, before its id. */
@@ -154,6 +163,11 @@ public final class ChatAccountRole {
 
     public String getId() {
         return this.id;
+    }
+
+    /** Whether {@code id} is written as a role's id is: a-z, 0-9 and _, 1 to 32 of them. */
+    public static boolean isWellFormedId(String id) {
+        return id != null && ID.matcher(id).matches();
     }
 
     /** Whether this is the absence of a role. */
@@ -263,6 +277,33 @@ public final class ChatAccountRole {
     /** The names an {@code @} reaches the role by in this side's game. */
     public List<String> mentionNames() {
         return mentionNames(LostTalesWords.LANG);
+    }
+
+    /**
+     * The names the server reads an {@code @} as calling the role by,
+     * whatever language its writer reads: the id, the name its entry gave
+     * it, and a shipped role's name in English and in the server's
+     * language.
+     */
+    public List<String> serverMentionNames() {
+        List<String> names = new ArrayList<String>(3);
+        addName(names, this.id);
+        addName(names, displayName(LostTalesLangFile.ENGLISH_WORDS));
+        addName(names, displayName(LostTalesWords.LANG));
+        return names;
+    }
+
+    private static void addName(List<String> names, String name) {
+        String wanted = name == null ? "" : name.trim();
+        if (wanted.length() == 0) {
+            return;
+        }
+        for (String held : names) {
+            if (held.equalsIgnoreCase(wanted)) {
+                return;
+            }
+        }
+        names.add(wanted);
     }
 
     /** Whether {@code name} after an {@code @} reaches the role here, whatever its case. */

@@ -11,11 +11,14 @@ import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -90,6 +93,8 @@ public final class LostTalesServerBroadcastHook {
     private static final long SHARED_COPY_MILLIS = 1000L;
     /** More shared lines going out at once than this is more than a tick holds. */
     private static final int MAX_SHARED_COPIES = 16;
+    /** How deep a line's parts are walked; far past any line the game builds. */
+    private static final int MAX_DEPTH = 32;
     /** The shared lines whose copies are going out, by their chat JSON. */
     private static final Map<String, SharedCopy> SHARED_COPIES =
             new LinkedHashMap<String, SharedCopy>();
@@ -101,7 +106,9 @@ public final class LostTalesServerBroadcastHook {
      * a join or a leave naming the account, with its id and its named
      * players appended as empty runs; or nothing, for a line about a
      * player still waiting for their first character
-     * ({@link #aboutFirstVisit}). The relay is told after, with the id;
+     * ({@link #aboutFirstVisit}), and for the join or the leave of a
+     * player who is Invisible ({@link #aboutInvisiblePlayer}). The relay
+     * is told after, with the id;
      * the runs are empty, so the relay reads the line's words as they go
      * out.
      */
@@ -113,7 +120,7 @@ public final class LostTalesServerBroadcastHook {
         long messageId = ChatMessageIds.NONE;
         try {
             line = namingTheAccount(message);
-            if (aboutFirstVisit(line)) {
+            if (aboutFirstVisit(line) || aboutInvisiblePlayer(line)) {
                 return null;
             }
             ChatChannel channel = ChatSystemLineClassifier.classify(line);
@@ -146,6 +153,24 @@ public final class LostTalesServerBroadcastHook {
                 }
                 return true;
             }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a line is the join or the leave of a player who is
+     * Invisible as the identity they play: nobody is told they came or
+     * went, in the game or on Discord, and the line is never said later.
+     */
+    private static boolean aboutInvisiblePlayer(IChatComponent line) {
+        ChatSystemLineClassifier.Kind kind = ChatSystemLineClassifier.kindOf(line);
+        if (kind == ChatSystemLineClassifier.Kind.JOIN) {
+            return ChatArrivals.arrivesInvisible(announcedAccount(line));
+        }
+        if (kind == ChatSystemLineClassifier.Kind.LEAVE) {
+            EntityPlayerMP leaving = LostTalesServerPlayers.findOnline(
+                    announcedAccount(line));
+            return leaving != null && ChatPresenceService.playsInvisible(leaving);
         }
         return false;
     }
@@ -318,7 +343,8 @@ public final class LostTalesServerBroadcastHook {
         if (recipients == null) {
             return ChatMessageIds.NONE;
         }
-        List<ChatNamedPlayer> named = namedPlayers(message, channel);
+        List<ChatNamedPlayer> named = withoutHiddenAccounts(message, channel,
+                namedPlayers(message, channel));
         long messageId = record(message, channel, "", recipients,
                 channel == ChatChannel.CLIENT_CONSOLE
                         ? ChatHistory.Audience.accounts(recipients, false)
@@ -328,7 +354,7 @@ public final class LostTalesServerBroadcastHook {
         }
         if (ChatSystemLineClassifier.kindOf(message)
                 == ChatSystemLineClassifier.Kind.JOIN) {
-            noteJoinLine(joinerAccount(message), messageId);
+            noteJoinLine(announcedAccount(message), messageId);
         }
         mark(message, messageId, named);
         return messageId;
@@ -357,7 +383,8 @@ public final class LostTalesServerBroadcastHook {
             mark(message, copy.messageId, copy.named);
             return;
         }
-        List<ChatNamedPlayer> named = namedPlayers(message, channel);
+        List<ChatNamedPlayer> named = withoutHiddenAccounts(message, channel,
+                namedPlayers(message, channel));
         List<UUID> recipients = onlineAccounts();
         if (recipients == null) {
             return;
@@ -374,6 +401,52 @@ public final class LostTalesServerBroadcastHook {
             while (SHARED_COPIES.size() > MAX_SHARED_COPIES && oldest.hasNext()) {
                 oldest.next();
                 oldest.remove();
+            }
+        }
+    }
+
+    /**
+     * The players an in-character line names, and the line itself, as
+     * they go out while the server shows no accounts: a death or an
+     * achievement names the character and goes to everyone alike, so its
+     * names and its whisper clicks carry no account at all. An
+     * out-of-character line, and every line while accounts are shown,
+     * stays as it is.
+     */
+    private static List<ChatNamedPlayer> withoutHiddenAccounts(
+            IChatComponent message, ChatChannel channel, List<ChatNamedPlayer> named) {
+        if (LostTalesConfig.showAccounts || !ChatRolePresentation.isInCharacter(channel)) {
+            return named;
+        }
+        withoutWhisperClicks(message, 0);
+        List<ChatNamedPlayer> shown = new ArrayList<ChatNamedPlayer>(named.size());
+        for (ChatNamedPlayer player : named) {
+            shown.add(player.withoutAccount());
+        }
+        return shown;
+    }
+
+    /** Takes the account out of every {@code /msg <account>} click in the line, keeping the click that marks a name. */
+    private static void withoutWhisperClicks(IChatComponent part, int depth) {
+        if (part == null || depth > MAX_DEPTH) {
+            return;
+        }
+        ClickEvent click = part.getChatStyle().getChatClickEvent();
+        if (click != null && click.getAction() == ClickEvent.Action.SUGGEST_COMMAND
+                && click.getValue() != null && click.getValue().startsWith(WHISPER_SUGGESTION)) {
+            part.getChatStyle().setChatClickEvent(new ClickEvent(
+                    ClickEvent.Action.SUGGEST_COMMAND, WHISPER_SUGGESTION));
+        }
+        if (part instanceof ChatComponentTranslation) {
+            for (Object argument : ((ChatComponentTranslation)part).getFormatArgs()) {
+                if (argument instanceof IChatComponent) {
+                    withoutWhisperClicks((IChatComponent)argument, depth + 1);
+                }
+            }
+        }
+        for (Object sibling : part.getSiblings()) {
+            if (sibling instanceof IChatComponent) {
+                withoutWhisperClicks((IChatComponent)sibling, depth + 1);
             }
         }
     }
@@ -508,13 +581,13 @@ public final class LostTalesServerBroadcastHook {
     }
 
     /**
-     * The account a join line announces. The game writes the joining
+     * The account a join or a leave line announces. The game writes the
      * player in as their display name, which suggests
      * {@code /msg <account> } on a click, and that is read first; the
      * name's own words stand in when the click says nothing. Null for a
      * line that is no translation or names nobody.
      */
-    static String joinerAccount(IChatComponent message) {
+    static String announcedAccount(IChatComponent message) {
         if (!(message instanceof ChatComponentTranslation)) {
             return null;
         }
@@ -619,7 +692,7 @@ public final class LostTalesServerBroadcastHook {
         if (ChatSystemLineClassifier.kindOf(message)
                 == ChatSystemLineClassifier.Kind.JOIN
                 && named.size() < ChatNamedPlayer.MAX_PER_LINE) {
-            ChatNamedPlayer joiner = ChatArrivals.take(joinerAccount(message));
+            ChatNamedPlayer joiner = ChatArrivals.take(announcedAccount(message));
             if (joiner != null
                     && ChatNamedPlayer.find(named, joiner.getAccount()) == null) {
                 named.add(joiner);

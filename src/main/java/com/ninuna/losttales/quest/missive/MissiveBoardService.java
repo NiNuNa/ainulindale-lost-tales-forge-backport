@@ -53,14 +53,14 @@ public final class MissiveBoardService {
         }
         ItemStack stack = board.getNotice(slot);
         MissiveBoardStateReason refusal =
-                MissiveAcceptance.check(player.worldObj, stack, expectedQuestId);
+                MissiveAcceptance.check(stack, expectedQuestId);
         if (refusal != null) {
             answer(player, board, refusal);
             return;
         }
         LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
         MissiveBoardStateReason outcome =
-                MissiveAcceptance.start(player, missive);
+                MissiveAcceptance.start(player, stack);
         if (outcome == MissiveBoardStateReason.ACCEPTED) {
             if (missive.isFirstComeFirstServed()) {
                 board.removeNotice(slot);

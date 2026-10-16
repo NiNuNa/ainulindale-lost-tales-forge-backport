@@ -1244,10 +1244,11 @@ public final class LostTalesChatPacketTest {
         LostTalesPacketCodec.writeUtf8String(probe, "", 128);
         LostTalesPacketCodec.writeUtf8String(probe, "", 8192);
         probe.writeInt(0);
-        // And the reactions, none, and the tab a command's answer is
-        // filed under, none.
+        // And the reactions, none, the tab a command's answer is filed
+        // under, none, and the roles it calls, none.
         probe.writeInt(0);
         LostTalesPacketCodec.writeUtf8String(probe, "", 384);
+        probe.writeInt(0);
         return probe.readableBytes();
     }
 }

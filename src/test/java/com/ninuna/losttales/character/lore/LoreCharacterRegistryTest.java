@@ -106,6 +106,38 @@ public final class LoreCharacterRegistryTest {
         }
     }
 
+    /** A file's History holds 2,048 characters; its Appearance, its Personality and its description 512. */
+    @Test
+    public void eachTextIsHeldToItsOwnLength() {
+        String head = "{\"dataVersion\":1,\"id\":\"losttales:long\","
+                + "\"name\":\"Long\",\"appearance\":null,";
+        String history = repeat(CharacterProfile.Section.HISTORY.getMaxLength());
+        LoreCharacterDefinitionJsonParser.ParseResult whole = parse(head
+                + "\"description\":\"\",\"profile\":{\"history\":\""
+                + history + "\"}}");
+        assertTrue(whole.getErrors().toString(), whole.isValid());
+        assertEquals(history, whole.getDefinition().getProfile()
+                .section(CharacterProfile.Section.HISTORY));
+        assertFalse("past the History's length", parse(head
+                + "\"description\":\"\",\"profile\":{\"history\":\""
+                + history + "a\"}}").isValid());
+        assertFalse("an Appearance is not as long as a History", parse(head
+                + "\"description\":\"\",\"profile\":{\"appearance\":\""
+                + repeat(CharacterProfile.Section.APPEARANCE.getMaxLength() + 1)
+                + "\"}}").isValid());
+
+        String description = repeat(
+                LoreCharacterDefinition.MAX_DESCRIPTION_LENGTH);
+        LoreCharacterDefinitionJsonParser.ParseResult described = parse(head
+                + "\"description\":\"" + description + "\"}");
+        assertTrue(described.getErrors().toString(), described.isValid());
+        assertEquals("the description stands in for the History", description,
+                described.getDefinition().getProfile()
+                        .section(CharacterProfile.Section.HISTORY));
+        assertFalse(parse(head + "\"description\":\"" + description
+                + "a\"}").isValid());
+    }
+
     @Test
     public void anAgeIsReadWhenGivenAndHeldToACharactersBounds() {
         LoreCharacterDefinitionJsonParser.ParseResult aged = parse(
@@ -246,6 +278,14 @@ public final class LoreCharacterRegistryTest {
             writer.close();
         }
         return configRoot;
+    }
+
+    private static String repeat(int count) {
+        StringBuilder text = new StringBuilder();
+        for (int index = 0; index < count; index++) {
+            text.append('a');
+        }
+        return text.toString();
     }
 
     private static LoreCharacterDefinitionJsonParser.ParseResult parse(String json) {

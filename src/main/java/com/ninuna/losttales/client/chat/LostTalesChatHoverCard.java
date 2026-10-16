@@ -259,9 +259,11 @@ final class LostTalesChatHoverCard {
                 LostTalesChatVisualStyle.removeColorCodes(target.identityName).trim());
         String account = target.accountName.trim();
         // Never "Name ()" or "(Account)": the suffix only exists when both
-        // halves do, and an account identity shows the account alone.
+        // halves do, and an account identity shows the account alone. A
+        // character's account shows only to a player the server shows it to.
         String suffix = !target.accountIdentity && name.length() > 0
                 && account.length() > 0 && !name.equalsIgnoreCase(account)
+                && ClientChatChannelState.seesAccounts()
                 ? " (" + account + ")" : "";
         if (name.length() == 0) {
             name = account;
@@ -892,7 +894,13 @@ final class LostTalesChatHoverCard {
         if (recordedId == null) {
             return targetForAccount(minecraft, mention.account);
         }
-        if (ClientCharacterAppearanceCache.getAuthoritative(recordedId) != null) {
+        // The player as they are now, while it is still the character the
+        // line named; a character they no longer play is shown as the line
+        // recorded it, never as another character of the same account.
+        CharacterAppearance now = ClientCharacterAppearanceCache.getAuthoritative(recordedId);
+        UUID namedCharacter = mention.recorded.getCharacterId();
+        if (now != null && (namedCharacter == null
+                || namedCharacter.equals(now.getCharacterId()))) {
             return placedTarget(minecraft, recordedId, mention.account);
         }
         return recordedTarget(minecraft, mention.recorded);

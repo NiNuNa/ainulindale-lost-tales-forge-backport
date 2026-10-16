@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -16,16 +17,15 @@ import org.lwjgl.input.Keyboard;
 
 /**
  * Every view the screen can show, in the order the Views sub-window
- * shows them: each category's view, then the custom views, the Lost Tales
- * Menu's first. The player makes, names, keys and deletes custom views;
- * those and their names and keys are kept in the layout file, a
- * {@code view} line each.
+ * shows them: each category's view, then the custom views the player
+ * made. A custom view is numbered 1 to {@link #MAX_CUSTOM}; its key is
+ * the binding of its number in Controls (<em>Custom View 1</em> and on),
+ * set there or in the view's menu. The custom views and their names are
+ * kept in the layout file, a {@code view} line each.
  */
 public final class Views {
-    /** The most custom views there may be, the Lost Tales Menu's among them. */
+    /** The most custom views there may be: one per key in Controls. */
     public static final int MAX_CUSTOM = 8;
-    /** The Lost Tales Menu's key at first. */
-    static final int MENU_KEY = Keyboard.KEY_CAPITAL;
     /** What a {@code view} line starts with. */
     static final String LINE = "view";
 
@@ -39,21 +39,13 @@ public final class Views {
                 OWN.put(category, new View(category.id(), category));
             }
         }
-        reset();
     }
 
     private Views() {}
 
-    /** Back to a new player's views: the categories' and the Lost Tales Menu's, Caps Lock its key. */
+    /** Back to a new player's views: the categories' alone. */
     public static synchronized void reset() {
         CUSTOM.clear();
-        CUSTOM.add(menuAsShipped());
-    }
-
-    private static View menuAsShipped() {
-        View menu = new View(View.MENU_ID, null);
-        menu.setKey(MENU_KEY);
-        return menu;
     }
 
     /** Every view, the categories' first, then the custom views. */
@@ -63,21 +55,20 @@ public final class Views {
         return all;
     }
 
-    /** The custom views, the Lost Tales Menu's first. */
+    /** The custom views, in the order they were made. */
     public static synchronized List<View> custom() {
         return Collections.unmodifiableList(new ArrayList<View>(CUSTOM));
     }
 
-    /** A category's view: its own, or the one it shares (the whispers stand with the channels). */
+    /**
+     * A category's view: its own, or the one it shares (the whispers
+     * stand with the channels). A New Page with nowhere else to stand
+     * stands in the Chat view.
+     */
     public static synchronized View of(PageCategory category) {
         PageCategory home = category == null ? null : category.home();
         View own = home == null ? null : OWN.get(home);
-        return own != null ? own : menu();
-    }
-
-    /** The Lost Tales Menu's view. */
-    public static synchronized View menu() {
-        return CUSTOM.get(0);
+        return own != null ? own : OWN.get(PageCategory.CHANNELS);
     }
 
     /** The view of that id; null for none. */
@@ -90,17 +81,31 @@ public final class Views {
         return null;
     }
 
-    /** The custom view a keyboard key opens; null for none. */
-    public static synchronized View byKey(int keyCode) {
-        if (keyCode <= 0) {
-            return null;
-        }
+    /** The custom view of that number; null while there is none. */
+    public static synchronized View numbered(int number) {
         for (View view : CUSTOM) {
-            if (view.key() == keyCode) {
+            if (view.number() == number) {
                 return view;
             }
         }
         return null;
+    }
+
+    /**
+     * The number of the custom view whose key in Controls is that keyboard
+     * key, made or not; 0 for none.
+     */
+    public static int numberForKey(int keyCode) {
+        if (keyCode <= 0) {
+            return 0;
+        }
+        for (int number = 1; number <= MAX_CUSTOM; number++) {
+            KeyBinding binding = LostTalesKeyBindings.getViewKeyBinding(number);
+            if (binding != null && binding.getKeyCode() == keyCode) {
+                return number;
+            }
+        }
+        return 0;
     }
 
     /** Whether another custom view can be made. */
@@ -110,22 +115,38 @@ public final class Views {
 
     /** A new custom view, last on the bar, with the lowest number free; null at the most there may be. */
     static synchronized View make() {
-        if (!canMake()) {
-            return null;
-        }
-        for (int number = 1; ; number++) {
-            String id = View.MADE_PREFIX + number;
-            if (byId(id) == null) {
-                View made = new View(id, null);
-                CUSTOM.add(made);
-                return made;
+        for (int number = 1; number <= MAX_CUSTOM; number++) {
+            if (numbered(number) == null) {
+                return make(number);
             }
         }
+        return null;
     }
 
-    /** Takes a view the player made off the bar; its windows are the layout's to let go. */
+    /**
+     * The custom view of {@code number}, made last on the bar, as its key
+     * makes it; null for a number out of range or one standing already.
+     */
+    public static synchronized View make(int number) {
+        if (number < 1 || number > MAX_CUSTOM || numbered(number) != null) {
+            return null;
+        }
+        View made = new View(View.CUSTOM_PREFIX + number, null);
+        CUSTOM.add(made);
+        return made;
+    }
+
+    /**
+     * Takes a custom view off the bar, and its key away with it, so it
+     * never comes back by a key pressed later; its windows are the
+     * layout's to let go.
+     */
     static synchronized boolean delete(View view) {
-        return view != null && view.isDeletable() && CUSTOM.remove(view);
+        if (view == null || !view.isCustom() || !CUSTOM.remove(view)) {
+            return false;
+        }
+        bind(view.number(), 0);
+        return true;
     }
 
     /** Gives a custom view a name; an empty one gives it back its own. */
@@ -160,8 +181,8 @@ public final class Views {
     /**
      * Why a keyboard key cannot open {@code view}; null where it can. A
      * key the screen or the game keeps (Escape, Enter, F1, F3, a modifier
-     * alone), one another binding holds and one another view holds are
-     * refused. 0 takes the key away and is always allowed.
+     * alone), and one another binding holds, another view's among them,
+     * are refused. 0 takes the key away and is always allowed.
      */
     static synchronized String keyRefusal(View view, int keyCode) {
         if (keyCode == 0) {
@@ -172,10 +193,15 @@ public final class Views {
             return StatCollector.translateToLocalFormatted(
                     "gui.losttales.window.views.key.reserved", name);
         }
-        View other = byKey(keyCode);
-        if (other != null && other != view) {
+        int number = numberForKey(keyCode);
+        if (number > 0 && number != view.number()) {
+            View other = numbered(number);
             return StatCollector.translateToLocalFormatted(
-                    "gui.losttales.window.views.key.taken", name, other.title());
+                    "gui.losttales.window.views.key.taken", name,
+                    other != null ? other.title() : StatCollector
+                            .translateToLocal(LostTalesKeyBindings
+                                    .getViewKeyBinding(number)
+                                    .getKeyDescription()));
         }
         String binding = bindingHolding(keyCode);
         if (binding != null) {
@@ -187,11 +213,27 @@ public final class Views {
 
     /** Gives a custom view its key, where {@link #keyRefusal} allows it. */
     static synchronized boolean setKey(View view, int keyCode) {
-        if (view == null || !view.isCustom() || keyRefusal(view, keyCode) != null) {
+        if (view == null || !view.isCustom()
+                || keyRefusal(view, keyCode) != null) {
             return false;
         }
-        view.setKey(keyCode);
+        bind(view.number(), keyCode);
         return true;
+    }
+
+    /** Sets the binding of custom view {@code number} in Controls, and writes the game's options. */
+    private static void bind(int number, int keyCode) {
+        KeyBinding binding = LostTalesKeyBindings.getViewKeyBinding(number);
+        if (binding == null) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft != null && minecraft.gameSettings != null) {
+            minecraft.gameSettings.setOptionKeyBinding(binding, keyCode);
+        } else {
+            binding.setKeyCode(keyCode);
+        }
+        KeyBinding.resetKeyBindingArrayAndHash();
     }
 
     private static boolean isReserved(int keyCode) {
@@ -217,14 +259,18 @@ public final class Views {
         }
     }
 
-    /** The name of the game's binding on that key, in the player's language; null for none. */
+    /**
+     * The name of the game's binding on that key, in the player's
+     * language, the custom views' own left aside; null for none.
+     */
     private static String bindingHolding(int keyCode) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || minecraft.gameSettings == null) {
             return null;
         }
         for (KeyBinding binding : minecraft.gameSettings.keyBindings) {
-            if (binding != null && binding.getKeyCode() == keyCode) {
+            if (binding != null && binding.getKeyCode() == keyCode
+                    && !LostTalesKeyBindings.isViewKeyBinding(binding)) {
                 return StatCollector.translateToLocal(binding.getKeyDescription());
             }
         }
@@ -240,99 +286,60 @@ public final class Views {
     /* ---- The layout file ---- */
 
     /**
-     * A {@code view} line: a custom view's id, its key and the name the
-     * player gave it. A line that cannot be read is left out.
+     * A {@code view} line: a custom view's id and the name the player gave
+     * it. A line that cannot be read is left out.
      */
     static View parse(String[] parts) {
-        if (parts.length < 2 || !LINE.equals(parts[0])) {
+        if (parts.length < 2 || !LINE.equals(parts[0])
+                || numberOf(parts[1]) == 0) {
             return null;
         }
-        String id = parts[1];
-        if (!View.MENU_ID.equals(id) && !isMadeId(id)) {
-            return null;
-        }
-        View view = new View(id, null);
+        View view = new View(parts[1], null);
         for (int index = 2; index < parts.length; index++) {
-            String part = parts[index];
-            if (part.startsWith("key=")) {
-                try {
-                    int key = Integer.parseInt(part.substring(4));
-                    view.setKey(key > 0 && key < 256 && !isReserved(key) ? key : 0);
-                } catch (NumberFormatException unreadable) {
-                    view.setKey(0);
-                }
-            } else if (part.startsWith("name=")) {
-                view.setName(cleanName(decode(part.substring(5))));
+            if (parts[index].startsWith("name=")) {
+                view.setName(cleanName(decode(parts[index].substring(5))));
             }
         }
         return view;
     }
 
-    private static boolean isMadeId(String id) {
-        if (!id.startsWith(View.MADE_PREFIX) || id.length() > 4) {
-            return false;
+    /** The number a custom view's id names, 1 to {@link #MAX_CUSTOM}; 0 for no custom view's id. */
+    private static int numberOf(String id) {
+        if (!id.startsWith(View.CUSTOM_PREFIX)) {
+            return 0;
         }
-        for (int index = View.MADE_PREFIX.length(); index < id.length(); index++) {
-            if (!Character.isDigit(id.charAt(index))) {
-                return false;
+        String digits = id.substring(View.CUSTOM_PREFIX.length());
+        if (digits.length() == 0 || digits.length() > 2
+                || digits.charAt(0) == '0') {
+            return 0;
+        }
+        for (int index = 0; index < digits.length(); index++) {
+            if (digits.charAt(index) < '0' || digits.charAt(index) > '9') {
+                return 0;
             }
         }
-        return id.length() > View.MADE_PREFIX.length()
-                && id.charAt(View.MADE_PREFIX.length()) != '0';
+        int number = Integer.parseInt(digits);
+        return number <= MAX_CUSTOM ? number : 0;
     }
 
-    /**
-     * The custom views the file named, in its order, the Lost Tales
-     * Menu's first whatever the file says; a view named twice, or past the
-     * most there may be, is left out.
-     */
+    /** The custom views the file named, in its order; a view named twice is left out. */
     static synchronized void load(List<View> read) {
         CUSTOM.clear();
-        View menu = null;
-        List<View> made = new ArrayList<View>();
-        if (read != null) {
-            for (View view : read) {
-                if (View.MENU_ID.equals(view.id())) {
-                    if (menu == null) {
-                        menu = view;
-                    }
-                } else if (!containsId(made, view.id())) {
-                    made.add(view);
-                }
+        if (read == null) {
+            return;
+        }
+        for (View view : read) {
+            if (numbered(view.number()) == null) {
+                CUSTOM.add(view);
             }
         }
-        CUSTOM.add(menu != null ? menu : menuAsShipped());
-        for (View view : made) {
-            if (CUSTOM.size() >= MAX_CUSTOM) {
-                break;
-            }
-            CUSTOM.add(view);
-        }
-        // Two views never share a key: the first named keeps it.
-        for (int index = 1; index < CUSTOM.size(); index++) {
-            int key = CUSTOM.get(index).key();
-            for (int before = 0; before < index; before++) {
-                if (key != 0 && CUSTOM.get(before).key() == key) {
-                    CUSTOM.get(index).setKey(0);
-                }
-            }
-        }
-    }
-
-    private static boolean containsId(List<View> views, String id) {
-        for (View view : views) {
-            if (view.id().equals(id)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** Every custom view's line, in the bar's order. */
     static synchronized void describe(List<String> lines) {
         for (View view : CUSTOM) {
             StringBuilder line = new StringBuilder(LINE).append(' ')
-                    .append(view.id()).append(" key=").append(view.key());
+                    .append(view.id());
             if (view.name().length() > 0) {
                 line.append(" name=").append(encode(view.name()));
             }

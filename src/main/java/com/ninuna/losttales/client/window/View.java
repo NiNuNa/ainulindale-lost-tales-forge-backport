@@ -8,18 +8,15 @@ import net.minecraft.util.StatCollector;
 /**
  * One view of the window screen: the windows the screen shows, one view
  * at a time. A category's view (Chat, Consoles, Map, Quest Journal,
- * Fellowships, Profile, Settings) opens with the windows
+ * Fellowships, Profile, Settings) opens with the window
  * {@link ViewDefaults} lays out for it and has the category's key. A
- * custom view is the player's: the Lost Tales Menu's first, then any
- * they make; each opens with a New Page, and has a name and a key of its
- * own. Any page may stand in any view. Only a custom view the player
- * made can be deleted.
+ * custom view is the player's: numbered 1 to {@link Views#MAX_CUSTOM},
+ * opening with a New Page, with a name of its own and the key of its
+ * number's binding in Controls. Any page may stand in any view.
  */
 public final class View {
-    /** The Lost Tales Menu's id: the first custom view, which cannot be deleted. */
-    public static final String MENU_ID = "menu";
-    /** What a made view's id starts with, before its number. */
-    static final String MADE_PREFIX = "v";
+    /** What a custom view's id starts with, before its number. */
+    static final String CUSTOM_PREFIX = "v";
     /** The longest name a player may give a view. */
     public static final int MAX_NAME_LENGTH = 24;
 
@@ -27,15 +24,13 @@ public final class View {
     private final PageCategory category;
     /** The name the player gave it; empty for its own. */
     private String name = "";
-    /** The key that opens it, a keyboard code; 0 for none. A category's view uses its binding's. */
-    private int key;
 
     View(String id, PageCategory category) {
         this.id = id;
         this.category = category;
     }
 
-    /** Its code name in the layout file: the category's, {@code menu}, or {@code v1} and on. */
+    /** Its code name in the layout file: the category's, or {@code v1} and on. */
     public String id() {
         return this.id;
     }
@@ -49,9 +44,10 @@ public final class View {
         return this.category == null;
     }
 
-    /** Whether the player may delete it: a view they made, never the Lost Tales Menu's. */
-    public boolean isDeletable() {
-        return isCustom() && !MENU_ID.equals(this.id);
+    /** A custom view's number, which names its key in Controls; 0 for a category's view. */
+    public int number() {
+        return isCustom() ? Integer.parseInt(this.id.substring(
+                CUSTOM_PREFIX.length())) : 0;
     }
 
     /** Its name: the category's, the one the player gave it, else its own. */
@@ -59,16 +55,13 @@ public final class View {
         if (this.category != null) {
             return this.category.title();
         }
-        if (this.name.length() > 0) {
-            return this.name;
-        }
-        if (MENU_ID.equals(this.id)) {
-            return StatCollector.translateToLocal(
-                    "gui.losttales.window.views.menu");
-        }
+        return this.name.length() > 0 ? this.name : ownTitle();
+    }
+
+    /** The name a custom view wears while the player gives it none: Custom View and its number. */
+    public String ownTitle() {
         return StatCollector.translateToLocalFormatted(
-                "gui.losttales.window.views.made", this.id.substring(
-                        MADE_PREFIX.length()));
+                "gui.losttales.window.views.made", Integer.valueOf(number()));
     }
 
     /** The name the player gave it; empty while it keeps its own. */
@@ -81,19 +74,15 @@ public final class View {
     }
 
     /**
-     * The key that opens it: a custom view's own, a category's view's
-     * binding's (none for the settings, whose key is Ctrl+,); 0 for none.
+     * The key that opens it, its binding's: a custom view's by its number,
+     * a category's view's by its category (none for the settings, whose
+     * key is Ctrl+,); 0 for none.
      */
     public int key() {
-        if (this.category == null) {
-            return this.key;
-        }
-        KeyBinding binding = bindingOf(this.category);
+        KeyBinding binding = isCustom()
+                ? LostTalesKeyBindings.getViewKeyBinding(number())
+                : bindingOf(this.category);
         return binding == null ? 0 : binding.getKeyCode();
-    }
-
-    void setKey(int key) {
-        this.key = Math.max(0, key);
     }
 
     /** The binding that opens a category's view; null for the settings. */

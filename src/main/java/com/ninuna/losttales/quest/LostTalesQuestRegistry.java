@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +26,6 @@ import java.util.Set;
 public final class LostTalesQuestRegistry {
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static final Map<String, LostTalesQuestDefinition> SERVER_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
-    /** Counts the reads of the server's quest files, so what was built from one read knows when it is stale. */
-    private static int serverQuestRevision;
     private static final Map<String, LostTalesQuestDefinition> RUNTIME_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static List<LostTalesQuestDefinition> sortedQuests = Collections.emptyList();
     private static boolean loaded;
@@ -77,7 +76,6 @@ public final class LostTalesQuestRegistry {
         ensureLoaded();
         ServerQuestFiles.Result result = ServerQuestFiles.read(
                 ServerQuestFiles.directory(), STATIC_QUESTS_BY_ID.keySet());
-        serverQuestRevision++;
         SERVER_QUESTS_BY_ID.clear();
         for (LostTalesQuestDefinition quest : result.quests) {
             SERVER_QUESTS_BY_ID.put(quest.getId(), quest);
@@ -100,22 +98,23 @@ public final class LostTalesQuestRegistry {
 
     /** Forgets the server's own quests as the server stops. */
     public static synchronized void clearServerQuests() {
-        serverQuestRevision++;
         if (!SERVER_QUESTS_BY_ID.isEmpty()) {
             SERVER_QUESTS_BY_ID.clear();
             rebuildSortedQuests();
         }
     }
 
-    /** Counts the reads of the server's quest files: it changes whenever what players are sent does. */
-    public static synchronized int serverQuestRevision() {
-        return serverQuestRevision;
+    /**
+     * The server's own quest of this id, or null: a quest a client has no
+     * file for and is sent once it needs it ({@link ServerQuestSync}).
+     */
+    public static synchronized LostTalesQuestDefinition getServerQuest(String questId) {
+        return questId == null ? null : SERVER_QUESTS_BY_ID.get(questId);
     }
 
-    /** The server's own quests, in the order their files were read: what every player is sent. */
-    public static synchronized List<LostTalesQuestDefinition> getServerQuests() {
-        return Collections.unmodifiableList(
-                new ArrayList<LostTalesQuestDefinition>(SERVER_QUESTS_BY_ID.values()));
+    /** The ids of the server's own quests, as they stand now. */
+    public static synchronized Set<String> serverQuestIds() {
+        return new HashSet<String>(SERVER_QUESTS_BY_ID.keySet());
     }
 
     public static synchronized Collection<LostTalesQuestDefinition> getQuests() {

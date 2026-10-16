@@ -74,14 +74,18 @@ public final class TabRowTest {
     public void everyControlAnswersOnItsOwnBox() {
         int rowBottom = 100;
         int rowTop = TabRow.rowTop(rowBottom);
+        LostTalesUiHitBox views = TabRow.viewsBox(40, rowBottom);
         LostTalesUiHitBox search = TabRow.searchBox(40, rowBottom);
         assertEquals(search.width, search.height, EPSILON);
+        assertEquals(views.width, search.width, EPSILON);
+        assertEquals(views.top, search.top, EPSILON);
         // The strip begins two pixels left of the row, on the window's
         // own edge, its one-pixel frame standing just outside it; the
-        // button stands seven clear pixels inside the frame, and the
-        // first tab a button's five past it.
+        // Views button stands seven clear pixels inside the frame, Page
+        // Search a button's five past it, and the first tab five more.
         int stripInset = 2;
-        assertEquals(40 - stripInset + 7, search.left, EPSILON);
+        assertEquals(40 - stripInset + 7, views.left, EPSILON);
+        assertEquals(views.right() + 5, search.left, EPSILON);
         assertEquals(search.right() + 5,
                 40 + TabRow.tabRunLeftInset() - stripInset, EPSILON);
         assertEquals(TabRow.centredInStrip(rowBottom,

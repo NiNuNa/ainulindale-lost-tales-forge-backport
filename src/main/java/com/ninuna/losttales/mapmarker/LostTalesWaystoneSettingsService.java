@@ -1,7 +1,11 @@
 package com.ninuna.losttales.mapmarker;
 
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
-import com.ninuna.losttales.character.server.KnownAccounts;
+import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.server.AccountVisibility;
+import com.ninuna.losttales.character.storage.CharacterStorage;
+import com.ninuna.losttales.character.storage.CharacterWorldData;
+import com.ninuna.losttales.character.validation.CharacterNames;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
@@ -23,6 +27,11 @@ import net.minecraft.world.World;
  * Main-thread server authority for waystone settings. The block link and
  * repository revision are revalidated for every request, and every
  * answer goes back to the player as the waystone's state, saying why.
+ *
+ * <p>A waystone is shared with characters and fellowships. A share holds
+ * for that character alone, whoever plays it, never for its account's
+ * other characters, so nothing about it says which characters share an
+ * account.</p>
  */
 public final class LostTalesWaystoneSettingsService {
     private static final double MIN_DISCOVERY_RADIUS = 1.0D;
@@ -80,25 +89,25 @@ public final class LostTalesWaystoneSettingsService {
                 outcome = applySettings(
                         player, context.record, request);
                 break;
-            case SHARE_PLAYER:
-                outcome = applyPlayerSharing(
-                        context.world, context.record,
-                        request.getTargetPlayerName(), false);
+            case SHARE_CHARACTER:
+                outcome = applyCharacterSharing(
+                        player, context.world, context.record,
+                        request.getTargetName(), false);
                 break;
-            case UNSHARE_PLAYER:
-                outcome = applyPlayerSharing(
-                        context.world, context.record,
-                        request.getTargetPlayerName(), true);
+            case UNSHARE_CHARACTER:
+                outcome = applyCharacterSharing(
+                        player, context.world, context.record,
+                        request.getTargetName(), true);
                 break;
             case SHARE_FELLOWSHIP:
                 outcome = applyFellowshipSharing(
                         player, context.record,
-                        request.getTargetPlayerName(), false);
+                        request.getTargetName(), false);
                 break;
             case UNSHARE_FELLOWSHIP:
                 outcome = applyFellowshipSharing(
                         player, context.record,
-                        request.getTargetPlayerName(), true);
+                        request.getTargetName(), true);
                 break;
             default:
                 outcome = Outcome.refused(
@@ -329,32 +338,52 @@ public final class LostTalesWaystoneSettingsService {
         return value == null ? "" : value.trim();
     }
 
-    private static Outcome applyPlayerSharing(
-            World world, LostTalesMapMarkerRecord record,
-            String playerName, boolean remove) {
-        UUID targetId = remove ? sharedNamed(record, playerName) : null;
-        if (targetId == null) {
-            targetId = KnownAccounts.find(world, playerName);
-        }
-        if (targetId == null) {
+    private static Outcome applyCharacterSharing(
+            EntityPlayerMP sharer, World world,
+            LostTalesMapMarkerRecord record,
+            String characterName, boolean remove) {
+        CharacterWorldData characters;
+        try {
+            characters = CharacterStorage.get(world);
+        } catch (RuntimeException unreadable) {
             return Outcome.refused(
-                    LostTalesWaystoneStateReason.PLAYER_NOT_FOUND);
+                    LostTalesWaystoneStateReason.CHARACTER_NOT_FOUND);
         }
-        if (targetId.equals(record.getOwnerPlayerId())) {
+        UUID characterId = remove
+                ? sharedNamed(characters, record, characterName)
+                : null;
+        RoleplayCharacter named = null;
+        if (characterId == null) {
+            named = CharacterNames.named(
+                    characters.getRosters(), characterName);
+            characterId = named == null ? null : named.getCharacterId();
+        }
+        if (characterId == null) {
+            return Outcome.refused(
+                    LostTalesWaystoneStateReason.CHARACTER_NOT_FOUND);
+        }
+        // The owner's account sees the waystone as any character it
+        // plays. Only whoever knows the character is the owner's is told
+        // so; anyone else shares it as any other.
+        if (!remove && named != null
+                && named.getOwnerId().equals(record.getOwnerPlayerId())
+                && refusesOwnerShare(
+                        sharer.getUniqueID().equals(record.getOwnerPlayerId()),
+                        AccountVisibility.seesAccounts(sharer))) {
             return Outcome.refused(
                     LostTalesWaystoneStateReason.INVALID_SHARE);
         }
         Set<UUID> shared =
-                new LinkedHashSet<UUID>(record.getSharedPlayerIds());
+                new LinkedHashSet<UUID>(record.getSharedCharacterIds());
         if (remove) {
-            shared.remove(targetId);
+            shared.remove(characterId);
         } else {
-            if (shared.size()
-                    >= LostTalesMapMarkerRecord.MAX_SHARED_PLAYERS) {
+            if (!shared.contains(characterId) && shared.size()
+                    >= LostTalesMapMarkerRecord.MAX_SHARED_CHARACTERS) {
                 return Outcome.refused(
                         LostTalesWaystoneStateReason.SHARE_LIMIT);
             }
-            shared.add(targetId);
+            shared.add(characterId);
         }
         LostTalesMapMarkerVisibility visibility =
                 record.getVisibility();
@@ -362,7 +391,7 @@ public final class LostTalesWaystoneSettingsService {
                 && visibility == LostTalesMapMarkerVisibility.PRIVATE) {
             visibility = LostTalesMapMarkerVisibility.SHARED;
         }
-        return Outcome.of(record.withSharedPlayers(shared, visibility));
+        return Outcome.of(record.withSharedCharacters(shared, visibility));
     }
 
     private static Outcome applyFellowshipSharing(
@@ -437,17 +466,27 @@ public final class LostTalesWaystoneSettingsService {
     }
 
     /**
-     * The player already shared with who goes by that name, so one who has
-     * not visited in a while can still be taken off the list.
+     * Whether a share naming a character of the owner's own account is
+     * turned down. The owner knows their characters, and one shown
+     * accounts knows whose they are; anyone else is answered as any share
+     * is, so the answer does not say the character is the owner's.
      */
-    private static UUID sharedNamed(
-            LostTalesMapMarkerRecord record, String playerName) {
-        String wanted = trim(playerName);
-        if (wanted.length() == 0) {
-            return null;
-        }
-        for (UUID shared : record.getSharedPlayerIds()) {
-            if (wanted.equalsIgnoreCase(KnownAccounts.nameOf(shared))) {
+    static boolean refusesOwnerShare(boolean sharerIsOwner,
+                                     boolean seesAccounts) {
+        return sharerIsOwner || seesAccounts;
+    }
+
+    /**
+     * The character already shared with that goes by the name, deleted or
+     * not, so one that is no longer played can still be taken off.
+     */
+    private static UUID sharedNamed(CharacterWorldData characters,
+                                    LostTalesMapMarkerRecord record,
+                                    String characterName) {
+        for (UUID shared : record.getSharedCharacterIds()) {
+            RoleplayCharacter character = characters.findCharacter(shared);
+            if (character != null
+                    && CharacterNames.same(characterName, character.getName())) {
                 return shared;
             }
         }

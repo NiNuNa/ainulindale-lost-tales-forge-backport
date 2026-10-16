@@ -4,6 +4,7 @@ package com.ninuna.losttales.character.validation;
 public enum CharacterErrorId {
     NONE("none"),
     INVALID_PLAYER("invalid_player"),
+    FIRST_CHARACTER_PENDING("first_character_pending"),
     CLIENT_SIDE_REQUEST("client_side_request"),
     STORAGE_READ_ONLY("storage_read_only"),
     MALFORMED_REQUEST("malformed_request"),

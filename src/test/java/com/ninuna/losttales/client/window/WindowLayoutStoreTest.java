@@ -70,33 +70,32 @@ public final class WindowLayoutStoreTest {
         List<String> described = WindowLayoutStore.describe();
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());
-        assertTrue(described.get(2).contains(" split=ooc,global,down,0.6000 "));
+        assertTrue(described.get(1).contains(" split=ooc,global,down,0.6000 "));
     }
 
     /**
      * Every window names the view it stands in, and a page held filling
-     * its window is kept as held; custom views come first, with their
-     * keys and the names the player gave them.
+     * its window is kept as held; custom views come first, with the names
+     * the player gave them. A line naming no custom view is left out.
      */
     @Test
     public void viewsAndHeldPagesRoundTrip() {
         WindowLayoutStore.load(Arrays.asList(
-                "view menu key=0",
-                "view v2 key=34 name=Hunting%20Party",
+                "view v2 name=Hunting%20Party",
+                "view v9",
+                "view menu",
                 "window w1 view=v2 locked=true borderless=held x=10.00 y=20.00 active=global tabs=global,ooc",
                 "window w2 view=consoles locked=false x=0.00 y=0.00 active=client_console tabs=client_console"));
         assertEquals("Hunting Party", Views.byId("v2").title());
-        assertEquals(34, Views.byId("v2").key());
-        assertEquals(0, Views.menu().key());
+        assertEquals(1, Views.custom().size());
         assertEquals(Views.byId("v2"), WindowLayout.viewOf(WindowLayout.window("w1")));
         assertTrue(WindowLayout.window("w1").isBorderlessHeld());
         assertFalse(WindowLayout.window("w2").isBorderlessHeld());
         List<String> described = WindowLayoutStore.describe();
-        assertEquals("view menu key=0", described.get(1));
-        assertEquals("view v2 key=34 name=Hunting+Party", described.get(2));
-        assertTrue(described.toString(), described.get(3).startsWith(
+        assertEquals("view v2 name=Hunting+Party", described.get(1));
+        assertTrue(described.toString(), described.get(2).startsWith(
                 "window w1 view=v2 locked=true borderless=held "));
-        assertFalse(described.get(4).contains("borderless="));
+        assertFalse(described.get(3).contains("borderless="));
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());
     }
@@ -167,15 +166,15 @@ public final class WindowLayoutStoreTest {
         assertEquals(Window.ScreenFill.NONE,
                 WindowLayout.window("w4").getFill());
         List<String> described = WindowLayoutStore.describe();
-        // After the heading and the Lost Tales Menu's view line.
-        assertTrue(described.get(2).contains(" fill=full"));
-        assertFalse(described.get(3).contains("fill"));
-        assertTrue(described.get(4).contains(" fill=top_right"));
-        assertFalse(described.get(5).contains("fill"));
+        // After the heading.
+        assertTrue(described.get(1).contains(" fill=full"));
+        assertFalse(described.get(2).contains("fill"));
+        assertTrue(described.get(3).contains(" fill=top_right"));
+        assertFalse(described.get(4).contains("fill"));
         // A part the player shaped keeps its edges.
         assertEquals(Window.ScreenFill.free(0.25D, 0.0D, 0.75D, 1.0D),
                 WindowLayout.window("w5").getFill());
-        assertTrue(described.get(6).contains(
+        assertTrue(described.get(5).contains(
                 " fill=free:0.25000,0.00000,0.75000,1.00000"));
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());
@@ -262,11 +261,10 @@ public final class WindowLayoutStoreTest {
             assertTrue("the change is written", own.isFile());
             List<String> written = Files.readAllLines(own.toPath(),
                     Charset.forName("UTF-8"));
-            assertEquals("view menu key=58", written.get(1));
-            assertTrue(written.toString(), written.get(2).startsWith(
+            assertTrue(written.toString(), written.get(1).startsWith(
                     "window " + window.getId()
                             + " view=channels locked=true x=10.00 y=20.00"
-                            + " fill=bottom_left active=global tabs=global,ooc"));
+                            + " active=global tabs=global,ooc"));
         } finally {
             WindowLayoutStore.initialize(null);
             deleteTree(folder);

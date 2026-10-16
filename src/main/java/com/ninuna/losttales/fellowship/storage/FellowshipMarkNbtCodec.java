@@ -1,6 +1,7 @@
 package com.ninuna.losttales.fellowship.storage;
 
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
+import com.ninuna.losttales.fellowship.model.FellowshipMarkKind;
 import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
 import com.ninuna.losttales.util.LostTalesLog;
@@ -12,16 +13,19 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * Versioned NBT codec for fellowships' marks. The root and each mark are
- * read only at the version this build writes; any other version keeps the
- * whole store as it is, read-only. A mark that lacks a key this build
- * always writes, or one past the most a fellowship holds, goes to the
+ * Versioned NBT codec for the marks of both kinds. The root and each mark
+ * are read only at the version this build writes; any other version keeps
+ * the whole store as it is, read-only. A mark that lacks a key its kind
+ * always writes, names no kind this build knows, is a second go-here mark
+ * of one owner, or stands past the most a fellowship holds, goes to the
  * quarantine whole.
  */
 public final class FellowshipMarkNbtCodec {
@@ -33,6 +37,7 @@ public final class FellowshipMarkNbtCodec {
     private static final String TAG_REASON = "Reason";
     private static final String TAG_MARK_INDEX = "MarkIndex";
     private static final String TAG_MARK_UUID = "MarkUUID";
+    private static final String TAG_KIND = "Kind";
     private static final String TAG_FELLOWSHIP_UUID = "FellowshipUUID";
     private static final String TAG_NAME = "Name";
     private static final String TAG_PLACED_BY = "PlacedByCharacterUUID";
@@ -85,6 +90,7 @@ public final class FellowshipMarkNbtCodec {
                 new ArrayList<NBTTagCompound>(quarantine.getEntries());
         Map<UUID, FellowshipMark> marks = new LinkedHashMap<UUID, FellowshipMark>();
         Map<UUID, Integer> perFellowship = new LinkedHashMap<UUID, Integer>();
+        Set<UUID> goHereOwners = new HashSet<UUID>();
         NBTTagList list = safeSource.getTagList(TAG_MARKS, Constants.NBT.TAG_COMPOUND);
         for (int index = 0; index < list.tagCount(); index++) {
             NBTTagCompound raw = list.getCompoundTagAt(index);
@@ -101,12 +107,19 @@ public final class FellowshipMarkNbtCodec {
                 failure = "invalid_mark_data";
             }
             if (mark == null && failure == null) {
-                failure = "missing_mark_key";
+                failure = raw.hasKey(TAG_KIND, Constants.NBT.TAG_STRING)
+                        && FellowshipMarkKind.fromId(raw.getString(TAG_KIND)) == null
+                        ? "unknown_mark_kind" : "missing_mark_key";
             }
             if (mark != null && marks.containsKey(mark.getMarkId())) {
                 failure = "duplicate_mark";
             }
-            Integer held = mark == null ? null : perFellowship.get(mark.getFellowshipId());
+            if (failure == null && mark.isGoHere()
+                    && goHereOwners.contains(mark.getPlacedBy())) {
+                failure = "duplicate_go_here";
+            }
+            Integer held = mark == null || mark.isGoHere() ? null
+                    : perFellowship.get(mark.getFellowshipId());
             if (failure == null && held != null
                     && held.intValue() >= FellowshipMark.MAX_PER_FELLOWSHIP) {
                 failure = "too_many_marks";
@@ -118,8 +131,12 @@ public final class FellowshipMarkNbtCodec {
                 continue;
             }
             marks.put(mark.getMarkId(), mark);
-            perFellowship.put(mark.getFellowshipId(),
-                    Integer.valueOf(held == null ? 1 : held.intValue() + 1));
+            if (mark.isGoHere()) {
+                goHereOwners.add(mark.getPlacedBy());
+            } else {
+                perFellowship.put(mark.getFellowshipId(),
+                        Integer.valueOf(held == null ? 1 : held.intValue() + 1));
+            }
         }
         return ReadResult.success(marks, repaired, quarantinedEntries);
     }
@@ -135,8 +152,11 @@ public final class FellowshipMarkNbtCodec {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, FellowshipMark.CURRENT_DATA_VERSION);
         NbtTags.writeUuid(tag, TAG_MARK_UUID, mark.getMarkId());
-        NbtTags.writeUuid(tag, TAG_FELLOWSHIP_UUID, mark.getFellowshipId());
-        tag.setString(TAG_NAME, mark.getName());
+        tag.setString(TAG_KIND, mark.getKind().getId());
+        if (!mark.isGoHere()) {
+            NbtTags.writeUuid(tag, TAG_FELLOWSHIP_UUID, mark.getFellowshipId());
+            tag.setString(TAG_NAME, mark.getName());
+        }
         NbtTags.writeUuid(tag, TAG_PLACED_BY, mark.getPlacedBy());
         tag.setInteger(TAG_DIMENSION_ID, mark.getDimensionId());
         tag.setDouble(TAG_X, mark.getX());
@@ -145,34 +165,58 @@ public final class FellowshipMarkNbtCodec {
         return tag;
     }
 
-    /** The mark a tag holds; null where a key this build always writes is missing. */
+    /**
+     * The mark a tag holds; null where its kind is not one this build knows,
+     * or a key its kind always writes is missing.
+     */
     private static FellowshipMark readMark(NBTTagCompound source) {
         UUID markId = NbtTags.readUuid(source, TAG_MARK_UUID);
-        UUID fellowshipId = NbtTags.readUuid(source, TAG_FELLOWSHIP_UUID);
         UUID placedBy = NbtTags.readUuid(source, TAG_PLACED_BY);
-        if (markId == null || fellowshipId == null || placedBy == null
-                || !source.hasKey(TAG_NAME, Constants.NBT.TAG_STRING)
+        FellowshipMarkKind kind = source.hasKey(TAG_KIND, Constants.NBT.TAG_STRING)
+                ? FellowshipMarkKind.fromId(source.getString(TAG_KIND)) : null;
+        if (markId == null || placedBy == null || kind == null
                 || !source.hasKey(TAG_DIMENSION_ID, Constants.NBT.TAG_INT)
                 || !source.hasKey(TAG_X, Constants.NBT.TAG_DOUBLE)
                 || !source.hasKey(TAG_Z, Constants.NBT.TAG_DOUBLE)
                 || !source.hasKey(TAG_PLACED_AT, Constants.NBT.TAG_LONG)) {
             return null;
         }
-        return new FellowshipMark(markId, fellowshipId,
-                source.getString(TAG_NAME), placedBy,
-                source.getInteger(TAG_DIMENSION_ID), source.getDouble(TAG_X),
-                source.getDouble(TAG_Z), source.getLong(TAG_PLACED_AT));
+        int dimensionId = source.getInteger(TAG_DIMENSION_ID);
+        double x = source.getDouble(TAG_X);
+        double z = source.getDouble(TAG_Z);
+        long placedAt = source.getLong(TAG_PLACED_AT);
+        if (kind == FellowshipMarkKind.GO_HERE) {
+            if (source.hasKey(TAG_FELLOWSHIP_UUID) || source.hasKey(TAG_NAME)) {
+                throw new IllegalArgumentException("a go-here mark holds no fellowship");
+            }
+            return FellowshipMark.goHere(markId, placedBy, dimensionId, x, z, placedAt);
+        }
+        UUID fellowshipId = NbtTags.readUuid(source, TAG_FELLOWSHIP_UUID);
+        if (fellowshipId == null || !source.hasKey(TAG_NAME, Constants.NBT.TAG_STRING)) {
+            return null;
+        }
+        return FellowshipMark.ofFellowship(markId, fellowshipId,
+                source.getString(TAG_NAME), placedBy, dimensionId, x, z, placedAt);
     }
 
-    /** A fellowship's marks together, the oldest first. */
+    /**
+     * The go-here marks first, by owner, then each fellowship's marks
+     * together, the oldest first.
+     */
     private static final Comparator<FellowshipMark> ORDER =
             new Comparator<FellowshipMark>() {
                 @Override
                 public int compare(FellowshipMark left, FellowshipMark right) {
-                    int byFellowship = left.getFellowshipId().toString().compareTo(
-                            right.getFellowshipId().toString());
-                    if (byFellowship != 0) {
-                        return byFellowship;
+                    if (left.getKind() != right.getKind()) {
+                        return left.getKind().compareTo(right.getKind());
+                    }
+                    int byHolder = left.isGoHere()
+                            ? left.getPlacedBy().toString().compareTo(
+                                    right.getPlacedBy().toString())
+                            : left.getFellowshipId().toString().compareTo(
+                                    right.getFellowshipId().toString());
+                    if (byHolder != 0) {
+                        return byHolder;
                     }
                     return left.getPlacedAt() != right.getPlacedAt()
                             ? (left.getPlacedAt() < right.getPlacedAt() ? -1 : 1)

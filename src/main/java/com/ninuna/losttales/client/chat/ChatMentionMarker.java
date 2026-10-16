@@ -34,11 +34,16 @@ final class ChatMentionMarker {
 
     /**
      * A player mention; {@code recorded} is the player as the line names
-     * them, or null where nobody could place them.
+     * them, or null where nobody could place them. A character recorded
+     * without its account, as a player not shown accounts is told of one,
+     * is marked by the record alone.
      */
     static ChatComponentText apply(ChatComponentText component, int color,
                                    String account, ChatNamedPlayer recorded) {
-        if (component != null && account != null && account.length() > 0) {
+        boolean placed = account != null && (account.length() > 0
+                || (recorded != null && recorded.getCharacterId() != null
+                        && recorded.getPlayerId() != null));
+        if (component != null && placed) {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
@@ -79,7 +84,8 @@ final class ChatMentionMarker {
         try {
             int color = Integer.parseInt(fields[0], 16) & 0xFFFFFF;
             String target = decodeText(fields[2]);
-            if (target.length() == 0) {
+            // Only a recorded character may stand without its account.
+            if (target.length() == 0 && fields.length != 7) {
                 return null;
             }
             if (ROLE.equals(fields[1]) && fields.length == 3) {

@@ -20,9 +20,10 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The server's own quests and the world quests on the wire: a definition
- * keeps its world and dialogue blocks, an empty list still clears the
- * client's, each player is sent only their own part, and a payload of any
- * other shape is refused whole.
+ * keeps its world and dialogue blocks, a list sent in place of the
+ * client's clears it even when empty while one added to it sends nothing
+ * for nothing, each player is sent only their own part, and a payload of
+ * any other shape is refused whole.
  */
 public final class LostTalesWorldQuestPacketsTest {
     private final UUID aldric = UUID.fromString(
@@ -33,7 +34,7 @@ public final class LostTalesWorldQuestPacketsTest {
         LostTalesQuestDefinition quest = WorldQuestFixtures.greenway();
         List<LostTalesServerQuestSyncPacket> packets =
                 LostTalesServerQuestSyncPacket.packetsFor(
-                        Collections.singletonList(quest));
+                        Collections.singletonList(quest), false);
         assertEquals(1, packets.size());
         ByteBuf buffer = Unpooled.buffer();
         packets.get(0).toBytes(buffer);
@@ -41,7 +42,7 @@ public final class LostTalesWorldQuestPacketsTest {
                 new LostTalesServerQuestSyncPacket();
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
-        assertTrue(decoded.isFirst());
+        assertFalse(decoded.replaces());
         LostTalesQuestDefinition read = decoded.getQuests().get(0);
         assertTrue(read.isWorldQuest());
         assertEquals("7", read.getWorld().get("days"));
@@ -52,10 +53,13 @@ public final class LostTalesWorldQuestPacketsTest {
     public void anEmptyListStillClearsTheClients() {
         List<LostTalesServerQuestSyncPacket> packets =
                 LostTalesServerQuestSyncPacket.packetsFor(
-                        Collections.<LostTalesQuestDefinition>emptyList());
+                        Collections.<LostTalesQuestDefinition>emptyList(), true);
         assertEquals(1, packets.size());
-        assertTrue(packets.get(0).isFirst());
+        assertTrue(packets.get(0).replaces());
         assertTrue(packets.get(0).getQuests().isEmpty());
+        assertTrue(LostTalesServerQuestSyncPacket.packetsFor(
+                Collections.<LostTalesQuestDefinition>emptyList(), false)
+                .isEmpty());
     }
 
     @Test

@@ -16,18 +16,21 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Mouse;
 
 /**
- * The Views sub-window: a row of square buttons at the foot of every
- * screen, as Steam's overlay keeps its bar. Each category's view first, a
- * hairline, then the custom views, the Lost Tales Menu's first, and the
- * {@code +} that makes another. A press swaps the screen to that view,
- * and the one shown stands lit; a right-click opens the view's menu
- * (rename, key, reset, delete). It cannot be closed, stands in front of
- * every window and sub-window, and never fades.
+ * The Views sub-window: a row of square buttons, as Steam's overlay keeps
+ * its bar. Each category's view first, a hairline, then the custom views
+ * and the {@code +} that makes another. A press swaps the screen to that
+ * view, and the one shown stands lit; a right-click opens the view's menu
+ * (rename, key, reset, delete). The Views button at the left end of every
+ * tab row opens and closes it. It belongs to the screen rather than to the
+ * window it was opened from, so it stays open as the views swap.
  */
 final class ViewsWindow extends SubWindowContent {
     /** The kind the screen opens it as, and the layout file keeps its place by. */
     static final SubWindowKind KIND = SubWindowKind.register("views",
             "gui.losttales.window.sub.views");
+    /** Its glyph, on its strip and its button: a stand-in until its own is painted. */
+    static final LostTalesUiSheet ICON = LostTalesUiSheet.SPLIT;
+    static final LostTalesUiSheet ICON_LIT = LostTalesUiSheet.SPLIT_LIT;
     /** A button's side: an icon with a framed button's wide inset round it. */
     static final int BUTTON = LostTalesUiInk.ICON_SIZE
             + 2 * LostTalesUiFramedButton.WIDE_INSET;
@@ -46,18 +49,8 @@ final class ViewsWindow extends SubWindowContent {
     private int pointed = -1;
 
     @Override
-    public boolean isPermanent() {
-        return true;
-    }
-
-    @Override
-    public boolean standsInFront() {
-        return true;
-    }
-
-    @Override
     public LostTalesUiSheet stripIcon() {
-        return null;
+        return ICON;
     }
 
     @Override
@@ -308,13 +301,10 @@ final class ViewsWindow extends SubWindowContent {
         }
     }
 
-    /** Where it first stands: centred at the foot of {@code screen}, the room it is held in. */
-    LostTalesUiHitBox firstContentBox(LostTalesUiHitBox screen) {
+    /** Where it first stands in {@code room}: hung from the Views button pressed. */
+    LostTalesUiHitBox firstContentBox(SubWindowAnchor anchor,
+                                      LostTalesUiHitBox room) {
         int width = naturalWidth();
-        int height = naturalHeight(width);
-        return new LostTalesUiHitBox(
-                Math.floor(screen.left + (screen.width - width) / 2.0D),
-                screen.top + screen.height - height,
-                width, height);
+        return anchor.contentBoxFor(width, naturalHeight(width), room);
     }
 }

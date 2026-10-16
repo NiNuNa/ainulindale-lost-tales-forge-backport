@@ -10,7 +10,9 @@ import net.minecraft.util.StatCollector;
  * What a marker with no name of its own is called after, kept beside its
  * empty name so each game words it in its own language:
  * {@code player:Nils} for a waystone its placer has not named
- * ({@code Nils's Waystone}), {@code entity:losttales.Nia} for a quest
+ * ({@code Nils's Waystone}), by their account's name, or their
+ * character's while the server shows no accounts,
+ * {@code entity:losttales.Nia} for a quest
  * giver known by its kind, {@code block:losttales:cheese_wheel} for a
  * block that gives a quest. A name a player or an operator gave a marker
  * always stands over it.
@@ -28,9 +30,9 @@ public final class LostTalesMapMarkerNamedAfter {
 
     private LostTalesMapMarkerNamedAfter() {}
 
-    /** A waystone called after the account name of the player who placed it. */
-    public static String player(String accountName) {
-        return of(PLAYER, accountName);
+    /** A waystone called after the player who placed it, by their account's or their character's name. */
+    public static String player(String placerName) {
+        return of(PLAYER, placerName);
     }
 
     /** A marker called after a creature's kind, as {@code EntityList} names it. */
@@ -45,7 +47,7 @@ public final class LostTalesMapMarkerNamedAfter {
 
     /**
      * Whether {@code namedAfter} is nothing, or one of the three kinds:
-     * an account name of printable characters, or a creature kind or a
+     * a placer's name of printable characters, or a creature kind or a
      * block id of letters, digits and {@code _ . : -}, as the game's
      * registries write them. Only the last two ever name a lang key.
      */
@@ -74,7 +76,7 @@ public final class LostTalesMapMarkerNamedAfter {
         return subject.matches("[A-Za-z0-9_.:\\-]+");
     }
 
-    /** The account, kind or block the reference names; empty for none. */
+    /** The placer, kind or block the reference names; empty for none. */
     public static String subject(String namedAfter) {
         String value = namedAfter == null ? "" : namedAfter;
         for (String prefix : new String[] {PLAYER, ENTITY, BLOCK}) {

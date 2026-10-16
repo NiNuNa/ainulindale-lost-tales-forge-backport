@@ -39,12 +39,13 @@ public final class LostTalesChatSendPacket implements IMessage {
     public static final int IDENTITY_CHARACTER = 2;
 
     // The fixed fields, the action flag and the unkept-quote flag among them.
-    private static final int MAX_PACKET_BYTES = 752
+    private static final int MAX_PACKET_BYTES = 816
             + ChatMessageValidator.MAX_UTF8_BYTES
             + ChatShareTokenParser.MAX_TOKENS
             * (ChatShareReference.MAX_MARKER_ID_BYTES + 8);
     private static final int MAX_CHANNEL_BYTES = 16;
-    private static final int MAX_TARGET_BYTES = 64;
+    /** An account's name, or a character's: 32 letters of up to four bytes. */
+    private static final int MAX_TARGET_BYTES = 128;
     /** An identity name is bounded like the one a line is signed with. */
     private static final int MAX_IDENTITY_BYTES = 256;
 

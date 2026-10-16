@@ -29,6 +29,7 @@ final class TabMenus {
     /** Marks a row a page found: this, the page's id, a colon, and the row's own id. */
     private static final String ENTRY_FIND_PREFIX = "find:";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
+    private static final String ENTRY_SNAP_LAYOUTS = "window:snap_layouts";
     /** The row of a tab's options that opens its split view beside the menu. */
     private static final String SPLIT_VIEW = "split_view";
     /** The rows of the split view, and the page a split is made with after this. */
@@ -530,8 +531,9 @@ final class TabMenus {
      * on the row anywhere but a tab: what a window has that nothing else
      * on the row offers. Locking
      * and closing are not among them, since the padlock and the cross
-     * stand beside the dots. Its two pins come first, then Reset Window
-     * Layout, and last Window Settings, which opens beside it.
+     * stand beside the dots. Its two pins come first, then Snap Layouts,
+     * which opens beside it, and Reset Window Layout, and last Window
+     * Settings, which opens beside it too.
      */
     void showWindowMenu(Window window, SubWindowAnchor anchor,
                         boolean toggle) {
@@ -1102,6 +1104,12 @@ final class TabMenus {
                         window.isPinnedToGui()));
                 entries.add(MenuWindow.Entry.separator());
                 entries.add(heldWhileLocked(new MenuWindow.Entry(
+                        ENTRY_SNAP_LAYOUTS, StatCollector.translateToLocal(
+                                "gui.losttales.window.menu.snap_layouts"))
+                        .withSprite(LostTalesUiSheet.FULLSCREEN,
+                                LostTalesUiSheet.FULLSCREEN_HOVER, false),
+                        window));
+                entries.add(heldWhileLocked(new MenuWindow.Entry(
                         ENTRY_WINDOW_RESET, StatCollector.translateToLocal(
                                 "gui.losttales.window.menu.reset"))
                         .withSprite(LostTalesUiSheet.RESET,
@@ -1114,9 +1122,9 @@ final class TabMenus {
         }
 
         /**
-         * Window Settings opens beside the menu, or goes away while it is
-         * out, and the menu stays; so do the pins; the rest are done with
-         * it.
+         * Window Settings and Snap Layouts open beside the menu, or go
+         * away while they are out, and the menu stays; so do the pins;
+         * the rest are done with it.
          */
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
@@ -1139,6 +1147,12 @@ final class TabMenus {
             if (ENTRY_PIN_GUI.equals(entry.id)) {
                 WindowLayout.setPinnedToGui(window.getId(),
                         !window.isPinnedToGui());
+                return true;
+            }
+            if (ENTRY_SNAP_LAYOUTS.equals(entry.id)) {
+                if (!back) {
+                    TabMenus.this.screen.toggleSnapLayouts(window, menuWindow);
+                }
                 return true;
             }
             if (ENTRY_WINDOW_RESET.equals(entry.id)

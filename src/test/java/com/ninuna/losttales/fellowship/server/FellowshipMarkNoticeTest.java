@@ -24,7 +24,7 @@ import static org.junit.Assert.assertTrue;
 /** The Server's line in a fellowship's conversation about its marks. */
 public final class FellowshipMarkNoticeTest {
 
-    private static final FellowshipMark MARK = new FellowshipMark(
+    private static final FellowshipMark MARK = FellowshipMark.ofFellowship(
             UUID.fromString("40000000-0000-0000-0000-000000000001"),
             UUID.fromString("20000000-0000-0000-0000-000000000002"),
             "Weathertop",

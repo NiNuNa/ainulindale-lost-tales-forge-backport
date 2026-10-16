@@ -3,17 +3,20 @@ package com.ninuna.losttales.fellowship.model;
 import java.util.Locale;
 
 /**
- * The three things a fellowship can switch on for its members, as LOTR's
- * fellowships can, all on for a new one: members cannot hurt each other,
- * nor each other's hired units, and they show to each other on the map even
- * while hiding. LOTR's fellowship behind each of ours carries them out.
+ * The three things a fellowship can switch on for its members, all on for a
+ * new one: members cannot hurt each other, nor each other's hired units, and
+ * their places go to each other (the compass, the HUD's order, our map).
+ * LOTR's fellowship behind each of ours carries out the two on harm.
  */
 public enum FellowshipSwitch {
     /** Members cannot hurt each other. Leader and guides set it. */
     NO_FIGHTING(0, "no_fighting", false),
     /** Members cannot hurt each other's hired units. Leader and guides set it. */
     NO_HIRED_HARM(1, "no_hired_harm", false),
-    /** Members show to each other on the map even while hiding. The leader sets it. */
+    /**
+     * Members' places go to each other, but never the place of one who hides
+     * on LOTR's map. The leader sets it.
+     */
     SHOWN_ON_MAP(2, "shown_on_map", true);
 
     private final int networkId;

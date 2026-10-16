@@ -7,14 +7,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.opengl.GL11;
 
 /**
  * Where a carried window will go, shown as a desktop shows it: a pane
@@ -26,13 +21,6 @@ import org.lwjgl.opengl.GL11;
  * window itself keeps its size under the hand all the while. Let go in a
  * zone, the window glides into the pane as the pane fades where it
  * stands.
- *
- * <p>On a suggestion, every other window the suggestion sends along has
- * a pane of its own, growing out of that window into its zone with the
- * window's tab icon large in its middle, as a desktop previews a snap
- * group on its acrylic; the panes go back into their windows when the
- * pointer leaves the suggestion, and fade where they stand as the
- * windows glide into them when it is taken.</p>
  */
 public final class SnapPreview {
     /**
@@ -41,20 +29,11 @@ public final class SnapPreview {
      * than as one.
      */
     static final float GLASS_SHARE = 0.5F;
-    /**
-     * How many times its own size a window's tab icon stands in the pane
-     * a suggestion sends the window to: a whole number, so the artwork
-     * keeps its texels, and smaller only where a pane has no room for it.
-     */
-    static final int ICON_SCALE = 3;
 
-    /** The window the panes belong to, the carried one, or null while none shows. */
+    /** The window the pane belongs to, the carried one, or null while none shows. */
     private String windowId;
-    /** The carried window's own pane. */
+    /** The carried window's pane. */
     private final Track own = new Track();
-    /** The panes of the other windows the suggestion under the pointer sends along, by window. */
-    private final Map<String, Track> companions =
-            new LinkedHashMap<String, Track>();
 
     SnapPreview() {
         reset();
@@ -91,90 +70,41 @@ public final class SnapPreview {
         }
     }
 
-    /** Where a window stands as drawn this frame, by id; null for one that has gone. */
-    public interface Boxes {
-        WindowPlacement.Box of(String windowId);
-    }
-
-    /** A companion's pane as it shows this frame, and whose it is. */
-    public static final class Shown {
-        public final String windowId;
-        public final Pane pane;
-        public final float opacity;
-
-        Shown(String windowId, Pane pane, float opacity) {
-            this.windowId = windowId;
-            this.pane = pane;
-            this.opacity = opacity;
-        }
-    }
-
-    /** As below, with no other window sent along. */
-    void aim(String windowId, Window.ScreenFill fill) {
-        aim(windowId, fill,
-                Collections.<String, Window.ScreenFill>emptyMap());
-    }
-
     /**
      * One frame of a carry: the pane is bound for {@code fill} for the
-     * window {@code windowId}, or back into the window for none, and each
-     * of {@code companions} — the other windows a suggestion sends along,
-     * each with its zone — has a pane of its own bound there, while a
-     * window no longer among them has its pane go back into it. A new aim
+     * window {@code windowId}, or back into the window for none. A new aim
      * starts a leg from the pane as it stands.
      */
-    void aim(String windowId, Window.ScreenFill fill,
-             Map<String, Window.ScreenFill> companions) {
+    void aim(String windowId, Window.ScreenFill fill) {
         if (windowId == null) {
             reset();
             return;
         }
         if (!windowId.equals(this.windowId)) {
-            // Another window's panes, still fading, give way at once.
+            // Another window's pane, still fading, gives way at once.
             reset();
             this.windowId = windowId;
         }
         this.own.aim(fill);
-        for (Map.Entry<String, Track> entry : this.companions.entrySet()) {
-            if (!companions.containsKey(entry.getKey())) {
-                entry.getValue().aim(Window.ScreenFill.NONE);
-            }
-        }
-        for (Map.Entry<String, Window.ScreenFill> companion
-                : companions.entrySet()) {
-            Track track = this.companions.get(companion.getKey());
-            if (track == null) {
-                track = new Track();
-                this.companions.put(companion.getKey(), track);
-            }
-            track.aim(companion.getValue());
-        }
     }
 
     /**
      * The carry is over. Let go into the pane ({@code filled}), the
-     * window glides into it and the pane fades where it stands, as every
-     * companion's pane does; otherwise every pane goes back into its
-     * window.
+     * window glides into it and the pane fades where it stands; otherwise
+     * the pane goes back into the window.
      */
     void release(boolean filled) {
         if (filled && this.own.isBound()) {
             this.own.land();
-            for (Track track : this.companions.values()) {
-                if (track.isBound()) {
-                    track.land();
-                }
-            }
             return;
         }
         aim(this.windowId, Window.ScreenFill.NONE);
     }
 
-    /** Forgets every pane at once. */
+    /** Forgets the pane at once. */
     void reset() {
         this.windowId = null;
         this.own.reset();
-        this.companions.clear();
     }
 
     /** The window the pane is drawn under — between it and the windows behind it — or null. */
@@ -197,7 +127,7 @@ public final class SnapPreview {
         }
         Pane pane = this.own.advance(minecraft, window, screenWidth,
                 screenHeight, System.nanoTime());
-        if (pane == null && this.companions.isEmpty()) {
+        if (pane == null) {
             reset();
         }
         return pane;
@@ -206,33 +136,6 @@ public final class SnapPreview {
     /** How much of the carried window's pane shows, 0..1, as last advanced. */
     public float opacity() {
         return this.own.opacity();
-    }
-
-    /**
-     * Moves every companion's pane on to this instant and answers the
-     * ones that show, each grown out of its own window as {@code boxes}
-     * has it this frame. A companion whose pane has gone, or whose
-     * window has, is let go.
-     */
-    public List<Shown> advanceCompanions(Minecraft minecraft, Boxes boxes,
-                                  int screenWidth, int screenHeight) {
-        List<Shown> shown = new ArrayList<Shown>(this.companions.size());
-        long now = System.nanoTime();
-        Iterator<Map.Entry<String, Track>> iterator =
-                this.companions.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<String, Track> entry = iterator.next();
-            WindowPlacement.Box box = boxes.of(entry.getKey());
-            Pane pane = box == null ? null : entry.getValue().advance(
-                    minecraft, box, screenWidth, screenHeight, now);
-            if (pane == null) {
-                iterator.remove();
-                continue;
-            }
-            shown.add(new Shown(entry.getKey(), pane,
-                    entry.getValue().opacity()));
-        }
-        return shown;
     }
 
     /**
@@ -321,46 +224,6 @@ public final class SnapPreview {
 
         float opacity() {
             return this.shown.clamped();
-        }
-    }
-
-    /**
-     * A companion window's front tab icon in the middle of its pane, as a
-     * desktop lays an app's icon on the acrylic it previews the app with:
-     * {@link #ICON_SCALE} times its own size, smaller where the pane has
-     * no room for that and the icon's shadow, on the display's grid.
-     */
-    public static void drawIcon(Minecraft minecraft, String windowId, Pane pane,
-                         float opacity) {
-        Window window = WindowLayout.window(windowId);
-        WindowPage front = window == null ? null : WindowFrame.activeTab(
-                window, WindowFrame.visibleTabs(window));
-        int alpha = Math.round(255.0F * Math.min(1.0F, opacity));
-        if (minecraft == null || front == null || pane == null
-                || alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
-            return;
-        }
-        float width = (float)(pane.right - pane.left);
-        float height = (float)(pane.bottom - pane.top);
-        int scale = ICON_SCALE;
-        while (scale > 1 && (scale * (LostTalesUiInk.ICON_SIZE + 1) > width
-                || scale * (LostTalesUiInk.ICON_SIZE + 1) > height)) {
-            scale--;
-        }
-        float size = scale * LostTalesUiInk.ICON_SIZE;
-        float pixels = LostTalesDisplayPixels.scaleFactor();
-        GL11.glPushMatrix();
-        try {
-            GL11.glTranslatef((float)pane.left
-                            + LostTalesUiInk.centredStart(width, size, pixels),
-                    (float)pane.top
-                            + LostTalesUiInk.centredStart(height, size, pixels),
-                    0.0F);
-            GL11.glScalef(scale, scale, 1.0F);
-            LostTalesUiInk.beginContent();
-            front.drawIcon(minecraft, 0.0F, 0.0F, alpha, TabMark.NONE);
-        } finally {
-            GL11.glPopMatrix();
         }
     }
 

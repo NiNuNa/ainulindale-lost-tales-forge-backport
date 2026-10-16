@@ -37,6 +37,9 @@ import net.minecraft.server.MinecraftServer;
  *
  * <p>Nothing of a player shows until their client has stated its
  * presence, so a player who hides never shows for a moment as they join.
+ * The status of the identity played is kept with the player's saved data
+ * ({@link ChatPresenceRecord}), so the server knows at the next join, before
+ * the client says anything, whether its line is to be said.
  * The identities in use are looked at again once a second, which is how
  * a change of character reaches everyone; a copy reading as another
  * character is told at once. Session state, cleared at both ends of a run.</p>
@@ -113,6 +116,7 @@ public final class ChatPresenceService {
         if (chosen == null) {
             return;
         }
+        ChatPresenceRecord.remember(player, playedChoice(chosen, playedIdentity(player)));
         Map<ChatPresenceIdentity, ChatPresence> shown = shown(chosen,
                 IDLE.contains(account), inUse(player));
         Map<ChatPresenceIdentity, String> lines = shownLines(shown,
@@ -246,10 +250,37 @@ public final class ChatPresenceService {
         if (player == null || player.getUniqueID() == null) {
             return false;
         }
+        return isShown(player.getUniqueID(), playedIdentity(player));
+    }
+
+    /**
+     * Whether the player is Invisible as the identity they play: by what
+     * their client has said this visit, else by what their saved data
+     * keeps from the last. Their join and their leave go unsaid.
+     */
+    public static synchronized boolean playsInvisible(EntityPlayerMP player) {
+        if (player == null || player.getUniqueID() == null) {
+            return false;
+        }
+        Map<ChatPresenceIdentity, ChatPresence> chosen = CHOSEN.get(player.getUniqueID());
+        ChatPresence presence = chosen != null
+                ? playedChoice(chosen, playedIdentity(player))
+                : ChatPresenceRecord.read(player);
+        return presence == ChatPresence.INVISIBLE;
+    }
+
+    /** The identity the player plays: their character, or the account before their first. */
+    private static ChatPresenceIdentity playedIdentity(EntityPlayerMP player) {
         RoleplayCharacter played = CharacterActiveResolver.get(player);
-        return isShown(player.getUniqueID(), played == null
-                ? ChatPresenceIdentity.ACCOUNT
-                : ChatPresenceIdentity.character(played.getCharacterId()));
+        return played == null ? ChatPresenceIdentity.ACCOUNT
+                : ChatPresenceIdentity.character(played.getCharacterId());
+    }
+
+    /** What the player chose for the identity they play; Online for no choice. */
+    static ChatPresence playedChoice(Map<ChatPresenceIdentity, ChatPresence> chosen,
+                                     ChatPresenceIdentity played) {
+        ChatPresence presence = chosen == null ? null : chosen.get(played);
+        return presence == null ? ChatPresence.ONLINE : presence;
     }
 
     /** How many players show as online to others ({@link #showsOnline}). */

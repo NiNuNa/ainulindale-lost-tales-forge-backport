@@ -8,7 +8,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 
@@ -23,8 +22,8 @@ import net.minecraft.client.gui.FontRenderer;
  * every frame and every mouse event, and asks them what is being
  * dragged; they move the layout live and write it down once, on
  * release. A carried window's landing is shown as it is found: the edge
- * of the neighbour it lines up with lit, the snap bar at the top of the
- * screen, and the preview pane in the part of the screen it fills.
+ * of the neighbour it lines up with lit, and the preview pane in the part
+ * of the screen it fills.
  */
 public final class WindowGestures {
     /** What the screen the windows stand on does for the drags. */
@@ -149,16 +148,12 @@ public final class WindowGestures {
     private FillResize fillResize;
     private ContentDrag contentDrag;
     private final SnapPreview snapPreview = new SnapPreview();
-    /** The snap bar at the top of the screen, which a carried window lands on. */
-    private final SnapBarWindow snapBar;
     /** What a window let go in a zone of a layout offers the other windows. */
     private final SnapAssist snapAssist;
 
-    public WindowGestures(Host host, SnapAssist snapAssist,
-                          SnapBarWindow snapBar) {
+    public WindowGestures(Host host, SnapAssist snapAssist) {
         this.host = host;
         this.snapAssist = snapAssist;
-        this.snapBar = snapBar;
     }
 
     /** Called from {@code initGui}, which also runs on every resize. */
@@ -427,9 +422,8 @@ public final class WindowGestures {
     public void cancelDrags() {
         this.lockedDrag = null;
         // Nothing carried lands anywhere: the preview goes back into its
-        // window and the snap bar goes up.
+        // window.
         this.snapPreview.release(false);
-        this.snapBar.hide();
         if (this.tabDrag != null && this.tabDrag.active) {
             // The tabs are already where the drag left them — in a row
             // they slid into, or in a window of their own — so ending
@@ -1120,15 +1114,11 @@ public final class WindowGestures {
         Edge edge = Edge.BELOW;
         /**
          * The part of the screen the window fills on release — the
-         * pointer is in a screen edge's zone, a corner's, or a layout's
-         * on the snap bar — or none.
+         * pointer is in a screen edge's zone or a corner's — or none.
          */
         Window.ScreenFill screenFill = Window.ScreenFill.NONE;
         /** The layout that part is a zone of, which snap assist offers the rest of; null for none. */
         Window.ScreenFill[] layout;
-        /** The other windows a suggestion sends to their zones with it, each with its zone. */
-        Map<String, Window.ScreenFill> companions =
-                Collections.<String, Window.ScreenFill>emptyMap();
     }
 
     /**
@@ -1213,7 +1203,6 @@ public final class WindowGestures {
         if (window == null || window.isLocked()) {
             this.windowDrag = null;
             this.snapPreview.release(false);
-            this.snapBar.hide();
             return;
         }
         if (!this.windowDrag.rebased && outOfItsOwnBox(window)) {
@@ -1237,10 +1226,10 @@ public final class WindowGestures {
      * at {@code x}, its baseline at {@code baseline} — the same whether it
      * was taken by its strip or carried out of a row by its tabs: it
      * lines up with a neighbour's edge it comes near, and with the
-     * pointer in a snap zone — a screen edge, a corner, a layout on the
-     * snap bar — the preview shows the part of the screen the window
-     * fills when the button comes up, which outranks lining up. The
-     * window itself goes on following the pointer at its own size.
+     * pointer in a snap zone — a screen edge or a corner — the preview
+     * shows the part of the screen the window fills when the button comes
+     * up, which outranks lining up. The window itself goes on following
+     * the pointer at its own size.
      */
     private void carry(Window window, Landing landing, double x,
                        double baseline) {
@@ -1262,55 +1251,31 @@ public final class WindowGestures {
                 this.screenWidth);
         double pointerY = WindowPlacement.preciseMouseY(this.mc,
                 this.screenHeight);
-        // On the snap bar all the way down its zones decide, and its padding
-        // lands the window nowhere; anywhere else, the bar peeking
-        // included, the screen's edges and corners.
-        Window.ScreenFill onBar = this.snapBar.follow(this.mc,
-                window.getId(), pointerX, pointerY);
-        landing.screenFill = onBar != null ? onBar
-                : snapZoneAt(pointerX, pointerY, this.screenWidth,
-                        this.screenHeight, SnapLayouts.offersThirds(
-                                this.mc, this.screenWidth, this.screenHeight));
-        landing.layout = onBar != null ? this.snapBar.litLayout(this.mc)
-                : SnapLayouts.layoutFor(landing.screenFill);
-        landing.companions = onBar != null ? this.snapBar.litCompanions(this.mc)
-                : Collections.<String, Window.ScreenFill>emptyMap();
+        landing.screenFill = snapZoneAt(pointerX, pointerY, this.screenWidth,
+                this.screenHeight, SnapLayouts.offersThirds(this.mc,
+                        this.screenWidth, this.screenHeight));
+        landing.layout = SnapLayouts.layoutFor(landing.screenFill);
         if (landing.screenFill != Window.ScreenFill.NONE) {
             landing.snapTargetId = null;
         }
-        this.snapPreview.aim(window.getId(), landing.screenFill,
-                landing.companions);
+        this.snapPreview.aim(window.getId(), landing.screenFill);
     }
 
     /**
      * Ends a carry: a window let go in a snap zone fills that part of
      * the screen — gliding into it from where it was dropped, which stays
-     * its own box to come back to — and the preview and the snap bar go.
-     * Let go on a suggestion, the suggestion's other windows go to their
-     * zones with it; otherwise the rest of the zone's layout is offered
-     * to the other windows.
+     * its own box to come back to — the preview goes, and the rest of the
+     * zone's layout is offered to the other windows.
      */
     private void land(String windowId, Landing landing) {
         boolean fills = landing.screenFill != Window.ScreenFill.NONE;
         if (fills) {
-            for (Map.Entry<String, Window.ScreenFill> companion
-                    : landing.companions.entrySet()) {
-                Window other = WindowLayout.window(companion.getKey());
-                if (other != null && !other.isLocked()) {
-                    WindowLayout.raise(other.getId());
-                    WindowLayout.setFill(other.getId(),
-                            companion.getValue(), true);
-                }
-            }
             WindowLayout.raise(windowId);
             WindowLayout.setFill(windowId, landing.screenFill, false);
-            if (landing.companions.isEmpty()) {
-                this.snapAssist.offer(windowId, landing.layout,
-                        landing.screenFill);
-            }
+            this.snapAssist.offer(windowId, landing.layout,
+                    landing.screenFill);
         }
         this.snapPreview.release(fills);
-        this.snapBar.hide();
     }
 
     /**
@@ -1862,7 +1827,6 @@ public final class WindowGestures {
         drag.tornAtEdge = false;
         // The window the tabs rode in is gone, and its landing with it.
         this.snapPreview.reset();
-        this.snapBar.hide();
         WindowLayout.raise(targetWindowId);
         TabSelection.selectAll(targetWindowId, drag.group);
         this.host.selectTab(drag.tab);
@@ -2059,7 +2023,6 @@ public final class WindowGestures {
     private void dropTab(TabDrag drag) {
         if (drag.splitWindowId != null && splitInto(drag)) {
             this.snapPreview.reset();
-            this.snapBar.hide();
             WindowLayout.persist();
             return;
         }

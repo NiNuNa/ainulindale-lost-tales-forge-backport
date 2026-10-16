@@ -927,7 +927,7 @@ final class ChatMenus {
                            int mouseY) {
         if (person == null || person.role != null || person.npcIdentity
                 || person.playerId == null
-                || person.accountName.length() == 0
+                || (person.accountName.length() == 0 && person.characterId == null)
                 || LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
                         person.playerId)
                 || ChatNarrator.SENDER_ID.equals(person.playerId)
@@ -1011,6 +1011,12 @@ final class ChatMenus {
                                     : "gui.losttales.chat.message.ignore",
                             name)));
         }
+        // A character whose account this player is not shown is ignored
+        // as the character alone; nothing names or reaches the account.
+        if (person.accountName.length() == 0) {
+            addCopyIdRows(entries, person);
+            return entries;
+        }
         boolean accountIgnored = ClientChatIgnores.isIgnored(person.playerId);
         entries.add(new MenuWindow.Entry(ENTRY_IGNORE,
                 StatCollector.translateToLocalFormatted(
@@ -1080,8 +1086,19 @@ final class ChatMenus {
         if (ENTRY_VIEW_PROFILE.equals(entry.id) && person.hasProfile()) {
             CharactersPage.visit(person.visit());
         } else if (ENTRY_MESSAGE.equals(entry.id)) {
-            this.tabActions.openWhisperTab(person.accountName,
-                    person.identityName);
+            if (person.accountName.length() > 0) {
+                this.tabActions.openWhisperTab(person.accountName,
+                        person.identityName);
+            } else {
+                // Not shown the account, the conversation is filed under the
+                // character it is with, and addressed to it by its id.
+                ConversationPage tab = this.tabActions.openWhisperTab(
+                        person.identityName, person.identityName);
+                if (tab != null && person.characterId != null) {
+                    ClientChatChannelState.rememberPartnerCharacterId(tab,
+                            person.characterId);
+                }
+            }
         } else if (ENTRY_MUTE_ACCOUNT.equals(entry.id)) {
             startMute(muteTarget(fromDiscord, person.accountName));
         } else if (ENTRY_UNMUTE_ACCOUNT.equals(entry.id)) {

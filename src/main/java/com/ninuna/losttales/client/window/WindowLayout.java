@@ -189,43 +189,37 @@ public final class WindowLayout {
     }
 
     /**
-     * Lays out the windows {@code view} opens with ({@link ViewDefaults})
+     * Lays out the window {@code view} opens with ({@link ViewDefaults})
      * while it has none: the view as a new player first sees it, and as
-     * it comes back once every window of it was closed. A page another
-     * view holds opens here as a copy of its own; a window with no page
-     * to hold is left out. The last window laid out stands in front.
-     * Answers whether anything was laid out.
+     * it comes back once every window of it was closed. It stands at the
+     * default place, in front, its first page in front of it. A page
+     * another view holds opens here as a copy of its own; with no page to
+     * hold, no window opens. Answers whether one was laid out.
      */
     public static synchronized boolean buildView(View view) {
-        if (view == null || hasWindowIn(view)) {
+        ViewDefaults.Defaults defaults = ViewDefaults.of(view);
+        if (defaults == null || hasWindowIn(view)) {
             return false;
         }
-        boolean built = false;
-        for (ViewDefaults.Slot slot : ViewDefaults.slotsOf(view)) {
-            List<WindowPage> tabs = new ArrayList<WindowPage>();
-            for (WindowPage page : slot.pages.pages()) {
-                WindowPage placed = page == null ? null : placeable(page);
-                if (placed != null && !tabs.contains(placed)) {
-                    tabs.add(placed);
-                }
+        List<WindowPage> tabs = new ArrayList<WindowPage>();
+        for (WindowPage page : defaults.pages.pages()) {
+            WindowPage placed = page == null ? null : placeable(page);
+            if (placed != null && !tabs.contains(placed)) {
+                tabs.add(placed);
             }
-            if (tabs.isEmpty()) {
-                continue;
-            }
-            Window window = newWindow();
-            window.setView(view);
-            window.tabs().addAll(tabs);
-            window.setActiveTab(tabs.get(0));
-            window.setLocked(slot.locked);
-            window.setFill(slot.fill);
-            WINDOWS.add(window);
-            raise(window.getId());
-            built = true;
         }
-        if (built) {
-            changed();
+        if (tabs.isEmpty()) {
+            return false;
         }
-        return built;
+        Window window = newWindow();
+        window.setView(view);
+        window.tabs().addAll(tabs);
+        window.setActiveTab(tabs.get(0));
+        window.setLocked(defaults.locked);
+        WINDOWS.add(window);
+        raise(window.getId());
+        changed();
+        return true;
     }
 
     /**
@@ -1659,11 +1653,10 @@ public final class WindowLayout {
     }
 
     /**
-     * Puts a window's layout back as its view first lays it out: filling
-     * the part of the screen its view's window of the same pages fills
-     * ({@link ViewDefaults#homeFillOf}), else at the default place, in the
-     * middle of the screen at two thirds of it; pinned nowhere, its splits
-     * parted, its page no longer held filling it, and locked again. Its
+     * Puts a window's layout back as its view first lays it out: at the
+     * default place, in the middle of the screen at two thirds of it;
+     * pinned nowhere, its splits parted, its page no longer held filling
+     * it, and locked again. Its
      * pages stay; what each lays out is put back by the page
      * ({@link WindowPage#resetView}), and the settings keep their own
      * reset. A locked window stays where it is, so only an unlocked one
@@ -1676,7 +1669,7 @@ public final class WindowLayout {
         }
         window.setOwnWidth(0);
         window.setOwnHeight(0.0D);
-        window.setFill(ViewDefaults.homeFillOf(viewOf(window), window.tabs()));
+        window.setFill(Window.ScreenFill.NONE);
         window.setPinnedToHud(false);
         window.setPinnedToGui(false);
         window.setBorderlessHeld(false);

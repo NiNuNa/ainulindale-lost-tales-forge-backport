@@ -132,7 +132,7 @@ public final class FellowshipClientRequestManager {
                 expectedFellowshipRevision, null, null);
     }
 
-    /** Places the player's go-here marker where they stand. */
+    /** Puts the go-here mark of the character played where the player stands. */
     public static int setGoHereMarker(UUID expectedActiveIdentityId) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || minecraft.thePlayer == null) {
@@ -143,7 +143,7 @@ public final class FellowshipClientRequestManager {
                 minecraft.thePlayer.posX, minecraft.thePlayer.posZ);
     }
 
-    /** Places the player's go-here marker at a place picked on the map. */
+    /** Puts the go-here mark of the character played at a place picked on the map. */
     public static int setGoHereMarker(UUID expectedActiveIdentityId,
                                       int dimensionId,
                                       double x,
@@ -192,13 +192,15 @@ public final class FellowshipClientRequestManager {
                 expectedFellowshipRevision, markId, null);
     }
 
+    /** Invites the character of that name; the server finds it, played or not. */
     public static int invitePlayer(UUID expectedActiveIdentityId,
                                    UUID expectedFellowshipId,
                                    long expectedFellowshipRevision,
-                                   UUID targetOwnerId) {
+                                   String characterName) {
         return send(FellowshipOperationType.INVITE_PLAYER,
                 expectedActiveIdentityId, expectedFellowshipId,
-                expectedFellowshipRevision, targetOwnerId, null);
+                expectedFellowshipRevision, null, null,
+                false, 0, 0.0D, 0.0D, characterName == null ? "" : characterName, -1);
     }
 
     /** Accepts an invitation for the identity the fellowship state was last sent for. */

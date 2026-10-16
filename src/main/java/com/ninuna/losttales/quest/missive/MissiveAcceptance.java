@@ -2,16 +2,16 @@ package com.ninuna.losttales.quest.missive;
 
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.network.packet.LostTalesMissiveCodec;
-import com.ninuna.losttales.quest.LostTalesQuestDefinition;
-import com.ninuna.losttales.quest.LostTalesQuestManager;
+import com.ninuna.losttales.quest.QuestStartGate;
+import com.ninuna.losttales.quest.QuestStartProof;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
-import net.minecraft.world.World;
 
 /**
  * How the server reads a missive letter a page names and starts its
  * quest, from a board or from the player's own inventory alike. Every
- * check is made against the stack standing in the slot now.
+ * check is made against the stack standing in the slot now; the letter's
+ * seal is checked where its quest starts ({@link QuestStartGate}).
  */
 public final class MissiveAcceptance {
     private MissiveAcceptance() {}
@@ -39,17 +39,16 @@ public final class MissiveAcceptance {
 
     /**
      * Why the letter in a slot cannot be accepted as the page named it:
-     * no letter, a letter that cannot be read or does not carry this
-     * world's seal, another letter than the one read. Null where it can.
+     * no letter, a letter that cannot be read, another letter than the
+     * one read. Null where it can be taken to the start gate.
      */
-    public static MissiveBoardStateReason check(World world, ItemStack stack,
+    public static MissiveBoardStateReason check(ItemStack stack,
                                                 String expectedQuestId) {
         if (!isLetter(stack)) {
             return MissiveBoardStateReason.GONE;
         }
         LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
-        if (missive == null || !missive.isValid()
-                || !MissiveSeals.isGenuine(world, stack)) {
+        if (missive == null || !missive.isValid()) {
             return MissiveBoardStateReason.DAMAGED;
         }
         String expected = expectedQuestId == null ? "" : expectedQuestId.trim();
@@ -58,32 +57,34 @@ public final class MissiveAcceptance {
     }
 
     /**
-     * Starts the letter's quest for the player: {@link
+     * Starts the quest of a letter {@link #check} passed, through the
+     * start gate, which checks its seal: {@link
      * MissiveBoardStateReason#ACCEPTED} once it runs, else why not. The
-     * quest's own refusal line is said by the quest system first.
+     * gate says its own refusal line first.
      */
     public static MissiveBoardStateReason start(EntityPlayerMP player,
-                                                LostTalesMissiveData missive) {
-        LostTalesQuestDefinition quest =
-                LostTalesMissiveQuestFactory.createQuestDefinition(missive);
-        if (quest == null) {
-            return MissiveBoardStateReason.REFUSED;
+                                                ItemStack letter) {
+        LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(letter);
+        if (missive == null) {
+            return MissiveBoardStateReason.DAMAGED;
         }
-        LostTalesQuestManager.StartResult result =
-                LostTalesQuestManager.startGeneratedQuest(player, quest,
-                        missive.getTimeLimitTicks());
-        if (result == LostTalesQuestManager.StartResult.STARTED) {
-            return MissiveBoardStateReason.ACCEPTED;
+        QuestStartGate.StartResult result = QuestStartGate.start(player,
+                missive.getQuestId(), QuestStartProof.letter(letter));
+        switch (result) {
+            case STARTED:
+                return MissiveBoardStateReason.ACCEPTED;
+            case UNPROVEN:
+                return MissiveBoardStateReason.DAMAGED;
+            case UNKNOWN_QUEST:
+                return MissiveBoardStateReason.REFUSED;
+            case ALREADY_ACTIVE:
+                return MissiveBoardStateReason.ALREADY_ACTIVE;
+            case ALREADY_COMPLETED:
+                return MissiveBoardStateReason.ALREADY_COMPLETED;
+            case REQUIREMENTS_NOT_MET:
+                return MissiveBoardStateReason.REQUIREMENTS;
+            default:
+                return MissiveBoardStateReason.NOT_NOW;
         }
-        if (result == LostTalesQuestManager.StartResult.ALREADY_ACTIVE) {
-            return MissiveBoardStateReason.ALREADY_ACTIVE;
-        }
-        if (result == LostTalesQuestManager.StartResult.ALREADY_COMPLETED) {
-            return MissiveBoardStateReason.ALREADY_COMPLETED;
-        }
-        if (result == LostTalesQuestManager.StartResult.REQUIREMENTS_NOT_MET) {
-            return MissiveBoardStateReason.REQUIREMENTS;
-        }
-        return MissiveBoardStateReason.NOT_NOW;
     }
 }

@@ -59,6 +59,38 @@ public final class MissiveSealTest {
         assertFalse(MissiveSeal.verifies(key(1), missive("minecraft:emerald*2", 999999L), seal));
     }
 
+    /** A gather notice hands its items over; a letter changed by hand to keep them has no seal that fits. */
+    @Test
+    public void aGatherLettersHandOverIsSealed() {
+        LostTalesMissiveData taking = gather("true");
+        byte[] seal = MissiveSeal.sign(key(1), taking);
+        assertTrue(MissiveSeal.verifies(key(1), taking, seal));
+        assertFalse(MissiveSeal.verifies(key(1), gather("false"), seal));
+        assertFalse(MissiveSeal.verifies(key(1), gather(null), seal));
+    }
+
+    private static LostTalesMissiveData gather(String take) {
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("item", "minecraft:coal");
+        params.put("count", "10");
+        if (take != null) {
+            params.put("take", take);
+        }
+        return LostTalesMissiveData.builder(QUEST, "gather")
+                .titleId("materials_wanted")
+                .issuerId("quartermaster")
+                .descriptionId("gather")
+                .flavorId("plain_notice")
+                .target("minecraft:coal")
+                .repeatable(true)
+                .firstComeFirstServed(true)
+                .generationWorldTime(1200L)
+                .objective(new LostTalesMissiveObjectiveData("gather_coal",
+                        "gather", false, params))
+                .rewardData(LostTalesMissiveRewardData.experienceAndItems(30, "minecraft:emerald"))
+                .build();
+    }
+
     @Test
     public void anotherWorldsKeyFindsNoSeal() {
         LostTalesMissiveData letter = missive("minecraft:emerald*2", 1200L);

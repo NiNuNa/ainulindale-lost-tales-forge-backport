@@ -67,8 +67,8 @@ import net.minecraft.util.StatCollector;
 import com.ninuna.losttales.fellowship.sync.FellowshipInvitationNotice;
 import com.ninuna.losttales.fellowship.sync.FellowshipInvitationSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipMarks;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
-import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
 
 /**
@@ -443,7 +443,8 @@ public final class LostTalesChatPresentation {
         try {
             return asTranslatedWords(line.withMessage(update.getMessage())
                     .withServerBody(update.getBodyJson(),
-                            update.getNamedPlayers()));
+                            update.getNamedPlayers())
+                    .withMentionedRoles(update.getMentionedRoles()));
         } catch (RuntimeException refused) {
             return null;
         }
@@ -966,7 +967,7 @@ public final class LostTalesChatPresentation {
         // anywhere else. The line is the player's own, so it never
         // chimes.
         boolean mentioned = LostTalesConfig.enableChatPings
-                && namesLocalPlayer(minecraft, message);
+                && ChatMentions.mentionsAny(message, localMentionNames(minecraft));
         int chatLineId = print(minecraft, packet, tab, mentioned);
         if (mentioned) {
             markPinged(chatLineId);
@@ -1354,7 +1355,7 @@ public final class LostTalesChatPresentation {
                         FellowshipMark.MARKER_ID_PREFIX)) {
             return showcase;
         }
-        String tint = ClientFellowshipTrackingCache.markTint(
+        String tint = ClientFellowshipMarks.markTint(
                 ChatFellowship.idOf(packet.getScopeValue()));
         return tint == null ? showcase : ChatShowcase.marker(
                 showcase.getTokenIndex(), showcase.getMarkerId(),
@@ -1367,11 +1368,11 @@ public final class LostTalesChatPresentation {
      * Whether a line the server sent names this player: the server says
      * whom its mentions reach ({@link LostTalesChatMessagePacket#getNamedPlayers}),
      * and one of them is this player as the line's channel knows them
-     * ({@link #isLocalIdentity}); or it names a mentionable role they
-     * hold — in every channel, since an operator is worth calling
-     * wherever the call is made — so {@code @Operator} reaches the
-     * operators and nobody else. Which roles the player holds is the
-     * server's word too, sent with the chat access.
+     * ({@link #isLocalIdentity}); or which roles it calls
+     * ({@link LostTalesChatMessagePacket#getMentionedRoles}), and this
+     * player holds one — in every channel, since an operator is worth
+     * calling wherever the call is made. Which roles the player holds is
+     * the server's word too, sent with the chat access.
      */
     private static boolean pingsLocalPlayer(LostTalesChatMessagePacket packet) {
         // A forward pings nobody: its words were said elsewhere, before.
@@ -1383,33 +1384,12 @@ public final class LostTalesChatPresentation {
                 return true;
             }
         }
-        return ChatMentions.mentionsAny(packet.getMessage(), localRoleNames());
-    }
-
-    /**
-     * Whether text this client wrote itself, which never passed through
-     * the server, names this player: one of their own names
-     * ({@link #localMentionNames}) or a mentionable role they hold.
-     */
-    private static boolean namesLocalPlayer(Minecraft minecraft, String message) {
-        List<String> names = localMentionNames(minecraft);
-        names.addAll(localRoleNames());
-        return ChatMentions.mentionsAny(message, names);
-    }
-
-    /**
-     * The mentionable roles this player holds, by the names a mention
-     * calls them: the name this game shows each by, and its id, which a
-     * player reading another language types the same.
-     */
-    private static List<String> localRoleNames() {
-        List<String> names = new ArrayList<String>(4);
         for (ChatAccountRole role : ClientChatChannelState.localRoles()) {
-            if (role.isMentionable()) {
-                names.addAll(role.mentionNames());
+            if (packet.getMentionedRoles().contains(role.getId())) {
+                return true;
             }
         }
-        return names;
+        return false;
     }
 
     /**
@@ -3380,7 +3360,8 @@ public final class LostTalesChatPresentation {
         }
         long now = System.currentTimeMillis();
         LostTalesChatMessagePacket packet = signedPacket(minecraft, tab,
-                ChatCommandText.describeTyped(command), null,
+                ChatCommandText.describeTyped(command,
+                        ClientChatChannelState.getPrivateCommands()), null,
                 ChatReplyReference.NONE, ClientChatMessageIds.nextLocal(), now);
         lastCommandEchoLineId = print(minecraft, packet, tab, false,
                 ChatBodyKind.COMMAND);

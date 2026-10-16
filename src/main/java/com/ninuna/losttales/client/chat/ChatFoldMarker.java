@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.FoldRule;
 import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.event.ClickEvent;
@@ -8,9 +9,10 @@ import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
 
 /**
- * Folds long messages. Words that take more than five rows show their
- * first four and a Read more under them; a click opens the message, and
- * the Show less under it folds it again.
+ * Folds long messages as {@link FoldRule} folds a long text: words that
+ * take more than five rows show their first four and a Read more under
+ * them; a click opens the message, and the Show less under it folds it
+ * again.
  *
  * <p>Which messages are open is kept by chat line id, which every view
  * of a message shares, so a message opened in one window is open in
@@ -18,8 +20,6 @@ import net.minecraft.util.StatCollector;
  * carries the id on its click event, like {@link ChatSpoilerMarker}.</p>
  */
 final class ChatFoldMarker {
-    /** The rows of words a folded message keeps. */
-    static final int KEPT_ROWS = 4;
     private static final String PREFIX = "losttales-chat-fold:";
     /** The messages the player has opened, by chat line id. */
     private static final Set<Integer> OPEN = new HashSet<Integer>();
@@ -39,16 +39,13 @@ final class ChatFoldMarker {
             return null;
         }
         boolean open = isOpen(chatLineId);
-        return new ChatLineWrapper.Fold(KEPT_ROWS, open,
-                toggle(chatLineId, open));
+        return new ChatLineWrapper.Fold(open, toggle(chatLineId, open));
     }
 
     /** Read more for a folded message, Show less for an open one, in the chat's aside tone. */
     static IChatComponent toggle(int chatLineId, boolean open) {
         ChatComponentText run = new ChatComponentText(
-                StatCollector.translateToLocal(open
-                        ? "gui.losttales.chat.show_less"
-                        : "gui.losttales.chat.read_more"));
+                StatCollector.translateToLocal(FoldRule.toggleKey(open)));
         run.getChatStyle().setColor(LostTalesChatPresentation
                 .nearestFormatting(LostTalesChatVisualStyle.asideRgb()));
         run.getChatStyle().setChatClickEvent(new ClickEvent(

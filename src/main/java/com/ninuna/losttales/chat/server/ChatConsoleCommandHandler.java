@@ -3,6 +3,9 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.chat.ChatCommandText;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -51,11 +54,32 @@ public final class ChatConsoleCommandHandler {
         LostTalesChatService.console(ChatConsoleEvent.Kind.COMMAND,
                 ChatConsoleEvent.Severity.INFO, actor,
                 ChatCommandText.describe(event.command.getCommandName(),
-                        event.parameters), context);
+                        aliasesOf(event), event.parameters,
+                        ChatCommandText.serverNames()), context);
         noteRecorded(actor, System.currentTimeMillis());
         // A command may make somebody an operator, or no longer one, or
         // change who reads the console: the watcher looks this tick.
         LostTalesChatRoleRosterWatcher.checkSoon();
+    }
+
+    /** The other names the command answers to; none where it gives none. */
+    private static List<String> aliasesOf(CommandEvent event) {
+        List<String> names = new ArrayList<String>();
+        try {
+            List<?> aliases = event.command.getCommandAliases();
+            if (aliases != null) {
+                for (Object alias : aliases) {
+                    if (alias instanceof String) {
+                        names.add((String)alias);
+                    }
+                }
+            }
+        } catch (RuntimeException brokenCommand) {
+            // Another mod's command that cannot list its names is matched
+            // by its own name alone.
+            return Collections.emptyList();
+        }
+        return names;
     }
 
     static synchronized void noteRecorded(String actor, long now) {

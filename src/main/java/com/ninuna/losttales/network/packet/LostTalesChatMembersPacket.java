@@ -112,6 +112,15 @@ public final class LostTalesChatMembersPacket implements IMessage {
                     false);
         }
 
+        /** The same row without its account: a character's row as a viewer not shown accounts reads it. */
+        public Member withoutAccount() {
+            return this.characterId == null || this.account.length() == 0 ? this
+                    : new Member(this.playerId, "", this.characterId, this.name,
+                            this.nameColor, this.skinId, this.title, this.titleColor,
+                            this.groupKey, this.groupName, this.groupOrder, this.online,
+                            this.npc);
+        }
+
         private Member(UUID playerId, String account, UUID characterId,
                        String name, int nameColor, String skinId, String title,
                        int titleColor, String groupKey, String groupName,

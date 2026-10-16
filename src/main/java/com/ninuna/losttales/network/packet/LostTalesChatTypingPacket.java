@@ -28,9 +28,10 @@ import java.util.UUID;
  * promise a message somewhere the message will not go.</p>
  */
 public final class LostTalesChatTypingPacket implements IMessage {
-    private static final int MAX_PACKET_BYTES = 256;
+    private static final int MAX_PACKET_BYTES = 320;
     private static final int MAX_CHANNEL_BYTES = 16;
-    private static final int MAX_TARGET_BYTES = 64;
+    /** An account's name, or a character's: 32 letters of up to four bytes. */
+    private static final int MAX_TARGET_BYTES = 128;
 
     private String channelId = "";
     /** The account a whisper is for, or the fellowship a fellowship line is for; empty otherwise. */

@@ -76,8 +76,9 @@ public final class LoreCharacterDefinitionJsonParser {
             }
             String id = requiredIdentifier(object.get("id"), "id");
             String name = requiredString(object.get("name"), "name", 64);
-            String description = string(
-                    object.get("description"), "description", 512, true);
+            String description = string(object.get("description"),
+                    "description",
+                    LoreCharacterDefinition.MAX_DESCRIPTION_LENGTH, true);
             int age = object.has("age")
                     ? requiredInteger(object.get("age"), "age")
                     : LoreCharacterDefinition.DEFAULT_AGE;
@@ -219,9 +220,10 @@ public final class LoreCharacterDefinitionJsonParser {
 
     /**
      * The profile a definition gives its character: an object of the
-     * profile's parts, every one optional — {@code appearance},
-     * {@code personality} and {@code history} (up to 512 characters,
-     * paragraphs kept), {@code facts} by name (up to 24 characters each),
+     * profile's parts, every one optional — {@code appearance} and
+     * {@code personality} (up to 512 characters each) and {@code history}
+     * (up to 2,048), paragraphs kept, {@code facts} by name (up to 24
+     * characters each),
      * and up to five {@code glances}, each the {@code emoji} of the chat's
      * by its name, a {@code title} and an optional {@code line}. The
      * History is the description where the profile gives none, and a file
@@ -243,7 +245,7 @@ public final class LoreCharacterDefinitionJsonParser {
                     profile = profile.withSection(section, string(
                             object.get(section.getId()),
                             "profile." + section.getId(),
-                            CharacterProfile.MAX_SECTION_LENGTH, true));
+                            section.getMaxLength(), true));
                 }
             }
             if (object.has("facts")) {
@@ -260,7 +262,8 @@ public final class LoreCharacterDefinitionJsonParser {
         }
         CharacterProfile stored = CharacterValidator.normalizeProfile(profile);
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
-            if (!CharacterValidator.isValidSection(stored.section(section))) {
+            if (!CharacterValidator.isValidSection(section,
+                    stored.section(section))) {
                 throw invalid("profile." + section.getId()
                         + " holds characters a profile may not");
             }

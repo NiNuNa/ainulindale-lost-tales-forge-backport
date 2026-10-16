@@ -4,7 +4,6 @@ import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
 import com.ninuna.losttales.client.window.PinnedWindows;
-import com.ninuna.losttales.client.window.View;
 import com.ninuna.losttales.client.window.Views;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
@@ -46,6 +45,19 @@ public class LostTalesKeyBindings {
     private static final KeyBinding TARGET_LOCK = new KeyBinding("key.losttales.targetLock", MIDDLE_MOUSE_KEY_CODE, CATEGORY);
     private static final KeyBinding CYCLE_TARGET_LEFT = new KeyBinding("key.losttales.cycleTargetLeft", Keyboard.KEY_NONE, CATEGORY);
     private static final KeyBinding CYCLE_TARGET_RIGHT = new KeyBinding("key.losttales.cycleTargetRight", Keyboard.KEY_NONE, CATEGORY);
+    /**
+     * One key per custom view number, unbound until the player gives it
+     * one, here or in the view's menu. A key whose view does not stand
+     * yet makes it.
+     */
+    private static final KeyBinding[] VIEWS = new KeyBinding[Views.MAX_CUSTOM];
+
+    static {
+        for (int index = 0; index < VIEWS.length; index++) {
+            VIEWS[index] = new KeyBinding("key.losttales.view." + (index + 1),
+                    Keyboard.KEY_NONE, CATEGORY);
+        }
+    }
 
     public void register() {
         ClientRegistry.registerKeyBinding(QUEST_JOURNAL);
@@ -59,6 +71,9 @@ public class LostTalesKeyBindings {
         ClientRegistry.registerKeyBinding(TARGET_LOCK);
         ClientRegistry.registerKeyBinding(CYCLE_TARGET_LEFT);
         ClientRegistry.registerKeyBinding(CYCLE_TARGET_RIGHT);
+        for (KeyBinding view : VIEWS) {
+            ClientRegistry.registerKeyBinding(view);
+        }
     }
 
     /**
@@ -88,24 +103,6 @@ public class LostTalesKeyBindings {
                 : PinnedWindows.stepWindow(minecraft, windows);
         if (taken) {
             KeyBinding.setKeyBindState(key, false);
-        }
-    }
-
-    /**
-     * While playing, a custom view's own key opens the screen on that view
-     * (Caps Lock the Lost Tales Menu's at first). The keys are the views',
-     * kept with the layout and read as keys: they are no bindings of
-     * Controls.
-     */
-    @SubscribeEvent
-    public void onViewKey(InputEvent.KeyInputEvent event) {
-        if (!Keyboard.getEventKeyState() || Keyboard.isRepeatEvent()
-                || Minecraft.getMinecraft().currentScreen != null) {
-            return;
-        }
-        View view = Views.byKey(Keyboard.getEventKey());
-        if (view != null) {
-            WindowScreen.openView(view);
         }
     }
 
@@ -157,6 +154,11 @@ public class LostTalesKeyBindings {
         }
         if (CYCLE_TARGET_RIGHT.isPressed()) {
             ThirdPersonTargetLockController.cycle(minecraft, 1);
+        }
+        for (int index = 0; index < VIEWS.length; index++) {
+            if (VIEWS[index].isPressed() && minecraft.currentScreen == null) {
+                WindowScreen.openCustomView(index + 1);
+            }
         }
     }
 
@@ -214,6 +216,21 @@ public class LostTalesKeyBindings {
 
     public static KeyBinding getCharactersKeyBinding() {
         return CHARACTERS;
+    }
+
+    /** The key of custom view {@code number}, 1 to {@link Views#MAX_CUSTOM}; null for any other number. */
+    public static KeyBinding getViewKeyBinding(int number) {
+        return number >= 1 && number <= VIEWS.length ? VIEWS[number - 1] : null;
+    }
+
+    /** Whether the binding is one of the custom views' keys. */
+    public static boolean isViewKeyBinding(KeyBinding binding) {
+        for (KeyBinding view : VIEWS) {
+            if (view == binding) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean isModifierKeyDown() {

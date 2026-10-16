@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.server;
 
+import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.permission.LostTalesPermissions;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
@@ -41,6 +42,8 @@ public final class LostTalesChatRoleRosterWatcher {
     private static final Set<UUID> SEEN = new HashSet<UUID>();
     private static final Set<UUID> OPERATORS = new HashSet<UUID>();
     private static final Set<UUID> CONSOLE_READERS = new HashSet<UUID>();
+    /** Who of them were shown which account plays a character. */
+    private static final Set<UUID> ACCOUNT_SEERS = new HashSet<UUID>();
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
@@ -83,6 +86,9 @@ public final class LostTalesChatRoleRosterWatcher {
             if (ChatChannelPolicy.readsConsole(player)) {
                 CONSOLE_READERS.add(id);
             }
+            if (AccountVisibility.seesAccounts(player)) {
+                ACCOUNT_SEERS.add(id);
+            }
         }
     }
 
@@ -94,6 +100,7 @@ public final class LostTalesChatRoleRosterWatcher {
             SEEN.remove(id);
             OPERATORS.remove(id);
             CONSOLE_READERS.remove(id);
+            ACCOUNT_SEERS.remove(id);
         }
     }
 
@@ -114,6 +121,7 @@ public final class LostTalesChatRoleRosterWatcher {
         Set<UUID> seen = new HashSet<UUID>();
         Set<UUID> operators = new HashSet<UUID>();
         Set<UUID> readers = new HashSet<UUID>();
+        Set<UUID> seers = new HashSet<UUID>();
         for (EntityPlayerMP player : online) {
             UUID id = player == null ? null : player.getUniqueID();
             if (id == null) {
@@ -128,8 +136,15 @@ public final class LostTalesChatRoleRosterWatcher {
             if (reads) {
                 readers.add(id);
             }
+            boolean sees = AccountVisibility.seesAccounts(player);
+            if (sees) {
+                seers.add(id);
+            }
             if (!SEEN.contains(id)) {
                 continue;
+            }
+            if (sees != ACCOUNT_SEERS.contains(id)) {
+                AccountVisibility.resendTo(player);
             }
             if (operator != OPERATORS.contains(id)) {
                 // The Server's own word, in the yellow of a join or a leave.
@@ -149,6 +164,8 @@ public final class LostTalesChatRoleRosterWatcher {
         OPERATORS.addAll(operators);
         CONSOLE_READERS.clear();
         CONSOLE_READERS.addAll(readers);
+        ACCOUNT_SEERS.clear();
+        ACCOUNT_SEERS.addAll(seers);
     }
 
     /**
@@ -165,5 +182,6 @@ public final class LostTalesChatRoleRosterWatcher {
         SEEN.clear();
         OPERATORS.clear();
         CONSOLE_READERS.clear();
+        ACCOUNT_SEERS.clear();
     }
 }

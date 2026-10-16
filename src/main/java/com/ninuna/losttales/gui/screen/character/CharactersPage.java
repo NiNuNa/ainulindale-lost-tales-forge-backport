@@ -44,7 +44,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -69,7 +71,9 @@ import org.lwjgl.opengl.GL11;
  * questions before a deletion or a restore open as sub-windows in the
  * page's window; the creator stays a screen of its own. Another person's
  * profile, opened from their card or their menu, stands in the
- * roster's place, read only, until Back.
+ * roster's place, read only, until Back. A long History opens under its
+ * Read more and folds again under its Show less, the words under it
+ * gliding along; the page keeps which are open until it closes.
  *
  * <p>It draws only the server's roster and never changes it on its own;
  * every request is checked again by the server.</p>
@@ -82,6 +86,8 @@ public final class CharactersPage extends PageContent {
     public static final ItemStack ICON = new ItemStack(Items.skull, 1, 3);
 
     private static final int NOTE_LINE = 10;
+    /** Nearer its place than this, in pixels, a History opening or folding has arrived. */
+    private static final double ARRIVED = 0.01D;
     /** A head before a name: eight pixels, centred in the icon's box. */
     private static final int HEAD = 8;
 
@@ -143,6 +149,14 @@ public final class CharactersPage extends PageContent {
     private boolean holdingFigure;
     /** The person whose profile stands in the roster's place; null for the player's own. */
     private Visit visit;
+    /** The characters whose History is open, until the page closes. */
+    private final Set<UUID> openHistories = new HashSet<UUID>();
+    /** The character whose History the profile drew last, how tall its folded rows stood, and how much of them stood shown, gliding. */
+    private UUID historyShown;
+    private int historyFolded;
+    private double shownHistory;
+    /** Read more or Show less where the profile drew it last, in the page's space; null for none. */
+    private LostTalesUiHitBox foldBox;
 
     /** The page's content as registered; null while it is not registered. */
     static CharactersPage current() {
@@ -367,6 +381,8 @@ public final class CharactersPage extends PageContent {
     /** The page in its own space; the pointer is there too, NaN while it is away. */
     private void drawPage(double clipX, double clipY, double mouseX,
                           double mouseY, int alpha) {
+        // Read more stands only where this frame draws it.
+        this.foldBox = null;
         CharacterRosterSnapshot snapshot = snapshot();
         if (snapshot == null) {
             drawCentred(I18n.format(ClientCharacterRosterCache.getState()
@@ -698,12 +714,13 @@ public final class CharactersPage extends PageContent {
                 this.font, (int)words.width, ProfileSubject.of(character),
                 ClientCharacterProfileCache.get(characterId),
                 ClientCharacterProfileCache.isUnavailable(characterId),
-                accountName(), played, isLore(character));
+                accountName(), played, isLore(character),
+                this.openHistories.contains(characterId));
         // While Change Look is open the figure wears the look it holds.
         LookEditWindow editing = LookEditWindow.openFor(characterId);
         CharacterAppearance draft = editing == null ? null
                 : editing.draftLook(snapshot.getOwnerId());
-        drawColumn(layout, column, played && draft == null
+        drawColumn(layout, column, characterId, played && draft == null
                         ? this.mc.thePlayer : null,
                 snapshot.getOwnerId(), draft != null ? draft
                         : lookOf(snapshot, character), clipX, clipY, alpha);
@@ -761,19 +778,22 @@ public final class CharactersPage extends PageContent {
                         : ProfileSubject.named(this.visit.characterId,
                                 this.visit.name, this.visit.skinId),
                 profile, ClientCharacterProfileCache.isUnavailable(
-                        this.visit.characterId), "", false, false);
-        drawColumn(layout, column, null, this.visit.playerId,
+                        this.visit.characterId), "", false, false,
+                this.openHistories.contains(this.visit.characterId));
+        drawColumn(layout, column, this.visit.characterId, null,
+                this.visit.playerId,
                 known ? look : null, clipX, clipY, alpha);
     }
 
     /** The profile's words and its figure in the profile's box, scrolled as one. */
     private void drawColumn(CharactersLayout layout,
-                            CharacterProfileColumn column,
+                            CharacterProfileColumn column, UUID characterId,
                             EntityLivingBase entity,
                             UUID ownerId, CharacterAppearance look,
                             double clipX, double clipY, int alpha) {
         LostTalesUiHitBox profile = layout.profile();
         LostTalesUiHitBox words = layout.words();
+        revealHistory(column, characterId);
         int most = Math.max(0, layout.wordsOffset() + column.height()
                 - (int)profile.height);
         this.profileScroll = Math.max(0, Math.min(this.profileScroll, most));
@@ -781,6 +801,8 @@ public final class CharactersPage extends PageContent {
                 this.profileScroll);
         int scrolled = whole(this.shownProfileScroll);
         float fraction = (float)(this.shownProfileScroll - scrolled);
+        this.foldBox = column.foldBox(this.font, words.left, words.top
+                + layout.wordsOffset() - this.shownProfileScroll);
         boolean clipped = LostTalesUiClip.beginLocal(this.mc,
                 (float)profile.left, (float)profile.top,
                 (float)profile.right(), (float)profile.bottom());
@@ -809,6 +831,55 @@ public final class CharactersPage extends PageContent {
         } finally {
             LostTalesUiClip.end(clipped);
         }
+    }
+
+    /**
+     * Shows as much of the History's folded rows as the page has opened:
+     * all of them while it is open, none while folded, gliding between
+     * the two. A History come into view, another character's or one just
+     * arrived, stands as it is at once.
+     */
+    private void revealHistory(CharacterProfileColumn column,
+                               UUID characterId) {
+        int folded = column.foldedHeight();
+        int target = this.openHistories.contains(characterId) ? folded : 0;
+        if (!characterId.equals(this.historyShown)
+                || this.historyFolded == 0) {
+            this.shownHistory = target;
+        } else {
+            this.shownHistory = glide(Math.min(folded, this.shownHistory),
+                    target);
+            if (Math.abs(this.shownHistory - target) < ARRIVED) {
+                this.shownHistory = target;
+            }
+        }
+        this.historyShown = characterId;
+        this.historyFolded = folded;
+        column.reveal(this.shownHistory);
+    }
+
+    /**
+     * Read more opens the History where it stands, the words under it
+     * gliding down; Show less folds it and scrolls back as far as it
+     * shrinks, so Read more comes to stand where Show less was.
+     */
+    private void flipHistory() {
+        UUID characterId = this.historyShown;
+        if (characterId == null) {
+            return;
+        }
+        if (this.openHistories.remove(characterId)) {
+            this.profileScroll = Math.max(0,
+                    this.profileScroll - this.historyFolded);
+        } else {
+            this.openHistories.add(characterId);
+        }
+    }
+
+    /** Whether a point in the page's space is on Read more or Show less, where the profile shows it. */
+    private boolean onFold(CharactersLayout layout, double x, double y) {
+        return this.foldBox != null && this.foldBox.contains(x, y)
+                && layout.profile().contains(x, y);
     }
 
     /** A character's look, for the figure posed from it. */
@@ -855,6 +926,10 @@ public final class CharactersPage extends PageContent {
             }
             return true;
         }
+        if (onFold(layout, x - box.left, y - box.top)) {
+            flipHistory();
+            return true;
+        }
         if (layout.figure(whole(this.shownProfileScroll)).contains(pageX, pageY)
                 && layout.profile().contains(pageX, pageY)) {
             this.holdingFigure = true;
@@ -890,8 +965,17 @@ public final class CharactersPage extends PageContent {
         CharacterRosterSnapshot snapshot = snapshot();
         return snapshot != null && (rowAt(rows(snapshot), rosterList(layout),
                 x - box.left, y - box.top) != null
+                || onFold(layout, x - box.left, y - box.top)
                 || layout.figure(whole(this.shownProfileScroll))
                         .contains(pageX, pageY));
+    }
+
+    /** The page closed: every History folds again. */
+    @Override
+    public void hidden() {
+        if (!WindowLayout.isOpen(tab())) {
+            this.openHistories.clear();
+        }
     }
 
     /** The wheel zooms the figure over it; anywhere else it scrolls what is under it. */

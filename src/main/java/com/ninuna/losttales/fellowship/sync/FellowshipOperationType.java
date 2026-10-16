@@ -64,7 +64,6 @@ public enum FellowshipOperationType {
         return this == REMOVE_MEMBER
                 || this == TRANSFER_LEADERSHIP
                 || this == SET_GUIDE
-                || this == INVITE_PLAYER
                 || this == ACCEPT_INVITATION
                 || this == DECLINE_INVITATION
                 || this == CANCEL_INVITATION
@@ -72,7 +71,7 @@ public enum FellowshipOperationType {
                 || this == REMOVE_MARK;
     }
 
-    /** Whether the request carries a place on the map: a go-here marker set, a mark placed or moved. */
+    /** Whether the request carries a place on the map: a go-here mark set, a fellowship's mark placed or moved. */
     public boolean requiresMapPosition() {
         return this == SET_GO_HERE_MARKER || this == PLACE_MARK
                 || this == MOVE_MARK;
@@ -82,9 +81,13 @@ public enum FellowshipOperationType {
         return this == SET_COLOR;
     }
 
-    /** A new fellowship, a rename and a mark placed carry a name. */
+    /**
+     * A new fellowship, a rename and a mark placed carry a name; an
+     * invitation carries the name of the character invited.
+     */
     public boolean requiresName() {
-        return this == RENAME || this == CREATE || this == PLACE_MARK;
+        return this == RENAME || this == CREATE || this == PLACE_MARK
+                || this == INVITE_PLAYER;
     }
 
     /**

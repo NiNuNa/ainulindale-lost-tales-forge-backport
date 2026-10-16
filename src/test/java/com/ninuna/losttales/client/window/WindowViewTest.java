@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.chat.ConversationPage;
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import java.util.Arrays;
@@ -25,10 +26,10 @@ import static org.junit.Assert.assertTrue;
  * The screen shows one view at a time: each category's view, or a custom
  * one. Any page may stand in any view: a page the game or a key opens goes
  * to its category's view, one opened by hand to the view on screen. A view
- * with no window opens with its defaults, and Reset View puts it back so;
- * custom views are made, named, keyed and deleted; a window pinned to the
- * GUI shows in every view, one pinned to the HUD stays while playing; a
- * locked window cannot be closed.
+ * with no window opens with its one window at the default place, and Reset
+ * View puts it back so; custom views are made, named, keyed in Controls
+ * and deleted; a window pinned to the GUI shows in every view, one pinned
+ * to the HUD stays while playing; a locked window cannot be closed.
  */
 public final class WindowViewTest {
     private static final String PAGE = "view_page";
@@ -80,11 +81,15 @@ public final class WindowViewTest {
         Views.reset();
         TwoWindowLayout.reset();
         WindowView.clear();
+        WindowView.forgetPrevious();
     }
 
     @After
     public void cleanUp() {
         WindowView.clear();
+        for (int number = 1; number <= Views.MAX_CUSTOM; number++) {
+            LostTalesKeyBindings.getViewKeyBinding(number).setKeyCode(0);
+        }
         Views.reset();
         TwoWindowLayout.reset();
         WindowLayout.setChangeListener(null);
@@ -180,7 +185,59 @@ public final class WindowViewTest {
         assertFalse(WindowView.shows(GLOBAL));
         assertFalse(WindowView.isOn(view(PageCategory.CHANNELS)));
         WindowView.forView(null);
-        assertTrue("no view is the Lost Tales Menu's", WindowView.isOn(Views.menu()));
+        assertTrue("no view is the Chat view",
+                WindowView.isOn(view(PageCategory.CHANNELS)));
+    }
+
+    /**
+     * The view shown before the one shown now is remembered, across the
+     * screen closing too, so a deleted view can swap back to it.
+     */
+    @Test
+    public void theViewShownBeforeIsRemembered() {
+        View map = view(PageCategory.MAP);
+        View journal = view(PageCategory.QUEST_JOURNAL);
+        WindowView.forView(map);
+        WindowView.forView(journal);
+        assertEquals(map, WindowView.shownBefore(journal));
+        WindowView.forView(journal);
+        assertEquals("the same view again changes nothing",
+                map, WindowView.shownBefore(journal));
+        WindowView.clear();
+        WindowView.forView(map);
+        assertEquals("the one shown last before the screen closed",
+                journal, WindowView.shownBefore(map));
+        WindowView.forgetPrevious();
+        assertEquals(view(PageCategory.CHANNELS), WindowView.shownBefore(map));
+    }
+
+    /** Reopening the screen on the view it closed on keeps the one shown before that. */
+    @Test
+    public void reopeningOnTheSameViewKeepsTheOneBefore() {
+        View map = view(PageCategory.MAP);
+        View made = Views.make();
+        WindowView.forView(map);
+        WindowView.forView(made);
+        WindowView.clear();
+        WindowView.forView(made);
+        assertEquals(map, WindowView.shownBefore(made));
+    }
+
+    /** A deleted view is never gone back to; with nothing standing it is the Chat view. */
+    @Test
+    public void aDeletedViewIsNeverGoneBackTo() {
+        View map = view(PageCategory.MAP);
+        View first = Views.make();
+        View second = Views.make();
+        WindowView.forView(map);
+        WindowView.forView(first);
+        WindowView.forView(second);
+        assertTrue(Views.delete(first));
+        assertEquals(view(PageCategory.CHANNELS), WindowView.shownBefore(second));
+        WindowView.forView(map);
+        assertTrue(Views.delete(second));
+        assertEquals("the deleted one is not remembered", view(PageCategory.CHANNELS),
+                WindowView.shownBefore(map));
     }
 
     /** A tab gone to by hand swaps the screen to the view of its window. */
@@ -196,39 +253,42 @@ public final class WindowViewTest {
     /* ---- Defaults ---- */
 
     /**
-     * Each category's view opens with its own windows, locked, each in
-     * its part of the screen; a page another view holds opens as a copy.
+     * Each category's view opens with one window at the default place,
+     * locked, its pages as tabs, the first in front; a page another view
+     * holds opens as a copy.
      */
     @Test
-    public void eachViewOpensWithItsDefaults() {
+    public void eachViewOpensWithItsOneWindow() {
         assertTrue(WindowLayout.buildView(view(PageCategory.MAP)));
         Window map = WindowLayout.windowOf(tab(MAP));
         assertTrue(map.isLocked());
-        assertEquals(Window.ScreenFill.FULL, map.getFill());
+        assertEquals(Window.ScreenFill.NONE, map.getFill());
         assertFalse("built once", WindowLayout.buildView(view(PageCategory.MAP)));
 
         assertTrue(WindowLayout.buildView(view(PageCategory.QUEST_JOURNAL)));
         Window journal = WindowLayout.windowOf(tab(JOURNAL));
-        assertEquals(Window.ScreenFill.LEFT, journal.getFill());
-        Window questMap = windowIn(view(PageCategory.QUEST_JOURNAL), tab(MAP));
-        assertNotNull(questMap);
-        assertEquals(Window.ScreenFill.RIGHT, questMap.getFill());
-        assertTrue(questMap.isLocked());
+        assertEquals(Window.ScreenFill.NONE, journal.getFill());
+        assertTrue(journal.isLocked());
+        assertEquals(tab(JOURNAL), journal.getActiveTab());
+        assertEquals("the map beside the journal, in the same window",
+                journal, windowIn(view(PageCategory.QUEST_JOURNAL), tab(MAP)));
+        assertEquals(1, windowsIn(view(PageCategory.QUEST_JOURNAL)));
         assertTrue("the Map view keeps its own", map.contains(tab(MAP)));
 
         assertTrue(WindowLayout.buildView(view(PageCategory.FELLOWSHIPS)));
-        assertEquals(Window.ScreenFill.CENTRE_HALF,
-                WindowLayout.windowOf(tab(FELLOWSHIPS)).getFill());
-        assertEquals(Window.ScreenFill.RIGHT_QUARTER,
-                windowIn(view(PageCategory.FELLOWSHIPS), tab(MAP)).getFill());
+        Window fellowships = WindowLayout.windowOf(tab(FELLOWSHIPS));
+        assertEquals(tab(FELLOWSHIPS), fellowships.getActiveTab());
+        assertEquals(fellowships,
+                windowIn(view(PageCategory.FELLOWSHIPS), tab(MAP)));
+        assertEquals(1, windowsIn(view(PageCategory.FELLOWSHIPS)));
         assertTrue(WindowLayout.buildView(view(PageCategory.PROFILE)));
-        assertEquals(Window.ScreenFill.FULL,
+        assertEquals(Window.ScreenFill.NONE,
                 WindowLayout.windowOf(tab(CHARACTERS)).getFill());
     }
 
-    /** The Chat view's defaults: Global and OOC in the bottom-left quarter; the consoles' the top-left. */
+    /** The Chat view's window: Global and OOC, Global in front; the Consoles view's every console. */
     @Test
-    public void theChatsViewsOpenInTheirQuarters() {
+    public void theChatsViewsOpenAtTheDefaultPlace() {
         for (Window window : WindowLayout.windows()) {
             window.setLocked(false);
         }
@@ -237,11 +297,12 @@ public final class WindowViewTest {
         assertTrue(WindowLayout.buildView(view(PageCategory.CHANNELS)));
         Window chat = WindowLayout.windowOf(GLOBAL);
         assertEquals(Arrays.<WindowPage>asList(GLOBAL, OOC), chat.getTabs());
-        assertEquals(Window.ScreenFill.BOTTOM_LEFT, chat.getFill());
+        assertEquals(GLOBAL, chat.getActiveTab());
+        assertEquals(Window.ScreenFill.NONE, chat.getFill());
         assertTrue(chat.isLocked());
         assertTrue(WindowLayout.buildView(view(PageCategory.CONSOLES)));
         Window consoles = WindowLayout.windowOf(CONSOLE);
-        assertEquals(Window.ScreenFill.TOP_LEFT, consoles.getFill());
+        assertEquals(Window.ScreenFill.NONE, consoles.getFill());
         assertTrue(consoles.isLocked());
     }
 
@@ -277,16 +338,16 @@ public final class WindowViewTest {
         assertFalse(map == WindowLayout.windowOf(tab(MAP)));
     }
 
-    /** Reset Window Layout puts a window back where its view's defaults have it, locked. */
+    /** Reset Window Layout puts a window back at the default place, locked. */
     @Test
-    public void resettingAWindowPutsItWhereItsViewHasIt() {
+    public void resettingAWindowPutsItAtTheDefaultPlace() {
         WindowLayout.buildView(view(PageCategory.QUEST_JOURNAL));
         Window journal = WindowLayout.windowOf(tab(JOURNAL));
         journal.setLocked(false);
-        WindowLayout.setFill(journal.getId(), Window.ScreenFill.NONE, false);
+        WindowLayout.setFill(journal.getId(), Window.ScreenFill.LEFT, false);
         WindowLayout.setPinnedToGui(journal.getId(), true);
         assertTrue(WindowLayout.resetWindow(journal.getId()));
-        assertEquals(Window.ScreenFill.LEFT, journal.getFill());
+        assertEquals(Window.ScreenFill.NONE, journal.getFill());
         assertTrue(journal.isLocked());
         assertFalse(journal.isPinnedToGui());
     }
@@ -297,45 +358,73 @@ public final class WindowViewTest {
         Window held = WindowLayout.showView(tab(JOURNAL));
         assertNotNull(held);
         assertEquals(view(PageCategory.QUEST_JOURNAL), WindowLayout.viewOf(held));
-        assertEquals(Window.ScreenFill.LEFT, held.getFill());
-        assertNotNull("the map beside it", windowIn(
+        assertEquals(Window.ScreenFill.NONE, held.getFill());
+        assertEquals("the map beside it, as a tab", held, windowIn(
                 view(PageCategory.QUEST_JOURNAL), tab(MAP)));
     }
 
     /* ---- Custom views ---- */
 
-    /** Custom views: the Lost Tales Menu's first, Caps Lock its key; at most a few more. */
+    /** A new player has no custom view; they are made up to the most, each by its number. */
     @Test
     public void customViewsAreMadeUpToTheMost() {
-        assertEquals(View.MENU_ID, Views.menu().id());
-        assertEquals(Keyboard.KEY_CAPITAL, Views.menu().key());
-        assertEquals(Views.menu(), Views.byKey(Keyboard.KEY_CAPITAL));
-        assertFalse(Views.menu().isDeletable());
+        assertTrue(Views.custom().isEmpty());
         View made = Views.make();
         assertEquals("v1", made.id());
-        assertTrue(made.isDeletable());
+        assertEquals(1, made.number());
+        assertEquals(made, Views.numbered(1));
         while (Views.canMake()) {
             assertNotNull(Views.make());
         }
         assertEquals(Views.MAX_CUSTOM, Views.custom().size());
         assertNull(Views.make());
         assertTrue(Views.delete(made));
-        assertFalse(Views.delete(Views.menu()));
+        assertFalse("a category's view stays", Views.delete(
+                view(PageCategory.MAP)));
         assertEquals("the lowest number free", "v1", Views.make().id());
     }
 
-    /** A view's key may be any key nothing else holds; a view's name is cleaned. */
+    /** A key bound to a number no view has makes that view, last on the bar. */
+    @Test
+    public void aViewIsMadeByItsNumber() {
+        View first = Views.make();
+        View third = Views.make(3);
+        assertNotNull(third);
+        assertEquals("v3", third.id());
+        assertEquals(Arrays.asList(first, third), Views.custom());
+        assertNull("one view per number", Views.make(3));
+        assertNull(Views.make(0));
+        assertNull(Views.make(Views.MAX_CUSTOM + 1));
+        assertEquals("v2", Views.make().id());
+    }
+
+    /**
+     * A view's key is its number's binding in Controls: any key nothing
+     * else holds; deleting the view takes it away. A view's name is
+     * cleaned.
+     */
     @Test
     public void aViewsKeyAndNameFollowTheRules() {
         View made = Views.make();
+        View other = Views.make();
         assertNotNull(Views.keyRefusal(made, Keyboard.KEY_ESCAPE));
-        assertNotNull("the menu's", Views.keyRefusal(made, Keyboard.KEY_CAPITAL));
         assertNull(Views.keyRefusal(made, Keyboard.KEY_G));
         assertTrue(Views.setKey(made, Keyboard.KEY_G));
-        assertEquals(made, Views.byKey(Keyboard.KEY_G));
-        assertFalse(Views.setKey(Views.menu(), Keyboard.KEY_G));
+        assertEquals(Keyboard.KEY_G, made.key());
+        assertEquals(Keyboard.KEY_G, LostTalesKeyBindings.getViewKeyBinding(
+                made.number()).getKeyCode());
+        assertEquals(made.number(), Views.numberForKey(Keyboard.KEY_G));
+        assertNotNull("another view's key", Views.keyRefusal(other,
+                Keyboard.KEY_G));
+        assertFalse(Views.setKey(other, Keyboard.KEY_G));
+        assertFalse("a category's view keeps its binding",
+                Views.setKey(view(PageCategory.MAP), Keyboard.KEY_H));
         assertTrue("no key at all", Views.setKey(made, 0));
-        assertNull(Views.byKey(Keyboard.KEY_G));
+        assertEquals(0, Views.numberForKey(Keyboard.KEY_G));
+        assertTrue(Views.setKey(other, Keyboard.KEY_H));
+        assertTrue(Views.delete(other));
+        assertEquals("deleting takes the key away", 0,
+                Views.numberForKey(Keyboard.KEY_H));
         Views.rename(made, "  §cHunting§r Party of the Long Grey Road ");
         assertEquals("Hunting Party of the Lon", made.title());
         Views.rename(Views.of(PageCategory.MAP), "Atlas");

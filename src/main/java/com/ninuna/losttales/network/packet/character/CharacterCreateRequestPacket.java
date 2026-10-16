@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
@@ -16,6 +17,9 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 /** Narrow client request to create one character in one unlocked slot. */
 public final class CharacterCreateRequestPacket implements IMessage {
+
+    private static final int HISTORY_BYTES = CharacterPacketCodec.maxSectionBytes(
+            CharacterProfile.Section.HISTORY);
 
     private int requestId;
     private long expectedRosterRevision;
@@ -72,7 +76,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
             this.skinId = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.history = LostTalesPacketCodec.readUtf8String(
-                    buffer, CharacterPacketCodec.MAX_SECTION_BYTES);
+                    buffer, HISTORY_BYTES);
             this.age = buffer.readInt();
             this.startingFactionId = LostTalesPacketCodec.readUtf8String(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.startingWaypointId = LostTalesPacketCodec.readUtf8String(
@@ -113,7 +117,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.skinId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         LostTalesPacketCodec.writeUtf8String(
-                buffer, this.history, CharacterPacketCodec.MAX_SECTION_BYTES);
+                buffer, this.history, HISTORY_BYTES);
         buffer.writeInt(this.age);
         LostTalesPacketCodec.writeUtf8String(buffer, this.startingFactionId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, this.startingWaypointId,

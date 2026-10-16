@@ -3,14 +3,21 @@ package com.ninuna.losttales.fellowship.model;
 import java.util.UUID;
 
 /**
- * Immutable server-owned invitation for one identity to join one fellowship.
+ * Immutable server-owned invitation for one character to join one
+ * fellowship. It waits a day, whether its character is played or not.
  *
- * Account UUIDs and names are validation/display snapshots. The identity
- * ids, a character's or the account's own, are what the fellowship goes by.
+ * Account UUIDs and names are validation/display snapshots. The character
+ * ids are what the fellowship goes by.
  */
 public final class FellowshipInvitation {
 
     public static final int CURRENT_DATA_VERSION = 1;
+    /** How long an invitation waits: a day. */
+    public static final long LIFETIME_MILLIS = 24L * 60L * 60L * 1000L;
+    /** The most invitations one fellowship has open at once. */
+    public static final int MAX_PER_FELLOWSHIP = 16;
+    /** The most invitations waiting for the characters of one account at once. */
+    public static final int MAX_PER_TARGET_ACCOUNT = 32;
 
     private final UUID invitationId;
     private final UUID fellowshipId;

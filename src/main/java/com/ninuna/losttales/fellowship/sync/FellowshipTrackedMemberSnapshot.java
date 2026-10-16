@@ -1,12 +1,15 @@
 package com.ninuna.losttales.fellowship.sync;
 
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
-import com.ninuna.losttales.fellowship.model.FellowshipGoHereMarker;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 
 import java.util.UUID;
 
 /** Immutable server-authoritative position for one currently trackable member. */
 public final class FellowshipTrackedMemberSnapshot {
+
+    /** The highest or lowest a tracked member may stand, in blocks. */
+    public static final double MAX_VERTICAL_COORDINATE = 4096.0D;
 
     private final UUID identityId;
     private final String characterName;
@@ -29,7 +32,7 @@ public final class FellowshipTrackedMemberSnapshot {
         if (color == null) {
             throw new IllegalArgumentException("color must not be null");
         }
-        if (!FellowshipGoHereMarker.isValidCoordinates(x, y, z)) {
+        if (!isValidPosition(x, y, z)) {
             throw new IllegalArgumentException("position is invalid");
         }
         this.identityId = identityId;
@@ -104,6 +107,12 @@ public final class FellowshipTrackedMemberSnapshot {
         bits = Double.doubleToLongBits(this.z);
         result = 31 * result + (int) (bits ^ (bits >>> 32));
         return result;
+    }
+
+    /** Whether a member may be tracked at this place. */
+    public static boolean isValidPosition(double x, double y, double z) {
+        return FellowshipMark.isValidPosition(x, z) && Double.isFinite(y)
+                && Math.abs(y) <= MAX_VERTICAL_COORDINATE;
     }
 
     /** The name trimmed; empty where there is none, which the client words. */

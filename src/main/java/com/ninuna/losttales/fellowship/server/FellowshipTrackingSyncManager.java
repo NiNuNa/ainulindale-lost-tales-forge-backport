@@ -2,17 +2,15 @@ package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
+import com.ninuna.losttales.compat.lotr.LotrMapLocations;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipTrackingSyncPacket;
 import com.ninuna.losttales.fellowship.model.Fellowship;
-import com.ninuna.losttales.fellowship.model.FellowshipColor;
-import com.ninuna.losttales.fellowship.model.FellowshipGoHereMarker;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
-import com.ninuna.losttales.fellowship.storage.FellowshipGoHereMarkerWorldData;
+import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
-import com.ninuna.losttales.fellowship.sync.FellowshipGoHereMarkerSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipTrackedMemberSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipTrackingSnapshot;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
@@ -22,16 +20,18 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.WorldServer;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Sends only authorized, quantized fellowship positions and persistent personal
- * markers. No client-reported coordinates are accepted by this subsystem.
+ * Sends each player the quantized positions of the members of the
+ * fellowship they travel with, and nothing else; the marks ride in the
+ * fellowship state. A member's position goes only while the fellowship
+ * shows members on the map and the member is neither concealed nor hidden
+ * on LOTR's map ({@link FellowshipPlaces}). No client-reported coordinates
+ * are accepted by this subsystem.
  */
 public final class FellowshipTrackingSyncManager {
 
@@ -96,12 +96,10 @@ public final class FellowshipTrackingSyncManager {
         if (receiver == null) {
             return false;
         }
-        // The character being played owns the marker and travels with the
-        // fellowship.
         Fellowship fellowship = view.fellowshipData.getTravellingFellowship(receiver.gameplayId);
         FellowshipTrackingSnapshot content = fellowship == null
-                ? buildSoloContent(recipient.getUniqueID(),
-                        receiver.gameplayId, receiver.displayName, view)
+                ? FellowshipTrackingSnapshot.noFellowship(recipient.getUniqueID(), 1L,
+                        receiver.gameplayId)
                 : buildFellowshipContent(recipient.getUniqueID(),
                         receiver.gameplayId, fellowship, view);
 
@@ -127,26 +125,6 @@ public final class FellowshipTrackingSyncManager {
         return true;
     }
 
-    /**
-     * One player, no fellowship: their own marker and nothing else.
-     *
-     * <p>{@code markerOwnerId} is the character being played.</p>
-     */
-    private static FellowshipTrackingSnapshot buildSoloContent(
-            UUID recipientOwnerId, UUID markerOwnerId,
-            String ownerName, ServerView view) {
-        ArrayList<FellowshipGoHereMarkerSnapshot> markers =
-                new ArrayList<FellowshipGoHereMarkerSnapshot>(1);
-        FellowshipGoHereMarker marker =
-                view.markerData.getMarker(markerOwnerId);
-        if (marker != null) {
-            markers.add(toMarkerSnapshot(
-                    marker, ownerName, FellowshipColor.GREEN));
-        }
-        return FellowshipTrackingSnapshot.noFellowship(
-                recipientOwnerId, 1L, markerOwnerId, markers);
-    }
-
     private static FellowshipTrackingSnapshot buildFellowshipContent(
             UUID recipientOwnerId,
             UUID recipientIdentityId,
@@ -154,6 +132,7 @@ public final class FellowshipTrackingSyncManager {
             ServerView view) {
         ArrayList<FellowshipTrackedMemberSnapshot> tracked =
                 new ArrayList<FellowshipTrackedMemberSnapshot>();
+        boolean ruleOn = fellowship.isOn(FellowshipSwitch.SHOWN_ON_MAP);
         for (FellowshipMember member : fellowship.getMembers()) {
             if (recipientIdentityId.equals(member.getIdentityId())) {
                 continue;
@@ -161,62 +140,32 @@ public final class FellowshipTrackingSyncManager {
             OnlinePlayerContext online = view.onlineByOwner.get(
                     member.getOwnerId());
             FellowshipTrackedMemberSnapshot snapshot = buildTrackedMember(
-                    member, online);
+                    member, online, ruleOn);
             if (snapshot != null) {
                 tracked.add(snapshot);
             }
         }
-
-        ArrayList<FellowshipGoHereMarkerSnapshot> markers =
-                new ArrayList<FellowshipGoHereMarkerSnapshot>();
-        for (FellowshipMember owner : fellowship.getMembers()) {
-            FellowshipGoHereMarker marker = view.markerData.getMarker(
-                    owner.getIdentityId());
-            if (marker != null) {
-                markers.add(toMarkerSnapshot(
-                        marker, owner.getCharacterName(), owner.getColor()));
-            }
-        }
-        Collections.sort(markers,
-                new Comparator<FellowshipGoHereMarkerSnapshot>() {
-                    @Override
-                    public int compare(FellowshipGoHereMarkerSnapshot left,
-                                       FellowshipGoHereMarkerSnapshot right) {
-                        return left.getOwnerIdentityId().toString().compareTo(
-                                right.getOwnerIdentityId().toString());
-                    }
-                });
         return new FellowshipTrackingSnapshot(
                 recipientOwnerId,
                 1L,
                 recipientIdentityId,
                 fellowship.getFellowshipId(),
                 fellowship.getRevision(),
-                tracked,
-                markers);
-    }
-
-    private static FellowshipGoHereMarkerSnapshot toMarkerSnapshot(
-            FellowshipGoHereMarker marker, String ownerName,
-            FellowshipColor ownerColor) {
-        return new FellowshipGoHereMarkerSnapshot(
-                marker.getOwnerIdentityId(), ownerName, ownerColor,
-                marker.getDimensionId(),
-                marker.getX(), marker.getY(), marker.getZ(),
-                marker.getUpdatedAt());
+                tracked);
     }
 
     private static FellowshipTrackedMemberSnapshot buildTrackedMember(
             FellowshipMember member,
-            OnlinePlayerContext online) {
+            OnlinePlayerContext online,
+            boolean ruleOn) {
         if (online == null || online.player == null
-                || !member.getIdentityId().equals(online.gameplayId)) {
+                || !member.getIdentityId().equals(online.gameplayId)
+                || !FellowshipPlaces.shared(ruleOn, online.concealed, online.hidden)) {
             return null;
         }
         EntityPlayerMP player = online.player;
         if (player.isDead || !player.isEntityAlive()
-                || AccessoryEffectService.isConcealed(player)
-                || !FellowshipGoHereMarker.isValidCoordinates(
+                || !FellowshipTrackedMemberSnapshot.isValidPosition(
                 player.posX, player.posY, player.posZ)) {
             return null;
         }
@@ -237,12 +186,10 @@ public final class FellowshipTrackingSyncManager {
                 source.getOwnerId(), sequence,
                 source.getActiveIdentityId(),
                 source.getFellowshipId(), source.getFellowshipRevision(),
-                source.getTrackedMembers(),
-                source.getGoHereMarkers())
+                source.getTrackedMembers())
                 : FellowshipTrackingSnapshot.noFellowship(
                 source.getOwnerId(), sequence,
-                source.getActiveIdentityId(),
-                source.getGoHereMarkers());
+                source.getActiveIdentityId());
     }
 
     private static ServerView collectServerView() {
@@ -255,18 +202,14 @@ public final class FellowshipTrackingSyncManager {
             return null;
         }
         FellowshipWorldData fellowshipData;
-        FellowshipGoHereMarkerWorldData markerData;
         try {
             fellowshipData = FellowshipStorage.get(overworld);
-            markerData = FellowshipService.getInstance()
-                    .getGoHereMarkerData(overworld);
         } catch (RuntimeException exception) {
             FMLLog.warning("[%s] Unable to synchronize fellowship tracking: %s",
                     LostTalesMetaData.MOD_ID, exception.toString());
             return null;
         }
-        if (markerData == null || markerData.isReadOnlyForNewerVersion()
-                || !fellowshipData.areCharacterReferencesValidated()) {
+        if (!fellowshipData.areCharacterReferencesValidated()) {
             return null;
         }
 
@@ -289,22 +232,20 @@ public final class FellowshipTrackingSyncManager {
                 }
                 onlineByOwner.put(player.getUniqueID(),
                         new OnlinePlayerContext(player, active.gameplayId(),
-                                active.displayName));
+                                AccessoryEffectService.isConcealed(player),
+                                LotrMapLocations.hides(player)));
             }
         }
-        return new ServerView(fellowshipData, markerData, onlineByOwner);
+        return new ServerView(fellowshipData, onlineByOwner);
     }
 
     private static final class ServerView {
         private final FellowshipWorldData fellowshipData;
-        private final FellowshipGoHereMarkerWorldData markerData;
         private final Map<UUID, OnlinePlayerContext> onlineByOwner;
 
         private ServerView(FellowshipWorldData fellowshipData,
-                           FellowshipGoHereMarkerWorldData markerData,
                            Map<UUID, OnlinePlayerContext> onlineByOwner) {
             this.fellowshipData = fellowshipData;
-            this.markerData = markerData;
             this.onlineByOwner = onlineByOwner;
         }
     }
@@ -313,13 +254,17 @@ public final class FellowshipTrackingSyncManager {
         private final EntityPlayerMP player;
         /** The id the player is playing as; never null. */
         private final UUID gameplayId;
-        private final String displayName;
+        /** Read once a pass, not for every recipient. */
+        private final boolean concealed;
+        /** Hidden on LOTR's map; read once a pass, not for every recipient. */
+        private final boolean hidden;
 
         private OnlinePlayerContext(EntityPlayerMP player, UUID gameplayId,
-                                    String displayName) {
+                                    boolean concealed, boolean hidden) {
             this.player = player;
             this.gameplayId = gameplayId;
-            this.displayName = displayName;
+            this.concealed = concealed;
+            this.hidden = hidden;
         }
     }
 

@@ -59,13 +59,13 @@ public final class LostTalesClientMapMarkerIndexTest {
         LostTalesClientMapMarkerIndex index =
                 new LostTalesClientMapMarkerIndex();
         LostTalesMapMarkerData world = marker(
-                "fellowship_go_here:shared", "World", 10.0D,
+                "fellowship_mark:shared", "World", 10.0D,
                 LostTalesMapMarkerSource.CUSTOM_PRESET);
         LostTalesMapMarkerData collidingFellowship = marker(
-                "fellowship_go_here:shared", "Fellowship Collision", 20.0D,
+                "fellowship_mark:shared", "Fellowship Collision", 20.0D,
                 LostTalesMapMarkerSource.QUEST_DYNAMIC);
         LostTalesMapMarkerData fellowship = marker(
-                "fellowship_go_here:member", "Fellowship", 30.0D,
+                "fellowship_mark:member", "Fellowship", 30.0D,
                 LostTalesMapMarkerSource.QUEST_DYNAMIC);
 
         index.replaceWorldMarkers(Collections.singleton(world));
@@ -92,7 +92,7 @@ public final class LostTalesClientMapMarkerIndexTest {
                 "losttales:second", "Second", 20.0D,
                 LostTalesMapMarkerSource.CUSTOM_PRESET);
         LostTalesMapMarkerData fellowship = marker(
-                "fellowship_go_here:member", "Fellowship", 30.0D,
+                "fellowship_mark:member", "Fellowship", 30.0D,
                 LostTalesMapMarkerSource.QUEST_DYNAMIC);
 
         index.replaceWorldMarkers(Collections.singleton(first));

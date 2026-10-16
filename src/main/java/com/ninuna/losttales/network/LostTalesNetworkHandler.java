@@ -11,6 +11,7 @@ import com.ninuna.losttales.network.packet.LostTalesMissiveBoardRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesMissiveBoardStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestActionPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestOfferPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesWorldQuestSyncPacket;
@@ -170,5 +171,6 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesServerQuestSyncPacket.Handler.class, LostTalesServerQuestSyncPacket.class, 71, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesWorldQuestSyncPacket.Handler.class, LostTalesWorldQuestSyncPacket.class, 72, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesServerStatusPacket.Handler.class, LostTalesServerStatusPacket.class, 73, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesQuestOfferPacket.Handler.class, LostTalesQuestOfferPacket.class, 74, Side.CLIENT);
     }
 }

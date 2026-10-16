@@ -13,6 +13,7 @@ import cpw.mods.fml.common.FMLLog;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatCommandText;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -295,6 +296,8 @@ public final class LostTalesConfig {
     public static boolean chatTypingIndicators = true;
     /** Words the server adds to the chat's profanity list, one per line as word=replacement. */
     public static String[] chatProfanityWords = new String[0];
+    /** Other mods' commands whose words the Server Log and an echo never repeat, one name per line. */
+    public static String[] chatPrivateCommands = new String[0];
     /** What a new player is greeted with on their first join, in OOC Chat; none greets nobody. */
     public static String[] chatWelcomeLines = new String[0];
     /** The address players join by, in the Server's status line and Discord's topics; empty for none. */
@@ -402,6 +405,8 @@ public final class LostTalesConfig {
     public static int characterStateCheckpointIntervalSeconds = 300;
     public static int characterStateCheckpointPlayersPerTick = 1;
     public static int characterDeletionRetentionDays = 30;
+    /** Whether every player is shown which account plays a character; off, only who holds character.see_accounts. */
+    public static boolean showAccounts = true;
     public static long characterSwitchCombatGraceMillis = 20000L;
     public static long characterSwitchTeleportGraceMillis = 5000L;
 
@@ -605,6 +610,12 @@ public final class LostTalesConfig {
                     characterDeletionRetentionDays,
                     1,
                     3650,
+                    TIP
+            );
+            showAccounts = config.getBoolean(
+                    "showAccounts",
+                    CATEGORY_CHARACTERS,
+                    showAccounts,
                     TIP
             );
             sanitizeCharacterSwitchOptions();
@@ -973,6 +984,12 @@ public final class LostTalesConfig {
                     "profanityWords",
                     CATEGORY_CHAT,
                     chatProfanityWords,
+                    TIP
+            );
+            chatPrivateCommands = config.getStringList(
+                    "privateCommands",
+                    CATEGORY_CHAT,
+                    chatPrivateCommands,
                     TIP
             );
             chatWelcomeLines = config.getStringList(
@@ -1640,6 +1657,14 @@ public final class LostTalesConfig {
         for (String warning : profanityWarnings) {
             warnings.warn(warning);
         }
+        // Other mods' commands the server keeps private, beside the ones
+        // the mod knows, sent to every client with its chat access.
+        List<String> commandWarnings = new ArrayList<String>();
+        ChatCommandText.installServerNames(ChatCommandText.parseNames(
+                chatPrivateCommands, commandWarnings));
+        for (String warning : commandWarnings) {
+            warnings.warn(warning);
+        }
         // The Operator channel's gate is put back when its line is
         // missing, before the gates are read, and the value written back
         // with the rest of the file at the end of this load.
@@ -2031,6 +2056,8 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CHANNELS, "icons", chatChannelIcons).set(chatChannelIcons);
         config.get(CATEGORY_CHAT, "profanityWords", chatProfanityWords)
                 .set(chatProfanityWords);
+        config.get(CATEGORY_CHAT, "privateCommands", chatPrivateCommands)
+                .set(chatPrivateCommands);
         config.get(CATEGORY_CHAT, "welcomeLines", chatWelcomeLines)
                 .set(chatWelcomeLines);
         config.get(CATEGORY_CHAT, "serverAddress", serverAddress)
@@ -2172,6 +2199,7 @@ public final class LostTalesConfig {
                 characterStateCheckpointPlayersPerTick);
         config.get(CATEGORY_CHARACTERS, "characterDeletionRetentionDays",
                 characterDeletionRetentionDays).set(characterDeletionRetentionDays);
+        config.get(CATEGORY_CHARACTERS, "showAccounts", showAccounts).set(showAccounts);
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
         Property hudPresetProperty = config.get(CATEGORY_CLIENT, "hudPlacementPreset", hudPlacementPreset);
         hudPresetProperty.set(hudPlacementPreset);

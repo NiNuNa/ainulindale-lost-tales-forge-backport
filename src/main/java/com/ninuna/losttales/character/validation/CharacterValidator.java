@@ -411,7 +411,7 @@ public final class CharacterValidator {
         List<String> words = new ArrayList<String>();
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
             String text = profile.section(section);
-            if (!isValidSection(text)) {
+            if (!isValidSection(section, text)) {
                 return CharacterValidationResult.failure(
                         CharacterErrorId.INVALID_PROFILE_TEXT);
             }
@@ -589,9 +589,10 @@ public final class CharacterValidator {
         return output.toString();
     }
 
-    /** An About text within its length, printable, its only breaks the ones between paragraphs. */
-    public static boolean isValidSection(String value) {
-        return isPrintable(value, CharacterProfile.MAX_SECTION_LENGTH, true);
+    /** An About text within its section's length, printable, its only breaks the ones between paragraphs. */
+    public static boolean isValidSection(CharacterProfile.Section section,
+                                         String value) {
+        return isPrintable(value, section.getMaxLength(), true);
     }
 
     /** One line of printable text of at most {@code maxLength} characters. */

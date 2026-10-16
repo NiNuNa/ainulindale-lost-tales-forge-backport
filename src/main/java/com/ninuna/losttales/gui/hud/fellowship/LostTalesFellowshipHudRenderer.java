@@ -200,7 +200,10 @@ public final class LostTalesFellowshipHudRenderer {
         if (hasLiveStatus) {
             float brightness = status.getAvailability()
                     == FellowshipMemberAvailability.DEAD ? 0.65F : 1.0F;
+            // A member whose place is not shared comes without a world.
             if (minecraft.thePlayer != null
+                    && status.getDimensionId()
+                    != FellowshipMemberStatusSnapshot.NO_DIMENSION
                     && minecraft.thePlayer.dimension
                     != status.getDimensionId()) {
                 brightness *= 0.65F;

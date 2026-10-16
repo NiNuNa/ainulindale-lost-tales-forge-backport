@@ -3,6 +3,9 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.quest.ClientQuestNews;
 import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.OptionGlyph;
+import com.ninuna.losttales.client.window.OtherPage;
+import com.ninuna.losttales.client.window.PageOption;
 import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.client.window.WindowMenus;
@@ -22,20 +25,30 @@ import java.util.Locale;
 import net.minecraft.util.StatCollector;
 
 /**
- * What is addressed to the player, as the Inbox lists it, as Discord's
- * inbox: the fellowship invitations waiting for the character played,
- * the lines that mentioned the player, the messages forwarded to them in a
- * whisper, and this session's quest news, each under its heading and the
- * newest first, narrowed by its field. A sub-window hung from the inbox
- * button every conversation's tool strip has beside its Notification
- * Settings; a press on a row goes where it names: a line in its
- * conversation, an invitation on the Fellowships page, a quest in the
- * journal. Each kind is read where it is kept; the inbox keeps nothing of
- * its own. The button counts what waits: invitations not yet answered,
- * mentions and forwards not yet read in their conversation, quest news
- * the inbox has not shown.
+ * What is addressed to the player, as an Inbox lists it, as Discord's
+ * inbox, each page's own kind ({@link Kind}): a conversation's lists the
+ * lines that mentioned the player and the messages forwarded to them in a
+ * whisper, each under its heading; the Quest Journal's this session's
+ * quest news; the Fellowships page's the invitations waiting for the
+ * character played. The newest first, narrowed by its field. A sub-window
+ * hung from the Inbox button on the page's tool strip; a press on a row
+ * goes where it names: a line in its conversation, a quest in the journal,
+ * an invitation on the Fellowships page. Each kind is read where it is
+ * kept; the inbox keeps nothing of its own. The button counts what waits
+ * of its kind: mentions and forwards not yet read in their conversation,
+ * quest news the inbox has not shown, invitations not yet answered.
  */
-final class ChatInbox {
+public final class ChatInbox {
+    /** What one Inbox lists: the kind of the page it stands on. */
+    public enum Kind {
+        /** A conversation's: the lines that mentioned the player, and the messages forwarded to them. */
+        CONVERSATIONS,
+        /** The Quest Journal's: this session's quest news. */
+        QUEST_NEWS,
+        /** The Fellowships page's: the invitations waiting for the character played. */
+        INVITATIONS
+    }
+
     /** What a row's id starts with, for what a press on it goes to. */
     static final String INVITATION = "invitation:";
     static final String LINE = "line:";
@@ -45,9 +58,14 @@ final class ChatInbox {
     /** How long the button's count stands before it is counted again. */
     private static final long COUNT_NANOS = 250L * 1000000L;
 
-    private static int counted;
-    private static long countedAt;
-    private static boolean everCounted;
+    private static final String OPTION_ID = "inbox";
+    private static final OptionGlyph GLYPH = OptionGlyph.sprite(
+            LostTalesUiSheet.INBOX, LostTalesUiSheet.INBOX_LIT);
+
+    /** Each kind's count, when it was counted, and whether it ever was. */
+    private static final int[] COUNTED = new int[Kind.values().length];
+    private static final long[] COUNTED_AT = new long[Kind.values().length];
+    private static final boolean[] EVER_COUNTED = new boolean[Kind.values().length];
 
     /** The Inbox's rows and what a press on one does, for the sub-window ({@link ChatSubWindows#INBOX}). */
     static final WindowMenus.Source SOURCE = new WindowMenus.Source() {
@@ -61,10 +79,13 @@ final class ChatInbox {
 
         @Override
         public void rebuild(MenuWindow menu) {
+            Kind kind = kindOf(menu.about());
             menu.setTitle(null, LostTalesUiSheet.INBOX);
-            menu.setRows(rows(menu.filter()));
-            // Shown, the quest news has been seen.
-            ClientQuestNews.markSeen();
+            menu.setRows(rows(menu.filter(), kind));
+            if (kind == Kind.QUEST_NEWS) {
+                // Shown, the quest news has been seen.
+                ClientQuestNews.markSeen();
+            }
         }
 
         @Override
@@ -86,6 +107,32 @@ final class ChatInbox {
     };
 
     private ChatInbox() {}
+
+    /** The kind an Inbox opened from {@code tab} lists. */
+    static Kind kindOf(Object tab) {
+        if (tab instanceof OtherPage) {
+            String id = ((OtherPage)tab).page().id;
+            if (QuestJournalPage.PAGE_ID.equals(id)) {
+                return Kind.QUEST_NEWS;
+            }
+            if (FellowshipPage.PAGE_ID.equals(id)) {
+                return Kind.INVITATIONS;
+            }
+        }
+        return Kind.CONVERSATIONS;
+    }
+
+    /**
+     * A page's Inbox button for its tool strip and its options, counting
+     * what waits of {@code kind} beside it.
+     */
+    public static PageOption option(Kind kind) {
+        TabMark waiting = mark(kind);
+        return PageOption.opens(OPTION_ID,
+                StatCollector.translateToLocal("gui.losttales.window.inbox"),
+                waiting.count() > 0 ? Integer.toString(waiting.count()) : "",
+                OptionGlyph.withMark(GLYPH, waiting), ChatSubWindows.INBOX);
+    }
 
     /** Goes where a row names. */
     private static void goTo(String id) {
@@ -109,57 +156,70 @@ final class ChatInbox {
         }
     }
 
-    /** The mark the inbox button wears: the tile counting what waits, nothing when nothing does. */
-    static TabMark mark() {
-        return TabMark.pings(waiting());
+    /** The mark an Inbox button wears: the tile counting what waits of its kind, nothing when nothing does. */
+    static TabMark mark(Kind kind) {
+        return TabMark.pings(waiting(kind));
     }
 
     /**
-     * How much waits, counted again at most four times a second: every
-     * conversation's strip asks each frame.
+     * How much of {@code kind} waits, counted again at most four times a
+     * second: every strip with an Inbox asks each frame.
      */
-    static synchronized int waiting() {
+    static synchronized int waiting(Kind kind) {
+        int at = kind.ordinal();
         long now = System.nanoTime();
-        if (everCounted && now - countedAt < COUNT_NANOS) {
-            return counted;
+        if (EVER_COUNTED[at] && now - COUNTED_AT[at] < COUNT_NANOS) {
+            return COUNTED[at];
         }
-        int count = invitations().size() + ClientQuestNews.unseen();
-        for (Integer line : newest(LostTalesChatPresentation.pingedLines())) {
+        int count;
+        if (kind == Kind.INVITATIONS) {
+            count = invitations().size();
+        } else if (kind == Kind.QUEST_NEWS) {
+            count = ClientQuestNews.unseen();
+        } else {
+            count = unread(LostTalesChatPresentation.pingedLines())
+                    + unread(LostTalesChatPresentation.forwardedLines());
+        }
+        COUNTED[at] = count;
+        COUNTED_AT[at] = now;
+        EVER_COUNTED[at] = true;
+        return count;
+    }
+
+    /** How many of the newest of {@code lines} stand in the inbox unread. */
+    private static int unread(List<Integer> lines) {
+        int count = 0;
+        for (Integer line : newest(lines)) {
             if (listed(line.intValue())
                     && ClientChatChannelViews.isUnread(line.intValue())) {
                 count++;
             }
         }
-        for (Integer line : newest(LostTalesChatPresentation.forwardedLines())) {
-            if (listed(line.intValue())
-                    && ClientChatChannelViews.isUnread(line.intValue())) {
-                count++;
-            }
-        }
-        counted = count;
-        countedAt = now;
-        everCounted = true;
         return count;
     }
 
     /**
-     * The inbox's rows, each kind under its heading, the newest first,
-     * those whose words hold {@code query} where it is not empty. Nothing
-     * at all says so; nothing found is no rows.
+     * An Inbox's rows of {@code kind}, the newest first, those whose words
+     * hold {@code query} where it is not empty: a conversation's mentions
+     * and forwards each under its heading. Nothing at all says so;
+     * nothing found is no rows.
      */
-    static List<MenuWindow.Entry> rows(String query) {
+    static List<MenuWindow.Entry> rows(String query, Kind kind) {
         String words = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
         long now = System.currentTimeMillis();
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
-        section(rows, "gui.losttales.inbox.invitations",
-                invitationRows(words));
-        section(rows, "gui.losttales.inbox.mentions",
-                lineRows(LostTalesChatPresentation.pingedLines(), false, words,
-                        now));
-        section(rows, "gui.losttales.inbox.forwards",
-                lineRows(LostTalesChatPresentation.forwardedLines(), true,
-                        words, now));
-        section(rows, "gui.losttales.inbox.quest_news", questRows(words, now));
+        if (kind == Kind.INVITATIONS) {
+            rows.addAll(invitationRows(words));
+        } else if (kind == Kind.QUEST_NEWS) {
+            rows.addAll(questRows(words, now));
+        } else {
+            section(rows, "gui.losttales.inbox.mentions",
+                    lineRows(LostTalesChatPresentation.pingedLines(), false, words,
+                            now));
+            section(rows, "gui.losttales.inbox.forwards",
+                    lineRows(LostTalesChatPresentation.forwardedLines(), true,
+                            words, now));
+        }
         if (rows.isEmpty() && words.length() == 0) {
             rows.add(MenuWindow.Entry.note(StatCollector.translateToLocal(
                     "gui.losttales.inbox.empty")));

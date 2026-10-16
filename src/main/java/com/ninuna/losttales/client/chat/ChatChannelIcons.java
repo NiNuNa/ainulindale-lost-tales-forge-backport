@@ -596,8 +596,12 @@ public final class ChatChannelIcons {
         }
         for (CharacterAppearance appearance
                 : ClientCharacterAppearanceCache.snapshot().values()) {
+            // A conversation is filed under the account, or for a player not
+            // shown accounts under the character it is with.
             if (appearance != null
-                    && name.equalsIgnoreCase(appearance.getAccountName())) {
+                    && (name.equalsIgnoreCase(appearance.getAccountName())
+                            || (appearance.hasCharacter()
+                                    && name.equalsIgnoreCase(appearance.getCharacterName())))) {
                 return appearance.getPlayerId();
             }
         }

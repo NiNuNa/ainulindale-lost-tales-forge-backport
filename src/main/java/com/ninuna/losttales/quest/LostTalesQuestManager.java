@@ -19,8 +19,8 @@ import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-import com.ninuna.losttales.util.LostTalesServerPlayers;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointUnlockHelper;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -28,7 +28,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
@@ -36,7 +35,6 @@ import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
@@ -45,45 +43,6 @@ import net.minecraft.util.IChatComponent;
 public final class LostTalesQuestManager {
 
     private LostTalesQuestManager() {}
-
-    public static StartResult startQuest(EntityPlayer player, String questId) {
-        return startQuest(player, questId, LostTalesQuestStartSource.COMMAND);
-    }
-
-    /**
-     * Registers, keeps with the player and starts a quest the server made, a
-     * missive's. Only called once the server trusts the missive: a letter
-     * carrying the world's seal ({@code MissiveSeals}). Its locked start mode
-     * keeps every other path from starting it. Refused while the player
-     * keeps as many missives as a quest log holds.
-     */
-    public static StartResult startGeneratedQuest(EntityPlayer player, LostTalesQuestDefinition quest, long timeLimitTicks) {
-        if (quest == null || !LostTalesQuestIds.fits(quest.getId())) {
-            return StartResult.UNKNOWN_QUEST;
-        }
-        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
-        if (data == null) {
-            sendQuestChat(player, "chat.losttales.quest.no_data");
-            return StartResult.NO_PLAYER_DATA;
-        }
-        if (!LostTalesQuestRegistry.registerRuntimeQuest(quest)) {
-            sendQuestChat(player, "chat.losttales.quest.unknown", quest.getId());
-            return StartResult.UNKNOWN_QUEST;
-        }
-        if (!data.rememberDynamicQuestDefinition(quest)) {
-            sendQuestChat(player, "chat.losttales.quest.missives_full");
-            return StartResult.START_NOT_ALLOWED;
-        }
-        StartResult result = startQuestInternal(player, quest.getId(),
-                LostTalesQuestStartSource.COMMAND, Math.max(0L, timeLimitTicks));
-        if (result != StartResult.STARTED) {
-            // Nothing runs, so nothing holds the missive's quest.
-            data.forgetEndedMissives();
-        }
-        // The log may have forgotten older missives to make room.
-        forgetUnheldMissives(null);
-        return result;
-    }
 
     /**
      * Drops the missives no player online holds in their quest log from the
@@ -116,135 +75,36 @@ public final class LostTalesQuestManager {
         LostTalesQuestRegistry.retainRuntimeQuests(held);
     }
 
-    public static StartResult startQuest(EntityPlayer player, String questId, LostTalesQuestStartSource source) {
-        return startQuestInternal(player, questId, source, 0L);
-    }
-
     /**
-     * Starts the quest a card offers as the joiner's own fresh copy. The
-     * card's author never joins it, and nobody joins once the author's
-     * character no longer runs the quest. The quest's own rules then
-     * apply as to any start: its start mode and the server's settings for
-     * it, the take-again rule and the prerequisites.
+     * Begins a quest {@link QuestStartGate} let through: its first stage,
+     * a deadline {@code timeLimitTicks} on where it has one, tracked and its
+     * markers revealed as the server's settings say, and its gathering
+     * counted at once.
      */
-    public static StartResult joinSharedQuest(EntityPlayerMP joiner,
-                                              UUID authorId, String questId) {
-        if (joiner == null) {
-            return StartResult.START_NOT_ALLOWED;
-        }
-        EntityPlayerMP author = LostTalesServerPlayers.findOnline(authorId);
-        LostTalesQuestPlayerData authorData = author == null ? null
-                : LostTalesQuestPlayerData.get(author);
-        if (!mayJoinShared(joiner.getUniqueID(), authorId,
-                authorData != null && questId != null
-                        && authorData.isQuestActive(questId))) {
-            sendQuestChat(joiner, "chat.losttales.quest.join_unavailable");
-            return StartResult.START_NOT_ALLOWED;
-        }
-        return startQuest(joiner, questId, LostTalesQuestStartSource.SHARED);
-    }
-
-    /**
-     * Whether a card's reader may join it: somebody other than its author,
-     * while the author still runs the quest.
-     */
-    static boolean mayJoinShared(UUID joinerId, UUID authorId,
-                                 boolean authorRunsIt) {
-        return joinerId != null && authorId != null
-                && !authorId.equals(joinerId) && authorRunsIt;
-    }
-
-    private static StartResult startQuestInternal(EntityPlayer player, String questId, LostTalesQuestStartSource source, long timeLimitTicks) {
-        LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
-        if (quest == null) {
-            sendQuestChat(player, "chat.losttales.quest.unknown", questId);
-            return StartResult.UNKNOWN_QUEST;
-        }
-        if (quest.isWorldQuest()) {
-            // The whole server works on it together; nobody takes it alone.
-            sendQuestChat(player, "chat.losttales.quest.world.not_personal",
-                    LostTalesQuestWords.titleComponent(quest));
-            return StartResult.START_NOT_ALLOWED;
-        }
-
+    static void begin(EntityPlayerMP player, LostTalesQuestDefinition quest,
+                      long timeLimitTicks) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
-        if (data == null) {
-            sendQuestChat(player, "chat.losttales.quest.no_data");
-            return StartResult.NO_PLAYER_DATA;
+        if (data == null || quest == null) {
+            return;
         }
-        if (data.isQuestActive(questId)) {
-            sendQuestChat(player, "chat.losttales.quest.already_active",
-                    LostTalesQuestWords.titleComponent(quest));
-            return StartResult.ALREADY_ACTIVE;
-        }
-        LostTalesQuestHistoryEntry history = data.getQuestHistoryEntry(questId);
-        if (!quest.mayTakeAgain(history)) {
-            if (history != null && history.isCompleted()) {
-                sendQuestChat(player, "chat.losttales.quest.already_completed",
-                        LostTalesQuestWords.titleComponent(quest));
-                return StartResult.ALREADY_COMPLETED;
-            }
-            sendQuestChat(player, "chat.losttales.quest.not_restartable",
-                    LostTalesQuestWords.titleComponent(quest));
-            return StartResult.RESTART_NOT_ALLOWED;
-        }
-        if (!canStartFromSource(quest, source)) {
-            sendQuestChat(player, "chat.losttales.quest.wrong_start");
-            return StartResult.START_NOT_ALLOWED;
-        }
-        if (LostTalesConfig.enableQuestPrerequisites) {
-            IChatComponent refusal = LostTalesQuestPrerequisiteHelper.refusalOf(
-                    quest, player, data);
-            if (refusal != null) {
-                player.addChatMessage(refusal);
-                return StartResult.REQUIREMENTS_NOT_MET;
-            }
-        }
-
+        String questId = quest.getId();
         LostTalesQuestStageDefinition firstStage = quest.getFirstStage();
-        long acceptedWorldTime = player != null && player.worldObj != null ? player.worldObj.getTotalWorldTime() : 0L;
-        long deadlineWorldTime = timeLimitTicks > 0L ? acceptedWorldTime + timeLimitTicks : 0L;
-        data.startQuest(questId, firstStage == null ? "" : firstStage.getId(), acceptedWorldTime, deadlineWorldTime);
+        long acceptedWorldTime = player.worldObj.getTotalWorldTime();
+        long deadlineWorldTime = timeLimitTicks > 0L
+                ? acceptedWorldTime + timeLimitTicks : 0L;
+        data.startQuest(questId, firstStage == null ? "" : firstStage.getId(),
+                acceptedWorldTime, deadlineWorldTime);
         if (LostTalesConfig.autoPinQuestOnStart && !data.isQuestPinned(questId)) {
             data.pinQuestId(questId);
         }
         if (LostTalesConfig.autoRevealQuestMarkersOnStart) {
             revealQuestMarkers(player, quest, false);
         }
-
-        if (player instanceof EntityPlayerMP) {
-            EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
-            if (scanProgressibleGatherObjectives(serverPlayer, quest)) {
-                evaluateStageProgress(serverPlayer, questId);
-            } else if (quest.getStages().isEmpty() || firstStage == null || firstStage.getObjectives().isEmpty()) {
-                evaluateStageProgress(serverPlayer, questId);
-            }
+        if (scanProgressibleGatherObjectives(player, quest)
+                || firstStage == null || firstStage.getObjectives().isEmpty()) {
+            evaluateStageProgress(player, questId);
         }
-
         syncToClient(player);
-        return StartResult.STARTED;
-    }
-
-    public static StartResult startQuestFromItem(EntityPlayerMP player, ItemStack stack) {
-        if (player == null || stack == null || !LostTalesConfig.allowQuestItemStarts || !stack.hasTagCompound()) {
-            return StartResult.START_NOT_ALLOWED;
-        }
-
-        NBTTagCompound tag = stack.getTagCompound();
-        String questId = tag.getString("LostTalesQuestId");
-        if (!LostTalesQuestIds.fits(questId)) {
-            return StartResult.UNKNOWN_QUEST;
-        }
-
-        StartResult result = startQuest(player, questId, LostTalesQuestStartSource.ITEM);
-        if (result == StartResult.STARTED && tag.getBoolean("LostTalesQuestConsume") && !player.capabilities.isCreativeMode) {
-            stack.stackSize--;
-            if (stack.stackSize <= 0) {
-                player.inventory.setInventorySlotContents(player.inventory.currentItem, null);
-            }
-            player.inventory.markDirty();
-        }
-        return result;
     }
 
     public static boolean completeQuest(EntityPlayer player, String questId) {
@@ -342,32 +202,6 @@ public final class LostTalesQuestManager {
     }
 
     /**
-     * Taking a quest that was offered in conversation. Everything is
-     * re-derived here: the quest has to exist, be one this build talks
-     * about, and name a giver the player is actually standing beside and
-     * can see, so a client that opened no conversation, or named another
-     * quest, starts nothing. The giver is marked on the map as touching
-     * them marks them. Answers whether the quest started.
-     */
-    public static boolean acceptFromConversation(EntityPlayerMP player,
-                                                 String questId) {
-        LostTalesQuestDefinition quest = conversationQuest(player, questId);
-        if (quest == null
-                || !LostTalesQuestDialogue.of(quest).isOffered()) {
-            return false;
-        }
-        Entity giver = nearbyNamed(player, quest.getInteraction());
-        boolean marked = giver != null
-                && revealQuestGiverMarker(player, quest, giver, false);
-        boolean started = startQuest(player, quest.getId(),
-                LostTalesQuestStartSource.INTERACTION) == StartResult.STARTED;
-        if (marked && !started) {
-            syncToClient(player);
-        }
-        return started;
-    }
-
-    /**
      * Giving over what a quest asked for, in conversation. Each talk or
      * delivery the quest waits on is answered by the person it names,
      * standing beside the player and in sight, whoever else stands
@@ -458,8 +292,8 @@ public final class LostTalesQuestManager {
         }
         @SuppressWarnings("unchecked")
         List<Entity> near = player.worldObj.getEntitiesWithinAABBExcludingEntity(
-                player, player.boundingBox.expand(CONVERSATION_REACH,
-                        CONVERSATION_REACH, CONVERSATION_REACH));
+                player, player.boundingBox.expand(QuestStartGate.GIVER_REACH,
+                        QuestStartGate.GIVER_REACH, QuestStartGate.GIVER_REACH));
         for (Entity candidate : near) {
             if (LostTalesQuestObjectiveMatcher.matchesEntity(candidate, params)
                     && player.canEntityBeSeen(candidate)) {
@@ -468,13 +302,6 @@ public final class LostTalesQuestManager {
         }
         return null;
     }
-
-    /**
-     * How far a conversation reaches: a little past an ordinary
-     * interaction, so turning on the spot while the screen is open does
-     * not end it.
-     */
-    private static final double CONVERSATION_REACH = 6.0D;
 
     public static boolean pinQuest(EntityPlayer player, String questId) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
@@ -813,7 +640,8 @@ public final class LostTalesQuestManager {
                 int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
                 int before = data.getObjectiveProgress(quest.getId(), objective.getId());
                 changed |= setObjectiveProgressAndEvaluate(player, quest, objective,
-                        GatherCount.raised(before, countHeld(player, objective), target));
+                        GatherCount.counted(GatherCount.takes(objective), before,
+                                countHeld(player, objective), target));
             }
         }
         return changed;
@@ -826,12 +654,12 @@ public final class LostTalesQuestManager {
      * whether anything changed, so the caller can tell a plain
      * interaction from one the quest system answered.
      *
-     * <p>A delivery is all or nothing: the items are counted in the
-     * player's inventory first and taken only once the whole amount is
-     * there, so a half-finished hand-over can never eat the items. The
-     * items leave the world with the recipient; nothing is given back.
-     * Each objective is asked separately, so two deliveries to the same
-     * person each take their own items.</p>
+     * <p>A delivery is all or nothing ({@link GatherCount#take}): the
+     * items are taken only once the whole amount is there, so a
+     * half-finished hand-over can never eat the items. The items leave the
+     * world with the recipient; nothing is given back. Each objective is
+     * asked separately, so two deliveries to the same person each take
+     * their own items.</p>
      */
     public static boolean handleTalkedTo(EntityPlayerMP player, Entity target) {
         return handleTalkedTo(player, target, null);
@@ -886,19 +714,16 @@ public final class LostTalesQuestManager {
                             objective, 1);
                     continue;
                 }
-                int wanted = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
-                if (countMatchingInventoryItems(player, objective) < wanted) {
+                if (!handOver(player, Collections.singletonList(objective)).whole) {
                     sendQuestChat(player, "chat.losttales.quest.missing_items",
                             LostTalesQuestWords.titleComponent(quest));
                     continue;
                 }
-                if (removeMatchingInventoryItems(player, objective, wanted)) {
-                    // The items are gone, so the objective is done and the
-                    // client is told, whatever the stored value was.
-                    setObjectiveProgressAndEvaluate(player, quest, objective,
-                            wanted);
-                    changed = true;
-                }
+                // The items are gone, so the objective is done and the
+                // client is told, whatever the stored value was.
+                setObjectiveProgressAndEvaluate(player, quest, objective,
+                        LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective));
+                changed = true;
             }
         }
         if (changed) {
@@ -908,36 +733,51 @@ public final class LostTalesQuestManager {
     }
 
     /**
-     * Takes {@code amount} matching items out of the player's inventory,
-     * and nothing at all when they are not all there. Answers whether
-     * they were taken.
+     * Takes what each of {@code objectives} asks for out of the player's
+     * inventory and cursor, all or nothing ({@link GatherCount#take}), and
+     * tells the player's client. Never called inside an inventory's own
+     * handling of a click: a craft is counted there.
      */
-    private static boolean removeMatchingInventoryItems(EntityPlayerMP player,
-            LostTalesQuestObjectiveDefinition objective, int amount) {
-        if (player == null || player.inventory == null || amount <= 0) {
-            return false;
+    private static GatherCount.Taking handOver(EntityPlayerMP player,
+            List<LostTalesQuestObjectiveDefinition> objectives) {
+        GatherCount.Check[] checks = new GatherCount.Check[objectives.size()];
+        int[] amounts = new int[objectives.size()];
+        for (int index = 0; index < checks.length; index++) {
+            final LostTalesQuestObjectiveDefinition objective = objectives.get(index);
+            checks[index] = new GatherCount.Check() {
+                @Override
+                public boolean matches(ItemStack stack) {
+                    return LostTalesQuestObjectiveMatcher.matchesItem(stack, objective);
+                }
+            };
+            amounts[index] = LostTalesQuestObjectiveTextHelper
+                    .getObjectiveTargetCount(objective);
+        }
+        GatherCount.Taking taking = GatherCount.take(
+                player.inventory.mainInventory, player.inventory.getItemStack(),
+                checks, amounts);
+        if (!taking.whole) {
+            return taking;
         }
         ItemStack[] inventory = player.inventory.mainInventory;
-        if (countMatchingInventoryItems(player, objective) < amount) {
-            return false;
+        for (int slot = 0; slot < inventory.length; slot++) {
+            if (!ItemStack.areItemStacksEqual(inventory[slot],
+                    taking.inventory[slot])) {
+                inventory[slot] = taking.inventory[slot];
+            }
         }
-        int left = amount;
-        for (int slot = 0; slot < inventory.length && left > 0; slot++) {
-            ItemStack stack = inventory[slot];
-            if (stack == null || stack.stackSize <= 0
-                    || !LostTalesQuestObjectiveMatcher.matchesItem(stack, objective)) {
-                continue;
-            }
-            int taken = Math.min(left, stack.stackSize);
-            stack.stackSize -= taken;
-            left -= taken;
-            if (stack.stackSize <= 0) {
-                inventory[slot] = null;
-            }
+        if (!ItemStack.areItemStacksEqual(player.inventory.getItemStack(),
+                taking.cursor)) {
+            player.inventory.setItemStack(taking.cursor);
+            player.updateHeldItem();
         }
         player.inventory.markDirty();
         player.inventoryContainer.detectAndSendChanges();
-        return left == 0;
+        if (player.openContainer != null
+                && player.openContainer != player.inventoryContainer) {
+            player.openContainer.detectAndSendChanges();
+        }
+        return taking;
     }
 
     /**
@@ -1200,7 +1040,44 @@ public final class LostTalesQuestManager {
         return true;
     }
 
+    /**
+     * Hands over what the stages marked due ask for, from the player's
+     * tick, outside any inventory's own handling of a click: each quest
+     * whose stage is still full gives its taking gather objectives' items
+     * and moves on. Where the items are no longer all there, each such
+     * objective counts what was there and the player is told once.
+     */
+    public static void settleHandOvers(EntityPlayerMP player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null || !data.hasHandOversDue()) {
+            return;
+        }
+        boolean changed = false;
+        for (String questId : data.takeHandOversDue()) {
+            changed |= advance(player, questId, true);
+        }
+        if (changed) {
+            syncToClient(player);
+        }
+    }
+
+    /**
+     * Moves the quest on once every required objective of its stage is
+     * full: to the next stage, or done. Answers whether anything changed.
+     * A stage with gather objectives that take only marks its hand-over
+     * due ({@link #settleHandOvers}).
+     */
     public static boolean evaluateStageProgress(EntityPlayerMP player, String questId) {
+        return advance(player, questId, false);
+    }
+
+    /**
+     * {@link #evaluateStageProgress}, handing over the taking gather
+     * objectives' items first where {@code mayTake} says the player's
+     * inventory may be changed now.
+     */
+    private static boolean advance(EntityPlayerMP player, String questId,
+                                   boolean mayTake) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
         LostTalesQuestProgress progress = data == null ? null : data.getActiveQuest(questId);
@@ -1218,6 +1095,30 @@ public final class LostTalesQuestManager {
             int current = progress.getObjectiveProgress(objective.getId());
             if (current < target) {
                 return false;
+            }
+        }
+
+        List<LostTalesQuestObjectiveDefinition> taking =
+                new ArrayList<LostTalesQuestObjectiveDefinition>();
+        for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+            if (GatherCount.takes(objective)) {
+                taking.add(objective);
+            }
+        }
+        if (!taking.isEmpty()) {
+            if (!mayTake) {
+                data.markHandOverDue(questId);
+                return false;
+            }
+            GatherCount.Taking taken = handOver(player, taking);
+            if (!taken.whole) {
+                for (int index = 0; index < taking.size(); index++) {
+                    data.setObjectiveProgress(questId, taking.get(index).getId(),
+                            taken.got[index]);
+                }
+                sendQuestChat(player, "chat.losttales.quest.missing_items",
+                        LostTalesQuestWords.titleComponent(quest));
+                return true;
             }
         }
 
@@ -1327,26 +1228,6 @@ public final class LostTalesQuestManager {
                 namedAfter);
     }
 
-    private static boolean canStartFromSource(LostTalesQuestDefinition quest, LostTalesQuestStartSource source) {
-        if (quest == null) {
-            return false;
-        }
-        if (source == LostTalesQuestStartSource.COMMAND) {
-            return true;
-        }
-        if (source == LostTalesQuestStartSource.ITEM) {
-            return LostTalesConfig.allowQuestItemStarts && quest.canStartFromItem();
-        }
-        if (source == LostTalesQuestStartSource.INTERACTION) {
-            return LostTalesConfig.allowQuestInteractionStarts && quest.canStartFromInteraction();
-        }
-        if (source == LostTalesQuestStartSource.SHARED) {
-            return quest.canStartFromShare(LostTalesConfig.allowQuestItemStarts,
-                    LostTalesConfig.allowQuestInteractionStarts);
-        }
-        return false;
-    }
-
     private static void grantQuestRewards(EntityPlayer player,
             LostTalesQuestDefinition quest,
             LostTalesQuestProgress progress) {
@@ -1419,12 +1300,17 @@ public final class LostTalesQuestManager {
         }
     }
 
+    /**
+     * Sends the player their quest log, the server quests it names first
+     * where their client was not sent them yet ({@link ServerQuestSync}).
+     */
     public static void syncToClient(EntityPlayerMP player) {
         if (player == null) {
             return;
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         LotrQuestJournalAdapter.prune(player, data);
+        ServerQuestSync.revealLog(player, data);
         LostTalesNetworkHandler.CHANNEL.sendTo(LostTalesQuestSyncPacket.fromPlayerData(data), player);
     }
 
@@ -1445,7 +1331,8 @@ public final class LostTalesQuestManager {
 
             int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
             int before = data.getObjectiveProgress(quest.getId(), objective.getId());
-            int counted = GatherCount.raised(before, countHeld(player, objective), target);
+            int counted = GatherCount.counted(GatherCount.takes(objective), before,
+                    countHeld(player, objective), target);
             if (counted != before) {
                 data.setObjectiveProgress(quest.getId(), objective.getId(), counted);
                 changed = true;
@@ -1467,21 +1354,6 @@ public final class LostTalesQuestManager {
                         return LostTalesQuestObjectiveMatcher.matchesItem(stack, objective);
                     }
                 });
-    }
-
-    private static int countMatchingInventoryItems(EntityPlayerMP player, LostTalesQuestObjectiveDefinition objective) {
-        if (player == null || player.inventory == null || objective == null) {
-            return 0;
-        }
-
-        int count = 0;
-        ItemStack[] inventory = player.inventory.mainInventory;
-        for (ItemStack stack : inventory) {
-            if (stack != null && stack.stackSize > 0 && LostTalesQuestObjectiveMatcher.matchesItem(stack, objective)) {
-                count += stack.stackSize;
-            }
-        }
-        return count;
     }
 
     private static boolean isGatherObjective(LostTalesQuestObjectiveDefinition objective) {
@@ -1601,14 +1473,4 @@ public final class LostTalesQuestManager {
         player.addChatMessage(new ChatComponentTranslation(key, args));
     }
 
-    public enum StartResult {
-        STARTED,
-        UNKNOWN_QUEST,
-        NO_PLAYER_DATA,
-        ALREADY_ACTIVE,
-        ALREADY_COMPLETED,
-        RESTART_NOT_ALLOWED,
-        START_NOT_ALLOWED,
-        REQUIREMENTS_NOT_MET
-    }
 }

@@ -13,11 +13,13 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The quests a server wrote in its own folder ({@link ServerQuestFiles}),
- * sent to a player as they join and to everyone after a reload, since a
- * client has no file for them. A long list goes in several packets, each
- * under {@link #CHUNK_BYTES}; the first says so and the client starts its
- * list afresh with it. A packet that cannot be read changes nothing.
+ * Quests a server wrote in its own folder ({@link ServerQuestFiles}),
+ * which a client has no file for: sent as the client comes to need them,
+ * added to what it holds, and after a reload in place of what it holds
+ * ({@link com.ninuna.losttales.quest.ServerQuestSync}). A long list goes
+ * in several packets, each under {@link #CHUNK_BYTES}; where the list
+ * replaces the client's, its first packet says so. A packet that cannot
+ * be read changes nothing.
  */
 public final class LostTalesServerQuestSyncPacket implements IMessage {
     static final int MAX_PACKET_BYTES = 2 * 1024 * 1024;
@@ -26,25 +28,26 @@ public final class LostTalesServerQuestSyncPacket implements IMessage {
 
     private final List<LostTalesQuestDefinition> quests =
             new ArrayList<LostTalesQuestDefinition>();
-    private boolean first;
+    private boolean replaces;
     private boolean malformed;
 
     public LostTalesServerQuestSyncPacket() {}
 
-    private LostTalesServerQuestSyncPacket(boolean first,
+    private LostTalesServerQuestSyncPacket(boolean replaces,
                                            List<LostTalesQuestDefinition> quests) {
-        this.first = first;
+        this.replaces = replaces;
         this.quests.addAll(quests);
     }
 
     /**
      * The packets that carry every one of {@code quests}, each under
-     * {@link #CHUNK_BYTES}; always at least one, so an empty list still
-     * clears what a client held. A quest too large for one packet alone is
-     * left out.
+     * {@link #CHUNK_BYTES}, added to what the client holds or, where
+     * {@code replace} says so, in place of it: then there is always one,
+     * so an empty list still clears what a client held. A quest too large
+     * for one packet alone is left out.
      */
     public static List<LostTalesServerQuestSyncPacket> packetsFor(
-            Collection<LostTalesQuestDefinition> quests) {
+            Collection<LostTalesQuestDefinition> quests, boolean replace) {
         List<LostTalesServerQuestSyncPacket> packets =
                 new ArrayList<LostTalesServerQuestSyncPacket>();
         List<LostTalesQuestDefinition> chunk =
@@ -58,7 +61,7 @@ public final class LostTalesServerQuestSyncPacket implements IMessage {
                 }
                 if (bytes + size > CHUNK_BYTES && !chunk.isEmpty()) {
                     packets.add(new LostTalesServerQuestSyncPacket(
-                            packets.isEmpty(), chunk));
+                            replace && packets.isEmpty(), chunk));
                     chunk = new ArrayList<LostTalesQuestDefinition>();
                     bytes = 0;
                 }
@@ -66,9 +69,9 @@ public final class LostTalesServerQuestSyncPacket implements IMessage {
                 bytes += size;
             }
         }
-        if (!chunk.isEmpty() || packets.isEmpty()) {
-            packets.add(new LostTalesServerQuestSyncPacket(packets.isEmpty(),
-                    chunk));
+        if (!chunk.isEmpty() || replace && packets.isEmpty()) {
+            packets.add(new LostTalesServerQuestSyncPacket(
+                    replace && packets.isEmpty(), chunk));
         }
         return packets;
     }
@@ -82,7 +85,7 @@ public final class LostTalesServerQuestSyncPacket implements IMessage {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid packet size");
             }
-            this.first = buf.readBoolean();
+            this.replaces = buf.readBoolean();
             int count = LostTalesPacketCodec.readCount(buf,
                     ServerQuestFiles.MAX_FILES, "server quest");
             for (int i = 0; i < count; i++) {
@@ -98,7 +101,7 @@ public final class LostTalesServerQuestSyncPacket implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buf) {
-        buf.writeBoolean(this.first);
+        buf.writeBoolean(this.replaces);
         LostTalesPacketCodec.writeCount(buf, this.quests.size(),
                 ServerQuestFiles.MAX_FILES, "server quest");
         for (LostTalesQuestDefinition quest : this.quests) {
@@ -107,8 +110,8 @@ public final class LostTalesServerQuestSyncPacket implements IMessage {
     }
 
     /** Whether the client starts its list of server quests afresh with this packet. */
-    public boolean isFirst() {
-        return this.first;
+    public boolean replaces() {
+        return this.replaces;
     }
 
     public List<LostTalesQuestDefinition> getQuests() {

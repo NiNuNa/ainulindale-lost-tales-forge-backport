@@ -3,19 +3,19 @@ package com.ninuna.losttales.fellowship.server;
 /**
  * What the fellowship stores hold that no longer stands: members whose character
  * is gone or belongs to another account, invitations that ran out or no
- * longer stand, and go-here markers whose owner or dimension is gone. A
- * check counts what a repair would remove; a repair counts what it removed.
+ * longer stand, and marks whose world, owner or fellowship is gone. A check
+ * counts what a repair would remove; a repair counts what it removed.
  */
 public final class FellowshipIntegrityReport {
 
     private final int members;
     private final int invitations;
-    private final int markers;
+    private final int marks;
 
-    FellowshipIntegrityReport(int members, int invitations, int markers) {
+    FellowshipIntegrityReport(int members, int invitations, int marks) {
         this.members = members;
         this.invitations = invitations;
-        this.markers = markers;
+        this.marks = marks;
     }
 
     public int getMembers() {
@@ -26,11 +26,11 @@ public final class FellowshipIntegrityReport {
         return this.invitations;
     }
 
-    public int getMarkers() {
-        return this.markers;
+    public int getMarks() {
+        return this.marks;
     }
 
     public boolean isClean() {
-        return this.members == 0 && this.invitations == 0 && this.markers == 0;
+        return this.members == 0 && this.invitations == 0 && this.marks == 0;
     }
 }

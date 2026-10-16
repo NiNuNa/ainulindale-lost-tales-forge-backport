@@ -53,9 +53,10 @@ public final class ChatBroadcastMarkers {
     }
 
     /**
-     * The mark for a player a line names: their account's id and name,
-     * the character they were playing and its skin, and the name their
-     * lines were signed with. Null for a player nobody could place.
+     * The mark for a player a line names: their account's id and name
+     * (none for a character while the server shows no accounts), the
+     * character they were playing and its skin, and the name their lines
+     * were signed with. Null for a player nobody could place.
      */
     public static String namedValue(ChatNamedPlayer player) {
         if (player == null || player.getPlayerId() == null
@@ -82,7 +83,6 @@ public final class ChatBroadcastMarkers {
         String[] fields = value.substring(NAMED_PREFIX.length())
                 .split("\\|", 5);
         if (fields.length != 5
-                || fields[1].length() == 0
                 || bytes(fields[1]) > ChatNamedPlayer.MAX_ACCOUNT_BYTES
                 || bytes(fields[3]) > ChatNamedPlayer.MAX_SKIN_ID_BYTES
                 || bytes(fields[4]) > ChatNamedPlayer.MAX_IDENTITY_BYTES) {

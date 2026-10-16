@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Private runtime positions and persistent markers for one authorized fellowship. */
+/** Private runtime positions of the members of the fellowship travelled with. */
 public final class FellowshipTrackingSnapshot {
 
     private final UUID ownerId;
@@ -18,15 +18,12 @@ public final class FellowshipTrackingSnapshot {
     private final UUID fellowshipId;
     private final long fellowshipRevision;
     private final List<FellowshipTrackedMemberSnapshot> trackedMembers;
-    private final List<FellowshipGoHereMarkerSnapshot> goHereMarkers;
 
     public static FellowshipTrackingSnapshot noFellowship(
-            UUID ownerId, long sequence, UUID activeIdentityId,
-            List<FellowshipGoHereMarkerSnapshot> goHereMarkers) {
+            UUID ownerId, long sequence, UUID activeIdentityId) {
         return new FellowshipTrackingSnapshot(ownerId, sequence,
                 activeIdentityId, null, -1L,
-                Collections.<FellowshipTrackedMemberSnapshot>emptyList(),
-                goHereMarkers);
+                Collections.<FellowshipTrackedMemberSnapshot>emptyList());
     }
 
     public FellowshipTrackingSnapshot(UUID ownerId,
@@ -34,8 +31,7 @@ public final class FellowshipTrackingSnapshot {
                                  UUID activeIdentityId,
                                  UUID fellowshipId,
                                  long fellowshipRevision,
-                                 List<FellowshipTrackedMemberSnapshot> trackedMembers,
-                                 List<FellowshipGoHereMarkerSnapshot> goHereMarkers) {
+                                 List<FellowshipTrackedMemberSnapshot> trackedMembers) {
         if (ownerId == null || activeIdentityId == null) {
             throw new IllegalArgumentException(
                     "owner and active character identities are required");
@@ -50,18 +46,9 @@ public final class FellowshipTrackingSnapshot {
         }
         List<FellowshipTrackedMemberSnapshot> safeMembers = copyMembers(
                 trackedMembers);
-        List<FellowshipGoHereMarkerSnapshot> safeMarkers = copyMarkers(
-                goHereMarkers);
         if (!hasFellowship && !safeMembers.isEmpty()) {
             throw new IllegalArgumentException(
                     "fellowshipless snapshot cannot contain tracked members");
-        }
-        if (!hasFellowship && (safeMarkers.size() > 1
-                || (!safeMarkers.isEmpty()
-                && !activeIdentityId.equals(
-                safeMarkers.get(0).getOwnerIdentityId())))) {
-            throw new IllegalArgumentException(
-                    "fellowshipless snapshot may contain only its active character marker");
         }
         this.ownerId = ownerId;
         this.synchronizationSequence = synchronizationSequence;
@@ -69,7 +56,6 @@ public final class FellowshipTrackingSnapshot {
         this.fellowshipId = fellowshipId;
         this.fellowshipRevision = fellowshipRevision;
         this.trackedMembers = safeMembers;
-        this.goHereMarkers = safeMarkers;
     }
 
     public UUID getOwnerId() {
@@ -100,18 +86,13 @@ public final class FellowshipTrackingSnapshot {
         return this.trackedMembers;
     }
 
-    public List<FellowshipGoHereMarkerSnapshot> getGoHereMarkers() {
-        return this.goHereMarkers;
-    }
-
     public boolean hasSameContent(FellowshipTrackingSnapshot other) {
         return other != null
                 && this.ownerId.equals(other.ownerId)
                 && this.activeIdentityId.equals(other.activeIdentityId)
                 && equalNullable(this.fellowshipId, other.fellowshipId)
                 && this.fellowshipRevision == other.fellowshipRevision
-                && this.trackedMembers.equals(other.trackedMembers)
-                && this.goHereMarkers.equals(other.goHereMarkers);
+                && this.trackedMembers.equals(other.trackedMembers);
     }
 
     private static List<FellowshipTrackedMemberSnapshot> copyMembers(
@@ -130,27 +111,6 @@ public final class FellowshipTrackingSnapshot {
         }
         if (result.size() > Fellowship.MAX_MEMBERS) {
             throw new IllegalArgumentException("too many tracked members");
-        }
-        return Collections.unmodifiableList(result);
-    }
-
-    private static List<FellowshipGoHereMarkerSnapshot> copyMarkers(
-            List<FellowshipGoHereMarkerSnapshot> source) {
-        ArrayList<FellowshipGoHereMarkerSnapshot> result =
-                new ArrayList<FellowshipGoHereMarkerSnapshot>();
-        Set<UUID> identities = new HashSet<UUID>();
-        if (source != null) {
-            for (FellowshipGoHereMarkerSnapshot marker : source) {
-                if (marker == null
-                        || !identities.add(marker.getOwnerIdentityId())) {
-                    throw new IllegalArgumentException(
-                            "marker owner identities must be unique");
-                }
-                result.add(marker);
-            }
-        }
-        if (result.size() > Fellowship.MAX_MEMBERS) {
-            throw new IllegalArgumentException("too many fellowship markers");
         }
         return Collections.unmodifiableList(result);
     }

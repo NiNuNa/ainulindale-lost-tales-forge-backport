@@ -14,6 +14,7 @@ import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
+import com.ninuna.losttales.chat.ChatCommandText;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -53,7 +54,8 @@ import java.util.UUID;
  */
 public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_HOLDERS = 256;
-    private static final int MAX_HOLDER_NAME_BYTES = 64;
+    /** An account's name, or a character's for a reader not shown accounts. */
+    private static final int MAX_HOLDER_NAME_BYTES = 128;
     /** As many capability ids as a player could plausibly hold. */
     public static final int MAX_CAPABILITIES = 128;
     private static final int MAX_CAPABILITY_ID_BYTES = 64;
@@ -86,6 +88,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public static final int MAX_DISCORD_LINKS = 64;
     /** A link key's longest: a code name. */
     private static final int MAX_DISCORD_LINK_BYTES = ChatCodeNames.MAX_LENGTH;
+    /** The most bytes one private command's name takes. */
+    private static final int MAX_PRIVATE_COMMAND_BYTES = ChatCommandText.MAX_NAME_LENGTH * 4;
     /** The Proximity radius's own upper bound in the server's config. */
     public static final int MAX_PROXIMITY_RADIUS = 512;
 
@@ -103,7 +107,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
                     * (MAX_CHANNEL_ID_BYTES + MAX_CHANNEL_ICON_BYTES + 4)
             + 2 + ChatProfanityWords.MAX_WORDS
                     * (ChatProfanityWords.MAX_ENTRY_BYTES + 2)
-            + 1 + MAX_DISCORD_LINKS * (MAX_DISCORD_LINK_BYTES + 2) + 1;
+            + 1 + ChatCommandText.MAX_LISTED_NAMES * (MAX_PRIVATE_COMMAND_BYTES + 2)
+            + 1 + MAX_DISCORD_LINKS * (MAX_DISCORD_LINK_BYTES + 2) + 1 + 1;
     /**
      * Every channel this build knows, by id: what a payload written
      * without a channel answer reads as, and what a client falls back to.
@@ -168,6 +173,11 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /** The words the server adds to the chat's profanity list. */
     private ChatProfanityWords profanityWords = ChatProfanityWords.NONE;
     /**
+     * The commands the server keeps private: a client's echo of one keeps
+     * only its name, as the Server Log does.
+     */
+    private List<String> privateCommands = Collections.emptyList();
+    /**
      * The game channels linked to Discord now, by their code names
      * ({@code global}, {@code gondor}). What a linked channel's split
      * icon reads.
@@ -178,6 +188,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
      * status: only then does a Discord member wear one.
      */
     private boolean discordStatuses;
+    /**
+     * Whether this player is shown which account plays a character: the
+     * server's Show Accounts, or character.see_accounts. A card names the
+     * account only then.
+     */
+    private boolean seesAccounts;
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -454,6 +470,23 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid profanity word");
             }
+            // The commands the server keeps private, each a command's
+            // name once.
+            int commandCount = buffer.readUnsignedByte();
+            if (commandCount > ChatCommandText.MAX_LISTED_NAMES) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many private commands");
+            }
+            List<String> commands = new ArrayList<String>(commandCount);
+            for (int index = 0; index < commandCount; index++) {
+                String name = LostTalesPacketCodec.readUtf8String(buffer,
+                        MAX_PRIVATE_COMMAND_BYTES);
+                if (!ChatCommandText.isValidName(name) || commands.contains(name)) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid private command");
+                }
+                commands.add(name);
+            }
             // The channels linked to Discord, each a key the tabs can
             // match and nothing else.
             int linkCount = buffer.readUnsignedByte();
@@ -472,6 +505,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 links.add(key);
             }
             boolean statuses = buffer.readBoolean();
+            boolean accounts = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             int knownMask = known.knownMask();
             List<RoleHolder> stated = new ArrayList<RoleHolder>(holderCount);
@@ -508,8 +542,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.definedChannels = Collections.unmodifiableList(defined);
             this.channelIcons = Collections.unmodifiableMap(icons);
             this.profanityWords = words;
+            this.privateCommands = Collections.unmodifiableList(commands);
             this.discordLinks = Collections.unmodifiableList(links);
             this.discordStatuses = statuses;
+            this.seesAccounts = accounts;
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.roleMask = 0;
@@ -527,8 +563,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.proximityRadius = 0;
             this.channelIcons = Collections.emptyMap();
             this.profanityWords = ChatProfanityWords.NONE;
+            this.privateCommands = Collections.emptyList();
             this.discordLinks = Collections.emptyList();
             this.discordStatuses = false;
+            this.seesAccounts = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -715,6 +753,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer, entry,
                     ChatProfanityWords.MAX_ENTRY_BYTES);
         }
+        // Then the commands the server keeps private.
+        buffer.writeByte(this.privateCommands.size());
+        for (String name : this.privateCommands) {
+            LostTalesPacketCodec.writeUtf8String(buffer, name,
+                    MAX_PRIVATE_COMMAND_BYTES);
+        }
         // Last, the channels linked to Discord, and whether Discord
         // members wear their status.
         buffer.writeByte(this.discordLinks.size());
@@ -723,6 +767,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                     MAX_DISCORD_LINK_BYTES);
         }
         buffer.writeBoolean(this.discordStatuses);
+        buffer.writeBoolean(this.seesAccounts);
     }
 
     /**
@@ -747,6 +792,28 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /** The game channels linked to Discord, by link key. */
     public List<String> getDiscordLinks() { return this.discordLinks; }
 
+    /**
+     * The same statement naming the commands the server keeps private:
+     * at most {@link ChatCommandText#MAX_LISTED_NAMES}, each a command's
+     * name once; one that is not is left out.
+     */
+    public LostTalesChatAccessPacket withPrivateCommands(List<String> names) {
+        List<String> kept = new ArrayList<String>();
+        if (names != null) {
+            for (String name : names) {
+                if (ChatCommandText.isValidName(name) && !kept.contains(name)
+                        && kept.size() < ChatCommandText.MAX_LISTED_NAMES) {
+                    kept.add(name);
+                }
+            }
+        }
+        this.privateCommands = Collections.unmodifiableList(kept);
+        return this;
+    }
+
+    /** The commands the server keeps private, by name. */
+    public List<String> getPrivateCommands() { return this.privateCommands; }
+
     /** The same statement saying whether Discord members wear their Discord status. */
     public LostTalesChatAccessPacket withDiscordStatuses(boolean shown) {
         this.discordStatuses = shown;
@@ -755,6 +822,15 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     /** Whether Discord members wear their Discord status on this server. */
     public boolean showsDiscordStatuses() { return this.discordStatuses; }
+
+    /** The same statement saying whether this player is shown which account plays a character. */
+    public LostTalesChatAccessPacket withSeesAccounts(boolean sees) {
+        this.seesAccounts = sees;
+        return this;
+    }
+
+    /** Whether this player is shown which account plays a character. */
+    public boolean seesAccounts() { return this.seesAccounts; }
 
     /** A link key: a code name, lower case letters, digits and underscores. */
     static boolean isLinkKey(String key) {

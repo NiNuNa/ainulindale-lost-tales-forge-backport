@@ -17,9 +17,9 @@ import io.netty.buffer.ByteBuf;
  * is not refreshed expires on its own, so a lost stop never leaves a ghost.
  */
 public final class LostTalesChatTypingSyncPacket implements IMessage {
-    private static final int MAX_PACKET_BYTES = 448;
+    private static final int MAX_PACKET_BYTES = 512;
     private static final int MAX_CHANNEL_BYTES = 16;
-    private static final int MAX_NAME_BYTES = 96;
+    private static final int MAX_NAME_BYTES = 128;
 
     private String channelId = "";
     /** The whisper tab this belongs in; empty for every other channel. */

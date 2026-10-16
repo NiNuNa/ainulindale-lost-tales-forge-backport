@@ -1,17 +1,23 @@
 package com.ninuna.losttales.chat.server;
 
+import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresentationMode;
+import com.ninuna.losttales.chat.ChatRolePresentation;
+import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.compat.discord.DiscordMemberDirectory;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 
@@ -22,7 +28,8 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * by the whole name after the at-sign ({@link ChatMentions#reached}).
  * The line keeps them as its named players, so every client shows the
  * mention, pings the person it names and opens their card from the same
- * record, whoever is online. The Server is nobody to mention.
+ * record, whoever is online. The Server is nobody to mention. Which roles
+ * a player's line calls is read here too ({@link #rolesOf}).
  */
 final class ChatMentionTargets {
     private ChatMentionTargets() {}
@@ -53,8 +60,48 @@ final class ChatMentionTargets {
             candidates = candidatesOf(
                     ChatMemberDirectory.answerFor(sender, channel, scope).members);
         }
-        return ChatMentions.reached(message, candidates,
+        return ChatMentions.reached(message, byCharacterOnly(channel, candidates),
                 ChatNamedPlayer.MAX_PER_LINE);
+    }
+
+    /**
+     * The candidates a mention in {@code channel} may reach: while the
+     * server shows no accounts, an in-character channel's characters by
+     * their name alone, so typing an account's name reaches nobody and no
+     * line pairs an account with a character. Everything else as it is.
+     */
+    static List<ChatNamedPlayer> byCharacterOnly(ChatChannel channel,
+                                                 List<ChatNamedPlayer> candidates) {
+        if (LostTalesConfig.showAccounts || !ChatRolePresentation.isInCharacter(channel)) {
+            return candidates;
+        }
+        List<ChatNamedPlayer> shown = new ArrayList<ChatNamedPlayer>(candidates.size());
+        for (ChatNamedPlayer candidate : candidates) {
+            if (candidate != null) {
+                shown.add(candidate.withoutAccount());
+            }
+        }
+        return shown;
+    }
+
+    /**
+     * The mentionable roles {@code message} calls, by id, read by every
+     * name the server knows each by ({@link ChatAccountRole#serverMentionNames}):
+     * what a client pings its player by when they hold one, whatever
+     * language the writer typed the name in.
+     */
+    static List<String> rolesOf(String message) {
+        if (message == null || message.indexOf('@') < 0) {
+            return Collections.emptyList();
+        }
+        Map<String, List<String>> names = new LinkedHashMap<String, List<String>>();
+        for (ChatAccountRole role : ChatRoleCatalog.server().roles()) {
+            if (role.isMentionable()) {
+                names.put(role.getId(), role.serverMentionNames());
+            }
+        }
+        return ChatMentions.reachedRoles(message, names,
+                ChatAccountRole.MAX_MENTIONS_PER_LINE);
     }
 
     /**
@@ -88,7 +135,7 @@ final class ChatMentionTargets {
                 candidates.add(ChatNamedPlayer.account(senderId, seen.name));
             }
         }
-        return ChatMentions.reached(message, candidates,
+        return ChatMentions.reached(message, byCharacterOnly(channel, candidates),
                 ChatNamedPlayer.MAX_PER_LINE);
     }
 

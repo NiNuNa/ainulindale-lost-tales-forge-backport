@@ -4,6 +4,8 @@ import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.custom.LostTalesBlockWaystone;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
+import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContext;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
@@ -47,7 +49,6 @@ import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
 import lotr.common.fellowship.LOTRFellowshipClient;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiPlayerInfo;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
@@ -517,7 +518,7 @@ public final class WaystonePage extends PageContent
         beginWaiting();
     }
 
-    /** Shares the waystone with the player or fellowship named, or stops sharing it. */
+    /** Shares the waystone with the character or fellowship named, or stops sharing it. */
     private void share(boolean remove) {
         String name = this.shareTarget.trim();
         if (this.state == null || this.waiting || !this.state.canEdit()
@@ -784,9 +785,9 @@ public final class WaystonePage extends PageContent
         }
 
         @Override
-        public int sharedPlayers() {
+        public int sharedCharacters() {
             return WaystonePage.this.state == null ? 0
-                    : WaystonePage.this.state.getSharedPlayerCount();
+                    : WaystonePage.this.state.getSharedCharacterCount();
         }
 
         @Override
@@ -894,16 +895,17 @@ public final class WaystonePage extends PageContent
     }
 
     /**
-     * The names the share field offers for what is typed: the players
-     * online but the player, or the player's fellowships, whichever the
-     * waystone is shared with, the typed name itself left out.
+     * The names the share field offers for what is typed: the others
+     * online ({@link #characterNames}), or the player's fellowships,
+     * whichever the waystone is shared with, the typed name itself left
+     * out.
      */
     private List<String> names(String typed) {
         String words = typed == null ? "" : typed.trim();
         String wanted = words.toLowerCase(Locale.ROOT);
         List<String> found = new ArrayList<String>();
         for (String name : this.shareWithFellowship ? fellowshipNames()
-                : playerNames()) {
+                : characterNames()) {
             if (found.size() >= MAX_OFFERS) {
                 break;
             }
@@ -915,21 +917,20 @@ public final class WaystonePage extends PageContent
         return found;
     }
 
-    private List<String> playerNames() {
+    /** The characters the others online play, which a share names. */
+    private List<String> characterNames() {
         List<String> names = new ArrayList<String>();
         EntityPlayer self = this.mc.thePlayer;
-        if (self == null || this.mc.thePlayer.sendQueue == null
-                || this.mc.thePlayer.sendQueue.playerInfoList == null) {
+        if (self == null) {
             return names;
         }
-        for (Object value : this.mc.thePlayer.sendQueue.playerInfoList) {
-            if (value instanceof GuiPlayerInfo) {
-                String name = ((GuiPlayerInfo)value).name;
-                if (name != null && name.length() > 0
-                        && !name.equalsIgnoreCase(
-                                self.getCommandSenderName())) {
-                    names.add(name);
-                }
+        for (CharacterAppearance appearance
+                : ClientCharacterAppearanceCache.snapshot().values()) {
+            String name = appearance == null || !appearance.hasCharacter()
+                    || self.getUniqueID().equals(appearance.getPlayerId())
+                    ? null : appearance.getCharacterName();
+            if (name != null && name.trim().length() > 0) {
+                names.add(name.trim());
             }
         }
         Collections.sort(names, String.CASE_INSENSITIVE_ORDER);

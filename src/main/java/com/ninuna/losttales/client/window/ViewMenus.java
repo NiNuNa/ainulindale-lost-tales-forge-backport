@@ -12,23 +12,21 @@ import org.lwjgl.input.Keyboard;
 /**
  * A view's menu, under a right-click on its button on the Views
  * sub-window: Rename View and Set Key for a custom view, then Reset View,
- * and Delete View for a view the player made. Rename View opens the
- * name's field beside the menu, Set Key a sub-window that takes the next
- * key pressed; Reset View and Delete View ask first.
+ * and Delete View for a custom view. Rename View names it in a naming
+ * window beside the menu ({@link NamingWindow}), an empty name giving it
+ * back its own; Set Key opens a sub-window that takes the next key
+ * pressed, the same key its row in Controls shows; Reset View and Delete
+ * View ask first.
  */
 final class ViewMenus {
     static final SubWindowKind MENU = SubWindowKind.register("view",
             "gui.losttales.window.sub.view");
-    static final SubWindowKind NAME = SubWindowKind.register("view_name",
-            "gui.losttales.window.sub.view_name");
     static final SubWindowKind KEY = SubWindowKind.register("view_key",
             "gui.losttales.window.sub.view_key");
     private static final String ROW_RENAME = "view:rename";
     private static final String ROW_KEY = "view:key";
     private static final String ROW_RESET = "view:reset";
     private static final String ROW_DELETE = "view:delete";
-    private static final String ROW_NAME_KEEP = "view:name_keep";
-    private static final String ROW_NAME_OWN = "view:name_own";
     private static final String ROW_KEY_NONE = "view:key_none";
 
     private final WindowScreen screen;
@@ -40,7 +38,6 @@ final class ViewMenus {
         this.screen = screen;
         this.menus = menus;
         menus.register(MENU, new MenuSource());
-        menus.register(NAME, new NameSource());
         menus.register(KEY, new KeySource());
     }
 
@@ -85,7 +82,7 @@ final class ViewMenus {
                     word("gui.losttales.window.views.reset"))
                     .withSprite(LostTalesUiSheet.RESET,
                             LostTalesUiSheet.RESET_DISCARD, false));
-            if (view.isDeletable()) {
+            if (view.isCustom()) {
                 rows.add(new MenuWindow.Entry(ROW_DELETE,
                         word("gui.losttales.window.views.delete"))
                         .withSprite(LostTalesUiSheet.TRASH,
@@ -99,8 +96,7 @@ final class ViewMenus {
                            SubWindow window, boolean back) {
             View view = (View)menu.about();
             if (ROW_RENAME.equals(entry.id)) {
-                ViewMenus.this.menus.show(NAME, view,
-                        WindowMenus.besideWindow(window), false);
+                rename(view, window);
                 return true;
             }
             if (ROW_KEY.equals(entry.id)) {
@@ -119,53 +115,29 @@ final class ViewMenus {
     }
 
     /**
-     * The name's field, holding the name the view wears: Enter or Keep Name
-     * keeps what it holds, Default Name gives the view back its own.
+     * Names the view beside its menu: the name it wears to start with, its
+     * own name in the empty field. A second Rename View puts it away.
      */
-    private final class NameSource extends WindowMenus.Source {
-        @Override
-        public boolean stillStands(MenuWindow menu) {
-            return menu.about() instanceof View
-                    && Views.all().contains(menu.about());
+    private void rename(final View view, SubWindow menuWindow) {
+        String key = "view:" + view.id();
+        if (this.screen.isNaming(key, view)) {
+            this.screen.stopNaming(key);
+            return;
         }
-
-        @Override
-        public void prepare(MenuWindow menu) {
-            View view = (View)menu.about();
-            menu.openField(word("gui.losttales.window.views.name_prompt"),
-                    null, null, View.MAX_NAME_LENGTH, true);
-            menu.setFilter(view.title());
-        }
-
-        @Override
-        public void rebuild(MenuWindow menu) {
-            View view = (View)menu.about();
-            menu.setTitle(null, null);
-            List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>(2);
-            rows.add(new MenuWindow.Entry(ROW_NAME_KEEP,
-                    word("gui.losttales.window.views.name_keep")));
-            if (view.name().length() > 0) {
-                rows.add(new MenuWindow.Entry(ROW_NAME_OWN,
-                        word("gui.losttales.window.views.name_own")));
-            }
-            menu.setRows(rows);
-        }
-
-        @Override
-        public MenuWindow.Entry firstFound(MenuWindow menu) {
-            return menu.entries().isEmpty() ? null : menu.entries().get(0);
-        }
-
-        @Override
-        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
-                           SubWindow window, boolean back) {
-            View view = (View)menu.about();
-            Views.rename(view, ROW_NAME_KEEP.equals(entry.id)
-                    ? menu.filter() : "");
-            ViewMenus.this.screen.viewsChanged();
-            ViewMenus.this.menus.rebuildIfOpen(MENU);
-            return false;
-        }
+        NamingWindow naming = this.screen.naming(key).ask(
+                word("gui.losttales.window.views.rename"), view.name(),
+                View.MAX_NAME_LENGTH, NamingWindow.ANY, new NamingWindow.Keeper() {
+                    @Override
+                    public void keep(String name) {
+                        if (!Views.all().contains(view)) {
+                            return;
+                        }
+                        Views.rename(view, name);
+                        ViewMenus.this.screen.viewsChanged();
+                        ViewMenus.this.menus.rebuildIfOpen(MENU);
+                    }
+                }).prompt(view.ownTitle()).about(view);
+        this.screen.nameBeside(menuWindow, key, naming);
     }
 
     /**

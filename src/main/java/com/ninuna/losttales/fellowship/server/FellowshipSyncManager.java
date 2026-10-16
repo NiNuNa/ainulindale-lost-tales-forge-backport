@@ -1,13 +1,13 @@
 package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipOperationResultPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipStateSyncPacket;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipInvitation;
-import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationWorldData;
@@ -15,7 +15,6 @@ import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import com.ninuna.losttales.fellowship.sync.FellowshipInviteTargetSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipOperationType;
-import com.ninuna.losttales.fellowship.sync.FellowshipSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -51,16 +50,6 @@ public final class FellowshipSyncManager {
 
     private FellowshipSyncManager() {}
 
-    /** The fellowships' marks as the world holds them now. */
-    private static FellowshipSnapshot.Marks marksView(final World world) {
-        return new FellowshipSnapshot.Marks() {
-            @Override
-            public List<FellowshipMark> of(UUID fellowshipId) {
-                return FellowshipService.getInstance().marksOf(world, fellowshipId);
-            }
-        };
-    }
-
     public static boolean sendState(EntityPlayerMP player, int requestId) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return false;
@@ -81,7 +70,9 @@ public final class FellowshipSyncManager {
                 player, state);
         FellowshipStateSnapshot snapshot = FellowshipStateSnapshot.fromState(
                 ownerId, sequence, FellowshipService.memberLimit(), state,
-                onlineView(player.worldObj), marksView(player.worldObj),
+                onlineView(player.worldObj).forViewer(
+                        AccountVisibility.seesAccounts(player)),
+                FellowshipService.getInstance().marksSeenBy(player.worldObj, state),
                 inviteTargets.targets, inviteTargets.truncated);
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new FellowshipStateSyncPacket(requestId, snapshot), player);
@@ -425,6 +416,8 @@ public final class FellowshipSyncManager {
 
         ArrayList<FellowshipInviteTargetSnapshot> candidates =
                 new ArrayList<FellowshipInviteTargetSnapshot>();
+        // The account behind each offer is named only to a receiver shown accounts.
+        boolean seesAccounts = AccountVisibility.seesAccounts(receiver);
         for (Object value : onlinePlayers) {
             if (!(value instanceof EntityPlayerMP)) {
                 continue;
@@ -446,7 +439,7 @@ public final class FellowshipSyncManager {
             candidates.add(new FellowshipInviteTargetSnapshot(
                     targetOwnerId,
                     target.gameplayId(),
-                    targetPlayer.getCommandSenderName(),
+                    seesAccounts ? targetPlayer.getCommandSenderName() : "",
                     target.displayName));
         }
 
@@ -454,15 +447,15 @@ public final class FellowshipSyncManager {
             @Override
             public int compare(FellowshipInviteTargetSnapshot left,
                                FellowshipInviteTargetSnapshot right) {
-                int playerComparison = left.getPlayerName().compareToIgnoreCase(
-                        right.getPlayerName());
-                if (playerComparison != 0) {
-                    return playerComparison;
-                }
                 int characterComparison = left.getCharacterName().compareToIgnoreCase(
                         right.getCharacterName());
                 if (characterComparison != 0) {
                     return characterComparison;
+                }
+                int playerComparison = left.getPlayerName().compareToIgnoreCase(
+                        right.getPlayerName());
+                if (playerComparison != 0) {
+                    return playerComparison;
                 }
                 return left.getOwnerId().toString().compareTo(
                         right.getOwnerId().toString());

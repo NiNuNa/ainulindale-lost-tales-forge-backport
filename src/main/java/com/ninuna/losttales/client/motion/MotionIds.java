@@ -61,12 +61,8 @@ public final class MotionIds {
     public static final String WINDOW_TAB_MARQUEE = "window.tab.marquee";
     /** The snap assist's panes. */
     public static final String WINDOW_SNAP_ASSIST = "window.snap.assist";
-    /** The snap layouts' flyout, and the snap bar's way down from its peek. */
-    public static final String WINDOW_SNAP_LAYOUTS = "window.snap.layouts";
     /** The frosted preview of where a window will snap. */
     public static final String WINDOW_SNAP_PREVIEW = "window.snap.preview";
-    /** The snap bar peeking further down as the pointer comes nearer it. */
-    public static final String WINDOW_SNAP_BAR_PEEK = "window.snap.bar.peek";
     /** The search well's magnifier becoming its cross. */
     public static final String WINDOW_SEARCH_CLEAR = "window.search.clear";
     /** A window gliding to the part of the screen it fills. */
@@ -111,7 +107,7 @@ public final class MotionIds {
     public static final String SCREEN_JOURNAL_SCROLL = "screen.journal.scroll";
     /** A quest conversation's replies gliding to the chosen one. */
     public static final String SCREEN_DIALOGUE_GLIDE = "screen.dialogue.glide";
-    /** The Characters page's roster and profile gliding to where they were scrolled, and its figure to its zoom. */
+    /** The Characters page's roster and profile gliding to where they were scrolled, a History opening or folding, and its figure to its zoom. */
     public static final String SCREEN_CHARACTERS_GLIDE = "screen.characters.glide";
 
     /* ---- map ---- */

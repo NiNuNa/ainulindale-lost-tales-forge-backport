@@ -9,8 +9,6 @@ import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
 import com.ninuna.losttales.util.LostTalesLog;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -30,9 +28,9 @@ import net.minecraftforge.common.util.Constants;
  * as it was sent, as the sender and as everyone else received it, with
  * who was sent it and who may still be shown it.
  *
- * <p>Each line's two copies are written as the bytes the wire carries,
- * so the one codec every client already decodes is the one the save is
- * read back through: a copy that does not decode, names another message
+ * <p>Each line's two copies are written field by field
+ * ({@link ChatLineNbtCodec}) and read back through the wire as every
+ * client reads them: a copy that is not a line, or names another message
  * or another channel than the entry says, is quarantined with the entry
  * rather than shown to anyone. The audience is written in full — a line
  * restored without it would be a private line replayed to whoever asks
@@ -48,7 +46,7 @@ public final class ChatHistoryNbtCodec {
      * The one entry layout this codec writes and reads, with or without
      * reactions and whatever their emoji.
      */
-    public static final int CURRENT_ENTRY_DATA_VERSION = 3;
+    public static final int CURRENT_ENTRY_DATA_VERSION = 4;
     /** Safety bound on kept lines read back; entries past it are quarantined. */
     public static final int MAX_ENTRIES = ChatHistory.MAX_TOTAL;
 
@@ -130,23 +128,8 @@ public final class ChatHistoryNbtCodec {
         if (quarantinedEntries != null) {
             quarantine.addAll(quarantinedEntries);
         }
-        int unwritable = 0;
-        for (int index = 0; index < ordered.size(); index++) {
-            ChatHistory.Entry entry = ordered.get(index);
-            try {
-                list.appendTag(writeEntry(entry));
-            } catch (RuntimeException refused) {
-                // A line the wire codec no longer accepts — a channel or
-                // a role the server has since lost — is kept by name in
-                // the quarantine rather than taking the save down with it.
-                quarantine.add(NbtQuarantine.entry("unwritable_line", TAG_ENTRY_INDEX, index,
-                        describe(entry)));
-                unwritable++;
-            }
-        }
-        if (unwritable > 0) {
-            LostTalesLog.warning("%d kept chat lines could not be written to the save and were quarantined",
-                    Integer.valueOf(unwritable));
+        for (ChatHistory.Entry entry : ordered) {
+            list.appendTag(writeEntry(entry));
         }
         output.setTag(TAG_ENTRIES, list);
         output.setTag(TAG_CONSOLE_EVENTS, writeConsoleEvents(consoleEvents,
@@ -309,16 +292,6 @@ public final class ChatHistoryNbtCodec {
         return null;
     }
 
-    /** What is kept of a line that could not be written: its names, not its bytes. */
-    private static NBTTagCompound describe(ChatHistory.Entry entry) {
-        NBTTagCompound tag = new NBTTagCompound();
-        tag.setLong(TAG_MESSAGE_ID, entry.forOthers.getMessageId());
-        tag.setString(TAG_AUTHOR_NAME, entry.author == null ? "" : entry.author);
-        tag.setString(TAG_CHANNEL, entry.channelId == null ? "" : entry.channelId);
-        tag.setLong(TAG_TIMESTAMP, entry.timestampMillis);
-        return tag;
-    }
-
     public static ReadResult read(NBTTagCompound source) {
         NBTTagCompound safeSource = source == null ? new NBTTagCompound() : source;
         int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
@@ -425,14 +398,14 @@ public final class ChatHistoryNbtCodec {
         if (entry.authorId != null) {
             NbtTags.writeUuid(tag, TAG_AUTHOR_UUID, entry.authorId);
         }
-        tag.setString(TAG_AUTHOR_NAME, entry.author);
+        tag.setString(TAG_AUTHOR_NAME, entry.author == null ? "" : entry.author);
         tag.setString(TAG_EXCERPT, entry.excerpt == null ? "" : entry.excerpt);
-        tag.setString(TAG_CHANNEL, entry.channelId);
+        tag.setString(TAG_CHANNEL, entry.channelId == null ? "" : entry.channelId);
         tag.setLong(TAG_TIMESTAMP, entry.timestampMillis);
         tag.setTag(TAG_SEEN_BY, writeUuids(entry.seenBy));
-        tag.setByteArray(TAG_FOR_OTHERS, bytesOf(entry.forOthers));
+        tag.setTag(TAG_FOR_OTHERS, ChatLineNbtCodec.write(entry.forOthers));
         if (entry.forSender != null && entry.forSender != entry.forOthers) {
-            tag.setByteArray(TAG_FOR_SENDER, bytesOf(entry.forSender));
+            tag.setTag(TAG_FOR_SENDER, ChatLineNbtCodec.write(entry.forSender));
         }
         NBTTagCompound audience = new NBTTagCompound();
         Set<UUID> accounts = entry.audience.accounts();
@@ -570,18 +543,20 @@ public final class ChatHistoryNbtCodec {
                 || raw.getLong(TAG_TIMESTAMP) <= 0L) {
             return EntryReadResult.failure("invalid_timestamp");
         }
-        if (!raw.hasKey(TAG_FOR_OTHERS, Constants.NBT.TAG_BYTE_ARRAY)) {
+        if (!raw.hasKey(TAG_FOR_OTHERS, Constants.NBT.TAG_COMPOUND)) {
             return EntryReadResult.failure("missing_line");
         }
-        LostTalesChatMessagePacket forOthers = decode(raw.getByteArray(TAG_FOR_OTHERS));
+        LostTalesChatMessagePacket forOthers = ChatLineNbtCodec.read(
+                raw.getCompoundTag(TAG_FOR_OTHERS));
         if (forOthers == null || forOthers.getChannel() == null
                 || forOthers.getMessageId() != messageId
                 || !channelId.equals(forOthers.getChannel().getId())) {
             return EntryReadResult.failure("invalid_line");
         }
         LostTalesChatMessagePacket forSender = forOthers;
-        if (raw.hasKey(TAG_FOR_SENDER, Constants.NBT.TAG_BYTE_ARRAY)) {
-            forSender = decode(raw.getByteArray(TAG_FOR_SENDER));
+        if (raw.hasKey(TAG_FOR_SENDER)) {
+            forSender = raw.hasKey(TAG_FOR_SENDER, Constants.NBT.TAG_COMPOUND)
+                    ? ChatLineNbtCodec.read(raw.getCompoundTag(TAG_FOR_SENDER)) : null;
             if (forSender == null || forSender.getChannel() == null
                     || forSender.getMessageId() != messageId
                     || !channelId.equals(forSender.getChannel().getId())) {
@@ -628,34 +603,6 @@ public final class ChatHistoryNbtCodec {
                 channelId, forSender, forOthers, audience,
                 raw.getLong(TAG_TIMESTAMP), reactions),
                 reactions.renamedOnRestore());
-    }
-
-    /** The line's wire bytes; what the save keeps and every client already reads. */
-    static byte[] bytesOf(LostTalesChatMessagePacket packet) {
-        ByteBuf buffer = Unpooled.buffer();
-        try {
-            packet.toBytes(buffer);
-            byte[] bytes = new byte[buffer.readableBytes()];
-            buffer.readBytes(bytes);
-            return bytes;
-        } finally {
-            buffer.release();
-        }
-    }
-
-    /** The line the bytes carry, or null for bytes no client would accept. */
-    static LostTalesChatMessagePacket decode(byte[] bytes) {
-        if (bytes == null || bytes.length == 0
-                || bytes.length > LostTalesChatMessagePacket.MAX_PACKET_BYTES) {
-            return null;
-        }
-        try {
-            LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket();
-            packet.fromBytes(Unpooled.wrappedBuffer(bytes));
-            return packet.isMalformed() ? null : packet;
-        } catch (RuntimeException malformed) {
-            return null;
-        }
     }
 
     private static NBTTagList writeUuids(Collection<UUID> ids) {

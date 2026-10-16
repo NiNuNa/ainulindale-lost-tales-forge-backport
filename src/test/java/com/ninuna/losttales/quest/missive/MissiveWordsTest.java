@@ -2,6 +2,7 @@ package com.ninuna.losttales.quest.missive;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestParams;
 import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.util.EnglishWords;
 import com.ninuna.losttales.util.LostTalesLangFile;
@@ -84,6 +85,28 @@ public final class MissiveWordsTest {
                         objective.getParams().get("count"));
             }
         }
+    }
+
+    /** Every gather notice the generator writes hands its items over, and its quest keeps that. */
+    @Test
+    public void everyGatherNoticeHandsItsItemsOver() {
+        int gathers = 0;
+        for (int seed = 0; seed < 200; seed++) {
+            LostTalesMissiveData missive = LostTalesMissiveGenerator
+                    .createRandomMissive(null, "dim0_1_64_1", 1000L, seed,
+                            new Random(seed));
+            LostTalesQuestDefinition quest =
+                    LostTalesMissiveQuestFactory.createQuestDefinition(missive);
+            for (LostTalesQuestObjectiveDefinition objective
+                    : quest.getStages().get(0).getObjectives()) {
+                if ("gather".equals(objective.getType())) {
+                    gathers++;
+                    assertEquals("true", objective.getParams().get(
+                            LostTalesQuestParams.TAKE));
+                }
+            }
+        }
+        assertTrue(gathers > 0);
     }
 
     /** In English a letter reads word for word as the generator once wrote it. */

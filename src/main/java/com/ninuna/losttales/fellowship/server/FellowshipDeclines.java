@@ -6,9 +6,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Whose invitation to whom was declined or taken back a moment ago. After
- * either the inviting account waits {@link #WAIT_MILLIS} before it may
- * invite that account again, so nobody can be chimed at over and over.
+ * Which fellowship's invitation to whom was declined or taken back a
+ * moment ago. After either, nobody of that fellowship may invite that
+ * account again for {@link #WAIT_MILLIS}, whoever sent the first, so a
+ * player is never chimed at over and over by one guide after another.
  * Static state, at most {@link #MAX_ENTRIES} entries, cleared as the server
  * starts and stops.
  */
@@ -20,13 +21,13 @@ public final class FellowshipDeclines {
 
     private FellowshipDeclines() {}
 
-    /** The inviter's invitation to the target was declined or taken back at {@code now}. */
-    static synchronized void startWait(UUID inviter, UUID target, long now) {
-        if (inviter == null || target == null) {
+    /** The fellowship's invitation to the target account was declined or taken back at {@code now}. */
+    static synchronized void startWait(UUID fellowship, UUID target, long now) {
+        if (fellowship == null || target == null) {
             return;
         }
         prune(now);
-        String key = key(inviter, target);
+        String key = key(fellowship, target);
         UNTIL.remove(key);
         UNTIL.put(key, Long.valueOf(now + WAIT_MILLIS));
         Iterator<String> oldest = UNTIL.keySet().iterator();
@@ -36,12 +37,12 @@ public final class FellowshipDeclines {
         }
     }
 
-    /** Whether the inviter must still wait before inviting the target again. */
-    static synchronized boolean mustWait(UUID inviter, UUID target, long now) {
-        if (inviter == null || target == null) {
+    /** Whether the fellowship must still wait before inviting the target account again. */
+    static synchronized boolean mustWait(UUID fellowship, UUID target, long now) {
+        if (fellowship == null || target == null) {
             return false;
         }
-        Long until = UNTIL.get(key(inviter, target));
+        Long until = UNTIL.get(key(fellowship, target));
         return until != null && now < until.longValue();
     }
 
@@ -58,7 +59,7 @@ public final class FellowshipDeclines {
         }
     }
 
-    private static String key(UUID inviter, UUID target) {
-        return inviter + ">" + target;
+    private static String key(UUID fellowship, UUID target) {
+        return fellowship + ">" + target;
     }
 }

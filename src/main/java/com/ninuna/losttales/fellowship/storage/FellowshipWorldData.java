@@ -120,7 +120,7 @@ public final class FellowshipWorldData extends WorldSavedData {
     /**
      * The fellowship an identity travels with: the one it chose, else the
      * first it joined; null while it is in none. The HUD, the compass, the
-     * go-here marker and shared quest credit follow it.
+     * members' go-here marks and shared quest credit follow it.
      */
     public synchronized Fellowship getTravellingFellowship(UUID identityId) {
         UUID chosen = identityId == null ? null

@@ -20,41 +20,6 @@ public abstract class SubWindowContent {
         return null;
     }
 
-    /**
-     * Whether the window is always there while the screen is open and
-     * cannot be closed: the Views sub-window and the snap bar. Its strip
-     * has no cross, and it keeps its own size.
-     */
-    public boolean isPermanent() {
-        return false;
-    }
-
-    /**
-     * Whether the window stands in front of every window and sub-window,
-     * drawn after them and answering the pointer first, and never fades
-     * under them, nor makes them fade: the Views sub-window.
-     */
-    public boolean standsInFront() {
-        return false;
-    }
-
-    /**
-     * Whether the window stands hidden for now, to show again by itself:
-     * the snap bar while no carried window nears the top. A tucked window
-     * fades out whole and answers no pointer.
-     */
-    public boolean isTucked() {
-        return false;
-    }
-
-    /**
-     * How far above where it stands the window is drawn now, in pixels:
-     * the snap bar peeking down from above the screen. None for most.
-     */
-    public double drawnAbove() {
-        return 0.0D;
-    }
-
     /** The glyph before the window's name on its strip; null for none. */
     public abstract LostTalesUiSheet stripIcon();
 

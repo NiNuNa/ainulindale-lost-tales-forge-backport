@@ -12,12 +12,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Versioned NBT codec for pending fellowship invitations. */
+/**
+ * Versioned NBT codec for pending fellowship invitations. An invitation
+ * past the most a fellowship has open, or past the most waiting for one
+ * account, the oldest kept, goes to the quarantine.
+ */
 public final class FellowshipInvitationNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
@@ -88,6 +93,8 @@ public final class FellowshipInvitationNbtCodec {
 
         LinkedHashMap<UUID, FellowshipInvitation> invitations =
                 new LinkedHashMap<UUID, FellowshipInvitation>();
+        Map<UUID, Integer> perFellowship = new HashMap<UUID, Integer>();
+        Map<UUID, Integer> perTargetAccount = new HashMap<UUID, Integer>();
         NBTTagList list = safeSource.getTagList(
                 TAG_INVITATIONS, Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < list.tagCount(); i++) {
@@ -109,10 +116,30 @@ public final class FellowshipInvitationNbtCodec {
                 repaired = true;
                 continue;
             }
+            String pastCap = count(perFellowship, result.invitation.getFellowshipId())
+                    >= FellowshipInvitation.MAX_PER_FELLOWSHIP
+                    ? "too_many_invitations_for_fellowship"
+                    : count(perTargetAccount, result.invitation.getTargetOwnerId())
+                            >= FellowshipInvitation.MAX_PER_TARGET_ACCOUNT
+                            ? "too_many_invitations_for_account" : null;
+            if (pastCap != null) {
+                quarantine.add(NbtQuarantine.entry(pastCap, TAG_INVITATION_INDEX, i, raw));
+                repaired = true;
+                continue;
+            }
+            perFellowship.put(result.invitation.getFellowshipId(), Integer.valueOf(
+                    count(perFellowship, result.invitation.getFellowshipId()) + 1));
+            perTargetAccount.put(result.invitation.getTargetOwnerId(), Integer.valueOf(
+                    count(perTargetAccount, result.invitation.getTargetOwnerId()) + 1));
             invitations.put(invitationId, result.invitation);
             repaired |= result.repaired;
         }
         return ReadResult.success(invitations, repaired, quarantine);
+    }
+
+    private static int count(Map<UUID, Integer> counts, UUID key) {
+        Integer held = counts.get(key);
+        return held == null ? 0 : held.intValue();
     }
 
     public static NBTTagCompound createQuarantineEntry(String reason,

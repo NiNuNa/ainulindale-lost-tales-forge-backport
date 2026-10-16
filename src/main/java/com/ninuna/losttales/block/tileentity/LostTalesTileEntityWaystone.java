@@ -37,7 +37,6 @@ public final class LostTalesTileEntityWaystone
     private LostTalesMapMarkerVisibility visibility =
             LostTalesMapMarkerVisibility.PRIVATE;
     private long markerRevision;
-    private int sharedPlayerCount;
     private boolean reconciled;
 
     @Override
@@ -93,7 +92,6 @@ public final class LostTalesTileEntityWaystone
         this.displayName = "";
         this.visibility = LostTalesMapMarkerVisibility.PRIVATE;
         this.markerRevision = 0L;
-        this.sharedPlayerCount = 0;
         markDirtyAndSync();
     }
 
@@ -128,7 +126,6 @@ public final class LostTalesTileEntityWaystone
         tag.setString("Visibility",
                 this.visibility.getSerializedName());
         tag.setLong("MarkerRevision", this.markerRevision);
-        tag.setInteger("SharedPlayerCount", this.sharedPlayerCount);
     }
 
     @Override
@@ -145,8 +142,6 @@ public final class LostTalesTileEntityWaystone
                         LostTalesMapMarkerVisibility.PRIVATE);
         this.markerRevision = Math.max(
                 0L, tag.getLong("MarkerRevision"));
-        this.sharedPlayerCount = Math.max(
-                0, tag.getInteger("SharedPlayerCount"));
         if (this.markerId.length() == 0 || this.linkToken == null) {
             this.markerId = "";
             this.linkToken = null;
@@ -162,7 +157,6 @@ public final class LostTalesTileEntityWaystone
         tag.setString("Visibility",
                 this.visibility.getSerializedName());
         tag.setLong("MarkerRevision", this.markerRevision);
-        tag.setInteger("SharedPlayerCount", this.sharedPlayerCount);
         return new S35PacketUpdateTileEntity(
                 this.xCoord, this.yCoord, this.zCoord, 0, tag);
     }
@@ -180,15 +174,12 @@ public final class LostTalesTileEntityWaystone
                         LostTalesMapMarkerVisibility.PRIVATE);
         this.markerRevision = Math.max(
                 0L, tag.getLong("MarkerRevision"));
-        this.sharedPlayerCount = Math.max(
-                0, tag.getInteger("SharedPlayerCount"));
     }
 
     private void applyPresentation(LostTalesMapMarkerRecord record) {
         this.displayName = record.getName();
         this.visibility = record.getVisibility();
         this.markerRevision = record.getRevision();
-        this.sharedPlayerCount = record.getSharedPlayerIds().size();
     }
 
     private void markDirtyAndSync() {

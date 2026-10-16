@@ -45,19 +45,42 @@ public final class LostTalesChatRevisionPacketTest {
         assertEquals(SERVER_ID, decoded.getMessageId());
     }
 
+    /** A role named twice, or a name that is no role's id, is not an edit's. */
+    @Test
+    public void anEditCallingRolesBadlyIsRefused() {
+        try {
+            LostTalesChatUpdatePacket.edited(SERVER_ID, "hi", "", null,
+                    java.util.Arrays.asList("herald", "herald"));
+            org.junit.Assert.fail("a role called twice");
+        } catch (IllegalArgumentException expected) {
+            // refused
+        }
+        try {
+            LostTalesChatUpdatePacket.edited(SERVER_ID, "hi", "", null,
+                    java.util.Arrays.asList("Not A Role"));
+            org.junit.Assert.fail("not a role's id");
+        } catch (IllegalArgumentException expected) {
+            // refused
+        }
+    }
+
     @Test
     public void updateRoundTripsBothWaysRound() {
         ByteBuf edited = Unpooled.buffer();
         com.ninuna.losttales.chat.ChatNamedPlayer bob =
                 new com.ninuna.losttales.chat.ChatNamedPlayer(
                         java.util.UUID.randomUUID(), "bob", null, "Beren", "");
-        LostTalesChatUpdatePacket.edited(SERVER_ID, "on reflection, @Beren", "",
-                java.util.Collections.singletonList(bob)).toBytes(edited);
+        LostTalesChatUpdatePacket.edited(SERVER_ID, "on reflection, @Beren @Herald", "",
+                java.util.Collections.singletonList(bob),
+                java.util.Collections.singletonList("herald")).toBytes(edited);
         LostTalesChatUpdatePacket decodedEdit = new LostTalesChatUpdatePacket();
         decodedEdit.fromBytes(edited);
         assertFalse(decodedEdit.isMalformed());
         assertFalse(decodedEdit.isRemoved());
-        assertEquals("on reflection, @Beren", decodedEdit.getMessage());
+        assertEquals("on reflection, @Beren @Herald", decodedEdit.getMessage());
+        assertEquals("an edit calls the roles its new words call",
+                java.util.Collections.singletonList("herald"),
+                decodedEdit.getMentionedRoles());
         assertEquals("", decodedEdit.getBodyJson());
         assertEquals("an edit names whom its new words name",
                 "Beren", decodedEdit.getNamedPlayers().get(0).getIdentityName());
@@ -125,7 +148,7 @@ public final class LostTalesChatRevisionPacketTest {
     public void anEditCarriesItsWordsToTranslate() {
         ByteBuf buffer = Unpooled.buffer();
         LostTalesChatUpdatePacket.edited(SERVER_ID, "look *[Sticker: Wave]*", BODY,
-                null).toBytes(buffer);
+                null, null).toBytes(buffer);
         LostTalesChatUpdatePacket decoded = new LostTalesChatUpdatePacket();
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
@@ -144,7 +167,7 @@ public final class LostTalesChatRevisionPacketTest {
             huge.append('x');
         }
         try {
-            LostTalesChatUpdatePacket.edited(SERVER_ID, "hello", huge.toString(), null);
+            LostTalesChatUpdatePacket.edited(SERVER_ID, "hello", huge.toString(), null, null);
             fail("a component past the bound was accepted");
         } catch (IllegalArgumentException expected) {
             // The factory validates, so it can never be sent either.
@@ -164,7 +187,7 @@ public final class LostTalesChatRevisionPacketTest {
         assertEquals("", decoded.getBodyJson());
 
         ByteBuf trailing = Unpooled.buffer();
-        LostTalesChatUpdatePacket.edited(SERVER_ID, "hello", BODY, null).toBytes(trailing);
+        LostTalesChatUpdatePacket.edited(SERVER_ID, "hello", BODY, null, null).toBytes(trailing);
         trailing.writeByte(7);
         LostTalesChatUpdatePacket withTail = new LostTalesChatUpdatePacket();
         withTail.fromBytes(trailing);

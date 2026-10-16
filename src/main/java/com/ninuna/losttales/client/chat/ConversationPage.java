@@ -62,7 +62,6 @@ public final class ConversationPage extends WindowPage {
     private static final String MENU_JUMP_UNREAD = "jump_unread";
     private static final String MENU_NOTIFY = "notify";
     private static final String MENU_FEED = "feed";
-    private static final String MENU_INBOX = "inbox";
     /** The options' two groups: reading, and the conversation's own settings. */
     private static final String GROUP_READING = "reading";
     private static final String GROUP_SETTINGS = "settings";
@@ -74,8 +73,6 @@ public final class ConversationPage extends WindowPage {
             ".#...");
     private static final OptionGlyph JUMP_GLYPH = OptionGlyph.sprite(
             LostTalesUiSheet.CHEVRON_5, LostTalesUiSheet.CHEVRON_5_HOVER);
-    private static final OptionGlyph INBOX_GLYPH = OptionGlyph.sprite(
-            LostTalesUiSheet.INBOX, LostTalesUiSheet.INBOX_LIT);
     /**
      * The bell of Notification Settings and the bubble of Chat Feed
      * Settings, one for each word in {@link ChatLineChoice}'s order: green for Everything,
@@ -754,12 +751,8 @@ public final class ConversationPage extends WindowPage {
                 ChatLayout.notification(conversation), BELL_GLYPHS)
                 .reachesEveryPage(word("gui.losttales.chat.tab.notify_all")));
         // What is addressed to the player, counted beside its button.
-        TabMark waiting = ChatInbox.mark();
-        options.add(PageOption.opens(MENU_INBOX,
-                word("gui.losttales.window.inbox"),
-                waiting.count() > 0 ? Integer.toString(waiting.count()) : "",
-                OptionGlyph.withMark(INBOX_GLYPH, waiting),
-                ChatSubWindows.INBOX).inGroup(GROUP_SETTINGS, ""));
+        options.add(ChatInbox.option(ChatInbox.Kind.CONVERSATIONS)
+                .inGroup(GROUP_SETTINGS, ""));
         return options;
     }
 

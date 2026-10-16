@@ -1,7 +1,9 @@
 package com.ninuna.losttales.fellowship.storage;
 
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
+import com.ninuna.losttales.fellowship.model.FellowshipMarkKind;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -12,15 +14,18 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/** Persistence of the fellowships' marks. */
+/** Persistence of the marks of both kinds. */
 public final class FellowshipMarkNbtCodecTest {
 
     private static final UUID FELLOWSHIP =
             UUID.fromString("20000000-0000-0000-0000-000000000002");
     private static final UUID PLACER =
             UUID.fromString("30000000-0000-0000-0000-000000000003");
+    private static final UUID OWNER =
+            UUID.fromString("50000000-0000-0000-0000-000000000005");
 
     @Test
     public void aMarkRoundTrips() {
@@ -33,12 +38,59 @@ public final class FellowshipMarkNbtCodecTest {
         assertFalse(result.isReadOnly());
         assertFalse(result.wasRepaired());
         FellowshipMark decoded = result.getMarks().get(mark.getMarkId());
+        assertEquals(FellowshipMarkKind.FELLOWSHIP, decoded.getKind());
         assertEquals("Weathertop", decoded.getName());
         assertEquals(FELLOWSHIP, decoded.getFellowshipId());
         assertEquals(PLACER, decoded.getPlacedBy());
         assertEquals(mark.getX(), decoded.getX(), 0.0D);
         assertEquals(mark.getZ(), decoded.getZ(), 0.0D);
         assertEquals(99L, decoded.getPlacedAt());
+    }
+
+    /** A go-here mark keeps its owner and place, and no fellowship or name. */
+    @Test
+    public void aGoHereMarkRoundTrips() {
+        FellowshipMark goHere = goHere(7, OWNER);
+        NBTTagCompound encoded = encoded(Arrays.asList(mark(1, "Bree", 99L), goHere));
+        assertFalse(markTag(encoded, 0).hasKey("FellowshipUUID"));
+
+        FellowshipMarkNbtCodec.ReadResult result = FellowshipMarkNbtCodec.read(encoded);
+
+        assertFalse(result.wasRepaired());
+        FellowshipMark decoded = result.getMarks().get(goHere.getMarkId());
+        assertTrue(decoded.isGoHere());
+        assertEquals(OWNER, decoded.getPlacedBy());
+        assertNull(decoded.getFellowshipId());
+        assertEquals("", decoded.getName());
+        assertEquals(-22000.25D, decoded.getX(), 0.0D);
+        assertEquals(2, result.getMarks().size());
+    }
+
+    /** One owner holds one go-here mark: a second, from an edited save, is quarantined. */
+    @Test
+    public void aSecondGoHereMarkOfOneOwnerIsQuarantined() {
+        FellowshipMarkNbtCodec.ReadResult result = FellowshipMarkNbtCodec.read(
+                encoded(Arrays.asList(goHere(7, OWNER), goHere(8, OWNER))));
+
+        assertEquals(1, result.getMarks().size());
+        assertTrue(result.wasRepaired());
+        assertEquals("duplicate_go_here",
+                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+    }
+
+    /** Go-here marks never count against a fellowship's limit. */
+    @Test
+    public void goHereMarksDoNotFillAFellowship() {
+        List<FellowshipMark> marks = new ArrayList<FellowshipMark>();
+        for (int index = 0; index < FellowshipMark.MAX_PER_FELLOWSHIP; index++) {
+            marks.add(mark(index + 1, "Camp " + index, 100L + index));
+        }
+        marks.add(goHere(9, OWNER));
+
+        FellowshipMarkNbtCodec.ReadResult result = FellowshipMarkNbtCodec.read(encoded(marks));
+
+        assertEquals(FellowshipMark.MAX_PER_FELLOWSHIP + 1, result.getMarks().size());
+        assertFalse(result.wasRepaired());
     }
 
     /** A fellowship never holds more marks than it may: the newest past the limit is quarantined, not dropped. */
@@ -72,6 +124,37 @@ public final class FellowshipMarkNbtCodecTest {
         assertTrue(result.getMarks().isEmpty());
         assertTrue(result.wasRepaired());
         assertEquals("missing_mark_key",
+                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+    }
+
+    /** A mark with no kind, as one saved before marks had kinds, or a kind this build does not know, is quarantined. */
+    @Test
+    public void aMarkWithoutAKnownKindIsQuarantined() {
+        NBTTagCompound noKind = encoded(Collections.singletonList(mark(1, "Bree", 99L)));
+        markTag(noKind, 0).removeTag("Kind");
+        FellowshipMarkNbtCodec.ReadResult result = FellowshipMarkNbtCodec.read(noKind);
+        assertTrue(result.getMarks().isEmpty());
+        assertEquals("missing_mark_key",
+                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+
+        NBTTagCompound otherKind = encoded(Collections.singletonList(mark(1, "Bree", 99L)));
+        markTag(otherKind, 0).setString("Kind", "camp");
+        result = FellowshipMarkNbtCodec.read(otherKind);
+        assertTrue(result.getMarks().isEmpty());
+        assertEquals("unknown_mark_kind",
+                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+    }
+
+    /** A go-here mark that names a fellowship, from an edited save, is quarantined. */
+    @Test
+    public void aGoHereMarkNamingAFellowshipIsQuarantined() {
+        NBTTagCompound encoded = encoded(Collections.singletonList(goHere(7, OWNER)));
+        markTag(encoded, 0).setString("Name", "Bree");
+
+        FellowshipMarkNbtCodec.ReadResult result = FellowshipMarkNbtCodec.read(encoded);
+
+        assertTrue(result.getMarks().isEmpty());
+        assertEquals("invalid_mark_data",
                 result.getQuarantineEntriesCopy().get(0).getString("Reason"));
     }
 
@@ -111,10 +194,16 @@ public final class FellowshipMarkNbtCodecTest {
     }
 
     private static FellowshipMark mark(int number, String name, long placedAt) {
-        return new FellowshipMark(
+        return FellowshipMark.ofFellowship(
                 UUID.fromString("40000000-0000-0000-0000-00000000000" + number),
                 FELLOWSHIP, name, PLACER, 100, 1200.5D + number, -300.0D,
                 placedAt);
+    }
+
+    private static FellowshipMark goHere(int number, UUID owner) {
+        return FellowshipMark.goHere(
+                UUID.fromString("60000000-0000-0000-0000-00000000000" + number),
+                owner, 100, -22000.25D, -7278.5D, 1234L);
     }
 
     private static NBTTagCompound encoded(List<FellowshipMark> marks) {

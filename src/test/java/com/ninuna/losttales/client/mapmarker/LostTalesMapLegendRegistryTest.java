@@ -60,7 +60,7 @@ public final class LostTalesMapLegendRegistryTest {
                         false, false)));
         assertEquals(LostTalesMapLegendRegistry.FELLOWSHIP,
                 LostTalesMapLegendRegistry.categoryFor(marker(
-                        "fellowship_go_here:character", "Go Here",
+                        "fellowship_mark:character", "Go Here",
                         LostTalesMapMarkerSource.PLAYER_CREATED,
                         false, false)));
     }

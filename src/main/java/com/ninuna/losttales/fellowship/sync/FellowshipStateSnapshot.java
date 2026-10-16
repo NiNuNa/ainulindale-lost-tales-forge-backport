@@ -2,26 +2,35 @@ package com.ninuna.losttales.fellowship.sync;
 
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipInvitation;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
 import com.ninuna.losttales.fellowship.server.FellowshipInvitationState;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
  * Everything one account may see of the fellowships of the identity it
- * plays: the fellowships, the one it travels with, whether it may make
- * another, its invitations, and whom it may invite.
+ * plays: the fellowships, the one it travels with, the marks it sees,
+ * whether it may make another, its invitations, and whom it may invite.
  */
 public final class FellowshipStateSnapshot {
 
     public static final int MAX_INCOMING_INVITATIONS = 128;
     public static final int MAX_OUTGOING_INVITATIONS = 128;
     public static final int MAX_INVITE_TARGETS = 64;
+    /**
+     * The most marks a state holds: those of each fellowship, and the
+     * go-here marks of every member of the one travelled with.
+     */
+    public static final int MAX_MARKS = FellowshipMark.MAX_PER_FELLOWSHIP
+            * Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY + Fellowship.MAX_MEMBERS;
 
     private final UUID ownerId;
     private final long synchronizationSequence;
@@ -31,6 +40,7 @@ public final class FellowshipStateSnapshot {
     private final UUID activeIdentityId;
     private final List<FellowshipSnapshot> fellowships;
     private final UUID travellingFellowshipId;
+    private final List<FellowshipMark> marks;
     private final FellowshipErrorId createRefusal;
     private final List<FellowshipInvitationSnapshot> incomingInvitations;
     private final List<FellowshipInvitationSnapshot> outgoingInvitations;
@@ -46,6 +56,7 @@ public final class FellowshipStateSnapshot {
                                    UUID activeIdentityId,
                                    List<FellowshipSnapshot> fellowships,
                                    UUID travellingFellowshipId,
+                                   List<FellowshipMark> marks,
                                    FellowshipErrorId createRefusal,
                                    List<FellowshipInvitationSnapshot> incomingInvitations,
                                    List<FellowshipInvitationSnapshot> outgoingInvitations,
@@ -70,6 +81,7 @@ public final class FellowshipStateSnapshot {
             this.activeIdentityId = null;
             this.fellowships = Collections.emptyList();
             this.travellingFellowshipId = null;
+            this.marks = Collections.emptyList();
             this.createRefusal = FellowshipErrorId.NONE;
             this.incomingInvitations = Collections.emptyList();
             this.outgoingInvitations = Collections.emptyList();
@@ -92,6 +104,8 @@ public final class FellowshipStateSnapshot {
             throw new IllegalArgumentException("travelling fellowship must be one of the fellowships");
         }
         this.travellingFellowshipId = travellingFellowshipId;
+        this.marks = acceptMarks(activeIdentityId, this.fellowships,
+                getTravellingFellowship(), marks);
         this.createRefusal = createRefusal;
         this.incomingInvitations = filterIncoming(activeIdentityId, incomingInvitations);
         this.outgoingInvitations = filterOutgoing(
@@ -120,7 +134,7 @@ public final class FellowshipStateSnapshot {
                                                     int memberLimit,
                                                     FellowshipInvitationState state,
                                                     FellowshipSnapshot.Presence presence,
-                                                    FellowshipSnapshot.Marks marks,
+                                                    List<FellowshipMark> marks,
                                                     List<FellowshipInviteTargetSnapshot> inviteTargets,
                                                     boolean inviteTargetsTruncated) {
         if (state == null || !state.isSuccessful()) {
@@ -130,8 +144,7 @@ public final class FellowshipStateSnapshot {
         }
         ArrayList<FellowshipSnapshot> fellowships = new ArrayList<FellowshipSnapshot>();
         for (Fellowship fellowship : state.getFellowships()) {
-            fellowships.add(FellowshipSnapshot.fromFellowship(fellowship, presence,
-                    marks));
+            fellowships.add(FellowshipSnapshot.fromFellowship(fellowship, presence));
         }
         ArrayList<FellowshipInvitationSnapshot> incoming = convert(
                 state, state.getIncomingInvitations(), MAX_INCOMING_INVITATIONS);
@@ -145,6 +158,7 @@ public final class FellowshipStateSnapshot {
                 state.getActiveIdentityId(),
                 fellowships,
                 state.getTravellingFellowshipId(),
+                marks,
                 state.getCreateRefusal(),
                 incoming,
                 outgoing,
@@ -171,6 +185,7 @@ public final class FellowshipStateSnapshot {
                 null,
                 Collections.<FellowshipSnapshot>emptyList(),
                 null,
+                Collections.<FellowshipMark>emptyList(),
                 FellowshipErrorId.NONE,
                 Collections.<FellowshipInvitationSnapshot>emptyList(),
                 Collections.<FellowshipInvitationSnapshot>emptyList(),
@@ -233,6 +248,63 @@ public final class FellowshipStateSnapshot {
         return findIn(this.fellowships, this.travellingFellowshipId);
     }
 
+    /**
+     * Every mark the identity sees: those of each of its fellowships, its
+     * own go-here mark, and the go-here marks of the members of the
+     * fellowship it travels with.
+     */
+    public List<FellowshipMark> getMarks() {
+        return this.marks;
+    }
+
+    /** One of the marks the identity sees; null for one it does not. */
+    public FellowshipMark getMark(UUID markId) {
+        if (markId == null) {
+            return null;
+        }
+        for (FellowshipMark mark : this.marks) {
+            if (markId.equals(mark.getMarkId())) {
+                return mark;
+            }
+        }
+        return null;
+    }
+
+    /** A character's go-here mark, while the identity sees it; null else. */
+    public FellowshipMark getGoHereOf(UUID ownerIdentityId) {
+        if (ownerIdentityId == null) {
+            return null;
+        }
+        for (FellowshipMark mark : this.marks) {
+            if (mark.isGoHere() && ownerIdentityId.equals(mark.getPlacedBy())) {
+                return mark;
+            }
+        }
+        return null;
+    }
+
+    /** The marks of one of the identity's fellowships, the oldest first. */
+    public List<FellowshipMark> getFellowshipMarks(UUID fellowshipId) {
+        List<FellowshipMark> held = new ArrayList<FellowshipMark>();
+        for (FellowshipMark mark : this.marks) {
+            if (fellowshipId != null && fellowshipId.equals(mark.getFellowshipId())) {
+                held.add(mark);
+            }
+        }
+        return held;
+    }
+
+    /** What the compass shows: every go-here mark, and the marks of the fellowship travelled with. */
+    public List<FellowshipMark> getCompassMarks() {
+        List<FellowshipMark> shown = new ArrayList<FellowshipMark>();
+        for (FellowshipMark mark : this.marks) {
+            if (mark.isGoHere() || mark.getFellowshipId().equals(this.travellingFellowshipId)) {
+                shown.add(mark);
+            }
+        }
+        return shown;
+    }
+
     /** Why the identity may not make a fellowship now; NONE when it may. */
     public FellowshipErrorId getCreateRefusal() {
         return this.createRefusal;
@@ -269,8 +341,11 @@ public final class FellowshipStateSnapshot {
 
     /**
      * The players one fellowship may invite: those the server offers, but
-     * its members, the accounts one of whose characters is a member, and
-     * those it invited already.
+     * its members, those it invited already, and, where the offer names
+     * its account, the accounts one of whose characters is a member. A
+     * reader not shown accounts is offered those too, since leaving them
+     * out would say whose characters they are; the server's refusal then
+     * says no more.
      */
     public List<FellowshipInviteTargetSnapshot> getInviteTargets(FellowshipSnapshot fellowship) {
         List<FellowshipInviteTargetSnapshot> result =
@@ -280,7 +355,8 @@ public final class FellowshipStateSnapshot {
         }
         for (FellowshipInviteTargetSnapshot target : this.inviteTargets) {
             if (!fellowship.containsMember(target.getIdentityId())
-                    && !fellowship.hasMemberOwnedBy(target.getOwnerId())
+                    && !(target.getPlayerName().length() > 0
+                            && fellowship.hasMemberOwnedBy(target.getOwnerId()))
                     && !invited(fellowship, target)) {
                 result.add(target);
             }
@@ -324,6 +400,48 @@ public final class FellowshipStateSnapshot {
                             "fellowships must be distinct, bounded and hold the active identity");
                 }
                 accepted.add(fellowship);
+            }
+        }
+        return Collections.unmodifiableList(accepted);
+    }
+
+    /**
+     * The marks the identity may see, each once: at most the most a
+     * fellowship holds of each of its fellowships, and one go-here mark of
+     * itself and of each member of the fellowship it travels with.
+     */
+    private static List<FellowshipMark> acceptMarks(UUID activeIdentityId,
+                                                    List<FellowshipSnapshot> fellowships,
+                                                    FellowshipSnapshot travelling,
+                                                    List<FellowshipMark> source) {
+        ArrayList<FellowshipMark> accepted = new ArrayList<FellowshipMark>();
+        Set<UUID> markIds = new HashSet<UUID>();
+        Set<UUID> goHereOwners = new HashSet<UUID>();
+        Map<UUID, Integer> perFellowship = new HashMap<UUID, Integer>();
+        if (source != null) {
+            for (FellowshipMark mark : source) {
+                if (mark == null || accepted.size() >= MAX_MARKS
+                        || markIds.contains(mark.getMarkId())) {
+                    continue;
+                }
+                if (mark.isGoHere()) {
+                    UUID owner = mark.getPlacedBy();
+                    if (!activeIdentityId.equals(owner)
+                            && (travelling == null || !travelling.containsMember(owner))
+                            || !goHereOwners.add(owner)) {
+                        continue;
+                    }
+                } else {
+                    Integer held = perFellowship.get(mark.getFellowshipId());
+                    int count = held == null ? 0 : held.intValue();
+                    if (findIn(fellowships, mark.getFellowshipId()) == null
+                            || count >= FellowshipMark.MAX_PER_FELLOWSHIP) {
+                        continue;
+                    }
+                    perFellowship.put(mark.getFellowshipId(), Integer.valueOf(count + 1));
+                }
+                markIds.add(mark.getMarkId());
+                accepted.add(mark);
             }
         }
         return Collections.unmodifiableList(accepted);

@@ -14,9 +14,11 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveMatcher;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveType;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.quest.LostTalesQuestRewardHelper;
+import com.ninuna.losttales.quest.ServerQuestSync;
 import com.ninuna.losttales.util.LostTalesLog;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -316,12 +318,21 @@ public final class WorldQuests {
         }
     }
 
-    /** Sends the player {@code runs}, one copy of the store shared by everyone sent it this sweep. */
+    /**
+     * Sends the player {@code runs}, one copy of the store shared by
+     * everyone sent it this sweep, each run's quest file first where their
+     * client was not sent it yet.
+     */
     private static void syncTo(EntityPlayerMP player, List<WorldQuestRun> runs) {
         UUID identity = RoleplayCharacterIdentityHook.resolveGameplayId(player);
         synchronized (WorldQuests.class) {
             SENT_AS.put(player.getUniqueID(), identity);
         }
+        List<String> questIds = new ArrayList<String>();
+        for (WorldQuestRun run : runs) {
+            questIds.add(run.getQuestId());
+        }
+        ServerQuestSync.reveal(player, questIds);
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 LostTalesWorldQuestSyncPacket.of(runs, identity), player);
     }

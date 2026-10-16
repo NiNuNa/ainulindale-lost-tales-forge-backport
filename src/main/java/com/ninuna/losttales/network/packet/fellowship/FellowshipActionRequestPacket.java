@@ -17,9 +17,10 @@ import java.util.UUID;
 
 /**
  * Single bounded client-to-server request envelope for fellowship operations.
- * The colour travels only for a colour change, the position only for a
- * go-here marker placed on the map, the name only for a new fellowship and a
- * rename, the value byte only for a guide made or unmade and a switch.
+ * The colour travels only for a colour change, the position only for a mark
+ * placed or moved, the name only for a new fellowship, a rename, a mark
+ * placed and an invitation (the invited character's), the value byte only
+ * for a guide made or unmade and a switch.
  */
 public final class FellowshipActionRequestPacket implements IMessage {
 
@@ -150,7 +151,7 @@ public final class FellowshipActionRequestPacket implements IMessage {
         return this.operationType;
     }
 
-    /** The name a new fellowship or a rename asks for, as typed; null for every other operation. */
+    /** The name the operation carries, as typed; null for an operation that carries none. */
     String getName() {
         return this.name;
     }

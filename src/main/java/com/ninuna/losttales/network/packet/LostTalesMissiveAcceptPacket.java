@@ -3,8 +3,6 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
-import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
-import com.ninuna.losttales.quest.missive.LostTalesMissiveNbt;
 import com.ninuna.losttales.quest.missive.MissiveAcceptance;
 import com.ninuna.losttales.quest.missive.MissiveBoardService;
 import com.ninuna.losttales.quest.missive.MissiveBoardStateReason;
@@ -156,16 +154,15 @@ public class LostTalesMissiveAcceptPacket implements IMessage {
         }
         ItemStack stack = player.inventory.getStackInSlot(slot);
         MissiveBoardStateReason refusal =
-                MissiveAcceptance.check(player.worldObj, stack, expectedQuestId);
+                MissiveAcceptance.check(stack, expectedQuestId);
         if (refusal != null) {
             say(player, refusal == MissiveBoardStateReason.GONE
                     ? "chat.losttales.missive.letter_gone"
                     : refusal.getMessageKey());
             return;
         }
-        LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
         MissiveBoardStateReason outcome =
-                MissiveAcceptance.start(player, missive);
+                MissiveAcceptance.start(player, stack);
         if (outcome == MissiveBoardStateReason.ACCEPTED) {
             player.inventory.setInventorySlotContents(slot, null);
             player.inventory.markDirty();

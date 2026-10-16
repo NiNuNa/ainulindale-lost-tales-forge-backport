@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.gui.style.FoldRule;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.util.ChatComponentText;
@@ -85,19 +86,16 @@ final class ChatLineWrapper {
     }
 
     /**
-     * How a long message's words fold. Words taking more than
-     * {@link #keptRows} rows and one more keep their first
-     * {@code keptRows} while folded and all of them once open, and
-     * {@link #toggle} stands on a row of its own under them: Read more
-     * while folded, Show less once open.
+     * How a long message's words fold, by {@link FoldRule}: words taking
+     * more rows than it keeps and one more keep the kept rows while folded
+     * and all of them once open, and {@link #toggle} stands on a row of
+     * its own under them: Read more while folded, Show less once open.
      */
     static final class Fold {
-        final int keptRows;
         final boolean open;
         final IChatComponent toggle;
 
-        Fold(int keptRows, boolean open, IChatComponent toggle) {
-            this.keptRows = keptRows;
+        Fold(boolean open, IChatComponent toggle) {
             this.open = open;
             this.toggle = toggle;
         }
@@ -768,11 +766,11 @@ final class ChatLineWrapper {
             }
             int wordsEnd = this.underFirstRow >= 0 ? this.underFirstRow
                     : this.lines.size();
-            if (wordsEnd - this.bodyFirstRow <= fold.keptRows + 1) {
+            int rows = wordsEnd - this.bodyFirstRow;
+            if (!FoldRule.folds(rows)) {
                 return;
             }
-            int kept = fold.open ? wordsEnd
-                    : this.bodyFirstRow + Math.max(1, fold.keptRows);
+            int kept = this.bodyFirstRow + FoldRule.shownRows(rows, fold.open);
             ChatComponentText row = new ChatComponentText("");
             row.appendSibling(ChatLayoutMarker.indent(this.closedIndent,
                     this.openIndent, this.nameColor, this.titleColor));

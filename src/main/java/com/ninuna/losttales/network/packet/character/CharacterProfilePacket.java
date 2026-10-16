@@ -13,8 +13,7 @@ import java.util.UUID;
 /**
  * What a character says about itself, sent to the player who asked, or
  * to its owner when they have just changed it: the profile, or word that
- * it cannot be read here — a character that is not the reader's own and
- * that nobody online is using.
+ * there is none to read, for a character this server does not hold.
  */
 public final class CharacterProfilePacket implements IMessage {
 
@@ -75,7 +74,7 @@ public final class CharacterProfilePacket implements IMessage {
         return this.characterId;
     }
 
-    /** Whether the profile could be read; false for a character this player may not see. */
+    /** Whether there was a profile to read; false for a character this server does not hold. */
     public boolean isAvailable() {
         return this.available;
     }

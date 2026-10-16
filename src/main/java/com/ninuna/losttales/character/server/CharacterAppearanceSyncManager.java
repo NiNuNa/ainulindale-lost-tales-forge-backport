@@ -20,7 +20,9 @@ import java.util.UUID;
 /**
  * Synchronizes only the public fields required to render and describe the
  * identity a player is playing: the active character, or the account
- * itself with the arm width its profile skin declares.
+ * itself with the arm width its profile skin declares. A player not shown
+ * which account plays a character ({@link AccountVisibility}) is sent each
+ * character without its account's name, but for their own.
  */
 public final class CharacterAppearanceSyncManager {
 
@@ -37,6 +39,7 @@ public final class CharacterAppearanceSyncManager {
         }
 
         CharacterWorldData data = CharacterStorage.get(recipient.worldObj);
+        boolean seesAccounts = AccountVisibility.seesAccounts(recipient);
         ArrayList<CharacterAppearance> appearances = new ArrayList<CharacterAppearance>();
         MinecraftServer server = MinecraftServer.getServer();
         if (server != null && server.getConfigurationManager() != null) {
@@ -51,7 +54,7 @@ public final class CharacterAppearanceSyncManager {
                         player.getUniqueID(), accountName(player), roster,
                         accountBodyType(player));
                 if (appearance.isPresent()) {
-                    appearances.add(appearance);
+                    appearances.add(shownTo(appearance, recipient, seesAccounts));
                 }
             }
         }
@@ -77,8 +80,9 @@ public final class CharacterAppearanceSyncManager {
                 target.getUniqueID(), accountName(target), roster,
                 accountBodyType(target));
         LostTalesNetworkHandler.CHANNEL.sendTo(
-                new CharacterAppearanceSyncPacket(
-                        false, Collections.singletonList(appearance)), recipient);
+                new CharacterAppearanceSyncPacket(false, Collections.singletonList(
+                        shownTo(appearance, recipient,
+                                AccountVisibility.seesAccounts(recipient)))), recipient);
     }
 
     /**
@@ -94,9 +98,27 @@ public final class CharacterAppearanceSyncManager {
         CharacterAppearance appearance = CharacterAppearance.fromRoster(
                 player.getUniqueID(), accountName(player), roster,
                 accountBodyType(player));
-        LostTalesNetworkHandler.CHANNEL.sendToAll(
-                new CharacterAppearanceSyncPacket(
-                        false, Collections.singletonList(appearance)));
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null) {
+            return;
+        }
+        for (Object value : new ArrayList<Object>(
+                server.getConfigurationManager().playerEntityList)) {
+            if (value instanceof EntityPlayerMP) {
+                EntityPlayerMP recipient = (EntityPlayerMP)value;
+                LostTalesNetworkHandler.CHANNEL.sendTo(new CharacterAppearanceSyncPacket(
+                        false, Collections.singletonList(shownTo(appearance, recipient,
+                                AccountVisibility.seesAccounts(recipient)))), recipient);
+            }
+        }
+    }
+
+    /** The appearance as {@code recipient} is sent it: without the account behind a character, unless shown it or their own. */
+    private static CharacterAppearance shownTo(CharacterAppearance appearance,
+                                               EntityPlayerMP recipient,
+                                               boolean seesAccounts) {
+        return seesAccounts || appearance.getPlayerId().equals(recipient.getUniqueID())
+                ? appearance : appearance.withoutAccountName();
     }
 
     public static void broadcastRemoval(UUID playerId) {

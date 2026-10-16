@@ -41,6 +41,27 @@ public final class LostTalesQuestDefinitionValidatorTest {
         assertTrue(found.get(0), found.get(0).contains(about));
     }
 
+    /** Only a required gather hands its items over, and {@code take} says true or false. */
+    @Test
+    public void onlyARequiredGatherTakes() {
+        String take = "{\"id\":\"logs\",\"type\":\"%s\",%s"
+                + "\"params\":{\"item\":\"minecraft:log\",\"count\":\"4\","
+                + "\"take\":\"%s\"}}";
+        assertEquals(Collections.<String>emptyList(), warnings(HEAD
+                + "\"stages\":[" + stage("10", String.format(take, "gather", "", "true"))
+                + "]}"));
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10",
+                String.format(take, "craft", "", "true")) + "]}",
+                "only a gather objective reads");
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10",
+                String.format(take, "gather", "\"optional\":true,", "true"),
+                String.format(GATHER, "more")) + "]}",
+                "never hands anything over");
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10",
+                String.format(take, "gather", "", "yes")) + "]}",
+                "it is true or false");
+    }
+
     @Test
     public void aWellWrittenQuestRaisesNothing() {
         assertEquals(Collections.<String>emptyList(), warnings(HEAD

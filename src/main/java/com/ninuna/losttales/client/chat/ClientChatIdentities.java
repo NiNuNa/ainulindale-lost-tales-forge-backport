@@ -8,9 +8,11 @@ import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +28,12 @@ import net.minecraft.client.Minecraft;
  * character's faction, and a whisper copy holds the conversation with
  * that character. The Narrator's voice is taken up per copy too. What
  * the closed feed shows always follows the character played.
+ *
+ * <p>The voices are kept per place in the layout file, one {@code voice}
+ * line each ({@link #describeVoices}), and come back at the next visit. A
+ * character the roster no longer holds, or a Narrator's voice the player
+ * may no longer take up, reads as the character played; the server checks
+ * whatever a line claims anyway.</p>
  */
 final class ClientChatIdentities {
     /** One choosable identity: the account, or one roster character. */
@@ -60,6 +68,15 @@ final class ClientChatIdentities {
 
     /** Each copy's voice, by the id of the row entry its window holds; a copy left out follows the character played. */
     private static final Map<String, Voice> VOICES = new HashMap<String, Voice>();
+    /** Each place's voices as the layout file keeps them, by row id. */
+    private static final Map<String, Map<String, Voice>> KEPT =
+            new LinkedHashMap<String, Map<String, Voice>>();
+    /** What a {@code voice} line begins with. */
+    static final String VOICE_LINE = "voice";
+    /** A {@code voice} line's word for no character, or for no Narrator. */
+    private static final String NONE = "-";
+    /** A {@code voice} line's word for the Narrator's voice taken up. */
+    private static final String NARRATOR = "narrator";
 
     private ClientChatIdentities() {}
 
@@ -92,10 +109,18 @@ final class ClientChatIdentities {
      * is what the roleplaying channels fall back to while no character is
      * held, never a choice. Choosing one puts the Narrator's voice down.
      */
-    static synchronized void select(ConversationPage tab, Identity identity) {
-        if (identity != null && !identity.account && isHeld(identity.characterId)) {
-            setVoice(tab, new Voice(identity.characterId, false));
+    static void select(ConversationPage tab, Identity identity) {
+        if (choose(tab, identity)) {
+            WindowLayout.persist();
         }
+    }
+
+    private static synchronized boolean choose(ConversationPage tab, Identity identity) {
+        if (identity == null || identity.account || !isHeld(identity.characterId)) {
+            return false;
+        }
+        setVoice(tab, new Voice(identity.characterId, false));
+        return true;
     }
 
     /**
@@ -224,16 +249,24 @@ final class ClientChatIdentities {
      */
     static synchronized boolean isNarrating(ConversationPage tab) {
         Voice voice = voiceOf(tab);
-        return voice != null && voice.narrating;
+        return voice != null && voice.narrating
+                && ClientChatChannelState.holds(LostTalesCapability.CHAT_NARRATE);
     }
 
     /** Takes the copy's Narrator's voice up or puts it down. */
-    static synchronized void setNarrating(ConversationPage tab, boolean on) {
+    static void setNarrating(ConversationPage tab, boolean on) {
+        if (narrate(tab, on)) {
+            WindowLayout.persist();
+        }
+    }
+
+    private static synchronized boolean narrate(ConversationPage tab, boolean on) {
         if (isNarrating(tab) == on) {
-            return;
+            return false;
         }
         Voice voice = voiceOf(tab);
         setVoice(tab, new Voice(voice == null ? null : voice.characterId, on));
+        return true;
     }
 
     /**
@@ -426,5 +459,94 @@ final class ClientChatIdentities {
 
     static synchronized void clear() {
         VOICES.clear();
+    }
+
+    /**
+     * Keeps the voices of the place's copies the layout holds, each one
+     * that speaks in character, as the layout file is to hold them.
+     */
+    static synchronized void rememberVoices(String place) {
+        if (place == null || place.length() == 0) {
+            return;
+        }
+        Map<String, Voice> kept = new LinkedHashMap<String, Voice>();
+        for (String id : new java.util.TreeSet<String>(VOICES.keySet())) {
+            ConversationPage copy = ConversationPage.fromId(id);
+            if (copy != null && !copy.isNpc() && speaksInCharacter(copy)
+                    && WindowLayout.holds(copy)) {
+                kept.put(id, VOICES.get(id));
+            }
+        }
+        if (kept.isEmpty()) {
+            KEPT.remove(place);
+        } else {
+            KEPT.put(place, kept);
+        }
+    }
+
+    /** Gives the place's copies the voices kept for them; a copy that has one already keeps it. */
+    static synchronized void restoreVoices(String place) {
+        Map<String, Voice> kept = place == null ? null : KEPT.get(place);
+        if (kept == null) {
+            return;
+        }
+        for (Map.Entry<String, Voice> entry : kept.entrySet()) {
+            if (!VOICES.containsKey(entry.getKey())) {
+                VOICES.put(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    /**
+     * Reads one {@code voice} line: the place, the copy's row id, the
+     * character's id or {@code -}, and {@code narrator} or {@code -}. A line
+     * that says anything else is skipped; whether its character or its
+     * Narrator still stands is asked as the voice is used.
+     */
+    static synchronized void readVoice(String[] fields) {
+        if (fields.length != 5 || !VOICE_LINE.equals(fields[0])
+                || fields[1].length() == 0) {
+            return;
+        }
+        ConversationPage copy = ConversationPage.fromId(fields[2]);
+        if (copy == null || copy.isNpc() || !copy.equals(ConversationPage.row(copy))) {
+            return;
+        }
+        UUID characterId = null;
+        if (!NONE.equals(fields[3])) {
+            try {
+                characterId = UUID.fromString(fields[3]);
+            } catch (IllegalArgumentException notAnId) {
+                return;
+            }
+        }
+        boolean narrating = NARRATOR.equals(fields[4]);
+        if ((!narrating && !NONE.equals(fields[4]))
+                || (characterId == null && !narrating)) {
+            return;
+        }
+        Map<String, Voice> kept = KEPT.get(fields[1]);
+        if (kept == null) {
+            kept = new LinkedHashMap<String, Voice>();
+            KEPT.put(fields[1], kept);
+        }
+        kept.put(copy.id(), new Voice(characterId, narrating));
+    }
+
+    /** Writes every place's kept voices, a tab-separated line each, since a place may hold spaces. */
+    static synchronized void describeVoices(List<String> lines) {
+        for (Map.Entry<String, Map<String, Voice>> place : KEPT.entrySet()) {
+            for (Map.Entry<String, Voice> entry : place.getValue().entrySet()) {
+                Voice voice = entry.getValue();
+                lines.add(VOICE_LINE + "\t" + place.getKey() + "\t" + entry.getKey()
+                        + "\t" + (voice.characterId == null ? NONE : voice.characterId.toString())
+                        + "\t" + (voice.narrating ? NARRATOR : NONE));
+            }
+        }
+    }
+
+    /** Forgets every place's kept voices, as the layout file is read afresh. */
+    static synchronized void clearKept() {
+        KEPT.clear();
     }
 }

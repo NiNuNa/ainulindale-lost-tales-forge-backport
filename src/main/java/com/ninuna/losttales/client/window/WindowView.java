@@ -12,6 +12,10 @@ package com.ninuna.losttales.client.window;
 public final class WindowView {
     /** The view the screen shows; null while no screen is open. */
     private static View current;
+    /** The view shown last, kept as the screen closes; null before any. */
+    private static View last;
+    /** The view shown before the one shown now, this session; null before any. */
+    private static View previous;
     /** Whether the windows pinned to the HUD are being drawn: only what the HUD shows counts. */
     private static boolean pinnedPass;
 
@@ -19,28 +23,57 @@ public final class WindowView {
 
     /** The screen opens for the chat: the Chat view. */
     public static synchronized void forChat() {
-        current = Views.of(PageCategory.CHANNELS);
+        turnTo(Views.of(PageCategory.CHANNELS));
     }
 
     /** The screen opens for a command: the Consoles view. */
     public static synchronized void forConsole() {
-        current = Views.of(PageCategory.CONSOLES);
+        turnTo(Views.of(PageCategory.CONSOLES));
     }
 
     /** The screen opens for a page, or swaps to it by its key: its category's view. */
     public static synchronized void forPage(OtherPage shown) {
-        current = Views.of(shown == null ? PageCategory.CHANNELS
-                : shown.category());
+        turnTo(Views.of(shown == null ? PageCategory.CHANNELS
+                : shown.category()));
     }
 
-    /** The screen opens on a view, or swaps to it. */
+    /** The screen opens on a view, or swaps to it; with none, the Chat view. */
     public static synchronized void forView(View view) {
-        current = view == null ? Views.menu() : view;
+        turnTo(view == null ? Views.of(PageCategory.CHANNELS) : view);
+    }
+
+    /**
+     * The screen shows {@code view} now. The one it showed before, or
+     * showed last before it closed, is remembered unless it is this one
+     * or no longer stands.
+     */
+    private static void turnTo(View view) {
+        View from = current != null ? current : last;
+        if (from != null && from != view && Views.all().contains(from)) {
+            previous = from;
+        }
+        current = view;
+        last = view;
     }
 
     /** The screen closed: every tab counts as shown again. */
     public static synchronized void clear() {
         current = null;
+    }
+
+    /**
+     * The view to go back to as {@code leaving} is deleted: the one shown
+     * before it while it still stands, else the Chat view.
+     */
+    public static synchronized View shownBefore(View leaving) {
+        return previous != null && previous != leaving && Views.all().contains(previous)
+                ? previous : Views.of(PageCategory.CHANNELS);
+    }
+
+    /** Forgets the views shown: a new session starts with none. */
+    public static synchronized void forgetPrevious() {
+        previous = null;
+        last = null;
     }
 
     /** The view the screen shows; null while no screen is open. */
@@ -75,7 +108,7 @@ public final class WindowView {
         }
         Window window = WindowLayout.windowOf(tab);
         if (window != null) {
-            current = WindowLayout.viewOf(window);
+            turnTo(WindowLayout.viewOf(window));
         }
     }
 

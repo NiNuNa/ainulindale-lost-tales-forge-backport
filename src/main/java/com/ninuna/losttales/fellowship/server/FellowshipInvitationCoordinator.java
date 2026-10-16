@@ -2,8 +2,11 @@ package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.character.storage.CharacterIndex;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
+import com.ninuna.losttales.character.validation.CharacterNames;
+import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipInvitation;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
@@ -19,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import com.ninuna.losttales.util.LostTalesServerPlayers;
 
 /**
  * Invitation-specific operations kept separate from the core fellowship lifecycle.
@@ -51,16 +53,24 @@ final class FellowshipInvitationCoordinator {
         }
     }
 
+    /**
+     * Invites the character of that name, played or not, wherever it is:
+     * the server finds it among every roster and takes its owner and id
+     * from there, never from the request. Refused for a name nobody goes
+     * by, and once the fellowship or the character's account has as many
+     * invitations open as it may. A refusal kept by account reaches an
+     * inviter not shown accounts as one neutral refusal ({@link #toInviter}).
+     */
     FellowshipInvitationOperationResult invitePlayer(
             EntityPlayerMP player,
             FellowshipService.ActiveIdentityContext inviting,
             FellowshipWorldData fellowshipData,
             Fellowship fellowship,
-            UUID targetOwnerId) {
+            String targetName) {
         CharacterWorldData characterData = inviting.characterData;
-        if (targetOwnerId == null) {
+        if (targetName == null || targetName.length() > CharacterValidator.MAX_NAME_LENGTH) {
             return FellowshipInvitationOperationResult.failure(
-                    FellowshipErrorId.INVALID_TARGET, fellowship, null);
+                    FellowshipErrorId.TARGET_NOT_FOUND, fellowship, null);
         }
         if (fellowship.isFull(FellowshipService.memberLimit())) {
             return FellowshipInvitationOperationResult.failure(
@@ -78,18 +88,14 @@ final class FellowshipInvitationCoordinator {
                 characterData,
                 System.currentTimeMillis());
 
-        EntityPlayerMP targetPlayer = LostTalesServerPlayers.findOnline(targetOwnerId);
-        if (targetPlayer == null) {
+        RoleplayCharacter target = CharacterNames.named(characterData.getRosters(), targetName);
+        if (target == null
+                || characterData.characterIndex().countOf(target.getCharacterId()) != 1) {
             return FellowshipInvitationOperationResult.failure(
-                    FellowshipErrorId.TARGET_OFFLINE, fellowship, null);
+                    FellowshipErrorId.TARGET_NOT_FOUND, fellowship, null);
         }
-        FellowshipService.ActiveIdentityContext target =
-                this.fellowshipService.resolveActiveIdentity(targetPlayer);
-        if (!target.isValid()) {
-            return FellowshipInvitationOperationResult.failure(
-                    FellowshipErrorId.INVALID_TARGET, fellowship, null);
-        }
-        UUID targetIdentityId = target.gameplayId();
+        UUID targetIdentityId = target.getCharacterId();
+        UUID targetOwnerId = target.getOwnerId();
         if (inviting.gameplayId().equals(targetIdentityId)) {
             return FellowshipInvitationOperationResult.failure(
                     FellowshipErrorId.CANNOT_INVITE_SELF, fellowship, null);
@@ -103,19 +109,33 @@ final class FellowshipInvitationCoordinator {
             return FellowshipInvitationOperationResult.failure(
                     FellowshipErrorId.TARGET_TOO_MANY_FELLOWSHIPS, fellowship, null);
         }
-        if (fellowship.hasMemberOwnedBy(target.ownerId())) {
+        boolean seesAccounts = AccountVisibility.seesAccounts(player);
+        if (fellowship.hasMemberOwnedBy(targetOwnerId)) {
             return FellowshipInvitationOperationResult.failure(
-                    FellowshipErrorId.ACCOUNT_ALREADY_IN_FELLOWSHIP, fellowship, null);
+                    toInviter(FellowshipErrorId.ACCOUNT_ALREADY_IN_FELLOWSHIP,
+                            seesAccounts), fellowship, null);
         }
         if (invitationData.hasInvitationForFellowshipAndTarget(
                 fellowship.getFellowshipId(), targetIdentityId)) {
             return FellowshipInvitationOperationResult.failure(
                     FellowshipErrorId.INVITATION_ALREADY_EXISTS, fellowship, null);
         }
-        if (FellowshipDeclines.mustWait(player.getUniqueID(), target.ownerId(),
-                System.currentTimeMillis())) {
+        if (FellowshipDeclines.mustWait(fellowship.getFellowshipId(),
+                targetOwnerId, System.currentTimeMillis())) {
             return FellowshipInvitationOperationResult.failure(
-                    FellowshipErrorId.RECENTLY_DECLINED, fellowship, null);
+                    toInviter(FellowshipErrorId.RECENTLY_DECLINED, seesAccounts),
+                    fellowship, null);
+        }
+        if (invitationData.getInvitationsForFellowship(fellowship.getFellowshipId()).size()
+                >= FellowshipInvitation.MAX_PER_FELLOWSHIP) {
+            return FellowshipInvitationOperationResult.failure(
+                    FellowshipErrorId.TOO_MANY_INVITATIONS, fellowship, null);
+        }
+        if (invitationData.getInvitationCountForTargetAccount(targetOwnerId)
+                >= FellowshipInvitation.MAX_PER_TARGET_ACCOUNT) {
+            return FellowshipInvitationOperationResult.failure(
+                    toInviter(FellowshipErrorId.TARGET_INVITATIONS_FULL, seesAccounts),
+                    fellowship, null);
         }
         UUID invitationId = createUniqueInvitationId(invitationData);
         if (invitationId == null) {
@@ -130,9 +150,9 @@ final class FellowshipInvitationCoordinator {
                 inviting.gameplayId(),
                 inviting.ownerId(),
                 inviting.displayName,
-                target.gameplayId(),
-                target.ownerId(),
-                target.displayName,
+                targetIdentityId,
+                targetOwnerId,
+                target.getName(),
                 now,
                 safeExpiration(now));
         try {
@@ -143,6 +163,29 @@ final class FellowshipInvitationCoordinator {
             this.fellowshipService.logFailure("invite", player, exception);
             return FellowshipInvitationOperationResult.failure(
                     FellowshipErrorId.INTERNAL_ERROR, fellowship, invitation);
+        }
+    }
+
+    /**
+     * What an inviter is told of a refusal. The refusals kept by account
+     * (another of its characters a member, one of them turned this
+     * fellowship down a moment ago, as many invitations waiting for the
+     * account as may) would each tell an inviter that two characters
+     * share an account, so one not shown accounts hears
+     * {@link FellowshipErrorId#TARGET_CANNOT_BE_INVITED} for all of them.
+     */
+    static FellowshipErrorId toInviter(FellowshipErrorId refusal,
+                                       boolean seesAccounts) {
+        if (seesAccounts) {
+            return refusal;
+        }
+        switch (refusal) {
+            case ACCOUNT_ALREADY_IN_FELLOWSHIP:
+            case RECENTLY_DECLINED:
+            case TARGET_INVITATIONS_FULL:
+                return FellowshipErrorId.TARGET_CANNOT_BE_INVITED;
+            default:
+                return refusal;
         }
     }
 
@@ -287,7 +330,7 @@ final class FellowshipInvitationCoordinator {
                     fellowship,
                     invitation);
         }
-        FellowshipDeclines.startWait(invitation.getInvitingOwnerId(),
+        FellowshipDeclines.startWait(invitation.getFellowshipId(),
                 invitation.getTargetOwnerId(), now);
         return FellowshipInvitationOperationResult.success(
                 true, fellowship, invitation, null);
@@ -317,10 +360,10 @@ final class FellowshipInvitationCoordinator {
                     fellowship,
                     invitation);
         }
-        // As after a decline, the one who sent it waits before inviting the
-        // same player again, so inviting and taking back cannot chime at
-        // them over and over.
-        FellowshipDeclines.startWait(invitation.getInvitingOwnerId(),
+        // As after a decline, the fellowship waits before inviting the same
+        // player again, so inviting and taking back cannot chime at them
+        // over and over.
+        FellowshipDeclines.startWait(invitation.getFellowshipId(),
                 invitation.getTargetOwnerId(), now);
         return FellowshipInvitationOperationResult.success(
                 true, fellowship, invitation, null);
@@ -504,9 +547,9 @@ final class FellowshipInvitationCoordinator {
     }
 
     private long safeExpiration(long now) {
-        return now > Long.MAX_VALUE - FellowshipService.INVITATION_LIFETIME_MILLIS
+        return now > Long.MAX_VALUE - FellowshipInvitation.LIFETIME_MILLIS
                 ? Long.MAX_VALUE
-                : now + FellowshipService.INVITATION_LIFETIME_MILLIS;
+                : now + FellowshipInvitation.LIFETIME_MILLIS;
     }
 
 }

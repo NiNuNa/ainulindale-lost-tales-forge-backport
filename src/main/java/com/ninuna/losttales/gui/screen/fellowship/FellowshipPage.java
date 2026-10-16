@@ -9,8 +9,8 @@ import com.ninuna.losttales.client.window.PageOption;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipDisplayNames;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipIcons;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipMarks;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
-import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
@@ -18,6 +18,8 @@ import com.ninuna.losttales.client.window.PageSearch;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.WindowLists;
+import com.ninuna.losttales.client.chat.ChatInbox;
+import com.ninuna.losttales.client.window.NamingWindow;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -26,7 +28,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.fellowship.model.Fellowship;
+import com.ninuna.losttales.fellowship.server.FellowshipNames;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
@@ -98,7 +102,6 @@ public final class FellowshipPage extends PageContent {
     private static final String LEAVE = "leave";
     private static final String DISBAND = "disband";
     private static final String NAME = "name";
-    private static final String NAME_FIELD = "name_field";
     /** The strip's switches: the switch's own id follows. */
     private static final String SWITCH = "switch:";
 
@@ -125,9 +128,6 @@ public final class FellowshipPage extends PageContent {
 
     /** What a row of the list is. */
     private enum Kind { HEADING, FELLOWSHIP, NOTE, MEMBER, INCOMING, OUTGOING }
-
-    /** What the name field is typed for. */
-    private enum Naming { NONE, CREATE, RENAME }
 
     private FontRenderer font;
     private int width = -1;
@@ -162,10 +162,8 @@ public final class FellowshipPage extends PageContent {
     private boolean inviteFocused;
     /** Which of the players the field offers is chosen. */
     private int offered;
-    /** The name field, which stands in the invite field's place while a name is typed. */
-    private GuiTextField nameField;
-    private Naming naming = Naming.NONE;
-    private boolean nameFocused;
+    /** Whether the arrows chose an offer since the name was last typed in. */
+    private boolean walkedOffers;
 
     /** One row of the list, as drawn and as hit. */
     private static final class Row {
@@ -364,9 +362,6 @@ public final class FellowshipPage extends PageContent {
         if (this.inviteField != null) {
             this.inviteField.updateCursorCounter();
         }
-        if (this.nameField != null) {
-            this.nameField.updateCursorCounter();
-        }
     }
 
     /** The page on screen asks for the state, so what it shows is fresh. */
@@ -421,7 +416,10 @@ public final class FellowshipPage extends PageContent {
             this.knownActiveIdentityId = active;
             this.pickedKind = null;
             this.scroll = 0;
-            stopNaming();
+            WindowScreen screen = WindowScreen.current();
+            if (screen != null) {
+                screen.stopNaming(tab().id());
+            }
             clearAnswer();
         }
         if (snapshot != null && this.pendingInvitation != null) {
@@ -767,12 +765,7 @@ public final class FellowshipPage extends PageContent {
         return false;
     }
 
-    /** Picks a row; one in another fellowship ends a rename. */
     private void pickRow(Row row) {
-        if (this.naming == Naming.RENAME && row.fellowshipId() != null
-                && !row.fellowshipId().equals(this.pickedFellowshipId)) {
-            stopNaming();
-        }
         pick(row.kind, row.fellowshipId(), row.id());
     }
 
@@ -839,10 +832,10 @@ public final class FellowshipPage extends PageContent {
 
     /* ---- The keys ---- */
 
-    /** While a field of the bar is typed in it keeps every key, the pages' keys among them. */
+    /** While the invite field is typed in it keeps every key, the pages' keys among them. */
     @Override
     public boolean holdsKeys() {
-        return this.inviteFocused || this.nameFocused;
+        return this.inviteFocused;
     }
 
     @Override
@@ -862,7 +855,6 @@ public final class FellowshipPage extends PageContent {
                         Keyboard.KEY_UP, PageKeys.OR, Keyboard.KEY_DOWN),
                 PageKeys.pageKey(PAGE_ID, "complete", Keyboard.KEY_TAB),
                 PageKeys.pageKey(PAGE_ID, "invite", Keyboard.KEY_RETURN),
-                PageKeys.pageKey(PAGE_ID, "name", Keyboard.KEY_RETURN),
                 PageKeys.pageKey(PAGE_ID, "leave_field", Keyboard.KEY_ESCAPE),
                 PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
     }
@@ -870,17 +862,14 @@ public final class FellowshipPage extends PageContent {
     /**
      * The invite field's keys while it is typed in: the arrows walk the
      * players it offers, Tab writes the chosen one's name, Return invites
-     * them, Escape leaves the field. The name field's: Return makes the
-     * fellowship or saves its name, Escape goes back to the invite field.
-     * Otherwise the arrows walk the list's rows.
+     * the character named in the field, or the one the arrows chose, or with
+     * nothing typed the first offered; Escape leaves the field. Otherwise
+     * the arrows walk the list's rows.
      */
     @Override
     public boolean keyTyped(char typedChar, int keyCode) {
         if (this.width < 0) {
             return false;
-        }
-        if (this.nameFocused && this.nameField != null) {
-            return typeInName(typedChar, keyCode);
         }
         if (this.inviteFocused && this.inviteField != null) {
             return typeInField(typedChar, keyCode);
@@ -903,6 +892,7 @@ public final class FellowshipPage extends PageContent {
                 int step = keyCode == Keyboard.KEY_UP ? -1 : 1;
                 this.offered = ((this.offered + step) % targets.size()
                         + targets.size()) % targets.size();
+                this.walkedOffers = true;
             }
             return true;
         }
@@ -918,8 +908,11 @@ public final class FellowshipPage extends PageContent {
         }
         if (keyCode == Keyboard.KEY_RETURN
                 || keyCode == Keyboard.KEY_NUMPADENTER) {
-            if (chosen != null) {
-                invite(chosen);
+            String typed = this.inviteField.getText().trim();
+            if (chosen != null && (this.walkedOffers || typed.length() == 0)) {
+                invite(chosen.getCharacterName());
+            } else if (typed.length() > 0) {
+                invite(typed);
             }
             return true;
         }
@@ -927,64 +920,98 @@ public final class FellowshipPage extends PageContent {
         this.inviteField.textboxKeyTyped(typedChar, keyCode);
         if (!before.equals(this.inviteField.getText())) {
             this.offered = 0;
+            this.walkedOffers = false;
         }
-        return true;
-    }
-
-    private boolean typeInName(char typedChar, int keyCode) {
-        if (keyCode == Keyboard.KEY_ESCAPE) {
-            stopNaming();
-            return true;
-        }
-        if (keyCode == Keyboard.KEY_RETURN
-                || keyCode == Keyboard.KEY_NUMPADENTER) {
-            saveName();
-            return true;
-        }
-        this.nameField.textboxKeyTyped(typedChar, keyCode);
         return true;
     }
 
     /**
-     * Sends the name typed: a new fellowship's, or the picked fellowship's
-     * as it stood when the leader typed it. Then back to the invite field.
+     * Names a fellowship in a naming window over the page: a new one, or
+     * ({@code renamed}) one the player leads, its name to start with. A
+     * second press of the same button puts the window away.
      */
-    private void saveName() {
+    private void openNaming(final UUID renamed, String name) {
+        WindowScreen screen = WindowScreen.current();
+        if (screen == null) {
+            return;
+        }
+        String key = tab().id();
+        String about = renamed == null ? CREATE : NAME;
+        if (screen.isNaming(key, about)) {
+            screen.stopNaming(key);
+            return;
+        }
+        NamingWindow naming = screen.naming(key).ask(
+                I18n.format(renamed == null ? "gui.losttales.fellowship.create"
+                        : "gui.losttales.fellowship.name"),
+                name, Fellowship.MAX_NAME_LENGTH, new NamingWindow.Rule() {
+                    @Override
+                    public String refusal(String typed) {
+                        return nameRefusal(renamed, typed);
+                    }
+                }, new NamingWindow.Keeper() {
+                    @Override
+                    public void keep(String typed) {
+                        keepName(renamed, typed);
+                    }
+                })
+                .prompt(I18n.format(renamed == null ? "gui.losttales.fellowship.create.hint"
+                        : "gui.losttales.fellowship.name.hint"))
+                .about(about);
+        screen.nameOverPage(tab(), key, naming);
+    }
+
+    /**
+     * Why the name may not be kept now: a request on its way, a fellowship
+     * the player may not make or no longer leads, or a name the server
+     * would refuse; empty when it may.
+     */
+    private String nameRefusal(UUID renamed, String name) {
+        FellowshipStateSnapshot snapshot = getSnapshot();
+        if (snapshot == null || isPending()) {
+            return I18n.format("gui.losttales.fellowship.working");
+        }
+        if (renamed == null) {
+            FellowshipErrorId refusal = snapshot.getCreateRefusal();
+            if (refusal != FellowshipErrorId.NONE) {
+                return ClientFellowshipDisplayNames.error(refusal);
+            }
+        } else {
+            FellowshipSnapshot fellowship = snapshot.getFellowship(renamed);
+            if (fellowship == null || !fellowship.isLeader(snapshot.getActiveIdentityId())) {
+                return ClientFellowshipDisplayNames.error(FellowshipErrorId.NOT_LEADER);
+            }
+        }
+        FellowshipErrorId error = FellowshipNames.nameError(name,
+                ChatProfanityCatalog.effective());
+        if (error == FellowshipErrorId.NONE) {
+            for (FellowshipSnapshot each : snapshot.getFellowships()) {
+                if (!each.getFellowshipId().equals(renamed)
+                        && each.getName().equalsIgnoreCase(name)) {
+                    error = FellowshipErrorId.NAME_IN_USE;
+                }
+            }
+        }
+        return error == FellowshipErrorId.NONE ? ""
+                : ClientFellowshipDisplayNames.error(error);
+    }
+
+    /** Asks for the fellowship to be made, or renamed as it stands now. */
+    private void keepName(UUID renamed, String name) {
         FellowshipStateSnapshot snapshot = getSnapshot();
         if (snapshot == null || this.pendingRequestId != 0) {
             return;
         }
-        String name = this.nameField.getText().trim();
-        if (this.naming == Naming.CREATE) {
+        if (renamed == null) {
             beginRequest(FellowshipClientRequestManager.createFellowship(
                     snapshot.getActiveIdentityId(), name), true);
-        } else {
-            FellowshipSnapshot fellowship = current(snapshot);
-            if (fellowship == null) {
-                return;
-            }
-            beginRequest(FellowshipClientRequestManager.renameFellowship(
-                    snapshot.getActiveIdentityId(), fellowship.getFellowshipId(),
-                    fellowship.getRevision(), name), true);
+            return;
         }
-        stopNaming();
-    }
-
-    /** The name field takes the invite field's place, filled with {@code name}. */
-    private void startNaming(Naming why, String name) {
-        releaseField();
-        this.naming = why;
-        this.nameFocused = true;
-        this.nameField.setText(name);
-        this.nameField.setFocused(true);
-        this.nameField.setCursorPositionEnd();
-    }
-
-    private void stopNaming() {
-        this.naming = Naming.NONE;
-        this.nameFocused = false;
-        if (this.nameField != null) {
-            this.nameField.setFocused(false);
+        FellowshipSnapshot fellowship = snapshot.getFellowship(renamed);
+        if (fellowship != null) {
+            beginRequest(FellowshipClientRequestManager.renameFellowship(
+                    snapshot.getActiveIdentityId(), renamed,
+                    fellowship.getRevision(), name), true);
         }
     }
 
@@ -1011,10 +1038,6 @@ public final class FellowshipPage extends PageContent {
         this.inviteFocused = false;
         if (this.inviteField != null) {
             this.inviteField.setFocused(false);
-        }
-        this.nameFocused = false;
-        if (this.nameField != null) {
-            this.nameField.setFocused(false);
         }
     }
 
@@ -1067,6 +1090,9 @@ public final class FellowshipPage extends PageContent {
                     glyphOf(fellowshipSwitch)).unavailable(why)
                     .inGroup("switches", "gui.losttales.fellowship.menu.switches"));
         }
+        // The invitations waiting, counted beside its button, a group of its
+        // own; never greyed, since they matter most outside any fellowship.
+        options.add(ChatInbox.option(ChatInbox.Kind.INVITATIONS).inGroup("inbox", ""));
         return options;
     }
 
@@ -1182,26 +1208,23 @@ public final class FellowshipPage extends PageContent {
         boolean manages = fellowship != null && fellowship.canManage(active);
         String busy = isPending() ? I18n.format("gui.losttales.fellowship.working")
                 : "";
-        if (this.naming == Naming.RENAME && !leader) {
-            stopNaming();
-        }
-        if (this.naming != Naming.NONE) {
-            items.add(nameItem());
-        } else if (fellowship != null) {
+        if (fellowship != null) {
             items.add(inviteItem(snapshot, fellowship, manages));
         }
+        WindowScreen screen = WindowScreen.current();
+        String key = tab().id();
         String create = I18n.format("gui.losttales.fellowship.create");
         FellowshipErrorId refusal = snapshot.getCreateRefusal();
         items.add(orBusy(BarItem.button(CREATE, create,
                 LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_ADD)
-                .tip(create).lit(this.naming == Naming.CREATE),
+                .tip(create).lit(screen != null && screen.isNaming(key, CREATE)),
                 refusal == FellowshipErrorId.NONE ? busy
                         : ClientFellowshipDisplayNames.error(refusal)));
         if (leader) {
             String name = I18n.format("gui.losttales.fellowship.name");
             items.add(orBusy(BarItem.button(NAME, name,
                     LostTalesUiSheet.DRAFT, LostTalesUiSheet.DRAFT_HOVER)
-                    .tip(name).lit(this.naming == Naming.RENAME), busy));
+                    .tip(name).lit(screen != null && screen.isNaming(key, NAME)), busy));
         }
         addPickedItems(items, snapshot, picked(rows(snapshot)), leader, manages, busy);
         if (fellowship == null) {
@@ -1219,8 +1242,7 @@ public final class FellowshipPage extends PageContent {
                 worn != null ? worn : new ItemStack(Items.item_frame))
                 .tip(icon), manages ? busy
                 : ClientFellowshipDisplayNames.error(FellowshipErrorId.NOT_LEADER_OR_GUIDE)));
-        String goHere = I18n.format(ClientFellowshipTrackingCache
-                .hasLocalGoHereMarker(snapshot)
+        String goHere = I18n.format(ClientFellowshipMarks.ownGoHere(snapshot) != null
                 ? "gui.losttales.fellowship.remove_go_here"
                 : "gui.losttales.fellowship.set_go_here");
         items.add(orBusy(BarItem.button(GO_HERE, goHere,
@@ -1288,10 +1310,11 @@ public final class FellowshipPage extends PageContent {
     }
 
     /**
-     * The invite field: its list offers who can be invited into the picked
-     * fellowship while it is typed in, narrowed by what is typed. Greyed,
-     * its hint saying why, for anyone but its leader and guides, and while
-     * it is full.
+     * The invite field: any character is invited by its name, played or
+     * not; while it is typed in its list offers the players online who can
+     * be invited into the picked fellowship, narrowed by what is typed.
+     * Greyed, its hint saying why, for anyone but its leader and guides, and
+     * while it is full.
      */
     private BarItem inviteItem(FellowshipStateSnapshot snapshot, FellowshipSnapshot fellowship,
                                boolean manages) {
@@ -1309,8 +1332,7 @@ public final class FellowshipPage extends PageContent {
                 : snapshot.isFull(fellowship) ? I18n.format(
                         "gui.losttales.fellowship.full",
                         Integer.valueOf(snapshot.getMemberLimit()))
-                : snapshot.getInviteTargets(fellowship).isEmpty()
-                        ? I18n.format("gui.losttales.fellowship.invite.nobody") : "";
+                : "";
         BarItem field = BarItem.field(INVITE, this.inviteField,
                 why.length() > 0 ? why
                         : I18n.format("gui.losttales.fellowship.invite.hint",
@@ -1324,29 +1346,15 @@ public final class FellowshipPage extends PageContent {
         }
         List<String> names = new ArrayList<String>();
         for (FellowshipInviteTargetSnapshot target : offeredTargets()) {
-            names.add(target.getCharacterName().equals(target.getPlayerName())
+            // The account stands after the name only where the server sent it.
+            names.add(target.getPlayerName().length() == 0
+                    || target.getCharacterName().equals(target.getPlayerName())
                     ? target.getCharacterName()
                     : target.getCharacterName() + " (" + target.getPlayerName()
                             + ")");
         }
         return field.offers(names, names.isEmpty() ? -1
                 : Math.min(this.offered, names.size() - 1));
-    }
-
-    /** The name field, made the first time a name is typed. */
-    private BarItem nameItem() {
-        if (this.nameField == null) {
-            WindowScreen screen = WindowScreen.current();
-            if (screen == null) {
-                return BarItem.words("");
-            }
-            this.nameField = screen.makeField();
-            this.nameField.setMaxStringLength(Fellowship.MAX_NAME_LENGTH);
-            this.nameField.setEnableBackgroundDrawing(false);
-        }
-        return BarItem.field(NAME_FIELD, this.nameField, I18n.format(
-                this.naming == Naming.CREATE ? "gui.losttales.fellowship.create.hint"
-                        : "gui.losttales.fellowship.name.hint"));
     }
 
     /** The players the field offers: those the picked fellowship may invite whose names hold what is typed. */
@@ -1381,7 +1389,7 @@ public final class FellowshipPage extends PageContent {
         if (INVITE.equals(id)) {
             List<FellowshipInviteTargetSnapshot> targets = offeredTargets();
             if (offer >= 0 && offer < targets.size()) {
-                invite(targets.get(offer));
+                invite(targets.get(offer).getCharacterName());
                 return;
             }
             // Who is online changes while nothing about the fellowship does.
@@ -1391,23 +1399,17 @@ public final class FellowshipPage extends PageContent {
             this.inviteFocused = true;
             this.inviteField.setFocused(true);
             this.offered = 0;
-            return;
-        }
-        if (NAME_FIELD.equals(id) && this.nameField != null) {
-            this.nameFocused = true;
-            this.nameField.setFocused(true);
+            this.walkedOffers = false;
             return;
         }
         FellowshipSnapshot fellowship = current(snapshot);
-        if (CREATE.equals(id) || NAME.equals(id)) {
-            Naming why = CREATE.equals(id) ? Naming.CREATE : Naming.RENAME;
-            if (this.naming == why) {
-                stopNaming();
-                return;
-            }
-            nameItem();
-            if (this.nameField != null && (why == Naming.CREATE || fellowship != null)) {
-                startNaming(why, why == Naming.CREATE ? "" : fellowship.getName());
+        if (CREATE.equals(id)) {
+            openNaming(null, "");
+            return;
+        }
+        if (NAME.equals(id)) {
+            if (fellowship != null) {
+                openNaming(fellowship.getFellowshipId(), fellowship.getName());
             }
             return;
         }
@@ -1439,7 +1441,7 @@ public final class FellowshipPage extends PageContent {
             beginRequest(FellowshipClientRequestManager.setIcon(
                     active, fellowshipId, revision), true);
         } else if (GO_HERE.equals(id)) {
-            beginRequest(ClientFellowshipTrackingCache.hasLocalGoHereMarker(snapshot)
+            beginRequest(ClientFellowshipMarks.ownGoHere(snapshot) != null
                     ? FellowshipClientRequestManager.removeGoHereMarker(active)
                     : FellowshipClientRequestManager.setGoHereMarker(active), true);
         } else if (LEAVE.equals(id) || DISBAND.equals(id)) {
@@ -1505,17 +1507,19 @@ public final class FellowshipPage extends PageContent {
                 });
     }
 
-    private void invite(FellowshipInviteTargetSnapshot target) {
+    /** Invites the character of that name into the picked fellowship; the server finds it. */
+    private void invite(String characterName) {
         FellowshipStateSnapshot snapshot = getSnapshot();
         FellowshipSnapshot fellowship = current(snapshot);
-        if (fellowship == null || target == null || this.pendingRequestId != 0) {
+        if (fellowship == null || characterName == null || this.pendingRequestId != 0) {
             return;
         }
         beginRequest(FellowshipClientRequestManager.invitePlayer(
                 snapshot.getActiveIdentityId(), fellowship.getFellowshipId(),
-                fellowship.getRevision(), target.getOwnerId()), true);
+                fellowship.getRevision(), characterName), true);
         this.inviteField.setText("");
         this.offered = 0;
+        this.walkedOffers = false;
     }
 
     /* ---- The snapshot ---- */
@@ -1555,6 +1559,10 @@ public final class FellowshipPage extends PageContent {
         long seconds = (remaining + 999L) / 1000L;
         long minutes = seconds / 60L;
         seconds %= 60L;
+        if (minutes >= 60L) {
+            return I18n.format("gui.losttales.fellowship.expires_hours",
+                    Long.valueOf(minutes / 60L), Long.valueOf(minutes % 60L));
+        }
         if (minutes > 0L) {
             return I18n.format("gui.losttales.fellowship.expires_minutes",
                     Long.valueOf(minutes), Long.valueOf(seconds));

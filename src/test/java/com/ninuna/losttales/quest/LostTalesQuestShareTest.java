@@ -5,7 +5,6 @@ import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.io.UnsupportedEncodingException;
 import java.util.Collections;
-import java.util.UUID;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -13,15 +12,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A quest card: who may join it and by which of the server's start
- * settings, and the words it carries always fitting the chat's bounds.
+ * A quest card: by which of the server's start settings it may be
+ * joined, and the words it carries always fitting the chat's bounds. Who
+ * may join it is the start gate's ({@link QuestStartRulesTest}).
  */
 public final class LostTalesQuestShareTest {
-    private static final UUID AUTHOR =
-            UUID.fromString("00000000-0000-0000-0000-00000000000a");
-    private static final UUID MEMBER =
-            UUID.fromString("00000000-0000-0000-0000-00000000000b");
-
     @Test
     public void aCardIsJoinedOnlyByAWayTheServerAllows() {
         LostTalesQuestDefinition item = quest(LostTalesQuestDefinition.START_MODE_ITEM);
@@ -38,19 +33,6 @@ public final class LostTalesQuestShareTest {
         assertFalse(any.canStartFromShare(false, false));
         assertFalse(locked.canStartFromShare(true, true));
         assertFalse(quest("script").canStartFromShare(true, true));
-    }
-
-    @Test
-    public void theAuthorNeverJoinsTheirOwnCard() {
-        assertFalse(LostTalesQuestManager.mayJoinShared(AUTHOR, AUTHOR, true));
-        assertTrue(LostTalesQuestManager.mayJoinShared(MEMBER, AUTHOR, true));
-    }
-
-    @Test
-    public void nobodyJoinsOnceTheAuthorNoLongerRunsTheQuest() {
-        assertFalse(LostTalesQuestManager.mayJoinShared(MEMBER, AUTHOR, false));
-        assertFalse(LostTalesQuestManager.mayJoinShared(MEMBER, null, true));
-        assertFalse(LostTalesQuestManager.mayJoinShared(null, AUTHOR, true));
     }
 
     @Test

@@ -613,7 +613,9 @@ public final class LostTalesDiscordBridge {
      * channel — for the Faction channel, of the sender's faction — that
      * posts; dropped where none does. Each post is the line as plain
      * text under the sender's name and picture, or the Narrator's name
-     * for a line the Narrator tells, an action among them; a Discord
+     * for a line the Narrator tells, an action among them; with Show
+     * Accounts off an in-character channel's posts wear the webhook's
+     * own picture ({@link DiscordAvatarUrl#shownIn}); a Discord
      * channel holds one game channel's lines, so nothing on the post need
      * say which.
      * {@code messageId} is the line's own name, kept so each post's
@@ -637,13 +639,14 @@ public final class LostTalesDiscordBridge {
         }
         long queuedAt = System.currentTimeMillis();
         List<ChatNamedPlayer> pings = pingsOf(named);
+        String picture = DiscordAvatarUrl.shownIn(channel, avatarUrl);
         List<Outbound> copies = new ArrayList<Outbound>();
         // Each id is looked up in the bindings of the worker it is
         // queued for, so it names the entry it was taken from.
         for (DiscordChannelBinding binding : running.bindings.forGame(channel, factionId)) {
             if (binding.sendsToDiscord()) {
                 copies.add(new Outbound(Outbound.Kind.POST, username,
-                        avatarUrl, message, messageId,
+                        picture, message, messageId,
                         reply == null ? ChatReplyReference.NONE : reply, null,
                         binding.id(), channel, factionId, senderId, queuedAt,
                         "", pings));
