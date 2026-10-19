@@ -82,25 +82,21 @@ public class LostTalesAddedWaypointMarkerTest {
     }
 
     /**
-     * The Lossoth used to be anchored by a Lost Tales waypoint of their own,
-     * which sat out in the Sundering Seas. Their control zone is LOTR's Cape
-     * of Forochel now, and nothing may put that waypoint back.
+     * The Lossoth hold LOTR's Cape of Forochel; Lost Tales adds neither a
+     * waypoint nor a fast-travel region of theirs (MOD-16).
      */
     @Test
-    public void lossothNoLongerHasAWaypointOfItsOwn() {
+    public void lossothHaveNoWaypointOrRegionOfTheirOwn() {
         LostTalesMapMarkerCatalog.reloadFromClasspath();
         ELostTalesWaypoint.values();
 
         assertNull(LostTalesMapMarkerCatalog.getMarker(
                 "lotr:waypoint:lossoth"));
-        assertNull("the Lossoth anchor waypoint must be gone",
+        assertNull("no Lossoth waypoint",
                 LOTRWaypoint.waypointForName("LOSSOTH"));
-        // Its fast-travel region stays registered: a character who unlocked it
-        // has the name saved, and the state adapter rejects a region it cannot
-        // resolve.
-        assertNotNull("the Lossoth region must survive for saved characters",
+        assertNull("no Lossoth region",
                 LOTRWaypoint.regionForName("LOSSOTH"));
-        assertNotNull("Cape of Forochel must exist to anchor them instead",
+        assertNotNull("Cape of Forochel anchors them",
                 LOTRWaypoint.CAPE_OF_FOROCHEL);
     }
 

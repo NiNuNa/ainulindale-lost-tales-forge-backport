@@ -21,9 +21,9 @@ import software.bernie.geckolib3.core.event.predicate.AnimationEvent;
 import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
 /**
- * Urn/amphora tile entity with the modern urn storage behavior backported onto it.
- * The common proxy still registers this class with the original legacy tile entity
- * id ("pot") so existing 1.7.10 worlds do not need a tile-entity migration.
+ * A vessel's contents: the amphora's, the urn's and the loutrophoros's. It
+ * holds items one at a time, can be sealed, and plays its fill and full
+ * animations on both sides.
  */
 public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IAnimatable {
     private static final int CLIENT_EVENT_FILL = 0;
@@ -32,7 +32,6 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
     private final AnimationFactory factory = new AnimationFactory(this);
     private ItemStack[] inventory = new ItemStack[2];
     private boolean sealed;
-    private boolean respawn;
     private float rotation;
     private boolean hasStoredRotation;
     private int desiredSlots = 2;
@@ -126,15 +125,6 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
 
     public boolean isSealed() {
         return this.sealed;
-    }
-
-    public void setRespawn(boolean respawn) {
-        this.respawn = respawn;
-        this.markDirtyAndSync();
-    }
-
-    public boolean isRespawn() {
-        return this.respawn;
     }
 
     public void setRotation(float rotation) {
@@ -241,7 +231,6 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
     public void readFromNBT(NBTTagCompound nbt) {
         super.readFromNBT(nbt);
         this.sealed = nbt.getBoolean("sealed");
-        this.respawn = nbt.getBoolean("respawn");
         this.hasStoredRotation = nbt.hasKey("rotation");
         this.rotation = this.hasStoredRotation ? LostTalesBlockRotationHelper.normalizeDegrees(nbt.getFloat("rotation")) : 0.0F;
         this.desiredSlots = nbt.hasKey("slots") ? nbt.getInteger("slots") : this.desiredSlots;
@@ -264,7 +253,6 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
     public void writeToNBT(NBTTagCompound nbt) {
         super.writeToNBT(nbt);
         nbt.setBoolean("sealed", this.sealed);
-        nbt.setBoolean("respawn", this.respawn);
         if (this.hasStoredRotation) {
             nbt.setFloat("rotation", this.rotation);
         }

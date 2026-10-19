@@ -76,7 +76,8 @@ public final class View {
     /**
      * The key that opens it, its binding's: a custom view's by its number,
      * a category's view's by its category (none for the settings, whose
-     * key is Ctrl+,); 0 for none.
+     * key is pressed with Ctrl: {@link LostTalesKeyBindings#getSettingsKeyBinding});
+     * 0 for none.
      */
     public int key() {
         KeyBinding binding = isCustom()

@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -21,9 +22,17 @@ import java.util.List;
 public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 2 * 1024 * 1024;
     private static final int MAX_MARKERS = 4096;
-    private static final int MAX_ID_BYTES = 256;
-    private static final int MAX_NAME_BYTES = 1024;
-    private static final int MAX_TEXT_BYTES = 8192;
+    /**
+     * Every text field holds whatever the marker store takes, at three
+     * bytes for each UTF-16 unit, so no stored marker fails to write.
+     */
+    private static final int BYTES_PER_UNIT = 3;
+    private static final int MAX_ID_BYTES =
+            BYTES_PER_UNIT * LostTalesMapMarkerRecord.MAX_ID_LENGTH;
+    private static final int MAX_NAME_BYTES =
+            BYTES_PER_UNIT * LostTalesMapMarkerRecord.MAX_NAME_LENGTH;
+    private static final int MAX_TEXT_BYTES =
+            BYTES_PER_UNIT * LostTalesMapMarkerRecord.MAX_TEXT_LENGTH;
 
     private final List<LostTalesMapMarkerDefinition> markers =
             new ArrayList<LostTalesMapMarkerDefinition>();
@@ -59,8 +68,8 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
                 String id = readId(buffer);
                 String name = readName(buffer);
                 String namedAfter = readNamedAfter(buffer);
-                String icon = readId(buffer);
-                String color = readId(buffer);
+                String icon = readName(buffer);
+                String color = readName(buffer);
                 String category = readName(buffer);
                 String description = readText(buffer);
                 boolean fastTravel = buffer.readBoolean();
@@ -117,8 +126,8 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer,
                     marker.getNamedAfter(),
                     LostTalesMapMarkerNamedAfter.MAX_LENGTH);
-            writeId(buffer, marker.getIconName());
-            writeId(buffer, marker.getColorName());
+            writeName(buffer, marker.getIconName());
+            writeName(buffer, marker.getColorName());
             writeName(buffer, marker.getCategoryName());
             writeText(buffer, marker.getDescription());
             buffer.writeBoolean(marker.hasFastTravel());

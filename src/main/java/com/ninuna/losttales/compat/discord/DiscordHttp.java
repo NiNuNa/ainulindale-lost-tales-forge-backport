@@ -234,6 +234,41 @@ public final class DiscordHttp {
                 + "/reactions/" + segment + "/@me";
     }
 
+    /**
+     * Reads the members who reacted to a message with one emoji, the
+     * first {@link DiscordJson#MAX_REACTORS_READ}: its ordinary reactions,
+     * or its super reactions when {@code burst} is set, which Discord
+     * lists apart. {@code pathForm} is the emoji as
+     * {@link DiscordJson.ReactionCount#pathForm} gives it.
+     */
+    static Reply getReactors(String botToken, String channelId, String messageId,
+                             String pathForm, boolean burst) throws IOException {
+        HttpURLConnection connection = open(reactorsUrl(channelId, messageId,
+                pathForm, burst), "GET");
+        connection.setRequestProperty("Authorization", "Bot " + botToken);
+        return exchange(connection, null);
+    }
+
+    /**
+     * Where the members behind one emoji are read. A custom emoji goes as
+     * its {@code name:id}, letters, digits and underscores before the
+     * colon and digits after it, which is safe in a path as it stands; a
+     * Unicode emoji is percent-encoded.
+     */
+    static String reactorsUrl(String channelId, String messageId, String pathForm,
+                              boolean burst) throws IOException {
+        if (!DiscordChannelBindings.isSnowflake(channelId)
+                || !DiscordChannelBindings.isSnowflake(messageId)
+                || pathForm == null || pathForm.length() == 0) {
+            throw new IOException("not a reaction Discord can be asked about");
+        }
+        String segment = DiscordJson.isCustomPathForm(pathForm) ? pathForm
+                : URLEncoder.encode(pathForm, "UTF-8");
+        return API_BASE + "/channels/" + channelId + "/messages/" + messageId
+                + "/reactions/" + segment + "?limit=" + DiscordJson.MAX_REACTORS_READ
+                + "&type=" + (burst ? 1 : 0);
+    }
+
     /** One message of the webhook, any query on the base URL set aside. */
     private static String webhookMessageUrl(String webhookUrl,
                                             String messageId) {

@@ -29,6 +29,12 @@ public final class ChatSpeechGateTest {
     }
 
     @Test
+    public void theGamesEmoteIsKnownByItsName() {
+        assertTrue(ChatSpeechGate.isEmote(command("me")));
+        assertFalse(ChatSpeechGate.isEmote(command("say")));
+    }
+
+    @Test
     public void aCommandSpeaksByItsNameOrAnAlias() {
         assertTrue(ChatSpeechGate.speaks(command("tell")));
         assertTrue(ChatSpeechGate.speaks(command("whisper", "w")));

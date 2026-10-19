@@ -9,6 +9,11 @@ import java.util.UUID;
 public final class FellowshipMember {
 
     public static final int CURRENT_DATA_VERSION = 1;
+    /**
+     * The owner of a released lore figure, which nobody holds: it keeps
+     * its places for its next holder (CHAR-36). No account has this id.
+     */
+    public static final UUID UNHELD = new UUID(0L, 0L);
 
     private final UUID identityId;
     private final UUID ownerId;
@@ -52,6 +57,11 @@ public final class FellowshipMember {
 
     public FellowshipColor getColor() {
         return this.color;
+    }
+
+    /** Whether the member is a released lore figure nobody holds now. */
+    public boolean isUnheld() {
+        return UNHELD.equals(this.ownerId);
     }
 
     public FellowshipMember withColor(FellowshipColor newColor) {

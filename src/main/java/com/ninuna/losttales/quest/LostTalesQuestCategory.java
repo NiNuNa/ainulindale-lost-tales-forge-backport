@@ -19,6 +19,8 @@ public final class LostTalesQuestCategory {
     public static final String MAIN_STORY = "main_story";
     public static final String WORLD = "world";
     public static final String MISC = "misc";
+    /** The leads heard for quests not taken (QUEST-20); never a quest's own category. */
+    public static final String RUMOURS = "rumours";
 
     /** Where the lang keys of the categories' names start. */
     public static final String KEY_PREFIX = "gui.losttales.quest.category.";

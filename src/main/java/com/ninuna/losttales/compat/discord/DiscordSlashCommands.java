@@ -8,7 +8,6 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.chat.server.ChatPresenceService;
 import com.ninuna.losttales.chat.server.ChatServerStatus;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.util.LostTalesWords;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -35,10 +34,7 @@ import java.util.Map;
  * be checked without a server. A reply is ephemeral, so the channel
  * stays clean. They are answered only in a Discord channel linked to the
  * game: a Discord server that merely has the bot in it learns nothing of
- * who plays. A Discord reader holds no capability, so with the server's
- * Show Accounts off the answers name characters alone: {@code /online}
- * counts who is still making a character rather than naming them, and
- * {@code /who} finds a character by its name and never says whose it is.
+ * who plays.
  */
 public final class DiscordSlashCommands {
 
@@ -219,11 +215,11 @@ public final class DiscordSlashCommands {
                 : onlinePlayers(words, server);
         String name = command == null ? "" : command.toLowerCase(Locale.ROOT);
         if (ONLINE.equals(name)) {
-            return online(words, players, LostTalesConfig.showAccounts);
+            return online(words, players);
         }
         if (WHO.equals(name)) {
             String wanted = options == null ? null : options.get("name");
-            return who(words, players, wanted, LostTalesConfig.showAccounts);
+            return who(words, players, wanted);
         }
         if (SERVER.equals(name)) {
             return serverStatus(ChatServerStatus.parts());
@@ -231,72 +227,45 @@ public final class DiscordSlashCommands {
         return "";
     }
 
-    /**
-     * {@code **3 online:** Steve (as Aragorn), Alex, Bob (as Boromir)};
-     * without accounts shown, {@code **3 online:** Aragorn, Boromir,
-     * 1 still making their first character}.
-     */
-    public static String online(LostTalesWords words, List<Player> players,
-                                boolean showAccounts) {
+    /** {@code **3 online:** Steve (as Aragorn), Alex, Bob (as Boromir)} */
+    public static String online(LostTalesWords words, List<Player> players) {
         if (players.isEmpty()) {
             return words.format("chat.losttales.discord.online.nobody");
         }
-        final boolean byAccount = showAccounts;
         List<Player> sorted = new ArrayList<Player>(players);
         Collections.sort(sorted, new Comparator<Player>() {
             @Override
             public int compare(Player left, Player right) {
-                return byAccount ? left.account.compareToIgnoreCase(right.account)
-                        : left.character.compareToIgnoreCase(right.character);
+                return left.account.compareToIgnoreCase(right.account);
             }
         });
         StringBuilder list = new StringBuilder();
-        int making = 0;
-        for (Player player : sorted) {
-            String entry;
-            if (byAccount) {
-                entry = player.character.length() > 0
-                        ? words.format("chat.losttales.discord.online.playing_as",
-                                escape(player.account), escape(player.character))
-                        : escape(player.account);
-            } else if (player.character.length() > 0) {
-                entry = escape(player.character);
-            } else {
-                making++;
-                continue;
-            }
-            if (list.length() > 0) {
+        for (int index = 0; index < sorted.size(); index++) {
+            if (index > 0) {
                 list.append(", ");
             }
-            list.append(entry);
-        }
-        if (making > 0) {
-            if (list.length() > 0) {
-                list.append(", ");
-            }
-            list.append(words.format("chat.losttales.discord.online.making",
-                    Integer.valueOf(making)));
+            Player player = sorted.get(index);
+            list.append(player.character.length() > 0
+                    ? words.format("chat.losttales.discord.online.playing_as",
+                            escape(player.account), escape(player.character))
+                    : escape(player.account));
         }
         return bound(words.format("chat.losttales.discord.online.list",
                 Integer.valueOf(sorted.size()), list.toString()));
     }
 
-    /**
-     * The one player or character named, or that nobody online is.
-     * Without accounts shown only a character's name finds anyone, and
-     * the answer does not say whose character it is.
-     */
+    /** The one player or character named, or that nobody online is. */
     public static String who(LostTalesWords words, List<Player> players,
-                             String wanted, boolean showAccounts) {
+                             String wanted) {
         String query = wanted == null ? "" : wanted.trim();
         if (query.length() == 0) {
             return words.format("chat.losttales.discord.who.ask");
         }
         for (Player player : players) {
-            if ((showAccounts && query.equalsIgnoreCase(player.account))
+            if (query.equalsIgnoreCase(player.account)
                     || (player.character.length() > 0
                             && query.equalsIgnoreCase(player.character))) {
-                return describe(words, player, showAccounts);
+                return describe(words, player);
             }
         }
         // The name is the asker's own words, as long as Discord lets an
@@ -305,8 +274,7 @@ public final class DiscordSlashCommands {
                 escape(query)));
     }
 
-    private static String describe(LostTalesWords words, Player player,
-                                   boolean showAccounts) {
+    private static String describe(LostTalesWords words, Player player) {
         if (player.character.length() == 0) {
             return bound(words.format("chat.losttales.discord.who.account",
                     escape(player.account)));
@@ -321,13 +289,6 @@ public final class DiscordSlashCommands {
             }
             details.append(words.format("chat.losttales.discord.who.faction",
                     escape(player.faction)));
-        }
-        if (!showAccounts) {
-            return bound(details.length() == 0
-                    ? words.format("chat.losttales.discord.who.played",
-                            escape(player.character))
-                    : words.format("chat.losttales.discord.who.played_details",
-                            escape(player.character), details.toString()));
         }
         return bound(details.length() == 0
                 ? words.format("chat.losttales.discord.who.character",
@@ -383,9 +344,9 @@ public final class DiscordSlashCommands {
     }
 
     /**
-     * A race by the name the game gives it: {@code losttales:half_troll}
-     * reads as {@code Half-troll}. One the lang file does not name reads
-     * as its id, {@code Half troll}.
+     * A race by the name the game gives it: {@code losttales:uruk} reads
+     * as {@code Uruk}. One the lang file does not name reads as its id,
+     * {@code losttales:black_uruk} as {@code Black uruk}.
      */
     static String raceName(LostTalesWords words, String raceId) {
         String path = raceId == null ? ""

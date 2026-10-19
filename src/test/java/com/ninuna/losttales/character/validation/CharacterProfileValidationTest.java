@@ -135,6 +135,38 @@ public final class CharacterProfileValidationTest {
                         .normalizeProfile(history(padded)), 20).isValid());
     }
 
+    /**
+     * The invisible marks that turn text around or take no room are
+     * dropped as the profile is stored, as the chat drops them, and a
+     * profile still holding one is refused.
+     */
+    @Test
+    public void invisibleMarksAreDroppedAndRefused() {
+        String[] marks = {"‮", "‪", "⁦", "⁩", "​",
+                "‌", "‍", "‎", "‏", "⁠", "﻿",
+                "؜"};
+        for (String mark : marks) {
+            String typed = "Ar" + mark + "agorn";
+            CharacterProfile stored = CharacterValidator.normalizeProfile(
+                    history(typed + "\n\nof" + mark + " Gondor")
+                            .withFact(CharacterProfile.Fact.EYES, mark + "Grey")
+                            .withGlances(Collections.singletonList(
+                                    new CharacterProfile.Glance("smiley",
+                                            "Pi" + mark + "pe", mark))));
+            assertEquals("Aragorn\n\nof Gondor",
+                    stored.section(CharacterProfile.Section.HISTORY));
+            assertEquals("Grey", stored.fact(CharacterProfile.Fact.EYES));
+            assertEquals("Pipe", stored.glances().get(0).getTitle());
+            assertEquals("", stored.glances().get(0).getLine());
+            assertEquals(CharacterErrorId.NONE, error(stored));
+            assertEquals(CharacterErrorId.INVALID_PROFILE_TEXT,
+                    error(history(typed)));
+            assertEquals(CharacterErrorId.INVALID_PROFILE_TEXT,
+                    error(CharacterProfile.EMPTY.withFact(
+                            CharacterProfile.Fact.EYES, typed)));
+        }
+    }
+
     private static CharacterErrorId error(CharacterProfile profile) {
         return CharacterValidator.validateProfile(profile, 20).getErrorId();
     }

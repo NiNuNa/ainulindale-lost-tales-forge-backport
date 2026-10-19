@@ -83,7 +83,7 @@ public final class ChatMessageValidator {
      * overrides and isolates, U+202A-U+202E and U+2066-U+2069): it could
      * make a line read as something other than what was typed.
      */
-    static boolean isDirectionMark(char character) {
+    public static boolean isDirectionMark(char character) {
         return character >= '\u202a' && character <= '\u202e'
                 || character >= '\u2066' && character <= '\u2069';
     }

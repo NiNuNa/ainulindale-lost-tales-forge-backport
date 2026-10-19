@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipRecord;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
@@ -29,9 +30,9 @@ import java.util.UUID;
  * settled as it joins the world. A unit whose character was deleted stays
  * parked, and comes back with the character if it is restored; once the
  * character is purged for good, the unit leaves its owner's service. One
- * whose lore character was released stays parked until its owner claims
- * that figure again. Every pass is best effort and never fails the switch
- * that asked for it.
+ * whose lore character was released stays parked until somebody claims
+ * that figure, and then serves its new holder (CHAR-30). Every pass is best
+ * effort and never fails the switch that asked for it.
  */
 public final class LotrHiredUnitCustody {
 
@@ -67,10 +68,15 @@ public final class LotrHiredUnitCustody {
             }
             LotrHiredUnitTag tag = LotrHiredUnitTag.read(unit);
             UUID hiring = LotrHiredUnitInfoAccess.hiringUuid(unit.hiredNPCInfo);
-            EntityPlayerMP owner = LostTalesServerPlayers.findOnline(
-                    tag == null ? hiring : tag.getOwnerId());
+            EntityPlayerMP owner = LostTalesServerPlayers.findOnline(tag == null ? hiring
+                    : LotrHiredUnitCustodyRule.answersTo(tag.getOwnerId(),
+                            figureHolder(unit.worldObj, tag.getCharacterId())));
             if (owner == null) {
                 return;
+            }
+            if (tag != null && !owner.getUniqueID().equals(tag.getOwnerId())) {
+                tag = new LotrHiredUnitTag(owner.getUniqueID(), tag.getCharacterId());
+                tag.write(unit);
             }
             PlayableIdentityResolver.Resolution resolution =
                     PlayableIdentityResolver.resolve(owner);
@@ -127,7 +133,13 @@ public final class LotrHiredUnitCustody {
                         tag = LotrHiredUnitTag.of(claim);
                         tag.write(unit);
                     } else if (!ownerId.equals(tag.getOwnerId())) {
-                        continue;
+                        // A released figure's unit serves whoever holds
+                        // the figure now (CHAR-30).
+                        if (!ownerId.equals(figureHolder(world, tag.getCharacterId()))) {
+                            continue;
+                        }
+                        tag = new LotrHiredUnitTag(ownerId, tag.getCharacterId());
+                        tag.write(unit);
                     }
                     settleUnit(unit, tag, ownerId, activeKey, roster);
                 }
@@ -173,6 +185,24 @@ public final class LotrHiredUnitCustody {
                             .getRecordByCharacterId(characterId) == null;
         } catch (RuntimeException unreadable) {
             return false;
+        }
+    }
+
+    /**
+     * The account holding the lore figure {@code characterId} now; null
+     * for a figure nobody holds, a character that is no figure, and a
+     * store that cannot say.
+     */
+    private static UUID figureHolder(World world, UUID characterId) {
+        if (world == null || characterId == null) {
+            return null;
+        }
+        try {
+            LoreCharacterOwnershipRecord record = LoreCharacterOwnershipStorage.get(world)
+                    .getRecordByCharacterId(characterId);
+            return record == null || !record.isClaimed() ? null : record.getOwnerId();
+        } catch (RuntimeException unreadable) {
+            return null;
         }
     }
 

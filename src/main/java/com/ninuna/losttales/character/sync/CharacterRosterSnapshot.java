@@ -26,6 +26,12 @@ public final class CharacterRosterSnapshot {
     private final Map<UUID, CharacterSummary> charactersById;
     private final Map<Integer, CharacterSummary> charactersBySlot;
     private final List<DeletedCharacterSummary> deleted;
+    /**
+     * Whether the server cannot read the characters right now (CHAR-01):
+     * the snapshot is empty, and the player waits in the creator as a ghost
+     * until the store reads again.
+     */
+    private final boolean storeUnreadable;
 
     /**
      * {@code deleted} are the owner's deleted characters the server still
@@ -36,6 +42,26 @@ public final class CharacterRosterSnapshot {
                                    UUID activeCharacterId, long revision,
                                    List<CharacterSummary> characters,
                                    List<DeletedCharacterSummary> deleted) {
+        this(ownerId, unlockedSlotCount, activeCharacterId, revision, characters,
+                deleted, false);
+    }
+
+    /**
+     * The snapshot of a player whose characters the server cannot read now:
+     * nothing in it, so they wait in the creator, told why.
+     */
+    public static CharacterRosterSnapshot unreadable(UUID ownerId) {
+        return new CharacterRosterSnapshot(ownerId,
+                CharacterRoster.INITIAL_UNLOCKED_SLOTS, null, 0L,
+                Collections.<CharacterSummary>emptyList(),
+                Collections.<DeletedCharacterSummary>emptyList(), true);
+    }
+
+    private CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
+                                    UUID activeCharacterId, long revision,
+                                    List<CharacterSummary> characters,
+                                    List<DeletedCharacterSummary> deleted,
+                                    boolean storeUnreadable) {
         if (ownerId == null) {
             throw new IllegalArgumentException("ownerId must not be null");
         }
@@ -81,6 +107,20 @@ public final class CharacterRosterSnapshot {
             }
         }
         this.deleted = Collections.unmodifiableList(kept);
+        this.storeUnreadable = storeUnreadable && accepted.isEmpty();
+    }
+
+    /** Whether the server cannot read the characters right now: an empty snapshot, the player held. */
+    public boolean isStoreUnreadable() {
+        return this.storeUnreadable;
+    }
+
+    /** The same snapshot, said to be of a store the server cannot read; only an empty one may be. */
+    public CharacterRosterSnapshot withStoreUnreadable(boolean unreadable) {
+        return unreadable == this.storeUnreadable ? this
+                : new CharacterRosterSnapshot(this.ownerId, this.unlockedSlotCount,
+                        this.activeCharacterId, this.revision, this.characters,
+                        this.deleted, unreadable);
     }
 
     public static CharacterRosterSnapshot fromRoster(CharacterRoster roster,

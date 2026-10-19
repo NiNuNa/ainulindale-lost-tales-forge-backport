@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityFilter;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
@@ -59,9 +60,15 @@ public final class ClientChatProfanity {
         return ChatProfanityFilter.filter(text, mode(), words());
     }
 
-    /** A message as typed, its tokens, emojis and links left alone. */
+    /** A message as typed, its tokens, emojis and links left alone; an {@code @} reaching nobody is filtered. */
     public static String filterMessage(String message) {
         return ChatProfanityFilter.filterMessage(message, mode(), words());
+    }
+
+    /** As above, its mentions of {@code named} left alone. */
+    public static String filterMessage(String message,
+                                       List<ChatNamedPlayer> named) {
+        return ChatProfanityFilter.filterMessage(message, mode(), words(), named);
     }
 
     /** The mode the client chose; off for a value that names none. */

@@ -32,7 +32,15 @@ public enum MissiveBoardStateReason {
     /** The quest's requirements are not met; the quest's own line said which. */
     REQUIREMENTS(14, "gui.losttales.missive_board.said.requirements", false),
     /** Any other reason the quest would not start; the quest's own line says which. */
-    NOT_NOW(15, "chat.losttales.missive.not_now", true);
+    NOT_NOW(15, "chat.losttales.missive.not_now", true),
+    /** The notice's time on a board is past, so its letter starts nothing. */
+    EXPIRED(16, "chat.losttales.missive.expired", true),
+    /** Somebody took this missive already; a copy of its letter starts nothing (QUEST-34). */
+    TAKEN_BEFORE(17, "chat.losttales.missive.taken_before", true),
+    /** The player's finished missives were handed in at the board (QUEST-31). */
+    HANDED_IN(18, "gui.losttales.missive_board.said.handed_in", false),
+    /** None of the player's missives waits for a board. */
+    NOTHING_TO_HAND_IN(19, "chat.losttales.missive.nothing_to_hand_in", true);
 
     private final int networkId;
     private final String messageKey;
@@ -67,7 +75,7 @@ public enum MissiveBoardStateReason {
     /** Whether the request it answers was turned down. */
     public boolean isRefusal() {
         return isAnswer() && this != ACCEPTED && this != TAKEN
-                && this != PINNED;
+                && this != PINNED && this != HANDED_IN;
     }
 
     /** The reason with this id; null for an id no reason has. */

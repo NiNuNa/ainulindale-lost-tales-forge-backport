@@ -403,7 +403,12 @@ public final class LoreCharacterTransferCoordinator {
                 // when they choose to, like any other character.
                 roster.incrementRevision();
                 stores.characters.saveRoster(roster);
+                existing = character;
             }
+            // The figure's places in fellowships are the holder's now
+            // (CHAR-36); a store that cannot take them leaves them for the
+            // check as the world next loads.
+            FellowshipService.getInstance().takeUpFigure(world, existing);
             LoreCharacterTransferStorage.flush(world);
             transaction = stores.transfers.advance(
                     transaction.getLoreCharacterId(),
@@ -431,8 +436,9 @@ public final class LoreCharacterTransferCoordinator {
                         roster.getActiveCharacterId())) {
                     return CharacterErrorId.LORE_CHARACTER_ACTIVE;
                 }
+                // The figure keeps its places for its next holder (CHAR-36).
                 FellowshipOperationResult cleanup = FellowshipService.getInstance()
-                        .removeCharacterForDeletion(world, character);
+                        .releaseFigure(world, character);
                 if (!cleanup.isSuccessful()) {
                     return CharacterErrorId.FELLOWSHIP_CLEANUP_FAILED;
                 }
@@ -546,7 +552,6 @@ public final class LoreCharacterTransferCoordinator {
         if (CharacterRaceRegistry.DWARF.equals(race)) return "durinsfolk";
         if (CharacterRaceRegistry.ORC.equals(race)
                 || CharacterRaceRegistry.URUK.equals(race)) return "mordor";
-        if (CharacterRaceRegistry.HALF_TROLL.equals(race)) return "halftroll";
         return "bree";
     }
 

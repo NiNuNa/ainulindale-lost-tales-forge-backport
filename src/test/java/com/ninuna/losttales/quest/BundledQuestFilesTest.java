@@ -57,6 +57,23 @@ public final class BundledQuestFilesTest {
         assertTrue(read.problems.get(1), read.problems.get(1).contains("broken.json"));
     }
 
+    /** A bundled file is held to every rule a server's is: one warning leaves it out (QUEST-04). */
+    @Test
+    public void aBundledFileWithAWarningIsLeftOut() {
+        Map<String, String> files = new LinkedHashMap<String, String>();
+        files.put(BundledQuestFiles.INDEX_FILE,
+                "{\"quests\":[\"quests/odd.json\",\"quests/good.json\"]}");
+        files.put("quests/odd.json", String.format(QUEST, "losttales:odd", "Odd")
+                .replace("\"stages\"", "\"repeatible\":true,\"stages\""));
+        files.put("quests/good.json", String.format(QUEST, "losttales:good", "Good"));
+        BundledQuestFiles.Result read = BundledQuestFiles.read(files(files));
+        assertEquals(1, read.quests.size());
+        assertEquals("losttales:good", read.quests.get(0).getId());
+        assertEquals(1, read.problems.size());
+        assertTrue(read.problems.get(0), read.problems.get(0).startsWith(
+                "quests/odd.json: ") && read.problems.get(0).contains("'repeatible'"));
+    }
+
     @Test
     public void aRepeatedIdIsRefusedAndTheFirstKept() {
         Map<String, String> files = new LinkedHashMap<String, String>();

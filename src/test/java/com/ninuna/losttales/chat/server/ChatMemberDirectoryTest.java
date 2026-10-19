@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import java.util.ArrayList;
@@ -25,7 +26,8 @@ import static org.junit.Assert.assertTrue;
  * the ungrouped after every group — then by name; the absent at the end,
  * leaving out whoever is here, until the answer's bound, past which they
  * are counted. And who a whisper is with: the character named by id,
- * else by name, else the account.
+ * else by name, else the account, which a viewer not shown accounts is
+ * never told in a character's place.
  */
 public final class ChatMemberDirectoryTest {
 
@@ -126,6 +128,22 @@ public final class ChatMemberDirectoryTest {
         assertNull("a name the roster does not hold",
                 ChatMemberDirectory.identityIn(roster, null, "Aragorn", "Steve"));
         assertNull(ChatMemberDirectory.identityIn(null, null, "Beren", "Steve"));
+    }
+
+    @Test
+    public void aWhisperPartnerNotMetLatelyStandsAsItsAccount() {
+        UUID owner = UUID.randomUUID();
+        RoleplayCharacter beren = character(owner, 0, "Beren");
+        ChatMemberDirectory.Absentee shown = ChatMemberDirectory.whisperPartner(
+                ChatChannel.WHISPER, owner, "Steve", beren, false);
+        assertEquals("Steve", shown.member.getName());
+        assertNull(shown.member.getCharacterId());
+        ChatMemberDirectory.Absentee met = ChatMemberDirectory.whisperPartner(
+                ChatChannel.WHISPER, owner, "Steve", beren, true);
+        assertEquals(beren.getCharacterId(), met.member.getCharacterId());
+        assertEquals("a conversation with the account names the account it was opened with",
+                "Steve", ChatMemberDirectory.whisperPartner(ChatChannel.WHISPER, owner,
+                        "Steve", null, true).member.getName());
     }
 
     private static RoleplayCharacter character(UUID owner, int slot, String name) {

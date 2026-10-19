@@ -29,6 +29,19 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.StatCollector;
 import com.ninuna.losttales.quest.LostTalesQuestRewardText;
+import com.ninuna.losttales.quest.LostTalesQuestItemSpec;
+import com.ninuna.losttales.quest.LostTalesQuestRules;
+import com.ninuna.losttales.quest.QuestChatAnswer;
+import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesQuestActionPacket;
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.event.ClickEvent;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
+import com.ninuna.losttales.quest.LostTalesQuestRewards;
 
 /**
  * Where a quest conversation is opened from.
@@ -94,7 +107,12 @@ public final class LostTalesQuestDialogueHooks {
                     }
 
                     @Override
-                    public void handOver() {
+                    public void handOver(int choice) {
+                        close(npc, false);
+                    }
+
+                    @Override
+                    public void choose(int choice) {
                         close(npc, false);
                     }
 
@@ -179,8 +197,9 @@ public final class LostTalesQuestDialogueHooks {
     /**
      * Touching a person with the conversation screen switched off: their
      * words go to the chat, and a ready hand-in is given over at once, as
-     * the screen's first answer would. A progress line is only said.
-     * Answers whether the person had anything to say.
+     * the screen's first answer would, or, where the quest offers a pick,
+     * the line ends on its items to click (QUEST-37). A progress line is
+     * only said. Answers whether the person had anything to say.
      */
     public static boolean answerWithoutScreen(Entity target) {
         if (target == null || LostTalesQuestDialogueGui.isEnabled()) {
@@ -197,9 +216,10 @@ public final class LostTalesQuestDialogueHooks {
     /**
      * A giver's offer, sent by the server as the player touched them: the
      * conversation opens on it, or with the conversation screen switched
-     * off the giver's line goes to the chat and the offer is taken at
-     * once. An offer whose speaker or quest this client cannot find, or
-     * one that comes while another screen is open, is let go.
+     * off the giver's line goes to the chat with *Accept* and *Decline*
+     * to click (QUEST-37). An offer whose speaker or quest this client
+     * cannot find, or one that comes while another screen is open, is let
+     * go.
      */
     public static void offerFrom(int entityId, String questId) {
         Minecraft minecraft = Minecraft.getMinecraft();
@@ -233,19 +253,114 @@ public final class LostTalesQuestDialogueHooks {
     }
 
     /**
-     * An exchange without the screen: the words go to the chat, an offer
-     * is taken and a ready hand-in given over.
+     * Somebody told the player a rumour, as the server sent it (QUEST-20):
+     * their words go to the chat in their own voice, a banner says a lead
+     * was heard, and the journal keeps it under Rumours.
+     */
+    public static void rumourFrom(int entityId, String questId) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.theWorld == null) {
+            return;
+        }
+        Entity speaker = minecraft.theWorld.getEntityByID(entityId);
+        LostTalesQuestDefinition quest =
+                LostTalesClientQuestDefinitionStore.getQuest(questId);
+        String line = LostTalesQuestWords.rumourLine(quest);
+        if (quest == null || line.length() == 0) {
+            return;
+        }
+        if (speaker instanceof LOTREntityNPC) {
+            LOTREntityNPC npc = (LOTREntityNPC) speaker;
+            LostTalesNpcChatHook.sayToPlayer(npc, line,
+                    LostTalesNpcChatHook.speakerColor(npc),
+                    LostTalesNpcChatHook.speakerFaction(npc));
+        } else if (speaker instanceof EntityLivingBase) {
+            LostTalesNpcChatHook.sayToPlayer((EntityLivingBase) speaker, line,
+                    LostTalesColors.rgb(LostTalesColors.HONEY), "");
+        }
+        String banner = translate("gui.losttales.quest.banner.rumour",
+                LostTalesQuestWords.title(quest));
+        LostTalesClientQuestNotificationStore.addInfo(banner);
+        ClientQuestNews.record(questId, banner);
+    }
+
+    /**
+     * An exchange without the screen (QUEST-37): the words go to the chat.
+     * An offer's line ends on *Accept* and *Decline*, which the player
+     * clicks; a hand-in with a pick ends on its items; a ready hand-in
+     * without one is given over at once.
      */
     private static void answer(Exchange exchange) {
-        LostTalesNpcChatHook.sayToPlayer(exchange.speaker, exchange.said,
-                LostTalesColors.rgb(LostTalesColors.HONEY), "");
-        LostTalesQuestDialogueGui.Action requests =
-                LostTalesQuestDialogueGui.questAction(exchange.quest.getId());
+        String questId = exchange.quest.getId();
+        IChatComponent answers = null;
         if (exchange.mood == QuestDialogueModel.Mood.OFFER) {
-            requests.accept();
-        } else if (exchange.mood == QuestDialogueModel.Mood.HAND_IN) {
-            requests.handOver();
+            answers = answers(new String[] {
+                    translate("gui.losttales.quest.chat.accept"),
+                    translate("gui.losttales.quest.chat.decline") },
+                    new String[] {
+                    QuestChatAnswer.encode(QuestChatAnswer.ACCEPT, -1, questId),
+                    QuestChatAnswer.encode(QuestChatAnswer.DECLINE, -1, questId) });
+        } else if (exchange.mood == QuestDialogueModel.Mood.CHOICE
+                || exchange.mood == QuestDialogueModel.Mood.HAND_IN
+                && !exchange.picks.isEmpty()) {
+            String[] words = new String[exchange.picks.size()];
+            String[] values = new String[words.length];
+            for (int index = 0; index < words.length; index++) {
+                words[index] = exchange.picks.get(index);
+                values[index] = QuestChatAnswer.encode(
+                        exchange.mood == QuestDialogueModel.Mood.CHOICE
+                                ? QuestChatAnswer.CHOOSE : QuestChatAnswer.HAND_IN,
+                        index, questId);
+            }
+            answers = answers(words, values);
         }
+        LostTalesNpcChatHook.sayToPlayer(exchange.speaker, exchange.said,
+                LostTalesColors.rgb(LostTalesColors.HONEY), "", answers);
+        if (exchange.mood == QuestDialogueModel.Mood.HAND_IN
+                && exchange.picks.isEmpty()) {
+            LostTalesQuestDialogueGui.questAction(questId).handOver(-1);
+        }
+    }
+
+    /**
+     * The words a chat line ends on to be clicked: the first in green, the
+     * rest in the chat's quiet ivory, a red last one where there are two
+     * (*Accept*, *Decline*), parted by a dot.
+     */
+    private static IChatComponent answers(String[] words, String[] values) {
+        ChatComponentText line = new ChatComponentText(" ");
+        for (int index = 0; index < words.length; index++) {
+            if (index > 0) {
+                line.appendSibling(new ChatComponentText(" \u00b7 "));
+            }
+            ChatComponentText word = new ChatComponentText(words[index]);
+            word.getChatStyle().setColor(index == 0 ? EnumChatFormatting.GREEN
+                    : words.length == 2 ? EnumChatFormatting.RED
+                    : EnumChatFormatting.GREEN)
+                    .setChatClickEvent(new ClickEvent(
+                            ClickEvent.Action.SUGGEST_COMMAND, values[index]));
+            line.appendSibling(word);
+        }
+        return line;
+    }
+
+    /**
+     * An answer clicked in the chat (QUEST-37): *Accept* asks for the quest
+     * as the conversation's reply does, a pick's item hands the quest in
+     * taking it, and *Decline* says nothing to anyone. The server checks
+     * each again, the giver beside the player and in sight above all.
+     */
+    public static void answerFromChat(QuestChatAnswer answer) {
+        if (answer == null || QuestChatAnswer.DECLINE.equals(answer.action)) {
+            return;
+        }
+        LostTalesNetworkHandler.CHANNEL.sendToServer(new LostTalesQuestActionPacket(
+                QuestChatAnswer.ACCEPT.equals(answer.action)
+                        ? LostTalesQuestActionPacket.ACTION_ACCEPT
+                        : QuestChatAnswer.CHOOSE.equals(answer.action)
+                        ? LostTalesQuestActionPacket.ACTION_CHOOSE
+                        : LostTalesQuestActionPacket.ACTION_HAND_IN,
+                answer.questId, answer.choice));
     }
 
     /**
@@ -260,7 +375,21 @@ public final class LostTalesQuestDialogueHooks {
                     LostTalesClientQuestDefinitionStore.getQuest(
                             progress.getQuestId());
             LostTalesQuestDialogue dialogue = LostTalesQuestDialogue.of(quest);
-            if (quest == null || !dialogue.exists()) {
+            if (quest == null || !dialogue.exists() && !progress.isChoosing()) {
+                continue;
+            }
+            if (progress.isChoosing()) {
+                Exchange choice = choiceWith(quest, dialogue, progress, target);
+                if (choice != null) {
+                    return choice;
+                }
+                continue;
+            }
+            if (progress.isReturning()) {
+                Exchange back = backAtGiver(quest, dialogue, progress, target);
+                if (back != null) {
+                    return back;
+                }
                 continue;
             }
             Exchange exchange = handIn(quest, dialogue, progress, target);
@@ -269,6 +398,78 @@ public final class LostTalesQuestDialogueHooks {
             }
         }
         return null;
+    }
+
+    /**
+     * The hand-in of a quest whose stages are all done, when this person
+     * is the one who gave it (QUEST-31): the giver's hand-in line, and the
+     * quest's pick to choose from.
+     */
+    private static Exchange backAtGiver(LostTalesQuestDefinition quest,
+                                        LostTalesQuestDialogue dialogue,
+                                        LostTalesQuestProgress progress,
+                                        Entity target) {
+        if (!LostTalesQuestRules.returnsToGiver(quest) || !dialogue.isHandedIn()
+                || !isReturnGiver(quest, progress, target)) {
+            return null;
+        }
+        Exchange exchange = exchange(quest, dialogue, target,
+                QuestDialogueModel.Mood.HAND_IN,
+                dialogue.line(LostTalesQuestDialogue.HAND_IN),
+                LostTalesQuestWords.returnLine(quest, progress));
+        if (exchange != null) {
+            exchange.picks.addAll(pickLabels(quest));
+        }
+        return exchange;
+    }
+
+    /**
+     * The choice a quest's stage waits for, when this person gave the
+     * quest (QUEST-32): the stage's ask line and its replies.
+     */
+    private static Exchange choiceWith(LostTalesQuestDefinition quest,
+                                       LostTalesQuestDialogue dialogue,
+                                       LostTalesQuestProgress progress,
+                                       Entity target) {
+        LostTalesQuestStageDefinition stage = LostTalesQuestObjectiveSelection
+                .getCurrentStage(quest, progress);
+        if (stage == null || !isReturnGiver(quest, progress, target)) {
+            return null;
+        }
+        Exchange exchange = exchange(quest, dialogue, target,
+                QuestDialogueModel.Mood.CHOICE,
+                LostTalesQuestWords.askLine(quest, stage),
+                LostTalesQuestWords.chooseLine(quest, progress));
+        if (exchange != null) {
+            for (int index = 0; index < LostTalesQuestRules.choices(stage).size(); index++) {
+                exchange.picks.add(LostTalesQuestWords.choiceWords(quest, stage, index));
+            }
+        }
+        return exchange;
+    }
+
+    /** Whether the person is the one a waiting quest goes back to, as the server reads it. */
+    private static boolean isReturnGiver(LostTalesQuestDefinition quest,
+                                         LostTalesQuestProgress progress,
+                                         Entity target) {
+        if (target == null || target.isDead) {
+            return false;
+        }
+        String giverId = progress.getGiverId();
+        return giverId.length() > 0
+                ? giverId.equals(target.getUniqueID().toString())
+                : matches(quest.getInteraction(), target);
+    }
+
+    /** What the player says to take each item of the quest's pick (QUEST-33); empty for none. */
+    private static List<String> pickLabels(LostTalesQuestDefinition quest) {
+        List<String> labels = new ArrayList<String>();
+        for (LostTalesQuestItemSpec item : LostTalesQuestRewards.picks(quest.getRewards())) {
+            labels.add(translate("gui.losttales.quest.dialogue.pick",
+                    LostTalesQuestRewardText.itemPhrase(item.getItemId()
+                            + "@" + item.getMeta() + "*" + item.getCount())));
+        }
+        return labels;
     }
 
     /**
@@ -354,6 +555,8 @@ public final class LostTalesQuestDialogueHooks {
         final QuestDialogueModel.Mood mood;
         final String said;
         final String objective;
+        /** What the player says to take each item of a pick at this hand-in; empty for none. */
+        final List<String> picks = new ArrayList<String>();
 
         Exchange(LostTalesQuestDefinition quest, LostTalesQuestDialogue dialogue,
                  EntityLivingBase speaker, QuestDialogueModel.Mood mood,
@@ -388,6 +591,9 @@ public final class LostTalesQuestDialogueHooks {
                                 translate("gui.losttales.quest.dialogue.decline")),
                         dialogue.lineOr(LostTalesQuestDialogue.LEAVE,
                                 translate("gui.losttales.quest.dialogue.leave"))});
+        if (!exchange.picks.isEmpty()) {
+            model = model.withChoices(exchange.picks);
+        }
         final EntityLivingBase speaker = exchange.speaker;
         final LostTalesQuestDialogueGui.Action requests =
                 LostTalesQuestDialogueGui.questAction(quest.getId());
@@ -399,8 +605,13 @@ public final class LostTalesQuestDialogueHooks {
                     }
 
                     @Override
-                    public void handOver() {
-                        requests.handOver();
+                    public void handOver(int choice) {
+                        requests.handOver(choice);
+                    }
+
+                    @Override
+                    public void choose(int choice) {
+                        requests.choose(choice);
                     }
 
                     @Override
@@ -416,9 +627,10 @@ public final class LostTalesQuestDialogueHooks {
                 });
     }
 
-    /** What a quest gives, in a line; empty where it gives nothing. */
+    /** What a quest gives, the optional objectives' rewards too, in a line; empty where it gives nothing. */
     private static String rewardLine(LostTalesQuestDefinition quest) {
-        String rewards = LostTalesQuestRewardText.summary(quest.getRewards());
+        String rewards = LostTalesQuestRewardText.summary(
+                LostTalesQuestRewards.withOptionals(quest));
         return rewards.length() == 0 ? ""
                 : translate("gui.losttales.quest.dialogue.reward", rewards);
     }

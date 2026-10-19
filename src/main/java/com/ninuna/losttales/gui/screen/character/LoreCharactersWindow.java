@@ -7,11 +7,11 @@ import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
-import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageSearch;
+import com.ninuna.losttales.client.window.PointerTip;
 import com.ninuna.losttales.client.window.SubWindowContent;
 import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.WindowFields;
@@ -52,8 +52,6 @@ final class LoreCharactersWindow extends SubWindowContent {
     private static final int FIND_LIMIT = 32;
     /** The most the list stands open at before it scrolls. */
     private static final int MAX_LIST_HEIGHT = 220;
-    /** The widest the row's card grows before it wraps. */
-    private static final int CARD_WIDTH = 220;
     private static final String FIELD = "field";
     private static final String ROW_PREFIX = "lore:";
     /** How often the field keeps time, as a screen's ticks would. */
@@ -425,62 +423,24 @@ final class LoreCharactersWindow extends SubWindowContent {
     }
 
     /**
-     * The row's card: the figure's name and its whole description. Why a
-     * greyed row cannot be taken is said when it is pressed.
+     * The row's tip: the figure's name in the accent and its whole
+     * description under it. Why a greyed row cannot be taken is said when
+     * it is pressed.
      */
     @Override
-    public String tipKey() {
-        return this.hovered == null || this.hovered.character == null ? ""
-                : this.hovered.character.getName();
-    }
-
-    @Override
-    public void drawTip(Minecraft minecraft, int tipX, int tipY,
-                        int screenWidth, float share) {
+    public PointerTip tip(FontRenderer font) {
         Line line = this.hovered;
         if (line == null || line.character == null) {
-            return;
+            return null;
         }
         String description = ClientCharacterDisplayNames.loreDescription(
                 line.character).trim();
         if (description.length() == 0) {
-            return;
+            return null;
         }
-        FontRenderer font = minecraft.fontRenderer;
-        List<String> text = new ArrayList<String>();
-        List<Integer> colours = new ArrayList<Integer>();
-        text.add(ClientCharacterDisplayNames.loreCardName(line.character));
-        colours.add(Integer.valueOf(LostTalesUiTheme.accentRgb()));
-        for (Object wrapped : font.listFormattedStringToWidth(description,
-                CARD_WIDTH)) {
-            text.add(String.valueOf(wrapped));
-            colours.add(Integer.valueOf(LostTalesUiInk.IVORY));
-        }
-        int widest = 0;
-        for (String each : text) {
-            widest = Math.max(widest, font.getStringWidth(each));
-        }
-        int width = widest + WindowStyle.POPUP_INSET * 2;
-        int height = text.size() * DESCRIPTION_LINE - 2
-                + WindowStyle.POPUP_INSET * 2 + LostTalesUiInk.SHADOW_OFFSET;
-        int x = Math.max(2, Math.min(screenWidth - width - 2,
-                tipX - width / 2));
-        int y = Math.max(2, tipY - 3 - height);
-        LostTalesTooltipSmoothing.begin(tipX, tipY);
-        try {
-            WindowStyle.drawPopup(x, y, x + width, y + height, share);
-            LostTalesUiInk.beginContent();
-            int lineY = y + WindowStyle.POPUP_INSET;
-            for (int index = 0; index < text.size(); index++) {
-                LostTalesUiInk.drawText(font, text.get(index),
-                        x + WindowStyle.POPUP_INSET, lineY,
-                        colours.get(index).intValue(),
-                        Math.round(255.0F * share));
-                lineY += DESCRIPTION_LINE;
-            }
-        } finally {
-            LostTalesTooltipSmoothing.end();
-        }
+        return PointerTip.titled(font,
+                ClientCharacterDisplayNames.loreCardName(line.character),
+                description);
     }
 
     /** The field keeps time as a screen's ticks would: the caret blinks. */

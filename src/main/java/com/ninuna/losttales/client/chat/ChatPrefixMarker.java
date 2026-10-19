@@ -56,10 +56,13 @@ final class ChatPrefixMarker {
 
     /**
      * True when the component contributes nothing to the line's own flow
-     * right now: the channel prefix while the chat screen is open.
+     * right now: the channel prefix while the chat screen is open, and the
+     * account after a character's name while Show Accounts is off
+     * ({@link ChatAccountMarker}).
      */
     static boolean isHidden(IChatComponent component, boolean chatOpen) {
-        return chatOpen && isMarker(component);
+        return (chatOpen && isMarker(component))
+                || ChatAccountMarker.isHidden(component);
     }
 
     /** The marker payload, or null. */

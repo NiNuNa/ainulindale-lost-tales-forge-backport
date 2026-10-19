@@ -6,6 +6,7 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -17,13 +18,11 @@ public final class LostTalesMissiveNbtTest {
         return LostTalesMissiveData.builder(
                 "losttales:missive/generated/test", "kill")
                 .titleId("clear_the_paths")
-                .repeatable(false)
-                .firstComeFirstServed(true)
                 .generationWorldTime(1200L)
                 .objective(new LostTalesMissiveObjectiveData("kill_wolves",
                         "kill", false,
                         Collections.singletonMap("count", "3")))
-                .rewardData(LostTalesMissiveRewardData.experienceAndItems(10, ""))
+                .rewardData(LostTalesMissiveRewardData.experienceAndCoins(10, 0))
                 .build();
     }
 
@@ -32,20 +31,17 @@ public final class LostTalesMissiveNbtTest {
         LostTalesMissiveData read = LostTalesMissiveNbt.readFromNBT(
                 LostTalesMissiveNbt.writeToNBT(letter()));
         assertNotNull(read);
-        assertFalse(read.isRepeatable());
-        assertTrue(read.isFirstComeFirstServed());
+        assertEquals(1200L, read.getGenerationWorldTime());
     }
 
-    /** The writer always writes who may take a letter, so a letter without it is malformed. */
+    /** A missive is taken once and never again: its quest is neither repeatable nor restartable (QUEST-34). */
     @Test
-    public void aLetterMissingWhoMayTakeItIsMalformed() {
-        NBTTagCompound noRepeatable = LostTalesMissiveNbt.writeToNBT(letter());
-        noRepeatable.removeTag("Repeatable");
-        assertNull(LostTalesMissiveNbt.readFromNBT(noRepeatable));
-
-        NBTTagCompound noFirstCome = LostTalesMissiveNbt.writeToNBT(letter());
-        noFirstCome.removeTag("FirstComeFirstServed");
-        assertNull(LostTalesMissiveNbt.readFromNBT(noFirstCome));
+    public void aMissivesQuestIsNeverTakenAgain() {
+        com.ninuna.losttales.quest.LostTalesQuestDefinition quest =
+                LostTalesMissiveQuestFactory.createQuestDefinition(letter());
+        assertNotNull(quest);
+        assertFalse(quest.isRepeatable());
+        assertFalse(quest.isRestartable());
     }
 
     @Test

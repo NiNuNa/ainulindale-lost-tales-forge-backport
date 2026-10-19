@@ -6,20 +6,20 @@ import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
- * One sub-window: a kind, what it holds, the window it belongs to, where
- * it stands and whether it is locked. Its box takes its strip — a
- * window's tool strip holding its icon, its name and its controls
- * ({@link SubWindowStrip}) — and under that its content; the frame runs
- * just outside the box, as a window's does.
+ * One sub-window: a kind, what it holds, the window it belongs to and
+ * where it stands. Its box takes its strip — a window's tool strip
+ * holding its icon, its name and its controls ({@link SubWindowStrip}) —
+ * and under that its content; the frame runs just outside the box, as a
+ * window's does.
  *
- * <p>A sub-window opens locked, at the place its kind was last locked in
- * or where its opener puts it. Locked, it is measured from its window's
- * room — the window's box, a frame and two clear pixels in from its edges
- * — so it rides along as that window moves, and it can be neither moved
- * nor resized. Unlocked, it stands where the player carries it on the
- * screen, past its window's edges if they like, and stays there while the
- * window moves. Either way it is held on the screen. A window on the bare
- * screen has the screen for its room.</p>
+ * <p>A sub-window opens at the place its kind was last put, or where its
+ * opener puts it. It is always measured from its window's room — the
+ * window's box, a frame and two clear pixels in from its edges — so it
+ * rides along as that window moves. Moved or resized, it stays where it
+ * was put in that room, past its window's edges if the player likes, and
+ * is held on the screen. A double-click on its strip puts it back where its
+ * opener put it (WIN-43). A window on the bare screen has the screen for
+ * its room.</p>
  *
  * <p>Its place may stand between whole pixels while it is moved; it is
  * drawn laid on the display's grid and every hit test asks the box it was
@@ -37,17 +37,17 @@ public final class SubWindow {
     public final SubWindowContent content;
     /** The window it belongs to; null for one on the bare screen. */
     public String parentId;
-    /**
-     * Where it stands, fractions and all: from its room's top left while
-     * locked, on the screen while unlocked.
-     */
+    /** Where it stands from its room's top left, fractions and all. */
     double x;
     double y;
     /** The size the player gave it, or its content's own. */
     int wantedWidth;
     int wantedHeight;
-    /** Whether it stands in its place in its window, and neither moves nor resizes. */
-    boolean locked = true;
+    /** Where its opener put it in its room, and the size it gave: where a double-click puts it back. */
+    double homeX;
+    double homeY;
+    int homeWidth;
+    int homeHeight;
     /** The room it was last laid out in; null while its window is not drawn. */
     LostTalesUiHitBox room;
     /** Where it stands on the screen, as laid out. */
@@ -60,15 +60,9 @@ public final class SubWindow {
             new MotionTransition(MotionIds.WINDOW_SUB_OPEN);
     final LostTalesUiButtonMotion closeMotion = new LostTalesUiButtonMotion(
             LostTalesUiButtonMotion.Character.SNAP);
-    final LostTalesUiButtonMotion lockMotion = new LostTalesUiButtonMotion(
-            LostTalesUiButtonMotion.Character.LIFT);
-    /** The padlock on its strip, turning as it is locked and unlocked. */
-    final LockAnimation lock = new LockAnimation();
     /** How far the grip has lit under the pointer, and when that was last stepped. */
     float gripFade;
     long gripNanos;
-    /** When a press the padlock held back last lit it; 0 for never. */
-    long lockNudgeNanos;
     /** Where the box was drawn this frame, laid on the display's grid. */
     double drawnLeft;
     double drawnTop;
@@ -104,11 +98,6 @@ public final class SubWindow {
         return this.open;
     }
 
-    /** Whether it stands locked in its window's room. */
-    public boolean isLocked() {
-        return this.locked;
-    }
-
     /** Opens it again while it is still fading out, or starts it closing. */
     void setOpen(boolean open) {
         this.open = open;
@@ -132,8 +121,8 @@ public final class SubWindow {
 
     /**
      * Lays the window out: as large as the player wants it, never larger
-     * than {@code screen} nor smaller than its least, where it stands —
-     * measured from {@code room} while locked — and held on the screen.
+     * than {@code screen} nor smaller than its least, where it stands from
+     * {@code room}'s top left, and held on the screen.
      */
     void layOut(LostTalesUiHitBox room, LostTalesUiHitBox screen) {
         this.room = room;
@@ -141,8 +130,8 @@ public final class SubWindow {
                 (int)Math.floor(screen.width));
         this.height = fitted(this.wantedHeight, minHeight(),
                 (int)Math.floor(screen.height));
-        double wantedLeft = this.locked ? room.left + this.x : this.x;
-        double wantedTop = this.locked ? room.top + this.y : this.y;
+        double wantedLeft = room.left + this.x;
+        double wantedTop = room.top + this.y;
         this.left = screen.left + held(wantedLeft - screen.left,
                 screen.width - this.width);
         this.top = screen.top + held(wantedTop - screen.top,
@@ -199,12 +188,6 @@ public final class SubWindow {
                 x, y);
     }
 
-    /** Whether the point is on the strip's padlock, as drawn. */
-    boolean lockContains(double x, double y) {
-        return onControl(this.strip == null ? null : this.strip.lockBox,
-                x, y);
-    }
-
     /** Whether the point is on the strip's grip, as drawn. */
     boolean gripContains(double x, double y) {
         return onControl(this.strip == null ? null : this.strip.gripBox,
@@ -221,11 +204,10 @@ public final class SubWindow {
      * The edge or corner of the window the point is on: the band
      * {@link WindowGestures#RESIZE_BORDER} wide just outside the box,
      * a corner reaching {@link WindowGestures#RESIZE_CORNER} along
-     * both its edges, as a window's do; null anywhere else, and anywhere
-     * while it is locked.
+     * both its edges, as a window's do; null anywhere else.
      */
     WindowGestures.ResizeEdge edgeAt(double x, double y) {
-        if (!this.open || this.locked) {
+        if (!this.open) {
             return null;
         }
         LostTalesUiHitBox box = drawnBox();

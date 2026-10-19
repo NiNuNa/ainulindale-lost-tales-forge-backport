@@ -87,7 +87,7 @@ public final class LostTalesWaystonePacketTest {
                         .build();
         LostTalesWaystoneStatePacket original =
                 new LostTalesWaystoneStatePacket(
-                        0, 4, 65, 9, record,
+                        0, 4, 65, 9, record, "Aldric",
                         true, false, LostTalesWaystoneStateReason.OPENED);
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
@@ -103,7 +103,9 @@ public final class LostTalesWaystonePacketTest {
         assertTrue(decoded.isPlayerPlaced());
         assertEquals(record.getRevision(), decoded.getRevision());
         assertTrue(decoded.canEdit());
-        assertFalse(decoded.canMakePublic());
+        assertFalse(decoded.managesMarkers());
+        assertEquals("the owning character's name travels", "Aldric",
+                decoded.getOwnerName());
         assertEquals(record.getDescription(),
                 decoded.getSettings().getDescription());
         assertEquals(record.getDimensionId(),
@@ -184,6 +186,50 @@ public final class LostTalesWaystonePacketTest {
                 "losttales:player/test", 4L, name.toString());
     }
 
+    @Test
+    public void handOverRoundTripsTheCharacterNamed() {
+        LostTalesWaystoneSettingsRequestPacket original =
+                LostTalesWaystoneSettingsRequestPacket.handOver(
+                        12, 70, -8, "losttales:player/test", 4L, "Faramir");
+        ByteBuf buffer = Unpooled.buffer();
+        original.toBytes(buffer);
+        LostTalesWaystoneSettingsRequestPacket decoded =
+                new LostTalesWaystoneSettingsRequestPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(com.ninuna.losttales.mapmarker
+                        .LostTalesWaystoneSettingsOperation.HAND_OVER,
+                decoded.getOperation());
+        assertEquals("Faramir", decoded.getTargetName());
+    }
+
+    @Test
+    public void aStateWithAnOverlongOwnerNameIsMalformed() {
+        StringBuilder owner = new StringBuilder();
+        for (int index = 0; index
+                <= LostTalesWaystoneStatePacket.MAX_OWNER_NAME_BYTES; index++) {
+            owner.append('a');
+        }
+        LostTalesWaystoneStatePacket fine = state(
+                LostTalesWaystoneStateReason.SAVED);
+        ByteBuf buffer = Unpooled.buffer();
+        fine.toBytes(buffer);
+        // The owner name sits after the two share counts: rewrite the
+        // packet by hand with one byte too many.
+        ByteBuf forged = Unpooled.buffer();
+        byte[] whole = new byte[buffer.readableBytes()];
+        buffer.readBytes(whole);
+        int tail = 1 + 1 + 1 + 1; // empty owner name, canEdit, manages, reason
+        forged.writeBytes(whole, 0, whole.length - tail);
+        LostTalesPacketCodec.writeUtf8String(forged, owner.toString(),
+                owner.length());
+        forged.writeBytes(whole, whole.length - tail + 1, tail - 1);
+        LostTalesWaystoneStatePacket decoded =
+                new LostTalesWaystoneStatePacket();
+        decoded.fromBytes(forged);
+        assertTrue(decoded.isMalformed());
+    }
+
     private static LostTalesWaystoneStatePacket state(
             LostTalesWaystoneStateReason reason) {
         LostTalesMapMarkerRecord record =
@@ -192,7 +238,7 @@ public final class LostTalesWaystonePacketTest {
                         UUID.randomUUID(), 0, 4, 65, 9,
                         UUID.randomUUID());
         return new LostTalesWaystoneStatePacket(0, 4, 65, 9, record,
-                true, false, reason);
+                "", true, false, reason);
     }
 
     private static LostTalesWaystoneStatePacket roundTrip(

@@ -92,14 +92,6 @@ public final class PlayerAppearanceResolverTest {
         assertEquals("losttales:wide", resolved.getBodyTypeId());
         assertEquals(CharacterRaceRegistry.get(CharacterRaceRegistry.ORC).getRendererScale(),
                 resolved.getRendererScale(), 0.0F);
-
-        ResolvedPlayerAppearance troll = PlayerAppearanceResolver.resolve(
-                PLAYER, unchosen(CharacterRaceRegistry.HALF_TROLL,
-                        CharacterGenderRegistry.FEMALE, ""));
-        assertNotNull(troll);
-        // No chest for a unisex body; the arm width still follows the record.
-        assertEquals("lotr:half_troll|lotr_64x64|losttales:none|losttales:slim",
-                troll.getRendererKey());
     }
 
     @Test

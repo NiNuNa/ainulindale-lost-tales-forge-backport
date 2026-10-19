@@ -174,7 +174,8 @@ public final class MissiveWords {
                                 objective.isOptional(), objective.getParams(),
                                 objectiveKey(objective.getType())));
             }
-            worded.add(new LostTalesQuestStageDefinition(stage.getId(), objectives));
+            worded.add(new LostTalesQuestStageDefinition(stage.getId(), objectives,
+                    stage.getRules()));
         }
         return worded;
     }

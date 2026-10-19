@@ -6,6 +6,7 @@ import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.quest.QuestStartGate;
+import com.ninuna.losttales.quest.QuestStarters;
 import com.ninuna.losttales.quest.QuestStartProof;
 import com.ninuna.losttales.quest.ServerQuestFiles;
 import com.ninuna.losttales.quest.ServerQuestSync;
@@ -40,6 +41,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     static final String SAY = "chat.losttales.quest.command.";
     /** The colour every answer is in. */
     private static final EnumChatFormatting WHITE = EnumChatFormatting.WHITE;
+    private static final EnumChatFormatting GRAY = EnumChatFormatting.GRAY;
 
     private final String commandPath;
 
@@ -252,31 +254,17 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             return;
         }
 
-        EntityPlayerMP player;
-        boolean consume = false;
-        if (args.length > 2 && isBoolean(args[2])) {
-            player = getTargetPlayer(sender, new String[] { args[0], questId }, 2);
-            consume = parseBoolean(args[2]);
-        } else {
-            player = getTargetPlayer(sender, args, 2);
-            if (args.length > 3) {
-                consume = parseBoolean(args[3]);
-            }
-        }
+        EntityPlayerMP player = getTargetPlayer(sender, args, 2);
         if (player == null) {
             return;
         }
 
-        ItemStack stack = new ItemStack(Items.paper);
-        NBTTagCompound tag = new NBTTagCompound();
-        tag.setString(QuestStartGate.TAG_QUEST_ID, questId);
-        tag.setBoolean(QuestStartGate.TAG_CONSUME, consume);
-        stack.setTagCompound(tag);
-        // An item's name is kept as written, so it is written in the
-        // server's language.
-        stack.setStackDisplayName(StatCollector.translateToLocalFormatted(
-                SAY + "starter.name", LostTalesQuestWords.title(quest)));
-
+        // Sealed by the world and used up as its quest starts (QUEST-34).
+        ItemStack stack = QuestStarters.create(player.worldObj, quest);
+        if (stack == null) {
+            say(sender, WHITE, SAY + "starter.unsealed");
+            return;
+        }
         if (!player.inventory.addItemStackToInventory(stack)) {
             EntityItem dropped = player.dropPlayerItemWithRandomChoice(stack, false);
             if (dropped != null) {
@@ -311,15 +299,30 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
     /**
      * Reads the server's own quest files again; each player online is sent
-     * afresh the ones their client holds or their log names.
+     * afresh the ones their client holds or their log names. Every reason
+     * a file was left out is said, a warning each (QUEST-04), up to
+     * {@link #MAX_RELOAD_LINES}; the server's log keeps them all.
      */
     private void reloadServerQuests(ICommandSender sender) {
         ServerQuestFiles.Result result = LostTalesQuestRegistry.loadServerQuests();
         ServerQuestSync.resendAfterReload(MinecraftServer.getServer());
-        say(sender, WHITE, "chat.losttales.quest.reload.done",
-                Integer.valueOf(result.quests.size()),
-                Integer.valueOf(result.problems.size()));
+        say(sender, WHITE, result.problems.isEmpty()
+                        ? "chat.losttales.quest.reload.done"
+                        : "chat.losttales.quest.reload.left_out",
+                Integer.valueOf(result.quests.size()));
+        int shown = Math.min(MAX_RELOAD_LINES, result.problems.size());
+        for (int index = 0; index < shown; index++) {
+            say(sender, GRAY, "chat.losttales.quest.reload.problem",
+                    result.problems.get(index));
+        }
+        if (result.problems.size() > shown) {
+            say(sender, GRAY, "chat.losttales.quest.reload.more",
+                    Integer.valueOf(result.problems.size() - shown));
+        }
     }
+
+    /** The most reasons a reload says in the chat; the log keeps the rest. */
+    private static final int MAX_RELOAD_LINES = 64;
 
     /** {@code world start|stop <id>} and {@code world list}. */
     private void worldQuest(ICommandSender sender, String[] args) {
@@ -414,14 +417,6 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             builder.append(value);
         }
         return builder.toString();
-    }
-
-    private boolean isBoolean(String value) {
-        return "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value) || "no".equalsIgnoreCase(value);
-    }
-
-    private boolean parseBoolean(String value) {
-        return "true".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value);
     }
 
     @Override

@@ -29,7 +29,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * view menu key=58
  * view v1 key=34 name=Hunting
  * window w1 view=consoles locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
- * window w2 view=v1 locked=true borderless=held hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
+ * window w2 view=v1 locked=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
  * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00
  * tips seen=3
@@ -55,6 +55,8 @@ public final class WindowLayoutStore {
     static final String FOLDER = LostTalesConfigFiles.WINDOW_LAYOUTS;
     /** The most lines a layout file is read to; a layout is a few dozen. */
     static final int MAX_LINES = 4096;
+    /** The most pages a window's line is read with; the rest are left out. */
+    static final int MAX_PAGES = 256;
     private static final List<Part> PARTS = new CopyOnWriteArrayList<Part>();
 
     private static File storeFile;
@@ -265,7 +267,6 @@ public final class WindowLayoutStore {
         // A line that says nothing of them: unlocked, as a window opens
         // that is not a new player's first, and pinned nowhere.
         boolean locked = false;
-        boolean held = false;
         boolean hud = false;
         boolean gui = false;
         View view = null;
@@ -285,18 +286,11 @@ public final class WindowLayoutStore {
             String key = part.substring(0, equals);
             String value = part.substring(equals + 1);
             if ("tabs".equals(key)) {
-                for (String tab : value.split(",")) {
-                    WindowPage parsed = WindowPage.fromId(tab);
-                    if (parsed != null) {
-                        tabs.add(parsed);
-                    }
-                }
+                tabs = pagesOf(value);
             } else if ("active".equals(key)) {
                 active = WindowPage.fromId(value);
             } else if ("locked".equals(key)) {
                 locked = "true".equalsIgnoreCase(value);
-            } else if ("borderless".equals(key)) {
-                held = "held".equalsIgnoreCase(value);
             } else if ("hud".equals(key)) {
                 hud = "true".equalsIgnoreCase(value);
             } else if ("gui".equals(key)) {
@@ -320,8 +314,26 @@ public final class WindowLayoutStore {
                 }
             }
         }
-        return new WindowLayout.WindowSpec(id, tabs, active, locked, held,
+        return new WindowLayout.WindowSpec(id, tabs, active, locked,
                 hud, gui, view, offsetX, offsetY, height, width, fill, splits);
+    }
+
+    /**
+     * The pages a window's line names, in its order: at most
+     * {@link #MAX_PAGES}, each one this game knows.
+     */
+    static List<WindowPage> pagesOf(String value) {
+        List<WindowPage> pages = new ArrayList<WindowPage>();
+        for (String tab : value.split(",")) {
+            if (pages.size() >= MAX_PAGES) {
+                break;
+            }
+            WindowPage parsed = WindowPage.fromId(tab);
+            if (parsed != null) {
+                pages.add(parsed);
+            }
+        }
+        return pages;
     }
 
     /**
@@ -378,9 +390,6 @@ public final class WindowLayoutStore {
             StringBuilder line = new StringBuilder("window ").append(spec.id);
             line.append(" view=").append(spec.view.id());
             line.append(" locked=").append(spec.locked);
-            if (spec.borderlessHeld) {
-                line.append(" borderless=held");
-            }
             if (spec.pinnedToHud) {
                 line.append(" hud=true");
             }

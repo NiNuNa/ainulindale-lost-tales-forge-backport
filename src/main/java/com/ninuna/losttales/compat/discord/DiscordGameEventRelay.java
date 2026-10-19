@@ -41,9 +41,7 @@ import net.minecraft.util.IChatComponent;
  * click event, which vanilla puts on every player name it announces, so
  * the picture follows the account and never a guess from the text. No
  * account there — a name a mod built by hand — means no picture and
- * nothing else lost. With the server's Show Accounts off a death or an
- * achievement, posted to Global's Discord channels, carries no head: the
- * head's URL names the account behind the character the line names.</p>
+ * nothing else lost.</p>
  *
  * <p>Every method here runs on the server thread and does nothing but
  * build a notice and queue it; the bridge's worker posts it. A notice of
@@ -203,9 +201,7 @@ public final class DiscordGameEventRelay {
         if (text == null || text.trim().length() == 0) {
             return null;
         }
-        String icon = DiscordAvatarUrl.shownIn(
-                ChatSystemLineClassifier.channelOf(kind),
-                DiscordAvatarUrl.forPlayer(subject));
+        String icon = DiscordAvatarUrl.forPlayer(subject);
         return kind == ChatSystemLineClassifier.Kind.DEATH
                 ? DiscordServerNotices.playerDied(text, icon)
                 : DiscordServerNotices.achievement(text, icon);

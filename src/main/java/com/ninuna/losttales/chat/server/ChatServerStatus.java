@@ -20,9 +20,16 @@ import net.minecraft.server.MinecraftServer;
  * how many ticks it runs a second, and how long it has taken players. One
  * status, said everywhere: the Server's status line and card in the game
  * ({@link LostTalesServerStatusPacket}, which each client writes in its own
- * words and whose time up it counts on itself), the topic of every linked
- * Discord channel, and Discord's {@code /server}. Looked at once a second;
+ * words and whose time up it counts on itself), Discord's {@code /server},
+ * and the topic of every linked Discord channel. Looked at once a second;
  * the players are told only when what they show changes.
+ *
+ * <p>The topic leaves the time up out and gives the ticks a second to the
+ * nearest {@link #TOPIC_TICKS_STEP}, so it changes only when something
+ * real does: a player arriving or leaving, the cap, the address, or the
+ * server's speed moving by a step. Discord takes two topic edits per
+ * channel in ten minutes, and a topic changing every minute would spend
+ * them all.</p>
  *
  * <p>An Invisible player is not counted, as Discord never counts one; the
  * address is never read off the machine, only from {@code serverAddress},
@@ -31,6 +38,8 @@ import net.minecraft.server.MinecraftServer;
 public final class ChatServerStatus {
     /** How often the status is looked at: once a second. */
     private static final int LOOK_TICKS = 20;
+    /** The step the topic's ticks a second are given to: 20, 15, 10, 5 or 0. */
+    static final int TOPIC_TICKS_STEP = 5;
     /** Whether the players have been told the status yet. */
     private static boolean told;
     private static int players;
@@ -39,6 +48,8 @@ public final class ChatServerStatus {
     private static int ticksPerSecond;
     /** The status in Discord's words, as it was last asked for; empty before the first look. */
     private static List<String> parts = Collections.emptyList();
+    /** The topic's parts in Discord's words, as they were last asked for; empty before the first look. */
+    private static List<String> topicParts = Collections.emptyList();
     /** When the server began to take players; 0 before. */
     private static long startedMillis;
     private static int ticks;
@@ -65,7 +76,8 @@ public final class ChatServerStatus {
 
     /**
      * The status as it is now: the players told when what they show
-     * changed, Discord's topics asked for again when their words did.
+     * changed, Discord's topics asked for again when the topic's words
+     * did, which the time up never makes them do.
      */
     private static synchronized void look(int playersNow, int maxNow,
                                           String addressNow, int ticksNow) {
@@ -85,10 +97,12 @@ public final class ChatServerStatus {
             ticksPerSecond = speed;
             LostTalesNetworkHandler.CHANNEL.sendToAll(packet());
         }
-        List<String> words = partsOf(LostTalesWords.LANG, shown, cap, named, speed,
-                upMillis());
-        if (!words.equals(parts)) {
-            parts = Collections.unmodifiableList(words);
+        parts = Collections.unmodifiableList(partsOf(LostTalesWords.LANG, shown,
+                cap, named, speed, upMillis()));
+        List<String> topic = topicPartsOf(LostTalesWords.LANG, shown, cap, named,
+                speed);
+        if (!topic.equals(topicParts)) {
+            topicParts = Collections.unmodifiableList(topic);
             LostTalesDiscordBridge.getInstance().requestStatusRefresh();
         }
     }
@@ -111,9 +125,37 @@ public final class ChatServerStatus {
                 : Math.max(1L, System.currentTimeMillis() - startedMillis);
     }
 
-    /** The status in Discord's words, as it was last asked for; empty before the first look. */
+    /** The status in Discord's words, as it was last looked at; empty before the first look. */
     public static synchronized List<String> parts() {
         return parts;
+    }
+
+    /** The topic's parts in Discord's words, as they were last looked at; empty before the first look. */
+    public static synchronized List<String> topicParts() {
+        return topicParts;
+    }
+
+    /**
+     * The topic's parts: the status without the time up, the ticks a
+     * second to the nearest {@link #TOPIC_TICKS_STEP}
+     * ({@link #topicTicksPerSecond}).
+     */
+    public static List<String> topicPartsOf(LostTalesWords words, int players,
+                                            int maxPlayers, String address,
+                                            int ticksPerSecond) {
+        return partsOf(words, players, maxPlayers, address,
+                topicTicksPerSecond(ticksPerSecond), 0L);
+    }
+
+    /**
+     * The ticks a second as the topic gives them: to the nearest
+     * {@link #TOPIC_TICKS_STEP}, so a server running between 18 and 20
+     * reads 20 however it wavers, and one under load reads 15 or 10
+     * until its speed moves by a step.
+     */
+    static int topicTicksPerSecond(int ticksPerSecond) {
+        int speed = Math.max(0, Math.min(20, ticksPerSecond));
+        return (speed + TOPIC_TICKS_STEP / 2) / TOPIC_TICKS_STEP * TOPIC_TICKS_STEP;
     }
 
     /**
@@ -221,6 +263,7 @@ public final class ChatServerStatus {
         address = "";
         ticksPerSecond = 0;
         parts = Collections.emptyList();
+        topicParts = Collections.emptyList();
         startedMillis = 0L;
         ticks = 0;
     }

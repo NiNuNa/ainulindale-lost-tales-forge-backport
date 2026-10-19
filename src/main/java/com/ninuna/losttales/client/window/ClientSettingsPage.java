@@ -14,7 +14,7 @@ import net.minecraft.util.StatCollector;
  * page of its own ({@link Settings.Place#CLIENT}) — the camera, the
  * screens, the look of bodies, the shortcuts —
  * in Settings' sections and rows, under the search in the window's tool
- * strip, Defaults last. Ctrl+, opens it on the window screen, and so
+ * strip, Defaults last. Ctrl+, opens it, in play and on the window screen, and so
  * does the character menu. A colour's row opens its palette and a
  * number's value or a line the field it is typed into, each hung from
  * its row.

@@ -66,6 +66,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private final Map<String, LostTalesQuestDefinition> dynamicQuestDefinitions = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private final Set<String> pinnedQuestIds = new LinkedHashSet<String>();
     private String pinnedMapMarkerId = "";
+    /** Whether this character was given its starter items (QUEST-29). */
+    private boolean startersGiven;
+    /** The quests whose rumours this character heard (QUEST-20), oldest first. */
+    private final Set<String> heardRumours = new LinkedHashSet<String>();
+    /** The most rumours a log keeps; the oldest goes first. */
+    public static final int MAX_RUMOURS = 256;
     /**
      * The quests whose stage ended on a hand-over still to be made, on
      * the player's next tick. Never saved: a stage still full asks again.
@@ -124,6 +130,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
             questTag.setTag("CompletedOptionalObjectives",
                     optionalObjectives);
+            questTag.setInteger("Completions", entry.getCompletions());
+            questTag.setTag("StagePath", LostTalesQuestProgress
+                    .writeStagePath(entry.getStagePath()));
             historyList.appendTag(questTag);
         }
         data.setTag("QuestHistory", historyList);
@@ -186,6 +195,14 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         data.setTag("DynamicMapMarkers", dynamicMarkerList);
         data.setString("PinnedMapMarkerId", this.pinnedMapMarkerId == null ? "" : this.pinnedMapMarkerId);
+        data.setBoolean("StartersGiven", this.startersGiven);
+        NBTTagList rumourList = new NBTTagList();
+        for (String questId : this.heardRumours) {
+            NBTTagCompound rumourTag = new NBTTagCompound();
+            rumourTag.setString("QuestId", questId);
+            rumourList.appendTag(rumourTag);
+        }
+        data.setTag("HeardRumours", rumourList);
 
         compound.setTag(PROPERTY_ID, data);
     }
@@ -207,6 +224,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.dynamicQuestDefinitions.clear();
         this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
+        this.startersGiven = false;
+        this.heardRumours.clear();
         this.readOnlyForNewerVersion = false;
         this.preservedReadOnlyData = null;
 
@@ -276,7 +295,10 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 this.questHistory.put(questId, new LostTalesQuestHistoryEntry(
                         questId, outcome, questTag.getString("Detail"),
                         questTag.getLong("WorldTime"),
-                        completedOptionalObjectives));
+                        completedOptionalObjectives,
+                        questTag.getInteger("Completions"),
+                        LostTalesQuestProgress.readStagePath(questTag,
+                                "StagePath")));
             }
         }
 
@@ -312,7 +334,47 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 findDiscoveredMarkerId(requestedPinnedMarkerId);
         this.pinnedMapMarkerId = storedPinnedMarkerId == null
                 ? "" : storedPinnedMarkerId;
+        this.startersGiven = data.getBoolean("StartersGiven");
+        NBTTagList rumourList = data.getTagList("HeardRumours", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < rumourList.tagCount(); i++) {
+            this.heardRumours.add(rumourList.getCompoundTagAt(i).getString("QuestId"));
+        }
         pruneInvalidReferences();
+    }
+
+    /** The quests whose rumours this character heard, oldest first (QUEST-20). */
+    public Set<String> getHeardRumours() {
+        return Collections.unmodifiableSet(new LinkedHashSet<String>(this.heardRumours));
+    }
+
+    /**
+     * Keeps that this character heard the quest's rumour; past
+     * {@link #MAX_RUMOURS} the oldest goes. Answers whether it is new.
+     */
+    public boolean hearRumour(String questId) {
+        if (!isWritable() || !LostTalesQuestIds.fits(questId) || questId.length() == 0
+                || this.heardRumours.contains(questId)) {
+            return false;
+        }
+        while (this.heardRumours.size() >= MAX_RUMOURS) {
+            this.heardRumours.remove(this.heardRumours.iterator().next());
+        }
+        this.heardRumours.add(questId);
+        return true;
+    }
+
+    /** Whether this character was given its starter items (QUEST-29). */
+    public boolean wereStartersGiven() {
+        return this.startersGiven;
+    }
+
+    /** Marks this character's starter items given; never again for it. */
+    public boolean markStartersGiven() {
+        if (!isWritable() || this.startersGiven) {
+            return false;
+        }
+        this.startersGiven = true;
+        return true;
     }
 
     @Override
@@ -404,10 +466,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return Collections.unmodifiableCollection(copy);
     }
 
+    /** The quests ever completed, however a later run of each ended. */
     public Set<String> getCompletedQuestIds() {
         LinkedHashSet<String> completed = new LinkedHashSet<String>();
         for (LostTalesQuestHistoryEntry entry : this.questHistory.values()) {
-            if (entry.isCompleted()) {
+            if (entry.wasEverCompleted()) {
                 completed.add(entry.getQuestId());
             }
         }
@@ -442,11 +505,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return due;
     }
 
-    /** Every quest the log names: running, in the History, and tracked. */
+    /** Every quest the log names: running, in the History, tracked, and heard of. */
     public Set<String> getQuestIdsInLog() {
         Set<String> named = new LinkedHashSet<String>(this.activeQuests.keySet());
         named.addAll(this.questHistory.keySet());
         named.addAll(this.pinnedQuestIds);
+        named.addAll(this.heardRumours);
         return named;
     }
 
@@ -555,11 +619,20 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return this.activeQuests.containsKey(questId);
     }
 
+    /**
+     * Whether the quest was ever completed, however a later run of it
+     * ended: what a {@code completed} prerequisite reads (QUEST-10).
+     */
     public boolean isQuestCompleted(String questId) {
         LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
-        return entry != null && entry.isCompleted();
+        return entry != null && entry.wasEverCompleted();
     }
 
+    /**
+     * Starts a quest at its first stage. A quest taken again keeps its
+     * History line until this run ends, which then takes its place and
+     * keeps its count of completions (QUEST-10).
+     */
     public void startQuest(String questId, String firstStageId, long acceptedWorldTime, long deadlineWorldTime) {
         if (!isWritable()) {
             return;
@@ -567,7 +640,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (!LostTalesQuestIds.fits(questId) || this.activeQuests.containsKey(questId)) {
             return;
         }
-        this.questHistory.remove(questId);
+        // A rumour leads to the quest; taken, it is no lead any more.
+        this.heardRumours.remove(questId);
         this.activeQuests.put(questId, new LostTalesQuestProgress(questId, 0, firstStageId, null, acceptedWorldTime, deadlineWorldTime));
     }
 
@@ -730,15 +804,33 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (questId == null || questId.length() == 0) {
             return false;
         }
-        boolean wasActive = this.activeQuests.remove(questId) != null;
+        LostTalesQuestProgress progress = this.activeQuests.remove(questId);
         this.pinnedQuestIds.remove(questId);
+        LostTalesQuestHistoryEntry before = this.questHistory.get(questId);
         LostTalesQuestHistoryEntry old = this.questHistory.put(questId,
                 new LostTalesQuestHistoryEntry(questId,
                         LostTalesQuestHistoryEntry.Outcome.COMPLETED,
                         boundedDetail(outcome), worldTime,
-                        completedOptionalObjectiveIds));
+                        completedOptionalObjectiveIds,
+                        completionsBefore(before) + (progress != null
+                                || before == null || !before.isCompleted()
+                                ? 1 : 0),
+                        pathOf(progress, before)));
         forgetEndedMissives();
-        return wasActive || old == null || !old.isCompleted();
+        return progress != null || old == null || !old.isCompleted();
+    }
+
+    /** How many completions a History line counts; none for no line. */
+    private static int completionsBefore(LostTalesQuestHistoryEntry before) {
+        return before == null ? 0 : before.getCompletions();
+    }
+
+    /** The stages a run reached: its own path, else the line's it replaces. */
+    private static java.util.List<String> pathOf(LostTalesQuestProgress progress,
+            LostTalesQuestHistoryEntry before) {
+        return progress != null ? progress.getStagePath()
+                : before != null ? before.getStagePath()
+                : Collections.<String>emptyList();
     }
 
     public boolean failQuest(String questId, String reason, long worldTime) {
@@ -748,14 +840,61 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (questId == null || questId.length() == 0) {
             return false;
         }
-        boolean wasActive = this.activeQuests.remove(questId) != null;
+        LostTalesQuestProgress progress = this.activeQuests.remove(questId);
         this.pinnedQuestIds.remove(questId);
+        LostTalesQuestHistoryEntry before = this.questHistory.get(questId);
         LostTalesQuestHistoryEntry old = this.questHistory.put(questId,
                 new LostTalesQuestHistoryEntry(questId,
                         LostTalesQuestHistoryEntry.Outcome.FAILED,
-                        boundedDetail(reason), worldTime));
+                        boundedDetail(reason), worldTime,
+                        Collections.<String>emptySet(),
+                        completionsBefore(before), pathOf(progress, before)));
         forgetEndedMissives();
-        return wasActive || old == null || !old.isFailed();
+        return progress != null || old == null || !old.isFailed();
+    }
+
+    /** Records who gave a running quest: their entity id, own name and kind. */
+    public boolean setQuestGiver(String questId, String entityId, String name,
+                                 String kind) {
+        LostTalesQuestProgress progress = this.activeQuests.get(questId);
+        if (!isWritable() || progress == null) {
+            return false;
+        }
+        progress.setGiver(entityId, name, kind);
+        return true;
+    }
+
+    /** Sets when the running quest's stage runs out of time; 0 for no limit. */
+    public boolean setStageDeadline(String questId, long worldTime) {
+        LostTalesQuestProgress progress = this.activeQuests.get(questId);
+        if (!isWritable() || progress == null) {
+            return false;
+        }
+        progress.setStageDeadlineWorldTime(worldTime);
+        return true;
+    }
+
+    /**
+     * Marks a running quest as waiting for its hand-in, every stage done
+     * (QUEST-31). Answers whether it changed.
+     */
+    public boolean markReturning(String questId) {
+        LostTalesQuestProgress progress = this.activeQuests.get(questId);
+        if (!isWritable() || progress == null || progress.isReturning()) {
+            return false;
+        }
+        progress.setReturning(true);
+        return true;
+    }
+
+    /** Marks a running quest as waiting for a choice, or not; answers whether it changed. */
+    public boolean setChoosing(String questId, boolean choosing) {
+        LostTalesQuestProgress progress = this.activeQuests.get(questId);
+        if (!isWritable() || progress == null || progress.isChoosing() == choosing) {
+            return false;
+        }
+        progress.setChoosing(choosing);
+        return true;
     }
 
     public boolean setQuestStage(String questId, int stageIndex, String stageId) {
@@ -815,15 +954,19 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (questId == null || questId.length() == 0) {
             return false;
         }
-        boolean changed = this.activeQuests.remove(questId) != null;
+        LostTalesQuestProgress progress = this.activeQuests.remove(questId);
         this.pinnedQuestIds.remove(questId);
-        if (changed) {
-            this.questHistory.put(questId, new LostTalesQuestHistoryEntry(
-                    questId, LostTalesQuestHistoryEntry.Outcome.ABANDONED,
-                    boundedDetail(reason), worldTime));
-            forgetEndedMissives();
+        if (progress == null) {
+            return false;
         }
-        return changed;
+        this.questHistory.put(questId, new LostTalesQuestHistoryEntry(
+                questId, LostTalesQuestHistoryEntry.Outcome.ABANDONED,
+                boundedDetail(reason), worldTime,
+                Collections.<String>emptySet(),
+                completionsBefore(this.questHistory.get(questId)),
+                progress.getStagePath()));
+        forgetEndedMissives();
+        return true;
     }
 
     public void copyFrom(LostTalesQuestPlayerData oldData) {
@@ -836,6 +979,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.dynamicQuestDefinitions.clear();
         this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
+        this.startersGiven = false;
+        this.heardRumours.clear();
         this.readOnlyForNewerVersion = false;
         this.preservedReadOnlyData = null;
         if (oldData == null) {
@@ -868,6 +1013,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 this.pinnedQuestIds.add(questId);
             }
         }
+        this.startersGiven = oldData.startersGiven;
+        this.heardRumours.addAll(oldData.heardRumours);
         String copiedPinnedMarkerId =
                 findDiscoveredMarkerId(oldData.pinnedMapMarkerId);
         this.pinnedMapMarkerId = copiedPinnedMarkerId == null
@@ -1109,7 +1256,10 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 || !NbtTags.hasCompoundListWithinLimit(
                 data, "DynamicMapMarkers", MAX_DYNAMIC_MARKERS)
                 || !hasReasonableOptionalString(
-                data, "PinnedMapMarkerId", MAX_IDENTIFIER_CHARACTERS)) {
+                data, "PinnedMapMarkerId", MAX_IDENTIFIER_CHARACTERS)
+                || !NbtTags.hasCompoundListWithinLimit(
+                data, "HeardRumours", MAX_RUMOURS)
+                || !hasQuestIdList(data, "HeardRumours")) {
             return false;
         }
 
@@ -1142,7 +1292,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                     LostTalesQuestProgress.MAX_OBJECTIVE_ENTRIES)
                     || !hasReasonableIdList(entry,
                     "CompletedOptionalObjectives", "ObjectiveId")
-                    || entry.getLong("WorldTime") < 0L) {
+                    || entry.getLong("WorldTime") < 0L
+                    || entry.hasKey("Completions")
+                    && !entry.hasKey("Completions", Constants.NBT.TAG_INT)
+                    || entry.getInteger("Completions") < 0
+                    || !LostTalesQuestProgress.isReasonableStagePath(entry,
+                    "StagePath")) {
                 return false;
             }
         }

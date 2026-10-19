@@ -3,24 +3,24 @@ package com.ninuna.losttales.block.tileentity;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData;
 import com.ninuna.losttales.storage.NbtTags;
 import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.network.NetworkManager;
-import net.minecraft.network.Packet;
-import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import software.bernie.geckolib3.core.IAnimatable;
 import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
 
-/** Minimal local link/presentation state; the world repository owns the record. */
+/**
+ * The block's link to its marker record: the marker id and the link token,
+ * nothing else; the world repository owns the record. The block sends its
+ * clients nothing, so a private waystone's name never reaches a game that
+ * only loads its chunk (WAY-10).
+ */
 public final class LostTalesTileEntityWaystone
         extends TileEntity implements IAnimatable {
-    public static final int CURRENT_DATA_VERSION = 1;
     /**
      * How near a player stands to use the waystone, squared, measured to
      * the block's middle: eight blocks. The waystone's page closes once
@@ -31,12 +31,6 @@ public final class LostTalesTileEntityWaystone
 
     private String markerId = "";
     private UUID linkToken;
-    private UUID ownerPlayerId;
-    /** The waystone's own name; empty for one called after its placer. */
-    private String displayName = "";
-    private LostTalesMapMarkerVisibility visibility =
-            LostTalesMapMarkerVisibility.PRIVATE;
-    private long markerRevision;
     private boolean reconciled;
 
     @Override
@@ -66,9 +60,7 @@ public final class LostTalesTileEntityWaystone
                 || !this.markerId.equals(record.getId())
                 || !this.linkToken.equals(record.getLinkToken())) {
             clearLink();
-            return;
         }
-        applyPresentation(record);
     }
 
     public void linkTo(LostTalesMapMarkerRecord record) {
@@ -79,20 +71,14 @@ public final class LostTalesTileEntityWaystone
         }
         this.markerId = record.getId();
         this.linkToken = record.getLinkToken();
-        this.ownerPlayerId = record.getOwnerPlayerId();
-        applyPresentation(record);
         this.reconciled = true;
-        markDirtyAndSync();
+        markDirty();
     }
 
     public void clearLink() {
         this.markerId = "";
         this.linkToken = null;
-        this.ownerPlayerId = null;
-        this.displayName = "";
-        this.visibility = LostTalesMapMarkerVisibility.PRIVATE;
-        this.markerRevision = 0L;
-        markDirtyAndSync();
+        markDirty();
     }
 
     public boolean isLinked() {
@@ -118,14 +104,8 @@ public final class LostTalesTileEntityWaystone
     @Override
     public void writeToNBT(NBTTagCompound tag) {
         super.writeToNBT(tag);
-        tag.setInteger("DataVersion", CURRENT_DATA_VERSION);
         tag.setString("MarkerId", this.markerId);
         NbtTags.writeUuid(tag, "LinkToken", this.linkToken);
-        NbtTags.writeUuid(tag, "Owner", this.ownerPlayerId);
-        tag.setString("DisplayName", this.displayName);
-        tag.setString("Visibility",
-                this.visibility.getSerializedName());
-        tag.setLong("MarkerRevision", this.markerRevision);
     }
 
     @Override
@@ -133,61 +113,11 @@ public final class LostTalesTileEntityWaystone
         super.readFromNBT(tag);
         this.markerId = bounded(tag.getString("MarkerId"), 256, "");
         this.linkToken = NbtTags.readUuid(tag, "LinkToken");
-        this.ownerPlayerId = NbtTags.readUuid(tag, "Owner");
-        this.displayName = bounded(
-                tag.getString("DisplayName"), 256, "");
-        this.visibility =
-                LostTalesMapMarkerVisibility.forSerializedName(
-                        tag.getString("Visibility"),
-                        LostTalesMapMarkerVisibility.PRIVATE);
-        this.markerRevision = Math.max(
-                0L, tag.getLong("MarkerRevision"));
         if (this.markerId.length() == 0 || this.linkToken == null) {
             this.markerId = "";
             this.linkToken = null;
         }
         this.reconciled = false;
-    }
-
-    @Override
-    public Packet getDescriptionPacket() {
-        NBTTagCompound tag = new NBTTagCompound();
-        tag.setString("MarkerId", this.markerId);
-        tag.setString("DisplayName", this.displayName);
-        tag.setString("Visibility",
-                this.visibility.getSerializedName());
-        tag.setLong("MarkerRevision", this.markerRevision);
-        return new S35PacketUpdateTileEntity(
-                this.xCoord, this.yCoord, this.zCoord, 0, tag);
-    }
-
-    @Override
-    public void onDataPacket(
-            NetworkManager manager, S35PacketUpdateTileEntity packet) {
-        NBTTagCompound tag = packet.func_148857_g();
-        this.markerId = bounded(tag.getString("MarkerId"), 256, "");
-        this.displayName = bounded(
-                tag.getString("DisplayName"), 256, "");
-        this.visibility =
-                LostTalesMapMarkerVisibility.forSerializedName(
-                        tag.getString("Visibility"),
-                        LostTalesMapMarkerVisibility.PRIVATE);
-        this.markerRevision = Math.max(
-                0L, tag.getLong("MarkerRevision"));
-    }
-
-    private void applyPresentation(LostTalesMapMarkerRecord record) {
-        this.displayName = record.getName();
-        this.visibility = record.getVisibility();
-        this.markerRevision = record.getRevision();
-    }
-
-    private void markDirtyAndSync() {
-        markDirty();
-        if (this.worldObj != null) {
-            this.worldObj.markBlockForUpdate(
-                    this.xCoord, this.yCoord, this.zCoord);
-        }
     }
 
     private static String bounded(

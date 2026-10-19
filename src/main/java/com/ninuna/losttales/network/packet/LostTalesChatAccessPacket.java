@@ -54,7 +54,7 @@ import java.util.UUID;
  */
 public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_HOLDERS = 256;
-    /** An account's name, or a character's for a reader not shown accounts. */
+    /** An account's name, or the character's a character's role is held by. */
     private static final int MAX_HOLDER_NAME_BYTES = 128;
     /** As many capability ids as a player could plausibly hold. */
     public static final int MAX_CAPABILITIES = 128;
@@ -108,7 +108,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             + 2 + ChatProfanityWords.MAX_WORDS
                     * (ChatProfanityWords.MAX_ENTRY_BYTES + 2)
             + 1 + ChatCommandText.MAX_LISTED_NAMES * (MAX_PRIVATE_COMMAND_BYTES + 2)
-            + 1 + MAX_DISCORD_LINKS * (MAX_DISCORD_LINK_BYTES + 2) + 1 + 1;
+            + 1 + MAX_DISCORD_LINKS * (MAX_DISCORD_LINK_BYTES + 2) + 1;
     /**
      * Every channel this build knows, by id: what a payload written
      * without a channel answer reads as, and what a client falls back to.
@@ -188,12 +188,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
      * status: only then does a Discord member wear one.
      */
     private boolean discordStatuses;
-    /**
-     * Whether this player is shown which account plays a character: the
-     * server's Show Accounts, or character.see_accounts. A card names the
-     * account only then.
-     */
-    private boolean seesAccounts;
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -505,7 +499,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 links.add(key);
             }
             boolean statuses = buffer.readBoolean();
-            boolean accounts = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             int knownMask = known.knownMask();
             List<RoleHolder> stated = new ArrayList<RoleHolder>(holderCount);
@@ -545,7 +538,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.privateCommands = Collections.unmodifiableList(commands);
             this.discordLinks = Collections.unmodifiableList(links);
             this.discordStatuses = statuses;
-            this.seesAccounts = accounts;
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.roleMask = 0;
@@ -566,7 +558,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.privateCommands = Collections.emptyList();
             this.discordLinks = Collections.emptyList();
             this.discordStatuses = false;
-            this.seesAccounts = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -767,7 +758,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
                     MAX_DISCORD_LINK_BYTES);
         }
         buffer.writeBoolean(this.discordStatuses);
-        buffer.writeBoolean(this.seesAccounts);
     }
 
     /**
@@ -822,15 +812,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     /** Whether Discord members wear their Discord status on this server. */
     public boolean showsDiscordStatuses() { return this.discordStatuses; }
-
-    /** The same statement saying whether this player is shown which account plays a character. */
-    public LostTalesChatAccessPacket withSeesAccounts(boolean sees) {
-        this.seesAccounts = sees;
-        return this;
-    }
-
-    /** Whether this player is shown which account plays a character. */
-    public boolean seesAccounts() { return this.seesAccounts; }
 
     /** A link key: a code name, lower case letters, digits and underscores. */
     static boolean isLinkKey(String key) {

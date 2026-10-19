@@ -15,7 +15,6 @@ public final class CharacterBodyModelRegistryTest {
             CharacterBodyModelRegistry.LOTR_HUMAN, CharacterBodyModelRegistry.LOTR_ELF,
             CharacterBodyModelRegistry.LOTR_DWARF, CharacterBodyModelRegistry.LOTR_HOBBIT,
             CharacterBodyModelRegistry.LOTR_ORC, CharacterBodyModelRegistry.LOTR_URUK,
-            CharacterBodyModelRegistry.LOTR_HALF_TROLL,
             CharacterBodyModelRegistry.LOSTTALES_PLAYER
     };
 
@@ -47,8 +46,7 @@ public final class CharacterBodyModelRegistryTest {
         for (String id : MODEL_IDS) {
             CharacterBodyModelDefinition model = CharacterBodyModelRegistry.get(id);
             assertNotNull(id, model);
-            boolean offsetShoulders = CharacterBodyModelRegistry.LOTR_HOBBIT.equals(id)
-                    || CharacterBodyModelRegistry.LOTR_HALF_TROLL.equals(id);
+            boolean offsetShoulders = CharacterBodyModelRegistry.LOTR_HOBBIT.equals(id);
             boolean classicLayout = CharacterBodyModelRegistry.LOTR_ORC.equals(id)
                     || CharacterBodyModelRegistry.LOTR_URUK.equals(id);
             boolean player = CharacterBodyModelRegistry.LOSTTALES_PLAYER.equals(id);

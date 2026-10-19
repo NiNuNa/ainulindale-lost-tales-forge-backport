@@ -17,11 +17,17 @@ public enum LostTalesWaystoneStateReason {
     INVALID_SETTINGS(4, "chat.losttales.waystone.invalid_settings"),
     PUBLIC_DENIED(5, "chat.losttales.waystone.public_denied"),
     CHARACTER_NOT_FOUND(6, "chat.losttales.waystone.character_not_found"),
-    INVALID_SHARE(7, "chat.losttales.waystone.invalid_share"),
+    /** The character or fellowship named shares the waystone already. */
+    ALREADY_SHARED(7, "chat.losttales.waystone.already_shared"),
     SHARE_LIMIT(8, "chat.losttales.waystone.share_limit"),
+    /** None of the sharer's fellowships goes by the name. */
     FELLOWSHIP_NOT_FOUND(9,
             "chat.losttales.waystone.fellowship_not_found"),
-    SAVE_FAILED(10, "chat.losttales.waystone.save_failed");
+    SAVE_FAILED(10, "chat.losttales.waystone.save_failed"),
+    /** Unshare named a character or fellowship the waystone is not shared with. */
+    NOT_SHARED(11, "chat.losttales.waystone.not_shared"),
+    /** Hand Over came from a player who does not manage markers, or for a waystone nobody placed. */
+    HAND_OVER_DENIED(12, "chat.losttales.waystone.hand_over_denied");
 
     private final int networkId;
     private final String messageKey;

@@ -157,11 +157,48 @@ public final class CharacterPlayerEventHandler {
                     LostTalesMetaData.MOD_ID,
                     player.getUniqueID(),
                     result.getErrorId().getId());
+            if (action == LifecycleAction.LOGIN && CharacterJoin.isWaiting(serverPlayer)) {
+                // The characters cannot be read: the player waits as a
+                // ghost, told so in the creator, and may still talk out of
+                // character, use the consoles and type commands (CHAR-01).
+                CharacterJoin.arriveUnreadable(serverPlayer);
+                CharacterSyncManager.sendUnreadable(serverPlayer,
+                        CharacterSyncManager.UNSOLICITED_REQUEST_ID);
+                CharacterAppearanceSyncManager.sendFullSnapshot(serverPlayer);
+                LostTalesChatService.sendAccessToAll(null);
+                LostTalesChatService.sendLoginReplay(serverPlayer);
+                ChatPresenceService.sendAll(serverPlayer);
+                ChatServerStatus.sendTo(serverPlayer);
+            }
             AccessoryRecoveryService.recover(serverPlayer);
             AccessoryInventorySyncManager.send(serverPlayer);
             return;
         }
+        settle(serverPlayer, action, result, false);
+    }
 
+    /**
+     * Asks the store again for a player held while it could not be read
+     * (CHAR-01). Once it reads, the rest of their login runs, all but the
+     * chat, which went out as they arrived, and they wait for their first
+     * character as anyone else. Answers whether it read.
+     */
+    static boolean retryUnreadable(EntityPlayerMP serverPlayer) {
+        LoreCharacterTransferCoordinator.getInstance()
+                .recoverForPlayer(serverPlayer);
+        CharacterOperationResult result = CharacterService.getInstance()
+                .ensureRoster(serverPlayer);
+        if (!result.isSuccessful()) {
+            return false;
+        }
+        CharacterJoin.readsAgain(serverPlayer);
+        settle(serverPlayer, LifecycleAction.LOGIN, result, true);
+        return true;
+    }
+
+    /** The login, respawn or dimension change once the roster is read. */
+    private static void settle(EntityPlayerMP serverPlayer, LifecycleAction action,
+                               CharacterOperationResult result, boolean chatSent) {
         CharacterErrorId lifecycleResult;
         if (action == LifecycleAction.RESPAWN) {
             lifecycleResult = CharacterSwitchCoordinator.getInstance()
@@ -177,7 +214,7 @@ public final class CharacterPlayerEventHandler {
                 && lifecycleResult != CharacterErrorId.SWITCH_DEATH_PENDING) {
             FMLLog.warning("[%s] Character lifecycle recovery for player %s returned %s",
                     LostTalesMetaData.MOD_ID,
-                    player.getUniqueID(),
+                    serverPlayer.getUniqueID(),
                     lifecycleResult.getId());
         }
 
@@ -214,15 +251,16 @@ public final class CharacterPlayerEventHandler {
                 CharacterSyncManager.UNSOLICITED_REQUEST_ID,
                 result.getRoster());
         CharacterAppearanceSyncManager.sendFullSnapshot(serverPlayer);
-        if (action == LifecycleAction.LOGIN) {
+        if (action == LifecycleAction.LOGIN && !chatSent) {
             // Everyone's role roster follows the join, the joiner's own
             // access included; then what was said and done while they
-            // were away, in the order it happened.
+            // were away, in the order it happened. A player held for the
+            // store had all this as they arrived.
             LostTalesChatService.sendAccessToAll(null);
             LostTalesChatService.sendLoginReplay(serverPlayer);
             ChatPresenceService.sendAll(serverPlayer);
             ChatServerStatus.sendTo(serverPlayer);
-        } else {
+        } else if (action != LifecycleAction.LOGIN) {
             LostTalesChatService.sendAccess(serverPlayer);
         }
         CharacterRaceGameplayHandler.apply(serverPlayer);

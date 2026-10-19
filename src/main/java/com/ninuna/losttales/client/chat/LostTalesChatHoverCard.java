@@ -259,12 +259,10 @@ final class LostTalesChatHoverCard {
                 LostTalesChatVisualStyle.removeColorCodes(target.identityName).trim());
         String account = target.accountName.trim();
         // Never "Name ()" or "(Account)": the suffix only exists when both
-        // halves do, and an account identity shows the account alone. A
-        // character's account shows only to a player the server shows it to.
-        String suffix = !target.accountIdentity && name.length() > 0
-                && account.length() > 0 && !name.equalsIgnoreCase(account)
-                && ClientChatChannelState.seesAccounts()
-                ? " (" + account + ")" : "";
+        // halves do, and an account identity shows the account alone. The
+        // card names a character's account whatever Show Accounts says.
+        String suffix = ChatAccountAside.suffix(name, account,
+                !target.accountIdentity);
         if (name.length() == 0) {
             name = account;
             suffix = "";
@@ -1139,7 +1137,7 @@ final class LostTalesChatHoverCard {
 
     /**
      * A tooltip of plain lines, laid out and drawn as every other tip is
-     * ({@link WindowStyle#drawPopupLines}): the popup's surface and inset,
+     * ({@link com.ninuna.losttales.client.window.PointerTip}): the popup's surface and inset,
      * its lines a line apart, the chat's shadow, and vanilla's colour
      * codes in the palette's own tones. What the achievement and text hover cards
      * and the shared-marker tooltip draw with, in place of vanilla's

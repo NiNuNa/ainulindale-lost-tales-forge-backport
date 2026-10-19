@@ -361,8 +361,10 @@ public final class WindowLayout {
     /**
      * Opens a new copy of {@code tab}'s page at the end of a window's row,
      * in front, whatever the window's kind: the {@code +}'s new page. A
-     * locked window, or one with no room, has it open in a new window a
-     * step on from it, unlocked and in front. Null for no such window.
+     * locked window, or one with no room, has it open as everything opened
+     * from it does (WIN-18): in another unlocked window of its view with
+     * room, else in a new window a step on from it. Null for no such
+     * window.
      */
     public static synchronized WindowPage openCopyIn(WindowPage tab,
                                                      String windowId) {
@@ -372,7 +374,7 @@ public final class WindowLayout {
             return null;
         }
         if (!takes(window, Collections.singletonList(copy))) {
-            return openInNewWindow(copy, window);
+            return placeIn(copy, viewOf(window), window.getId());
         }
         window.tabs().add(copy);
         window.setActiveTab(copy);
@@ -383,8 +385,10 @@ public final class WindowLayout {
     /**
      * Opens another copy of {@code tab}'s page right after it, in front, as
      * Chrome's Duplicate does: a view of its own of the same page. A
-     * locked window, or one with no room, has it open where a page opened
-     * by hand from there would. Null for a page that opens once.
+     * locked window, or one with no room, has it open as everything opened
+     * from it does (WIN-18): in another unlocked window of its view with
+     * room, else in a new window a step on from it. Null for a page that
+     * opens once.
      */
     public static synchronized WindowPage duplicate(WindowPage tab) {
         Window window = exactWindowOf(tab);
@@ -1351,7 +1355,6 @@ public final class WindowLayout {
                 window.setOffsets(clampWindowPercent(spec.offsetX),
                         clampWindowPercent(spec.offsetY));
                 window.setLocked(spec.locked);
-                window.setBorderlessHeld(spec.borderlessHeld);
                 window.setPinnedToHud(spec.pinnedToHud);
                 window.setPinnedToGui(spec.pinnedToGui);
                 window.setFill(spec.fill);
@@ -1390,7 +1393,7 @@ public final class WindowLayout {
             }
             result.add(new WindowSpec(window.getId(), tabs,
                     active != null && active.isKeptInLayout() ? active : null,
-                    window.isLocked(), window.isBorderlessHeld(),
+                    window.isLocked(),
                     window.isPinnedToHud(), window.isPinnedToGui(),
                     viewOf(window), window.getOffsetX(),
                     window.getOffsetY(), window.getOwnHeight(),
@@ -1405,8 +1408,6 @@ public final class WindowLayout {
         final List<WindowPage> tabs;
         final WindowPage activeTab;
         final boolean locked;
-        /** Its page fills it, held there until the player lets it go. */
-        final boolean borderlessHeld;
         final boolean pinnedToHud;
         final boolean pinnedToGui;
         /** The view it stands in; null to take its front page's category's. */
@@ -1424,7 +1425,7 @@ public final class WindowLayout {
 
         public WindowSpec(String id, List<? extends WindowPage> tabs,
                           WindowPage activeTab, boolean locked,
-                          boolean borderlessHeld, boolean pinnedToHud,
+                          boolean pinnedToHud,
                           boolean pinnedToGui, View view, double offsetX,
                           double offsetY,
                           double height, int width, Window.ScreenFill fill,
@@ -1441,7 +1442,6 @@ public final class WindowLayout {
             this.tabs = kept;
             this.activeTab = activeTab;
             this.locked = locked;
-            this.borderlessHeld = borderlessHeld;
             this.pinnedToHud = pinnedToHud;
             this.pinnedToGui = pinnedToGui;
             this.view = view;
@@ -1672,24 +1672,8 @@ public final class WindowLayout {
         window.setFill(Window.ScreenFill.NONE);
         window.setPinnedToHud(false);
         window.setPinnedToGui(false);
-        window.setBorderlessHeld(false);
         window.splits().clear();
         window.setLocked(true);
-        changed();
-        return true;
-    }
-
-    /**
-     * Holds a window's page filling it, or lets it go
-     * ({@link ContentView}). Answers whether anything changed.
-     */
-    public static synchronized boolean setBorderlessHeld(String windowId,
-                                                         boolean held) {
-        Window window = window(windowId);
-        if (window == null || window.isBorderlessHeld() == held) {
-            return false;
-        }
-        window.setBorderlessHeld(held);
         changed();
         return true;
     }

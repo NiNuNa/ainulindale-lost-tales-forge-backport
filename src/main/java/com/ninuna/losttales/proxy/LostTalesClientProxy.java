@@ -8,7 +8,9 @@ import com.ninuna.losttales.client.chat.ClientChatIdentitySelection;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapPage;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
+import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.io.File;
+import java.util.Collection;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
@@ -90,6 +92,8 @@ import com.ninuna.losttales.network.packet.LostTalesMissiveBoardStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestFellowsPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestProgressPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestOfferPacket;
@@ -428,6 +432,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleQuestOffer(LostTalesQuestOfferPacket packet) {
         if (packet != null) {
+            if (packet.isRumour()) {
+                LostTalesQuestDialogueHooks.rumourFrom(packet.getEntityId(),
+                        packet.getQuestId());
+                return;
+            }
             LostTalesQuestDialogueHooks.offerFrom(packet.getEntityId(),
                     packet.getQuestId());
         }
@@ -448,6 +457,28 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             LostTalesClientQuestDefinitionStore.setDynamicQuestDefinitions(packet.getDynamicQuestDefinitions());
             LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getQuestHistory());
             LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getQuestHistory(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
+            LostTalesClientQuestProgressStore.setHeardRumours(packet.getHeardRumours());
+        }
+    }
+
+    /** Counts that moved, laid over the log held, told as a whole log's change would be. */
+    @Override
+    public void handleQuestProgress(LostTalesQuestProgressPacket packet) {
+        if (packet == null || !LostTalesClientQuestProgressStore.hasReceivedSync()) {
+            return;
+        }
+        Collection<LostTalesQuestProgress> active =
+                LostTalesClientQuestProgressStore.withCounts(packet.getQuests());
+        LostTalesClientQuestNotificationStore.notifyForIncomingSync(active,
+                LostTalesClientQuestProgressStore.getQuestHistory());
+        LostTalesClientQuestProgressStore.replaceActiveQuests(active);
+    }
+
+    /** How the fellowships' members stand in the quests this player runs too (QUEST-25). */
+    @Override
+    public void handleQuestFellows(LostTalesQuestFellowsPacket packet) {
+        if (packet != null) {
+            com.ninuna.losttales.client.quest.ClientQuestFellows.set(packet.getCounts());
         }
     }
 
@@ -747,7 +778,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     packet.getProximityRadius());
             ClientChatChannelState.setChannelIcons(packet.getChannelIcons());
             ClientChatChannelState.setDiscordLinks(packet.getDiscordLinks());
-            ClientChatChannelState.setSeesAccounts(packet.seesAccounts());
             com.ninuna.losttales.client.chat.ClientChatPresence.setDiscordStatuses(
                     packet.showsDiscordStatuses());
             // The words the server adds to the profanity list, over the

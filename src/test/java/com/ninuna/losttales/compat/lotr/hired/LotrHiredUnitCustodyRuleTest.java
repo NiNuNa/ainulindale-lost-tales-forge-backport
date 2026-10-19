@@ -24,6 +24,15 @@ public final class LotrHiredUnitCustodyRuleTest {
     private static final String ACCOUNT_KEY = OWNER.toString();
 
 
+    /** A released figure's unit answers to whoever holds the figure now (CHAR-30). */
+    @Test
+    public void aFiguresUnitAnswersToItsHolderNow() {
+        UUID holder = UUID.fromString("e5000000-0000-0000-0000-00000000005e");
+        assertEquals(holder, LotrHiredUnitCustodyRule.answersTo(OWNER, holder));
+        assertEquals("nobody holds it, or it is no figure", OWNER,
+                LotrHiredUnitCustodyRule.answersTo(OWNER, null));
+    }
+
     @Test
     public void theActiveIdentitysUnitIsReleasedOnceAndLeftAfter() {
         assertEquals(Action.RELEASE, LotrHiredUnitCustodyRule.decide(

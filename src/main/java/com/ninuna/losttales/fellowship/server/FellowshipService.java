@@ -4,6 +4,8 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipRecord;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.storage.CharacterIndex;
 import com.ninuna.losttales.character.storage.CharacterStorage;
@@ -33,8 +35,10 @@ import net.minecraftforge.common.DimensionManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -256,6 +260,11 @@ public final class FellowshipService {
         }
         if (fellowship.isLeader(targetIdentityId)) {
             return FellowshipOperationResult.success(false, fellowship, target);
+        }
+        // A figure nobody holds cannot lead (CHAR-36).
+        if (target.isUnheld()) {
+            return FellowshipOperationResult.failure(
+                    FellowshipErrorId.INVALID_TARGET, fellowship);
         }
         if (countLed(context.fellowshipData.getFellowshipsForIdentity(targetIdentityId),
                 targetIdentityId) >= leadLimitOf(target)) {
@@ -742,7 +751,8 @@ public final class FellowshipService {
         UUID first = null;
         for (FellowshipMember member : fellowship.getMembers()) {
             UUID identityId = member.getIdentityId();
-            if (identityId.equals(leaving)) {
+            // A figure nobody holds cannot lead (CHAR-36).
+            if (identityId.equals(leaving) || member.isUnheld()) {
                 continue;
             }
             if (first == null) {
@@ -943,6 +953,16 @@ public final class FellowshipService {
                 : data.getFellowshipsForIdentity(active.gameplayId());
     }
 
+    /**
+     * The id of the fellowship a character travels with, played or not;
+     * null for none, or while it cannot be told.
+     */
+    public synchronized UUID getTravellingFellowshipId(World world, UUID identityId) {
+        Fellowship fellowship = world == null || world.isRemote || identityId == null
+                ? null : travellingFellowshipOf(world, identityId);
+        return fellowship == null ? null : fellowship.getFellowshipId();
+    }
+
     /** The fellowship the character a player plays travels with; null for none. */
     public synchronized Fellowship getTravellingFellowshipForActiveIdentity(
             EntityPlayerMP player) {
@@ -955,11 +975,29 @@ public final class FellowshipService {
     /**
      * Removes a character from every fellowship, with its invitations and
      * its go-here mark, before its record is deleted. A leader leaving so
-     * is followed as {@link #successorOf} picks; a fellowship left empty
-     * ends. Deletion is refused if a store cannot be updated safely.
+     * is followed as {@link #successorOf} picks; a fellowship nobody else
+     * plays a member of ends. Deletion is refused if a store cannot be
+     * updated safely.
      */
     public synchronized FellowshipOperationResult removeCharacterForDeletion(
             World world, RoleplayCharacter character) {
+        return leaveAll(world, character, false);
+    }
+
+    /**
+     * A lore figure is released (CHAR-36): it stays a member of every
+     * fellowship, held by nobody, for its next holder to take up. The lead
+     * it held passes on as {@link #successorOf} picks, its invitations and
+     * its go-here mark go, and a fellowship nobody else plays a member of
+     * ends. The release is refused if a store cannot be updated safely.
+     */
+    public synchronized FellowshipOperationResult releaseFigure(
+            World world, RoleplayCharacter character) {
+        return leaveAll(world, character, true);
+    }
+
+    private FellowshipOperationResult leaveAll(World world, RoleplayCharacter character,
+                                               boolean keepPlaces) {
         if (world == null || world.isRemote || character == null) {
             return FellowshipOperationResult.failure(FellowshipErrorId.INVALID_PLAYER, null);
         }
@@ -1003,7 +1041,7 @@ public final class FellowshipService {
             last = fellowship;
             changed = true;
             left.add(fellowship.getFellowshipId());
-            if (fellowship.getMemberCount() == 1) {
+            if (!fellowship.hasHeldMemberBesides(characterId)) {
                 invitationData.removeInvitationsForFellowship(fellowship.getFellowshipId());
                 fellowshipData.removeFellowship(fellowship.getFellowshipId());
                 marks.removeMarksOf(fellowship.getFellowshipId());
@@ -1013,13 +1051,92 @@ public final class FellowshipService {
                 fellowship.transferLeadership(successorOf(fellowshipData, fellowship,
                         characterId, this.leadLimits));
             }
-            fellowship.removeMember(characterId);
+            if (keepPlaces) {
+                fellowship.refreshMemberIdentity(characterId, FellowshipMember.UNHELD,
+                        removed.getCharacterName());
+            } else {
+                fellowship.removeMember(characterId);
+            }
             fellowshipData.saveFellowship(fellowship);
         }
         for (UUID fellowshipId : left) {
             FellowshipMirrors.reconcile(world, fellowshipId);
         }
         return FellowshipOperationResult.success(changed, last, removed);
+    }
+
+    /**
+     * A claimed lore figure's next holder takes up its places (CHAR-36):
+     * each fellowship it stands in held by nobody now names the new owner,
+     * except where that account already has a member, which the figure
+     * leaves (FEL-01). A store that cannot be written leaves the places as
+     * they are, for the check as the world next loads to take up.
+     */
+    public synchronized FellowshipOperationResult takeUpFigure(
+            World world, RoleplayCharacter character) {
+        if (world == null || world.isRemote || character == null) {
+            return FellowshipOperationResult.failure(FellowshipErrorId.INVALID_PLAYER, null);
+        }
+        FellowshipWorldData fellowshipData = getFellowshipData(world);
+        if (fellowshipData == null) {
+            return FellowshipOperationResult.failure(FellowshipErrorId.INTERNAL_ERROR, null);
+        }
+        if (fellowshipData.isReadOnlyForNewerVersion()) {
+            return FellowshipOperationResult.failure(
+                    FellowshipErrorId.FELLOWSHIP_STORAGE_READ_ONLY, null);
+        }
+        UUID characterId = character.getCharacterId();
+        Fellowship last = null;
+        List<UUID> taken = new ArrayList<UUID>();
+        for (Fellowship fellowship : fellowshipData.getFellowshipsForIdentity(characterId)) {
+            if (takeUp(fellowship, characterId, character.getOwnerId(), character.getName())) {
+                fellowshipData.saveFellowship(fellowship);
+                taken.add(fellowship.getFellowshipId());
+                last = fellowship;
+            }
+        }
+        for (UUID fellowshipId : taken) {
+            FellowshipMirrors.reconcile(world, fellowshipId);
+        }
+        return FellowshipOperationResult.success(!taken.isEmpty(), last,
+                last == null ? null : last.getMember(characterId));
+    }
+
+    /**
+     * The figure {@code identityId}, held by nobody in {@code fellowship},
+     * is taken up by {@code ownerId}, or leaves where that account already
+     * has a member. Whether anything changed.
+     */
+    static boolean takeUp(Fellowship fellowship, UUID identityId, UUID ownerId, String name) {
+        FellowshipMember member = fellowship.getMember(identityId);
+        if (member == null || !member.isUnheld() || ownerId == null) {
+            return false;
+        }
+        if (fellowship.hasMemberOwnedBy(ownerId)) {
+            fellowship.removeMember(identityId);
+            return true;
+        }
+        return fellowship.refreshMemberIdentity(identityId, ownerId, name);
+    }
+
+    /**
+     * The characters that are lore figures, held or not, whose fellowships
+     * keep their places while nobody holds them (CHAR-36); null while the
+     * lore store cannot say, so that no place goes for want of an answer.
+     */
+    private static Set<UUID> loreFigures(World world) {
+        try {
+            Set<UUID> figures = new HashSet<UUID>();
+            for (LoreCharacterOwnershipRecord record
+                    : LoreCharacterOwnershipStorage.get(world).getRecords()) {
+                if (record.getCharacterId() != null) {
+                    figures.add(record.getCharacterId());
+                }
+            }
+            return figures;
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
     }
 
     /** Validates the persistent stores and removes stale invitations and marks. */
@@ -1059,10 +1176,11 @@ public final class FellowshipService {
             return null;
         }
         CharacterIndex index = characterData.characterIndex();
+        Set<UUID> figures = loreFigures(world);
         int members = 0;
         for (Fellowship fellowship : fellowshipData.getFellowships()) {
             for (FellowshipMember member : fellowship.getMembers()) {
-                if (memberRemovalReason(member, index) != null) {
+                if (memberRemovalReason(member, index, figures) != null) {
                     members++;
                 }
             }
@@ -1096,7 +1214,8 @@ public final class FellowshipService {
                 || characterData.isReadOnlyForNewerVersion()) {
             return null;
         }
-        int members = repairMemberReferences(fellowshipData, characterData);
+        int members = repairMemberReferences(fellowshipData, characterData,
+                loreFigures(world));
         fellowshipData.markCharacterReferencesValidated();
         int invitations = this.invitationCoordinator.pruneInvalidInvitations(
                 fellowshipData, invitationData, characterData, System.currentTimeMillis());
@@ -1136,18 +1255,20 @@ public final class FellowshipService {
                 || characterData.isReadOnlyForNewerVersion()) {
             return false;
         }
-        repairMemberReferences(fellowshipData, characterData);
+        repairMemberReferences(fellowshipData, characterData, loreFigures(world));
         fellowshipData.markCharacterReferencesValidated();
         return true;
     }
 
     /**
      * Quarantines every member that no longer stands, brings the names of
-     * the others up to date, and mends a fellowship's leader or ends an empty
-     * fellowship. Returns how many members it removed.
+     * the others up to date, has a figure claimed since it was released
+     * taken up by its holder, and mends a fellowship's leader or ends one
+     * nobody plays a member of. Returns how many members it removed.
      */
     private int repairMemberReferences(FellowshipWorldData fellowshipData,
-                                       CharacterWorldData characterData) {
+                                       CharacterWorldData characterData,
+                                       Set<UUID> figures) {
         int removed = 0;
         CharacterIndex index = characterData.characterIndex();
         List<Fellowship> fellowships = new ArrayList<Fellowship>(fellowshipData.getFellowships());
@@ -1155,7 +1276,7 @@ public final class FellowshipService {
             boolean changed = false;
             for (FellowshipMember member : new ArrayList<FellowshipMember>(fellowship.getMembers())) {
                 UUID identityId = member.getIdentityId();
-                String removalReason = memberRemovalReason(member, index);
+                String removalReason = memberRemovalReason(member, index, figures);
                 if (removalReason != null) {
                     fellowship.removeMember(identityId);
                     fellowshipData.quarantine(removalReason,
@@ -1165,6 +1286,14 @@ public final class FellowshipService {
                     continue;
                 }
                 RoleplayCharacter character = index.find(identityId);
+                if (member.isUnheld()) {
+                    // Claimed while its places waited: its holder takes them up.
+                    if (character != null && takeUp(fellowship, identityId,
+                            character.getOwnerId(), character.getName())) {
+                        changed = true;
+                    }
+                    continue;
+                }
                 String name = character != null ? character.getName()
                         : RoleplayCharacterIdentityHook.resolveGameplayName(identityId);
                 if (name != null && name.length() > 0
@@ -1173,7 +1302,7 @@ public final class FellowshipService {
                     changed = true;
                 }
             }
-            if (fellowship.getMemberCount() == 0) {
+            if (!fellowship.hasHeldMemberBesides(null)) {
                 fellowshipData.removeFellowship(fellowship.getFellowshipId());
                 continue;
             }
@@ -1189,15 +1318,22 @@ public final class FellowshipService {
 
     /**
      * Why a member no longer stands: its id is held by two rosters, names
-     * no character, or names a character of another account. Null while it
-     * stands.
+     * no character, or names a character of another account. A figure held
+     * by nobody stands while it is a lore figure, for its next holder to
+     * take up; {@code figures} is null while the lore store cannot say,
+     * which keeps every such figure. Null while it stands.
      */
-    private static String memberRemovalReason(FellowshipMember member, CharacterIndex index) {
+    static String memberRemovalReason(FellowshipMember member, CharacterIndex index,
+                                      Set<UUID> figures) {
         UUID identityId = member.getIdentityId();
         if (index.isAmbiguous(identityId)) {
             return "ambiguous_character_uuid";
         }
         RoleplayCharacter character = index.find(identityId);
+        if (member.isUnheld()) {
+            return character != null || figures == null || figures.contains(identityId)
+                    ? null : "missing_character";
+        }
         if (character == null) {
             return "missing_character";
         }

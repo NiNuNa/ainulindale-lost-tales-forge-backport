@@ -22,9 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 /**
- * A player's whole quest log, sent whenever it changes: running quests and
- * their counts, the History, tracked quests, discovered and placed
- * markers, and the missives' quests.
+ * A player's whole quest log: running quests and their counts, the
+ * History, tracked quests, discovered and placed markers, and the
+ * missives' quests. It is sent when anything but a running quest's counts
+ * changes; counts alone travel as {@link LostTalesQuestProgressPacket}.
  */
 public class LostTalesQuestSyncPacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 2 * 1024 * 1024;
@@ -45,6 +46,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
     private final List<LostTalesMapMarkerDefinition> dynamicMapMarkers = new ArrayList<LostTalesMapMarkerDefinition>();
     private final List<LostTalesQuestDefinition> dynamicQuestDefinitions = new ArrayList<LostTalesQuestDefinition>();
     private String pinnedMapMarkerId = "";
+    private final Set<String> heardRumours = new LinkedHashSet<String>();
     private boolean malformed;
 
     public LostTalesQuestSyncPacket() {}
@@ -99,11 +101,31 @@ public class LostTalesQuestSyncPacket implements IMessage {
         if (data == null) {
             return new LostTalesQuestSyncPacket();
         }
-        return new LostTalesQuestSyncPacket(data.getActiveQuests(),
+        LostTalesQuestSyncPacket packet = new LostTalesQuestSyncPacket(data.getActiveQuests(),
                 data.getQuestHistory(), data.getPinnedQuestIds(),
                 data.getDiscoveredMarkerIds(), data.getPinnedMapMarkerId(),
                 data.getDynamicMapMarkers(),
                 data.getDynamicQuestDefinitions());
+        return packet.withHeardRumours(data.getHeardRumours());
+    }
+
+    /** The same log with the rumours its character heard (QUEST-20). */
+    public LostTalesQuestSyncPacket withHeardRumours(Collection<String> rumours) {
+        this.heardRumours.clear();
+        if (rumours != null) {
+            for (String questId : rumours) {
+                if (questId != null && questId.length() > 0
+                        && this.heardRumours.size() < LostTalesQuestPlayerData.MAX_RUMOURS) {
+                    this.heardRumours.add(questId);
+                }
+            }
+        }
+        return this;
+    }
+
+    /** The quests whose rumours the character heard. */
+    public Set<String> getHeardRumours() {
+        return Collections.unmodifiableSet(new LinkedHashSet<String>(this.heardRumours));
     }
 
     @Override
@@ -119,41 +141,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
             int activeCount = LostTalesPacketCodec.readCount(
                     buf, MAX_ACTIVE_QUESTS, "active quest");
             for (int i = 0; i < activeCount; i++) {
-                String questId = readIdentifier(buf);
-                int stageIndex = buf.readInt();
-                String stageId = readIdentifier(buf);
-                long acceptedWorldTime = buf.readLong();
-                long deadlineWorldTime = buf.readLong();
-                if (stageIndex < 0 || acceptedWorldTime < 0L
-                        || deadlineWorldTime < 0L
-                        || deadlineWorldTime > 0L
-                        && acceptedWorldTime > 0L
-                        && deadlineWorldTime < acceptedWorldTime) {
-                    throw new LostTalesPacketCodec.DecodeException(
-                            "invalid active quest timing");
-                }
-
-                Map<String, Integer> objectiveProgress =
-                        new LinkedHashMap<String, Integer>();
-                int objectiveCount = LostTalesPacketCodec.readCount(
-                        buf, MAX_OBJECTIVE_PROGRESS, "objective progress");
-                for (int j = 0; j < objectiveCount; j++) {
-                    String objectiveId = readIdentifier(buf);
-                    int progress = buf.readInt();
-                    if (objectiveId.length() == 0 || progress < 0) {
-                        throw new LostTalesPacketCodec.DecodeException(
-                                "invalid objective progress");
-                    }
-                    objectiveProgress.put(objectiveId, progress);
-                }
-
-                if (questId.length() == 0) {
-                    throw new LostTalesPacketCodec.DecodeException(
-                            "active quest ID is empty");
-                }
-                this.activeQuests.add(new LostTalesQuestProgress(
-                        questId, stageIndex, stageId, objectiveProgress,
-                        acceptedWorldTime, deadlineWorldTime));
+                this.activeQuests.add(readProgress(buf));
             }
 
             int pinnedQuestCount = LostTalesPacketCodec.readCount(
@@ -184,9 +172,17 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 readIdentifierSet(buf, completedOptionalObjectives,
                         "completed optional objective",
                         MAX_OBJECTIVE_PROGRESS);
+                int completions = buf.readInt();
+                if (completions < 0) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid quest completions");
+                }
+                LinkedHashSet<String> stagePath = new LinkedHashSet<String>();
+                readIdentifierSet(buf, stagePath, "stage path",
+                        LostTalesQuestProgress.MAX_PATH_STAGES);
                 this.questHistory.add(new LostTalesQuestHistoryEntry(
                         questId, outcome, detail, worldTime,
-                        completedOptionalObjectives));
+                        completedOptionalObjectives, completions, stagePath));
             }
 
             int dynamicMarkerCount = LostTalesPacketCodec.readCount(
@@ -241,6 +237,8 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 }
                 this.dynamicQuestDefinitions.add(quest);
             }
+            readIdentifierSet(buf, this.heardRumours, "heard rumour",
+                    LostTalesQuestPlayerData.MAX_RUMOURS);
             LostTalesPacketCodec.requireFinished(buf);
         } catch (RuntimeException exception) {
             clearState();
@@ -255,34 +253,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
         LostTalesPacketCodec.writeCount(buf, this.activeQuests.size(),
                 MAX_ACTIVE_QUESTS, "active quest");
         for (LostTalesQuestProgress progress : this.activeQuests) {
-            if (progress == null || progress.getStageIndex() < 0
-                    || progress.getAcceptedWorldTime() < 0L
-                    || progress.getDeadlineWorldTime() < 0L
-                    || progress.getDeadlineWorldTime() > 0L
-                    && progress.getAcceptedWorldTime() > 0L
-                    && progress.getDeadlineWorldTime()
-                    < progress.getAcceptedWorldTime()) {
-                throw new IllegalStateException("invalid active quest");
-            }
-            writeIdentifier(buf, progress.getQuestId());
-            buf.writeInt(progress.getStageIndex());
-            writeIdentifier(buf, progress.getStageId());
-            buf.writeLong(progress.getAcceptedWorldTime());
-            buf.writeLong(progress.getDeadlineWorldTime());
-
-            Map<String, Integer> objectiveProgress = progress.getObjectiveProgress();
-            LostTalesPacketCodec.writeCount(buf, objectiveProgress.size(),
-                    MAX_OBJECTIVE_PROGRESS, "objective progress");
-            for (Map.Entry<String, Integer> entry : objectiveProgress.entrySet()) {
-                if (entry.getKey() == null || entry.getKey().length() == 0
-                        || entry.getValue() == null
-                        || entry.getValue() < 0) {
-                    throw new IllegalStateException(
-                            "invalid objective progress");
-                }
-                writeIdentifier(buf, entry.getKey());
-                buf.writeInt(entry.getValue());
-            }
+            writeProgress(buf, progress);
         }
 
         writeIdentifierSet(buf, this.pinnedQuestIds, "pinned quest");
@@ -305,6 +276,10 @@ public class LostTalesQuestSyncPacket implements IMessage {
                     entry.getCompletedOptionalObjectiveIds(),
                     "completed optional objective",
                     MAX_OBJECTIVE_PROGRESS);
+            buf.writeInt(entry.getCompletions());
+            writeIdentifierSet(buf, new LinkedHashSet<String>(
+                    entry.getStagePath()), "stage path",
+                    LostTalesQuestProgress.MAX_PATH_STAGES);
         }
 
         LostTalesPacketCodec.writeCount(buf, this.dynamicMapMarkers.size(),
@@ -339,10 +314,126 @@ public class LostTalesQuestSyncPacket implements IMessage {
         for (LostTalesQuestDefinition quest : this.dynamicQuestDefinitions) {
             LostTalesQuestDefinitionCodec.write(buf, quest);
         }
+        writeIdentifierSet(buf, this.heardRumours, "heard rumour",
+                LostTalesQuestPlayerData.MAX_RUMOURS);
         if (buf.writerIndex() - startIndex > MAX_PACKET_BYTES) {
             throw new IllegalStateException(
                     "quest snapshot exceeds packet limit");
         }
+    }
+
+    /**
+     * One running quest as both quest packets carry it: its id, stage,
+     * times, each objective's count and the stages it has reached.
+     */
+    static void writeProgress(ByteBuf buf, LostTalesQuestProgress progress) {
+        if (progress == null || progress.getStageIndex() < 0
+                || progress.getAcceptedWorldTime() < 0L
+                || progress.getDeadlineWorldTime() < 0L
+                || progress.getDeadlineWorldTime() > 0L
+                && progress.getAcceptedWorldTime() > 0L
+                && progress.getDeadlineWorldTime()
+                < progress.getAcceptedWorldTime()) {
+            throw new IllegalStateException("invalid active quest");
+        }
+        writeIdentifier(buf, progress.getQuestId());
+        buf.writeInt(progress.getStageIndex());
+        writeIdentifier(buf, progress.getStageId());
+        buf.writeLong(progress.getAcceptedWorldTime());
+        buf.writeLong(progress.getDeadlineWorldTime());
+
+        Map<String, Integer> objectiveProgress = progress.getObjectiveProgress();
+        LostTalesPacketCodec.writeCount(buf, objectiveProgress.size(),
+                MAX_OBJECTIVE_PROGRESS, "objective progress");
+        for (Map.Entry<String, Integer> entry : objectiveProgress.entrySet()) {
+            if (entry.getKey() == null || entry.getKey().length() == 0
+                    || entry.getValue() == null
+                    || entry.getValue() < 0) {
+                throw new IllegalStateException(
+                        "invalid objective progress");
+            }
+            writeIdentifier(buf, entry.getKey());
+            buf.writeInt(entry.getValue());
+        }
+        writeIdentifierSet(buf, new LinkedHashSet<String>(
+                progress.getStagePath()), "stage path",
+                LostTalesQuestProgress.MAX_PATH_STAGES);
+        buf.writeLong(progress.getStageDeadlineWorldTime());
+        buf.writeBoolean(progress.isReturning());
+        buf.writeBoolean(progress.isChoosing());
+        writeIdentifier(buf, progress.getGiverId());
+        writeName(buf, progress.getGiverName());
+        writeIdentifier(buf, progress.getGiverKind());
+    }
+
+    /** One running quest as {@link #writeProgress} wrote it; throws on anything else. */
+    static LostTalesQuestProgress readProgress(ByteBuf buf) {
+        String questId = readIdentifier(buf);
+        int stageIndex = buf.readInt();
+        String stageId = readIdentifier(buf);
+        long acceptedWorldTime = buf.readLong();
+        long deadlineWorldTime = buf.readLong();
+        if (stageIndex < 0 || acceptedWorldTime < 0L
+                || deadlineWorldTime < 0L
+                || deadlineWorldTime > 0L
+                && acceptedWorldTime > 0L
+                && deadlineWorldTime < acceptedWorldTime) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "invalid active quest timing");
+        }
+
+        Map<String, Integer> objectiveProgress =
+                new LinkedHashMap<String, Integer>();
+        int objectiveCount = LostTalesPacketCodec.readCount(
+                buf, MAX_OBJECTIVE_PROGRESS, "objective progress");
+        for (int j = 0; j < objectiveCount; j++) {
+            String objectiveId = readIdentifier(buf);
+            int progress = buf.readInt();
+            if (objectiveId.length() == 0 || progress < 0) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid objective progress");
+            }
+            objectiveProgress.put(objectiveId, progress);
+        }
+        LinkedHashSet<String> stagePath = new LinkedHashSet<String>();
+        readIdentifierSet(buf, stagePath, "stage path",
+                LostTalesQuestProgress.MAX_PATH_STAGES);
+        long stageDeadline = buf.readLong();
+        boolean returning = buf.readBoolean();
+        boolean choosing = buf.readBoolean();
+        String giverId = readIdentifier(buf);
+        String giverName = readName(buf);
+        String giverKind = readIdentifier(buf);
+
+        if (questId.length() == 0 || stageDeadline < 0L
+                || giverName.length() > LostTalesQuestProgress.MAX_GIVER_NAME_CHARACTERS) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "invalid active quest");
+        }
+        LostTalesQuestProgress read = new LostTalesQuestProgress(questId,
+                stageIndex, stageId, objectiveProgress, acceptedWorldTime,
+                deadlineWorldTime, stagePath);
+        read.setStageDeadlineWorldTime(stageDeadline);
+        read.setReturning(returning);
+        read.setChoosing(choosing);
+        read.setGiver(giverId, giverName, giverKind);
+        return read;
+    }
+
+    /**
+     * The log with every running quest's counts left out: what must stay
+     * the same for counts alone to bring a client up to date.
+     */
+    public LostTalesQuestSyncPacket withoutObjectiveCounts() {
+        List<LostTalesQuestProgress> uncounted =
+                new ArrayList<LostTalesQuestProgress>(this.activeQuests.size());
+        for (LostTalesQuestProgress progress : this.activeQuests) {
+            uncounted.add(progress.withoutCounts());
+        }
+        return new LostTalesQuestSyncPacket(uncounted, this.questHistory,
+                this.pinnedQuestIds, this.discoveredMarkerIds,
+                this.pinnedMapMarkerId, this.dynamicMapMarkers,
+                this.dynamicQuestDefinitions).withHeardRumours(this.heardRumours);
     }
 
     public List<LostTalesQuestProgress> getActiveQuests() {
@@ -384,6 +475,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
     }
 
     private void clearState() {
+        this.heardRumours.clear();
         this.activeQuests.clear();
         this.questHistory.clear();
         this.discoveredMarkerIds.clear();

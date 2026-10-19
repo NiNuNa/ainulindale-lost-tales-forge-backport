@@ -63,6 +63,8 @@ final class ChatLineNbtCodec {
     private static final String TAG_NAMED = "Named";
     private static final String TAG_TAB = "Tab";
     private static final String TAG_CALLED_ROLES = "CalledRoles";
+    private static final String TAG_NOT_IN_WORLD = "NotInWorld";
+    private static final String TAG_TYPED = "Typed";
 
     private static final String TAG_REPLY_KIND = "Kind";
     private static final String TAG_REPLY_AUTHOR = "Author";
@@ -155,6 +157,8 @@ final class ChatLineNbtCodec {
         tag.setTag(TAG_NAMED, named);
         tag.setString(TAG_TAB, line.getTabId());
         tag.setTag(TAG_CALLED_ROLES, writeStrings(line.getMentionedRoles()));
+        tag.setBoolean(TAG_NOT_IN_WORLD, line.isNotInWorld());
+        tag.setString(TAG_TYPED, line.getTyped());
         return tag;
     }
 
@@ -211,7 +215,9 @@ final class ChatLineNbtCodec {
                     .withAction(flag(tag, TAG_ACTION))
                     .withServerBody(string(tag, TAG_BODY), named)
                     .withTabId(string(tag, TAG_TAB))
-                    .withMentionedRoles(knownRoles(strings(tag, TAG_CALLED_ROLES)));
+                    .withMentionedRoles(knownRoles(strings(tag, TAG_CALLED_ROLES)))
+                    .withNotInWorld(flag(tag, TAG_NOT_IN_WORLD))
+                    .withTyped(string(tag, TAG_TYPED));
             return readsOnTheWire(line) ? line : null;
         } catch (RuntimeException unreadable) {
             return null;

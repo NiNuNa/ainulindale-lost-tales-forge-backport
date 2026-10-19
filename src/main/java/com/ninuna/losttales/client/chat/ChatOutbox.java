@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatTypedText;
 import com.ninuna.losttales.chat.ChatAction;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
@@ -85,7 +86,7 @@ final class ChatOutbox {
             long edited = this.composer.editingMessageId();
             this.composer.cancelEdit();
             LostTalesNetworkHandler.CHANNEL.sendToServer(
-                    new LostTalesChatEditPacket(edited, outgoing));
+                    new LostTalesChatEditPacket(edited, outgoing, message));
             return;
         }
         if (tab.isNpc()) {
@@ -96,7 +97,7 @@ final class ChatOutbox {
             return;
         }
         recordEmojiUse(outgoing);
-        sendToTab(tab, outgoing, this.composer.replyReference(), false);
+        sendToTab(tab, outgoing, message, this.composer.replyReference(), false);
         // Answered: the next message is a message of its own.
         this.composer.cancelReply();
     }
@@ -113,11 +114,13 @@ final class ChatOutbox {
         ClientChatIdentitySelection.update();
         String outgoing = ChatAction.sentence(
                 ChatInputRules.outgoingMessage(words));
+        // What was typed, its /me before the words, as an edit fills the bar.
+        String typed = ChatTypedText.ACTION_PREFIX + words;
         if (this.composer.isEditing()) {
             long edited = this.composer.editingMessageId();
             this.composer.cancelEdit();
             LostTalesNetworkHandler.CHANNEL.sendToServer(
-                    new LostTalesChatEditPacket(edited, outgoing));
+                    new LostTalesChatEditPacket(edited, outgoing, typed));
             return;
         }
         if (tab.isNpc()) {
@@ -128,7 +131,7 @@ final class ChatOutbox {
             return;
         }
         recordEmojiUse(outgoing);
-        sendToTab(tab, outgoing, this.composer.replyReference(), true);
+        sendToTab(tab, outgoing, typed, this.composer.replyReference(), true);
         this.composer.cancelReply();
     }
 
@@ -163,7 +166,7 @@ final class ChatOutbox {
                     Integer.valueOf(ChatMessageValidator.MAX_CHARACTERS)));
             return;
         }
-        sendToTab(tab, ChatInputRules.outgoingMessage(text),
+        sendToTab(tab, ChatInputRules.outgoingMessage(text), text,
                 ChatReplyReference.NONE, false);
     }
 
@@ -197,7 +200,7 @@ final class ChatOutbox {
      * references the server re-checks; {@code action} sends the words as
      * an action.
      */
-    private void sendToTab(ConversationPage tab, String outgoing,
+    private void sendToTab(ConversationPage tab, String outgoing, String typed,
                            ChatReplyReference reply, boolean action) {
         if (tab == null) {
             return;
@@ -224,7 +227,8 @@ final class ChatOutbox {
                                 ? ClientChatChannelState.partnerCharacterIdOf(tab)
                                 : null,
                         unkept, action)
-                        .narrating(ClientChatIdentities.wireNarrating(tab)));
+                        .narrating(ClientChatIdentities.wireNarrating(tab))
+                        .typed(typed));
     }
 
     /**

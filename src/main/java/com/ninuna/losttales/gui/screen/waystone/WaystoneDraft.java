@@ -11,7 +11,9 @@ import java.util.EnumSet;
  * was read from. It says which of them changed, which is what lights
  * Save; keeps the player's edits when newer settings arrive; and makes
  * the settings Save sends. The waystone's place, structure and link are
- * the settings' own and are never edited here.
+ * the settings' own and are never edited here. Access is public or not:
+ * a waystone that is not public reads as shared or private by its shares
+ * alone (WAY-14), so the draft keeps only whether it is public.
  */
 public final class WaystoneDraft {
     /** Every setting the page edits. */
@@ -47,7 +49,7 @@ public final class WaystoneDraft {
     private boolean hidden;
     private boolean region;
     private boolean fastTravel;
-    private LostTalesMapMarkerVisibility visibility;
+    private boolean publicAccess;
 
     public WaystoneDraft(LostTalesMapMarkerEditableSettings base) {
         reset(base);
@@ -71,7 +73,7 @@ public final class WaystoneDraft {
         this.hidden = settings.isHiddenUntilDiscovered();
         this.region = settings.requiresRegionUnlock();
         this.fastTravel = settings.hasFastTravel();
-        this.visibility = settings.getVisibility();
+        this.publicAccess = isPublic(settings);
     }
 
     /**
@@ -98,7 +100,7 @@ public final class WaystoneDraft {
         boolean keptHidden = this.hidden;
         boolean keptRegion = this.region;
         boolean keptFastTravel = this.fastTravel;
-        LostTalesMapMarkerVisibility keptVisibility = this.visibility;
+        boolean keptPublic = this.publicAccess;
         reset(newer);
         if (edited.contains(Field.NAME)) {
             this.name = keptName;
@@ -137,7 +139,7 @@ public final class WaystoneDraft {
             this.fastTravel = keptFastTravel;
         }
         if (edited.contains(Field.VISIBILITY)) {
-            this.visibility = keptVisibility;
+            this.publicAccess = keptPublic;
         }
         if (!this.discoverable) {
             this.hidden = false;
@@ -194,7 +196,7 @@ public final class WaystoneDraft {
         if (this.fastTravel != from.hasFastTravel()) {
             fields.add(Field.FAST_TRAVEL);
         }
-        if (this.visibility != from.getVisibility()) {
+        if (this.publicAccess != isPublic(from)) {
             fields.add(Field.VISIBILITY);
         }
         return fields;
@@ -210,7 +212,9 @@ public final class WaystoneDraft {
                 from.getZ(), this.compassRadius, this.discoveryRadius,
                 this.hidden, this.discoverable, this.region,
                 from.hasWaystone(), from.getWaystoneStructureType(),
-                this.priority, this.visibility);
+                this.priority, this.publicAccess
+                        ? LostTalesMapMarkerVisibility.PUBLIC
+                        : LostTalesMapMarkerVisibility.PRIVATE);
     }
 
     /* ---- The settings ---- */
@@ -229,9 +233,8 @@ public final class WaystoneDraft {
     public boolean isHidden() { return this.hidden; }
     public boolean requiresRegion() { return this.region; }
     public boolean hasFastTravel() { return this.fastTravel; }
-    public LostTalesMapMarkerVisibility visibility() {
-        return this.visibility;
-    }
+    /** Whether the waystone is to be public; one that is not reads as shared or private by its shares. */
+    public boolean isPublic() { return this.publicAccess; }
 
     public void setName(String name) {
         this.name = text(name);
@@ -293,23 +296,26 @@ public final class WaystoneDraft {
     }
 
     /**
-     * The next access: private, shared, and public only where the player
-     * may make a waystone public; one standing public for a player who may
-     * not steps back into the other two.
+     * Private to public and back. Only a player who manages markers turns
+     * a waystone public; one that is public already may step back to it
+     * whoever edits it, since saving it public again needs nothing.
      */
-    public void stepVisibility(boolean back, boolean canMakePublic) {
-        LostTalesMapMarkerVisibility[] all = canMakePublic
-                ? LostTalesMapMarkerVisibility.values()
-                : new LostTalesMapMarkerVisibility[] {
-                        LostTalesMapMarkerVisibility.PRIVATE,
-                        LostTalesMapMarkerVisibility.SHARED};
-        int index = -1;
-        for (int at = 0; at < all.length; at++) {
-            if (all[at] == this.visibility) {
-                index = at;
-            }
+    public void stepVisibility(boolean managesMarkers) {
+        if (this.publicAccess) {
+            this.publicAccess = false;
+        } else if (mayBePublic(managesMarkers)) {
+            this.publicAccess = true;
         }
-        this.visibility = all[next(index, all.length, back)];
+    }
+
+    /** Whether the draft may step to public: for a manager, or a waystone saved public already. */
+    public boolean mayBePublic(boolean managesMarkers) {
+        return managesMarkers || isPublic(this.base);
+    }
+
+    private static boolean isPublic(
+            LostTalesMapMarkerEditableSettings settings) {
+        return settings.getVisibility() == LostTalesMapMarkerVisibility.PUBLIC;
     }
 
     /** The word after {@code current} in {@code words}, or before it; a word off the list steps onto the first or the last. */

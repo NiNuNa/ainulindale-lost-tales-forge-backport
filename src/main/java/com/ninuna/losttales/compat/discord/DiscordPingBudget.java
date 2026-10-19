@@ -8,14 +8,15 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * How many pings each player may make on Discord through the bridge: at
- * most {@link #MOST_PINGS} in any {@link #WINDOW_MILLIS}. Every ping a
- * post really makes counts, so a member pinged in three linked channels
- * is three pings, and a post that pings nobody costs nothing. A post past
- * the budget still goes, and its mentions still read as names; it only
- * pings nobody. The chat's own rate limit holds how often a player
- * speaks; this holds how many calls on people on Discord they can make
- * while they do. Forgotten with the bridge's session.
+ * How many pings each player may make on Discord through the bridge, and
+ * each Discord member in the game: at most {@link #MOST_PINGS} in any
+ * {@link #WINDOW_MILLIS}. Every ping a post really makes counts, so a
+ * member pinged in three linked channels is three pings, and a post that
+ * pings nobody costs nothing. A post past the budget still goes, and its
+ * mentions still read as names; it only pings nobody. The chat's own rate
+ * limit holds how often someone speaks; this holds how many calls on
+ * people they can make while they do. Times are read on the monotonic
+ * clock. Forgotten with the bridge's session.
  */
 final class DiscordPingBudget {
     static final int MOST_PINGS = 10;

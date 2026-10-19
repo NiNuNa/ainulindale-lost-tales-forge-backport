@@ -1,9 +1,10 @@
 package com.ninuna.losttales.chat;
 
 /**
- * An action line: what a character does, typed as {@code /me draws his
- * sword} in an in-character channel and shown as a sentence the
- * speaker's name opens, <em>Aldric draws his sword.</em> The words are
+ * An action line: what someone does, typed as {@code /me draws his
+ * sword} and shown as a sentence the speaker's name opens, <em>Aldric
+ * draws his sword.</em>, told by the Narrator in character and under the
+ * account out of it (CHAT-37). The words are
  * the message and the name is the line's own, so an action is a message
  * with a flag and nothing more. Pure rules over the words, asked alike
  * by the client that shows the line at once and the server that keeps
@@ -30,6 +31,16 @@ public final class ChatAction {
             }
         }
         return text;
+    }
+
+    /**
+     * Whether {@code /me} in {@code channel} is an action of the chat's:
+     * in every conversation, in character and out of it, but the two
+     * consoles, where it is the game's command.
+     */
+    public static boolean takesActions(ChatChannel channel) {
+        return channel != null && channel != ChatChannel.CLIENT_CONSOLE
+                && channel != ChatChannel.SERVER_CONSOLE;
     }
 
     /**

@@ -105,9 +105,10 @@ public final class LostTalesQuickLootInventoryHelper {
      * Whether nothing solid stands between the player's eyes and the block:
      * a ray to its middle, or to a point inside one of the faces turned toward
      * the player, meets the block itself (or the other half of a double chest
-     * or a tall urn) or nothing at all before it ends inside the block.
+     * or a tall urn) or nothing at all before it ends inside the block. A
+     * missive board asks the same before its notices are taken or pinned.
      */
-    private static boolean isInSight(EntityPlayer player, World world, int x, int y, int z) {
+    public static boolean isInSight(EntityPlayer player, World world, int x, int y, int z) {
         double eyeX = player.posX;
         double eyeY = player.posY + (double) player.getEyeHeight();
         double eyeZ = player.posZ;

@@ -64,9 +64,29 @@ public final class CharacterRosterSyncPacketTest {
         ByteBuf buffer = Unpooled.buffer();
         new CharacterRosterSyncPacket(1, snapshot).toBytes(buffer);
         CharacterRosterSyncPacket shortened = new CharacterRosterSyncPacket();
-        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - 1));
+        // The deleted count and the store's flag after it.
+        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - 2));
         assertTrue(shortened.isMalformed());
         assertNull(shortened.getSnapshot());
+    }
+
+    /** A store the server cannot read is said so, with nothing in it (CHAR-01). */
+    @Test
+    public void anUnreadableStoreIsSaidSoAndHoldsNothing() {
+        CharacterRosterSnapshot unreadable = CharacterRosterSnapshot.unreadable(OWNER);
+        assertTrue(unreadable.isStoreUnreadable());
+        assertTrue(unreadable.isWaitingForFirstCharacter());
+        CharacterRosterSyncPacket decoded = roundTrip(unreadable);
+        assertFalse(decoded.isMalformed());
+        assertTrue(decoded.getSnapshot().isStoreUnreadable());
+        assertTrue(decoded.getSnapshot().getCharacters().isEmpty());
+        UUID id = UUID.randomUUID();
+        CharacterRosterSnapshot held = new CharacterRosterSnapshot(OWNER, 1, id, 2L,
+                Collections.singletonList(summary(id, 0, "Aldric", "lotr:gondor")),
+                Collections.<DeletedCharacterSummary>emptyList());
+        assertFalse("a roster with characters is read", held.withStoreUnreadable(true)
+                .isStoreUnreadable());
+        assertFalse(roundTrip(held).getSnapshot().isStoreUnreadable());
     }
 
     @Test

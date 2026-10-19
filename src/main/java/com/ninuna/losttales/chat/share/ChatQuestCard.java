@@ -67,7 +67,7 @@ public final class ChatQuestCard {
     public static final int MAX_OBJECTIVE_TYPE_BYTES = 16;
     public static final int MAX_TARGET_BYTES = 128;
     public static final int MAX_OBJECTIVE_TEXT_BYTES = 256;
-    public static final int MAX_REWARDS = 6;
+    public static final int MAX_REWARDS = 12;
     public static final int MAX_REWARD_KEY_BYTES = 32;
     public static final int MAX_REWARD_VALUE_BYTES = 256;
     /** The largest count or progress an objective may show. */

@@ -48,7 +48,6 @@ public final class LostTalesQuestRegistry {
 
         LostTalesMapMarkerCatalog.reloadFromClasspath();
         LostTalesMapMarkerCatalog.logQuestMarkerWarnings(sortedQuests);
-        LostTalesQuestDefinitionValidator.logWarnings(sortedQuests);
     }
 
     public static synchronized void ensureLoaded() {

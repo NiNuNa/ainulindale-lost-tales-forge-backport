@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest.missive;
 
+import com.ninuna.losttales.quest.LostTalesQuestRewards;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -20,13 +21,14 @@ public final class LostTalesMissiveRewardData {
         return new LostTalesMissiveRewardData(Collections.<String, String>emptyMap());
     }
 
-    public static LostTalesMissiveRewardData experienceAndItems(int experience, String items) {
+    /** A notice's pay: experience and LOTR coins (QUEST-33). */
+    public static LostTalesMissiveRewardData experienceAndCoins(int experience, int coins) {
         LinkedHashMap<String, String> rewards = new LinkedHashMap<String, String>();
         if (experience > 0) {
             rewards.put("experience", String.valueOf(experience));
         }
-        if (items != null && items.trim().length() > 0) {
-            rewards.put("items", items.trim());
+        if (coins > 0) {
+            rewards.put(LostTalesQuestRewards.COINS, String.valueOf(coins));
         }
         return new LostTalesMissiveRewardData(rewards);
     }

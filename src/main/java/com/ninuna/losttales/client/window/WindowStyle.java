@@ -449,27 +449,6 @@ public final class WindowStyle {
         return POPUP_LINE_HEIGHT + Math.max(0, lines - 1) * LINE_HEIGHT;
     }
 
-    /**
-     * A popup of several lines of words with its top left at {@code x},
-     * {@code y}, as wide as its widest line: a long tip.
-     */
-    public static void drawPopupLines(FontRenderer font, List<String> lines,
-                                      int x, int y, float opacity) {
-        int width = 0;
-        for (String line : lines) {
-            width = Math.max(width, popupLineWidth(font, line));
-        }
-        drawPopup(x, y, x + width, y + popupLinesHeight(lines.size()),
-                opacity);
-        int alpha = Math.round(255.0F * Math.max(0.0F,
-                Math.min(1.0F, opacity)));
-        for (int index = 0; index < lines.size(); index++) {
-            LostTalesUiInk.drawText(font, lines.get(index), x + POPUP_INSET,
-                    y + POPUP_INSET + index * LINE_HEIGHT,
-                    LostTalesUiInk.IVORY, alpha);
-        }
-    }
-
     /** A one-line popup's width for {@code text}: the text, the inset either side. */
     public static int popupLineWidth(FontRenderer font, String text) {
         return font.getStringWidth(text) + POPUP_INSET * 2;

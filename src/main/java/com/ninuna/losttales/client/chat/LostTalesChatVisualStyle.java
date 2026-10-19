@@ -968,6 +968,9 @@ public final class LostTalesChatVisualStyle {
                     explicitColor = ChatTitleMarker.colorOf(part);
                 }
                 if (explicitColor == null) {
+                    explicitColor = ChatAccountMarker.colorOf(part);
+                }
+                if (explicitColor == null) {
                     explicitColor = ChatReplyMarker.colorOf(part);
                 }
                 if (explicitColor == null) {

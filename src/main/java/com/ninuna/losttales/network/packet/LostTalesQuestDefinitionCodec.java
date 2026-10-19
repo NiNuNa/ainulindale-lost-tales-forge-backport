@@ -72,6 +72,7 @@ public final class LostTalesQuestDefinitionCodec {
             throw new IllegalStateException("invalid quest words");
         }
         writeStringMap(buf, quest.getWords(), "words");
+        writeStringMap(buf, quest.getRules(), "rule");
 
         List<LostTalesQuestStageDefinition> stages = quest.getStages();
         LostTalesPacketCodec.writeCount(buf, stages.size(),
@@ -81,6 +82,7 @@ public final class LostTalesQuestDefinitionCodec {
                 throw new IllegalStateException("invalid quest stage");
             }
             writeString(buf, stage.getId(), MAX_IDENTIFIER_BYTES);
+            writeStringMap(buf, stage.getRules(), "stage rule");
             List<LostTalesQuestObjectiveDefinition> objectives =
                     stage.getObjectives();
             LostTalesPacketCodec.writeCount(buf, objectives.size(),
@@ -127,6 +129,7 @@ public final class LostTalesQuestDefinitionCodec {
             throw new LostTalesPacketCodec.DecodeException(
                     "invalid quest words");
         }
+        Map<String, String> rules = readStringMap(buf, "rule");
 
         List<LostTalesQuestStageDefinition> stages =
                 new ArrayList<LostTalesQuestStageDefinition>();
@@ -135,6 +138,7 @@ public final class LostTalesQuestDefinitionCodec {
         for (int i = 0; i < stageCount; i++) {
             String stageId = LostTalesPacketCodec.readUtf8String(buf,
                     MAX_IDENTIFIER_BYTES);
+            Map<String, String> stageRules = readStringMap(buf, "stage rule");
             List<LostTalesQuestObjectiveDefinition> objectives =
                     new ArrayList<LostTalesQuestObjectiveDefinition>();
             int objectiveCount = LostTalesPacketCodec.readCount(
@@ -159,7 +163,8 @@ public final class LostTalesQuestDefinitionCodec {
                         objectiveId, objectiveType, objectiveDescription,
                         optional, params));
             }
-            stages.add(new LostTalesQuestStageDefinition(stageId, objectives));
+            stages.add(new LostTalesQuestStageDefinition(stageId, objectives,
+                    stageRules));
         }
 
         if (id.length() == 0) {
@@ -169,7 +174,7 @@ public final class LostTalesQuestDefinitionCodec {
         return new LostTalesQuestDefinition(id, title, description,
                 repeatable, restartable, startMode, prerequisites, rewards,
                 interaction, markers, journalLog, dialogue, world, stages,
-                false, words);
+                false, words, rules);
     }
 
     private static void writeString(ByteBuf buf, String value, int maxBytes) {

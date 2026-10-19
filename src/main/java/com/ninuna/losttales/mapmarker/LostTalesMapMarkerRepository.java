@@ -15,22 +15,25 @@ public final class LostTalesMapMarkerRepository {
     }
 
     public static LostTalesMapMarkerRecord createPlayerMarker(
-            EntityPlayerMP owner, int x, int y, int z, UUID linkToken) {
-        if (owner == null || owner.worldObj == null
-                || owner.worldObj.isRemote) {
+            EntityPlayerMP player, int x, int y, int z, UUID linkToken) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
             throw new IllegalArgumentException(
                     "player marker requires a server player");
         }
         UUID markerUuid = UUID.randomUUID();
         String id = "losttales:player/"
                 + markerUuid.toString().replace("-", "");
+        // The character played places it, owns it and names it (WAY-01,
+        // WAY-08); with none played no record is made and the placing fails.
+        RoleplayCharacter placer =
+                PlayableIdentityResolver.resolve(player).getCharacter();
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        id, placerName(PlayableIdentityResolver
-                                .resolve(owner).getCharacter()),
-                        owner.getUniqueID(),
-                        owner.dimension, x, y, z, linkToken);
-        LostTalesMapMarkerWorldData data = get(owner.worldObj);
+                        id, placerName(placer),
+                        placer == null ? null : placer.getCharacterId(),
+                        player.dimension, x, y, z, linkToken);
+        LostTalesMapMarkerWorldData data = get(player.worldObj);
         if (data.getRecord(id) != null) {
             throw new IllegalStateException(
                     "generated duplicate marker id");

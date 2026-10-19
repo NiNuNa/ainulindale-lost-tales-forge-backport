@@ -1,7 +1,9 @@
 package com.ninuna.losttales.quest.missive;
 
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
+import com.ninuna.losttales.compat.lotr.LotrContainerProtection;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesMissiveBoardStatePacket;
 import java.util.ArrayList;
@@ -16,8 +18,9 @@ import net.minecraft.world.World;
  * Main-thread server authority for a missive board's page. Using the
  * board sends its notices as an opening; every request the page sends —
  * accept, take, pin — is checked against the world as it stands (the
- * player's world, the board at the place named, the player's reach, the
- * slot's range and the letter in it, as the page read it) and answered
+ * player's world, the player's reach and sight, the board at the place
+ * named, LOTR's banners, the slot's range and the letter in it, as the
+ * page read it) and answered
  * with the board's notices and why. Whoever else watches the board is
  * sent the change by {@link MissiveBoardWatches}.
  */
@@ -25,8 +28,9 @@ public final class MissiveBoardService {
     private MissiveBoardService() {}
 
     /**
-     * The player used a board: where they may use it, its notices go to
-     * them as an opening, which opens the board's page, and they watch it.
+     * The player used a board: where they may use it, and LOTR's banners
+     * let them at it, its notices go to them as an opening, which opens
+     * the board's page, and they watch it.
      */
     public static boolean open(EntityPlayerMP player,
                                LostTalesTileEntityMissiveBoard board) {
@@ -34,11 +38,16 @@ public final class MissiveBoardService {
                 || !board.isUseableByPlayer(player)) {
             return false;
         }
+        if (!LotrContainerProtection.mayOpen(player, board.getWorldObj(),
+                board.xCoord, board.yCoord, board.zCoord)) {
+            say(player, "chat.losttales.missive.protected");
+            return false;
+        }
         send(player, board, MissiveBoardStateReason.OPENED);
         return true;
     }
 
-    /** Accepts the notice in the board's {@code slot}: its quest starts, and a first-come notice comes down. */
+    /** Accepts the notice in the board's {@code slot}: its quest starts, and the notice comes down. */
     public static void accept(EntityPlayerMP player, int dimensionId, int x,
                               int y, int z, int slot,
                               String expectedQuestId) {
@@ -58,16 +67,38 @@ public final class MissiveBoardService {
             answer(player, board, refusal);
             return;
         }
-        LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
         MissiveBoardStateReason outcome =
                 MissiveAcceptance.start(player, stack);
         if (outcome == MissiveBoardStateReason.ACCEPTED) {
-            if (missive.isFirstComeFirstServed()) {
-                board.removeNotice(slot);
-            }
+            board.removeNotice(slot);
             pop(player, board);
         }
         answer(player, board, outcome);
+    }
+
+    /**
+     * Hands in, at the board, every missive of the player's that waits for
+     * a board, its work done (QUEST-31): each pays as it ends; and what the
+     * player carries for a running world quest's delivery handed in at a
+     * board (QUEST-36).
+     */
+    public static void handIn(EntityPlayerMP player, int dimensionId, int x,
+                              int y, int z) {
+        LostTalesTileEntityMissiveBoard board =
+                resolve(player, dimensionId, x, y, z);
+        if (board == null) {
+            return;
+        }
+        int handedIn = com.ninuna.losttales.quest.LostTalesQuestManager
+                .handInAtBoard(player);
+        if (com.ninuna.losttales.quest.world.WorldQuests.deliverAtBoard(player)) {
+            handedIn++;
+        }
+        if (handedIn > 0) {
+            pop(player, board);
+        }
+        answer(player, board, handedIn > 0 ? MissiveBoardStateReason.HANDED_IN
+                : MissiveBoardStateReason.NOTHING_TO_HAND_IN);
     }
 
     /**
@@ -160,38 +191,117 @@ public final class MissiveBoardService {
 
     /**
      * The board at the place a page names, where this player may use it
-     * now: in the player's own world, standing there, and within reach.
-     * Where it is not, the chat says why and nothing is sent: the page
-     * closes by itself once the player is away from the board.
+     * now ({@link #refusal}). Where they may not, the chat says why and
+     * nothing is sent: the page closes by itself once the player is away
+     * from the board.
      */
     private static LostTalesTileEntityMissiveBoard resolve(
-            EntityPlayerMP player, int dimensionId, int x, int y, int z) {
+            final EntityPlayerMP player, final int dimensionId, final int x,
+            final int y, final int z) {
         if (player == null || player.worldObj == null
                 || player.worldObj.provider == null) {
             return null;
         }
-        if (player.worldObj.provider.dimensionId != dimensionId) {
-            say(player, "chat.losttales.missive.board_gone");
+        final World world = player.worldObj;
+        final LostTalesTileEntityMissiveBoard[] found =
+                new LostTalesTileEntityMissiveBoard[1];
+        String refusal = refusal(new BoardSite() {
+            @Override
+            public boolean inPlayersWorld() {
+                return world.provider.dimensionId == dimensionId;
+            }
+
+            @Override
+            public boolean withinReach() {
+                return LostTalesTileEntityMissiveBoard.isWithinReach(
+                        player, x, y, z);
+            }
+
+            @Override
+            public boolean inSight() {
+                return world.blockExists(x, y, z)
+                        && LostTalesQuickLootInventoryHelper.isInSight(
+                                player, world, x, y, z);
+            }
+
+            @Override
+            public boolean boardStands() {
+                TileEntity tile = world.getTileEntity(x, y, z);
+                found[0] = tile instanceof LostTalesTileEntityMissiveBoard
+                        ? (LostTalesTileEntityMissiveBoard)tile : null;
+                return found[0] != null;
+            }
+
+            @Override
+            public boolean usable() {
+                return found[0].isUseableByPlayer(player);
+            }
+
+            @Override
+            public boolean bannerAllows() {
+                return LotrContainerProtection.mayOpen(player, world, x, y, z);
+            }
+        });
+        if (refusal != null) {
+            say(player, refusal);
             return null;
         }
-        // The distance first, so a place far off never has its chunk
-        // loaded to be asked.
-        if (!LostTalesTileEntityMissiveBoard.isWithinReach(player, x, y, z)) {
-            say(player, "chat.losttales.missive.too_far");
-            return null;
+        return found[0];
+    }
+
+    /**
+     * What a page's request asks of the world at the board, each question
+     * asked only once the one before it holds: the distance before
+     * anything at the place is read, so a place far off never has its
+     * chunk loaded to be asked.
+     */
+    interface BoardSite {
+        /** The board's world is the player's. */
+        boolean inPlayersWorld();
+
+        /** The player is within the board's reach. */
+        boolean withinReach();
+
+        /** Nothing solid stands between the player's eyes and the board. */
+        boolean inSight();
+
+        /** A missive board stands at the place. */
+        boolean boardStands();
+
+        /** The board lets this player use it. */
+        boolean usable();
+
+        /** LOTR's banners let this player at the board, as at a chest. */
+        boolean bannerAllows();
+    }
+
+    /**
+     * Why the player may not use the board a request names, as the chat
+     * words it, or null where they may: as a chest is opened by quick
+     * loot, the board must be in their world, within reach, in sight,
+     * standing and usable, and open to them under LOTR's banner
+     * protection.
+     */
+    static String refusal(BoardSite site) {
+        if (!site.inPlayersWorld()) {
+            return "chat.losttales.missive.board_gone";
         }
-        TileEntity tile = player.worldObj.getTileEntity(x, y, z);
-        if (!(tile instanceof LostTalesTileEntityMissiveBoard)) {
-            say(player, "chat.losttales.missive.board_gone");
-            return null;
+        if (!site.withinReach()) {
+            return "chat.losttales.missive.too_far";
         }
-        LostTalesTileEntityMissiveBoard board =
-                (LostTalesTileEntityMissiveBoard)tile;
-        if (!board.isUseableByPlayer(player)) {
-            say(player, "chat.losttales.missive.too_far");
-            return null;
+        if (!site.inSight()) {
+            return "chat.losttales.missive.out_of_sight";
         }
-        return board;
+        if (!site.boardStands()) {
+            return "chat.losttales.missive.board_gone";
+        }
+        if (!site.usable()) {
+            return "chat.losttales.missive.too_far";
+        }
+        if (!site.bannerAllows()) {
+            return "chat.losttales.missive.protected";
+        }
+        return null;
     }
 
     /** The board's notices, slot by slot, as its page shows them. */

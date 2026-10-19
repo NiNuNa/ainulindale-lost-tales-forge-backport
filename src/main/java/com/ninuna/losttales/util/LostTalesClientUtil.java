@@ -151,9 +151,8 @@ public final class LostTalesClientUtil {
     }
 
     /**
-     * Which pieces of the item's armour set the player wears, and the
-     * set's bonus with all four on. No set has a bonus yet, so the line
-     * says there is none.
+     * For an armour piece the player wears: how many of the four pieces of
+     * its set, light or heavy, they wear, and what each armour slot holds.
      */
     public static void addArmorSetInformation(ItemStack itemStack, EntityPlayer player,
                                               List list) {
@@ -163,7 +162,6 @@ public final class LostTalesClientUtil {
         ItemStack boots = player.getCurrentArmor(0);
         String infoTextBase = "§8>§o ";
         String[] names = new String[]{infoTextBase, infoTextBase, infoTextBase, infoTextBase};
-        int setCounter = 0;
 
         if (itemStack == helmet || itemStack == armor || itemStack == leggings || itemStack == boots) {
             list.add("");
@@ -171,19 +169,11 @@ public final class LostTalesClientUtil {
                 if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
                     boolean heavy = ((LostTalesItemArmorBase)itemStack.getItem()).getItemType()
                             == ELostTalesItem.Type.ARMOR_HEAVY;
-                    setCounter = displayArmorSetDetails(heavy, names, helmet, armor, leggings, boots);
-                    list.add("§e[" + setCounter + "/4] §r§7"
+                    int worn = displayArmorSetDetails(heavy, names, helmet, armor, leggings, boots);
+                    list.add("§e[" + worn + "/4] §r§7"
                             + word(heavy ? "set.heavy" : "set.light"));
                 }
                 Collections.addAll(list, names);
-                if (setCounter == 4) {
-                    list.add("");
-                    boolean heavy = ((LostTalesItemArmorBase)itemStack.getItem()).getItemType()
-                            == ELostTalesItem.Type.ARMOR_HEAVY;
-                    list.add("§e[4/4] §r§7"
-                            + word(heavy ? "set.heavy.bonus" : "set.light.bonus"));
-                    list.add("§e§o" + word("set.no_bonus"));
-                }
             } else {
                 list.add(hold("set", LostTalesTooltipIcons.key(
                         LostTalesKeyBindings.getModifierKeyBinding(),

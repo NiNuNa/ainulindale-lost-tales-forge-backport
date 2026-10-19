@@ -175,6 +175,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     private static void clearSessionState() {
         WindowSession.clear();
         LostTalesClientQuestProgressStore.clear();
+        com.ninuna.losttales.client.quest.ClientQuestFellows.clear();
         LostTalesClientQuestNotificationStore.clear();
         ClientQuestNews.clear();
         LostTalesClientQuestDefinitionStore.clearServerSentDefinitions();

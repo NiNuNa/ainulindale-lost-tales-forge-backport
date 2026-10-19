@@ -122,6 +122,12 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 deleted.add(new DeletedCharacterSummary(characterId, name,
                         raceId, skinId, daysLeft));
             }
+            // Last, whether the server cannot read the characters now.
+            boolean unreadable = buffer.readBoolean();
+            if (unreadable && !characters.isEmpty()) {
+                throw new CharacterPacketCodec.DecodeException(
+                        "an unreadable store with characters in it");
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             this.snapshot = new CharacterRosterSnapshot(
                     ownerId,
@@ -130,7 +136,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     revision,
                     characters,
                     deleted
-            );
+            ).withStoreUnreadable(unreadable);
             if (activeCharacterId != null && this.snapshot.getActiveCharacterId() == null) {
                 throw new CharacterPacketCodec.DecodeException("invalid active character reference");
             }
@@ -183,6 +189,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeShort(Math.min(0xFFFF, deleted.getDaysLeft()));
         }
+        buffer.writeBoolean(this.snapshot.isStoreUnreadable());
     }
 
     public int getRequestId() {

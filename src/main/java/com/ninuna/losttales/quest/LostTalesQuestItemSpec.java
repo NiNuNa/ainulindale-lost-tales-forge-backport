@@ -14,6 +14,13 @@ import net.minecraft.item.Item;
  * reward are always the same item, count and meta.
  */
 public final class LostTalesQuestItemSpec {
+    /**
+     * The most of one item a reward grants: a whole inventory of full
+     * stacks. A file asking for more grants this many, and every screen
+     * names this many.
+     */
+    public static final int MAX_REWARD_COUNT = 36 * 64;
+
     private final String itemId;
     private final int count;
     private final int meta;
@@ -65,23 +72,32 @@ public final class LostTalesQuestItemSpec {
         LostTalesQuestItemSpec item = parse(written,
                 LostTalesQuestParams.parseInt(rewards.get("count"), 1),
                 LostTalesQuestParams.parseInt(rewards.get("meta"), 0));
-        return item.isEmpty() ? null : item;
+        return item.isEmpty() ? null : item.rewarded();
     }
 
-    /** Each item a reward map's {@code items} names, parted by commas or semicolons. */
+    /**
+     * Each item a reward map's {@code items} names, parted by commas,
+     * each at most {@link #MAX_REWARD_COUNT}.
+     */
     public static List<LostTalesQuestItemSpec> rewardItems(Map<String, String> rewards) {
         List<LostTalesQuestItemSpec> items = new ArrayList<LostTalesQuestItemSpec>();
         String written = LostTalesQuestParams.value(rewards, "items");
         if (written.length() == 0) {
             return items;
         }
-        for (String part : written.replace(';', ',').split(",")) {
+        for (String part : written.split(",")) {
             LostTalesQuestItemSpec item = parse(part, 1, 0);
             if (!item.isEmpty()) {
-                items.add(item);
+                items.add(item.rewarded());
             }
         }
         return items;
+    }
+
+    /** This item as a reward grants it: at most {@link #MAX_REWARD_COUNT}. */
+    LostTalesQuestItemSpec rewarded() {
+        return this.count <= MAX_REWARD_COUNT ? this
+                : new LostTalesQuestItemSpec(this.itemId, MAX_REWARD_COUNT, this.meta);
     }
 
     /** The namespaced id as written; empty when the text names none. */

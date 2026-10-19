@@ -506,10 +506,6 @@ public final class LostTalesCharacterHeadIconRenderer {
             } else if (drawFeatures && layout.getOverlayKind()
                     == CharacterHeadIconLayout.OverlayKind.LOTR_ORC_FEATURES) {
                 drawOrcNose(x, y, size, layout.getImageHeight());
-            } else if (drawFeatures && layout.getOverlayKind()
-                    == CharacterHeadIconLayout.OverlayKind
-                    .LOTR_HALF_TROLL_FEATURES) {
-                drawHalfTrollNose(x, y, size, layout.getImageHeight());
             }
             return true;
         } catch (Throwable ignored) {
@@ -545,17 +541,6 @@ public final class LostTalesCharacterHeadIconRenderer {
                 x + 3.5F * unit, y + 4.0F * unit,
                 unit, 2.0F * unit,
                 15.0F, 18.0F, 1.0F, 2.0F,
-                64.0F, imageHeight);
-    }
-
-    /** Front face of ModelHalfTroll's 8x3x2 muzzle cuboid. */
-    private static void drawHalfTrollNose(float x, float y, float size,
-                                          float imageHeight) {
-        float unit = size / 10.0F;
-        drawTexturedQuad(
-                x + unit, y + 7.0F * unit,
-                8.0F * unit, 3.0F * unit,
-                42.0F, 7.0F, 8.0F, 3.0F,
                 64.0F, imageHeight);
     }
 

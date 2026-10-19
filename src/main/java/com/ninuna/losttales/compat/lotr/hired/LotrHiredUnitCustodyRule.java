@@ -38,6 +38,15 @@ public final class LotrHiredUnitCustodyRule {
         return parkedUuid(ownerId).equals(hiringUuid) ? Action.LEAVE : Action.PARK;
     }
 
+    /**
+     * The account a unit answers to: the holder of the lore figure that
+     * hired it, where an account holds that figure now (CHAR-30), else the
+     * account it was tagged with.
+     */
+    public static UUID answersTo(UUID taggedOwner, UUID figureHolder) {
+        return figureHolder != null ? figureHolder : taggedOwner;
+    }
+
     /** The UUID the unit is hired under after the action. */
     public static UUID hiringUuidAfter(Action action, UUID ownerId, UUID current) {
         switch (action) {

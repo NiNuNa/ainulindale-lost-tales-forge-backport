@@ -50,6 +50,8 @@ import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatCommandContextPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatReactPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestShareJoinPacket;
+import com.ninuna.losttales.chat.share.QuestShareInvite;
+import com.ninuna.losttales.client.quest.LostTalesQuestDialogueHooks;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -144,6 +146,31 @@ public final class ChatScreenPart extends ScreenPart {
      * search follows it, and every other window wears a resting bar.
      */
     private String liveWindowId;
+
+    /**
+     * Joining from a card asks first (QUEST-25): *Join "The Cheese
+     * Cache"?*, and only a yes asks the server, which checks the card,
+     * the author and the fellowship again.
+     */
+    private void askToJoin(final ClientChatShowcaseStore.Quest quest) {
+        WindowScreen screen = WindowScreen.current();
+        if (screen == null) {
+            return;
+        }
+        screen.askOnScreen("quest-join", StatCollector.translateToLocal(
+                        "gui.losttales.quest.ask.join.title"),
+                StatCollector.translateToLocalFormatted(
+                        "gui.losttales.quest.ask.join.detail", quest.title),
+                StatCollector.translateToLocal("gui.losttales.quest.action.join"),
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        LostTalesNetworkHandler.CHANNEL.sendToServer(
+                                new LostTalesQuestShareJoinPacket(
+                                        quest.messageId, quest.tokenIndex));
+                    }
+                });
+    }
 
     private ChatScreenPart(WindowScreen screen) {
         super(screen);
@@ -2520,9 +2547,7 @@ public final class ChatScreenPart extends ScreenPart {
                         : ClientChatShowcaseStore.getQuest(share.showcaseId);
                 if (quest != null) {
                     if (quest.joinable) {
-                        LostTalesNetworkHandler.CHANNEL.sendToServer(
-                                new LostTalesQuestShareJoinPacket(
-                                        quest.messageId, quest.tokenIndex));
+                        askToJoin(quest);
                     } else {
                         WindowScreen.openPage(QuestJournalPage.PAGE_ID);
                     }
@@ -2533,6 +2558,21 @@ public final class ChatScreenPart extends ScreenPart {
                 ChatFellowshipInvitationAnswers.answer(
                         ChatInteractions.invitationAnswer(part));
                 return true;
+            case QUEST_ANSWER:
+                LostTalesQuestDialogueHooks.answerFromChat(
+                        ChatInteractions.questAnswer(part));
+                return true;
+            case QUEST_INVITE: {
+                // Join answers the line's question at once; Not now leaves
+                // the card as it is.
+                QuestShareInvite.Answer invite = ChatInteractions.questInvite(part);
+                if (invite != null && invite.join) {
+                    LostTalesNetworkHandler.CHANNEL.sendToServer(
+                            new LostTalesQuestShareJoinPacket(invite.messageId,
+                                    invite.tokenIndex));
+                }
+                return true;
+            }
             case CONSUMED:
                 return true;
             case LINK:

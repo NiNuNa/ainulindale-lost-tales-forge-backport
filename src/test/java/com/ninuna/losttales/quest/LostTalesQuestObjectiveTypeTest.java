@@ -109,6 +109,12 @@ public final class LostTalesQuestObjectiveTypeTest {
         assertEquals("a group reads by its noun line",
                 "Defeat 3 hostile creatures.", LostTalesQuestObjectiveTextHelper
                 .describe(objective("kill", "group", "hostile", "count", "3")));
+        assertEquals("whoever the character is against (QUEST-35)",
+                "Defeat 3 enemies.", LostTalesQuestObjectiveTextHelper
+                .describe(objective("kill", "group", "enemy", "count", "3")));
+        assertEquals("Defeat 2 people of Middle-earth.", LostTalesQuestObjectiveTextHelper
+                .describe(objective("kill", "group", "npc", "count", "2")));
+        assertTrue(LostTalesQuestObjectiveMatcher.isGroup("enemy"));
         assertEquals("Deliver", LostTalesQuestObjectiveTextHelper
                 .typeName("deliver"));
         assertEquals("Speak", LostTalesQuestObjectiveTextHelper

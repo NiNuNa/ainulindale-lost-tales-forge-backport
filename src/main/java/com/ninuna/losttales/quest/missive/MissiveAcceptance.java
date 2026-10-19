@@ -58,7 +58,8 @@ public final class MissiveAcceptance {
 
     /**
      * Starts the quest of a letter {@link #check} passed, through the
-     * start gate, which checks its seal: {@link
+     * start gate, which checks its seal, once its notice's time is not
+     * past and nobody took it before (QUEST-34): {@link
      * MissiveBoardStateReason#ACCEPTED} once it runs, else why not. The
      * gate says its own refusal line first.
      */
@@ -67,6 +68,10 @@ public final class MissiveAcceptance {
         LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(letter);
         if (missive == null) {
             return MissiveBoardStateReason.DAMAGED;
+        }
+        MissiveBoardStateReason refusal = MissivesTaken.refusal(player.worldObj, missive);
+        if (refusal != null) {
+            return refusal;
         }
         QuestStartGate.StartResult result = QuestStartGate.start(player,
                 missive.getQuestId(), QuestStartProof.letter(letter));

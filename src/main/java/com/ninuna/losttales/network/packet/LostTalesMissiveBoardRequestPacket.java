@@ -12,7 +12,8 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
  * A missive board page's request to take a notice down into the
- * player's inventory, or to pin a letter from it onto the board. It names
+ * player's inventory, to pin a letter from it onto the board, or to hand
+ * in at the board every missive of theirs that waits for one. It names
  * the board by its world and place, the slot — the board's for a take,
  * the inventory's for a pin — and the quest id of the letter the page
  * read there, empty for a letter that cannot be read. The server checks
@@ -25,7 +26,9 @@ public final class LostTalesMissiveBoardRequestPacket implements IMessage {
         /** The notice in a slot of the board, into the inventory. */
         TAKE(0),
         /** The letter in a slot of the inventory, onto the board. */
-        PIN(1);
+        PIN(1),
+        /** Every missive of the player's that waits for a board, handed in (QUEST-31). */
+        HAND_IN(2);
 
         private final int networkId;
 
@@ -88,6 +91,13 @@ public final class LostTalesMissiveBoardRequestPacket implements IMessage {
                 dimensionId, x, y, z, slot, expectedQuestId);
     }
 
+    /** Hands in, at the board, every missive of the player's that waits for one. */
+    public static LostTalesMissiveBoardRequestPacket handIn(int dimensionId,
+                                                            int x, int y, int z) {
+        return new LostTalesMissiveBoardRequestPacket(Operation.HAND_IN,
+                dimensionId, x, y, z, 0, "");
+    }
+
     @Override
     public void fromBytes(ByteBuf buffer) {
         this.malformed = false;
@@ -143,6 +153,9 @@ public final class LostTalesMissiveBoardRequestPacket implements IMessage {
                 || (this.operation == Operation.TAKE
                         ? this.slot < 0 || this.slot
                                 >= LostTalesMissiveBoardStatePacket.MAX_NOTICES
+                        : this.operation == Operation.HAND_IN
+                        ? this.slot != 0 || this.expectedQuestId == null
+                                || this.expectedQuestId.length() != 0
                         : !LostTalesPacketCodec.isReasonableInventorySlot(
                                 this.slot))
                 || this.expectedQuestId == null
@@ -190,6 +203,11 @@ public final class LostTalesMissiveBoardRequestPacket implements IMessage {
                                         message.getX(), message.getY(),
                                         message.getZ(), message.getSlot(),
                                         message.getExpectedQuestId());
+                            } else if (message.getOperation() == Operation.HAND_IN) {
+                                MissiveBoardService.handIn(serverPlayer,
+                                        message.getDimensionId(),
+                                        message.getX(), message.getY(),
+                                        message.getZ());
                             } else {
                                 MissiveBoardService.pin(serverPlayer,
                                         message.getDimensionId(),

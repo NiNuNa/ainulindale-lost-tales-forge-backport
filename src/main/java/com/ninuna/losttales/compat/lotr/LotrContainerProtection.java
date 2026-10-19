@@ -11,10 +11,11 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.world.World;
 
 /**
- * Asks LOTR's banner protection whether a player may open a container, with
- * the permission LOTR's own right-click check asks for that block: FOOD for a
- * barrel or a kebab stand, PERSONAL_CONTAINERS for an ender chest, CONTAINERS
- * for anything else. When LOTR cannot answer, the container stays closed.
+ * Asks LOTR's banner protection whether a player may open a container, or
+ * take from a missive board, with the permission LOTR's own right-click
+ * check asks for that block: FOOD for a barrel or a kebab stand,
+ * PERSONAL_CONTAINERS for an ender chest, CONTAINERS for anything else.
+ * When LOTR cannot answer, the container stays closed.
  */
 public final class LotrContainerProtection {
     private static boolean warnedUnavailable;
@@ -55,7 +56,7 @@ public final class LotrContainerProtection {
         }
         warnedUnavailable = true;
         FMLLog.warning(
-                "[%s] LOTR banner protection could not be asked; quick loot stays closed: %s",
+                "[%s] LOTR banner protection could not be asked; quick loot and missive boards stay closed: %s",
                 LostTalesMetaData.MOD_ID, throwable.getClass().getSimpleName());
     }
 }

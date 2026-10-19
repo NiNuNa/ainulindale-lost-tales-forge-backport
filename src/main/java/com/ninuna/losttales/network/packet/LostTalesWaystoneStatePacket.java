@@ -18,7 +18,8 @@ import io.netty.buffer.ByteBuf;
  * the answer to every request the page sends, saying why ({@link #getReason}).
  * A name, category or description left empty travels empty, with what the
  * waystone is called after and whether a player placed it, so the page
- * shows the words it stands for in its reader's language.
+ * shows the words it stands for in its reader's language. Only a player
+ * who may see the waystone is ever sent it (WAY-10).
  */
 public final class LostTalesWaystoneStatePacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 16384;
@@ -26,6 +27,8 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     private static final int MAX_TEXT_BYTES = 1024;
     private static final int MAX_DESCRIPTION_BYTES = 4096;
     private static final int MAX_STRUCTURE_ID_BYTES = 512;
+    /** Past the longest name a character or a lore figure can have. */
+    public static final int MAX_OWNER_NAME_BYTES = 256;
 
     private int dimensionId;
     private int x;
@@ -38,8 +41,10 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     private LostTalesMapMarkerEditableSettings settings;
     private int sharedCharacterCount;
     private int sharedFellowshipCount;
+    /** The owning character's name; empty for a waystone nobody owns or one whose owner is gone. */
+    private String ownerName = "";
     private boolean canEdit;
-    private boolean canMakePublic;
+    private boolean managesMarkers;
     private LostTalesWaystoneStateReason reason;
     private boolean malformed;
 
@@ -47,7 +52,8 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
 
     public LostTalesWaystoneStatePacket(
             int dimensionId, int x, int y, int z,
-            LostTalesMapMarkerRecord record, boolean canEdit, boolean canMakePublic,
+            LostTalesMapMarkerRecord record, String ownerName,
+            boolean canEdit, boolean managesMarkers,
             LostTalesWaystoneStateReason reason) {
         if (record == null) {
             throw new IllegalArgumentException(
@@ -67,8 +73,9 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         this.sharedCharacterCount = record.getSharedCharacterIds().size();
         this.sharedFellowshipCount =
                 record.getSharedFellowshipIds().size();
+        this.ownerName = ownerName == null ? "" : ownerName;
         this.canEdit = canEdit;
-        this.canMakePublic = canMakePublic;
+        this.managesMarkers = managesMarkers;
         this.reason = reason;
         validate();
     }
@@ -132,8 +139,10 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                     structureType, priority, visibility);
             this.sharedCharacterCount = buffer.readInt();
             this.sharedFellowshipCount = buffer.readInt();
+            this.ownerName = LostTalesPacketCodec.readUtf8String(
+                    buffer, MAX_OWNER_NAME_BYTES);
             this.canEdit = buffer.readBoolean();
-            this.canMakePublic = buffer.readBoolean();
+            this.managesMarkers = buffer.readBoolean();
             this.reason = LostTalesWaystoneStateReason.fromNetworkId(
                     buffer.readUnsignedByte());
             LostTalesPacketCodec.requireFinished(buffer);
@@ -188,8 +197,10 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         buffer.writeByte(value.getVisibility().ordinal());
         buffer.writeInt(this.sharedCharacterCount);
         buffer.writeInt(this.sharedFellowshipCount);
+        LostTalesPacketCodec.writeUtf8String(
+                buffer, this.ownerName, MAX_OWNER_NAME_BYTES);
         buffer.writeBoolean(this.canEdit);
-        buffer.writeBoolean(this.canMakePublic);
+        buffer.writeBoolean(this.managesMarkers);
         buffer.writeByte(this.reason.getNetworkId());
     }
 
@@ -211,7 +222,10 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 || this.sharedFellowshipCount < 0
                 || this.sharedFellowshipCount
                         > LostTalesMapMarkerRecord
-                                .MAX_SHARED_FELLOWSHIPS) {
+                                .MAX_SHARED_FELLOWSHIPS
+                || this.ownerName == null
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.ownerName, MAX_OWNER_NAME_BYTES)) {
             throw new IllegalArgumentException(
                     "invalid waystone state");
         }
@@ -241,9 +255,15 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     public int getSharedFellowshipCount() {
         return this.sharedFellowshipCount;
     }
+    /** The owning character's name; empty for none the server could name. */
+    public String getOwnerName() { return this.ownerName; }
     public boolean canEdit() { return this.canEdit; }
-    public boolean canMakePublic() {
-        return this.canMakePublic;
+    /**
+     * Whether the reader holds {@code mapmarker.manage}: the page offers
+     * Public and Hand Over (WAY-13, WAY-08).
+     */
+    public boolean managesMarkers() {
+        return this.managesMarkers;
     }
     /** Why it was sent: an opening, or the answer to a request. */
     public LostTalesWaystoneStateReason getReason() {

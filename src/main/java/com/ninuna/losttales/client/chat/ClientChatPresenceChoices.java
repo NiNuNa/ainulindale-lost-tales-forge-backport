@@ -300,7 +300,11 @@ public final class ClientChatPresenceChoices {
         LostTalesTextFiles.writeLines(file, describe());
     }
 
+    /**
+     * The file's lines: its heading, and the statuses, status lines and
+     * role-play statuses, no more of each than it may hold.
+     */
     private static List<String> readLines(File file) {
-        return LostTalesTextFiles.readLines(file, Integer.MAX_VALUE);
+        return LostTalesTextFiles.readLines(file, 3 * MAX_CHOICES + 1);
     }
 }

@@ -46,9 +46,9 @@ public final class ChatHistoryNbtCodec {
      * The one entry layout this codec writes and reads, with or without
      * reactions and whatever their emoji.
      */
-    public static final int CURRENT_ENTRY_DATA_VERSION = 4;
+    public static final int CURRENT_ENTRY_DATA_VERSION = 5;
     /** Safety bound on kept lines read back; entries past it are quarantined. */
-    public static final int MAX_ENTRIES = ChatHistory.MAX_TOTAL;
+    public static final int MAX_ENTRIES = ChatHistory.MAX_KEPT;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_ENTRIES = "Entries";

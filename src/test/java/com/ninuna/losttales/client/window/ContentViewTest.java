@@ -104,26 +104,19 @@ public final class ContentViewTest {
         assertFalse(ContentView.leave(null));
     }
 
+    /** WIN-41: nothing holds Borderless; the screen closing ends it, and the layout never keeps it. */
     @Test
-    public void aHeldPageKeepsFillingItsWindowUntilLetGo() {
+    public void borderlessEndsWithTheScreenAndIsNeverSaved() {
         Window window = WindowLayout.addWindow(row(this.map, this.journal),
                 this.map);
-        ContentView.hold(window, true);
-        assertFalse("nothing to hold while the page does not fill it",
-                window.isBorderlessHeld());
         assertTrue(ContentView.enter(window));
-        ContentView.hold(window, true);
-        assertTrue(window.isBorderlessHeld());
-        assertFalse("Escape and the exit leave it", ContentView.leave(window));
+        for (String line : WindowLayoutStore.describe()) {
+            assertFalse(line, line.contains("borderless"));
+        }
         ContentView.leaveAll();
-        WindowLayout.setActiveTab(this.journal);
-        ContentView.follow();
-        assertTrue("kept through the screen closing and another page",
-                ContentView.isOn(window));
-        ContentView.hold(window, false);
-        assertFalse(window.isBorderlessHeld());
-        assertTrue("let go, it still fills the window", ContentView.isOn(window));
-        assertTrue(ContentView.leave(window));
+        assertFalse("the screen closing ends it", ContentView.isOn(window));
+        assertTrue(ContentView.enter(window));
+        assertTrue("the exit or Escape ends it", ContentView.leave(window));
         assertFalse(ContentView.isOn(window));
     }
 }

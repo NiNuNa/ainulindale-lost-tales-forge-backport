@@ -14,6 +14,8 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveMatcher;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveType;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.quest.LostTalesQuestRewardHelper;
+import com.ninuna.losttales.quest.LostTalesQuestRules;
+import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.ServerQuestSync;
 import com.ninuna.losttales.util.LostTalesLog;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -63,6 +65,10 @@ public final class WorldQuests {
 
     private static boolean changed;
     private static int ticks;
+    /** Sweeps between two looks at the schedules: a minute. */
+    private static final int SCHEDULE_SWEEPS = 60;
+    /** Sweeps since the schedules were last looked at; they are looked at once a minute. */
+    private static int sweepsSinceSchedules = SCHEDULE_SWEEPS;
     /** The identity each player was last sent their part for. */
     private static final Map<UUID, UUID> SENT_AS = new HashMap<UUID, UUID>();
 
@@ -96,7 +102,27 @@ public final class WorldQuests {
             return StartResult.TOO_MANY;
         }
         markChanged();
+        announce(server, quest);
         return StartResult.STARTED;
+    }
+
+    /**
+     * Says in OOC that a world quest has begun, to everyone online
+     * (QUEST-36): out-of-character news for the whole server, as a join
+     * is. Every missive board shows its notice too, read by each player's
+     * game from the world quests it is sent.
+     */
+    private static void announce(MinecraftServer server,
+                                 LostTalesQuestDefinition quest) {
+        if (server == null || server.getConfigurationManager() == null) {
+            return;
+        }
+        server.getConfigurationManager().sendChatMsg(
+                new net.minecraft.util.ChatComponentTranslation(
+                        com.ninuna.losttales.chat.ChatSystemLineClassifier
+                                .WORLD_QUEST_BEGUN_KEY,
+                        LostTalesQuestWords.titleComponent(quest),
+                        Integer.valueOf(WorldQuestRules.days(quest))));
     }
 
     /**
@@ -135,6 +161,130 @@ public final class WorldQuests {
         count(player, LostTalesQuestObjectiveType.KILL, victim, null, 1);
     }
 
+    /**
+     * The player touched somebody: every running world quest's delivery
+     * that names them takes what the player carries of its items, up to
+     * what its count still lacks (QUEST-36). Answers whether anything was
+     * handed in.
+     */
+    public static boolean handleDelivery(EntityPlayerMP player, Entity target) {
+        return target != null && deliver(player, target);
+    }
+
+    /** As above, at a missive board: every running delivery handed in at a board. */
+    public static boolean deliverAtBoard(EntityPlayerMP player) {
+        return deliver(player, null);
+    }
+
+    /**
+     * Whether a running world quest's delivery is handed in at a board and
+     * takes something the player carries: what a board's Hand In asks.
+     */
+    public static boolean hasBoardDelivery(EntityPlayerMP player) {
+        MinecraftServer server = MinecraftServer.getServer();
+        WorldQuestWorldData data = data(server);
+        if (player == null || data == null || data.runningCount() == 0) {
+            return false;
+        }
+        for (String questId : data.runningQuestIds(now(server))) {
+            for (LostTalesQuestObjectiveDefinition objective
+                    : WorldQuestRules.objectives(LostTalesQuestRegistry.getQuest(questId))) {
+                if (LostTalesQuestObjectiveType.DELIVER.is(objective)
+                        && LostTalesQuestDefinitionValidator.isBoardDelivery(
+                                objective.getParams())
+                        && carried(player, objective) > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean deliver(EntityPlayerMP player, Entity target) {
+        if (player == null || player instanceof FakePlayer) {
+            return false;
+        }
+        MinecraftServer server = MinecraftServer.getServer();
+        WorldQuestWorldData data = data(server);
+        if (data == null || data.runningCount() == 0) {
+            return false;
+        }
+        UUID helper = RoleplayCharacterIdentityHook.resolveGameplayId(player);
+        boolean any = false;
+        for (String questId : data.runningQuestIds(now(server))) {
+            LostTalesQuestDefinition quest =
+                    LostTalesQuestRegistry.getQuest(questId);
+            if (quest == null || !quest.isWorldQuest()) {
+                continue;
+            }
+            boolean added = false;
+            for (LostTalesQuestObjectiveDefinition objective
+                    : WorldQuestRules.objectives(quest)) {
+                boolean atBoard = LostTalesQuestDefinitionValidator
+                        .isBoardDelivery(objective.getParams());
+                if (!LostTalesQuestObjectiveType.DELIVER.is(objective)
+                        || (target == null) != atBoard
+                        || target != null && !LostTalesQuestObjectiveMatcher
+                                .matchesEntity(target, objective, player)) {
+                    continue;
+                }
+                int lacking = WorldQuestRules.goal(objective)
+                        - data.count(questId, objective.getId());
+                int taken = take(player, objective, lacking);
+                if (taken > 0 && data.add(questId, objective.getId(), taken,
+                        WorldQuestRules.goal(objective), helper) > 0) {
+                    added = true;
+                }
+            }
+            if (added) {
+                any = true;
+                markChanged();
+                completeIfDone(server, data, quest);
+            }
+        }
+        return any;
+    }
+
+    /** How many of a delivery's items the player carries. */
+    private static int carried(EntityPlayerMP player,
+                               LostTalesQuestObjectiveDefinition objective) {
+        int carried = 0;
+        for (ItemStack stack : player.inventory.mainInventory) {
+            if (stack != null && LostTalesQuestObjectiveMatcher.matchesItem(stack, objective)) {
+                carried += stack.stackSize;
+            }
+        }
+        return carried;
+    }
+
+    /**
+     * Takes up to {@code most} of a delivery's items out of the player's
+     * inventory, and tells their client; answers how many were taken.
+     */
+    private static int take(EntityPlayerMP player,
+                            LostTalesQuestObjectiveDefinition objective,
+                            int most) {
+        int taken = 0;
+        ItemStack[] inventory = player.inventory.mainInventory;
+        for (int slot = 0; slot < inventory.length && taken < most; slot++) {
+            ItemStack stack = inventory[slot];
+            if (stack == null || !LostTalesQuestObjectiveMatcher.matchesItem(stack, objective)) {
+                continue;
+            }
+            int part = Math.min(stack.stackSize, most - taken);
+            stack.stackSize -= part;
+            taken += part;
+            if (stack.stackSize <= 0) {
+                inventory[slot] = null;
+            }
+        }
+        if (taken > 0) {
+            player.inventory.markDirty();
+            player.inventoryContainer.detectAndSendChanges();
+        }
+        return taken;
+    }
+
     /** A craft by {@code player}: it counts for every running quest whose craft objective names what was made. */
     public static void handleCraft(EntityPlayerMP player, ItemStack crafted) {
         if (player == null || player instanceof FakePlayer || crafted == null
@@ -168,7 +318,7 @@ public final class WorldQuests {
                 }
                 boolean matches = victim != null
                         ? LostTalesQuestObjectiveMatcher.matchesEntity(victim,
-                                objective)
+                                objective, player)
                         : LostTalesQuestObjectiveMatcher.matchesItem(crafted,
                                 objective);
                 if (matches && data.add(questId, objective.getId(), amount,
@@ -195,7 +345,8 @@ public final class WorldQuests {
             }
         }
         if (data.end(quest.getId(), WorldQuestRun.State.COMPLETED, now(server),
-                WorldQuestRules.least(quest), accounts(server))) {
+                WorldQuestRules.least(quest), accounts(server),
+                !LostTalesQuestRules.podiumRewards(quest).isEmpty())) {
             payEveryoneHere(server, data);
         }
     }
@@ -298,7 +449,10 @@ public final class WorldQuests {
         if (overworld != null && overworld.mapStorage != null) {
             overworld.mapStorage.saveAllData();
         }
-        for (String questId : questIds) {
+        for (String waiting : questIds) {
+            boolean podium = waiting.startsWith(WorldQuestRules.PODIUM_REWARD_PREFIX);
+            String questId = podium ? waiting.substring(
+                    WorldQuestRules.PODIUM_REWARD_PREFIX.length()) : waiting;
             LostTalesQuestDefinition quest =
                     LostTalesQuestRegistry.getQuest(questId);
             if (quest == null) {
@@ -307,15 +461,64 @@ public final class WorldQuests {
                         player.getCommandSenderName(), questId);
                 continue;
             }
-            LostTalesQuestRewardHelper.grantRewards(player, quest, null);
+            if (podium) {
+                LostTalesQuestRewardHelper.grantRewardBlock(player,
+                        LostTalesQuestRules.podiumRewards(quest));
+            } else {
+                LostTalesQuestRewardHelper.grantRewards(player, quest, null, -1);
+            }
         }
     }
 
     /** Sends the player every run kept and their part in each. */
     public static void syncTo(EntityPlayerMP player) {
         if (player != null) {
-            syncTo(player, runs(MinecraftServer.getServer()));
+            MinecraftServer server = MinecraftServer.getServer();
+            List<WorldQuestRun> runs = runs(server);
+            syncTo(player, runs, podiums(server, runs));
         }
+    }
+
+    /**
+     * Each run's podium as everyone is shown it (QUEST-36): its best
+     * helpers, one per account, by their characters' names, best first.
+     * A helper who played an account of their own is left out of the
+     * names; the podium still pays them.
+     */
+    private static Map<String, WorldQuestView> podiums(MinecraftServer server,
+                                                       List<WorldQuestRun> runs) {
+        Map<String, WorldQuestView> podiums = new HashMap<String, WorldQuestView>();
+        WorldServer overworld = server == null ? null
+                : server.worldServerForDimension(0);
+        if (overworld == null) {
+            return podiums;
+        }
+        WorldQuestPayees.Accounts accounts = accounts(server);
+        for (WorldQuestRun run : runs) {
+            LostTalesQuestDefinition quest =
+                    LostTalesQuestRegistry.getQuest(run.getQuestId());
+            if (quest == null || run.getHelpers().isEmpty()) {
+                continue;
+            }
+            List<String> names = new ArrayList<String>();
+            List<Integer> parts = new ArrayList<Integer>();
+            for (UUID best : WorldQuestPayees.podium(run.getHelpers(),
+                    WorldQuestRules.least(quest), accounts,
+                    WorldQuestRules.PODIUM_PLACES)) {
+                RoleplayCharacter character;
+                try {
+                    character = CharacterStorage.get(overworld).findCharacter(best);
+                } catch (RuntimeException unreadable) {
+                    character = null;
+                }
+                if (character != null) {
+                    names.add(character.getName());
+                    parts.add(Integer.valueOf(run.getHelped(best)));
+                }
+            }
+            podiums.put(run.getQuestId(), WorldQuestView.of(run, null, names, parts));
+        }
+        return podiums;
     }
 
     /**
@@ -323,7 +526,8 @@ public final class WorldQuests {
      * everyone sent it this sweep, each run's quest file first where their
      * client was not sent it yet.
      */
-    private static void syncTo(EntityPlayerMP player, List<WorldQuestRun> runs) {
+    private static void syncTo(EntityPlayerMP player, List<WorldQuestRun> runs,
+                               Map<String, WorldQuestView> podiums) {
         UUID identity = RoleplayCharacterIdentityHook.resolveGameplayId(player);
         synchronized (WorldQuests.class) {
             SENT_AS.put(player.getUniqueID(), identity);
@@ -334,7 +538,7 @@ public final class WorldQuests {
         }
         ServerQuestSync.reveal(player, questIds);
         LostTalesNetworkHandler.CHANNEL.sendTo(
-                LostTalesWorldQuestSyncPacket.of(runs, identity), player);
+                LostTalesWorldQuestSyncPacket.of(runs, identity, podiums), player);
     }
 
     /** Forgets what was sent to a player who left. */
@@ -363,6 +567,16 @@ public final class WorldQuests {
         if (data == null) {
             return;
         }
+        boolean lookAtSchedules;
+        synchronized (WorldQuests.class) {
+            lookAtSchedules = ++sweepsSinceSchedules >= SCHEDULE_SWEEPS;
+            if (lookAtSchedules) {
+                sweepsSinceSchedules = 0;
+            }
+        }
+        if (lookAtSchedules) {
+            WorldQuestSchedules.check(server, System.currentTimeMillis());
+        }
         long now = now(server);
         for (WorldQuestRun run : data.runs()) {
             if (run.isRunning() && now >= run.getEndsAt()
@@ -380,9 +594,10 @@ public final class WorldQuests {
             return;
         }
         List<WorldQuestRun> runs = data.runs();
+        Map<String, WorldQuestView> podiums = podiums(server, runs);
         for (Object each : server.getConfigurationManager().playerEntityList) {
             if (each instanceof EntityPlayerMP) {
-                syncTo((EntityPlayerMP)each, runs);
+                syncTo((EntityPlayerMP)each, runs, podiums);
             }
         }
     }
@@ -391,6 +606,8 @@ public final class WorldQuests {
     public static synchronized void clear() {
         changed = false;
         ticks = 0;
+        // The schedules are looked at on the first sweep of a server.
+        sweepsSinceSchedules = SCHEDULE_SWEEPS;
         SENT_AS.clear();
     }
 

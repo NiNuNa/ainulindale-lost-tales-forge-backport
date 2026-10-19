@@ -19,6 +19,8 @@ public enum CharacterErrorId {
     INVALID_NAME_EMPTY("invalid_name_empty"),
     INVALID_NAME_LENGTH("invalid_name_length"),
     INVALID_NAME_CHARACTERS("invalid_name_characters"),
+    /** The name mixes the letters of two scripts (CHAR-11). */
+    INVALID_NAME_SCRIPT("invalid_name_script"),
     INVALID_NAME_PROFANE("invalid_name_profane"),
     DUPLICATE_NAME("duplicate_name"),
     NAME_RESERVED("name_reserved"),

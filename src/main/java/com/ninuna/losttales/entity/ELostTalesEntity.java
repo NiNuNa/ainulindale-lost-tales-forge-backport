@@ -12,7 +12,7 @@ import net.minecraft.entity.EntityList;
 import java.util.*;
 
 public enum ELostTalesEntity {
-    TEST_PERSON(LostTalesEntityBlueGoblinSoldier.class, "TestPerson", 7000, 13521151, 373075),
+    BLUE_GOBLIN_SOLDIER(LostTalesEntityBlueGoblinSoldier.class, "BlueGoblinSoldier", 7000, 13521151, 373075),
     NIA(LostTalesEntityNia.class, "Nia", 7001, 854606, 6097486),
     ODANE_MAN(LostTalesEntityOdaneMan.class, "OdaneMan", 7002, 0x8A5A38, 0xB45A32),
     ODANE_GUARD(LostTalesEntityOdaneGuard.class, "OdaneGuard", 7003, 0x4F5A33, 0xC89B5A);

@@ -44,13 +44,13 @@ public final class ChatPermissionConfigTest {
     public void aPermissionNamesTheCapabilitiesItReaches() {
         LostTalesPermissionCatalog catalog = ChatRoleConfig.parsePermissions(new String[] {
                 "keeper=capability:chat.moderate;capability:chat.server_console.read",
-                "builder=capability:waystone.manage",
+                "builder=capability:mapmarker.manage",
         }, collect);
         assertTrue(warnings.toString(), warnings.isEmpty());
         assertEquals(Arrays.asList("keeper", "builder"), catalog.ids());
         assertTrue(catalog.reaches("keeper", LostTalesCapability.CHAT_SERVER_CONSOLE_READ));
         assertTrue(catalog.reaches("keeper", LostTalesCapability.CHAT_MODERATE));
-        assertFalse(catalog.reaches("keeper", LostTalesCapability.WAYSTONE_MANAGE));
+        assertFalse(catalog.reaches("keeper", LostTalesCapability.MAPMARKER_MANAGE));
     }
 
     /** Ids are read case-insensitively and answered the same way. */

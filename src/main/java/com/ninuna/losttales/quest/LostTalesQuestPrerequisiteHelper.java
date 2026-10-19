@@ -97,7 +97,7 @@ public final class LostTalesQuestPrerequisiteHelper {
         if (value == null || value.trim().length() == 0) {
             return new String[0];
         }
-        String[] raw = value.replace(';', ',').split(",");
+        String[] raw = value.split(",");
         java.util.List<String> cleaned = new java.util.ArrayList<String>();
         for (String entry : raw) {
             if (entry != null && entry.trim().length() > 0) {

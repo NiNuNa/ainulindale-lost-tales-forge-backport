@@ -23,15 +23,13 @@ public final class LostTalesMissiveData {
     private final String issuerId;
     private final String flavorId;
     private final String target;
-    private final boolean repeatable;
-    private final boolean firstComeFirstServed;
     private final long generationWorldTime;
     private final long timeLimitTicks;
     private final Map<String, String> generationContext;
     private final List<LostTalesMissiveObjectiveData> objectives;
     private final LostTalesMissiveRewardData rewardData;
 
-    public LostTalesMissiveData(String questId, String questType, String titleId, String descriptionId, String issuerId, String flavorId, String target, boolean repeatable, boolean firstComeFirstServed, long generationWorldTime, long timeLimitTicks, Map<String, String> generationContext, List<LostTalesMissiveObjectiveData> objectives, LostTalesMissiveRewardData rewardData) {
+    public LostTalesMissiveData(String questId, String questType, String titleId, String descriptionId, String issuerId, String flavorId, String target, long generationWorldTime, long timeLimitTicks, Map<String, String> generationContext, List<LostTalesMissiveObjectiveData> objectives, LostTalesMissiveRewardData rewardData) {
         this.questId = LostTalesMissiveObjectiveData.clean(questId);
         this.questType = LostTalesMissiveObjectiveData.clean(questType);
         this.titleId = LostTalesMissiveObjectiveData.clean(titleId);
@@ -39,8 +37,6 @@ public final class LostTalesMissiveData {
         this.issuerId = LostTalesMissiveObjectiveData.clean(issuerId);
         this.flavorId = LostTalesMissiveObjectiveData.clean(flavorId);
         this.target = LostTalesMissiveObjectiveData.clean(target);
-        this.repeatable = repeatable;
-        this.firstComeFirstServed = firstComeFirstServed;
         this.generationWorldTime = Math.max(0L, generationWorldTime);
         this.timeLimitTicks = Math.max(0L, timeLimitTicks);
         this.generationContext = Collections.unmodifiableMap(LostTalesMissiveObjectiveData.copyStringMap(generationContext));
@@ -81,14 +77,6 @@ public final class LostTalesMissiveData {
         return this.target;
     }
 
-    public boolean isRepeatable() {
-        return this.repeatable;
-    }
-
-    public boolean isFirstComeFirstServed() {
-        return this.firstComeFirstServed;
-    }
-
     /** The world time the notice was posted at, on the board it stands on; a board takes it down after its expiry. */
     public long getGenerationWorldTime() {
         return this.generationWorldTime;
@@ -98,7 +86,7 @@ public final class LostTalesMissiveData {
     public LostTalesMissiveData postedAt(long worldTime) {
         return new LostTalesMissiveData(this.questId, this.questType,
                 this.titleId, this.descriptionId, this.issuerId,
-                this.flavorId, this.target, this.repeatable, this.firstComeFirstServed, worldTime,
+                this.flavorId, this.target, worldTime,
                 this.timeLimitTicks, this.generationContext, this.objectives,
                 this.rewardData);
     }
@@ -184,8 +172,6 @@ public final class LostTalesMissiveData {
         private String issuerId = "";
         private String flavorId = "";
         private String target = "";
-        private boolean repeatable = true;
-        private boolean firstComeFirstServed = true;
         private long generationWorldTime;
         private long timeLimitTicks;
         private final Map<String, String> generationContext = new LinkedHashMap<String, String>();
@@ -222,16 +208,6 @@ public final class LostTalesMissiveData {
             return this;
         }
 
-        public Builder repeatable(boolean repeatable) {
-            this.repeatable = repeatable;
-            return this;
-        }
-
-        public Builder firstComeFirstServed(boolean firstComeFirstServed) {
-            this.firstComeFirstServed = firstComeFirstServed;
-            return this;
-        }
-
         public Builder generationWorldTime(long generationWorldTime) {
             this.generationWorldTime = generationWorldTime;
             return this;
@@ -262,7 +238,7 @@ public final class LostTalesMissiveData {
         }
 
         public LostTalesMissiveData build() {
-            return new LostTalesMissiveData(this.questId, this.questType, this.titleId, this.descriptionId, this.issuerId, this.flavorId, this.target, this.repeatable, this.firstComeFirstServed, this.generationWorldTime, this.timeLimitTicks, this.generationContext, this.objectives, this.rewardData);
+            return new LostTalesMissiveData(this.questId, this.questType, this.titleId, this.descriptionId, this.issuerId, this.flavorId, this.target, this.generationWorldTime, this.timeLimitTicks, this.generationContext, this.objectives, this.rewardData);
         }
     }
 }

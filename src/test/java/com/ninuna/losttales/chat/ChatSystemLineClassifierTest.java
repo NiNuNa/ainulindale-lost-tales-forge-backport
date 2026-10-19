@@ -72,11 +72,16 @@ public final class ChatSystemLineClassifierTest {
                 new ChatComponentTranslation("chat.type.announcement",
                         "Server", "hello")));
         assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.classify(
-                new ChatComponentTranslation("chat.type.emote",
-                        "Steve", "waves")));
-        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.type.text",
                         "Steve", "vanilla chat")));
+    }
+
+    /** The game's emote is out-of-character words: OOC, never Global (CHAT-37). */
+    @Test
+    public void theGamesEmoteGoesToOoc() {
+        assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.classify(
+                new ChatComponentTranslation("chat.type.emote",
+                        "Steve", "waves")));
     }
 
     @Test

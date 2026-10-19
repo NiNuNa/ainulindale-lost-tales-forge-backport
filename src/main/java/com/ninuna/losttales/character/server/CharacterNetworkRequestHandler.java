@@ -9,6 +9,8 @@ import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.fellowship.server.FellowshipSyncManager;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipRecord;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSyncManager;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
 import cpw.mods.fml.common.FMLLog;
@@ -177,7 +179,7 @@ public final class CharacterNetworkRequestHandler {
                                         expectedOwnershipRevision,
                                         expectedRosterRevision, slotIndex);
                     }
-                });
+                }, figureAudience(player, loreCharacterId));
     }
 
     public static void handleLoreReleaseRequest(
@@ -194,7 +196,28 @@ public final class CharacterNetworkRequestHandler {
                                         expectedOwnershipRevision,
                                         expectedRosterRevision);
                     }
-                });
+                }, figureAudience(player, loreCharacterId));
+    }
+
+    /**
+     * Who a lore figure's fellowships and invitations reach, taken before a
+     * claim or a release changes them, so every member hears of it
+     * (CHAR-36). Empty for a figure never claimed, which is in none.
+     */
+    private static FellowshipSyncManager.AudienceSnapshot figureAudience(
+            EntityPlayerMP player, String loreCharacterId) {
+        UUID characterId = null;
+        if (player != null && player.worldObj != null) {
+            try {
+                LoreCharacterOwnershipRecord record = LoreCharacterOwnershipStorage
+                        .get(player.worldObj).getRecord(loreCharacterId);
+                characterId = record == null ? null : record.getCharacterId();
+            } catch (RuntimeException unreadable) {
+                // The claim or release refuses an unreadable store itself.
+            }
+        }
+        return FellowshipSyncManager.captureCharacterRelationsAudience(
+                player == null ? null : player.worldObj, characterId);
     }
 
     private static void execute(EntityPlayerMP player,
@@ -218,6 +241,16 @@ public final class CharacterNetworkRequestHandler {
             CharacterSyncManager.sendFailure(player, requestId, operationType,
                     CharacterErrorId.FIRST_CHARACTER_PENDING);
             return;
+        }
+        if (CharacterJoin.waitsOnUnreadableStore(player)
+                && operationType == CharacterOperationType.REQUEST_ROSTER) {
+            // The store is tried again: while it still cannot be read the
+            // roster says so, and the creator keeps saying why the player
+            // waits; once it reads, they make their first character (CHAR-01).
+            if (!CharacterPlayerEventHandler.retryUnreadable(player)) {
+                CharacterSyncManager.sendUnreadable(player, requestId);
+                return;
+            }
         }
         CharacterOperationResult result;
         try {

@@ -1,7 +1,6 @@
 package com.ninuna.losttales.config.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -190,12 +189,6 @@ public final class LostTalesServerConfigService {
                 || categories.contains(LostTalesConfig.CATEGORY_DISCORD)) {
             LostTalesChatService.sendAccessToAll(null);
             restarted.add(ServerConfigApplyResult.RESTARTED_CHAT_ACCESS);
-        }
-        // Show Accounts, or a role granting character.see_accounts, decides
-        // what names an account in the lore list and the fellowships.
-        if (categories.contains(LostTalesConfig.CATEGORY_CHARACTERS)
-                || categories.contains(LostTalesConfig.CATEGORY_ROLES)) {
-            AccountVisibility.resendToAll();
         }
         return restarted;
     }

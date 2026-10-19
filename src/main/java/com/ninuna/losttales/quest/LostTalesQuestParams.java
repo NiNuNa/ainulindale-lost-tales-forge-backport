@@ -14,6 +14,11 @@ public final class LostTalesQuestParams {
      * counted as its stage ends; {@code false}, or none, keeps it.
      */
     public static final String TAKE = "take";
+    /**
+     * A world quest's delivery's {@code board}: {@code true} hands the
+     * items in at any missive board instead of to someone (QUEST-36).
+     */
+    public static final String BOARD = "board";
 
     private LostTalesQuestParams() {}
 

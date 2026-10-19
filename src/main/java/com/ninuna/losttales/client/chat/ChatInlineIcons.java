@@ -131,6 +131,9 @@ final class ChatInlineIcons {
         if (stamp >= 0) {
             return stamp;
         }
+        if (ChatWorldMark.isMarker(part)) {
+            return ChatWorldMark.RUN_WIDTH;
+        }
         return ChatSpacerMarker.decode(part);
     }
 

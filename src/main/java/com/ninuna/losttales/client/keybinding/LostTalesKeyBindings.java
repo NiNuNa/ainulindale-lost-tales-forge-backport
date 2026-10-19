@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.keybinding;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
+import com.ninuna.losttales.client.window.ClientSettingsPage;
 import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.Views;
 import com.ninuna.losttales.client.window.WindowScreen;
@@ -38,6 +39,15 @@ public class LostTalesKeyBindings {
     private static final KeyBinding CHARACTERS = new KeyBinding("key.losttales.characters", Keyboard.KEY_NONE, CATEGORY);
     private static final KeyBinding MAP = new KeyBinding(
             "key.losttales.map", Keyboard.KEY_M, CATEGORY);
+    /**
+     * The Settings view's key, pressed with Ctrl (Cmd on a Mac) in play as
+     * on the window screen: Ctrl+, until the player binds it to another key
+     * (WIN-05). A binding holds no modifier in 1.7.10, so the row holds the
+     * key and Ctrl is always asked for, which keeps a comma typed in a
+     * field a comma.
+     */
+    private static final KeyBinding SETTINGS = new KeyBinding(
+            "key.losttales.settings", Keyboard.KEY_COMMA, CATEGORY);
     private static final KeyBinding TOGGLE_HUD = new KeyBinding("key.losttales.toggleHud", Keyboard.KEY_H, CATEGORY);
     private static final KeyBinding USE = new KeyBinding("key.losttales.use", Keyboard.KEY_R, CATEGORY);
     private static final KeyBinding MODIFIER = new KeyBinding("key.losttales.modifier", Keyboard.KEY_LMENU, CATEGORY);
@@ -64,6 +74,7 @@ public class LostTalesKeyBindings {
         ClientRegistry.registerKeyBinding(FELLOWSHIP);
         ClientRegistry.registerKeyBinding(CHARACTERS);
         ClientRegistry.registerKeyBinding(MAP);
+        ClientRegistry.registerKeyBinding(SETTINGS);
         ClientRegistry.registerKeyBinding(TOGGLE_HUD);
         ClientRegistry.registerKeyBinding(USE);
         ClientRegistry.registerKeyBinding(MODIFIER);
@@ -132,6 +143,10 @@ public class LostTalesKeyBindings {
         }
         if (MAP.isPressed() && minecraft.currentScreen == null) {
             LostTalesLotrMapGui.open();
+        }
+        if (SETTINGS.isPressed() && minecraft.currentScreen == null
+                && isCommandKeyDown()) {
+            WindowScreen.openView(ClientSettingsPage.PAGE_ID);
         }
         if (TOGGLE_HUD.isPressed()) {
             if (isModifierKeyDown()) {
@@ -216,6 +231,28 @@ public class LostTalesKeyBindings {
 
     public static KeyBinding getCharactersKeyBinding() {
         return CHARACTERS;
+    }
+
+    /** The Settings view's key, pressed with Ctrl; see {@link #SETTINGS}. */
+    public static KeyBinding getSettingsKeyBinding() {
+        return SETTINGS;
+    }
+
+    /**
+     * Whether {@code keyCode} is the Settings view's key: the key its row
+     * in Controls holds, pressed with Ctrl. KEY_NONE never is.
+     */
+    public static boolean isSettingsKey(int keyCode) {
+        return isKeyboardKey(SETTINGS, keyCode);
+    }
+
+    /** Whether Ctrl, or Cmd on a Mac, is held: the key the Settings key is pressed with. */
+    private static boolean isCommandKeyDown() {
+        return Minecraft.isRunningOnMac
+                ? Keyboard.isKeyDown(Keyboard.KEY_LMETA)
+                        || Keyboard.isKeyDown(Keyboard.KEY_RMETA)
+                : Keyboard.isKeyDown(Keyboard.KEY_LCONTROL)
+                        || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
     }
 
     /** The key of custom view {@code number}, 1 to {@link Views#MAX_CUSTOM}; null for any other number. */

@@ -58,71 +58,30 @@ public final class DiscordSlashCommandsTest {
     @Test
     public void onlineListsEveryoneAlphabeticallyWithTheirCharacter() {
         assertEquals("**2 online:** Alex, steve (as Aragorn)",
-                DiscordSlashCommands.online(ENGLISH, PLAYERS, true));
+                DiscordSlashCommands.online(ENGLISH, PLAYERS));
         assertEquals("**Nobody is online.**",
                 DiscordSlashCommands.online(ENGLISH,
-                        Collections.<DiscordSlashCommands.Player>emptyList(), true));
-    }
-
-    /** With Show Accounts off the list names characters and only counts the rest. */
-    @Test
-    public void onlineWithoutAccountsNamesCharactersAlone() {
-        List<DiscordSlashCommands.Player> players = Arrays.asList(
-                new DiscordSlashCommands.Player("steve", "Boromir", "", ""),
-                new DiscordSlashCommands.Player("Alex", "", "", ""),
-                new DiscordSlashCommands.Player("bob", "Aragorn", "", ""),
-                new DiscordSlashCommands.Player("Cid", "", "", ""));
-        String online = DiscordSlashCommands.online(ENGLISH, players, false);
-        assertEquals("**4 online:** Aragorn, Boromir,"
-                + " 2 still making their first character", online);
-        for (DiscordSlashCommands.Player player : players) {
-            assertFalse(online, online.contains(player.account));
-        }
-        assertEquals("**1 online:** 1 still making their first character",
-                DiscordSlashCommands.online(ENGLISH, Collections.singletonList(
-                        new DiscordSlashCommands.Player("Alex", "", "", "")), false));
-        assertEquals("**Nobody is online.**",
-                DiscordSlashCommands.online(ENGLISH,
-                        Collections.<DiscordSlashCommands.Player>emptyList(), false));
+                        Collections.<DiscordSlashCommands.Player>emptyList()));
     }
 
     @Test
     public void whoFindsByAccountOrCharacterAndDescribes() {
         assertEquals("**Aragorn** — steve's character: Human, of Gondor.",
-                DiscordSlashCommands.who(ENGLISH, PLAYERS, "aragorn", true));
+                DiscordSlashCommands.who(ENGLISH, PLAYERS, "aragorn"));
         assertEquals("**Alex** is online, making a character.",
-                DiscordSlashCommands.who(ENGLISH, PLAYERS, "ALEX", true));
+                DiscordSlashCommands.who(ENGLISH, PLAYERS, "ALEX"));
         assertEquals("Nobody online is called **Bob**.",
-                DiscordSlashCommands.who(ENGLISH, PLAYERS, "Bob", true));
+                DiscordSlashCommands.who(ENGLISH, PLAYERS, "Bob"));
         assertEquals("Say whom: `/who name`.",
-                DiscordSlashCommands.who(ENGLISH, PLAYERS, " ", true));
+                DiscordSlashCommands.who(ENGLISH, PLAYERS, " "));
         // Markdown in a name stays inert.
         assertEquals("Nobody online is called **\\*\\*Bob\\*\\***.",
-                DiscordSlashCommands.who(ENGLISH, PLAYERS, "**Bob**", true));
+                DiscordSlashCommands.who(ENGLISH, PLAYERS, "**Bob**"));
         // A character with no race or faction known is the account's alone.
         assertEquals("**Boromir** — bob's character.",
                 DiscordSlashCommands.who(ENGLISH, Collections.singletonList(
                         new DiscordSlashCommands.Player("bob", "Boromir", "", "")),
-                        "boromir", true));
-    }
-
-    /**
-     * With Show Accounts off a character is found by its name alone and
-     * never said to be anyone's; an account's name finds nobody, the
-     * same answer as a name nobody has.
-     */
-    @Test
-    public void whoWithoutAccountsAnswersByCharacterAlone() {
-        assertEquals("**Aragorn** is online: Human, of Gondor.",
-                DiscordSlashCommands.who(ENGLISH, PLAYERS, "aragorn", false));
-        assertEquals("**Boromir** is online.",
-                DiscordSlashCommands.who(ENGLISH, Collections.singletonList(
-                        new DiscordSlashCommands.Player("bob", "Boromir", "", "")),
-                        "boromir", false));
-        assertEquals("Nobody online is called **steve**.",
-                DiscordSlashCommands.who(ENGLISH, PLAYERS, "steve", false));
-        assertEquals("Nobody online is called **Alex**.",
-                DiscordSlashCommands.who(ENGLISH, PLAYERS, "Alex", false));
+                        "boromir"));
     }
 
     /** What /link and /unlink answer, one lang line a sentence. */
@@ -176,7 +135,7 @@ public final class DiscordSlashCommandsTest {
         for (int index = 0; index < 3000; index++) {
             name.append('*');
         }
-        String answer = DiscordSlashCommands.who(ENGLISH, PLAYERS, name.toString(), true);
+        String answer = DiscordSlashCommands.who(ENGLISH, PLAYERS, name.toString());
         assertTrue(answer.length() + " characters", answer.length() <= 2000);
         assertTrue(answer.endsWith("..."));
         StringBuilder emoji = new StringBuilder();
@@ -202,8 +161,8 @@ public final class DiscordSlashCommandsTest {
     /** A race reads as the game names it, and as its id where no lang line names it. */
     @Test
     public void aRaceReadsAsTheGameNamesIt() {
-        assertEquals("Half-troll",
-                DiscordSlashCommands.raceName(ENGLISH, "losttales:half_troll"));
+        assertEquals("Uruk",
+                DiscordSlashCommands.raceName(ENGLISH, "losttales:uruk"));
         // The game's lang lookup answers a key it lacks with the key itself.
         LostTalesWords lacking = new LostTalesWords() {
             @Override
@@ -211,8 +170,8 @@ public final class DiscordSlashCommandsTest {
                 return key;
             }
         };
-        assertEquals("Half troll",
-                DiscordSlashCommands.raceName(lacking, "losttales:half_troll"));
+        assertEquals("Black uruk",
+                DiscordSlashCommands.raceName(lacking, "losttales:black_uruk"));
         assertEquals("", DiscordSlashCommands.raceName(ENGLISH, ""));
         assertEquals("", DiscordSlashCommands.raceName(ENGLISH, null));
     }

@@ -1,8 +1,11 @@
 package com.ninuna.losttales.chat.profanity;
 
+import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatMentions;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -84,11 +87,24 @@ public final class ChatProfanityFilter {
 
     /**
      * {@link #filter} over a message as typed, leaving alone what is not
-     * words: share tokens, emoji shortcodes, web addresses, mentions,
-     * channel links and quoted {@code `code`}.
+     * words: share tokens, emoji shortcodes, web addresses, quoted
+     * {@code `code`}, channel links and the mentions that reach somebody
+     * the message names. An {@code @word} reaching nobody is filtered as
+     * a word, as the chat's lines filter it.
      */
     public static String filterMessage(String message, ChatProfanityMode mode,
                                        ChatProfanityWords words) {
+        return filterMessage(message, mode, words,
+                Collections.<ChatNamedPlayer>emptyList());
+    }
+
+    /**
+     * As above for a message naming {@code named}: whom its mentions
+     * reach, as the server recorded them with the line.
+     */
+    public static String filterMessage(String message, ChatProfanityMode mode,
+                                       ChatProfanityWords words,
+                                       List<ChatNamedPlayer> named) {
         if (message == null) {
             return "";
         }
@@ -96,17 +112,19 @@ public final class ChatProfanityFilter {
                 || words.isEmpty()) {
             return message;
         }
+        List<ChatNamedPlayer> reached = named == null
+                ? Collections.<ChatNamedPlayer>emptyList() : named;
         StringBuilder out = new StringBuilder(message.length() + 16);
         List<ChatShareTokenParser.Token> tokens = ChatShareTokenParser.parse(message);
         int literalStart = 0;
         for (int index = 0; index < tokens.size(); index++) {
             ChatShareTokenParser.Token token = tokens.get(index);
             appendOutsideEmojis(out, message.substring(literalStart, token.start),
-                    mode, words);
+                    mode, words, reached);
             out.append(message, token.start, token.end);
             literalStart = token.end;
         }
-        appendOutsideEmojis(out, message.substring(literalStart), mode, words);
+        appendOutsideEmojis(out, message.substring(literalStart), mode, words, reached);
         return out.toString();
     }
 
@@ -119,12 +137,13 @@ public final class ChatProfanityFilter {
 
     private static void appendOutsideEmojis(StringBuilder out, String text,
                                             ChatProfanityMode mode,
-                                            ChatProfanityWords words) {
+                                            ChatProfanityWords words,
+                                            List<ChatNamedPlayer> named) {
         for (ChatEmojiParser.Segment segment : ChatEmojiParser.split(text)) {
             if (segment.isEmoji()) {
                 out.append(segment.getEmoji().getShortcode());
             } else {
-                appendOutsideCode(out, segment.getText(), mode, words);
+                appendOutsideCode(out, segment.getText(), mode, words, named);
             }
         }
     }
@@ -136,7 +155,8 @@ public final class ChatProfanityFilter {
      */
     private static void appendOutsideCode(StringBuilder out, String text,
                                           ChatProfanityMode mode,
-                                          ChatProfanityWords words) {
+                                          ChatProfanityWords words,
+                                          List<ChatNamedPlayer> named) {
         int literalStart = 0;
         int cursor = 0;
         while (cursor < text.length()) {
@@ -151,53 +171,70 @@ public final class ChatProfanityFilter {
                 cursor = open + 1;
                 continue;
             }
-            appendWords(out, text.substring(literalStart, open), mode, words);
+            appendWords(out, text.substring(literalStart, open), mode, words, named);
             out.append(text, open, close + 1);
             literalStart = close + 1;
             cursor = close + 1;
         }
-        appendWords(out, text.substring(literalStart), mode, words);
+        appendWords(out, text.substring(literalStart), mode, words, named);
     }
 
     /**
-     * The words of a run, chunk by whitespace-separated chunk: a chunk
-     * that is a web address, a mention or a channel link is kept whole,
-     * every other is filtered.
+     * The words of a run: a web address, a channel link and a mention
+     * reaching somebody {@code named} names are kept whole, as the chat's
+     * lines keep them; every other word is filtered, an {@code @word}
+     * reaching nobody among them.
      */
     private static void appendWords(StringBuilder out, String text,
                                     ChatProfanityMode mode,
-                                    ChatProfanityWords words) {
+                                    ChatProfanityWords words,
+                                    List<ChatNamedPlayer> named) {
+        int literalStart = 0;
         int cursor = 0;
         while (cursor < text.length()) {
-            if (Character.isWhitespace(text.charAt(cursor))) {
-                out.append(text.charAt(cursor));
+            int kept = keptEnd(text, cursor, named);
+            if (kept > cursor) {
+                out.append(filter(text.substring(literalStart, cursor), mode, words));
+                out.append(text, cursor, kept);
+                literalStart = kept;
+                cursor = kept;
+            } else {
                 cursor++;
-                continue;
             }
-            int end = cursor;
-            while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
-                end++;
-            }
-            String chunk = text.substring(cursor, end);
-            out.append(isKeptWhole(chunk) ? chunk : filter(chunk, mode, words));
-            cursor = end;
         }
+        out.append(filter(text.substring(literalStart), mode, words));
     }
 
     /**
-     * Whether a chunk is a web address, or a mention or channel link: an
-     * {@code @} or {@code #} with a name's own character right after it,
-     * as the chat reads them. {@code @**word**} names nobody, so its word
-     * is filtered.
+     * Where what is kept whole from {@code at} ends: a web address to the
+     * next space, a channel link, a mention of someone {@code named}
+     * names; {@code at} itself where nothing is kept there.
      */
-    private static boolean isKeptWhole(String chunk) {
-        char first = chunk.charAt(0);
-        if (first == '@' || first == '#') {
-            return chunk.length() > 1
-                    && ChatMentions.isNameCharacter(chunk.charAt(1));
+    private static int keptEnd(String text, int at, List<ChatNamedPlayer> named) {
+        boolean opensWord = at == 0 || Character.isWhitespace(text.charAt(at - 1))
+                || !ChatMentions.isNameCharacter(text.charAt(at - 1));
+        if (!opensWord) {
+            return at;
         }
-        String lowered = chunk.toLowerCase(Locale.ROOT);
-        return lowered.startsWith("http://") || lowered.startsWith("https://");
+        char first = text.charAt(at);
+        if (first == '@') {
+            ChatMentions.Hit hit = ChatMentions.nameAt(text, at, named);
+            return hit == null ? at : hit.end;
+        }
+        if (first == '#') {
+            ChatChannelSuggester.Link link = ChatChannelSuggester.linkAt(text, at);
+            return link == null ? at : link.end;
+        }
+        String rest = text.substring(at).toLowerCase(Locale.ROOT);
+        if ((at == 0 || Character.isWhitespace(text.charAt(at - 1)))
+                && (rest.startsWith("http://") || rest.startsWith("https://"))) {
+            int end = at;
+            while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
+                end++;
+            }
+            return end;
+        }
+        return at;
     }
 
     /**

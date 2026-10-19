@@ -78,24 +78,9 @@ public final class ChatNamedPlayer {
         return this.skinId;
     }
 
-    /**
-     * Whether the entry names anybody at all: an account, or a character
-     * by its id and name, as a reader not shown accounts is told of one.
-     */
+    /** Whether the entry names anybody at all. */
     public boolean isValid() {
-        return this.account.length() > 0
-                || (this.characterId != null && this.identityName.length() > 0);
-    }
-
-    /**
-     * The same entry without its account, for a reader not shown which
-     * account plays a character: a character's entry keeps its id, name
-     * and skin; an account's is itself.
-     */
-    public ChatNamedPlayer withoutAccount() {
-        return this.characterId == null || this.account.length() == 0 ? this
-                : new ChatNamedPlayer(this.playerId, "", this.characterId,
-                        this.identityName, this.skinId);
+        return this.account.length() > 0;
     }
 
     /**

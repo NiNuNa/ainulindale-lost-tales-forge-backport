@@ -51,7 +51,6 @@ public final class ChatSystemLineClassifier {
     /** Shared lines that are neither of the kinds above. */
     private static final String[] OTHER_GLOBAL_KEYS = {
             "chat.type.announcement",
-            "chat.type.emote",
             "chat.type.text",
             // LOTR's travelling-trader notices go to every player in the
             // world (LOTRSpeech.messageAllPlayersInWorld), so they are
@@ -60,8 +59,16 @@ public final class ChatSystemLineClassifier {
             "lotr.travellingTrader.arriveMP",
             "lotr.travellingTrader.depart",
     };
+    /**
+     * The game's emote, {@code * Steve waves}, from anything but a player
+     * (a player's own {@code /me} is the chat's action, ChatSpeechGate):
+     * out-of-character words, said in OOC and never in Global (CHAT-37).
+     */
+    private static final String EMOTE_KEY = "chat.type.emote";
     /** The server's welcome to a new player (ChatWelcome), which waits in OOC. */
     private static final String WELCOME_KEY = "chat.losttales.welcome";
+    /** A world quest beginning, said to everyone in OOC (QUEST-36). */
+    public static final String WORLD_QUEST_BEGUN_KEY = "chat.losttales.quest.world.begun";
     /**
      * Vanilla's notice to every operator of what a command did:
      * {@code [Server: Opped Nils]}, its first argument the name of whoever
@@ -94,7 +101,8 @@ public final class ChatSystemLineClassifier {
         if (contains(OTHER_GLOBAL_KEYS, key)) {
             return ChatChannel.GLOBAL;
         }
-        if (WELCOME_KEY.equals(key)) {
+        if (WELCOME_KEY.equals(key) || WORLD_QUEST_BEGUN_KEY.equals(key)
+                || EMOTE_KEY.equals(key)) {
             return ChatChannel.OOC;
         }
         return ChatChannel.CLIENT_CONSOLE;

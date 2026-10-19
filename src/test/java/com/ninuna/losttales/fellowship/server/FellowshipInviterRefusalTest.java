@@ -1,13 +1,15 @@
 package com.ninuna.losttales.fellowship.server;
 
+import com.ninuna.losttales.util.EnglishWords;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
 /**
- * A refusal kept by account would tell an inviter that two characters
- * share an account; one not shown accounts hears one neutral refusal for
- * all of them, and every other refusal as it is.
+ * Every refusal of an invitation says its own reason to whoever invited
+ * (FEL-17): the refusals kept by account each have words of their own.
  */
 public final class FellowshipInviterRefusalTest {
 
@@ -18,32 +20,12 @@ public final class FellowshipInviterRefusalTest {
     };
 
     @Test
-    public void anInviterShownAccountsHearsThePreciseReason() {
-        for (FellowshipErrorId refusal : FellowshipErrorId.values()) {
-            assertEquals(refusal, FellowshipInvitationCoordinator.toInviter(refusal, true));
-        }
-    }
-
-    @Test
-    public void anInviterNotShownAccountsHearsOneRefusalForEveryAccountReason() {
+    public void eachRefusalKeptByAccountSaysItsOwnReason() {
+        Set<String> words = new HashSet<String>();
         for (FellowshipErrorId refusal : BY_ACCOUNT) {
-            assertEquals(refusal.name(), FellowshipErrorId.TARGET_CANNOT_BE_INVITED,
-                    FellowshipInvitationCoordinator.toInviter(refusal, false));
+            words.add(EnglishWords.INSTANCE.format(
+                    "gui.losttales.fellowship.error." + refusal.getId()));
         }
-        assertEquals(FellowshipErrorId.TARGET_NOT_FOUND,
-                FellowshipInvitationCoordinator.toInviter(
-                        FellowshipErrorId.TARGET_NOT_FOUND, false));
-        assertEquals(FellowshipErrorId.INVITATION_ALREADY_EXISTS,
-                FellowshipInvitationCoordinator.toInviter(
-                        FellowshipErrorId.INVITATION_ALREADY_EXISTS, false));
-        assertEquals(FellowshipErrorId.TARGET_ALREADY_MEMBER,
-                FellowshipInvitationCoordinator.toInviter(
-                        FellowshipErrorId.TARGET_ALREADY_MEMBER, false));
-    }
-
-    @Test
-    public void theNeutralRefusalTravelsByItsOwnId() {
-        assertEquals(FellowshipErrorId.TARGET_CANNOT_BE_INVITED,
-                FellowshipErrorId.fromId("target_cannot_be_invited"));
+        assertEquals(BY_ACCOUNT.length, words.size());
     }
 }

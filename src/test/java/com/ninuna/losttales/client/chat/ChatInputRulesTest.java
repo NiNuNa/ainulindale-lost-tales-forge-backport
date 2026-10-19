@@ -48,15 +48,21 @@ public final class ChatInputRulesTest {
         assertTrue(ChatInputRules.isAction("/me waves", ChatChannel.GLOBAL));
         assertTrue(ChatInputRules.isAction("/me waves", ChatChannel.PROXIMITY));
         assertTrue(ChatInputRules.isAction("/me waves", ChatChannel.WHISPER));
-        assertFalse(ChatInputRules.isAction("/me waves", ChatChannel.OOC));
+        // Out of character too, an action under the account (CHAT-37); in a
+        // console it is the game's command.
+        assertTrue(ChatInputRules.isAction("/me waves", ChatChannel.OOC));
         assertFalse(ChatInputRules.isAction("/me waves",
                 ChatChannel.SERVER_CONSOLE));
+        assertFalse(ChatInputRules.isAction("/me waves",
+                ChatChannel.CLIENT_CONSOLE));
         assertFalse(ChatInputRules.isAction("/me waves", null));
 
         assertFalse(ChatInputRules.isServerCommand("/me waves",
                 ChatChannel.GLOBAL));
-        assertTrue(ChatInputRules.isServerCommand("/me waves",
+        assertFalse(ChatInputRules.isServerCommand("/me waves",
                 ChatChannel.OOC));
+        assertTrue(ChatInputRules.isServerCommand("/me waves",
+                ChatChannel.CLIENT_CONSOLE));
         assertTrue(ChatInputRules.isServerCommand("/losttales hud",
                 ChatChannel.GLOBAL));
 

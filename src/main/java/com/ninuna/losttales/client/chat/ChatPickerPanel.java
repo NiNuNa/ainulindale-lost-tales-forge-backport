@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PointerRegions;
+import com.ninuna.losttales.client.window.PointerTip;
 import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.SubWindowContent;
 import com.ninuna.losttales.client.window.TabIcons;
@@ -25,7 +26,6 @@ import java.util.Locale;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
 import net.minecraft.client.gui.Gui;
@@ -563,34 +563,11 @@ abstract class ChatPickerPanel extends SubWindowContent {
         this.searchField.drawTextBox();
     }
 
+    /** The hovered cell's name. */
     @Override
-    public String tipKey() {
-        String label = this.hoveredEntry == null ? null : tooltip(this.hoveredEntry);
-        return label == null ? "" : label;
-    }
-
-    /** The hovered cell's name, as the chat's pointer tip is drawn. */
-    @Override
-    public void drawTip(Minecraft minecraft, int tipX, int tipY, int screenWidth,
-                        float share) {
+    public PointerTip tip(FontRenderer font) {
         Entry entry = this.hoveredEntry;
-        String label = entry == null ? null : tooltip(entry);
-        if (label == null || label.length() == 0) {
-            return;
-        }
-        FontRenderer font = minecraft.fontRenderer;
-        int width = WindowStyle.popupLineWidth(font, label);
-        int x = Math.max(2, Math.min(screenWidth - width - 2,
-                tipX - width / 2));
-        int y = tipY - 3 - WindowStyle.POPUP_LINE_HEIGHT;
-        // Beside the pointer, so it keeps pace with the cursor rather
-        // than with the interface grid, as every other tooltip does.
-        LostTalesTooltipSmoothing.begin(tipX, tipY);
-        try {
-            WindowStyle.drawPopupLine(font, label, x, y, share);
-        } finally {
-            LostTalesTooltipSmoothing.end();
-        }
+        return entry == null ? null : PointerTip.of(font, tooltip(entry));
     }
 
     private void ensureSearchField(FontRenderer font) {

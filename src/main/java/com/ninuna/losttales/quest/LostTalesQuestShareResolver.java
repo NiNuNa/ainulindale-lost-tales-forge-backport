@@ -76,7 +76,7 @@ public final class LostTalesQuestShareResolver {
         return new ChatQuestCard(source, title,
                 fitBytes(LostTalesQuestCategory.of(quest),
                         ChatQuestCard.MAX_CATEGORY_BYTES),
-                objectives(quest, progress, source), rewards(quest.getRewards()));
+                objectives(quest, progress, source), rewards(everyReward(quest)));
     }
 
     private static List<ChatQuestCard.Objective> objectives(
@@ -135,6 +135,25 @@ public final class LostTalesQuestShareResolver {
             }
         }
         return targets;
+    }
+
+    /**
+     * Every reward the quest pays (QUEST-33): its own, then each optional
+     * objective's as {@code optional.<n>.<key>}, numbered in the file's
+     * order so the keys stay short.
+     */
+    private static Map<String, String> everyReward(LostTalesQuestDefinition quest) {
+        Map<String, String> all = new LinkedHashMap<String, String>();
+        int optional = 0;
+        for (Map.Entry<String, Map<String, String>> block : LostTalesQuestRewards
+                .split(LostTalesQuestRewards.withOptionals(quest)).entrySet()) {
+            String prefix = block.getKey().length() == 0 ? ""
+                    : LostTalesQuestRewards.OPTIONAL_PREFIX + (++optional) + ".";
+            for (Map.Entry<String, String> reward : block.getValue().entrySet()) {
+                all.put(prefix + reward.getKey(), reward.getValue());
+            }
+        }
+        return all;
     }
 
     /** The reward entries as written, as many as a card holds, each within its bounds. */

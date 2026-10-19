@@ -132,18 +132,42 @@ public final class LostTalesClientQuestNotificationStore {
                 addInfo(line);
                 ClientQuestNews.record(questId, line);
                 playQuestSound(SOUND_PROGRESS, 0.35F, 1.0F);
-                if (next.getDeadlineWorldTime() > next.getAcceptedWorldTime()) {
+                if (next.hasTimeLimit()) {
                     addFailed(StatCollector.translateToLocalFormatted(
                             "gui.losttales.quest.banner.time_limit",
-                            LostTalesQuestTimeText.shortForm(
-                                    next.getDeadlineWorldTime()
-                                            - next.getAcceptedWorldTime())));
+                            LostTalesQuestTimeText.shortForm(next.getRemainingTicks(
+                                    next.getAcceptedWorldTime()))));
                 }
                 continue;
             }
 
             if (stageChanged(previous, next)) {
                 String line = banner("advanced", questId);
+                addInfo(line);
+                ClientQuestNews.record(questId, line);
+                playQuestSound(SOUND_PROGRESS, 0.35F, 1.05F);
+                if (next.getStageDeadlineWorldTime() > 0L
+                        && next.getStageDeadlineWorldTime()
+                        != previous.getStageDeadlineWorldTime()) {
+                    // The new stage runs on a clock of its own (QUEST-32).
+                    Minecraft minecraft = Minecraft.getMinecraft();
+                    long now = minecraft == null || minecraft.theWorld == null ? 0L
+                            : minecraft.theWorld.getTotalWorldTime();
+                    addFailed(StatCollector.translateToLocalFormatted(
+                            "gui.losttales.quest.banner.time_limit",
+                            LostTalesQuestTimeText.shortForm(next.getRemainingTicks(now))));
+                }
+            } else if (!previous.isReturning() && next.isReturning()
+                    || !previous.isChoosing() && next.isChoosing()) {
+                // Every stage done: the quest waits for its hand-in
+                // (QUEST-31), or for a choice (QUEST-32).
+                LostTalesQuestDefinition quest =
+                        LostTalesClientQuestDefinitionStore.getQuest(questId);
+                String line = StatCollector.translateToLocalFormatted(
+                        "gui.losttales.quest.banner.returning",
+                        questTitle(questId), next.isChoosing()
+                                ? LostTalesQuestWords.chooseLine(quest, next)
+                                : LostTalesQuestWords.returnLine(quest, next));
                 addInfo(line);
                 ClientQuestNews.record(questId, line);
                 playQuestSound(SOUND_PROGRESS, 0.35F, 1.05F);

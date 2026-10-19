@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.compat.lotr.LotrNpcRelations;
 import java.util.Locale;
 import java.util.Map;
 import net.minecraft.entity.Entity;
@@ -25,9 +26,11 @@ import net.minecraftforge.oredict.OreDictionary;
  * <p>Whom: {@code entity} lists creature kinds by the name the game
  * registers them under ({@code Zombie}, {@code losttales.Nia}), and
  * {@code group} lists groups: {@code living}, {@code player},
- * {@code hostile}, {@code animal} and {@code npc}. A creature matches
- * when it is one of the kinds or in one of the groups; a selector that
- * names nobody matches nobody.</p>
+ * {@code hostile} (the game's own monsters), {@code animal}, {@code npc}
+ * (LOTR's NPCs) and {@code enemy}, whoever the character is against now:
+ * the game's monsters and every LOTR NPC of a faction it stands against
+ * (QUEST-35). A creature matches when it is one of the kinds or in one of
+ * the groups; a selector that names nobody matches nobody.</p>
  */
 public final class LostTalesQuestObjectiveMatcher {
     public static final String GROUP_LIVING = "living";
@@ -35,14 +38,15 @@ public final class LostTalesQuestObjectiveMatcher {
     public static final String GROUP_HOSTILE = "hostile";
     public static final String GROUP_ANIMAL = "animal";
     public static final String GROUP_NPC = "npc";
+    public static final String GROUP_ENEMY = "enemy";
 
     private LostTalesQuestObjectiveMatcher() {}
 
-    /** Whether the word is one of the five groups. */
+    /** Whether the word is one of the six groups. */
     public static boolean isGroup(String word) {
         return GROUP_LIVING.equals(word) || GROUP_PLAYER.equals(word)
                 || GROUP_HOSTILE.equals(word) || GROUP_ANIMAL.equals(word)
-                || GROUP_NPC.equals(word);
+                || GROUP_NPC.equals(word) || GROUP_ENEMY.equals(word);
     }
 
     /** Whether the params name anybody at all: an {@code entity} or a {@code group}. */
@@ -76,11 +80,30 @@ public final class LostTalesQuestObjectiveMatcher {
     }
 
     public static boolean matchesEntity(Entity entity, LostTalesQuestObjectiveDefinition objective) {
-        return objective != null && matchesEntity(entity, objective.getParams());
+        return objective != null && matchesEntity(entity, objective.getParams(), null);
     }
 
-    /** Whether the creature is one the params' {@code entity} or {@code group} names. */
+    /**
+     * Whether the creature is one the objective names, to {@code player}:
+     * the one whose enemies {@code enemy} means.
+     */
+    public static boolean matchesEntity(Entity entity,
+            LostTalesQuestObjectiveDefinition objective, EntityPlayer player) {
+        return objective != null && matchesEntity(entity, objective.getParams(), player);
+    }
+
+    /** Whether the creature is one the params' {@code entity} or {@code group} names; {@code enemy} never, without a player. */
     public static boolean matchesEntity(Entity entity, Map<String, String> params) {
+        return matchesEntity(entity, params, null);
+    }
+
+    /**
+     * Whether the creature is one the params' {@code entity} or
+     * {@code group} names, to {@code player}, whose enemies {@code enemy}
+     * means.
+     */
+    public static boolean matchesEntity(Entity entity, Map<String, String> params,
+                                        EntityPlayer player) {
         if (entity == null) {
             return false;
         }
@@ -94,14 +117,14 @@ public final class LostTalesQuestObjectiveMatcher {
             }
         }
         for (String group : LostTalesQuestParams.value(params, "group").split(",")) {
-            if (inGroup(entity, group.trim())) {
+            if (inGroup(entity, group.trim(), player)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean inGroup(Entity entity, String group) {
+    private static boolean inGroup(Entity entity, String group, EntityPlayer player) {
         if (GROUP_LIVING.equals(group)) {
             return entity instanceof EntityLivingBase;
         }
@@ -115,18 +138,12 @@ public final class LostTalesQuestObjectiveMatcher {
             return entity instanceof IAnimals && !(entity instanceof IMob);
         }
         if (GROUP_NPC.equals(group)) {
-            return isNpc(entity);
+            return LotrNpcRelations.isNpc(entity);
         }
-        return false;
-    }
-
-    /** Whether the creature is some mod's NPC: a class it is made from is named for one. */
-    private static boolean isNpc(Entity entity) {
-        for (Class<?> type = entity.getClass(); type != null
-                && type != Entity.class; type = type.getSuperclass()) {
-            if (type.getSimpleName().toLowerCase(Locale.ROOT).indexOf("npc") >= 0) {
-                return true;
-            }
+        if (GROUP_ENEMY.equals(group)) {
+            return player != null && (LotrNpcRelations.isNpc(entity)
+                    ? LotrNpcRelations.isEnemyOf(entity, player)
+                    : entity instanceof IMob);
         }
         return false;
     }

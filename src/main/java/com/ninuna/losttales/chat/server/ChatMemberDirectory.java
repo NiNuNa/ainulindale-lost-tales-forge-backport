@@ -4,13 +4,10 @@ import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.character.server.CharacterJoin;
 import com.ninuna.losttales.character.server.KnownAccounts;
 import com.ninuna.losttales.character.state.CharacterLastSeen;
 import com.ninuna.losttales.character.storage.CharacterStorage;
-import com.ninuna.losttales.character.storage.CharacterWorldData;
-import com.ninuna.losttales.character.validation.CharacterNames;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatFellowship;
@@ -27,7 +24,6 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
-import com.ninuna.losttales.util.LostTalesServerPlayers;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import java.util.ArrayList;
@@ -166,28 +162,8 @@ public final class ChatMemberDirectory {
                         request.getHeldCharacterId())
                 : answerFor(viewer, channel,
                         ChatTabIds.scopeOf(request.getConversationKey()));
-        List<LostTalesChatMembersPacket.Member> members = answer.members;
-        if (!AccountVisibility.seesAccounts(viewer)) {
-            members = withoutAccounts(members, viewer.getUniqueID());
-        }
         return new LostTalesChatMembersPacket(channel,
-                request.getConversationKey(), members, answer.unlisted);
-    }
-
-    /**
-     * The rows as a viewer not shown which account plays a character reads
-     * them: a character's row names no account, unless it is the viewer's
-     * own; an account's row is itself.
-     */
-    static List<LostTalesChatMembersPacket.Member> withoutAccounts(
-            List<LostTalesChatMembersPacket.Member> members, UUID viewer) {
-        List<LostTalesChatMembersPacket.Member> shown =
-                new ArrayList<LostTalesChatMembersPacket.Member>(members.size());
-        for (LostTalesChatMembersPacket.Member member : members) {
-            shown.add(member.getCharacterId() == null || viewer.equals(member.getPlayerId())
-                    ? member : member.withoutAccount());
-        }
-        return shown;
+                request.getConversationKey(), answer.members, answer.unlisted);
     }
 
     /**
@@ -333,44 +309,26 @@ public final class ChatMemberDirectory {
         present.add(serverMember());
         String named = partnerAccount == null ? "" : partnerAccount.trim();
         if (named.length() > 0) {
-            EntityPlayerMP online;
-            UUID owner;
-            RoleplayCharacter character;
-            if (AccountVisibility.seesAccounts(viewer)) {
-                online = server.getConfigurationManager().func_152612_a(named);
-                owner = online != null ? online.getUniqueID()
-                        : KnownAccounts.ownerNamed(viewer.worldObj, named);
-                CharacterRoster roster = owner == null ? null : rosterOf(viewer, owner);
-                character = identityIn(roster, partnerCharacterId,
-                        partnerIdentity, named);
-            } else {
-                // Never an account and a character of it at once: the list
-                // would tell which characters the account holds.
-                character = characterAddressed(viewer, named, partnerIdentity,
-                        partnerCharacterId);
-                online = character != null ? LostTalesServerPlayers.findOnline(
-                        character.getOwnerId()) : LostTalesServerPlayers.findOnline(named);
-                owner = character != null ? character.getOwnerId()
-                        : online != null ? online.getUniqueID() : null;
-            }
+            EntityPlayerMP online = server.getConfigurationManager().func_152612_a(named);
+            UUID owner = online != null ? online.getUniqueID()
+                    : KnownAccounts.ownerNamed(viewer.worldObj, named);
+            CharacterRoster roster = owner == null ? null : rosterOf(viewer, owner);
+            RoleplayCharacter character = identityIn(roster, partnerCharacterId,
+                    partnerIdentity, named);
             if (online != null && online != viewer && isHere(online, character)) {
                 present.add(present(online, character, channel, true));
                 presentKeys.add(keyOf(online, character));
             } else if (owner != null && !owner.equals(viewer.getUniqueID())) {
                 String account = online != null ? accountOf(online)
                         : KnownAccounts.nameOf(owner);
-                // A character nobody has met lately is not told of; the
-                // conversation names its account instead, as the viewer did.
-                if (character != null && !CharacterLastSeen.seenWithin(viewer.worldObj,
-                        character.getCharacterId(), OFFLINE_WINDOW_MILLIS)) {
-                    character = null;
+                Absentee partner = whisperPartner(channel, owner,
+                        account.length() > 0 ? account : named, character,
+                        character == null || CharacterLastSeen.seenWithin(
+                                viewer.worldObj, character.getCharacterId(),
+                                OFFLINE_WINDOW_MILLIS));
+                if (partner != null) {
+                    absent.add(partner);
                 }
-                absent.add(character != null
-                        ? new Absentee(characterKey(character.getCharacterId()),
-                                characterMember(owner, account.length() > 0
-                                        ? account : named, character))
-                        : new Absentee(accountKey(owner), accountMember(channel,
-                                owner, account.length() > 0 ? account : named, 0)));
             }
         }
         Collections.sort(absent, BY_NAME);
@@ -379,30 +337,18 @@ public final class ChatMemberDirectory {
     }
 
     /**
-     * The character a whisper of a viewer not shown accounts is with: by
-     * its id, else by the identity it is filed under, else by the name the
-     * conversation is filed under, which is the character's for such a
-     * viewer; null for a conversation with an account.
+     * The other party of a whisper while absent: {@code character} where
+     * one is named and was met lately, else the account. Never null.
      */
-    private static RoleplayCharacter characterAddressed(EntityPlayerMP viewer,
-                                                        String partner,
-                                                        String identity,
-                                                        UUID characterId) {
-        try {
-            CharacterWorldData characters = CharacterStorage.get(viewer.worldObj);
-            if (characterId != null) {
-                return characters.characterIndex().countOf(characterId) == 1
-                        ? characters.characterIndex().find(characterId) : null;
-            }
-            String wanted = identity == null ? "" : identity.trim();
-            if (wanted.length() == 0 || wanted.equalsIgnoreCase(partner)) {
-                wanted = LostTalesServerPlayers.findOnline(partner) != null ? "" : partner;
-            }
-            return wanted.length() == 0 ? null
-                    : CharacterNames.named(characters.getRosters(), wanted);
-        } catch (RuntimeException unreadable) {
-            return null;
+    static Absentee whisperPartner(ChatChannel channel, UUID owner,
+                                   String account, RoleplayCharacter character,
+                                   boolean seenLately) {
+        if (character != null && seenLately) {
+            return new Absentee(characterKey(character.getCharacterId()),
+                    characterMember(owner, account, character));
         }
+        return new Absentee(accountKey(owner), accountMember(channel, owner,
+                account, 0));
     }
 
     /**
@@ -780,12 +726,17 @@ public final class ChatMemberDirectory {
                 : PlayableIdentity.displayName(character, account);
         if (inCharacter) {
             String factionId = ChatChannelPolicy.factionOf(character);
+            // A character a copy speaks as while another is played is here,
+            // but not in the world (CHAT-05).
+            RoleplayCharacter played = ChatIdentitySelection.played(member);
             return new LostTalesChatMembersPacket.Member(member.getUniqueID(),
                     account, character == null ? null : character.getCharacterId(),
                     name, nameColor, character == null ? ""
                             : character.getSkinId(),
                     presentation.title, presentation.titleColor, factionId,
-                    "", 0, true);
+                    "", 0, true).withNotInWorld(character != null
+                            && (played == null || !character.getCharacterId()
+                                    .equals(played.getCharacterId())));
         }
         // Someone still making their first character stands apart, as a
         // ghost: here, but not yet in the world.

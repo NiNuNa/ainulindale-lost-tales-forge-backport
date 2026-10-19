@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.KnownAccounts;
 import com.ninuna.losttales.character.storage.CharacterStorage;
+import com.ninuna.losttales.character.validation.CharacterNames;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -109,7 +110,7 @@ final class LostTalesCommandSubject {
                     continue;
                 }
                 for (RoleplayCharacter character : roster.getCharacters()) {
-                    if (character == null || !name.equalsIgnoreCase(character.getName())) {
+                    if (character == null || !CharacterNames.same(name, character.getName())) {
                         continue;
                     }
                     if (found != null) {

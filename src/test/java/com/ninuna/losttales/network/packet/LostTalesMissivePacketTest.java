@@ -47,8 +47,7 @@ public final class LostTalesMissivePacketTest {
                 .context("board", "dim0_4_65_9")
                 .objective(new LostTalesMissiveObjectiveData("kill_zombies",
                         "kill", false, params))
-                .rewardData(LostTalesMissiveRewardData.experienceAndItems(40,
-                        "minecraft:emerald*2"))
+                .rewardData(LostTalesMissiveRewardData.experienceAndCoins(40, 12))
                 .build();
     }
 
@@ -337,6 +336,18 @@ public final class LostTalesMissivePacketTest {
 
     /* ---- Take and pin ---- */
 
+    /** Hand In names the board alone: no slot and no letter (QUEST-31). */
+    @Test
+    public void aHandInRoundTripsNamingTheBoardAlone() {
+        LostTalesMissiveBoardRequestPacket handIn = decodeRequest(bytes(
+                LostTalesMissiveBoardRequestPacket.handIn(0, 4, 65, 9)));
+        assertFalse(handIn.isMalformed());
+        assertEquals(LostTalesMissiveBoardRequestPacket.Operation.HAND_IN,
+                handIn.getOperation());
+        assertEquals(0, handIn.getSlot());
+        assertEquals("", handIn.getExpectedQuestId());
+    }
+
     @Test
     public void takeAndPinRoundTrip() {
         LostTalesMissiveBoardRequestPacket take = decodeRequest(bytes(
@@ -527,7 +538,8 @@ public final class LostTalesMissivePacketTest {
         List<MissiveBoardStateReason> successes = new ArrayList<MissiveBoardStateReason>(
                 Arrays.asList(MissiveBoardStateReason.ACCEPTED,
                         MissiveBoardStateReason.TAKEN,
-                        MissiveBoardStateReason.PINNED));
+                        MissiveBoardStateReason.PINNED,
+                        MissiveBoardStateReason.HANDED_IN));
         for (MissiveBoardStateReason reason : MissiveBoardStateReason.values()) {
             boolean answer = reason != MissiveBoardStateReason.OPENED
                     && reason != MissiveBoardStateReason.CHANGED;

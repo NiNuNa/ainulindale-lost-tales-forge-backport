@@ -18,6 +18,9 @@ import static org.junit.Assert.assertTrue;
  * own, that flag included.
  */
 public final class LostTalesChatSendPacketUnkeptQuoteTest {
+    /** What follows the forward's id: the typed words, none, one byte. */
+    private static final int TYPED_TAIL = 1;
+
 
     private static LostTalesChatSendPacket request(boolean unkept) {
         return new LostTalesChatSendPacket(ChatChannel.GLOBAL, "which one?",
@@ -76,7 +79,7 @@ public final class LostTalesChatSendPacketUnkeptQuoteTest {
                 "which one?", null, "", LostTalesChatSendPacket.IDENTITY_DEFAULT,
                 null, ChatMessageIdAllocator.next(), "", 7L, null, false));
         // The flag, before the eight bytes of the message a forward names.
-        buffer.setByte(buffer.writerIndex() - 9, 1);
+        buffer.setByte(buffer.writerIndex() - TYPED_TAIL - 9, 1);
         LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
@@ -97,7 +100,7 @@ public final class LostTalesChatSendPacketUnkeptQuoteTest {
         assertEquals("", decoded.getMessage());
         assertEquals("Beren", decoded.getTarget());
         // A forward that says it answers a line no longer kept is refused.
-        buffer.setByte(buffer.writerIndex() - 9, 1);
+        buffer.setByte(buffer.writerIndex() - TYPED_TAIL - 9, 1);
         decoded = new LostTalesChatSendPacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
@@ -106,7 +109,7 @@ public final class LostTalesChatSendPacketUnkeptQuoteTest {
         assertEquals(ChatMessageIds.NONE, plain.getForwardOf());
         // Words beside a forward are refused off the wire.
         buffer = encode(plain);
-        buffer.setLong(buffer.writerIndex() - 8, original);
+        buffer.setLong(buffer.writerIndex() - TYPED_TAIL - 8, original);
         decoded = new LostTalesChatSendPacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());

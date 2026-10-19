@@ -71,7 +71,7 @@ public final class LostTalesChatMembersPacket implements IMessage {
     private static final int MAX_MEMBER_BYTES = 16 + 5 + MAX_ACCOUNT_BYTES
             + 17 + 5 + MAX_NAME_BYTES + 4 + 5 + MAX_SKIN_ID_BYTES
             + 5 + MAX_TITLE_BYTES + 4 + 5 + MAX_GROUP_KEY_BYTES
-            + 5 + MAX_GROUP_NAME_BYTES + 2 + 1;
+            + 5 + MAX_GROUP_NAME_BYTES + 2 + 1 + 1;
     private static final int MAX_PACKET_BYTES = 5 + MAX_CHANNEL_ID_BYTES
             + 5 + MAX_CONVERSATION_KEY_BYTES + 8 + 1 + 4 + 2
             + MAX_MEMBERS * MAX_MEMBER_BYTES;
@@ -93,6 +93,12 @@ public final class LostTalesChatMembersPacket implements IMessage {
         private final int groupOrder;
         private final boolean online;
         private final boolean npc;
+        /**
+         * Whether the member is a character its player speaks as in a copy
+         * of their chat without playing it: here, but not in the world
+         * (CHAT-05).
+         */
+        private final boolean notInWorld;
 
         /**
          * {@code characterId} is null, and {@code skinId} empty, for a
@@ -109,22 +115,14 @@ public final class LostTalesChatMembersPacket implements IMessage {
                       int groupOrder, boolean online) {
             this(playerId, account, characterId, name, nameColor, skinId,
                     title, titleColor, groupKey, groupName, groupOrder, online,
-                    false);
-        }
-
-        /** The same row without its account: a character's row as a viewer not shown accounts reads it. */
-        public Member withoutAccount() {
-            return this.characterId == null || this.account.length() == 0 ? this
-                    : new Member(this.playerId, "", this.characterId, this.name,
-                            this.nameColor, this.skinId, this.title, this.titleColor,
-                            this.groupKey, this.groupName, this.groupOrder, this.online,
-                            this.npc);
+                    false, false);
         }
 
         private Member(UUID playerId, String account, UUID characterId,
                        String name, int nameColor, String skinId, String title,
                        int titleColor, String groupKey, String groupName,
-                       int groupOrder, boolean online, boolean npc) {
+                       int groupOrder, boolean online, boolean npc,
+                       boolean notInWorld) {
             this.playerId = playerId;
             this.account = account == null ? "" : account;
             this.characterId = characterId;
@@ -139,6 +137,19 @@ public final class LostTalesChatMembersPacket implements IMessage {
             this.groupOrder = Math.max(0, Math.min(0xFFFF, groupOrder));
             this.online = online;
             this.npc = npc;
+            this.notInWorld = notInWorld && characterId != null && online && !npc;
+        }
+
+        /**
+         * The same row of a character spoken as but not played, or of one
+         * that is: only a character here may be not in the world.
+         */
+        public Member withNotInWorld(boolean away) {
+            return away == this.notInWorld ? this
+                    : new Member(this.playerId, this.account, this.characterId,
+                            this.name, this.nameColor, this.skinId, this.title,
+                            this.titleColor, this.groupKey, this.groupName,
+                            this.groupOrder, this.online, this.npc, away);
         }
 
         /**
@@ -151,7 +162,7 @@ public final class LostTalesChatMembersPacket implements IMessage {
                                  String portrait, String groupKey,
                                  String groupName, int groupOrder) {
             return new Member(npcId, "", null, name, nameColor, portrait, "",
-                    nameColor, groupKey, groupName, groupOrder, true, true);
+                    nameColor, groupKey, groupName, groupOrder, true, true, false);
         }
 
         public UUID getPlayerId() { return this.playerId; }
@@ -171,6 +182,8 @@ public final class LostTalesChatMembersPacket implements IMessage {
         public boolean isOnline() { return this.online; }
         /** Whether the member is an NPC the client listed itself. */
         public boolean isNpc() { return this.npc; }
+        /** Whether the member is a character spoken as but not played: here, not in the world. */
+        public boolean isNotInWorld() { return this.notInWorld; }
 
         /** Whether every field is within what the wire carries; an NPC never is. */
         boolean fits() {
@@ -204,7 +217,8 @@ public final class LostTalesChatMembersPacket implements IMessage {
             hash = 31 * hash + this.groupKey.hashCode();
             hash = 31 * hash + this.groupName.hashCode();
             hash = 31 * hash + this.groupOrder;
-            return 31 * hash + (this.online ? 1 : 0);
+            hash = 31 * hash + (this.online ? 1 : 0);
+            return 31 * hash + (this.notInWorld ? 1 : 0);
         }
     }
 
@@ -449,6 +463,11 @@ public final class LostTalesChatMembersPacket implements IMessage {
                 MAX_GROUP_NAME_BYTES);
         int groupOrder = buffer.readUnsignedShort();
         boolean online = buffer.readBoolean();
+        boolean notInWorld = buffer.readBoolean();
+        if (notInWorld && (characterId == null || !online)) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "only a character here may be not in the world");
+        }
         if (name.length() == 0) {
             throw new LostTalesPacketCodec.DecodeException(
                     "a member without a name");
@@ -459,7 +478,7 @@ public final class LostTalesChatMembersPacket implements IMessage {
         }
         return new Member(playerId, account, characterId, name, nameColor,
                 skinId, title, titleColor, groupKey, groupName, groupOrder,
-                online);
+                online).withNotInWorld(notInWorld);
     }
 
     @Override
@@ -494,6 +513,7 @@ public final class LostTalesChatMembersPacket implements IMessage {
                     MAX_GROUP_NAME_BYTES);
             buffer.writeShort(member.groupOrder);
             buffer.writeBoolean(member.online);
+            buffer.writeBoolean(member.notInWorld);
         }
     }
 

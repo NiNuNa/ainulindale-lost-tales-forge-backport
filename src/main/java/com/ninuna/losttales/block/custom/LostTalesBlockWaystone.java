@@ -11,6 +11,8 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRepository;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneSettingsService;
+import com.ninuna.losttales.quest.LostTalesQuestManager;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.util.Random;
 import java.util.UUID;
 import net.minecraft.block.Block;
@@ -82,18 +84,29 @@ public final class LostTalesBlockWaystone
             rollbackFailedPlacement(world, x, y, z, player);
             return;
         }
+        String placedId;
         try {
             UUID token = UUID.randomUUID();
             LostTalesMapMarkerRecord record =
                     LostTalesMapMarkerRepository.createPlayerMarker(
                             player, x, y, z, token);
             ((LostTalesTileEntityWaystone)tile).linkTo(record);
-            LostTalesMapMarkerSyncManager.syncAll();
+            placedId = record.getId();
         } catch (RuntimeException exception) {
             rollbackFailedPlacement(world, x, y, z, player);
             player.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.waystone.place_failed"));
+            return;
         }
+        // The placing character has found its own waystone, so it is on its
+        // map at once, hidden until discovered as it is (WAY-11).
+        try {
+            LostTalesQuestManager.revealMapMarker(player, placedId);
+        } catch (RuntimeException exception) {
+            LostTalesLog.warning("The waystone %s was placed, but %s could not be told they found it: %s",
+                    placedId, player.getUniqueID(), exception.toString());
+        }
+        LostTalesMapMarkerSyncManager.syncAll();
     }
 
     /**

@@ -94,4 +94,32 @@ public final class ServerConfigChangeValidatorTest {
         assertTrue(ServerConfigChangeValidator.refusal(single,
                 new ServerConfigChange("chat", "key", "anything")) == null);
     }
+
+    /**
+     * A value stays on its own line of the file: a line break would write
+     * lines of its own there, other options among them.
+     */
+    @Test
+    public void aValueThatWouldBreakItsLineIsRefused() {
+        ServerConfigEntry single = entry(ServerConfigEntry.Type.STRING, false, "", "", null);
+        ServerConfigEntry list = entry(ServerConfigEntry.Type.STRING, true, "", "", null);
+        String[] broken = {
+                "a\nS:channelBindings=x", "a\rb", "tab\there", "§cred",
+                "a b", "a b", "a\u0085b", "a\u0000b"};
+        for (String value : broken) {
+            assertEquals(value, "holds a line break, a control character or a formatting code",
+                    reason(ServerConfigChangeValidator.refusal(single,
+                            new ServerConfigChange("chat", "key", value))));
+            assertEquals(value, "holds a line break, a control character or a formatting code",
+                    reason(ServerConfigChangeValidator.refusal(list,
+                            new ServerConfigChange("chat", "key", true,
+                                    Arrays.asList("fine", value)))));
+        }
+        ServerConfigEntry number = entry(ServerConfigEntry.Type.INTEGER, false, "", "", null);
+        assertEquals("holds a line break, a control character or a formatting code",
+                reason(ServerConfigChangeValidator.refusal(number,
+                        new ServerConfigChange("chat", "key", "3\n"))));
+        assertNull(ServerConfigChangeValidator.refusal(single,
+                new ServerConfigChange("chat", "key", "Éomer's hall: 3 <> & \"quotes\"")));
+    }
 }

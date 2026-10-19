@@ -5,11 +5,9 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresentationMode;
-import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.compat.discord.DiscordMemberDirectory;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
@@ -60,28 +58,8 @@ final class ChatMentionTargets {
             candidates = candidatesOf(
                     ChatMemberDirectory.answerFor(sender, channel, scope).members);
         }
-        return ChatMentions.reached(message, byCharacterOnly(channel, candidates),
+        return ChatMentions.reached(message, candidates,
                 ChatNamedPlayer.MAX_PER_LINE);
-    }
-
-    /**
-     * The candidates a mention in {@code channel} may reach: while the
-     * server shows no accounts, an in-character channel's characters by
-     * their name alone, so typing an account's name reaches nobody and no
-     * line pairs an account with a character. Everything else as it is.
-     */
-    static List<ChatNamedPlayer> byCharacterOnly(ChatChannel channel,
-                                                 List<ChatNamedPlayer> candidates) {
-        if (LostTalesConfig.showAccounts || !ChatRolePresentation.isInCharacter(channel)) {
-            return candidates;
-        }
-        List<ChatNamedPlayer> shown = new ArrayList<ChatNamedPlayer>(candidates.size());
-        for (ChatNamedPlayer candidate : candidates) {
-            if (candidate != null) {
-                shown.add(candidate.withoutAccount());
-            }
-        }
-        return shown;
     }
 
     /**
@@ -105,9 +83,12 @@ final class ChatMentionTargets {
     }
 
     /**
-     * Whom a Discord member's line in {@code channel} mentions: the
-     * players it reaches, as the channel shows them, and the Discord
-     * members who can see a Discord channel linked to it.
+     * Whom a Discord member's line in {@code channel} mentions: the same
+     * members a player's line there reaches (CHAT-82), as the member list
+     * shows them to a player the line reaches, every identity in use and
+     * those gone a while included, with the Discord members who can see a
+     * Discord channel linked to it; with nobody here to read it, those
+     * Discord members alone.
      */
     static List<ChatNamedPlayer> ofDiscordLine(ChatChannel channel,
                                                String factionScope,
@@ -116,18 +97,15 @@ final class ChatMentionTargets {
         if (channel == null || message == null || message.indexOf('@') < 0) {
             return Collections.emptyList();
         }
-        boolean asAccounts = channel.getPresentation()
-                == ChatPresentationMode.OUT_OF_CHARACTER;
-        List<ChatNamedPlayer> candidates = new ArrayList<ChatNamedPlayer>();
         if (reached != null) {
             for (EntityPlayerMP player : reached) {
                 if (player != null && player.getUniqueID() != null) {
-                    candidates.add(asAccounts
-                            ? LostTalesServerBroadcastHook.namedAccount(player)
-                            : LostTalesServerBroadcastHook.namedPlayer(player));
+                    return ChatLinePipeline.membersNamed(player, channel,
+                            factionScope == null ? "" : factionScope, message, false);
                 }
             }
         }
+        List<ChatNamedPlayer> candidates = new ArrayList<ChatNamedPlayer>();
         for (DiscordMemberDirectory.Seen seen : LostTalesDiscordBridge.getInstance()
                 .membersSeeing(channel, factionScope == null ? "" : factionScope)) {
             UUID senderId = LostTalesChatMessagePacket.discordSenderId(seen.userId);
@@ -135,7 +113,7 @@ final class ChatMentionTargets {
                 candidates.add(ChatNamedPlayer.account(senderId, seen.name));
             }
         }
-        return ChatMentions.reached(message, byCharacterOnly(channel, candidates),
+        return ChatMentions.reached(message, candidates,
                 ChatNamedPlayer.MAX_PER_LINE);
     }
 

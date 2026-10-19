@@ -6,6 +6,7 @@ import com.ninuna.losttales.client.window.OptionGlyph;
 import com.ninuna.losttales.client.window.PageOption;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientQuestEntry;
+import com.ninuna.losttales.client.quest.ClientQuestFellows;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.QuestMarks;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -42,6 +43,7 @@ import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +60,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 import com.ninuna.losttales.quest.LostTalesQuestRewardText;
+import com.ninuna.losttales.quest.LostTalesQuestRewards;
 /**
  * The quest journal, a page a window holds: the quests on the left, the
  * one being read on the right. The window holds the rest: the list's
@@ -484,6 +487,9 @@ public final class QuestJournalPage extends PageContent {
 
     /** How a quest's state reads on its own line. */
     private static String statusWord(ClientQuestEntry quest) {
+        if (quest.isRumour()) {
+            return translate("gui.losttales.quest.status.rumour");
+        }
         if (quest.isFailed()) {
             return translate("gui.losttales.quest.status.failed");
         }
@@ -692,6 +698,9 @@ public final class QuestJournalPage extends PageContent {
 
     /** The mark a quest's state is read by, in the list and in the detail. */
     private static String stateGlyph(ClientQuestEntry quest) {
+        if (quest.isRumour()) {
+            return QuestMarks.AHEAD;
+        }
         if (quest.isCompleted()) {
             return QuestMarks.DONE;
         }
@@ -702,6 +711,9 @@ public final class QuestJournalPage extends PageContent {
     }
 
     private static int glyphRgb(ClientQuestEntry quest) {
+        if (quest.isRumour()) {
+            return LostTalesColors.TEXT_DIM;
+        }
         if (quest.isCompleted()) {
             return LostTalesColors.GREEN;
         }
@@ -989,12 +1001,17 @@ public final class QuestJournalPage extends PageContent {
         addTitleHeader(lines, quest.getTitle(), width);
         addQuestStatusLines(lines, quest, progress, completed, failed,
                 abandoned, pinned, width);
-        addHistoryLines(lines, entry.getHistoryEntry(), width);
+        addHistoryLines(lines, entry.getHistoryEntry(), progress != null,
+                width);
         addBlankLine(lines);
 
-        String loreText = getCurrentJournalText(quest, progress, completed);
-        addWrappedLines(lines, loreText, completed ? WindowStyle.asideRgb() : LostTalesUiInk.IVORY, 8, width - 16);
-        addBlankLine(lines);
+        for (String paragraph : getJournalTale(quest, progress,
+                entry.getHistoryEntry(), completed)) {
+            addWrappedLines(lines, paragraph, completed
+                    ? WindowStyle.asideRgb() : LostTalesUiInk.IVORY, 8,
+                    width - 16);
+            addBlankLine(lines);
+        }
 
         addStageSummary(lines, quest, progress, completed,
                 entry.getHistoryEntry(), width);
@@ -1032,6 +1049,11 @@ public final class QuestJournalPage extends PageContent {
                 quest.isCompleted() ? WindowStyle.asideRgb()
                         : LostTalesUiInk.IVORY,
                 8, width - 16);
+        if (quest.isRumour()) {
+            // Only a lead: who gives the quest and where, in the teller's
+            // words, never what it asks (QUEST-20).
+            return lines;
+        }
         addSectionTitle(lines, translate("gui.losttales.quest.section.objectives"));
         for (ClientQuestEntry.Objective objective : quest.getObjectives()) {
             int color = objective.isComplete()
@@ -1040,6 +1062,13 @@ public final class QuestJournalPage extends PageContent {
             addObjectiveWrappedLines(lines, objective.getText(), color,
                     12, width - 16, objective.isComplete(),
                     quest.isActive() && !objective.isComplete());
+        }
+        if (!quest.getPodium().isEmpty()) {
+            addSectionTitle(lines, translate("gui.losttales.quest.section.podium"));
+            for (String place : quest.getPodium()) {
+                addWrappedLines(lines, place, LostTalesUiInk.IVORY, 16, width - 16);
+            }
+            addBlankLine(lines);
         }
         if (!quest.getRewards().isEmpty()) {
             addSectionTitle(lines, translate("gui.losttales.quest.section.rewards"));
@@ -1063,20 +1092,24 @@ public final class QuestJournalPage extends PageContent {
     }
 
     /**
-     * The journal line for where the quest stands: the current stage's, or
-     * the latest earlier stage's; the last stage's for a finished quest,
-     * the first's for one no longer running. The description stands in
-     * where no stage has a line.
+     * The quest's tale so far (QUEST-30): a paragraph for each stage it
+     * reached, the running quest's path, else the path its History line
+     * kept. The description stands in where no stage reached has a line.
      */
-    private String getCurrentJournalText(LostTalesQuestDefinition quest, LostTalesQuestProgress progress, boolean completed) {
-        int stage = completed ? quest.getStages().size() - 1
-                : Math.max(0, LostTalesQuestObjectiveSelection
-                        .getCurrentStageIndex(quest, progress));
-        String line = LostTalesQuestWords.journalLine(quest, stage);
-        if (line.length() == 0) {
-            line = LostTalesQuestWords.description(quest);
+    private List<String> getJournalTale(LostTalesQuestDefinition quest,
+            LostTalesQuestProgress progress, LostTalesQuestHistoryEntry history,
+            boolean completed) {
+        List<String> path = progress != null ? progress.getStagePath()
+                : history != null ? history.getStagePath()
+                : Collections.<String>emptyList();
+        List<String> tale = LostTalesQuestWords.journalParagraphs(quest, path,
+                completed);
+        if (tale.isEmpty()) {
+            String description = LostTalesQuestWords.description(quest);
+            tale.add(description == null || description.length() == 0
+                    ? translate("gui.losttales.quest.log.none") : description);
         }
-        return line == null || line.length() == 0 ? translate("gui.losttales.quest.log.none") : line;
+        return tale;
     }
 
     private void addStageSummary(List<DetailLine> lines,
@@ -1091,8 +1124,15 @@ public final class QuestJournalPage extends PageContent {
 
         int currentStageIndex = getCurrentStageIndex(progress, completed, quest);
         boolean addedAny = false;
+        List<String> path = progress != null ? progress.getStagePath()
+                : history != null ? history.getStagePath()
+                : Collections.<String>emptyList();
         for (int i = 0; i < quest.getStages().size(); i++) {
             LostTalesQuestStageDefinition stage = quest.getStages().get(i);
+            if (!path.isEmpty() && !path.contains(stage.getId())) {
+                // A branch the quest did not take (QUEST-32).
+                continue;
+            }
             boolean stageComplete = completed || i < currentStageIndex;
             boolean current = progress != null && i == currentStageIndex && !completed;
             if (!completed && !stageComplete && !current) {
@@ -1123,10 +1163,29 @@ public final class QuestJournalPage extends PageContent {
                 addObjectiveWrappedLines(lines, line, objectiveColor, 12,
                         width - 16, objectiveComplete,
                         objectiveActive && !objectiveComplete);
+                if (current) {
+                    // The fellowships' members at this stage or past it
+                    // (QUEST-25): Tobin 2/3 · Dior done.
+                    String fellows = ClientQuestFellows.lineFor(quest.getId(),
+                            objective.getId(), getObjectiveTargetCount(objective));
+                    if (fellows.length() > 0) {
+                        addWrappedLines(lines, fellows, WindowStyle.asideRgb(),
+                                20, width - 16);
+                    }
+                }
                 addedAny = true;
             }
         }
 
+        if (progress != null && (progress.isReturning() || progress.isChoosing())) {
+            // Every stage done, the quest waits for its hand-in (QUEST-31),
+            // or its stage waits for a choice (QUEST-32).
+            addObjectiveWrappedLines(lines, progress.isChoosing()
+                    ? LostTalesQuestWords.chooseLine(quest, progress)
+                    : LostTalesQuestWords.returnLine(quest, progress),
+                    LostTalesUiInk.IVORY, 12, width - 16, false, true);
+            addedAny = true;
+        }
         if (!addedAny) {
             addWrappedLines(lines, completed ? translate("gui.losttales.quest.status.completed") : translate("gui.losttales.quest.objective.none"), completed ? WindowStyle.asideRgb() : WindowStyle.asideRgb(), 16, width - 16);
         }
@@ -1137,7 +1196,7 @@ public final class QuestJournalPage extends PageContent {
     }
 
     private void addRewardSummary(List<DetailLine> lines, LostTalesQuestDefinition quest, int width, boolean completed) {
-        if (quest.getRewards().isEmpty()) {
+        if (LostTalesQuestRewards.withOptionals(quest).isEmpty()) {
             return;
         }
         addSectionTitle(lines, translate("gui.losttales.quest.section.rewards"));
@@ -1175,9 +1234,26 @@ public final class QuestJournalPage extends PageContent {
         }
     }
 
+    /**
+     * What the History line says: how the quest last ended, why and when,
+     * and how many times it was completed. While the quest is taken again
+     * only the count shows (QUEST-10).
+     */
     private void addHistoryLines(List<DetailLine> lines,
-            LostTalesQuestHistoryEntry history, int width) {
+            LostTalesQuestHistoryEntry history, boolean running, int width) {
         if (history == null) {
+            return;
+        }
+        int completions = history.getCompletions();
+        String count = completions == 0 ? ""
+                : completions == 1 ? translate("gui.losttales.quest.completions.one")
+                : translate("gui.losttales.quest.completions.many",
+                        String.valueOf(completions));
+        if (running) {
+            if (count.length() > 0) {
+                addWrappedLines(lines, count, WindowStyle.asideRgb(), 8,
+                        width - 16);
+            }
             return;
         }
         if (history.getDetail().length() > 0) {
@@ -1197,6 +1273,9 @@ public final class QuestJournalPage extends PageContent {
         addWrappedLines(lines, translate("gui.losttales.quest.recorded",
                 formatWorldDate(history.getWorldTime())),
                 WindowStyle.asideRgb(), 8, width - 16);
+        if (completions > 1 || completions == 1 && !history.isCompleted()) {
+            addWrappedLines(lines, count, WindowStyle.asideRgb(), 8, width - 16);
+        }
     }
 
     private String formatWorldDate(long worldTime) {
@@ -1214,7 +1293,8 @@ public final class QuestJournalPage extends PageContent {
 
     private List<String> buildRewardLines(LostTalesQuestDefinition quest) {
         List<String> result = quest == null ? new ArrayList<String>()
-                : LostTalesQuestRewardText.phrases(quest.getRewards());
+                : LostTalesQuestRewardText.phrases(
+                        LostTalesQuestRewards.withOptionals(quest));
         if (result.isEmpty()) {
             result.add(translate("gui.losttales.quest.reward.pending"));
         }

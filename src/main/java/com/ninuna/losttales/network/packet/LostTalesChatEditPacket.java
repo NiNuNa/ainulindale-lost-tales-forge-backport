@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatTypedText;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
@@ -24,17 +25,26 @@ import net.minecraft.entity.player.EntityPlayerMP;
  */
 public final class LostTalesChatEditPacket implements IMessage {
     private static final int MAX_PACKET_BYTES =
-            64 + ChatMessageValidator.MAX_UTF8_BYTES;
+            64 + ChatMessageValidator.MAX_UTF8_BYTES
+                    + 5 + ChatTypedText.MAX_UTF8_BYTES;
 
     private long messageId = ChatMessageIds.NONE;
     private String message = "";
+    /** What the player typed for the new words, where it differs from them. */
+    private String typed = "";
     private boolean malformed;
 
     public LostTalesChatEditPacket() {}
 
     public LostTalesChatEditPacket(long messageId, String message) {
+        this(messageId, message, "");
+    }
+
+    /** As above, keeping what the player typed for the new words ({@link ChatTypedText#kept}). */
+    public LostTalesChatEditPacket(long messageId, String message, String typed) {
         this.messageId = messageId;
         this.message = message == null ? "" : message;
+        this.typed = ChatTypedText.kept(typed, this.message);
         validate();
     }
 
@@ -49,12 +59,15 @@ public final class LostTalesChatEditPacket implements IMessage {
             this.messageId = buffer.readLong();
             this.message = LostTalesPacketCodec.readUtf8String(
                     buffer, ChatMessageValidator.MAX_UTF8_BYTES);
+            this.typed = LostTalesPacketCodec.readUtf8String(
+                    buffer, ChatTypedText.MAX_UTF8_BYTES);
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.messageId = ChatMessageIds.NONE;
             this.message = "";
+            this.typed = "";
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -65,13 +78,16 @@ public final class LostTalesChatEditPacket implements IMessage {
         buffer.writeLong(this.messageId);
         LostTalesPacketCodec.writeUtf8String(buffer, this.message,
                 ChatMessageValidator.MAX_UTF8_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.typed,
+                ChatTypedText.MAX_UTF8_BYTES);
     }
 
     private void validate() {
         // Only a message the server named can be edited: a client-local
         // id belongs to a line no server ever saw.
         if (!ChatMessageIds.isServerId(this.messageId)
-                || !ChatMessageValidator.isValid(this.message)) {
+                || !ChatMessageValidator.isValid(this.message)
+                || !ChatTypedText.isValid(this.typed)) {
             throw new IllegalArgumentException("invalid chat edit");
         }
     }
@@ -80,6 +96,8 @@ public final class LostTalesChatEditPacket implements IMessage {
     public long getMessageId() { return this.messageId; }
     /** What it should say instead. */
     public String getMessage() { return this.message; }
+    /** What the player typed for it; empty where it is the words themselves. */
+    public String getTyped() { return this.typed; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<
@@ -100,7 +118,7 @@ public final class LostTalesChatEditPacket implements IMessage {
                         public void run(EntityPlayerMP serverPlayer) {
                             LostTalesChatService.edit(serverPlayer,
                                     message.getMessageId(),
-                                    message.getMessage());
+                                    message.getMessage(), message.getTyped());
                         }
                     });
             return null;

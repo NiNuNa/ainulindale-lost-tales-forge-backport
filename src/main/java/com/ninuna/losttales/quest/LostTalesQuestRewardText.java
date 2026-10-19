@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.compat.lotr.LotrQuestRewards;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -10,19 +11,40 @@ import net.minecraft.util.StatCollector;
 /**
  * What a quest pays, in the words every place shows: the journal, the
  * conversation, a quest card in the chat and a missive letter. Items go
- * by their names, never their ids ({@code 2x Bread}). Works on both
- * sides: a dedicated server names items in its own language.
+ * by their names, never their ids ({@code 2x Bread}), a faction by LOTR's
+ * name for it. A map from {@link LostTalesQuestRewards#withOptionals}
+ * names each optional objective's reward too, marked optional, so every
+ * reward shows before a quest is taken (QUEST-33). Works on both sides: a
+ * dedicated server names items in its own language.
  */
 public final class LostTalesQuestRewardText {
 
     private LostTalesQuestRewardText() {}
 
-    /** Each reward of a quest's reward map as one phrase, in the map's order. */
+    /**
+     * Each reward of a reward map as one phrase, in the map's order: the
+     * quest's own, then each optional objective's, marked optional.
+     */
     public static List<String> phrases(Map<String, String> rewards) {
         List<String> result = new ArrayList<String>();
         if (rewards == null) {
             return result;
         }
+        boolean own = true;
+        for (Map<String, String> block
+                : LostTalesQuestRewards.split(rewards).values()) {
+            for (String phrase : blockPhrases(block)) {
+                result.add(own ? phrase : StatCollector.translateToLocalFormatted(
+                        "gui.losttales.quest.reward.optional", phrase));
+            }
+            own = false;
+        }
+        return result;
+    }
+
+    /** The phrases of one reward block, in its order. */
+    private static List<String> blockPhrases(Map<String, String> rewards) {
+        List<String> result = new ArrayList<String>();
         for (Map.Entry<String, String> entry : rewards.entrySet()) {
             String key = entry.getKey() == null ? "" : entry.getKey();
             String value = entry.getValue() == null ? "" : entry.getValue().trim();
@@ -45,6 +67,34 @@ public final class LostTalesQuestRewardText {
             } else if ("item".equals(key)) {
                 addPhrase(result, itemPhrase(
                         LostTalesQuestItemSpec.rewardItem(rewards)));
+            } else if (LostTalesQuestRewards.ALIGNMENT.equals(key)) {
+                for (LostTalesQuestRewards.Alignment alignment
+                        : LostTalesQuestRewards.alignments(rewards)) {
+                    result.add(StatCollector.translateToLocalFormatted(
+                            "gui.losttales.quest.reward.alignment_with",
+                            String.valueOf(alignment.getAmount()),
+                            factionName(alignment.getFactionId())));
+                }
+            } else if (LostTalesQuestRewards.COINS.equals(key)) {
+                int coins = LostTalesQuestRewards.coins(rewards);
+                if (coins > 0) {
+                    result.add(StatCollector.translateToLocalFormatted(coins == 1
+                            ? "gui.losttales.quest.reward.coin"
+                            : "gui.losttales.quest.reward.coins",
+                            String.valueOf(coins)));
+                }
+            } else if (LostTalesQuestRewards.PICK.equals(key)) {
+                StringBuilder items = new StringBuilder();
+                for (LostTalesQuestItemSpec item : LostTalesQuestRewards.picks(rewards)) {
+                    if (items.length() > 0) {
+                        items.append(", ");
+                    }
+                    items.append(itemPhrase(item));
+                }
+                if (items.length() > 0) {
+                    result.add(StatCollector.translateToLocalFormatted(
+                            "gui.losttales.quest.reward.pick", items.toString()));
+                }
             } else if (("count".equals(key) || "meta".equals(key))
                     && LostTalesQuestParams.value(rewards, "item").length() > 0) {
                 // Parts of the item, which its own phrase says.
@@ -105,6 +155,22 @@ public final class LostTalesQuestRewardText {
         } catch (RuntimeException unnamed) {
             return readable;
         }
+    }
+
+    /** A faction by LOTR's name for it, else its id made readable. */
+    private static String factionName(String factionId) {
+        String name;
+        try {
+            name = LotrQuestRewards.factionName(factionId);
+        } catch (LinkageError noLotr) {
+            name = "";
+        }
+        // LOTR names a faction it has no line for by the line's key.
+        if (name.length() > 0 && !name.startsWith("lotr.faction.")) {
+            return name;
+        }
+        String id = factionId == null ? "" : factionId;
+        return prettify(id.substring(id.indexOf(':') + 1));
     }
 
     private static void addPhrase(List<String> phrases, String phrase) {

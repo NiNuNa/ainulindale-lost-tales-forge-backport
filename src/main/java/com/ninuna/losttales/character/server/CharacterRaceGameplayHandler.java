@@ -8,10 +8,7 @@ import com.ninuna.losttales.character.physics.CharacterRaceEntityData;
 import com.ninuna.losttales.character.physics.CharacterPlayerEyeHeightHelper;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayRegistry;
-import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
-import com.ninuna.losttales.compat.lotr.LotrHalfTrollArmorAdapter;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
-import com.ninuna.losttales.util.LostTalesIdentifiers;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -19,7 +16,6 @@ import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.ai.attributes.IAttributeInstance;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IChatComponent;
@@ -41,10 +37,6 @@ public final class CharacterRaceGameplayHandler {
     private static final UUID ATTACK_DAMAGE_MODIFIER_ID =
             UUID.fromString("c077b9d5-9073-4598-8b81-b2b955a2bf47");
 
-    private static final String HALF_TROLL_ARMOR_NOTICE_TIME =
-            "LostTalesHalfTrollArmorNoticeTime";
-    private static final long ARMOR_NOTICE_COOLDOWN_TICKS = 40L;
-
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
         if (event == null || event.phase != TickEvent.Phase.END
@@ -63,10 +55,6 @@ public final class CharacterRaceGameplayHandler {
             return;
         }
         RoleplayCharacter character = identity.getCharacter();
-
-        // Equipment is checked every tick so inventory clicks, dispensers,
-        // commands, and other mods cannot leave invalid armor equipped.
-        enforceRaceArmor(player, character);
 
         // Legacy EntityPlayer code and other transformation mods can restore
         // vanilla dimensions during ordinary ticks. apply() is idempotent and
@@ -169,26 +157,8 @@ public final class CharacterRaceGameplayHandler {
 
     public static void apply(
             EntityPlayerMP player, RoleplayCharacter character) {
-        applyInternal(player, character, true);
-    }
-
-    /**
-     * Applies attributes and dimensions before transaction commit without moving
-     * or dropping equipment. Equipment enforcement is allowed only post-commit.
-     */
-    public static void applyProvisional(
-            EntityPlayerMP player, RoleplayCharacter character) {
-        applyInternal(player, character, false);
-    }
-
-    private static void applyInternal(
-            EntityPlayerMP player, RoleplayCharacter character,
-            boolean enforceEquipment) {
         if (player == null || player.worldObj == null || player.worldObj.isRemote) {
             return;
-        }
-        if (enforceEquipment) {
-            enforceRaceArmor(player, character);
         }
         if (character == null) {
             restoreVanillaPlayerState(player);
@@ -228,103 +198,6 @@ public final class CharacterRaceGameplayHandler {
         CharacterPlayerEyeHeightHelper.apply(player, dimensions, true);
     }
 
-
-    /**
-     * Transaction-safe armor normalization. Unlike ordinary enforcement this
-     * method never drops an item into the world: it either moves every rejected
-     * armor stack into empty main-inventory slots or leaves the player unchanged.
-     */
-    public static boolean prepareEquipmentForCharacterSwitch(
-            EntityPlayerMP player, RoleplayCharacter character) {
-        if (player == null || character == null
-                || !CharacterRaceRegistry.HALF_TROLL.equals(
-                        LostTalesIdentifiers.normalize(
-                                character.getRaceId()))) {
-            return true;
-        }
-        int rejected = 0;
-        for (int equipmentSlot = LotrHalfTrollArmorAdapter.SLOT_BOOTS;
-             equipmentSlot <= LotrHalfTrollArmorAdapter.SLOT_HELMET;
-             equipmentSlot++) {
-            ItemStack equipped = player.getEquipmentInSlot(equipmentSlot);
-            if (!LotrHalfTrollArmorAdapter.isAllowedInEquipmentSlot(
-                    equipped, equipmentSlot)) {
-                rejected++;
-            }
-        }
-        if (rejected == 0) {
-            return true;
-        }
-        int empty = 0;
-        for (ItemStack stack : player.inventory.mainInventory) {
-            if (stack == null) {
-                empty++;
-            }
-        }
-        if (empty < rejected) {
-            return false;
-        }
-        for (int equipmentSlot = LotrHalfTrollArmorAdapter.SLOT_BOOTS;
-             equipmentSlot <= LotrHalfTrollArmorAdapter.SLOT_HELMET;
-             equipmentSlot++) {
-            ItemStack equipped = player.getEquipmentInSlot(equipmentSlot);
-            if (LotrHalfTrollArmorAdapter.isAllowedInEquipmentSlot(
-                    equipped, equipmentSlot)) {
-                continue;
-            }
-            int emptySlot = player.inventory.getFirstEmptyStack();
-            if (emptySlot < 0) {
-                return false;
-            }
-            player.setCurrentItemOrArmor(equipmentSlot, null);
-            player.inventory.mainInventory[emptySlot] = equipped;
-        }
-        player.inventory.markDirty();
-        return true;
-    }
-
-    private static void enforceRaceArmor(
-            EntityPlayerMP player, RoleplayCharacter character) {
-        if (player == null || character == null
-                || !CharacterRaceRegistry.HALF_TROLL.equals(
-                        LostTalesIdentifiers.normalize(
-                                character.getRaceId()))) {
-            return;
-        }
-        boolean rejectedAny = false;
-        for (int equipmentSlot = LotrHalfTrollArmorAdapter.SLOT_BOOTS;
-             equipmentSlot <= LotrHalfTrollArmorAdapter.SLOT_HELMET;
-             equipmentSlot++) {
-            if (!LotrHalfTrollArmorAdapter.isAllowedInEquipmentSlot(
-                    player.getEquipmentInSlot(equipmentSlot), equipmentSlot)) {
-                rejectedAny = true;
-                break;
-            }
-        }
-        if (!rejectedAny) {
-            return;
-        }
-
-        // Never drop equipment as a side effect of login, recovery, or a race
-        // refresh. A world drop followed by a crash could be replayed from an
-        // older snapshot. Move all rejected pieces atomically or leave them in
-        // place until enough inventory space is available.
-        if (prepareEquipmentForCharacterSwitch(player, character)) {
-            player.inventoryContainer.detectAndSendChanges();
-        }
-        sendHalfTrollArmorNotice(player);
-    }
-
-    private static void sendHalfTrollArmorNotice(EntityPlayerMP player) {
-        long now = player.worldObj.getTotalWorldTime();
-        long last = player.getEntityData().getLong(HALF_TROLL_ARMOR_NOTICE_TIME);
-        if (last > 0L && now - last < ARMOR_NOTICE_COOLDOWN_TICKS) {
-            return;
-        }
-        player.getEntityData().setLong(HALF_TROLL_ARMOR_NOTICE_TIME, now);
-        player.addChatMessage(new ChatComponentTranslation(
-                "losttales.character.halfTrollArmorOnly"));
-    }
 
     private static void restoreVanillaPlayerState(EntityPlayerMP player) {
         removeModifier(player.getEntityAttribute(SharedMonsterAttributes.maxHealth),

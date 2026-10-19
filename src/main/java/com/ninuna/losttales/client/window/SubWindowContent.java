@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.ScaledResolution;
 import org.lwjgl.opengl.GL11;
 
@@ -49,20 +50,13 @@ public abstract class SubWindowContent {
                        double pointerY, int alpha, int surfaceAlpha);
 
     /**
-     * What the pointer rests on, for the tip's timing: the same words for
-     * the same thing, empty where there is no tip.
+     * The tip of what the pointer rests on; null where there is none. The
+     * screen draws it beside the pointer once every window is drawn, as it
+     * draws every tip.
      */
-    public String tipKey() {
-        return "";
+    public PointerTip tip(FontRenderer font) {
+        return null;
     }
-
-    /**
-     * Draws the tip of what the pointer rests on, beside
-     * {@code tipX}/{@code tipY}, once every window is drawn, at
-     * {@code share} of its strength as it fades in.
-     */
-    public void drawTip(Minecraft minecraft, int tipX, int tipY, int screenWidth,
-                        float share) {}
 
     /**
      * What a point on the content is, as a hover of its own kind; null

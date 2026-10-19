@@ -24,6 +24,9 @@ final class MissiveActions {
         if (picked == null) {
             return WHY + "pick";
         }
+        if (picked.isWorld()) {
+            return WHY + "world";
+        }
         return whyNotAcceptLetter(picked.isReadable(), alreadyActive, waiting);
     }
 
@@ -32,6 +35,9 @@ final class MissiveActions {
                              boolean waiting) {
         if (picked == null) {
             return WHY + "pick";
+        }
+        if (picked.isWorld()) {
+            return WHY + "world";
         }
         if (inventoryFull) {
             return WHY + "inventory_full";
@@ -50,6 +56,14 @@ final class MissiveActions {
         }
         if (notices >= Math.min(maxNotices, slots)) {
             return WHY + "board_full";
+        }
+        return waiting ? WHY + "waiting" : "";
+    }
+
+    /** Hand In: a missive of the player's waiting for a board, and no answer awaited. */
+    static String whyNotHandIn(int waitingMissives, boolean waiting) {
+        if (waitingMissives <= 0) {
+            return WHY + "nothing_to_hand_in";
         }
         return waiting ? WHY + "waiting" : "";
     }

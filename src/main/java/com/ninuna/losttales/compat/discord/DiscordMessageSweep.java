@@ -22,12 +22,15 @@ import java.util.Map;
  * <p>Pure bookkeeping over parsed pages, owned by the worker that reads
  * them — one thread, no locks — and dying with it, exactly like the
  * poll cursor beside it; the next worker starts again from the members'
- * lines the bridge's links still hold ({@link #watch}). Bounded to the
- * newest {@link #MAX_TRACKED} relayed messages.</p>
+ * lines the bridge's links still hold ({@link #watch}) and the lines the
+ * bridge heard this run with their edit stamps ({@link DiscordHeardLines}),
+ * which the worker also takes up whenever the live connection drops, so
+ * the re-read watches the lines heard live too. Bounded to the newest
+ * {@link #MAX_TRACKED} relayed messages.</p>
  */
 final class DiscordMessageSweep {
     /** Messages watched; past it the oldest is let go first. */
-    private static final int MAX_TRACKED = 128;
+    static final int MAX_TRACKED = 128;
 
     /** Relayed message id to the edit stamp it was last seen with; null for one not seen yet. */
     private final LinkedHashMap<String, String> tracked =
@@ -59,6 +62,37 @@ final class DiscordMessageSweep {
         }
         this.tracked.put(message.id, message.editedTimestamp);
         trim();
+    }
+
+    /**
+     * Watches a message the bridge heard with the edit stamp
+     * {@code editedTimestamp}: one the gateway carried, or one an
+     * earlier worker read. A message already watched keeps the newer of
+     * its two stamps, so a later page reports only what changed since
+     * either was heard.
+     */
+    void track(String discordId, String editedTimestamp) {
+        if (discordId == null || discordId.length() == 0) {
+            return;
+        }
+        String stamp = editedTimestamp == null ? "" : editedTimestamp;
+        String held = this.tracked.get(discordId);
+        if (!this.tracked.containsKey(discordId) || held == null
+                || isNewer(stamp, held)) {
+            this.tracked.put(discordId, stamp);
+            trim();
+        }
+    }
+
+    /**
+     * Whether the edit stamp {@code stamp} is later than {@code than}.
+     * Discord writes every stamp in one ISO 8601 form, which sorts as
+     * the times it names; never edited, the empty stamp, is earliest.
+     */
+    static boolean isNewer(String stamp, String than) {
+        String left = stamp == null ? "" : stamp;
+        String right = than == null ? "" : than;
+        return left.compareTo(right) > 0;
     }
 
     /**
@@ -118,7 +152,9 @@ final class DiscordMessageSweep {
                 if (entry.getValue() == null) {
                     // Watched without its stamp: this page supplies it.
                     entry.setValue(found.editedTimestamp);
-                } else if (!found.editedTimestamp.equals(entry.getValue())) {
+                } else if (isNewer(found.editedTimestamp, entry.getValue())) {
+                    // Only a later stamp is an edit: a page older than
+                    // what the gateway already said brings stale words.
                     edited.add(found);
                     entry.setValue(found.editedTimestamp);
                 }

@@ -28,7 +28,8 @@ import static org.junit.Assert.assertTrue;
  * A page may stand open more than once, each copy a tab with a view of its
  * own: asked about a page, the layout answers with the copy used last; a
  * new copy opens from the menu, Duplicate Page and Page Search; a page
- * picked on a menu tab takes its place; what the page is the copies share.
+ * picked on a menu tab takes its place; what the page is the copies share,
+ * and a conversation's copies share its unread lines and settings.
  */
 public final class PageCopiesTest {
     private static final String PAGE = "copies_page";
@@ -180,6 +181,51 @@ public final class PageCopiesTest {
         assertFalse(WindowLayout.windowOf(menuTab).isLocked());
     }
 
+    /**
+     * WIN-18: everything opened from a locked window, its {@code +}, a
+     * Duplicate Page and a New Page's pick, opens in another unlocked
+     * window of its view with room first.
+     */
+    @Test
+    public void whatALockedWindowOpensGoesToAnotherUnlockedWindowOfItsView() {
+        Window locked = WindowLayout.windowOf(GLOBAL);
+        ConversationPage friend = ConversationPage.whisper("friend", "");
+        Window other = Unlocking.of(WindowLayout.addWindow(
+                Arrays.asList(friend), friend));
+        assertSame("both stand in the Chat view", WindowLayout.viewOf(locked),
+                WindowLayout.viewOf(other));
+        WindowLayout.setLocked(locked.getId(), true);
+        WindowPage plus = WindowLayout.openCopyIn(WindowPages.tab(PAGE),
+                locked.getId());
+        assertSame("the +", other, WindowLayout.windowOf(plus));
+        WindowPage duplicated = WindowLayout.duplicate(GLOBAL);
+        assertSame("Duplicate Page", other, WindowLayout.windowOf(duplicated));
+        // A pick on a New Page standing in the locked window cannot turn
+        // that tab into it, and opens as the window's + does.
+        WindowPage picked = WindowLayout.openCopyIn(GLOBAL, locked.getId());
+        assertSame("a New Page's pick", other, WindowLayout.windowOf(picked));
+        assertFalse(locked.contains(plus) || locked.contains(duplicated)
+                || locked.contains(picked));
+    }
+
+    /** WIN-18: with no unlocked window of its view taking it, a new window a step on. */
+    @Test
+    public void whatALockedWindowOpensWithNoRoomElseGetsANewWindowAStepOn() {
+        Window locked = WindowLayout.windowOf(GLOBAL);
+        ConversationPage friend = ConversationPage.whisper("friend", "");
+        Window other = WindowLayout.addWindow(Arrays.asList(friend), friend);
+        WindowLayout.setLocked(locked.getId(), true);
+        assertTrue(other.isLocked());
+        WindowPage plus = WindowLayout.openCopyIn(WindowPages.tab(PAGE),
+                locked.getId());
+        Window created = WindowLayout.windowOf(plus);
+        assertNotSame(locked, created);
+        assertNotSame(other, created);
+        assertFalse("unlocked", created.isLocked());
+        assertSame("in the locked window's view", WindowLayout.viewOf(locked),
+                WindowLayout.viewOf(created));
+    }
+
     @Test
     public void aPageThatOpensOnceIsBroughtForwardInsteadOfCopied() {
         OtherPage once = WindowPages.tab(ONCE);
@@ -193,22 +239,34 @@ public final class PageCopiesTest {
     }
 
     /**
-     * Two copies of a conversation are two people's chats on one screen:
-     * a line waits unread in each, and reading it in one leaves it unread
-     * in the other.
+     * Copies of a conversation share its unread lines and its divider
+     * (CHAT-02): a line waits unread in both, and reading it in one reads
+     * it in the other.
      */
     @Test
-    public void eachCopyOfAConversationKeepsItsOwnUnread() {
+    public void copiesOfAConversationShareItsUnread() {
         ConversationPage copy = (ConversationPage)WindowLayout.duplicate(GLOBAL);
         ConversationPage elsewhere = ConversationPage.of(ChatChannel.OOC);
         ClientChatChannelViews.record(-1, GLOBAL, elsewhere, false,
                 ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertEquals(1, ClientChatChannelViews.unreadCount(GLOBAL));
         assertEquals(1, ClientChatChannelViews.unreadCount(copy));
+        assertEquals(ClientChatChannelViews.unreadDividerLine(GLOBAL),
+                ClientChatChannelViews.unreadDividerLine(copy));
         ClientChatChannelViews.markViewed(copy);
         assertEquals(0, ClientChatChannelViews.unreadCount(copy));
-        assertEquals("still unread in the first copy",
-                1, ClientChatChannelViews.unreadCount(GLOBAL));
+        assertEquals("read in the first copy too",
+                0, ClientChatChannelViews.unreadCount(GLOBAL));
+    }
+
+    /** A line in front in one copy, at its newest line, is read in every copy. */
+    @Test
+    public void aLineShownInOneCopyIsReadInAll() {
+        ConversationPage copy = (ConversationPage)WindowLayout.duplicate(GLOBAL);
+        ClientChatChannelViews.record(-2, GLOBAL, copy, false,
+                ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        assertEquals(0, ClientChatChannelViews.unreadCount(GLOBAL));
+        assertEquals(0, ClientChatChannelViews.unreadCount(copy));
     }
 
     @Test
@@ -223,22 +281,26 @@ public final class PageCopiesTest {
     }
 
     /**
-     * A copy's notification choice is its own, and a line chimes when any
-     * copy showing it lets it through.
+     * A conversation's two settings are one for all its copies (CHAT-02):
+     * a choice made in one copy holds in the other.
      */
     @Test
-    public void aNotificationChoiceIsTheCopysOwnAndAnyCopyChimes() {
+    public void copiesShareTheConversationsSettings() {
         ConversationPage copy = (ConversationPage)WindowLayout.duplicate(GLOBAL);
         ChatLayout.setNotification(copy,
                 com.ninuna.losttales.client.chat.ChatLineChoice.NOTHING);
         assertTrue(copy.isMuted());
-        assertFalse(ChatLayout.isMuted(GLOBAL));
-        assertTrue("the first copy still chimes for a mention",
-                ChatLayout.chimes(GLOBAL, true));
-        assertFalse(ChatLayout.chimes(GLOBAL, false));
+        assertTrue("the first copy is muted too", ChatLayout.isMuted(GLOBAL));
+        assertFalse(ChatLayout.chimes(GLOBAL, true));
         ChatLayout.setNotification(GLOBAL,
                 com.ninuna.losttales.client.chat.ChatLineChoice.EVERYTHING);
         assertTrue(ChatLayout.chimes(copy, false));
+        ChatLayout.setFeedChoice(copy,
+                com.ninuna.losttales.client.chat.ChatLineChoice.ONLY_MENTIONS);
+        assertEquals(com.ninuna.losttales.client.chat.ChatLineChoice.ONLY_MENTIONS,
+                ChatLayout.feedChoice(GLOBAL));
+        ChatLayout.setFeedChoice(GLOBAL,
+                com.ninuna.losttales.client.chat.ChatLineChoice.EVERYTHING);
     }
 
     /** A page with nothing on it. */

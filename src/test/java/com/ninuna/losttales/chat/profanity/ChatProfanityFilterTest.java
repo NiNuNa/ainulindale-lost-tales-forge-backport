@@ -5,8 +5,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.junit.Test;
 
 /**
@@ -101,8 +104,10 @@ public final class ChatProfanityFilterTest {
     public void aMessageKeepsItsTokensEmojisLinksMentionsChannelsAndCode() {
         String message = "shit [i:Iron Sword] :smile: https://example.com/fuck "
                 + "@fuck #fuck `fuck` fuck";
+        // A mention reaching nobody and a word that is no channel are
+        // words like any other, as the chat's lines read them (CHAT-82).
         assertEquals("poop [i:Iron Sword] :smile: https://example.com/fuck "
-                + "@fuck #fuck `fuck` flip",
+                + "@flip #flip `fuck` flip",
                 ChatProfanityFilter.filterMessage(message, ChatProfanityMode.SILLY, WORDS));
         assertEquals("a lone ` tick flip",
                 ChatProfanityFilter.filterMessage("a lone ` tick fuck",
@@ -113,6 +118,18 @@ public final class ChatProfanityFilterTest {
         // Discord role's or channel's bold name is filtered.
         assertEquals("@**flip** #**poop**", ChatProfanityFilter.filterMessage(
                 "@**fuck** #**shit**", ChatProfanityMode.SILLY, WORDS));
+    }
+
+    /** A mention of someone the line names, and a channel link, are kept whole (CHAT-82). */
+    @Test
+    public void aMentionReachingSomebodyAndAChannelLinkAreKeptWhole() {
+        List<ChatNamedPlayer> named = Collections.singletonList(
+                ChatNamedPlayer.account(UUID.randomUUID(), "fuck"));
+        assertEquals("hi @fuck in #global, flip",
+                ChatProfanityFilter.filterMessage("hi @fuck in #global, fuck",
+                        ChatProfanityMode.SILLY, WORDS, named));
+        assertEquals("hi @flip", ChatProfanityFilter.filterMessage("hi @fuck",
+                ChatProfanityMode.SILLY, WORDS));
     }
 
     @Test

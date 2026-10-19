@@ -13,6 +13,7 @@ import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
+import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityFilter;
@@ -80,25 +81,9 @@ public final class CharacterValidator {
      * not a clash with itself — the one being changed. Null when a name
      * is being taken for the first time and every name already in the
      * roster belongs to somebody else.</p>
-     *
-     * <p>{@code keptRaceId} is the race that character already is, which
-     * it may go on being even when nobody may newly choose it. Null when
-     * a race is being taken rather than kept.</p>
      */
     public static CharacterAppearanceValidationResult validateAppearance(
             CharacterRoster roster, UUID exceptCharacterId,
-            String requestedName, String requestedRaceId,
-            String requestedGenderId, String requestedSkinId,
-            String requestedBodyTypeId, String requestedChestTypeId,
-            String requestedHistory, int requestedAge) {
-        return validateAppearance(roster, exceptCharacterId, null,
-                requestedName, requestedRaceId, requestedGenderId,
-                requestedSkinId, requestedBodyTypeId, requestedChestTypeId,
-                requestedHistory, requestedAge);
-    }
-
-    public static CharacterAppearanceValidationResult validateAppearance(
-            CharacterRoster roster, UUID exceptCharacterId, String keptRaceId,
             String requestedName, String requestedRaceId,
             String requestedGenderId, String requestedSkinId,
             String requestedBodyTypeId, String requestedChestTypeId,
@@ -121,6 +106,10 @@ public final class CharacterValidator {
         if (!containsOnlyAllowedNameCharacters(normalizedName)) {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_NAME_CHARACTERS);
+        }
+        if (!CharacterNames.inOneScript(normalizedName)) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_NAME_SCRIPT);
         }
         // A word the chat would filter is no name: the list in force on
         // this side, the bundled one with the server's words over it.
@@ -159,14 +148,6 @@ public final class CharacterValidator {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_RACE);
         }
-        // A race nobody may newly choose may still be kept by a character
-        // who already is one; what is refused is taking it.
-        if (!race.isSelectable() && !raceId.equals(
-                LostTalesIdentifiers.normalize(keptRaceId))) {
-            return CharacterAppearanceValidationResult.failure(
-                    CharacterErrorId.INVALID_RACE);
-        }
-
         String genderId = LostTalesIdentifiers.normalize(requestedGenderId);
         if (!isValidIdentifierLength(genderId)
                 || !CharacterGenderRegistry.contains(genderId)
@@ -494,7 +475,8 @@ public final class CharacterValidator {
         String name = normalizeName(input);
         int length = name.codePointCount(0, name.length());
         return length >= MIN_NAME_LENGTH && length <= MAX_NAME_LENGTH
-                && containsOnlyAllowedNameCharacters(name);
+                && containsOnlyAllowedNameCharacters(name)
+                && CharacterNames.inOneScript(name);
     }
 
     public static String normalizeName(String input) {
@@ -527,21 +509,26 @@ public final class CharacterValidator {
         return normalized.withGlances(glances);
     }
 
-    /** A fact, or a glance's title or line, as stored: the rule a name follows. */
+    /**
+     * A fact, or a glance's title or line, as stored: the rule a name
+     * follows, its invisible marks dropped ({@link #isInvisibleMark}).
+     */
     public static String normalizeLine(String input) {
-        return normalizeWhitespace(input);
+        return normalizeWhitespace(withoutInvisibleMarks(input));
     }
 
     /**
-     * An About text as stored: NFC, each paragraph's whitespace folded as
-     * a name's is, one empty line at most between paragraphs, and none
+     * An About text as stored: NFC, its invisible marks dropped
+     * ({@link #isInvisibleMark}), each paragraph's whitespace folded as a
+     * name's is, one empty line at most between paragraphs, and none
      * before the first or after the last.
      */
     public static String normalizeSection(String input) {
         if (input == null) {
             return "";
         }
-        String text = input.replace("\r\n", "\n").replace('\r', '\n');
+        String text = withoutInvisibleMarks(input)
+                .replace("\r\n", "\n").replace('\r', '\n');
         StringBuilder output = new StringBuilder(text.length());
         boolean gap = false;
         for (String paragraph : text.split("\n", -1)) {
@@ -613,11 +600,44 @@ public final class CharacterValidator {
                 continue;
             }
             if (codePoint == 0x00A7 || Character.isISOControl(codePoint)
-                    || !Character.isDefined(codePoint)) {
+                    || !Character.isDefined(codePoint)
+                    || isInvisibleMark(codePoint)) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * A mark profile text drops: one that turns the text after it around,
+     * as the chat drops them ({@link ChatMessageValidator#isDirectionMark}),
+     * a left-to-right or right-to-left mark (U+200E, U+200F, U+061C), or a
+     * character of no width (U+200B-U+200D, U+2060-U+2064, U+FEFF). Each
+     * could make a profile read as something other than what was typed, or
+     * hide a word from the filter.
+     */
+    static boolean isInvisibleMark(int codePoint) {
+        return codePoint <= Character.MAX_VALUE
+                        && ChatMessageValidator.isDirectionMark((char)codePoint)
+                || codePoint >= 0x200B && codePoint <= 0x200F
+                || codePoint >= 0x2060 && codePoint <= 0x2064
+                || codePoint == 0xFEFF || codePoint == 0x061C;
+    }
+
+    /** {@code input} without its invisible marks ({@link #isInvisibleMark}). */
+    private static String withoutInvisibleMarks(String input) {
+        if (input == null) {
+            return "";
+        }
+        StringBuilder kept = new StringBuilder(input.length());
+        for (int offset = 0; offset < input.length();) {
+            int codePoint = input.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (!isInvisibleMark(codePoint)) {
+                kept.appendCodePoint(codePoint);
+            }
+        }
+        return kept.toString();
     }
 
     public static String normalizeStableIdentifier(String input) {

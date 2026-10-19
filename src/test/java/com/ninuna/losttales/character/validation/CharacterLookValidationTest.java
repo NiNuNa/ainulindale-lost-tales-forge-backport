@@ -12,7 +12,6 @@ import org.junit.Test;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -89,19 +88,22 @@ public final class CharacterLookValidationTest {
                         "losttales:enormous").getErrorId());
     }
 
-    /** The account's own skin is offered where the race allows it, as in the creator. */
+    /** Every race may wear the account's own skin, as the creator offers it. */
     @Test
-    public void theAccountSkinFollowsTheRace() {
+    public void theAccountSkinFitsEveryRace() {
         assertTrue(CharacterValidator.validateLook(human(),
                 CharacterSkinRegistry.ACCOUNT_SKIN_ID, "", "").isValid());
-        RoleplayCharacter troll = RoleplayCharacter.builder(UUID.randomUUID(),
+        RoleplayCharacter orc = RoleplayCharacter.builder(UUID.randomUUID(),
                 OWNER).slot(1).name("Grug")
-                .race(CharacterRaceRegistry.HALF_TROLL)
+                .race(CharacterRaceRegistry.ORC)
                 .gender(CharacterGenderRegistry.NON_BINARY)
-                .skin("losttales:half_troll_0").age(30)
-                .startingFaction("lotr:half_troll").createdAt(1L).build();
-        assertFalse(CharacterValidator.validateLook(troll,
-                CharacterSkinRegistry.ACCOUNT_SKIN_ID, "", "").isValid());
+                .skin(CharacterSkinRegistry.getDefaultSkinId(CharacterRaceRegistry.ORC,
+                        CharacterGenderRegistry.NON_BINARY, OWNER)).age(30)
+                .startingFaction("lotr:mordor").createdAt(1L).build();
+        // Each race has its own account skin, first in its list.
+        String accountSkin = CharacterSkinRegistry.getCompatibleSkins(
+                CharacterRaceRegistry.ORC, CharacterGenderRegistry.NON_BINARY).get(0).getId();
+        assertTrue(CharacterValidator.validateLook(orc, accountSkin, "", "").isValid());
     }
 
     @Test

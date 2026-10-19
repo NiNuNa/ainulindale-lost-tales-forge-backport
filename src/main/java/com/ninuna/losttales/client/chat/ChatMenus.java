@@ -567,14 +567,13 @@ final class ChatMenus {
             entries.add(MenuWindow.Entry.separator());
         }
         if (isOwnMessage(aim)) {
-            if (ClientChatMessages.get(aim.messageId) != null) {
-                // Editable only while this client still remembers what
-                // was typed: the field is filled with the original text,
-                // markup and all, not with the line as it reads.
-                entries.add(new MenuWindow.Entry(ENTRY_EDIT,
-                        StatCollector.translateToLocal(
-                                "gui.losttales.chat.message.edit")));
-            }
+            // The server keeps what was typed with every line of yours it
+            // keeps and hands it back with the line, so Edit stands on
+            // each; a line this client no longer holds says why it cannot.
+            entries.add(action(ENTRY_EDIT, "gui.losttales.chat.message.edit",
+                    ClientChatMessages.get(aim.messageId) != null ? ""
+                            : StatCollector.translateToLocal(
+                                    "gui.losttales.chat.message.edit.unheld")));
             entries.add(new MenuWindow.Entry(ENTRY_DELETE,
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.message.delete"))
@@ -1622,8 +1621,12 @@ final class ChatMenus {
         // after the move.
         this.tabActions.selectChannel(aim.tab);
         this.composer.startEdit(aim.tab, aim.messageId);
-        this.field.setText(remembered.packet.getMessage());
-        ClientChatChannelState.setDraft(remembered.packet.getMessage());
+        // What was typed, as the server keeps it with the line; the words
+        // themselves where the two are the same (CHAT-83).
+        String typed = remembered.packet.getTyped().length() > 0
+                ? remembered.packet.getTyped() : remembered.packet.getMessage();
+        this.field.setText(typed);
+        ClientChatChannelState.setDraft(typed);
     }
 
     /**

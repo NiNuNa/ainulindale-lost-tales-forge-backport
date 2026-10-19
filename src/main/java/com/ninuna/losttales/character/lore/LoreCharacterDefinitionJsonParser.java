@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 
@@ -75,7 +76,13 @@ public final class LoreCharacterDefinitionJsonParser {
                 throw invalid("unsupported dataVersion " + dataVersion);
             }
             String id = requiredIdentifier(object.get("id"), "id");
-            String name = requiredString(object.get("name"), "name", 64);
+            String name = requiredString(object.get("name"), "name",
+                    LoreCharacterDefinition.MAX_NAME_LENGTH);
+            if (name.getBytes(StandardCharsets.UTF_8).length
+                    > LoreCharacterDefinition.MAX_NAME_BYTES) {
+                throw invalid("name exceeds "
+                        + LoreCharacterDefinition.MAX_NAME_BYTES + " bytes");
+            }
             String description = string(object.get("description"),
                     "description",
                     LoreCharacterDefinition.MAX_DESCRIPTION_LENGTH, true);
@@ -146,7 +153,8 @@ public final class LoreCharacterDefinitionJsonParser {
     }
 
     private static String requiredIdentifier(JsonElement element, String path) {
-        String value = requiredString(element, path, 160)
+        String value = requiredString(element, path,
+                LoreCharacterDefinition.MAX_ID_LENGTH)
                 .toLowerCase(Locale.ROOT);
         if (!IDENTIFIER.matcher(value).matches()) {
             throw invalid(path + " must be a lowercase namespaced identifier");

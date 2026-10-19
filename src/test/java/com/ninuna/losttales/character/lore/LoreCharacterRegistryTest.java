@@ -192,6 +192,25 @@ public final class LoreCharacterRegistryTest {
         assertTrue(result.getErrors().get(0).contains("modelId is incompatible"));
     }
 
+    /** There is no half-troll: a lore file naming one is refused (CHAR-09). */
+    @Test
+    public void aLoreFileNamingAHalfTrollIsRefused() {
+        LoreCharacterDefinitionJsonParser.ParseResult result = parse(
+                "{\"dataVersion\":1,"
+                        + "\"id\":\"losttales:bogdal\","
+                        + "\"name\":\"Bogdal\","
+                        + "\"description\":\"\","
+                        + "\"appearance\":{"
+                        + "\"raceId\":\"losttales:half_troll\","
+                        + "\"genderId\":\"losttales:non_binary\","
+                        + "\"modelId\":\"lotr:half_troll\","
+                        + "\"skinId\":\"losttales:half_troll_0\"}}"
+        );
+
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().get(0).contains("not a supported playable race"));
+    }
+
     @Test
     public void bundledRegistryContainsUniqueFoundationEntries() {
         LoreCharacterRegistry.load(null);

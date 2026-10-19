@@ -13,6 +13,7 @@ public final class MissiveNotice {
     private final int slot;
     private final long ticksLeft;
     private final LostTalesMissiveData missive;
+    private final String worldQuestId;
 
     /**
      * A notice in {@code slot}, taken down by the board in
@@ -24,6 +25,28 @@ public final class MissiveNotice {
         this.slot = slot;
         this.ticksLeft = ticksLeft < 0L ? STAYS_UP : ticksLeft;
         this.missive = missive != null && missive.isValid() ? missive : null;
+        this.worldQuestId = "";
+    }
+
+    private MissiveNotice(int slot, long ticksLeft, String worldQuestId) {
+        this.slot = slot;
+        this.ticksLeft = ticksLeft < 0L ? STAYS_UP : ticksLeft;
+        this.missive = null;
+        this.worldQuestId = worldQuestId == null ? "" : worldQuestId;
+    }
+
+    /**
+     * A running world quest's notice, which every board shows while it runs
+     * (QUEST-36): no letter, nothing to accept or take; {@code slot} is the
+     * page's own, below every board slot.
+     */
+    public static MissiveNotice world(int slot, long ticksLeft, String questId) {
+        return new MissiveNotice(slot, ticksLeft, questId);
+    }
+
+    /** Whether it is a world quest's notice rather than a letter. */
+    public boolean isWorld() {
+        return this.worldQuestId.length() > 0;
     }
 
     public int getSlot() {
@@ -48,8 +71,9 @@ public final class MissiveNotice {
         return this.missive != null;
     }
 
-    /** The letter's quest id; empty for one that cannot be read. */
+    /** The letter's quest id, or the world quest's; empty for a letter that cannot be read. */
     public String getQuestId() {
-        return this.missive == null ? "" : this.missive.getQuestId();
+        return isWorld() ? this.worldQuestId
+                : this.missive == null ? "" : this.missive.getQuestId();
     }
 }

@@ -254,6 +254,16 @@ public final class Fellowship {
         return null;
     }
 
+    /** Whether a member other than {@code identityId} is somebody's: a fellowship of figures nobody holds has nobody to lead it. */
+    public boolean hasHeldMemberBesides(UUID identityId) {
+        for (FellowshipMember member : this.membersByIdentityId.values()) {
+            if (!member.isUnheld() && !member.getIdentityId().equals(identityId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The members, first joined first. */
     public List<FellowshipMember> getMembers() {
         ArrayList<FellowshipMember> members = new ArrayList<FellowshipMember>(this.membersByIdentityId.values());
@@ -436,8 +446,14 @@ public final class Fellowship {
         return true;
     }
 
+    /** The member who joined first among those somebody holds, else the first of all. */
     private UUID selectSuccessorIdentityId() {
         List<FellowshipMember> ordered = getMembers();
+        for (FellowshipMember member : ordered) {
+            if (!member.isUnheld()) {
+                return member.getIdentityId();
+            }
+        }
         return ordered.isEmpty() ? null : ordered.get(0).getIdentityId();
     }
 

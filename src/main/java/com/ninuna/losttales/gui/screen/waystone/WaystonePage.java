@@ -6,7 +6,7 @@ import com.ninuna.losttales.block.custom.LostTalesBlockWaystone;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
-import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
+import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContext;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
@@ -28,6 +28,8 @@ import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WorldPageReach;
 import com.ninuna.losttales.client.window.WorldPageWatch;
+import com.ninuna.losttales.fellowship.sync.FellowshipSnapshot;
+import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -45,9 +47,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import lotr.common.LOTRDimension;
-import lotr.common.LOTRLevelData;
-import lotr.common.LOTRPlayerData;
-import lotr.common.fellowship.LOTRFellowshipClient;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
@@ -72,8 +71,8 @@ import org.lwjgl.input.Keyboard;
  * changed. The server answers every request with the waystone's state
  * and why, which stands over the page's bar, as does the line the
  * server says in the chat while the page is shown; a stale revision
- * brings back what stands now and the page says so. Share and Unshare are
- * sent at once.</p>
+ * brings back what stands now and the page says so. Share, Unshare and,
+ * for a player who manages markers, Hand Over are sent at once.</p>
  *
  * <p>Destinations opens the map in travel mode beside the waystone's tab.
  * The tab closes by itself, fading as tabs close, once the
@@ -420,8 +419,8 @@ public final class WaystonePage extends PageContent
     /**
      * A row taken: a number's chevrons step it and its value opens the
      * field it is typed into, as does a line; a switch flips, a few-word
-     * option steps on, or back with the right button; Share and Unshare
-     * are sent at once. A row greyed is never taken.
+     * option steps on, or back with the right button; Share, Unshare and
+     * Hand Over are sent at once. A row greyed is never taken.
      */
     private void take(MenuWindow.Entry entry, String part, boolean back,
                       LostTalesUiHitBox row) {
@@ -462,7 +461,7 @@ public final class WaystonePage extends PageContent
         } else if (WaystoneRows.FAST_TRAVEL.equals(id)) {
             this.draft.setFastTravel(!this.draft.hasFastTravel());
         } else if (WaystoneRows.VISIBILITY.equals(id)) {
-            this.draft.stepVisibility(back, this.state.canMakePublic());
+            this.draft.stepVisibility(this.state.managesMarkers());
         } else if (WaystoneRows.SHARE_KIND.equals(id)) {
             this.shareWithFellowship = !this.shareWithFellowship;
             this.shareTarget = "";
@@ -470,6 +469,8 @@ public final class WaystonePage extends PageContent
             share(false);
         } else if (WaystoneRows.UNSHARE.equals(id) && !back) {
             share(true);
+        } else if (WaystoneRows.HAND_OVER.equals(id) && !back) {
+            handOver();
         }
     }
 
@@ -536,6 +537,31 @@ public final class WaystonePage extends PageContent
                             remove, this.state.getX(), this.state.getY(),
                             this.state.getZ(), this.state.getMarkerId(),
                             this.state.getRevision(), name);
+        } catch (IllegalArgumentException invalid) {
+            sayRefused(word("invalid_share_target"));
+            return;
+        }
+        LostTalesNetworkHandler.CHANNEL.sendToServer(packet);
+        this.sent = null;
+        beginWaiting();
+    }
+
+    /**
+     * Makes the character named the waystone's owner: a manager's request,
+     * which the server checks again (WAY-08).
+     */
+    private void handOver() {
+        String name = this.shareTarget.trim();
+        if (this.state == null || this.waiting || !this.state.canEdit()
+                || !this.state.managesMarkers() || this.shareWithFellowship
+                || name.length() == 0) {
+            return;
+        }
+        LostTalesWaystoneSettingsRequestPacket packet;
+        try {
+            packet = LostTalesWaystoneSettingsRequestPacket.handOver(
+                    this.state.getX(), this.state.getY(), this.state.getZ(),
+                    this.state.getMarkerId(), this.state.getRevision(), name);
         } catch (IllegalArgumentException invalid) {
             sayRefused(word("invalid_share_target"));
             return;
@@ -851,6 +877,24 @@ public final class WaystonePage extends PageContent
         }
 
         @Override
+        public String ownerName() {
+            return WaystonePage.this.state == null ? ""
+                    : WaystonePage.this.state.getOwnerName();
+        }
+
+        @Override
+        public boolean isPlayerPlaced() {
+            return WaystonePage.this.state != null
+                    && WaystonePage.this.state.isPlayerPlaced();
+        }
+
+        @Override
+        public boolean managesMarkers() {
+            return WaystonePage.this.state != null
+                    && WaystonePage.this.state.managesMarkers();
+        }
+
+        @Override
         public boolean stands() {
             OtherPage tab = WindowPages.tab(PAGE_ID);
             return this.made == WaystonePage.this.shownCount
@@ -895,10 +939,10 @@ public final class WaystonePage extends PageContent
     }
 
     /**
-     * The names the share field offers for what is typed: the others
-     * online ({@link #characterNames}), or the player's fellowships,
-     * whichever the waystone is shared with, the typed name itself left
-     * out.
+     * The names the share field offers for what is typed: the characters
+     * the others online play ({@link #characterNames}), or the fellowships
+     * of the character played ({@link #fellowshipNames}), whichever the
+     * waystone is shared with, the typed name itself left out.
      */
     private List<String> names(String typed) {
         String words = typed == null ? "" : typed.trim();
@@ -937,31 +981,23 @@ public final class WaystonePage extends PageContent
         return names;
     }
 
+    /**
+     * The fellowships of ours the character played is in, from the
+     * fellowship state the server last sent: the ones a share is looked up
+     * among (WAY-09).
+     */
     private List<String> fellowshipNames() {
         List<String> names = new ArrayList<String>();
-        if (this.mc.thePlayer == null) {
+        FellowshipStateSnapshot snapshot =
+                ClientFellowshipStateCache.getSnapshot();
+        if (snapshot == null || !snapshot.isAvailable()) {
             return names;
         }
-        try {
-            LOTRPlayerData data = LOTRLevelData.getData(this.mc.thePlayer);
-            List<LOTRFellowshipClient> fellowships = data == null ? null
-                    : data.getClientFellowships();
-            if (fellowships != null) {
-                for (LOTRFellowshipClient fellowship : fellowships) {
-                    if (fellowship != null && fellowship.getName() != null) {
-                        names.add(fellowship.getName());
-                    }
-                }
+        for (FellowshipSnapshot fellowship : snapshot.getFellowships()) {
+            if (fellowship != null && fellowship.getName() != null
+                    && fellowship.getName().trim().length() > 0) {
+                names.add(fellowship.getName().trim());
             }
-        } catch (RuntimeException unavailable) {
-            // A changed LOTR fellowship API costs the offers, nothing more.
-            LostTalesClientDiagnostics.warnOnce("waystone-fellowships",
-                    "The player's fellowships could not be read for the waystone's share field",
-                    unavailable);
-        } catch (LinkageError unavailable) {
-            LostTalesClientDiagnostics.warnOnce("waystone-fellowships",
-                    "The player's fellowships could not be read for the waystone's share field",
-                    unavailable);
         }
         Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
         return names;

@@ -97,7 +97,7 @@ public final class CharacterNameProfanityValidationTest {
 
     private static CharacterAppearanceValidationResult validate(String name) {
         return CharacterValidator.validateAppearance(
-                new CharacterRoster(OWNER), null, null,
+                new CharacterRoster(OWNER), null,
                 name, CharacterRaceRegistry.HUMAN,
                 CharacterGenderRegistry.MALE,
                 CharacterSkinRegistry.getDefaultSkinId(CharacterRaceRegistry.HUMAN,

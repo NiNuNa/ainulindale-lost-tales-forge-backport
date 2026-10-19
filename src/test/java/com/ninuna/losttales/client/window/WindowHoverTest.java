@@ -18,8 +18,7 @@ public final class WindowHoverTest {
     @Test
     public void theHandIsWhereAPressActs() {
         for (WindowHover.Kind kind : new WindowHover.Kind[] {
-                WindowHover.Kind.TAB_ROW, WindowHover.Kind.SUB_WINDOW_CLOSE,
-                WindowHover.Kind.SUB_WINDOW_LOCK}) {
+                WindowHover.Kind.TAB_ROW, WindowHover.Kind.SUB_WINDOW_CLOSE}) {
             assertEquals(kind.name(), LostTalesMapCursor.Pose.HAND,
                     new WindowHover(kind).pose());
         }

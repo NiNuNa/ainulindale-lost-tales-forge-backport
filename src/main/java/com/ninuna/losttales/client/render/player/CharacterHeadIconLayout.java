@@ -13,8 +13,7 @@ final class CharacterHeadIconLayout {
         NONE,
         MINECRAFT,
         LOTR_EXTENDED,
-        LOTR_ORC_FEATURES,
-        LOTR_HALF_TROLL_FEATURES
+        LOTR_ORC_FEATURES
     }
 
     private final float imageHeight;
@@ -68,13 +67,6 @@ final class CharacterHeadIconLayout {
             // the beard on the model.
             return new CharacterHeadIconLayout(
                     64.0F, 8.0F, 8.0F, 8.0F, OverlayKind.LOTR_EXTENDED);
-        }
-        if (CharacterRaceRegistry.HALF_TROLL.equals(canonicalRace)) {
-            // LOTRModelHalfTroll uses a 10x10 head instead of a biped 8x8
-            // head. Its inherited headwear cube is intentionally hidden.
-            return new CharacterHeadIconLayout(
-                    64.0F, 10.0F, 10.0F, 10.0F,
-                    OverlayKind.LOTR_HALF_TROLL_FEATURES);
         }
         if (CharacterRaceRegistry.ORC.equals(canonicalRace)
                 || CharacterRaceRegistry.URUK.equals(canonicalRace)) {

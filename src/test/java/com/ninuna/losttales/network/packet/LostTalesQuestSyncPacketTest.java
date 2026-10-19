@@ -20,6 +20,34 @@ import static org.junit.Assert.assertTrue;
 
 public final class LostTalesQuestSyncPacketTest {
 
+    /** A History line's count and both paths travel whole (QUEST-10, QUEST-30). */
+    @Test
+    public void countsAndPathsRoundTrip() {
+        LostTalesQuestProgress progress = new LostTalesQuestProgress(
+                "losttales:tale", 2, "end",
+                Collections.<String, Integer>emptyMap(), 100L, 0L,
+                Arrays.asList("start", "middle"));
+        LostTalesQuestSyncPacket original = new LostTalesQuestSyncPacket(
+                Collections.singletonList(progress),
+                Collections.singletonList(new LostTalesQuestHistoryEntry(
+                        "losttales:tale",
+                        LostTalesQuestHistoryEntry.Outcome.ABANDONED, "", 90L,
+                        Collections.<String>emptySet(), 3,
+                        Arrays.asList("start"))),
+                Collections.<String>emptySet(), Collections.<String>emptySet(),
+                "", null, null);
+        ByteBuf buffer = Unpooled.buffer();
+        original.toBytes(buffer);
+        LostTalesQuestSyncPacket decoded = new LostTalesQuestSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(Arrays.asList("start", "middle", "end"),
+                decoded.getActiveQuests().get(0).getStagePath());
+        assertEquals(3, decoded.getQuestHistory().get(0).getCompletions());
+        assertEquals(Arrays.asList("start"),
+                decoded.getQuestHistory().get(0).getStagePath());
+    }
+
     @Test
     public void completeSnapshotRoundTrips() {
         LostTalesQuestProgress progress = new LostTalesQuestProgress(

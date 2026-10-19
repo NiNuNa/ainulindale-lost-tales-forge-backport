@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatAction;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatRolePresentation;
@@ -41,8 +42,8 @@ final class ChatInputRules {
     }
 
     /**
-     * As above for text typed in {@code channel}: an action typed in an
-     * in-character channel is the chat's own too.
+     * As above for text typed in {@code channel}: an action typed in a
+     * conversation is the chat's own too.
      */
     static boolean isServerCommand(String text, ChatChannel channel) {
         return isServerCommand(text) && !isAction(text, channel);
@@ -59,12 +60,12 @@ final class ChatInputRules {
 
     /**
      * Whether text typed in {@code channel} is an action line: {@code /me}
-     * in an in-character channel. Anywhere else {@code /me} is the
-     * game's own command.
+     * in any conversation, in character or out of it (CHAT-37). In a
+     * console {@code /me} is the game's own command, which the server
+     * says in OOC Chat.
      */
     static boolean isAction(String text, ChatChannel channel) {
-        return isActionCommand(text)
-                && ChatRolePresentation.isInCharacter(channel);
+        return isActionCommand(text) && ChatAction.takesActions(channel);
     }
 
     /**

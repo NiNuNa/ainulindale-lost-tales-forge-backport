@@ -187,8 +187,9 @@ public final class LostTalesQuestWordsTest {
         assertEquals("Ein Gespräch mit Nia", LostTalesQuestWords.title(quest));
         assertEquals("Bringe Nia 4 Stöcke.", LostTalesQuestObjectiveTextHelper
                 .describe(quest.getStages().get(0).getObjectives().get(0)));
-        assertEquals("Nia bat mich um ein paar Stöcke.",
-                LostTalesQuestWords.journalLine(quest, 0));
+        assertEquals(Arrays.asList("Nia bat mich um ein paar Stöcke."),
+                LostTalesQuestWords.journalParagraphs(quest,
+                        Arrays.asList("10"), false));
         assertEquals("Der Sturm hat meinen Dachbalken gebrochen.",
                 LostTalesQuestDialogue.of(quest).line(LostTalesQuestDialogue.OFFER));
         assertTrue("the offer still makes it a conversation",
@@ -202,8 +203,11 @@ public final class LostTalesQuestWordsTest {
         assertEquals("A Conversation with Nia", LostTalesQuestWords.title(quest));
         assertEquals("Bring Nia 4 sticks.", LostTalesQuestObjectiveTextHelper
                 .describe(quest.getStages().get(0).getObjectives().get(0)));
-        assertEquals("I gathered the sticks Nia requested and should hand them over.",
-                LostTalesQuestWords.journalLine(quest, 1));
+        assertEquals(Arrays.asList(
+                "Nia asked me to bring her a few sticks for repairs.",
+                "I gathered the sticks Nia requested and should hand them over."),
+                LostTalesQuestWords.journalParagraphs(quest,
+                        Arrays.asList("10", "20"), false));
         assertEquals("Take care, Nia.", LostTalesQuestDialogue.of(quest)
                 .line(LostTalesQuestDialogue.LEAVE));
     }
@@ -222,7 +226,8 @@ public final class LostTalesQuestWordsTest {
         assertFalse(quest.isBundled());
         assertEquals("The Old Road", LostTalesQuestWords.title(quest));
         assertEquals("Walk it.", LostTalesQuestWords.description(quest));
-        assertEquals("I walked.", LostTalesQuestWords.journalLine(quest, 0));
+        assertEquals(Arrays.asList("I walked."), LostTalesQuestWords
+                .journalParagraphs(quest, Arrays.asList("10"), false));
         IChatComponent component = LostTalesQuestWords.titleComponent(quest);
         assertTrue(component instanceof ChatComponentText);
         assertEquals("The Old Road", EnglishWords.INSTANCE.read(component));

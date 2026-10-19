@@ -411,6 +411,58 @@ public final class ChatHistoryTest {
     }
 
     /**
+     * A shared channel keeps its last fifty lines whatever the total does
+     * (CHAT-69): many fellowships talking at once push out their own oldest,
+     * never Global's floor.
+     */
+    @Test
+    public void aSharedChannelKeepsItsFloorWhateverTheOthersSay() {
+        int kept = LostTalesConfig.chatHistoryPerChannel;
+        LostTalesConfig.chatHistoryPerChannel = ChatHistory.MAX_TOTAL;
+        try {
+            List<Long> global = new java.util.ArrayList<Long>();
+            for (int index = 0; index < ChatHistory.CHANNEL_FLOOR + 10; index++) {
+                global.add(Long.valueOf(record(ChatChannel.GLOBAL, BOB, "line " + index,
+                        Arrays.asList(BOB), ChatHistory.Audience.everyone())));
+            }
+            for (int index = 0; index < ChatHistory.MAX_TOTAL; index++) {
+                UUID fellowship = new UUID(7L, index % 40);
+                record(ChatChannel.FELLOWSHIP, ALICE, "chatter " + index,
+                        Arrays.asList(ALICE), ChatHistory.Audience.fellowship(fellowship,
+                                Arrays.asList(ALICE)), fellowship.toString());
+            }
+            assertEquals(ChatHistory.MAX_TOTAL, ChatHistory.size());
+            for (int index = 0; index < global.size(); index++) {
+                assertEquals("Global line " + index,
+                        index >= 10, ChatHistory.mayRead(global.get(index).longValue(),
+                                requester(CAROL)));
+            }
+            assertTrue(ChatHistory.keepsFloor("global"));
+            assertTrue(ChatHistory.keepsFloor("faction:gondor"));
+            assertFalse(ChatHistory.keepsFloor("fellowship:" + FELLOWSHIP));
+            assertFalse(ChatHistory.keepsFloor("whisper:a|b"));
+        } finally {
+            LostTalesConfig.chatHistoryPerChannel = kept;
+        }
+    }
+
+    /** Each whisper pair has its own share of the join replay, inside the whole (CHAT-69). */
+    @Test
+    public void eachWhisperPairHasItsOwnReplayShare() {
+        for (int index = 0; index < ChatHistory.MAX_REPLAY_PER_CONVERSATION + 20; index++) {
+            record(ChatChannel.WHISPER, ALICE, "to bob " + index, Arrays.asList(ALICE, BOB),
+                    ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+            record(ChatChannel.WHISPER, ALICE, "to carol " + index,
+                    Arrays.asList(ALICE, CAROL),
+                    ChatHistory.Audience.accounts(Arrays.asList(ALICE, CAROL), false));
+        }
+        assertEquals(2 * ChatHistory.MAX_REPLAY_PER_CONVERSATION,
+                ChatHistory.replayFor(requester(ALICE), ChatMessageIds.NONE).size());
+        assertEquals(ChatHistory.MAX_REPLAY_PER_CONVERSATION,
+                ChatHistory.replayFor(requester(BOB), ChatMessageIds.NONE).size());
+    }
+
+    /**
      * Many accounts' private lines together never hold more than a fifth
      * of the 2,000: past it the oldest private line goes, whoever's, and
      * each account still keeps to its own cap.
@@ -785,7 +837,7 @@ public final class ChatHistoryTest {
         both.put(GONDOR, Long.valueOf(SENT_AT - 1L));
         both.put("MORDOR", Long.valueOf(SENT_AT - 1L));
         List<LostTalesChatMessagePacket> lines = ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, both, null, EVERY_CHANNEL, null, true),
+                new ChatHistory.Requester(CAROL, both, null, EVERY_CHANNEL, null),
                 ChatMessageIds.NONE);
         assertEquals(2, lines.size());
 
@@ -793,7 +845,7 @@ public final class ChatHistoryTest {
         java.util.Map<String, Long> gondorOnly = new java.util.HashMap<String, Long>();
         gondorOnly.put(GONDOR, Long.valueOf(SENT_AT - 1L));
         List<LostTalesChatMessagePacket> gondor = ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, gondorOnly, null, EVERY_CHANNEL, null, true),
+                new ChatHistory.Requester(CAROL, gondorOnly, null, EVERY_CHANNEL, null),
                 ChatMessageIds.NONE);
         assertEquals(1, gondor.size());
         assertEquals(gondorLine, gondor.get(0).getMessageId());
@@ -805,7 +857,7 @@ public final class ChatHistoryTest {
         laterMordor.put(GONDOR, Long.valueOf(SENT_AT - 1L));
         laterMordor.put("MORDOR", Long.valueOf(SENT_AT + 1L));
         List<LostTalesChatMessagePacket> mixed = ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, laterMordor, null, EVERY_CHANNEL, null, true),
+                new ChatHistory.Requester(CAROL, laterMordor, null, EVERY_CHANNEL, null),
                 ChatMessageIds.NONE);
         assertEquals(1, mixed.size());
         assertEquals(gondorLine, mixed.get(0).getMessageId());
@@ -838,7 +890,7 @@ public final class ChatHistoryTest {
         java.util.Map<String, Long> gondor = new java.util.HashMap<String, Long>();
         gondor.put(GONDOR, Long.valueOf(SENT_AT - 1L));
         ChatHistory.Requester requester =
-                new ChatHistory.Requester(CAROL, gondor, null, EVERY_CHANNEL, null, true);
+                new ChatHistory.Requester(CAROL, gondor, null, EVERY_CHANNEL, null);
 
         List<LostTalesChatMessagePacket> all = ChatHistory.replayForContext(
                 requester, ChatChannel.FACTION, GONDOR, ChatMessageIds.NONE);

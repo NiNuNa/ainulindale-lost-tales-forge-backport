@@ -66,8 +66,6 @@ public final class LostTalesMissiveNbt {
         tag.setString("IssuerId", missive.getIssuerId());
         tag.setString("FlavorId", missive.getFlavorId());
         tag.setString("Target", missive.getTarget());
-        tag.setBoolean("Repeatable", missive.isRepeatable());
-        tag.setBoolean("FirstComeFirstServed", missive.isFirstComeFirstServed());
         tag.setLong("GenerationWorldTime", missive.getGenerationWorldTime());
         tag.setLong("TimeLimitTicks", missive.getTimeLimitTicks());
         tag.setTag("GenerationContext", writeStringMap(missive.getGenerationContext()));
@@ -89,8 +87,6 @@ public final class LostTalesMissiveNbt {
                 tag.getString("IssuerId"),
                 tag.getString("FlavorId"),
                 tag.getString("Target"),
-                tag.getBoolean("Repeatable"),
-                tag.getBoolean("FirstComeFirstServed"),
                 tag.getLong("GenerationWorldTime"),
                 tag.getLong("TimeLimitTicks"),
                 readStringMap(tag.getTagList("GenerationContext", Constants.NBT.TAG_COMPOUND)),
@@ -116,8 +112,6 @@ public final class LostTalesMissiveNbt {
                 MissiveWords.MAX_TEMPLATE_ID_BYTES, false)
                 || !NbtTags.hasReasonableString(tag, "Target",
                 MissiveWords.MAX_TARGET_BYTES, false)
-                || !tag.hasKey("Repeatable", Constants.NBT.TAG_BYTE)
-                || !tag.hasKey("FirstComeFirstServed", Constants.NBT.TAG_BYTE)
                 || tag.getLong("GenerationWorldTime") < 0L
                 || tag.getLong("TimeLimitTicks") < 0L
                 || !LostTalesQuestDefinitionNbt.isStringMapReasonable(tag, "GenerationContext")

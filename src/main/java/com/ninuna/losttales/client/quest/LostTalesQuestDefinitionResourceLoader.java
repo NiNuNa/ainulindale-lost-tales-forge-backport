@@ -4,7 +4,6 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.quest.BundledQuestFiles;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionJsonParser;
-import com.ninuna.losttales.quest.LostTalesQuestDefinitionValidator;
 import cpw.mods.fml.common.FMLLog;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -19,8 +18,8 @@ import net.minecraft.util.ResourceLocation;
 /**
  * The bundled quest files as the client reads them: from its resources,
  * a resource pack's included, the same way the server reads its own
- * ({@link BundledQuestFiles}). A file left out and a warning the checker
- * raises are logged, as the server logs them.
+ * ({@link BundledQuestFiles}). A file left out is logged with each
+ * reason, a warning among them, as the server logs it.
  */
 final class LostTalesQuestDefinitionResourceLoader {
 
@@ -47,7 +46,6 @@ final class LostTalesQuestDefinitionResourceLoader {
             FMLLog.warning("[%s] Bundled quest left out: %s",
                     LostTalesMetaData.MOD_ID, problem);
         }
-        LostTalesQuestDefinitionValidator.logWarnings(read.quests);
         return read.quests;
     }
 

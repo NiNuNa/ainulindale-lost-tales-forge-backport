@@ -198,6 +198,8 @@ public final class LostTalesChatMembersPacketTest {
         LostTalesPacketCodec.writeUtf8String(buffer, groupName, 128);
         buffer.writeShort(0);
         buffer.writeBoolean(true);
+        // Not a character spoken as but not played.
+        buffer.writeBoolean(false);
         LostTalesChatMembersPacket read = new LostTalesChatMembersPacket();
         read.fromBytes(buffer);
         return read;

@@ -21,11 +21,25 @@ import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Applies narrowly scoped compatibility hooks where public Forge 1.7.10 events
  * do not expose the required camera, debug-box, identity, and LOTR behavior.
  */
 public final class LostTalesClassTransformer implements IClassTransformer {
+    /**
+     * The active flags the patch being tried on this thread has set, each
+     * with what it held before ({@link #activate}, {@link #rollBack}).
+     */
+    private static final ThreadLocal<List<String[]>> ACTIVATED =
+            new ThreadLocal<List<String[]>>() {
+                @Override
+                protected List<String[]> initialValue() {
+                    return new ArrayList<String[]>();
+                }
+            };
     public static final String LOTR_MAP_SCENE_ACTIVE_PROPERTY =
             "losttales.lotrMapSceneTransformer.active";
     public static final String LOTR_MAP_BACKGROUND_ACTIVE_PROPERTY =
@@ -564,8 +578,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (containsHook(method,
                         LOTR_QUEST_PRESENTATION_HOOK_OWNER,
                         "shouldRenderNativeTracker")) {
-                    System.setProperty(LOTR_QUEST_TRACKER_ACTIVE_PROPERTY,
-                            "true");
+                    activate(LOTR_QUEST_TRACKER_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 LabelNode render = new LabelNode();
@@ -577,14 +590,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 guard.add(new InsnNode(Opcodes.RETURN));
                 guard.add(render);
                 method.instructions.insert(guard);
-                System.setProperty(LOTR_QUEST_TRACKER_ACTIVE_PROPERTY,
-                        "true");
+                activate(LOTR_QUEST_TRACKER_ACTIVE_PROPERTY);
                 info("Patched the native LOTR quest tracker behind the Lost Tales fallback option");
                 return write(owner);
             }
             warn("Could not locate LOTRGuiMiniquestTracker#drawTracker; keeping LOTR's tracker");
             return basicClass;
         } catch (Throwable failure) {
+            rollBack();
             warn("Failed to guard the LOTR quest tracker: " + failure);
             return basicClass;
         }
@@ -616,7 +629,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 // LOTR's own names are identical in development and production.
                 if (!name.equals(method.name) || !descriptor.equals(method.desc)) continue;
                 if (containsHook(method, LOTR_MAP_SCENE_HOOK_OWNER, hookName)) {
-                    System.setProperty(property, "true");
+                    activate(property);
                     return basicClass;
                 }
                 InsnList hook = new InsnList();
@@ -643,12 +656,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(fallback);
                 method.instructions.insert(hook);
                 byte[] transformed = write(owner);
-                System.setProperty(property, "true");
+                activate(property);
                 info("Patched shared map scene: " + owner.name + "#" + name);
                 return transformed;
             }
             warn("Could not locate shared map target " + name + descriptor + "; keeping LOTR rendering");
         } catch (Throwable failure) {
+            rollBack();
             warn("Failed to patch shared map scene: " + failure);
         }
         return basicClass;
@@ -666,7 +680,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     continue;
                 }
                 if (containsHook(method, MAIN_MENU_TITLE_HOOK_OWNER, "drawPiece")) {
-                    System.setProperty(property, "true");
+                    activate(property);
                     return basicClass;
                 }
                 FieldInsnNode buttons = null;
@@ -728,13 +742,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 // vanilla's rare alternate logo; otherwise keep the old title.
                 if (pieces == (lotr ? 2 : 7) && subtitles == (lotr ? 1 : 0)) {
                     byte[] result = write(owner);
-                    System.setProperty(property, "true");
+                    activate(property);
                     info("Patched custom main-menu title: " + owner.name);
                     return result;
                 }
             }
             warn("Could not patch main-menu title: " + property);
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch main-menu title: " + property + ": " + throwable);
         }
         return basicClass;
@@ -752,7 +767,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     continue;
                 }
                 if (containsHook(method, MAIN_MENU_TEXT_HOOK_OWNER, "drawString")) {
-                    System.setProperty(activeProperty, "true");
+                    activate(activeProperty);
                     return basicClass;
                 }
                 boolean patched = false;
@@ -787,16 +802,58 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (patched) {
                     byte[] result = write(owner);
-                    System.setProperty(activeProperty, "true");
+                    activate(activeProperty);
                     info("Patched main-menu text onto the Lost Tales palette: " + owner.name);
                     return result;
                 }
             }
             warn("Could not patch main-menu text: " + activeProperty);
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch main-menu text: " + activeProperty + ": " + throwable);
         }
         return basicClass;
+    }
+
+    /**
+     * Makes the player's constructor build the accessory-aware container:
+     * its {@code NEW} and its constructor call are changed together, or
+     * neither is, since one without the other fails verification. Answers
+     * whether the constructor builds it now.
+     */
+    static boolean patchPlayerContainer(MethodNode constructor) {
+        String vanilla = "net/minecraft/inventory/ContainerPlayer";
+        String desc = "(Lnet/minecraft/entity/player/InventoryPlayer;"
+                + "ZLnet/minecraft/entity/player/EntityPlayer;)V";
+        TypeInsnNode allocation = null;
+        MethodInsnNode construction = null;
+        int allocations = 0;
+        int constructions = 0;
+        for (AbstractInsnNode instruction = constructor.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof TypeInsnNode
+                    && instruction.getOpcode() == Opcodes.NEW
+                    && (vanilla.equals(((TypeInsnNode)instruction).desc)
+                    || ACCESSORY_CONTAINER_CLASS.equals(((TypeInsnNode)instruction).desc))) {
+                allocation = (TypeInsnNode)instruction;
+                allocations++;
+            } else if (instruction instanceof MethodInsnNode
+                    && instruction.getOpcode() == Opcodes.INVOKESPECIAL
+                    && "<init>".equals(((MethodInsnNode)instruction).name)
+                    && desc.equals(((MethodInsnNode)instruction).desc)
+                    && (vanilla.equals(((MethodInsnNode)instruction).owner)
+                    || ACCESSORY_CONTAINER_CLASS.equals(
+                            ((MethodInsnNode)instruction).owner))) {
+                construction = (MethodInsnNode)instruction;
+                constructions++;
+            }
+        }
+        if (allocations != 1 || constructions != 1) {
+            return false;
+        }
+        allocation.desc = ACCESSORY_CONTAINER_CLASS;
+        construction.owner = ACCESSORY_CONTAINER_CLASS;
+        return true;
     }
 
     /** Installs the player container and the Forge drop-capture transaction hook. */
@@ -811,42 +868,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         && "(Lnet/minecraft/world/World;"
                         .concat("Lcom/mojang/authlib/GameProfile;)V")
                         .equals(method.desc)) {
-                    boolean allocationPatched = false;
-                    boolean constructorPatched = false;
-                    for (AbstractInsnNode instruction =
-                         method.instructions.getFirst();
-                         instruction != null;
-                         instruction = instruction.getNext()) {
-                        if (instruction instanceof TypeInsnNode
-                                && instruction.getOpcode() == Opcodes.NEW) {
-                            TypeInsnNode allocation = (TypeInsnNode)instruction;
-                            if ("net/minecraft/inventory/ContainerPlayer"
-                                    .equals(allocation.desc)) {
-                                allocation.desc = ACCESSORY_CONTAINER_CLASS;
-                                allocationPatched = true;
-                            } else if (ACCESSORY_CONTAINER_CLASS.equals(
-                                    allocation.desc)) {
-                                allocationPatched = true;
-                            }
-                        } else if (instruction instanceof MethodInsnNode) {
-                            MethodInsnNode call = (MethodInsnNode)instruction;
-                            if (call.getOpcode() == Opcodes.INVOKESPECIAL
-                                    && "<init>".equals(call.name)
-                                    && "(Lnet/minecraft/entity/player/InventoryPlayer;"
-                                    .concat("ZLnet/minecraft/entity/player/EntityPlayer;)V")
-                                    .equals(call.desc)) {
-                                if ("net/minecraft/inventory/ContainerPlayer"
-                                        .equals(call.owner)) {
-                                    call.owner = ACCESSORY_CONTAINER_CLASS;
-                                    constructorPatched = true;
-                                } else if (ACCESSORY_CONTAINER_CLASS.equals(
-                                        call.owner)) {
-                                    constructorPatched = true;
-                                }
-                            }
-                        }
-                    }
-                    containerPatched = allocationPatched && constructorPatched;
+                    containerPatched = patchPlayerContainer(method);
                 }
 
                 if (("onDeath".equals(method.name)
@@ -893,23 +915,25 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
 
             }
+            byte[] result = containerPatched || deathPatched
+                    ? write(owner) : basicClass;
             if (containerPatched) {
-                System.setProperty(
-                        ACCESSORY_CONTAINER_ACTIVE_PROPERTY, "true");
+                activate(ACCESSORY_CONTAINER_ACTIVE_PROPERTY);
                 info("Installed accessory-aware player container");
             } else {
                 warn("Could not patch EntityPlayer player-container construction; "
                         + "accessory slots will remain unavailable");
             }
             if (deathPatched) {
-                System.setProperty(ACCESSORY_DEATH_ACTIVE_PROPERTY, "true");
+                activate(ACCESSORY_DEATH_ACTIVE_PROPERTY);
                 info("Installed accessory death-drop capture hook");
             } else {
                 warn("Could not patch EntityPlayer death-drop capture; "
                         + "accessory insertion must remain disabled");
             }
-            return containerPatched || deathPatched ? write(owner) : basicClass;
+            return result;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch EntityPlayer accessory integration: "
                     + throwable);
             return basicClass;
@@ -936,8 +960,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (containsHook(method,
                         ACCESSORY_CONCEALMENT_HOOK_OWNER,
                         "isConcealed")) {
-                    System.setProperty(
-                            ACCESSORY_AI_TARGET_ACTIVE_PROPERTY, "true");
+                    activate(ACCESSORY_AI_TARGET_ACTIVE_PROPERTY);
                     info("Installed accessory AI target-suitability hook");
                     return write(owner);
                 }
@@ -945,6 +968,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Could not patch EntityAITarget target suitability");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch EntityAITarget target suitability: "
                     + throwable);
             return basicClass;
@@ -970,8 +994,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (containsHook(method,
                         ACCESSORY_CONCEALMENT_HOOK_OWNER,
                         "isConcealed")) {
-                    System.setProperty(
-                            ACCESSORY_INVISIBILITY_ACTIVE_PROPERTY, "true");
+                    activate(ACCESSORY_INVISIBILITY_ACTIVE_PROPERTY);
                     info("Installed accessory vanilla-invisibility hook");
                     return write(owner);
                 }
@@ -979,6 +1002,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Could not patch Entity invisibility predicate");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch Entity invisibility predicate: "
                     + throwable);
             return basicClass;
@@ -1020,14 +1044,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
             }
             if (sightPatched) {
-                System.setProperty(
-                        ACCESSORY_SIGHT_ACTIVE_PROPERTY, "true");
+                activate(ACCESSORY_SIGHT_ACTIVE_PROPERTY);
             } else {
                 warn("Could not patch EntityLivingBase sight checks");
             }
             if (collisionPatched) {
-                System.setProperty(
-                        ACCESSORY_COLLISION_ACTIVE_PROPERTY, "true");
+                activate(ACCESSORY_COLLISION_ACTIVE_PROPERTY);
             } else {
                 warn("Could not patch EntityLivingBase collision targeting");
             }
@@ -1037,6 +1059,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch EntityLivingBase sight checks: "
                     + throwable);
             return basicClass;
@@ -1093,7 +1116,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     continue;
                 }
                 if (containsHook(method, WINDOW_DEFAULTS_HOOK_OWNER, "resolve")) {
-                    System.setProperty(WINDOW_DEFAULTS_ACTIVE_PROPERTY, "true");
+                    activate(WINDOW_DEFAULTS_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 // Rewrite only the dimension arguments. Vanilla stores these in
@@ -1113,12 +1136,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(new VarInsnNode(Opcodes.ISTORE, 3));
                 method.instructions.insert(hook);
                 byte[] transformed = write(owner);
-                System.setProperty(WINDOW_DEFAULTS_ACTIVE_PROPERTY, "true");
+                activate(WINDOW_DEFAULTS_ACTIVE_PROPERTY);
                 info("Patched default startup window dimensions");
                 return transformed;
             }
             warn("Could not locate Minecraft constructor; keeping vanilla window dimensions");
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch startup window dimensions: " + throwable);
         }
         return basicClass;
@@ -1138,8 +1162,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (containsHook(method,
                         ACCESSORY_CONTAINER_HOOK_OWNER,
                         "resolveVanillaInventorySlotCount")) {
-                    System.setProperty(
-                            ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY, "true");
+                    activate(ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 for (AbstractInsnNode instruction =
@@ -1163,9 +1186,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         // writes an InterfaceMethodref for this class method,
                         // which Java 8 rejects during Minecraft verification.
                         call.itf = false;
-                        System.setProperty(
-                                ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY,
-                                "true");
+                        activate(ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY);
                         info("Patched creative pick-block hotbar indexing");
                         return write(owner);
                     }
@@ -1174,6 +1195,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Could not patch Minecraft creative pick-block indexing");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch creative pick-block indexing: "
                     + throwable);
             return basicClass;
@@ -1196,8 +1218,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, ACCESSORY_CREATIVE_HOOK_OWNER,
                         "handle")) {
-                    System.setProperty(
-                            ACCESSORY_CREATIVE_ACTIVE_PROPERTY, "true");
+                    activate(ACCESSORY_CREATIVE_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 String playerField = findPlayerEntityField(method);
@@ -1228,14 +1249,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(vanilla);
                 method.instructions.insertBefore(
                         method.instructions.getFirst(), hook);
-                System.setProperty(
-                        ACCESSORY_CREATIVE_ACTIVE_PROPERTY, "true");
+                activate(ACCESSORY_CREATIVE_ACTIVE_PROPERTY);
                 info("Installed server accessory creative-slot validation");
                 return write(owner);
             }
             warn("Could not patch creative inventory action handling");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch creative inventory action handling: "
                     + throwable);
             return basicClass;
@@ -1276,7 +1297,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (containsHook(
                         method, ROLEPLAY_IDENTITY_HOOK_OWNER,
                         "resolveDeathMessage")) {
-                    System.setProperty(DEATH_MESSAGE_ACTIVE_PROPERTY, "true");
+                    activate(DEATH_MESSAGE_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 for (AbstractInsnNode instruction =
@@ -1304,7 +1325,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             "resolveDeathMessage",
                             DEATH_MESSAGE_HOOK_DESC));
                     method.instructions.insert(invocation, hook);
-                    System.setProperty(DEATH_MESSAGE_ACTIVE_PROPERTY, "true");
+                    activate(DEATH_MESSAGE_ACTIVE_PROPERTY);
                     info("Patched player death messages with roleplay names");
                     return write(owner);
                 }
@@ -1312,6 +1333,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Could not patch player death-message broadcast");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch player death messages: " + throwable);
             return basicClass;
         }
@@ -1520,8 +1542,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     && subtitleLayoutHookPresent;
             byte[] transformed = changed ? write(owner) : basicClass;
             if (fullscreenLayoutReady) {
-                System.setProperty(
-                        LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY, "true");
+                activate(LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY);
             } else {
                 System.clearProperty(LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY);
                 if (!fullscreenBoundsHookPresent) {
@@ -1535,8 +1556,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
             }
             if (fullscreenLayoutReady && tooltipLayoutHookPresent) {
-                System.setProperty(
-                        LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY, "true");
+                activate(LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY);
             } else {
                 System.clearProperty(LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY);
                 if (!tooltipLayoutHookPresent) {
@@ -1544,24 +1564,21 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
             }
             if (rotationHookPresent && labelRotationHookPresent) {
-                System.setProperty(
-                        LOTR_MAP_ROTATION_ACTIVE_PROPERTY, "true");
+                activate(LOTR_MAP_ROTATION_ACTIVE_PROPERTY);
             } else {
                 System.clearProperty(LOTR_MAP_ROTATION_ACTIVE_PROPERTY);
                 warn("Could not patch LOTR map coordinates; "
                         + "map rotation will stay disabled");
             }
             if (windowClipHookPresent) {
-                System.setProperty(
-                        LOTR_MAP_WINDOW_CLIP_ACTIVE_PROPERTY, "true");
+                activate(LOTR_MAP_WINDOW_CLIP_ACTIVE_PROPERTY);
             } else {
                 System.clearProperty(LOTR_MAP_WINDOW_CLIP_ACTIVE_PROPERTY);
                 warn("Could not patch LOTR map clipping; the map keeps a "
                         + "screen of its own instead of a window");
             }
             if (miniQuestFilterHookPresent) {
-                System.setProperty(
-                        LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY, "true");
+                activate(LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY);
             } else {
                 System.clearProperty(
                         LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY);
@@ -1570,6 +1587,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             return transformed;
         } catch (Throwable throwable) {
+            rollBack();
             System.clearProperty(LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY);
             System.clearProperty(LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY);
             System.clearProperty(
@@ -1663,8 +1681,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
             }
             if (isOpPatched && protectionPatched) {
-                System.setProperty(
-                        LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY, "true");
+                activate(LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY);
                 info("Patched LOTR's map news to reach the map in a window");
             } else {
                 System.clearProperty(LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY);
@@ -1674,6 +1691,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             return changed ? write(owner) : basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             System.clearProperty(LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY);
             warn("Failed to patch LOTR's map news: " + throwable);
             return basicClass;
@@ -2082,8 +2100,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (containsHook(method,
                         ACCESSORY_LOTR_MAP_HOOK_OWNER,
                         "addPlayerLocationIfVisible")) {
-                    System.setProperty(
-                            ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY, "true");
+                    activate(ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 for (AbstractInsnNode instruction =
@@ -2109,8 +2126,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             + "LOTRPacketUpdatePlayerLocations;"
                             + "Lcom/mojang/authlib/GameProfile;DD)V";
                     call.itf = false;
-                    System.setProperty(
-                            ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY, "true");
+                    activate(ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY);
                     info("Patched LOTR map locations for accessory concealment");
                     return write(owner);
                 }
@@ -2118,6 +2134,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Could not patch LOTR player-location packet construction");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR player-location packets: "
                     + throwable);
             return basicClass;
@@ -2175,17 +2192,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     interact, ENTITY_ACTION_HOOK_OWNER,
                     "handleInteraction");
             if (entityActive) {
-                System.setProperty(
-                        THIRD_PERSON_ENTITY_ACTION_ACTIVE_PROPERTY,
-                        "true");
+                activate(THIRD_PERSON_ENTITY_ACTION_ACTIVE_PROPERTY);
             }
             boolean blockActive = block != null && containsHook(
                     block, BLOCK_ACTION_HOOK_OWNER,
                     "sendBlockActionOrVanilla");
             if (blockActive) {
-                System.setProperty(
-                        THIRD_PERSON_BLOCK_ACTION_ACTIVE_PROPERTY,
-                        "true");
+                activate(THIRD_PERSON_BLOCK_ACTION_ACTIVE_PROPERTY);
             }
             if (changed) {
                 info("Patched PlayerControllerMP third-person actions "
@@ -2194,6 +2207,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch PlayerControllerMP entity actions: "
                     + throwable);
             return basicClass;
@@ -2243,6 +2257,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "bounties will remain account-bound");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to bind LOTR faction bounties to characters: "
                     + throwable);
             return basicClass;
@@ -2292,6 +2307,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Could not patch LOTR faction bounty target names");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR faction bounty target names: "
                     + throwable);
             return basicClass;
@@ -2321,7 +2337,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     if (call.getOpcode() == Opcodes.INVOKESTATIC
                             && ROLEPLAY_IDENTITY_HOOK_OWNER.equals(call.owner)
                             && "resolveRoleplayName".equals(call.name)) {
-                        System.setProperty(LOTR_SPEECH_ACTIVE_PROPERTY, "true");
+                        activate(LOTR_SPEECH_ACTIVE_PROPERTY);
                         return basicClass;
                     }
                     if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
@@ -2334,7 +2350,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         call.owner = ROLEPLAY_IDENTITY_HOOK_OWNER;
                         call.name = "resolveRoleplayName";
                         call.desc = ROLEPLAY_NAME_HOOK_DESC;
-                        System.setProperty(LOTR_SPEECH_ACTIVE_PROPERTY, "true");
+                        activate(LOTR_SPEECH_ACTIVE_PROPERTY);
                         info("Patched LOTR NPC speech to "
                                 + "use active roleplay-character names");
                         return write(owner);
@@ -2345,6 +2361,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "use account names");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR NPC speech names: " + throwable);
             return basicClass;
         }
@@ -2383,8 +2400,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     if (call.getOpcode() == Opcodes.INVOKESTATIC
                             && NPC_CHAT_HOOK_OWNER.equals(call.owner)
                             && "addNpcChatMessage".equals(call.name)) {
-                        System.setProperty(
-                                NPC_CHAT_ACTIVE_PROPERTY, "true");
+                        activate(NPC_CHAT_ACTIVE_PROPERTY);
                         return basicClass;
                     }
                     if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
@@ -2415,7 +2431,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 chatCall.name = "addNpcChatMessage";
                 chatCall.desc = NPC_CHAT_HOOK_DESC;
                 insertImmersiveSpeechHook(method, npcLocal);
-                System.setProperty(NPC_CHAT_ACTIVE_PROPERTY, "true");
+                activate(NPC_CHAT_ACTIVE_PROPERTY);
                 info("Patched LOTR NPC speech chat lines into the "
                         + "Lost Tales chat presentation");
                 return write(owner);
@@ -2424,6 +2440,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "NPC chat will keep LOTR's style");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR NPC speech chat: " + throwable);
             return basicClass;
         }
@@ -2475,8 +2492,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, NAMEPLATE_HOOK_OWNER,
                         "liftAlignment")) {
-                    System.setProperty(
-                            ALIGNMENT_LIFT_ACTIVE_PROPERTY, "true");
+                    activate(ALIGNMENT_LIFT_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 // doRender(this, entity, x, y, z, ...): y is the double
@@ -2488,7 +2504,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         ALIGNMENT_LIFT_DESC, false));
                 lift.add(new VarInsnNode(Opcodes.DSTORE, 4));
                 method.instructions.insert(lift);
-                System.setProperty(ALIGNMENT_LIFT_ACTIVE_PROPERTY, "true");
+                activate(ALIGNMENT_LIFT_ACTIVE_PROPERTY);
                 info("Patched LOTR floating alignment to stand above a "
                         + "speaker's name");
                 return write(owner);
@@ -2497,6 +2513,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "floating alignment will keep LOTR's height");
             return basicClass;
         } catch (Throwable failure) {
+            rollBack();
             warn("Failed to lift LOTR floating alignment: " + failure);
             return basicClass;
         }
@@ -2518,7 +2535,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, NAMEPLATE_HOOK_OWNER,
                         "hidesNameplate")) {
-                    System.setProperty(NAMEPLATE_ACTIVE_PROPERTY, "true");
+                    activate(NAMEPLATE_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 LabelNode carryOn = new LabelNode();
@@ -2531,7 +2548,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 guard.add(new InsnNode(Opcodes.RETURN));
                 guard.add(carryOn);
                 method.instructions.insert(guard);
-                System.setProperty(NAMEPLATE_ACTIVE_PROPERTY, "true");
+                activate(NAMEPLATE_ACTIVE_PROPERTY);
                 info("Patched entity nameplates so a speaking player "
                         + "wears the chat's own name");
                 return write(owner);
@@ -2540,6 +2557,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "a speaking player will wear both names");
             return basicClass;
         } catch (Throwable failure) {
+            rollBack();
             warn("Failed to patch entity nameplates: " + failure);
             return basicClass;
         }
@@ -2564,16 +2582,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     }
                     if (NPC_CHAT_HOOK_OWNER.equals(call.owner)
                             && "renderNpcSpeeches".equals(call.name)) {
-                        System.setProperty(
-                                NPC_SPEECH_RENDER_ACTIVE_PROPERTY, "true");
+                        activate(NPC_SPEECH_RENDER_ACTIVE_PROPERTY);
                         return basicClass;
                     }
                     if (LOTR_NPC_RENDERING.equals(call.owner)
                             && "renderAllNPCSpeeches".equals(call.name)) {
                         call.owner = NPC_CHAT_HOOK_OWNER;
                         call.name = "renderNpcSpeeches";
-                        System.setProperty(
-                                NPC_SPEECH_RENDER_ACTIVE_PROPERTY, "true");
+                        activate(NPC_SPEECH_RENDER_ACTIVE_PROPERTY);
                         info("Patched LOTR NPC floating speech into the "
                                 + "Lost Tales chat style");
                         return write(owner);
@@ -2584,6 +2600,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "NPC floating speech will keep LOTR's style");
             return basicClass;
         } catch (Throwable failure) {
+            rollBack();
             warn("Failed to patch LOTR NPC floating speech: " + failure);
             return basicClass;
         }
@@ -2669,7 +2686,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     }
 
     private static void activateLotrBountyTransformer() {
-        System.setProperty(LOTR_BOUNTY_ACTIVE_PROPERTY, "true");
+        activate(LOTR_BOUNTY_ACTIVE_PROPERTY);
     }
 
     private static byte[] transformLotrFastTravelHandler(byte[] basicClass) {
@@ -2688,7 +2705,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (targetCall.getOpcode() == Opcodes.INVOKESTATIC
                         && FAST_TRAVEL_HOOK_OWNER.equals(targetCall.owner)) {
-                    System.setProperty(FAST_TRAVEL_ACTIVE_PROPERTY, "true");
+                    activate(FAST_TRAVEL_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 int playerLocal = findLotrHandlerPlayerLocal(method);
@@ -2704,7 +2721,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 targetCall.owner = FAST_TRAVEL_HOOK_OWNER;
                 targetCall.name = "setTargetIfAllowed";
                 targetCall.desc = FAST_TRAVEL_HOOK_DESC;
-                System.setProperty(FAST_TRAVEL_ACTIVE_PROPERTY, "true");
+                activate(FAST_TRAVEL_ACTIVE_PROPERTY);
                 info("Patched LOTR fast travel for "
                         + "character-specific marker discovery");
                 return write(owner);
@@ -2713,6 +2730,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "the per-tick fallback will remain active");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR fast travel: " + throwable);
             return basicClass;
         }
@@ -2760,7 +2778,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 changed = true;
             }
 
-            System.setProperty(CAMERA_ACTIVE_PROPERTY, "true");
+            activate(CAMERA_ACTIVE_PROPERTY);
 
             VarInsnNode distanceStore = findThirdPersonDistanceStore(
                     cameraMethod);
@@ -2837,8 +2855,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     fovMethod, THIRD_PERSON_CAMERA_HOOK_OWNER,
                     "resolveFov");
             if (cameraOverhaulActive) {
-                System.setProperty(
-                        THIRD_PERSON_CAMERA_ACTIVE_PROPERTY, "true");
+                activate(THIRD_PERSON_CAMERA_ACTIVE_PROPERTY);
             }
             MethodNode mouseOverMethod = findMouseOverMethod(owner);
             if (mouseOverMethod == null) {
@@ -2853,9 +2870,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (containsHook(
                         mouseOverMethod, TARGETING_HOOK_OWNER,
                         "resolveMouseOver")) {
-                    System.setProperty(
-                            THIRD_PERSON_TARGETING_ACTIVE_PROPERTY,
-                            "true");
+                    activate(THIRD_PERSON_TARGETING_ACTIVE_PROPERTY);
                 }
             }
             if (changed) {
@@ -2865,6 +2880,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch EntityRenderer camera origin: " + throwable);
             return basicClass;
         }
@@ -2921,6 +2937,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "GUI animation hover coordinates will remain vanilla");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch animated GUI draw coordinates: "
                     + throwable);
             return basicClass;
@@ -3000,6 +3017,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "click coordinates will remain vanilla");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch animated GUI input coordinates: "
                     + throwable);
             return basicClass;
@@ -3054,6 +3072,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "GUI backdrops will remain attached to the content");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch stationary GUI backdrops: " + throwable);
             return basicClass;
         }
@@ -3084,8 +3103,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, CHAT_HIT_HOOK_OWNER,
                         "componentAt")) {
-                    System.setProperty(
-                            CHAT_HIT_TEST_ACTIVE_PROPERTY, "true");
+                    activate(CHAT_HIT_TEST_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 LabelNode vanilla = new LabelNode();
@@ -3109,7 +3127,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 head.add(new InsnNode(Opcodes.ARETURN));
                 head.add(vanilla);
                 method.instructions.insert(head);
-                System.setProperty(CHAT_HIT_TEST_ACTIVE_PROPERTY, "true");
+                activate(CHAT_HIT_TEST_ACTIVE_PROPERTY);
                 info("Patched GuiNewChat hit testing for the Lost Tales chat layout");
                 return write(owner);
             }
@@ -3117,6 +3135,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "hover cards will use vanilla's line geometry");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch chat hit testing: " + throwable);
             return basicClass;
         }
@@ -3147,7 +3166,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     continue;
                 }
                 if (containsHook(method, CHAT_WRAP_HOOK_OWNER, "wrap")) {
-                    System.setProperty(CHAT_WRAP_ACTIVE_PROPERTY, "true");
+                    activate(CHAT_WRAP_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 MethodInsnNode chatOpen = findChatOpenCall(method);
@@ -3177,7 +3196,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 + "Ljava/util/ArrayList;)Ljava/util/ArrayList;"));
                 hook.add(new VarInsnNode(Opcodes.ASTORE, lines.var));
                 method.instructions.insertBefore(receiver, hook);
-                System.setProperty(CHAT_WRAP_ACTIVE_PROPERTY, "true");
+                activate(CHAT_WRAP_ACTIVE_PROPERTY);
                 info("Patched GuiNewChat line wrapping for the Lost Tales chat layout");
                 return write(owner);
             }
@@ -3185,6 +3204,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "lines will not indent under the message body");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch chat line wrapping: " + throwable);
             return basicClass;
         }
@@ -3212,7 +3232,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     continue;
                 }
                 if (containsHook(method, CHAT_LOG_HOOK_OWNER, "logged")) {
-                    System.setProperty(CHAT_LOG_ACTIVE_PROPERTY, "true");
+                    activate(CHAT_LOG_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 int patched = 0;
@@ -3239,7 +3259,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             + " starts a line of its own in the log");
                     return basicClass;
                 }
-                System.setProperty(CHAT_LOG_ACTIVE_PROPERTY, "true");
+                activate(CHAT_LOG_ACTIVE_PROPERTY);
                 info("Patched GuiNewChat logging to keep each chat line on one"
                         + " log line");
                 return write(owner);
@@ -3249,6 +3269,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + " in the log");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch the chat log: " + throwable);
             return basicClass;
         }
@@ -3279,7 +3300,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, CHAT_HISTORY_HOOK_OWNER,
                         "deleteUnlessRefreshing")) {
-                    System.setProperty(CHAT_DELETE_ACTIVE_PROPERTY, "true");
+                    activate(CHAT_DELETE_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 int replaced = 0;
@@ -3312,7 +3333,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             + "; re-wrapping the chat will lose its history");
                     return basicClass;
                 }
-                System.setProperty(CHAT_DELETE_ACTIVE_PROPERTY, "true");
+                activate(CHAT_DELETE_ACTIVE_PROPERTY);
                 info("Patched GuiNewChat line replacement for re-wrapping");
                 return write(owner);
             }
@@ -3320,6 +3341,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "the chat will lose its history");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch chat line replacement: " + throwable);
             return basicClass;
         }
@@ -3348,7 +3370,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, CHAT_HISTORY_HOOK_OWNER,
                         "capacity")) {
-                    System.setProperty(CHAT_HISTORY_ACTIVE_PROPERTY, "true");
+                    activate(CHAT_HISTORY_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 int replaced = 0;
@@ -3371,7 +3393,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             + "; the chat history keeps vanilla's hundred");
                     return basicClass;
                 }
-                System.setProperty(CHAT_HISTORY_ACTIVE_PROPERTY, "true");
+                activate(CHAT_HISTORY_ACTIVE_PROPERTY);
                 info("Patched GuiNewChat history capacity");
                 return write(owner);
             }
@@ -3379,6 +3401,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "history keeps vanilla's hundred");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch chat history capacity: " + throwable);
             return basicClass;
         }
@@ -3407,8 +3430,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, MENU_FRAMERATE_HOOK_OWNER,
                         "menuFramerateLimit")) {
-                    System.setProperty(MENU_FRAMERATE_ACTIVE_PROPERTY,
-                            "true");
+                    activate(MENU_FRAMERATE_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 int replaced = 0;
@@ -3435,7 +3457,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             + "thirty frames");
                     return basicClass;
                 }
-                System.setProperty(MENU_FRAMERATE_ACTIVE_PROPERTY, "true");
+                activate(MENU_FRAMERATE_ACTIVE_PROPERTY);
                 info("Patched menu framerate cap");
                 return write(owner);
             }
@@ -3443,6 +3465,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "keep vanilla's thirty frames");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch the menu framerate cap: " + throwable);
             return basicClass;
         }
@@ -3473,8 +3496,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, FAST_TRAVEL_ARRIVAL_HOOK_OWNER,
                         "onArrived")) {
-                    System.setProperty(
-                            LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY, "true");
+                    activate(LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 MethodInsnNode travel = null;
@@ -3508,8 +3530,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         "onArrived",
                         "(Llotr/common/LOTRPlayerData;"
                                 + "Llotr/common/world/map/LOTRAbstractWaypoint;)V"));
-                System.setProperty(
-                        LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY, "true");
+                activate(LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY);
                 info("Patched LOTR fast travel completion to report arrivals");
                 return write(owner);
             }
@@ -3517,6 +3538,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "fast-travel arrivals will not be reported");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR fast travel completion: " + throwable);
             return basicClass;
         }
@@ -3543,7 +3565,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     continue;
                 }
                 if (containsHook(method, LOTR_HIRED_UNIT_HOOK_OWNER, "onHired")) {
-                    System.setProperty(LOTR_HIRED_UNIT_ACTIVE_PROPERTY, "true");
+                    activate(LOTR_HIRED_UNIT_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 int patched = 0;
@@ -3567,7 +3589,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             + "hired units will be tagged on the first switch instead");
                     return basicClass;
                 }
-                System.setProperty(LOTR_HIRED_UNIT_ACTIVE_PROPERTY, "true");
+                activate(LOTR_HIRED_UNIT_ACTIVE_PROPERTY);
                 info("Patched LOTR unit hiring to tag units with the hiring identity");
                 return write(owner);
             }
@@ -3575,6 +3597,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "be tagged on the first switch instead");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR unit hiring: " + throwable);
             return basicClass;
         }
@@ -3600,7 +3623,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     continue;
                 }
                 if (containsHook(method, LOTR_SHARED_WAYPOINT_NAME_HOOK_OWNER, "name")) {
-                    System.setProperty(LOTR_SHARED_WAYPOINT_NAME_ACTIVE_PROPERTY, "true");
+                    activate(LOTR_SHARED_WAYPOINT_NAME_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 int patched = 0;
@@ -3622,7 +3645,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             + "shared waypoints will name the account");
                     return basicClass;
                 }
-                System.setProperty(LOTR_SHARED_WAYPOINT_NAME_ACTIVE_PROPERTY, "true");
+                activate(LOTR_SHARED_WAYPOINT_NAME_ACTIVE_PROPERTY);
                 info("Patched LOTR shared waypoints to name the sharing character");
                 return write(owner);
             }
@@ -3630,6 +3653,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "shared waypoints will name the account");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR shared waypoint names: " + throwable);
             return basicClass;
         }
@@ -3684,10 +3708,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         + "LOTR's own fellowship requests are not refused");
                 return basicClass;
             }
-            System.setProperty(LOTR_FELLOWSHIP_REQUESTS_ACTIVE_PROPERTY, "true");
+            activate(LOTR_FELLOWSHIP_REQUESTS_ACTIVE_PROPERTY);
             info("Patched LOTR's fellowship requests to be refused");
             return write(owner);
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR's fellowship requests: " + throwable);
             return basicClass;
         }
@@ -3709,7 +3734,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     continue;
                 }
                 if (containsHook(method, LOTR_FELLOWSHIP_HOOK_OWNER, "refusesCreation")) {
-                    System.setProperty(LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY, "true");
+                    activate(LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 LabelNode go = new LabelNode();
@@ -3721,7 +3746,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 refusal.add(new InsnNode(Opcodes.ARETURN));
                 refusal.add(go);
                 method.instructions.insert(refusal);
-                System.setProperty(LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY, "true");
+                activate(LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY);
                 info("Patched LOTR's request to make a fellowship to be refused");
                 return write(owner);
             }
@@ -3729,6 +3754,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "LOTR's own requests to make a fellowship are not refused");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR's request to make a fellowship: " + throwable);
             return basicClass;
         }
@@ -3788,18 +3814,19 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             if (patched == 0) {
                 if (present) {
-                    System.setProperty(LOTR_TRADER_NOTICE_ACTIVE_PROPERTY, "true");
+                    activate(LOTR_TRADER_NOTICE_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 warn("Could not locate a travelling trader notice in "
                         + "LOTRTravellingTraderInfo; the notices stay yellow");
                 return basicClass;
             }
-            System.setProperty(LOTR_TRADER_NOTICE_ACTIVE_PROPERTY, "true");
+            activate(LOTR_TRADER_NOTICE_ACTIVE_PROPERTY);
             info("Patched " + patched + " LOTR travelling trader notices to wear "
                     + "the trader's faction colour");
             return write(owner);
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR travelling trader notices: " + throwable);
             return basicClass;
         }
@@ -3862,10 +3889,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         + "text; LOTR achievement hover cards keep LOTR's colours");
                 return basicClass;
             }
-            System.setProperty(LOTR_ACHIEVEMENT_HOVER_ACTIVE_PROPERTY, "true");
+            activate(LOTR_ACHIEVEMENT_HOVER_ACTIVE_PROPERTY);
             info("Patched LOTR achievement hover cards into the chat's palette");
             return write(owner);
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch LOTR achievement hover cards: " + throwable);
             return basicClass;
         }
@@ -3893,7 +3921,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, SERVER_BROADCAST_HOOK_OWNER,
                         "onPlayerLine")) {
-                    System.setProperty(PLAYER_LINE_ACTIVE_PROPERTY, "true");
+                    activate(PLAYER_LINE_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 InsnList hook = new InsnList();
@@ -3911,7 +3939,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(new InsnNode(Opcodes.RETURN));
                 hook.add(send);
                 method.instructions.insert(hook);
-                System.setProperty(PLAYER_LINE_ACTIVE_PROPERTY, "true");
+                activate(PLAYER_LINE_ACTIVE_PROPERTY);
                 info("Patched player chat lines to keep a command's "
                         + "answers with its tab");
                 return write(owner);
@@ -3920,6 +3948,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "command answers will not be kept in the history");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch player chat lines: " + throwable);
             return basicClass;
         }
@@ -3952,8 +3981,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, SERVER_BROADCAST_HOOK_OWNER,
                         "onBroadcast")) {
-                    System.setProperty(SERVER_BROADCAST_ACTIVE_PROPERTY,
-                            "true");
+                    activate(SERVER_BROADCAST_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 // The hook hands the component back, written over the
@@ -3973,7 +4001,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(new InsnNode(Opcodes.RETURN));
                 hook.add(send);
                 method.instructions.insert(hook);
-                System.setProperty(SERVER_BROADCAST_ACTIVE_PROPERTY, "true");
+                activate(SERVER_BROADCAST_ACTIVE_PROPERTY);
                 info("Patched server chat broadcasts to report every "
                         + "server-wide line");
                 return write(owner);
@@ -3982,6 +4010,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "deaths and achievements will not reach Discord");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch server chat broadcasts: " + throwable);
             return basicClass;
         }
@@ -4056,10 +4085,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 if (containsHook(method, TOOLTIP_HOOK_OWNER,
                         "drawHoveringText")) {
-                    System.setProperty(
-                            TOOLTIP_ICON_ACTIVE_PROPERTY, "true");
-                    System.setProperty(
-                            TOOLTIP_SMOOTHING_ACTIVE_PROPERTY, "true");
+                    activate(TOOLTIP_ICON_ACTIVE_PROPERTY);
+                    activate(TOOLTIP_SMOOTHING_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 LabelNode vanilla = new LabelNode();
@@ -4093,8 +4120,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 // Every way out of the method takes the shift back off,
                 // the icon renderer's own early return included.
                 injectTooltipSmoothingEnd(method);
-                System.setProperty(TOOLTIP_ICON_ACTIVE_PROPERTY, "true");
-                System.setProperty(TOOLTIP_SMOOTHING_ACTIVE_PROPERTY, "true");
+                activate(TOOLTIP_ICON_ACTIVE_PROPERTY);
+                activate(TOOLTIP_SMOOTHING_ACTIVE_PROPERTY);
                 info("Patched GuiScreen tooltips for inline key icons and "
                         + "pointer-accurate placement");
                 return write(owner);
@@ -4104,6 +4131,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "step with the interface grid rather than the pointer");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch tooltip key icons: " + throwable);
             return basicClass;
         }
@@ -4243,14 +4271,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             if (framePatched && iconPatched && overlayPatched
                     && intentPatched) {
-                System.setProperty(
-                        SMOOTH_INVENTORY_ACTIVE_PROPERTY, "true");
+                activate(SMOOTH_INVENTORY_ACTIVE_PROPERTY);
                 info("Installed smooth inventory item movement hooks");
                 return write(owner);
             }
             warn("Could not install all smooth inventory item hooks");
             return basicClass;
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch smooth inventory item rendering: "
                     + throwable);
             return basicClass;
@@ -4273,7 +4301,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 return basicClass;
             }
             if (containsHook(method, DEBUG_HOOK_OWNER, "resolveRenderY")) {
-                System.setProperty(DEBUG_BOX_ACTIVE_PROPERTY, "true");
+                activate(DEBUG_BOX_ACTIVE_PROPERTY);
                 return basicClass;
             }
 
@@ -4288,19 +4316,53 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             hook.add(new VarInsnNode(Opcodes.DSTORE, 4));
             method.instructions.insert(hook);
 
-            System.setProperty(DEBUG_BOX_ACTIVE_PROPERTY, "true");
+            activate(DEBUG_BOX_ACTIVE_PROPERTY);
             info("Patched RenderManager F3+B origin for roleplay races");
             return write(owner);
         } catch (Throwable throwable) {
+            rollBack();
             warn("Failed to patch RenderManager F3+B origin: " + throwable);
             return basicClass;
         }
     }
 
+    /**
+     * Reads a class to patch, which opens a new attempt: the flags the
+     * attempt before set stand, and those this one sets are recorded
+     * from here ({@link #activate}).
+     */
     private static ClassNode read(byte[] bytes) {
+        ACTIVATED.get().clear();
         ClassNode node = new ClassNode();
         new ClassReader(bytes).accept(node, 0);
         return node;
+    }
+
+    /**
+     * Sets a patch's active flag, noting what it held before, so the
+     * attempt's {@link #rollBack} can put it back should anything after
+     * it fail, the class's writing among them.
+     */
+    private static void activate(String property) {
+        ACTIVATED.get().add(new String[] {property, System.getProperty(property)});
+        System.setProperty(property, "true");
+    }
+
+    /**
+     * Puts back every flag this attempt set, newest first: a patch that
+     * failed returns the class as it was, and no flag may say otherwise.
+     */
+    static void rollBack() {
+        List<String[]> activated = ACTIVATED.get();
+        for (int index = activated.size() - 1; index >= 0; index--) {
+            String[] flag = activated.get(index);
+            if (flag[1] == null) {
+                System.clearProperty(flag[0]);
+            } else {
+                System.setProperty(flag[0], flag[1]);
+            }
+        }
+        activated.clear();
     }
 
     private static byte[] write(ClassNode node) {
@@ -4780,13 +4842,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     }
 
     private static void activateGuiAnimationPart(String property) {
-        System.setProperty(property, "true");
+        activate(property);
         if (Boolean.getBoolean(GUI_ANIMATION_DRAW_ACTIVE_PROPERTY)
                 && Boolean.getBoolean(
                 GUI_ANIMATION_INPUT_ACTIVE_PROPERTY)
                 && Boolean.getBoolean(
                 GUI_ANIMATION_BACKGROUND_ACTIVE_PROPERTY)) {
-            System.setProperty(GUI_ANIMATION_ACTIVE_PROPERTY, "true");
+            activate(GUI_ANIMATION_ACTIVE_PROPERTY);
         }
     }
 

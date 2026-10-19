@@ -15,20 +15,11 @@ import lotr.common.fac.LOTRMapRegion;
 import lotr.common.world.map.LOTRWaypoint;
 
 public enum ELostTalesFaction {
-    ARNOR(
-            //  Faction:
-            LostTalesUtil.addFaction("ARNOR", LostTalesColors.rgb(LostTalesColors.SEAFOAM), LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            false, false, false,
-            //  Faction Map Region:
-            new LOTRMapRegion(0, 0, 250)
-            ),
-
     LOSSOTH(
             //  Faction:
             LostTalesUtil.addFaction("LOSSOTH", LostTalesColors.rgb(LostTalesColors.IVORY), DimensionRegion.NORTH.getRegion(), EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            true, false, false,
+            //  Approves of War Crimes?, Isolationist?:
+            false, false,
             //  Faction Map Region:
             new LOTRMapRegion((860), 350, 220)
     ),
@@ -36,8 +27,8 @@ public enum ELostTalesFaction {
     MORIA_GOBLINS(
             //  Faction:
             LostTalesUtil.addFaction("MORIA_GOBLINS", LostTalesColors.rgb(LostTalesColors.PLUM_BLACK), LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_ORC)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            true, true, false,
+            //  Approves of War Crimes?, Isolationist?:
+            true, false,
             //  Faction Map Region:
             new LOTRMapRegion(1155, 870, 30)
     ),
@@ -45,8 +36,8 @@ public enum ELostTalesFaction {
     OROCARNI(
             //  Faction:
             LostTalesUtil.addFaction("OROCARNI", LostTalesColors.rgb(LostTalesColors.CRIMSON), LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_DWARF)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            true, true, false,
+            //  Approves of War Crimes?, Isolationist?:
+            true, false,
             //  Faction Map Region:
             new LOTRMapRegion(2415, 915, 350)
     ),
@@ -54,17 +45,17 @@ public enum ELostTalesFaction {
     THARBAD(
             //  Faction:
             LostTalesUtil.addFaction("THARBAD", LostTalesColors.rgb(LostTalesColors.RUST), LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            true, false, false,
-            //  Faction Map Region:
-            new LOTRMapRegion(2415, 915, 350)
+            //  Approves of War Crimes?, Isolationist?:
+            false, false,
+            //  Faction Map Region: round LOTR's Tharbad waypoint.
+            new LOTRMapRegion(979, 878, 50)
     ),
 
     MOON_ELVES(
             //  Faction:
             LostTalesUtil.addFaction("MOON_ELVES", LostTalesColors.rgb(LostTalesColors.INDIGO), DimensionRegion.NORTH.getRegion(), EnumSet.of(LOTRFaction.FactionType.TYPE_ELF, LOTRFaction.FactionType.TYPE_FREE)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            true, false, false,
+            //  Approves of War Crimes?, Isolationist?:
+            false, false,
             //  Faction Map Region:
             new LOTRMapRegion(1577, 533, 35)
     ),
@@ -72,8 +63,8 @@ public enum ELostTalesFaction {
     SUN_ELVES(
             //  Faction:
             LostTalesUtil.addFaction("SUN_ELVES", LostTalesColors.rgb(LostTalesColors.WINE), LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_ELF, LOTRFaction.FactionType.TYPE_FREE)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            true, false, false,
+            //  Approves of War Crimes?, Isolationist?:
+            false, false,
             //  Faction Map Region:
             new LOTRMapRegion(2550, 1475, 225)
             ),
@@ -81,8 +72,8 @@ public enum ELostTalesFaction {
     ODANE(
             //  Faction:
             LostTalesUtil.addFaction("ODANE", LostTalesColors.rgb(LostTalesColors.CORAL), LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            true, false, false,
+            //  Approves of War Crimes?, Isolationist?:
+            false, false,
             //  Faction Map Region:
             new LOTRMapRegion(3128, 790, 150)
     ),
@@ -90,13 +81,12 @@ public enum ELostTalesFaction {
     BLUE_GOBLINS(
             //  Faction:
             LostTalesUtil.addFaction("BLUE_GOBLINS", LostTalesColors.rgb(LostTalesColors.HARBOR_BLUE), LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_ORC)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            true, true, false,
+            //  Approves of War Crimes?, Isolationist?:
+            true, false,
             //  Faction Map Region:
             new LOTRMapRegion(630, 530, 80)
     );
 
-    private final boolean isFactionActive;
     private final boolean isFactionIsolationist;
     private final boolean factionApprovesWarCrimes;
     private final LOTRMapRegion factionMapRegion;
@@ -104,9 +94,8 @@ public enum ELostTalesFaction {
     private LostTalesPair[] factionRelations;
     private LostTalesPair[] factionControlZones;
 
-    ELostTalesFaction(LOTRFaction faction, boolean isFactionActive, boolean factionApprovesWarCrimes, boolean isFactionIsolationist, LOTRMapRegion factionMapRegion) {
+    ELostTalesFaction(LOTRFaction faction, boolean factionApprovesWarCrimes, boolean isFactionIsolationist, LOTRMapRegion factionMapRegion) {
         this.faction = faction;
-        this.isFactionActive = isFactionActive;
         this.factionApprovesWarCrimes = factionApprovesWarCrimes;
         this.isFactionIsolationist = isFactionIsolationist;
         this.factionMapRegion = factionMapRegion;
@@ -122,7 +111,6 @@ public enum ELostTalesFaction {
         ELostTalesFaction.setUpFactionRelations();
         ELostTalesFaction.setUpFactionControlZones();
         ELostTalesFaction.setUpFactionRanks();
-        ELostTalesFaction.removeInactiveFactions();
     }
 
     public static void setUpFactionRelations() {
@@ -262,10 +250,13 @@ public enum ELostTalesFaction {
                 new LostTalesPair(LOTRWaypoint.MOUNT_RERIR, 125)
         });
 
-        // LOTR's own Cape of Forochel, rather than a Lost Tales waypoint of
-        // our own: the one that was here sat out in the Sundering Seas.
         LOSSOTH.setFactionControlZones( new LostTalesPair[]{
                 new LostTalesPair(LOTRWaypoint.CAPE_OF_FOROCHEL, 175)
+        });
+
+        // The Rangers of the North hold a zone of the same size here.
+        THARBAD.setFactionControlZones( new LostTalesPair[]{
+                new LostTalesPair(LOTRWaypoint.THARBAD, 50)
         });
 
         ODANE.setFactionControlZones( new LostTalesPair[]{
@@ -286,47 +277,27 @@ public enum ELostTalesFaction {
 
     public static void setUpFactionRanks() {
         for (ELostTalesFaction f : ELostTalesFaction.values()) {
-            if (f.isFactionActive) {
-                boolean categoryExists = false;
-                for (LOTRAchievement.Category category : LOTRAchievement.Category.values()) {
-                    if (category.codeName().equals(
-                            f.getFaction().codeName())) {
-                        categoryExists = true;
-                    }
+            boolean categoryExists = false;
+            for (LOTRAchievement.Category category : LOTRAchievement.Category.values()) {
+                if (category.codeName().equals(
+                        f.getFaction().codeName())) {
+                    categoryExists = true;
                 }
-
-                if (categoryExists) {
-                    LostTalesUtil.setFactionAchievementCategory(f.getFaction(), LOTRAchievement.Category.valueOf(f.getFaction().codeName()));
-                } else {
-                    LostTalesUtil.setFactionAchievementCategory(f.getFaction(), ELostTalesAchievement.Category.valueOf(f.getFaction().codeName()).getCategory());
-                }
-                LostTalesUtil.addFactionRank(f.getFaction(), 10.0f, "a", f.hasFeminineRank("a")).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 50.0f, "b", f.hasFeminineRank("b")).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 100.0f, "c", f.hasFeminineRank("c")).makeAchievement().makeTitle().setPledgeRank();
-                LostTalesUtil.addFactionRank(f.getFaction(), 200.0f, "d", f.hasFeminineRank("d")).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 500.0f, "e", f.hasFeminineRank("e")).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 1000.0f, "f", f.hasFeminineRank("f")).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 1500.0f, "g", f.hasFeminineRank("g")).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 3000.0f, "h", f.hasFeminineRank("h")).makeAchievement().makeTitle();
             }
-        }
-    }
 
-    public static void removeInactiveFactions() {
-        for (ELostTalesFaction f : ELostTalesFaction.values()) {
-            if (!f.isFactionActive()) {
-                f.getFaction().allowPlayer = false;
-                f.getFaction().hasFixedAlignment = true;
-                f.getFaction().fixedAlignment = 0;
-
-                if(f.getFaction().factionDimension != null) f.getFaction().factionDimension.factionList.remove(f.getFaction());
-                if(f.getFaction().factionRegion != null) f.getFaction().factionRegion.factionList.remove(f.getFaction());
-                f.getFaction().factionDimension = null;
-                f.getFaction().factionRegion = null;
-                f.getFaction().factionMapInfo = null;
-
-                LostTalesUtil.clearControlZones(f.getFaction());
+            if (categoryExists) {
+                LostTalesUtil.setFactionAchievementCategory(f.getFaction(), LOTRAchievement.Category.valueOf(f.getFaction().codeName()));
+            } else {
+                LostTalesUtil.setFactionAchievementCategory(f.getFaction(), ELostTalesAchievement.Category.valueOf(f.getFaction().codeName()).getCategory());
             }
+            LostTalesUtil.addFactionRank(f.getFaction(), 10.0f, "a", f.hasFeminineRank("a")).makeAchievement().makeTitle();
+            LostTalesUtil.addFactionRank(f.getFaction(), 50.0f, "b", f.hasFeminineRank("b")).makeAchievement().makeTitle();
+            LostTalesUtil.addFactionRank(f.getFaction(), 100.0f, "c", f.hasFeminineRank("c")).makeAchievement().makeTitle().setPledgeRank();
+            LostTalesUtil.addFactionRank(f.getFaction(), 200.0f, "d", f.hasFeminineRank("d")).makeAchievement().makeTitle();
+            LostTalesUtil.addFactionRank(f.getFaction(), 500.0f, "e", f.hasFeminineRank("e")).makeAchievement().makeTitle();
+            LostTalesUtil.addFactionRank(f.getFaction(), 1000.0f, "f", f.hasFeminineRank("f")).makeAchievement().makeTitle();
+            LostTalesUtil.addFactionRank(f.getFaction(), 1500.0f, "g", f.hasFeminineRank("g")).makeAchievement().makeTitle();
+            LostTalesUtil.addFactionRank(f.getFaction(), 3000.0f, "h", f.hasFeminineRank("h")).makeAchievement().makeTitle();
         }
     }
 
@@ -356,10 +327,6 @@ public enum ELostTalesFaction {
 
     public LOTRMapRegion getFactionMapRegion() {
         return factionMapRegion;
-    }
-
-    public boolean isFactionActive() {
-        return isFactionActive;
     }
 
     public boolean doesFactionApproveWarCrimes() {

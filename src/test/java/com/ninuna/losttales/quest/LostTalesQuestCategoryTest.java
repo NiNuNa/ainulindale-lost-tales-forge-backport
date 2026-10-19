@@ -77,18 +77,30 @@ public final class LostTalesQuestCategoryTest {
                 LostTalesQuestCategory.key(""));
     }
 
+    /** Each stage reached adds its paragraph, in the order reached (QUEST-30). */
     @Test
-    public void aJournalLineIsTheLatestStageThatHasOne() {
+    public void theJournalTellsEachStageReached() {
         Map<String, String> journal = new LinkedHashMap<String, String>();
         journal.put("start", "I set out.");
         journal.put("end", "I came back.");
         LostTalesQuestDefinition quest = quest("losttales:test/q", journal,
                 "start", "middle", "end");
-        assertEquals("I set out.", quest.journalLine(0));
-        assertEquals("a stage without a line keeps the one before",
-                "I set out.", quest.journalLine(1));
-        assertEquals("I came back.", quest.journalLine(2));
-        assertEquals("I came back.", quest.journalLine(9));
-        assertEquals("", quest.journalLine(-1));
+        assertEquals(Arrays.asList("I set out."), LostTalesQuestWords
+                .journalParagraphs(quest, Arrays.asList("start"), false));
+        assertEquals("a stage without a line adds nothing",
+                Arrays.asList("I set out."), LostTalesQuestWords
+                        .journalParagraphs(quest, Arrays.asList("start", "middle"), false));
+        assertEquals(Arrays.asList("I set out.", "I came back."),
+                LostTalesQuestWords.journalParagraphs(quest,
+                        Arrays.asList("start", "middle", "end"), false));
+        assertEquals("a path that branched tells only the stages it took",
+                Arrays.asList("I came back."), LostTalesQuestWords
+                        .journalParagraphs(quest, Arrays.asList("middle", "end"), false));
+        assertEquals("no path is the first stage",
+                Arrays.asList("I set out."), LostTalesQuestWords
+                        .journalParagraphs(quest, Collections.<String>emptyList(), false));
+        assertEquals("no path of a finished quest is every stage",
+                Arrays.asList("I set out.", "I came back."), LostTalesQuestWords
+                        .journalParagraphs(quest, Collections.<String>emptyList(), true));
     }
 }

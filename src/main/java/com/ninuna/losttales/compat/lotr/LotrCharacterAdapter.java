@@ -719,9 +719,6 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         if (faction.isOfType(LOTRFaction.FactionType.TYPE_ORC)) {
             categories.add(CharacterFactionCategory.ORC);
         }
-        if (faction.isOfType(LOTRFaction.FactionType.TYPE_TROLL)) {
-            categories.add(CharacterFactionCategory.TROLL);
-        }
         if (faction.isOfType(LOTRFaction.FactionType.TYPE_TREE)) {
             categories.add(CharacterFactionCategory.TREE);
         }

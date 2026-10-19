@@ -1,6 +1,8 @@
 package com.ninuna.losttales.quest.world;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -19,11 +21,26 @@ public final class WorldQuestView {
     private final Map<String, Integer> counts;
     private final int helpers;
     private final int mine;
+    private final List<String> podiumNames;
+    private final List<Integer> podiumParts;
 
     public WorldQuestView(String questId, WorldQuestRun.State state,
                           long endsAt, long endedAt,
                           Map<String, Integer> counts, int helpers,
                           int mine) {
+        this(questId, state, endsAt, endedAt, counts, helpers, mine,
+                Collections.<String>emptyList(), Collections.<Integer>emptyList());
+    }
+
+    /**
+     * A view naming its podium (QUEST-36): the best helpers' character
+     * names, best first, each beside how much it added.
+     */
+    public WorldQuestView(String questId, WorldQuestRun.State state,
+                          long endsAt, long endedAt,
+                          Map<String, Integer> counts, int helpers,
+                          int mine, List<String> podiumNames,
+                          List<Integer> podiumParts) {
         this.questId = questId == null ? "" : questId;
         this.state = state == null ? WorldQuestRun.State.STOPPED : state;
         this.endsAt = endsAt;
@@ -33,13 +50,42 @@ public final class WorldQuestView {
                         ? Collections.<String, Integer>emptyMap() : counts));
         this.helpers = Math.max(0, helpers);
         this.mine = Math.max(0, mine);
+        List<String> names = new ArrayList<String>();
+        List<Integer> parts = new ArrayList<Integer>();
+        for (int index = 0; podiumNames != null && podiumParts != null
+                && index < podiumNames.size() && index < podiumParts.size()
+                && names.size() < WorldQuestRules.PODIUM_PLACES; index++) {
+            names.add(podiumNames.get(index) == null ? "" : podiumNames.get(index));
+            parts.add(Integer.valueOf(Math.max(0, podiumParts.get(index).intValue())));
+        }
+        this.podiumNames = Collections.unmodifiableList(names);
+        this.podiumParts = Collections.unmodifiableList(parts);
     }
 
     /** The run as the identity {@code viewer} sees it. */
     public static WorldQuestView of(WorldQuestRun run, UUID viewer) {
+        return of(run, viewer, Collections.<String>emptyList(),
+                Collections.<Integer>emptyList());
+    }
+
+    /** The run as {@code viewer} sees it, with its podium's names and parts. */
+    public static WorldQuestView of(WorldQuestRun run, UUID viewer,
+                                    List<String> podiumNames,
+                                    List<Integer> podiumParts) {
         return new WorldQuestView(run.getQuestId(), run.getState(),
                 run.getEndsAt(), run.getEndedAt(), run.getCounts(),
-                run.getHelpers().size(), run.getHelped(viewer));
+                run.getHelpers().size(), run.getHelped(viewer), podiumNames,
+                podiumParts);
+    }
+
+    /** The best helpers' character names, best first; at most three. */
+    public List<String> getPodiumNames() {
+        return this.podiumNames;
+    }
+
+    /** How much each helper on the podium added, in its order. */
+    public List<Integer> getPodiumParts() {
+        return this.podiumParts;
     }
 
     public String getQuestId() {

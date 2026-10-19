@@ -58,19 +58,17 @@ public final class LostTalesCapability {
     /** Inspect, restore and purge the roleplay characters of any account. */
     public static final LostTalesCapability CHARACTER_ADMIN =
             register("character.admin", OPERATOR);
-    /** See which account plays a character, and its other characters, while Show Accounts is off. */
-    public static final LostTalesCapability CHARACTER_SEE_ACCOUNTS =
-            register("character.see_accounts", OPERATOR);
     /** Grant, revoke and inspect quest progress. */
     public static final LostTalesCapability QUEST_ADMIN = register("quest.admin", OPERATOR);
     /** Check and repair the fellowship stores, and clear the combat markers (/losttales fellowship). */
     public static final LostTalesCapability FELLOWSHIP_ADMIN = register("fellowship.admin", OPERATOR);
-    /** Inspect players' map markers, discover, forget, track or untrack them, and place failed waystones again (/losttales mapmarker). */
+    /**
+     * Inspect players' map markers, discover, forget, track or untrack
+     * them, and place failed waystones again (/losttales mapmarker); see,
+     * edit, break, make public and hand over any waystone.
+     */
     public static final LostTalesCapability MAPMARKER_MANAGE =
             register("mapmarker.manage", OPERATOR);
-    /** Place public waystones and change their settings. */
-    public static final LostTalesCapability WAYSTONE_MANAGE =
-            register("waystone.manage", OPERATOR);
     /** Ban an account, a character or everyone from spawning LOTR's structures (/losttales structures). */
     public static final LostTalesCapability STRUCTURES_BAN =
             register("structures.ban", OPERATOR);

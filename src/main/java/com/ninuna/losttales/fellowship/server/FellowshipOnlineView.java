@@ -81,32 +81,6 @@ final class FellowshipOnlineView implements FellowshipSnapshot.Presence {
         return this.byOwner.values();
     }
 
-    /**
-     * The view as one viewer is shown it: to one not shown accounts
-     * ({@link com.ninuna.losttales.character.server.AccountVisibility}), a
-     * member whose account plays another character reads as away, and that
-     * character is never named.
-     */
-    FellowshipSnapshot.Presence forViewer(boolean seesAccounts) {
-        if (seesAccounts) {
-            return this;
-        }
-        final FellowshipOnlineView view = this;
-        return new FellowshipSnapshot.Presence() {
-            @Override
-            public FellowshipMemberPresence of(FellowshipMember member) {
-                FellowshipMemberPresence presence = view.of(member);
-                return presence == FellowshipMemberPresence.ELSEWHERE
-                        ? FellowshipMemberPresence.AWAY : presence;
-            }
-
-            @Override
-            public String elsewhereName(FellowshipMember member) {
-                return "";
-            }
-        };
-    }
-
     @Override
     public FellowshipMemberPresence of(FellowshipMember member) {
         Online online = get(member.getOwnerId());

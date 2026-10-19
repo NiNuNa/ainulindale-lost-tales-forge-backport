@@ -27,6 +27,12 @@ import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.server.LostTalesServerBroadcastHook;
 import com.ninuna.losttales.chat.share.ChatShowcase;
+import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestCardWords;
+import com.ninuna.losttales.compat.lotr.LotrQuestReference;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
+import com.ninuna.losttales.chat.share.QuestShareInvite;
 import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
@@ -45,10 +51,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
@@ -96,8 +104,21 @@ public final class LostTalesChatPresentation {
     /** Pinged line ids remembered: as many as the history can hold. */
     private static final int MAX_PINGED_LINES =
             LostTalesChatHistoryHooks.MAX_CAPACITY;
-    private static final LinkedHashSet<Integer> pingedChatLineIds =
-            new LinkedHashSet<Integer>();
+    /**
+     * The lines that mention this player, each with the voices it names
+     * ({@link ConversationPage#ownerKeyOf}): a copy lights a line only
+     * where its voice is among them (CHAT-02), or where the line names
+     * {@link #EVERY_VOICE}.
+     */
+    private static final LinkedHashMap<Integer, Set<String>> pingedChatLineIds =
+            new LinkedHashMap<Integer, Set<String>>();
+    /**
+     * What a line pinging every copy names: the account out of character,
+     * a role, a reply to one of this player's lines, a line of the game's.
+     */
+    static final String EVERY_VOICE = "*";
+    private static final Set<String> EVERY_COPY =
+            Collections.singleton(EVERY_VOICE);
     /** Lines forwarded to this player in a whisper, as many as the history holds: the inbox's forwards. */
     private static final LinkedHashSet<Integer> forwardedChatLineIds =
             new LinkedHashSet<Integer>();
@@ -217,8 +238,10 @@ public final class LostTalesChatPresentation {
         // mention does, whether or not it names them.
         boolean repliedTo = LostTalesConfig.enableChatPings
                 && repliesToLocalPlayer(minecraft, packet.getReply());
-        boolean mentioned = repliedTo || (LostTalesConfig.enableChatPings
-                && pingsLocalPlayer(packet));
+        Set<String> pingedVoices = repliedTo ? EVERY_COPY
+                : LostTalesConfig.enableChatPings ? pingedVoices(packet)
+                : Collections.<String>emptySet();
+        boolean mentioned = !pingedVoices.isEmpty();
         // A line of the server's own that carries its component — an
         // achievement with its hover, a death, a join — is shown from
         // that component the way the live line was, the players it
@@ -308,7 +331,7 @@ public final class LostTalesChatPresentation {
             receivingBeforeArrival = false;
         }
         if (mentioned) {
-            markPinged(chatLineId);
+            markPinged(chatLineId, pingedVoices);
         }
         // A message somebody forwarded to this player in a whisper waits
         // in the inbox, as a mention does.
@@ -328,6 +351,70 @@ public final class LostTalesChatPresentation {
                 replayed) && ClientChatChannelState.isAvailable(tab)) {
             playPingSound(minecraft, tab);
         }
+        if (!replayed) {
+            askToJoinSharedQuests(minecraft, packet, tab);
+        }
+    }
+
+    /**
+     * A quest card somebody shared in a fellowship's conversation asks this
+     * member under it, as a fellowship invitation asks (QUEST-25): <i>Aldric
+     * asks the fellowship to join The Cheese Cache. Join · Not now</i>. Only
+     * for a line said now, never one caught up from the history; only for a
+     * card that may be joined and a quest this character could take now as
+     * far as its own log tells; the server judges Join again.
+     */
+    private static void askToJoinSharedQuests(Minecraft minecraft,
+                                              LostTalesChatMessagePacket packet,
+                                              ConversationPage tab) {
+        if (packet.getChannel() != ChatChannel.FELLOWSHIP
+                || isLocalAccount(packet.getSenderId())
+                || LostTalesChatMessagePacket.isSystemSender(packet.getSenderId())
+                || LostTalesChatMessagePacket.isDiscordSender(packet.getSenderId())
+                || packet.getReply().isForward()
+                || !ChatMessageIds.isServerId(packet.getMessageId())) {
+            return;
+        }
+        for (ChatShowcase showcase : packet.getShowcases()) {
+            if (showcase == null || showcase.getKind() != ChatShareKind.QUEST
+                    || !showcase.isQuestJoinable()
+                    || !couldJoin(showcase.getQuestReference())) {
+                continue;
+            }
+            IChatComponent line = QuestShareInvite.line(packet.getIdentityName(),
+                    LostTalesQuestCardWords.title(showcase.getQuestReference(),
+                            showcase.getQuestCard()),
+                    packet.getMessageId(), showcase.getTokenIndex());
+            boolean addressed = LostTalesConfig.enableChatPings;
+            int chatLineId = printServerLine(minecraft, tab, line, addressed,
+                    packet.getTimestampMillis(), ChatReplyReference.NONE,
+                    ChatMessageIds.NONE);
+            if (addressed) {
+                markPinged(chatLineId);
+            }
+            if (lineChimes(tab, addressed, false, false)
+                    && ClientChatChannelState.isAvailable(tab)) {
+                playPingSound(minecraft, tab);
+            }
+        }
+    }
+
+    /**
+     * Whether this character could take the quest a card names, as far as
+     * its own log tells: not a LOTR quest, not running, and not one done
+     * that is not taken again.
+     */
+    private static boolean couldJoin(String reference) {
+        if (reference == null || LotrQuestReference.isLotrQuest(reference)
+                || LostTalesClientQuestProgressStore.isQuestActive(reference)) {
+            return false;
+        }
+        LostTalesQuestDefinition quest =
+                LostTalesClientQuestDefinitionStore.getQuest(reference);
+        return quest == null
+                ? !LostTalesClientQuestProgressStore.isQuestCompleted(reference)
+                : quest.mayTakeAgain(
+                        LostTalesClientQuestProgressStore.getQuestHistoryEntry(reference));
     }
 
     /**
@@ -422,9 +509,12 @@ public final class LostTalesChatPresentation {
         // a name added lights the line without a chime, a name taken out
         // no longer counts. A reply to this player stays one.
         Minecraft here = Minecraft.getMinecraft();
-        if (LostTalesConfig.enableChatPings && (pingsLocalPlayer(edited)
-                || repliesToLocalPlayer(here, edited.getReply()))) {
-            markPinged(chatLineId.intValue());
+        Set<String> voices = !LostTalesConfig.enableChatPings
+                ? Collections.<String>emptySet()
+                : repliesToLocalPlayer(here, edited.getReply()) ? EVERY_COPY
+                : pingedVoices(edited);
+        if (!voices.isEmpty()) {
+            markPinged(chatLineId.intValue(), voices);
         } else {
             unmarkPinged(chatLineId.intValue());
         }
@@ -444,7 +534,8 @@ public final class LostTalesChatPresentation {
             return asTranslatedWords(line.withMessage(update.getMessage())
                     .withServerBody(update.getBodyJson(),
                             update.getNamedPlayers())
-                    .withMentionedRoles(update.getMentionedRoles()));
+                    .withMentionedRoles(update.getMentionedRoles())
+                    .withTyped(update.getTyped()));
         } catch (RuntimeException refused) {
             return null;
         }
@@ -1375,21 +1466,38 @@ public final class LostTalesChatPresentation {
      * the server's word too, sent with the chat access.
      */
     private static boolean pingsLocalPlayer(LostTalesChatMessagePacket packet) {
+        return !pingedVoices(packet).isEmpty();
+    }
+
+    /**
+     * The voices of this player's a line names, as {@link #pingsLocalPlayer}
+     * finds them: in character each character of theirs it names that they
+     * play or a copy speaks as; {@link #EVERY_VOICE} for the account out of
+     * character and for a role they hold. Empty for a line that names none
+     * of them, and for a forward.
+     */
+    static Set<String> pingedVoices(LostTalesChatMessagePacket packet) {
         // A forward pings nobody: its words were said elsewhere, before.
         if (packet.getReply().isForward()) {
-            return false;
+            return Collections.emptySet();
         }
+        Set<String> voices = new LinkedHashSet<String>();
         for (ChatNamedPlayer named : packet.getNamedPlayers()) {
             if (isLocalIdentity(named, packet.getChannel())) {
-                return true;
+                voices.add(named.getCharacterId() == null
+                        || packet.getChannel() == null
+                        || packet.getChannel().getPresentation()
+                                == ChatPresentationMode.OUT_OF_CHARACTER
+                        ? EVERY_VOICE
+                        : ConversationPage.ownerKeyOf(named.getCharacterId()));
             }
         }
         for (ChatAccountRole role : ClientChatChannelState.localRoles()) {
             if (packet.getMentionedRoles().contains(role.getId())) {
-                return true;
+                voices.add(EVERY_VOICE);
             }
         }
-        return false;
+        return voices.contains(EVERY_VOICE) ? EVERY_COPY : voices;
     }
 
     /**
@@ -1728,11 +1836,18 @@ public final class LostTalesChatPresentation {
      * mentions into the feed lets this one in.
      */
     static void markPinged(int chatLineId) {
-        if (!pingedChatLineIds.add(Integer.valueOf(chatLineId))) {
+        markPinged(chatLineId, EVERY_COPY);
+    }
+
+    /** As above for a line naming only {@code voices} of this player's. */
+    static void markPinged(int chatLineId, Set<String> voices) {
+        Set<String> kept = Collections.unmodifiableSet(
+                new LinkedHashSet<String>(voices));
+        if (kept.equals(pingedChatLineIds.put(Integer.valueOf(chatLineId), kept))) {
             return;
         }
         while (pingedChatLineIds.size() > MAX_PINGED_LINES) {
-            Iterator<Integer> iterator = pingedChatLineIds.iterator();
+            Iterator<Integer> iterator = pingedChatLineIds.keySet().iterator();
             iterator.next();
             iterator.remove();
         }
@@ -1742,19 +1857,37 @@ public final class LostTalesChatPresentation {
 
     /** Forgets a mention an edit took out; the views are laid out again. */
     static void unmarkPinged(int chatLineId) {
-        if (pingedChatLineIds.remove(Integer.valueOf(chatLineId))) {
+        if (pingedChatLineIds.remove(Integer.valueOf(chatLineId)) != null) {
             ClientChatChannelViews.invalidateCache();
             ChatWindowLines.noteMutated();
         }
     }
 
+    /** Whether the line mentions this player in any of their voices. */
     static boolean isPingedLine(int chatLineId) {
-        return pingedChatLineIds.contains(Integer.valueOf(chatLineId));
+        return pingedChatLineIds.containsKey(Integer.valueOf(chatLineId));
+    }
+
+    /**
+     * Whether the line lights in {@code view}: it mentions this player, and
+     * the voice the copy speaks as is one it names, or it names them all.
+     */
+    static boolean isPingedIn(int chatLineId, ConversationPage view) {
+        Set<String> voices = pingedChatLineIds.get(Integer.valueOf(chatLineId));
+        if (voices == null) {
+            return false;
+        }
+        if (voices.contains(EVERY_VOICE) || view == null) {
+            return true;
+        }
+        ClientChatIdentities.Identity voice = ClientChatIdentities.viewing(view);
+        return voices.contains(ConversationPage.ownerKeyOf(
+                voice == null ? null : voice.characterId));
     }
 
     /** The lines that mentioned this player, the oldest first. */
     static List<Integer> pingedLines() {
-        return new ArrayList<Integer>(pingedChatLineIds);
+        return new ArrayList<Integer>(pingedChatLineIds.keySet());
     }
 
     /** Remembers a line forwarded to this player, for the inbox. */
@@ -1987,9 +2120,10 @@ public final class LostTalesChatPresentation {
         ChatChannel channel = packet.getChannel();
         ChatComponentText root = new ChatComponentText("");
         ConversationPage named = tab == null ? tabOf(packet) : tab;
-        // An action is the Narrator's to tell, a sentence its speaker's
-        // name opens; a forwarded one keeps the forward's own layout and
-        // names its author in its words (appendBody).
+        // An action is a sentence its speaker's name opens, told by the
+        // Narrator in character and under the account out of it (CHAT-37);
+        // a forwarded one keeps the forward's own layout and names its
+        // author in its words (appendBody).
         boolean action = packet.isAction() && kind.parsesBody()
                 && !packet.getReply().isForward();
         if (grouped) {
@@ -2022,7 +2156,7 @@ public final class LostTalesChatPresentation {
         // Continuation lines of a wrapped message align here, under the
         // sender's opening bracket; see ChatLineWrapper.
         root.appendSibling(ChatLayoutMarker.anchor());
-        if (action) {
+        if (action && !packet.isAccountLine()) {
             appendNarratorHeader(root, packet);
             appendActionBody(root, packet, showcaseIds, channel);
             return root;
@@ -2059,6 +2193,11 @@ public final class LostTalesChatPresentation {
 
         root.appendSibling(reply(text(shownName(packet),
                 nearestFormatting(packet.getNameColor()), false), whisper));
+        if (packet.isNotInWorld()) {
+            // Spoken as in a copy while another character was played:
+            // here, but not in the world (CHAT-05).
+            root.appendSibling(ChatWorldMark.run());
+        }
         if (packet.getTitle().length() > 0) {
             // LOTR's NPC naming, "Name, the Gondor Farmer": the epithet is
             // the sender's people and title in this game's words; an
@@ -2073,6 +2212,16 @@ public final class LostTalesChatPresentation {
                             false),
                     packet.getTitleColor(), epithet));
         }
+        // The account behind a character trails its name and title, faint,
+        // while this player's Show Accounts is on (ChatAccountMarker).
+        String account = ChatAccountAside.suffix(shownName(packet),
+                packet.getAccountName(), !packet.isAccountLine()
+                        && !packet.isNarrator()
+                        && packet.getIdentityCharacterId() != null);
+        if (account.length() > 0) {
+            root.appendSibling(ChatAccountMarker.apply(text(account,
+                    EnumChatFormatting.GRAY, false)));
+        }
         // The closing bracket keeps the same clear space from what
         // precedes it that the opening one keeps from the head; a glyph
         // carries one pixel of that as its own trailing space.
@@ -2080,8 +2229,13 @@ public final class LostTalesChatPresentation {
                 ChatInlineIcons.NAME_GAP - 1));
         root.appendSibling(reply(text("> ", nearestFormatting(
                 packet.getNameColor()), false), whisper));
-        // The header ends here; the body stands on the next row.
-        appendBody(root, packet, showcaseIds, channel, kind, body);
+        // The header ends here; the body stands on the next row: an
+        // account's action under the account's own name row.
+        if (action) {
+            appendActionBody(root, packet, showcaseIds, channel);
+        } else {
+            appendBody(root, packet, showcaseIds, channel, kind, body);
+        }
         return root;
     }
 
@@ -3778,6 +3932,22 @@ public final class LostTalesChatPresentation {
                                            String message,
                                            int nameColor,
                                            String factionName) {
+        return receiveNpcSpeech(tab, npcId, npcName, texturePath, message,
+                nameColor, factionName, null);
+    }
+
+    /**
+     * As above, the line ending on {@code answers}, words the player may
+     * click to answer the speaker (a quest giver's *Accept* and
+     * *Decline*); null for none.
+     */
+    public static boolean receiveNpcSpeech(ConversationPage tab, UUID npcId,
+                                           String npcName,
+                                           String texturePath,
+                                           String message,
+                                           int nameColor,
+                                           String factionName,
+                                           IChatComponent answers) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (tab == null || npcId == null || npcName == null
                 || npcName.length() == 0 || message == null
@@ -3821,12 +3991,12 @@ public final class LostTalesChatPresentation {
         long now = System.currentTimeMillis();
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
         chat.printChatMessageWithOptionalDeletion(
-                buildNpcSpeech(tab, npcId, npcName,
-                        texturePath, message, nameColor, false),
+                withAnswers(buildNpcSpeech(tab, npcId, npcName,
+                        texturePath, message, nameColor, false), answers),
                 chatLineId);
         ChatGroupRuns.remember(chatLineId, tab, npcId, npcName, false, now,
-                true, buildNpcSpeech(tab, npcId, npcName, texturePath,
-                        message, nameColor, true));
+                true, withAnswers(buildNpcSpeech(tab, npcId, npcName,
+                        texturePath, message, nameColor, true), answers));
         // An NPC's speech is this client's own line too: nobody else
         // sees it, so it is named locally like the player's replies.
         ClientChatMessageIds.remember(chatLineId,
@@ -3839,6 +4009,15 @@ public final class LostTalesChatPresentation {
             playPingSound(minecraft, tab);
         }
         return true;
+    }
+
+    /** The line with the answers after its words; the line as it is for none. */
+    private static IChatComponent withAnswers(IChatComponent line,
+                                              IChatComponent answers) {
+        if (answers != null) {
+            line.appendSibling(answers.createCopy());
+        }
+        return line;
     }
 
     /**

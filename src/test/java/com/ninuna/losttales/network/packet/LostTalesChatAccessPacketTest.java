@@ -61,14 +61,6 @@ public final class LostTalesChatAccessPacketTest {
         assertTrue(decoded.getProfanityWords().isEmpty());
     }
 
-    /** Whether this player is shown accounts travels last; nobody is until told so. */
-    @Test
-    public void whetherAccountsAreShownRoundTrips() {
-        assertTrue(roundTrip(ChatPacketFixtures.access(0).build().withSeesAccounts(true))
-                .seesAccounts());
-        assertFalse(roundTrip(ChatPacketFixtures.access(0).build()).seesAccounts());
-    }
-
     /** Whether Discord members wear their status travels with the links. */
     @Test
     public void theDiscordStatusFlagRoundTrips() {
@@ -126,7 +118,7 @@ public final class LostTalesChatAccessPacketTest {
     public void theHeldCapabilitiesRoundTrip() {
         List<String> held = Arrays.asList(
                 com.ninuna.losttales.permission.LostTalesCapability.CHAT_MODERATE.getId(),
-                com.ninuna.losttales.permission.LostTalesCapability.WAYSTONE_MANAGE.getId());
+                com.ninuna.losttales.permission.LostTalesCapability.MAPMARKER_MANAGE.getId());
         LostTalesChatAccessPacket decoded = roundTrip(ChatPacketFixtures.access(0)
                 .catalog(Collections.<ChatAccountRole>emptyList()).canModerate().capabilities(held)
                 .build());

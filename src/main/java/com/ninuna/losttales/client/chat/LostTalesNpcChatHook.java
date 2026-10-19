@@ -143,6 +143,17 @@ public final class LostTalesNpcChatHook {
      */
     public static void sayToPlayer(EntityLivingBase speaker, String speech,
                                    int nameColor, String faction) {
+        sayToPlayer(speaker, speech, nameColor, faction, null);
+    }
+
+    /**
+     * As above, the line ending on {@code answers}: words the player may
+     * click to answer, a quest giver's *Accept* and *Decline* where the
+     * conversation is switched off (QUEST-37); null for none.
+     */
+    public static void sayToPlayer(EntityLivingBase speaker, String speech,
+                                   int nameColor, String faction,
+                                   IChatComponent answers) {
         try {
             if (speaker == null || speech == null) {
                 return;
@@ -157,8 +168,12 @@ public final class LostTalesNpcChatHook {
             if (!LostTalesConfig.enableNpcChatStyling) {
                 EntityPlayer player = Minecraft.getMinecraft().thePlayer;
                 if (player != null) {
-                    player.addChatMessage(new ChatComponentText(
-                            "<" + name + "> " + plain));
+                    IChatComponent line = new ChatComponentText(
+                            "<" + name + "> " + plain);
+                    if (answers != null) {
+                        line.appendSibling(answers);
+                    }
+                    player.addChatMessage(line);
                 }
                 return;
             }
@@ -170,7 +185,7 @@ public final class LostTalesNpcChatHook {
             LostTalesChatPresentation.receiveNpcSpeech(tab,
                     tab.npcSpeakerId(), name,
                     texture == null ? "" : texture.toString(), plain,
-                    nameColor, faction == null ? "" : faction);
+                    nameColor, faction == null ? "" : faction, answers);
         } catch (Throwable throwable) {
             logFailureOnce(throwable);
         }

@@ -5,9 +5,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The Gateway's conversation, without the socket: what each payload the
@@ -114,6 +117,9 @@ public final class DiscordGatewayProtocol {
         }
     }
 
+    /** The longest gateway address taken: far longer than any Discord gives. */
+    static final int MAX_GATEWAY_URL_LENGTH = 256;
+
     private final String token;
     private int intents;
     private long sequence = -1L;
@@ -124,6 +130,36 @@ public final class DiscordGatewayProtocol {
     public DiscordGatewayProtocol(String token, int intents) {
         this.token = token == null ? "" : token;
         this.intents = intents;
+    }
+
+    /**
+     * Whether {@code url} is a gateway address of Discord's: {@code wss}
+     * on {@code discord.gg} or a host under it, on the default port, with
+     * no user, path, query or fragment of its own. The bot token travels
+     * on the connection, so an address read off the wire is never taken
+     * unchecked.
+     */
+    public static boolean isDiscordGateway(String url) {
+        if (url == null || url.length() == 0 || url.length() > MAX_GATEWAY_URL_LENGTH) {
+            return false;
+        }
+        URI uri;
+        try {
+            uri = new URI(url);
+        } catch (URISyntaxException malformed) {
+            return false;
+        }
+        String host = uri.getHost();
+        String path = uri.getRawPath();
+        if (!"wss".equalsIgnoreCase(uri.getScheme()) || host == null
+                || uri.getRawUserInfo() != null
+                || uri.getPort() != -1 && uri.getPort() != 443
+                || uri.getRawQuery() != null || uri.getRawFragment() != null
+                || path != null && path.length() > 0 && !"/".equals(path)) {
+            return false;
+        }
+        String name = host.toLowerCase(Locale.ROOT);
+        return name.equals("discord.gg") || name.endsWith(".discord.gg");
     }
 
     /** Whether a session can be resumed rather than identified afresh. */
@@ -211,7 +247,10 @@ public final class DiscordGatewayProtocol {
                 JsonObject data = object(payload, "d");
                 if ("READY".equals(name) && data != null) {
                     this.sessionId = string(data, "session_id");
-                    this.resumeGatewayUrl = string(data, "resume_gateway_url");
+                    String resumeAt = string(data, "resume_gateway_url");
+                    // A resume address that is not Discord's is not
+                    // followed: the session resumes on the gateway's own.
+                    this.resumeGatewayUrl = isDiscordGateway(resumeAt) ? resumeAt : "";
                     actions.add(Action.ready(data));
                 } else if (name.length() > 0 && data != null) {
                     actions.add(Action.event(name, data));

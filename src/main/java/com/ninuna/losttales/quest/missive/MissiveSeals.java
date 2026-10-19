@@ -11,8 +11,10 @@ import net.minecraftforge.common.util.Constants;
 
 /**
  * Seals the missive letters the server writes, and tells a sealed letter
- * from any other, with the world's key ({@link MissiveSealWorldData}). Server
- * only: a client holds no key and never checks a seal.
+ * from any other, with the world's key ({@link MissiveSealWorldData}); a
+ * quest's starter item is sealed with the same key
+ * ({@link com.ninuna.losttales.quest.QuestStarters}). Server only: a client
+ * holds no key and never checks a seal.
  */
 public final class MissiveSeals {
     /** Where a letter keeps its seal, beside its missive. */
@@ -47,7 +49,8 @@ public final class MissiveSeals {
                 letter.stackTagCompound.getByteArray(TAG_SEAL));
     }
 
-    private static byte[] keyOf(World world) {
+    /** The world's sealing key, made on first use; null off the server or where it cannot be used. */
+    public static byte[] keyOf(World world) {
         if (world == null || world.isRemote) {
             return null;
         }

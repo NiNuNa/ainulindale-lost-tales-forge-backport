@@ -40,7 +40,8 @@ public final class LostTalesQuestObjectiveSelection {
 
     /**
      * Includes every current-stage objective plus optional objectives from
-     * earlier stages. Future objectives never become live early.
+     * earlier stages the quest went through (a branch not taken stays
+     * quiet, QUEST-32). Future objectives never become live early.
      */
     public static List<LostTalesQuestObjectiveDefinition>
             getProgressibleObjectives(LostTalesQuestDefinition quest,
@@ -51,10 +52,17 @@ public final class LostTalesQuestObjectiveSelection {
         }
         ArrayList<LostTalesQuestObjectiveDefinition> objectives =
                 new ArrayList<LostTalesQuestObjectiveDefinition>();
+        List<String> path = progress.getStagePath();
         for (int stageIndex = 0; stageIndex <= currentStageIndex;
                 stageIndex++) {
+            LostTalesQuestStageDefinition stage = quest.getStages().get(stageIndex);
+            boolean reached = stageIndex == currentStageIndex || path.isEmpty()
+                    || path.contains(stage.getId());
+            if (!reached) {
+                continue;
+            }
             for (LostTalesQuestObjectiveDefinition objective
-                    : quest.getStages().get(stageIndex).getObjectives()) {
+                    : stage.getObjectives()) {
                 if (stageIndex == currentStageIndex
                         || objective.isOptional()) {
                     objectives.add(objective);

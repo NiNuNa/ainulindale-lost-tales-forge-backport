@@ -86,6 +86,21 @@ public final class ChatHistory {
     public static final int MAX_REPLAY_PER_CONVERSATION = 100;
     /** The most a joining player is shown in all. */
     public static final int MAX_REPLAY_TOTAL = 400;
+    /**
+     * The lines every shared channel keeps whatever the total does
+     * (CHAT-69): Global, Proximity, OOC, Operator Chat, a server's own
+     * channels and each faction. Fellowships and whispers, which anyone
+     * can make more of, keep no floor and give up their oldest first.
+     */
+    public static final int CHANNEL_FLOOR = 50;
+    /**
+     * The most conversations a floor is kept for: every channel the server
+     * can have and every faction, with room. What the save reads back is
+     * bounded by the total and these floors together.
+     */
+    static final int MAX_FLOORED_CONVERSATIONS = 128;
+    /** The most lines kept at once: the total, and every floor it may not take. */
+    public static final int MAX_KEPT = MAX_TOTAL + CHANNEL_FLOOR * MAX_FLOORED_CONVERSATIONS;
 
     /**
      * Before an account's id, the budget of the lines kept for that
@@ -550,6 +565,20 @@ public final class ChatHistory {
                                                    String bodyJson,
                                                    List<ChatNamedPlayer> named,
                                                    List<String> roleIds) {
+        return applyEdit(messageId, editor, message, bodyJson, named, roleIds, "");
+    }
+
+    /**
+     * As above, keeping {@code typed}, what the author typed for the new
+     * words, with the author's own copy (CHAT-83).
+     */
+    public static synchronized Set<UUID> applyEdit(long messageId,
+                                                   UUID editor,
+                                                   String message,
+                                                   String bodyJson,
+                                                   List<ChatNamedPlayer> named,
+                                                   List<String> roleIds,
+                                                   String typed) {
         Entry entry = authored(messageId, editor);
         if (entry == null || message == null) {
             return null;
@@ -558,7 +587,8 @@ public final class ChatHistory {
         LostTalesChatMessagePacket forOthers;
         try {
             forSender = entry.forSender.withMessage(message)
-                    .withServerBody(bodyJson, named).withMentionedRoles(roleIds);
+                    .withServerBody(bodyJson, named).withMentionedRoles(roleIds)
+                    .withTyped(typed);
             forOthers = entry.forOthers.withMessage(message)
                     .withServerBody(bodyJson, named).withMentionedRoles(roleIds);
         } catch (RuntimeException refused) {
@@ -755,6 +785,46 @@ public final class ChatHistory {
     }
 
     /**
+     * Puts the Discord members' reactions with one emoji, made in the
+     * Discord channel {@code origin} to a kept message, right by what
+     * Discord lists for it there ({@link ChatReactions#setDiscord}), and
+     * answers with what changed, or null when nothing did.
+     */
+    public static synchronized ReactionChange setDiscordReactions(
+            long messageId, String emoji, String customId, String origin,
+            Map<UUID, String> listed, Set<UUID> refused, boolean complete) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null) {
+            return null;
+        }
+        String key = entry.reactions.discordKeyOf(emoji, customId, null, true);
+        if (key == null) {
+            return null;
+        }
+        ChatReactions.Stand before = entry.reactions.standOf(key);
+        if (!entry.reactions.setDiscord(emoji, customId, origin, listed, refused,
+                complete)) {
+            return null;
+        }
+        changed();
+        return new ReactionChange(
+                Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy)),
+                key, before, entry.reactions.standOf(key));
+    }
+
+    /**
+     * How many Discord members reacted to a kept message with each emoji
+     * in the Discord channel {@code origin}, by key; empty for a message
+     * not kept ({@link ChatReactions#discordCountsIn}).
+     */
+    public static synchronized Map<String, Integer> discordReactionCounts(
+            long messageId, String origin) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry == null ? Collections.<String, Integer>emptyMap()
+                : entry.reactions.discordCountsIn(origin);
+    }
+
+    /**
      * The reactions on a kept message as a reader is shown them, by the
      * reader's identities ({@link Requester#identityIds}).
      */
@@ -797,6 +867,16 @@ public final class ChatHistory {
     public static synchronized ChatChannel channelOf(long messageId) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         return entry == null ? null : entry.forOthers.getChannel();
+    }
+
+    /**
+     * For a kept whisper, the character of the other party the author's
+     * conversation is with; null for their account, for any other line and
+     * for none kept.
+     */
+    public static synchronized UUID partnerCharacterOf(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry == null ? null : entry.forSender.getPartnerCharacterId();
     }
 
     /**
@@ -844,16 +924,10 @@ public final class ChatHistory {
                         requester.identityIds));
     }
 
-    /**
-     * The copy of a kept line meant for the requester: its author's own,
-     * else everyone else's, without the accounts behind characters for a
-     * requester not shown them.
-     */
+    /** The copy of a kept line meant for the requester: its author's own, else everyone else's. */
     private static LostTalesChatMessagePacket copyFor(Requester requester, Entry entry) {
-        LostTalesChatMessagePacket copy = requester.accountId != null
-                && requester.accountId.equals(entry.authorId)
+        return requester.accountId != null && requester.accountId.equals(entry.authorId)
                 ? entry.forSender : entry.forOthers;
-        return requester.seesAccounts ? copy : copy.withoutAccountsFor(requester.accountId);
     }
 
     /** The conversation a whisper copy is held in, as the reader's tab names it. */
@@ -922,8 +996,10 @@ public final class ChatHistory {
                     || !entry.audience.admits(requester, entry)) {
                 continue;
             }
-            String conversation = entry.channelId + ChatTabIds.SEPARATOR
-                    + entry.forOthers.getScopeValue();
+            // Each faction, fellowship and whisper pair is a conversation
+            // of its own here too: one busy whisper never takes the others'
+            // share of the replay.
+            String conversation = replayConversationOf(entry);
             Integer count = taken.get(conversation);
             int soFar = count == null ? 0 : count.intValue();
             if (soFar >= MAX_REPLAY_PER_CONVERSATION) {
@@ -1226,14 +1302,11 @@ public final class ChatHistory {
          * theirs: what a reaction of theirs may have been made as.
          */
         final Set<UUID> identityIds;
-        /** Whether the player is shown which account plays a character. */
-        final boolean seesAccounts;
 
         public Requester(UUID accountId, Map<String, Long> ownedFactions,
                          Collection<UUID> fellowshipIds, Collection<ChatChannel> readable,
-                         Collection<UUID> identityIds, boolean seesAccounts) {
+                         Collection<UUID> identityIds) {
             this.accountId = accountId;
-            this.seesAccounts = seesAccounts;
             Set<UUID> identities = new HashSet<UUID>();
             if (accountId != null) {
                 identities.add(accountId);
@@ -1321,12 +1394,52 @@ public final class ChatHistory {
             return scope.length() == 0 ? entry.channelId
                     : entry.channelId + ":" + scope.toLowerCase(Locale.ROOT);
         }
-        String one = (copy.getAccountName() + "/" + copy.getIdentityName())
-                .toLowerCase(Locale.ROOT);
-        String other = (copy.getPartner() + "/" + copy.getPartnerIdentity())
-                .toLowerCase(Locale.ROOT);
+        // A pair of identities by their ids, so a rename keeps the pair's
+        // lines together: the author as the identity the line wore, the
+        // other account as the identity it was with.
+        UUID partnerAccount = null;
+        for (UUID reader : entry.seenBy) {
+            if (!reader.equals(entry.authorId)) {
+                partnerAccount = reader;
+            }
+        }
+        String one = identityKey(entry.authorId, copy.getIdentityCharacterId());
+        String other = identityKey(partnerAccount, copy.getPartnerCharacterId());
         return entry.channelId + ":" + (one.compareTo(other) <= 0
                 ? one + "|" + other : other + "|" + one);
+    }
+
+    /**
+     * The conversation a line counts toward in a replay: its channel and
+     * scope, and for a whisper between two people the pair of identities.
+     */
+    private static String replayConversationOf(Entry entry) {
+        if (ChatChannel.WHISPER.getId().equals(entry.channelId)
+                && entry.audience.soleAccount() == null) {
+            return budgetKeyOf(entry);
+        }
+        return entry.channelId + ChatTabIds.SEPARATOR
+                + entry.forOthers.getScopeValue();
+    }
+
+    private static String identityKey(UUID account, UUID character) {
+        return (account == null ? "-" : account.toString()) + "/"
+                + (character == null ? "-" : character.toString());
+    }
+
+    /**
+     * Whether a budget keeps its floor ({@link #CHANNEL_FLOOR}): a shared
+     * channel's or a faction's, never a fellowship's, a whisper pair's or
+     * an account's own.
+     */
+    static boolean keepsFloor(String budgetKey) {
+        if (budgetKey == null || isPrivateBudget(budgetKey)) {
+            return false;
+        }
+        String channel = budgetKey.indexOf(':') < 0 ? budgetKey
+                : budgetKey.substring(0, budgetKey.indexOf(':'));
+        return !ChatChannel.WHISPER.getId().equals(channel)
+                && !ChatChannel.FELLOWSHIP.getId().equals(channel);
     }
 
     /**
@@ -1334,7 +1447,9 @@ public final class ChatHistory {
      * oldest of that budget past its cap; for a private line, the oldest
      * private line past {@link #MAX_PRIVATE} and past the total, so a
      * private line never pushes out a shared one; for a shared line, the
-     * oldest line of all past the total.
+     * oldest line past the total of a conversation above its floor, so no
+     * shared channel ever loses its last {@link #CHANNEL_FLOOR} lines to
+     * the others (CHAT-69).
      */
     private static void trim(String budgetKey) {
         Integer count = COUNT_BY_CHANNEL.get(budgetKey);
@@ -1360,13 +1475,24 @@ public final class ChatHistory {
         while (oldest.hasNext()) {
             String key = budgetKeyOf(oldest.next().getValue());
             if ((budgetKey == null || budgetKey.equals(key))
-                    && (!privateOnly || isPrivateBudget(key))) {
+                    && (!privateOnly || isPrivateBudget(key))
+                    // The total never takes a shared channel's floor.
+                    && (budgetKey != null || privateOnly || !atFloor(key))) {
                 oldest.remove();
                 count(key, -1);
                 return true;
             }
         }
         return false;
+    }
+
+    /** Whether a budget keeping its floor holds no more than it. */
+    private static boolean atFloor(String budgetKey) {
+        if (!keepsFloor(budgetKey)) {
+            return false;
+        }
+        Integer count = COUNT_BY_CHANNEL.get(budgetKey);
+        return count == null || count.intValue() <= CHANNEL_FLOOR;
     }
 
     /** Cleared with the rest of the server's chat state. */

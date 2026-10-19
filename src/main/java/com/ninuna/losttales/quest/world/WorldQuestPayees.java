@@ -34,6 +34,27 @@ public final class WorldQuestPayees {
     };
 
     /**
+     * The best helpers of a run, one per account as {@link #of} pays them,
+     * most help first and on a tie the one that joined first, at most
+     * {@code places}: a podium (QUEST-36).
+     */
+    public static List<UUID> podium(final Map<UUID, Integer> helpers, int least,
+                                    Accounts accounts, int places) {
+        List<UUID> ranked = new ArrayList<UUID>(of(helpers, least, accounts));
+        final List<UUID> joined = new ArrayList<UUID>(helpers.keySet());
+        java.util.Collections.sort(ranked, new java.util.Comparator<UUID>() {
+            @Override
+            public int compare(UUID left, UUID right) {
+                int byPart = helpers.get(right).compareTo(helpers.get(left));
+                return byPart != 0 ? byPart
+                        : joined.indexOf(left) - joined.indexOf(right);
+            }
+        });
+        return ranked.size() <= places ? ranked
+                : new ArrayList<UUID>(ranked.subList(0, Math.max(0, places)));
+    }
+
+    /**
      * The identities to pay, in the order they joined the run.
      * {@code helpers} holds each identity's part in that order.
      */

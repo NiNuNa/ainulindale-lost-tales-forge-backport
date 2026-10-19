@@ -167,6 +167,8 @@ public final class LostTalesConfig {
      */
     public static String chatProfanityFilter = ChatProfanityMode.SILLY.name();
     public static boolean enableChatMessageGrouping = true;
+    /** Whether the account behind a character stands faint after its name on chat lines and in member lists; the card names it either way. */
+    public static boolean chatShowAccounts = true;
     /** Whether the world blurs behind every window while the window screen is open. */
     public static boolean windowBackgroundBlur = true;
     public static boolean enableNpcChatStyling = true;
@@ -338,7 +340,7 @@ public final class LostTalesConfig {
     public static boolean discordAchievements = true;
     /** Keep the channel topic saying whether the server is up and who is on. */
     public static boolean discordChannelStatus = true;
-    /** Least seconds between two topic writes; Discord allows two per ten minutes. */
+    /** Least seconds between two topic writes; five minutes at least, Discord's two in ten. */
     public static int discordChannelStatusIntervalSeconds = 300;
     /** Connect the bot to Discord's gateway for instant relay and slash commands. */
     public static boolean discordGateway = true;
@@ -365,6 +367,15 @@ public final class LostTalesConfig {
     public static boolean autoPinQuestOnStart = true;
     public static boolean autoDiscoverNearbyMapMarkers = true;
     public static int mapMarkerDiscoveryScanIntervalTicks = 40;
+    /**
+     * World quests started on the server's real clock (QUEST-36), one
+     * line each: {@code <quest id> <weekday> <HH:MM>} or
+     * {@code <quest id> every <days> days <HH:MM>}.
+     */
+    public static String[] worldQuestSchedules = new String[0];
+    /** The quests whose sealed starters every new character carries (QUEST-29); empty for none. */
+    public static String newCharacterStarterQuests =
+            "losttales:tutorial/starter_note,losttales:path/survivalist/first_sparks";
 
     public static boolean enableWaystoneRecipe = true;
     public static String waystoneRecipeCornerIngredient =
@@ -372,6 +383,11 @@ public final class LostTalesConfig {
     public static String waystoneRecipeEdgeIngredient = "ore:ingotGold";
     public static String waystoneRecipeCenterIngredient =
             "minecraft:ender_pearl";
+
+    public static boolean enableMissiveBoardRecipe = true;
+    public static String missiveBoardRecipeCornerIngredient = "ore:plankWood";
+    public static String missiveBoardRecipeEdgeIngredient = "ore:stickWood";
+    public static String missiveBoardRecipeCenterIngredient = "minecraft:paper";
 
     public static boolean enableDynamicMissiveBoards = true;
     public static int missiveBoardMinAvailable = 5;
@@ -405,8 +421,6 @@ public final class LostTalesConfig {
     public static int characterStateCheckpointIntervalSeconds = 300;
     public static int characterStateCheckpointPlayersPerTick = 1;
     public static int characterDeletionRetentionDays = 30;
-    /** Whether every player is shown which account plays a character; off, only who holds character.see_accounts. */
-    public static boolean showAccounts = true;
     public static long characterSwitchCombatGraceMillis = 20000L;
     public static long characterSwitchTeleportGraceMillis = 5000L;
 
@@ -610,12 +624,6 @@ public final class LostTalesConfig {
                     characterDeletionRetentionDays,
                     1,
                     3650,
-                    TIP
-            );
-            showAccounts = config.getBoolean(
-                    "showAccounts",
-                    CATEGORY_CHARACTERS,
-                    showAccounts,
                     TIP
             );
             sanitizeCharacterSwitchOptions();
@@ -1130,7 +1138,7 @@ public final class LostTalesConfig {
                     "channelStatusIntervalSeconds",
                     CATEGORY_DISCORD,
                     discordChannelStatusIntervalSeconds,
-                    60,
+                    300,
                     3600,
                     TIP
             );
@@ -1184,6 +1192,12 @@ public final class LostTalesConfig {
                     "enableChatMessageGrouping",
                     CATEGORY_CLIENT,
                     enableChatMessageGrouping,
+                    TIP
+            );
+            chatShowAccounts = config.getBoolean(
+                    "chatShowAccounts",
+                    CATEGORY_CLIENT,
+                    chatShowAccounts,
                     TIP
             );
             windowBackgroundBlur = config.getBoolean(
@@ -1441,6 +1455,18 @@ public final class LostTalesConfig {
                     200,
                     TIP
             );
+            newCharacterStarterQuests = config.getString(
+                    "newCharacterStarterQuests",
+                    CATEGORY_QUESTS,
+                    newCharacterStarterQuests,
+                    TIP
+            );
+            worldQuestSchedules = config.get(
+                    CATEGORY_QUESTS,
+                    "worldQuestSchedules",
+                    worldQuestSchedules,
+                    TIP
+            ).getStringList();
 
             enableWaystoneRecipe = config.getBoolean(
                     "enableWaystoneRecipe",
@@ -1464,6 +1490,31 @@ public final class LostTalesConfig {
                     "waystoneRecipeCenterIngredient",
                     CATEGORY_WAYSTONES,
                     waystoneRecipeCenterIngredient,
+                    TIP
+            );
+
+            enableMissiveBoardRecipe = config.getBoolean(
+                    "enableMissiveBoardRecipe",
+                    CATEGORY_MISSIVES,
+                    enableMissiveBoardRecipe,
+                    TIP
+            );
+            missiveBoardRecipeCornerIngredient = config.getString(
+                    "missiveBoardRecipeCornerIngredient",
+                    CATEGORY_MISSIVES,
+                    missiveBoardRecipeCornerIngredient,
+                    TIP
+            );
+            missiveBoardRecipeEdgeIngredient = config.getString(
+                    "missiveBoardRecipeEdgeIngredient",
+                    CATEGORY_MISSIVES,
+                    missiveBoardRecipeEdgeIngredient,
+                    TIP
+            );
+            missiveBoardRecipeCenterIngredient = config.getString(
+                    "missiveBoardRecipeCenterIngredient",
+                    CATEGORY_MISSIVES,
+                    missiveBoardRecipeCenterIngredient,
                     TIP
             );
 
@@ -2068,6 +2119,8 @@ public final class LostTalesConfig {
                 convertChatEmoticons).set(convertChatEmoticons);
         config.get(CATEGORY_CLIENT, "enableChatMessageGrouping",
                 enableChatMessageGrouping).set(enableChatMessageGrouping);
+        config.get(CATEGORY_CLIENT, "chatShowAccounts",
+                chatShowAccounts).set(chatShowAccounts);
         config.get(CATEGORY_CLIENT, "windowBackgroundBlur",
                 windowBackgroundBlur).set(windowBackgroundBlur);
         config.get(CATEGORY_CLIENT, "sendChatTypingStatus",
@@ -2199,7 +2252,6 @@ public final class LostTalesConfig {
                 characterStateCheckpointPlayersPerTick);
         config.get(CATEGORY_CHARACTERS, "characterDeletionRetentionDays",
                 characterDeletionRetentionDays).set(characterDeletionRetentionDays);
-        config.get(CATEGORY_CHARACTERS, "showAccounts", showAccounts).set(showAccounts);
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
         Property hudPresetProperty = config.get(CATEGORY_CLIENT, "hudPlacementPreset", hudPlacementPreset);
         hudPresetProperty.set(hudPlacementPreset);
@@ -2288,10 +2340,16 @@ public final class LostTalesConfig {
         config.get(CATEGORY_QUESTS, "autoPinQuestOnStart", autoPinQuestOnStart).set(autoPinQuestOnStart);
         config.get(CATEGORY_QUESTS, "autoDiscoverNearbyMapMarkers", autoDiscoverNearbyMapMarkers).set(autoDiscoverNearbyMapMarkers);
         config.get(CATEGORY_QUESTS, "mapMarkerDiscoveryScanIntervalTicks", mapMarkerDiscoveryScanIntervalTicks).set(mapMarkerDiscoveryScanIntervalTicks);
+        config.get(CATEGORY_QUESTS, "newCharacterStarterQuests", newCharacterStarterQuests).set(newCharacterStarterQuests);
+        config.get(CATEGORY_QUESTS, "worldQuestSchedules", worldQuestSchedules).set(worldQuestSchedules);
         config.get(CATEGORY_WAYSTONES, "enableWaystoneRecipe", enableWaystoneRecipe).set(enableWaystoneRecipe);
         config.get(CATEGORY_WAYSTONES, "waystoneRecipeCornerIngredient", waystoneRecipeCornerIngredient).set(waystoneRecipeCornerIngredient);
         config.get(CATEGORY_WAYSTONES, "waystoneRecipeEdgeIngredient", waystoneRecipeEdgeIngredient).set(waystoneRecipeEdgeIngredient);
         config.get(CATEGORY_WAYSTONES, "waystoneRecipeCenterIngredient", waystoneRecipeCenterIngredient).set(waystoneRecipeCenterIngredient);
+        config.get(CATEGORY_MISSIVES, "enableMissiveBoardRecipe", enableMissiveBoardRecipe).set(enableMissiveBoardRecipe);
+        config.get(CATEGORY_MISSIVES, "missiveBoardRecipeCornerIngredient", missiveBoardRecipeCornerIngredient).set(missiveBoardRecipeCornerIngredient);
+        config.get(CATEGORY_MISSIVES, "missiveBoardRecipeEdgeIngredient", missiveBoardRecipeEdgeIngredient).set(missiveBoardRecipeEdgeIngredient);
+        config.get(CATEGORY_MISSIVES, "missiveBoardRecipeCenterIngredient", missiveBoardRecipeCenterIngredient).set(missiveBoardRecipeCenterIngredient);
         config.get(CATEGORY_MISSIVES, "enableDynamicMissiveBoards", enableDynamicMissiveBoards).set(enableDynamicMissiveBoards);
         config.get(CATEGORY_MISSIVES, "missiveBoardMinAvailable", missiveBoardMinAvailable).set(missiveBoardMinAvailable);
         config.get(CATEGORY_MISSIVES, "missiveBoardMaxAvailable", missiveBoardMaxAvailable).set(missiveBoardMaxAvailable);

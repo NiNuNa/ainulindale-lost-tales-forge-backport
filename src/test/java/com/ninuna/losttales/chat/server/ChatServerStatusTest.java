@@ -37,6 +37,33 @@ public final class ChatServerStatusTest {
                         20, 0L));
     }
 
+    /**
+     * The topic leaves the time up out and gives the ticks a second to the
+     * nearest five, so the hours passing and a wavering speed leave its
+     * words as they are, while a join changes them.
+     */
+    @Test
+    public void theTopicChangesOnlyWithSomethingReal() {
+        assertEquals(Arrays.asList("3/20 players", "play.example.org", "20 TPS"),
+                ChatServerStatus.topicPartsOf(ENGLISH, 3, 20, "play.example.org", 19));
+        assertEquals(ChatServerStatus.topicPartsOf(ENGLISH, 3, 20, "", 20),
+                ChatServerStatus.topicPartsOf(ENGLISH, 3, 20, "", 18));
+        assertFalse("a join", ChatServerStatus.topicPartsOf(ENGLISH, 3, 20, "", 20)
+                .equals(ChatServerStatus.topicPartsOf(ENGLISH, 4, 20, "", 20)));
+        assertEquals(Arrays.asList("1 player", "15 TPS"),
+                ChatServerStatus.topicPartsOf(ENGLISH, 1, 0, "", 14));
+        for (int speed = 18; speed <= 20; speed++) {
+            assertEquals(20, ChatServerStatus.topicTicksPerSecond(speed));
+        }
+        assertEquals(15, ChatServerStatus.topicTicksPerSecond(17));
+        assertEquals(15, ChatServerStatus.topicTicksPerSecond(13));
+        assertEquals(10, ChatServerStatus.topicTicksPerSecond(12));
+        assertEquals(5, ChatServerStatus.topicTicksPerSecond(3));
+        assertEquals(0, ChatServerStatus.topicTicksPerSecond(2));
+        assertEquals(0, ChatServerStatus.topicTicksPerSecond(-4));
+        assertEquals(20, ChatServerStatus.topicTicksPerSecond(25));
+    }
+
     /** The time up, to the minute, as the lang file words it. */
     @Test
     public void theTimeUpReadsToTheMinute() {

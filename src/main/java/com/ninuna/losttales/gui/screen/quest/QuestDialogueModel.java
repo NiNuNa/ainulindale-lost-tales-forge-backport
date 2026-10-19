@@ -24,7 +24,9 @@ public final class QuestDialogueModel {
         /** It is under way and not yet finished. */
         PROGRESS,
         /** What it asked for is in hand and may be given over. */
-        HAND_IN
+        HAND_IN,
+        /** Its stage is done and waits for the player's choice (QUEST-32). */
+        CHOICE
     }
 
     /** What the player may say. */
@@ -38,7 +40,9 @@ public final class QuestDialogueModel {
         /** Refuse the quest. */
         DECLINE,
         /** End the conversation, having taken it or being part way through. */
-        LEAVE
+        LEAVE,
+        /** Make one of a stage's choices. */
+        CHOOSE
     }
 
     private final String speaker;
@@ -49,13 +53,32 @@ public final class QuestDialogueModel {
     private final String opening;
     private final String more;
     private final List<String> labels;
+    private final List<String> choices;
     private final boolean toldMore;
+
+    /** One thing the player may say: its kind, the choice it names (-1 for none) and its words. */
+    public static final class Option {
+        private final Reply reply;
+        private final int choice;
+        private final String label;
+
+        Option(Reply reply, int choice, String label) {
+            this.reply = reply;
+            this.choice = choice;
+            this.label = label;
+        }
+
+        public Reply getReply() { return this.reply; }
+        /** Which of the hand-in's choices it takes; -1 for a reply that names none. */
+        public int getChoice() { return this.choice; }
+        public String getLabel() { return this.label; }
+    }
 
     private QuestDialogueModel(String speaker, String subtitle,
                                String questTitle, String objective,
                                Mood mood, String opening,
                                String more, List<String> labels,
-                               boolean toldMore) {
+                               List<String> choices, boolean toldMore) {
         this.speaker = safe(speaker);
         this.subtitle = safe(subtitle);
         this.questTitle = safe(questTitle);
@@ -64,6 +87,7 @@ public final class QuestDialogueModel {
         this.opening = safe(opening);
         this.more = safe(more);
         this.labels = labels;
+        this.choices = choices;
         this.toldMore = toldMore;
     }
 
@@ -79,13 +103,32 @@ public final class QuestDialogueModel {
                                         String[] labels) {
         List<String> words = new ArrayList<String>();
         Reply[] replies = Reply.values();
-        for (int index = 0; index < replies.length; index++) {
+        for (int index = 0; index < replies.length - 1; index++) {
             words.add(labels != null && index < labels.length
                     && labels[index] != null ? labels[index].trim() : "");
         }
         return new QuestDialogueModel(speaker, subtitle, questTitle,
                 objective, mood, opening, more,
-                Collections.unmodifiableList(words), false);
+                Collections.unmodifiableList(words),
+                Collections.<String>emptyList(), false);
+    }
+
+    /**
+     * The same conversation whose hand-in offers a choice: one reply per
+     * entry of {@code choices}, each handing over and taking that one, in
+     * place of the single hand-over (a quest's pick of rewards, QUEST-33).
+     */
+    public QuestDialogueModel withChoices(List<String> choices) {
+        List<String> words = new ArrayList<String>();
+        if (choices != null) {
+            for (String choice : choices) {
+                words.add(choice == null ? "" : choice.trim());
+            }
+        }
+        return new QuestDialogueModel(this.speaker, this.subtitle,
+                this.questTitle, this.objective, this.mood, this.opening,
+                this.more, this.labels, Collections.unmodifiableList(words),
+                this.toldMore);
     }
 
     public String getSpeaker() { return this.speaker; }
@@ -112,34 +155,49 @@ public final class QuestDialogueModel {
         }
         return new QuestDialogueModel(this.speaker, this.subtitle,
                 this.questTitle, this.objective, this.mood,
-                this.opening, this.more, this.labels, true);
+                this.opening, this.more, this.labels, this.choices, true);
     }
 
     /**
      * What the player may say, in the order it is offered: what there is
-     * to do first, then asking for more, then leaving.
+     * to do first (a hand-in with a choice offers each), then asking for
+     * more, then leaving.
      */
-    public List<Reply> getReplies() {
-        List<Reply> offered = new ArrayList<Reply>();
+    public List<Option> getReplies() {
+        List<Option> offered = new ArrayList<Option>();
         if (this.mood == Mood.OFFER && labelOf(Reply.ACCEPT).length() > 0) {
-            offered.add(Reply.ACCEPT);
+            offered.add(option(Reply.ACCEPT));
         }
-        if (this.mood == Mood.HAND_IN && labelOf(Reply.HAND_OVER).length() > 0) {
-            offered.add(Reply.HAND_OVER);
+        if (this.mood == Mood.CHOICE) {
+            for (int index = 0; index < this.choices.size(); index++) {
+                offered.add(new Option(Reply.CHOOSE, index, this.choices.get(index)));
+            }
+        } else if (this.mood == Mood.HAND_IN && !this.choices.isEmpty()) {
+            for (int index = 0; index < this.choices.size(); index++) {
+                offered.add(new Option(Reply.HAND_OVER, index,
+                        this.choices.get(index)));
+            }
+        } else if (this.mood == Mood.HAND_IN
+                && labelOf(Reply.HAND_OVER).length() > 0) {
+            offered.add(option(Reply.HAND_OVER));
         }
         if (!this.toldMore && this.more.length() > 0
                 && labelOf(Reply.MORE).length() > 0) {
-            offered.add(Reply.MORE);
+            offered.add(option(Reply.MORE));
         }
-        offered.add(this.mood == Mood.OFFER
+        offered.add(option(this.mood == Mood.OFFER
                 && labelOf(Reply.DECLINE).length() > 0
-                ? Reply.DECLINE : Reply.LEAVE);
+                ? Reply.DECLINE : Reply.LEAVE));
         return Collections.unmodifiableList(offered);
+    }
+
+    private Option option(Reply reply) {
+        return new Option(reply, -1, labelOf(reply));
     }
 
     /** The words on a reply; empty where it was not written. */
     public String labelOf(Reply reply) {
-        return reply == null ? ""
+        return reply == null || reply.ordinal() >= this.labels.size() ? ""
                 : this.labels.get(reply.ordinal());
     }
 

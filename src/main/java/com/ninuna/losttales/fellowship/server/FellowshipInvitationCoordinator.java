@@ -2,7 +2,6 @@ package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.character.storage.CharacterIndex;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.validation.CharacterNames;
@@ -58,8 +57,7 @@ final class FellowshipInvitationCoordinator {
      * the server finds it among every roster and takes its owner and id
      * from there, never from the request. Refused for a name nobody goes
      * by, and once the fellowship or the character's account has as many
-     * invitations open as it may. A refusal kept by account reaches an
-     * inviter not shown accounts as one neutral refusal ({@link #toInviter}).
+     * invitations open as it may. Each refusal says its own reason.
      */
     FellowshipInvitationOperationResult invitePlayer(
             EntityPlayerMP player,
@@ -109,11 +107,9 @@ final class FellowshipInvitationCoordinator {
             return FellowshipInvitationOperationResult.failure(
                     FellowshipErrorId.TARGET_TOO_MANY_FELLOWSHIPS, fellowship, null);
         }
-        boolean seesAccounts = AccountVisibility.seesAccounts(player);
         if (fellowship.hasMemberOwnedBy(targetOwnerId)) {
             return FellowshipInvitationOperationResult.failure(
-                    toInviter(FellowshipErrorId.ACCOUNT_ALREADY_IN_FELLOWSHIP,
-                            seesAccounts), fellowship, null);
+                    FellowshipErrorId.ACCOUNT_ALREADY_IN_FELLOWSHIP, fellowship, null);
         }
         if (invitationData.hasInvitationForFellowshipAndTarget(
                 fellowship.getFellowshipId(), targetIdentityId)) {
@@ -123,8 +119,7 @@ final class FellowshipInvitationCoordinator {
         if (FellowshipDeclines.mustWait(fellowship.getFellowshipId(),
                 targetOwnerId, System.currentTimeMillis())) {
             return FellowshipInvitationOperationResult.failure(
-                    toInviter(FellowshipErrorId.RECENTLY_DECLINED, seesAccounts),
-                    fellowship, null);
+                    FellowshipErrorId.RECENTLY_DECLINED, fellowship, null);
         }
         if (invitationData.getInvitationsForFellowship(fellowship.getFellowshipId()).size()
                 >= FellowshipInvitation.MAX_PER_FELLOWSHIP) {
@@ -134,8 +129,7 @@ final class FellowshipInvitationCoordinator {
         if (invitationData.getInvitationCountForTargetAccount(targetOwnerId)
                 >= FellowshipInvitation.MAX_PER_TARGET_ACCOUNT) {
             return FellowshipInvitationOperationResult.failure(
-                    toInviter(FellowshipErrorId.TARGET_INVITATIONS_FULL, seesAccounts),
-                    fellowship, null);
+                    FellowshipErrorId.TARGET_INVITATIONS_FULL, fellowship, null);
         }
         UUID invitationId = createUniqueInvitationId(invitationData);
         if (invitationId == null) {
@@ -163,29 +157,6 @@ final class FellowshipInvitationCoordinator {
             this.fellowshipService.logFailure("invite", player, exception);
             return FellowshipInvitationOperationResult.failure(
                     FellowshipErrorId.INTERNAL_ERROR, fellowship, invitation);
-        }
-    }
-
-    /**
-     * What an inviter is told of a refusal. The refusals kept by account
-     * (another of its characters a member, one of them turned this
-     * fellowship down a moment ago, as many invitations waiting for the
-     * account as may) would each tell an inviter that two characters
-     * share an account, so one not shown accounts hears
-     * {@link FellowshipErrorId#TARGET_CANNOT_BE_INVITED} for all of them.
-     */
-    static FellowshipErrorId toInviter(FellowshipErrorId refusal,
-                                       boolean seesAccounts) {
-        if (seesAccounts) {
-            return refusal;
-        }
-        switch (refusal) {
-            case ACCOUNT_ALREADY_IN_FELLOWSHIP:
-            case RECENTLY_DECLINED:
-            case TARGET_INVITATIONS_FULL:
-                return FellowshipErrorId.TARGET_CANNOT_BE_INVITED;
-            default:
-                return refusal;
         }
     }
 

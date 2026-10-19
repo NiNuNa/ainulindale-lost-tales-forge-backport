@@ -41,11 +41,9 @@ public class WindowHover {
         SUB_WINDOW_RESIZE,
         /** The cross on a sub-window's strip. */
         SUB_WINDOW_CLOSE,
-        /** The padlock on a sub-window's strip. */
-        SUB_WINDOW_LOCK,
-        /** The grip at a sub-window's strip's end, which moves it while unlocked. */
+        /** The grip at a sub-window's strip's end, which moves it. */
         SUB_WINDOW_GRIP,
-        /** A sub-window's strip, which moves it while unlocked. */
+        /** A sub-window's strip, which moves it, and puts it back on a double-click. */
         SUB_WINDOW_STRIP,
         /** A sub-window's content where nothing of it answers. */
         SUB_WINDOW,
@@ -125,15 +123,12 @@ public class WindowHover {
     public boolean acts() {
         switch (this.kind) {
             case SUB_WINDOW_CLOSE:
-            case SUB_WINDOW_LOCK:
                 return true;
             case DENT:
                 return this.dentPart != null;
             case SUB_WINDOW_STRIP:
             case SUB_WINDOW_GRIP:
-                // A strip carries its sub-window only while it is not
-                // locked; a locked one is inert.
-                return this.subWindow != null && !this.subWindow.isLocked();
+                return this.subWindow != null;
             case TAB_ROW:
                 return !heldOnRow();
             case STRIP:

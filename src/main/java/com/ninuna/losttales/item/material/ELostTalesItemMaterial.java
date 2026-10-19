@@ -27,15 +27,19 @@ public enum ELostTalesItemMaterial {
     }
 
     /**
-     * A material named after a Lost Tales faction uses that faction; any other
-     * name must be one of LOTR's own factions (LOTHLORIEN is one — the mod
-     * deliberately has no faction of its own for it). NEUTRAL is LOTR's
-     * UNALIGNED pseudo-faction; its display name comes from the
-     * lotr.faction.UNALIGNED.name entry in this mod's lang file.
+     * The faction an item's Ctrl tooltip names. NEUTRAL is LOTR's UNALIGNED
+     * pseudo-faction, named by the lotr.faction.UNALIGNED.name line in this
+     * mod's lang file. ARNOR is LOTR's Rangers of the North, Arnor's heirs.
+     * A material named after a Lost Tales faction uses that faction; any
+     * other name is one of LOTR's own factions (LOTHLORIEN is one: the mod
+     * has no faction of its own for it).
      */
     private static LOTRFaction resolveFaction(String name) {
         if ("NEUTRAL".equals(name)) {
             return LOTRFaction.UNALIGNED;
+        }
+        if ("ARNOR".equals(name)) {
+            return LOTRFaction.RANGER_NORTH;
         }
         for (ELostTalesFaction f : ELostTalesFaction.values()) {
             if (f.name().equals(name)) {

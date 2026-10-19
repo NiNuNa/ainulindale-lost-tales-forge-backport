@@ -192,7 +192,7 @@ public final class CharacterService {
         }
         CharacterAppearanceValidationResult appearance =
                 CharacterValidator.validateAppearance(roster, characterId,
-                        current.getRaceId(), newName, current.getRaceId(),
+                        newName, current.getRaceId(),
                         current.getGenderId(), current.getSkinId(),
                         current.getBodyTypeId(), current.getChestTypeId(),
                         current.getProfile().section(CharacterProfile.Section.HISTORY),

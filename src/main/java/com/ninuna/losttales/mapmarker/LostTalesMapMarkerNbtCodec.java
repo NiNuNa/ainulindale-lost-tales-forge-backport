@@ -25,6 +25,8 @@ public final class LostTalesMapMarkerNbtCodec {
     private static final String DATA_VERSION = "DataVersion";
     private static final String MARKERS = "Markers";
     private static final String QUARANTINE = "Quarantine";
+    /** The character that owns a placed waystone (WAY-08). */
+    static final String OWNER_CHARACTER = "OwnerCharacter";
 
     private LostTalesMapMarkerNbtCodec() {}
 
@@ -152,7 +154,8 @@ public final class LostTalesMapMarkerNbtCodec {
         tag.setBoolean("HasWaystone", record.hasWaystone());
         tag.setString("StructureType", record.getWaystoneStructureType());
         tag.setInteger("Priority", record.getPriority());
-        NbtTags.writeUuid(tag, "Owner", record.getOwnerPlayerId());
+        NbtTags.writeUuid(tag, OWNER_CHARACTER,
+                record.getOwnerCharacterId());
         tag.setString("Visibility",
                 record.getVisibility().getSerializedName());
         NBTTagList shared = new NBTTagList();
@@ -236,7 +239,8 @@ public final class LostTalesMapMarkerNbtCodec {
                                     tag.getString("StructureType"))
                             .priority(tag.hasKey("Priority", Constants.NBT.TAG_INT)
                                     ? tag.getInteger("Priority") : 0)
-                            .ownerPlayerId(NbtTags.readUuid(tag, "Owner"))
+                            .ownerCharacterId(NbtTags.readUuid(
+                                    tag, OWNER_CHARACTER))
                             .visibility(
                                     LostTalesMapMarkerVisibility.forSerializedName(
                                             tag.getString("Visibility"),

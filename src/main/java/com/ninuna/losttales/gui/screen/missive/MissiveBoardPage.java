@@ -1,5 +1,10 @@
 package com.ninuna.losttales.gui.screen.missive;
 
+import com.ninuna.losttales.quest.world.WorldQuestView;
+import com.ninuna.losttales.quest.LostTalesQuestWords;
+import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
+import com.ninuna.losttales.client.quest.ClientWorldQuests;
 import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
@@ -96,10 +101,12 @@ public final class MissiveBoardPage extends PageContent
     private static final String ACCEPT = "accept";
     private static final String TAKE = "take";
     private static final String PIN = "pin";
+    private static final String HAND_IN = "hand_in";
     /** The keys the bar's buttons answer to while the page holds the keys. */
     private static final int ACCEPT_KEY = Keyboard.KEY_A;
     private static final int TAKE_KEY = Keyboard.KEY_T;
     private static final int PIN_KEY = Keyboard.KEY_P;
+    private static final int HAND_IN_KEY = Keyboard.KEY_H;
     /** Ticks a request waits for its answer before the page stops waiting: five seconds. */
     private static final int ANSWER_TICKS = 100;
 
@@ -255,7 +262,7 @@ public final class MissiveBoardPage extends PageContent
     private void read(LostTalesMissiveBoardStatePacket packet) {
         this.state = packet;
         this.receivedAt = worldTime();
-        this.pickedSlot = MissiveNoticeList.keepPick(packet.getNotices(),
+        this.pickedSlot = MissiveNoticeList.keepPick(allNotices(),
                 this.pickedSlot, this.pickedQuestId);
         MissiveNotice picked = picked();
         this.pickedQuestId = picked == null ? "" : picked.getQuestId();
@@ -288,16 +295,36 @@ public final class MissiveBoardPage extends PageContent
 
     private MissiveNotice picked() {
         return this.state == null ? null
-                : MissiveNoticeList.inSlot(this.state.getNotices(),
-                        this.pickedSlot);
+                : MissiveNoticeList.inSlot(allNotices(), this.pickedSlot);
     }
+
+    /**
+     * Every notice the page shows: each running world quest's first, as
+     * every board shows them (QUEST-36), then the board's own.
+     */
+    private List<MissiveNotice> allNotices() {
+        if (this.state == null) {
+            return Collections.emptyList();
+        }
+        List<MissiveNotice> all = new ArrayList<MissiveNotice>();
+        long now = worldTime();
+        int index = 0;
+        for (WorldQuestView view : ClientWorldQuests.running()) {
+            all.add(MissiveNotice.world(WORLD_SLOTS - index++,
+                    Math.max(0L, view.getEndsAt() - now), view.getQuestId()));
+        }
+        all.addAll(this.state.getNotices());
+        return all;
+    }
+
+    /** The page's own slots for world quests' notices, counting down below every board slot. */
+    private static final int WORLD_SLOTS = -2;
 
     private void pick(int slot) {
         if (slot == this.pickedSlot || this.state == null) {
             return;
         }
-        MissiveNotice notice = MissiveNoticeList.inSlot(
-                this.state.getNotices(), slot);
+        MissiveNotice notice = MissiveNoticeList.inSlot(allNotices(), slot);
         if (notice != null) {
             this.pickedSlot = slot;
             this.pickedQuestId = notice.getQuestId();
@@ -321,7 +348,7 @@ public final class MissiveBoardPage extends PageContent
     /** The notices the search keeps, in slot order. */
     private List<MissiveNotice> listed() {
         return this.state == null ? Collections.<MissiveNotice>emptyList()
-                : MissiveNoticeList.of(this.state.getNotices(), this.query);
+                : MissiveNoticeList.of(allNotices(), this.query);
     }
 
     private long worldTime() {
@@ -391,7 +418,7 @@ public final class MissiveBoardPage extends PageContent
     private void acceptPicked() {
         MissiveNotice picked = picked();
         if (this.state == null || picked == null || !picked.isReadable()
-                || this.waiting) {
+                || picked.isWorld() || this.waiting) {
             return;
         }
         send(LostTalesMissiveAcceptPacket.fromBoard(
@@ -403,7 +430,8 @@ public final class MissiveBoardPage extends PageContent
     /** Takes the picked notice down into the inventory. */
     private void takePicked() {
         MissiveNotice picked = picked();
-        if (this.state == null || picked == null || this.waiting) {
+        if (this.state == null || picked == null || picked.isWorld()
+                || this.waiting) {
             return;
         }
         send(LostTalesMissiveBoardRequestPacket.take(
@@ -441,6 +469,36 @@ public final class MissiveBoardPage extends PageContent
                 this.state.getDimensionId(), this.state.getX(),
                 this.state.getY(), this.state.getZ(), slot, questId));
         this.pinning = questId;
+    }
+
+    /** Hands in every missive of the player's that waits for a board (QUEST-31). */
+    private void handIn() {
+        if (this.state == null || this.waiting) {
+            return;
+        }
+        send(LostTalesMissiveBoardRequestPacket.handIn(
+                this.state.getDimensionId(), this.state.getX(),
+                this.state.getY(), this.state.getZ()));
+    }
+
+    /**
+     * How much there is to hand in at a board: the player's missives
+     * waiting for one, their work done, and one more where they carry what
+     * a running world quest's board delivery asks for (QUEST-36).
+     */
+    private int missivesToHandIn() {
+        int count = com.ninuna.losttales.client.quest.ClientWorldQuests
+                .carriesForBoard(this.mc.thePlayer) ? 1 : 0;
+        for (com.ninuna.losttales.quest.progress.LostTalesQuestProgress progress
+                : LostTalesClientQuestProgressStore.getActiveQuests()) {
+            if (progress.isReturning() && com.ninuna.losttales.quest.LostTalesQuestRules
+                    .returnsToBoard(com.ninuna.losttales.client.quest
+                            .LostTalesClientQuestDefinitionStore.getQuest(
+                                    progress.getQuestId()))) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /** Sends a request and waits for the board's answer. */
@@ -535,8 +593,16 @@ public final class MissiveBoardPage extends PageContent
             LostTalesUiHitBox letter = layout.letter();
             if (letter.width > 0 && letter.height > 0) {
                 MissiveNotice picked = picked();
-                this.view.draw(minecraft, letter, picked == null ? null
-                        : picked.getMissive(), emptyWords(picked), alpha);
+                if (picked != null && picked.isWorld()) {
+                    this.view.drawWorld(minecraft, letter,
+                            LostTalesClientQuestDefinitionStore.getQuest(
+                                    picked.getQuestId()),
+                            ClientWorldQuests.view(picked.getQuestId()),
+                            picked.getTicksLeft(), alpha);
+                } else {
+                    this.view.draw(minecraft, letter, picked == null ? null
+                            : picked.getMissive(), emptyWords(picked), alpha);
+                }
             }
         } finally {
             GL11.glPopMatrix();
@@ -636,9 +702,14 @@ public final class MissiveBoardPage extends PageContent
                 LostTalesUiInk.CAP_HEIGHT);
         boolean isPicked = notice.getSlot() == this.pickedSlot;
         LostTalesMissiveData missive = notice.getMissive();
-        String title = missive == null ? word("unreadable")
+        LostTalesQuestDefinition world = notice.isWorld()
+                ? LostTalesClientQuestDefinitionStore.getQuest(notice.getQuestId())
+                : null;
+        String title = notice.isWorld() ? word("world.title",
+                world == null ? notice.getQuestId() : LostTalesQuestWords.title(world))
+                : missive == null ? word("unreadable")
                 : MissiveWords.title(missive);
-        int titleRgb = missive == null ? WindowStyle.asideRgb()
+        int titleRgb = missive == null && !notice.isWorld() ? WindowStyle.asideRgb()
                 : isPicked ? LostTalesUiInk.IVORY
                 : LostTalesColors.rgb(LostTalesColors.TEXT);
         int width = Math.max(0, right - left);
@@ -654,7 +725,8 @@ public final class MissiveBoardPage extends PageContent
             LostTalesUiInk.drawText(font, time, right - timeWidth, second,
                     WindowStyle.asideRgb(), alpha);
         }
-        String issuer = MissiveWords.issuer(missive);
+        String issuer = notice.isWorld() ? word("world.issuer")
+                : MissiveWords.issuer(missive);
         if (issuer.length() > 0) {
             LostTalesUiInk.drawText(font, LostTalesSkyrimUiStyle.trimToWidth(
                             font, issuer, Math.max(0, width - timeWidth
@@ -720,6 +792,7 @@ public final class MissiveBoardPage extends PageContent
                 PageKeys.pageKey(PAGE_ID, "accept", Keyboard.KEY_A),
                 PageKeys.pageKey(PAGE_ID, "take", Keyboard.KEY_T),
                 PageKeys.pageKey(PAGE_ID, "pin", Keyboard.KEY_P),
+                PageKeys.pageKey(PAGE_ID, "hand_in", Keyboard.KEY_H),
                 PageKeys.pageKey(PAGE_ID, "pick",
                         Keyboard.KEY_UP, PageKeys.OR, Keyboard.KEY_DOWN),
                 PageKeys.pageKey(PAGE_ID, "turn",
@@ -738,12 +811,14 @@ public final class MissiveBoardPage extends PageContent
             return false;
         }
         if (keyCode == ACCEPT_KEY || keyCode == TAKE_KEY
-                || keyCode == PIN_KEY) {
+                || keyCode == PIN_KEY || keyCode == HAND_IN_KEY) {
             String why = keyCode == ACCEPT_KEY ? whyNotAccept()
-                    : keyCode == TAKE_KEY ? whyNotTake() : whyNotPin();
+                    : keyCode == TAKE_KEY ? whyNotTake()
+                    : keyCode == PIN_KEY ? whyNotPin() : whyNotHandIn();
             if (why == null || why.length() == 0) {
                 barPressed(keyCode == ACCEPT_KEY ? ACCEPT
-                        : keyCode == TAKE_KEY ? TAKE : PIN, -1);
+                        : keyCode == TAKE_KEY ? TAKE
+                        : keyCode == PIN_KEY ? PIN : HAND_IN, -1);
             }
             return true;
         }
@@ -849,9 +924,9 @@ public final class MissiveBoardPage extends PageContent
     /* ---- The window's bar ---- */
 
     /**
-     * Accept, Take Letter and Pin Letter, each there whatever is picked,
-     * greyed with the reason where it cannot be taken, and at the right
-     * how many notices the board posts of how many it holds.
+     * Accept, Take Letter, Pin Letter and Hand In, each there whatever is
+     * picked, greyed with the reason where it cannot be taken, and at the
+     * right how many notices the board posts of how many it holds.
      */
     @Override
     public List<BarItem> barItems() {
@@ -871,6 +946,10 @@ public final class MissiveBoardPage extends PageContent
                 new ItemStack(Items.sign)).tip(WindowBar.withKey(
                         word("pin.tip"), PIN_KEY)),
                 whyNotPin()));
+        items.add(orWhy(BarItem.button(HAND_IN, word("hand_in"),
+                LostTalesUiSheet.QUEST, LostTalesUiSheet.QUEST_HOVER)
+                .tip(WindowBar.withKey(word("hand_in.tip"), HAND_IN_KEY)),
+                whyNotHandIn()));
         items.add(BarItem.words(word("available",
                 Integer.valueOf(this.state.getNotices().size()),
                 Integer.valueOf(this.state.getMaxNotices()))));
@@ -899,6 +978,11 @@ public final class MissiveBoardPage extends PageContent
                 LostTalesTileEntityMissiveBoard.INVENTORY_SIZE, this.waiting);
     }
 
+    /** Why Hand In cannot be taken now, as a lang key; empty while it can. */
+    private String whyNotHandIn() {
+        return MissiveActions.whyNotHandIn(missivesToHandIn(), this.waiting);
+    }
+
     /** Greyed with the words of {@code whyKey}; as it is for an empty key. */
     private static BarItem orWhy(BarItem item, String whyKey) {
         return whyKey == null || whyKey.length() == 0 ? item
@@ -913,6 +997,8 @@ public final class MissiveBoardPage extends PageContent
             takePicked();
         } else if (PIN.equals(id)) {
             pinFromBar();
+        } else if (HAND_IN.equals(id)) {
+            handIn();
         }
     }
 }

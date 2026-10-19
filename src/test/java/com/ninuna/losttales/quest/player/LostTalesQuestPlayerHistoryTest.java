@@ -54,6 +54,83 @@ public final class LostTalesQuestPlayerHistoryTest {
                 "losttales:optional", "help_scout"));
     }
 
+    /**
+     * A retake keeps the last end's line while it runs, counts each
+     * completion, and a retake given up keeps the count: the quest stays
+     * "ever completed" for every prerequisite (QUEST-10).
+     */
+    @Test
+    public void aRetakeKeepsTheHistoryLineAndCountsCompletions() {
+        String id = "losttales:again";
+        LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
+        data.startQuest(id, "first", 10L, 0L);
+        assertTrue(data.completeQuest(id, "", 20L, Collections.<String>emptySet()));
+        assertEquals(1, data.getQuestHistoryEntry(id).getCompletions());
+
+        data.startQuest(id, "first", 30L, 0L);
+        assertTrue("the line stays while the retake runs",
+                data.getQuestHistoryEntry(id) != null);
+        assertTrue(data.isQuestActive(id));
+        assertTrue(data.isQuestCompleted(id));
+        assertTrue(data.completeQuest(id, "", 40L, Collections.<String>emptySet()));
+        assertEquals(2, data.getQuestHistoryEntry(id).getCompletions());
+        assertEquals(40L, data.getQuestHistoryEntry(id).getWorldTime());
+
+        data.startQuest(id, "first", 50L, 0L);
+        assertTrue(data.abandonQuest(id, "gui.losttales.quest.reason.abandoned", 60L));
+        LostTalesQuestHistoryEntry line = data.getQuestHistoryEntry(id);
+        assertTrue(line.isAbandoned());
+        assertEquals("an abandoned retake keeps the count", 2, line.getCompletions());
+        assertTrue("still ever completed", data.isQuestCompleted(id));
+        assertEquals(Collections.singleton(id), data.getCompletedQuestIds());
+
+        data.startQuest(id, "first", 70L, 0L);
+        assertTrue(data.failQuest(id, "gui.losttales.quest.reason.expired", 80L));
+        assertEquals(2, data.getQuestHistoryEntry(id).getCompletions());
+
+        NBTTagCompound wrapper = new NBTTagCompound();
+        data.saveNBTData(wrapper);
+        LostTalesQuestPlayerData loaded = new LostTalesQuestPlayerData();
+        loaded.loadNBTData(wrapper);
+        assertEquals(2, loaded.getQuestHistoryEntry(id).getCompletions());
+        assertTrue(loaded.getQuestHistoryEntry(id).isFailed());
+
+        assertTrue("only an operator's reset clears it", loaded.resetQuest(id));
+        assertFalse(loaded.isQuestCompleted(id));
+    }
+
+    /** The stages a quest reached are kept while it runs and with its line (QUEST-30). */
+    @Test
+    public void theStagesReachedAreKept() {
+        String id = "losttales:tale";
+        LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
+        data.startQuest(id, "start", 10L, 0L);
+        data.setQuestStage(id, 2, "end");
+        assertEquals(java.util.Arrays.asList("start", "end"),
+                data.getActiveQuest(id).getStagePath());
+
+        NBTTagCompound wrapper = new NBTTagCompound();
+        data.saveNBTData(wrapper);
+        LostTalesQuestPlayerData loaded = new LostTalesQuestPlayerData();
+        loaded.loadNBTData(wrapper);
+        assertEquals(java.util.Arrays.asList("start", "end"),
+                loaded.getActiveQuest(id).getStagePath());
+
+        loaded.completeQuest(id, "", 20L, Collections.<String>emptySet());
+        assertEquals(java.util.Arrays.asList("start", "end"),
+                loaded.getQuestHistoryEntry(id).getStagePath());
+        NBTTagCompound again = new NBTTagCompound();
+        loaded.saveNBTData(again);
+        LostTalesQuestPlayerData reloaded = new LostTalesQuestPlayerData();
+        reloaded.loadNBTData(again);
+        assertEquals(java.util.Arrays.asList("start", "end"),
+                reloaded.getQuestHistoryEntry(id).getStagePath());
+        assertFalse(reloaded.isReadOnlyForNewerVersion());
+        // A character's copy of the log reads back exactly as written.
+        LostTalesQuestPlayerData.validateCharacterState(
+                reloaded.writeCharacterState());
+    }
+
     @Test
     public void completionOutcomeUsesTheSameTerminalHistory() {
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();

@@ -130,12 +130,10 @@ public final class ClientChatChannelState {
      */
     private static java.util.Set<String> readableChannels = DEFAULT_READABLE;
     private static java.util.Set<String> sendableChannels = DEFAULT_SENDABLE;
-    /** The channels linked to Discord, by link key, as the server said. */
-    /** Whether this player is shown which account plays a character; not until the server says so. */
-    private static boolean seesAccounts;
     /** The commands the server keeps private ({@code chat.privateCommands}). */
     private static final java.util.Set<String> PRIVATE_COMMANDS =
             new java.util.LinkedHashSet<String>();
+    /** The channels linked to Discord, by link key, as the server said. */
     private static final java.util.Set<String> DISCORD_LINKS =
             new java.util.HashSet<String>();
     /** Server-stated muted senders; filled for operators only. */
@@ -788,15 +786,6 @@ public final class ClientChatChannelState {
      * Replaces the server's statement of which channels are linked to
      * Discord, by code name ({@code global}, {@code gondor}).
      */
-    /** States whether this player is shown which account plays a character. */
-    public static synchronized void setSeesAccounts(boolean sees) {
-        seesAccounts = sees;
-    }
-
-    /** Whether this player is shown which account plays a character: only then does a card name it. */
-    public static synchronized boolean seesAccounts() {
-        return seesAccounts;
-    }
 
     /**
      * The commands the server keeps private: their echo here keeps only
@@ -1138,7 +1127,6 @@ public final class ClientChatChannelState {
         SENT_HISTORY.clear();
         DISCORD_LINKS.clear();
         PRIVATE_COMMANDS.clear();
-        seesAccounts = false;
     }
 
     /**
@@ -1192,12 +1180,10 @@ public final class ClientChatChannelState {
         for (CharacterAppearance appearance
                 : ClientCharacterAppearanceCache.snapshot().values()) {
             if (appearance != null
-                    && named.equalsIgnoreCase(appearance.getCharacterName())) {
-                // Not shown the account, the conversation is filed under
-                // the character itself.
-                String account = appearance.getAccountName().length() > 0
-                        ? appearance.getAccountName() : appearance.getCharacterName();
-                return new String[] {account, appearance.getCharacterName()};
+                    && named.equalsIgnoreCase(appearance.getCharacterName())
+                    && appearance.getAccountName().length() > 0) {
+                return new String[] {appearance.getAccountName(),
+                        appearance.getCharacterName()};
             }
         }
         return null;

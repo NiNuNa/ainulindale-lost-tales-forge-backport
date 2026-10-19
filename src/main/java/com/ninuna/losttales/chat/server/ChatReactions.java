@@ -282,6 +282,90 @@ public final class ChatReactions {
     }
 
     /**
+     * Puts the Discord members' reactions with one emoji, made in the
+     * Discord channel {@code channel}, right by what Discord lists for it
+     * there: each member in {@code listed}, by name, who has none here
+     * gains one, as {@link #discordKeyOf} files it, but for those in
+     * {@code refused}; and, when {@code complete}, each one made in that
+     * channel whom Discord no longer lists is taken back. The players'
+     * reactions stay, and so do those made in another Discord channel.
+     * {@code emoji} and {@code customId} are as {@link #discordKeyOf}
+     * takes them. Answers whether anything changed.
+     */
+    public boolean setDiscord(String emoji, String customId, String channel,
+                              Map<UUID, String> listed, Set<UUID> refused,
+                              boolean complete) {
+        if (channel == null || channel.length() == 0 || listed == null) {
+            return false;
+        }
+        boolean changed = false;
+        // Added first, so a custom emoji's key stays the one the message
+        // holds for its id even when every member before is taken back.
+        for (Map.Entry<UUID, String> member : listed.entrySet()) {
+            UUID reactor = member.getKey();
+            if (reactor == null || !LostTalesChatMessagePacket.isDiscordSender(reactor)
+                    || (refused != null && refused.contains(reactor))) {
+                continue;
+            }
+            String key = discordKeyOf(emoji, customId, reactor, true);
+            LinkedHashMap<UUID, String> reactors = key == null ? null
+                    : this.byEmoji.get(key);
+            if (key != null && (reactors == null || !reactors.containsKey(reactor))
+                    && set(key, reactor, member.getValue(), channel, true)) {
+                changed = true;
+            }
+        }
+        if (!complete) {
+            return changed;
+        }
+        List<String> keys = customKeysOf(customId);
+        if (keys.isEmpty() && emoji != null) {
+            keys = Collections.singletonList(emoji);
+        }
+        for (String key : keys) {
+            LinkedHashMap<UUID, String> reactors = this.byEmoji.get(key);
+            if (reactors == null) {
+                continue;
+            }
+            for (UUID reactor : new ArrayList<UUID>(reactors.keySet())) {
+                if (LostTalesChatMessagePacket.isDiscordSender(reactor)
+                        && channel.equals(originOf(key, reactor))
+                        && !listed.containsKey(reactor)
+                        && set(key, reactor, "", channel, false)) {
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * How many Discord members reacted with each emoji in the Discord
+     * channel {@code channel}, by key; an emoji none of them used there is
+     * left out.
+     */
+    public Map<String, Integer> discordCountsIn(String channel) {
+        Map<String, Integer> counts = new LinkedHashMap<String, Integer>();
+        if (channel == null || channel.length() == 0) {
+            return counts;
+        }
+        for (Map.Entry<String, LinkedHashMap<UUID, String>> kind
+                : this.byEmoji.entrySet()) {
+            int made = 0;
+            for (UUID reactor : kind.getValue().keySet()) {
+                if (LostTalesChatMessagePacket.isDiscordSender(reactor)
+                        && channel.equals(originOf(kind.getKey(), reactor))) {
+                    made++;
+                }
+            }
+            if (made > 0) {
+                counts.put(kind.getKey(), Integer.valueOf(made));
+            }
+        }
+        return counts;
+    }
+
+    /**
      * Who stands behind the emoji, which decides the bridge's own
      * reaction on each Discord copy. A custom emoji counts every key of
      * its id, since the bot's one reaction there is by the id.

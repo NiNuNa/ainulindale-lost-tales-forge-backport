@@ -23,8 +23,7 @@ import org.lwjgl.opengl.GL11;
  * the left limbs mirror the right ones, the hat is the hanging hair and
  * beard cuboid at (0,32) where the shape has one, and features read the
  * texels LOTR painted for them. An armor variant reads the classic 64x32
- * armor layout and keeps only the proportions of its shape; the half-troll's
- * armor is painted for its own 64x64 box layout and keeps it. Feature parts
+ * armor layout and keeps only the proportions of its shape. Feature parts
  * are children of the limb they belong to, so every pose the biped takes
  * moves them.
  */
@@ -91,21 +90,9 @@ public final class LostTalesPlayerModel extends ModelBiped {
         boolean minecraftLayout = !armorTexture
                 && layout == CharacterSkinLayout.MINECRAFT_64X64;
         int armWidth = slim ? 3 : 4;
-        boolean drawChest = chest != null && !chest.isNone() && !armorTexture
-                && !shape.isHalfTroll();
+        boolean drawChest = chest != null && !chest.isNone() && !armorTexture;
         this.chestShape = drawChest ? chest.getShape() : CharacterChestTypeRegistry.Shape.NONE;
         this.chestSize = drawChest ? chest.getSize() : 0.0F;
-
-        if (shape.isHalfTroll()) {
-            buildHalfTroll(inflation, slim, armorTexture);
-            this.overlays = new ModelRenderer[0];
-            this.chestLeft = null;
-            this.chestRight = null;
-            this.chestLeftOverlay = null;
-            this.chestRightOverlay = null;
-            applyShapePivots();
-            return;
-        }
 
         if (slim) {
             this.bipedRightArm = new ModelRenderer(this, 40, 16);
@@ -239,86 +226,6 @@ public final class LostTalesPlayerModel extends ModelBiped {
         }
 
         applyShapePivots();
-    }
-
-    /**
-     * The half-troll replaces every biped box. Its armor is painted for the
-     * same boxes, so the armor variant keeps them and only drops the
-     * features on the head. Parts start at vanilla's pivots; the shape's
-     * pivot rules then move them, as they do after every pose.
-     */
-    private void buildHalfTroll(float inflation, boolean slim, boolean armorTexture) {
-        this.bipedHead = new ModelRenderer(this, 0, 0);
-        this.bipedHead.setRotationPoint(0.0F, 0.0F, 0.0F);
-        this.bipedHead.addBox(-5.0F, -10.0F, -5.0F, 10, 10, 10, inflation);
-        this.bipedHead.setTextureOffset(40, 5);
-        this.bipedHead.addBox(-4.0F, -3.0F, -7.0F, 8, 3, 2, inflation);
-        if (!armorTexture) {
-            ModelRenderer nose = child(this.bipedHead, 30, 0,
-                    -1.0F, -4.5F, -8.0F, 2, 3, 3, inflation);
-            nose.rotateAngleX = -(float)Math.toRadians(20.0D);
-            ModelRenderer tusks = new ModelRenderer(this, 60, 7);
-            tusks.addBox(-3.5F, -7.5F, -5.0F, 1, 2, 1, inflation);
-            tusks.mirror = true;
-            tusks.addBox(2.5F, -7.5F, -5.0F, 1, 2, 1, inflation);
-            tusks.rotateAngleX = (float)Math.toRadians(30.0D);
-            this.bipedHead.addChild(tusks);
-            ModelRenderer earRight = child(this.bipedHead, 0, 0,
-                    -5.0F, -6.0F, -2.0F, 1, 3, 3, inflation);
-            earRight.rotateAngleY = -(float)Math.toRadians(35.0D);
-            ModelRenderer earLeft = new ModelRenderer(this, 0, 0);
-            earLeft.mirror = true;
-            earLeft.addBox(4.0F, -6.0F, -2.0F, 1, 3, 3, inflation);
-            earLeft.rotateAngleY = (float)Math.toRadians(35.0D);
-            this.bipedHead.addChild(earLeft);
-            child(this.bipedHead, 40, 10, -1.0F, -12.5F, -1.5F, 2, 10, 8, inflation);
-            ModelRenderer hornRight = child(this.bipedHead, 40, 0,
-                    -10.0F, -8.0F, 1.0F, 3, 2, 2, inflation);
-            hornRight.rotateAngleZ = (float)Math.toRadians(20.0D);
-            ModelRenderer hornRightTip = child(this.bipedHead, 50, 2,
-                    -14.5F, -4.0F, 1.5F, 3, 1, 1, inflation);
-            hornRightTip.rotateAngleZ = (float)Math.toRadians(40.0D);
-            ModelRenderer hornLeft = new ModelRenderer(this, 40, 0);
-            hornLeft.mirror = true;
-            hornLeft.addBox(7.0F, -8.0F, 1.0F, 3, 2, 2, inflation);
-            hornLeft.rotateAngleZ = -(float)Math.toRadians(20.0D);
-            this.bipedHead.addChild(hornLeft);
-            ModelRenderer hornLeftTip = new ModelRenderer(this, 50, 2);
-            hornLeftTip.mirror = true;
-            hornLeftTip.addBox(11.5F, -4.0F, 1.5F, 3, 1, 1, inflation);
-            hornLeftTip.rotateAngleZ = -(float)Math.toRadians(40.0D);
-            this.bipedHead.addChild(hornLeftTip);
-        }
-
-        this.bipedBody = new ModelRenderer(this, 0, 20);
-        this.bipedBody.setRotationPoint(0.0F, -8.0F, 0.0F);
-        this.bipedBody.addBox(-6.0F, 0.0F, -4.0F, 12, 16, 8, inflation);
-
-        // Slim trims one pixel off the outer side of each arm piece.
-        int upperWidth = slim ? 5 : 6;
-        int lowerWidth = slim ? 4 : 5;
-        this.bipedRightArm = new ModelRenderer(this, 20, 50);
-        this.bipedRightArm.setRotationPoint(-VANILLA_ARM_REACH, 0.0F, 0.0F);
-        this.bipedRightArm.addBox(slim ? -2.5F : -3.5F, -2.0F, -3.0F,
-                upperWidth, 8, 6, inflation);
-        this.bipedRightArm.setTextureOffset(0, 49);
-        this.bipedRightArm.addBox(slim ? -2.0F : -3.0F, 6.0F, -2.5F,
-                lowerWidth, 10, 5, inflation);
-        this.bipedLeftArm = new ModelRenderer(this, 20, 50);
-        this.bipedLeftArm.setRotationPoint(VANILLA_ARM_REACH, 0.0F, 0.0F);
-        this.bipedLeftArm.mirror = true;
-        this.bipedLeftArm.addBox(-2.5F, -2.0F, -3.0F, upperWidth, 8, 6, inflation);
-        this.bipedLeftArm.setTextureOffset(0, 49);
-        this.bipedLeftArm.addBox(-2.0F, 6.0F, -2.5F, lowerWidth, 10, 5, inflation);
-
-        this.bipedRightLeg = new ModelRenderer(this, 40, 28);
-        this.bipedRightLeg.setRotationPoint(-3.2F, 12.0F, 0.0F);
-        this.bipedRightLeg.addBox(-3.0F, 0.0F, -3.0F, 6, 16, 6, inflation);
-        this.bipedLeftLeg = new ModelRenderer(this, 40, 28);
-        this.bipedLeftLeg.setRotationPoint(3.2F, 12.0F, 0.0F);
-        this.bipedLeftLeg.mirror = true;
-        this.bipedLeftLeg.addBox(-3.0F, 0.0F, -3.0F, 6, 16, 6, inflation);
-        this.bipedHeadwear.isHidden = true;
     }
 
     /** True when a feminine chest is drawn. */
@@ -542,9 +449,6 @@ public final class LostTalesPlayerModel extends ModelBiped {
 
     private static int textureHeight(PlayerBodyShape shape, CharacterSkinLayout layout,
                                      boolean armorTexture) {
-        if (shape != null && shape.isHalfTroll()) {
-            return TEXTURE_SIZE;
-        }
         if (armorTexture || layout == CharacterSkinLayout.LOTR_64X32) {
             return CLASSIC_TEXTURE_HEIGHT;
         }

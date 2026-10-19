@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import org.lwjgl.input.Keyboard;
 
 /**
@@ -245,7 +246,6 @@ public final class PageKeys {
                         window("pages.help", Keyboard.KEY_F1, OR, CLICK),
                         window("pages.search", COMMAND, PLUS, Keyboard.KEY_F),
                         window("pages.borderless", alt, PLUS, enter, OR, CLICK),
-                        window("pages.borderless_lock", CLICK),
                         window("pages.split", CLICK),
                         window("pages.split_drop", DRAG),
                         window("pages.split_divider", DRAG, OR, DOUBLE_CLICK),
@@ -279,7 +279,8 @@ public final class PageKeys {
                         window("menus.views", CLICK),
                         window("menus.view_menu", RIGHT_CLICK),
                         window("menus.new_view", CLICK),
-                        window("menus.settings", COMMAND, PLUS, Keyboard.KEY_COMMA),
+                        window("menus.settings", COMMAND, PLUS,
+                                LostTalesKeyBindings.getSettingsKeyBinding().getKeyCode()),
                         window("menus.open", COMMAND, PLUS, Keyboard.KEY_N),
                         window("menus.tab_search", COMMAND, PLUS, shift, PLUS, Keyboard.KEY_A),
                         window("menus.switcher", COMMAND, PLUS, Keyboard.KEY_K),

@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatTypedText;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -28,7 +29,8 @@ public final class LostTalesChatUpdatePacket implements IMessage {
             64 + ChatMessageValidator.MAX_UTF8_BYTES
                     + 4 + LostTalesChatMessagePacket.MAX_BODY_BYTES
                     + LostTalesChatNamedPlayerCodec.MAX_BYTES
-                    + LostTalesChatRoleMentionCodec.MAX_BYTES;
+                    + LostTalesChatRoleMentionCodec.MAX_BYTES
+                    + 5 + ChatTypedText.MAX_UTF8_BYTES;
 
     private long messageId = ChatMessageIds.NONE;
     /** Whether the message is gone rather than rewritten. */
@@ -46,6 +48,8 @@ public final class LostTalesChatUpdatePacket implements IMessage {
     private List<ChatNamedPlayer> namedPlayers = Collections.emptyList();
     /** The roles the new words call, by id; none for a removal. */
     private List<String> mentionedRoles = Collections.emptyList();
+    /** What the editor typed for the new words, on the editor's own copy alone. */
+    private String typed = "";
     private boolean malformed;
 
     public LostTalesChatUpdatePacket() {}
@@ -100,6 +104,8 @@ public final class LostTalesChatUpdatePacket implements IMessage {
                     buffer, LostTalesChatMessagePacket.MAX_BODY_BYTES);
             this.namedPlayers = LostTalesChatNamedPlayerCodec.read(buffer);
             this.mentionedRoles = LostTalesChatRoleMentionCodec.read(buffer);
+            this.typed = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatTypedText.MAX_UTF8_BYTES);
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -110,6 +116,7 @@ public final class LostTalesChatUpdatePacket implements IMessage {
             this.bodyJson = "";
             this.namedPlayers = Collections.emptyList();
             this.mentionedRoles = Collections.emptyList();
+            this.typed = "";
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -125,6 +132,8 @@ public final class LostTalesChatUpdatePacket implements IMessage {
                 LostTalesChatMessagePacket.MAX_BODY_BYTES);
         LostTalesChatNamedPlayerCodec.write(buffer, this.namedPlayers);
         LostTalesChatRoleMentionCodec.write(buffer, this.mentionedRoles);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.typed,
+                ChatTypedText.MAX_UTF8_BYTES);
     }
 
     private void validate() {
@@ -133,32 +142,15 @@ public final class LostTalesChatUpdatePacket implements IMessage {
                         || this.bodyJson.length() > 0
                         || !this.namedPlayers.isEmpty()
                         || !this.mentionedRoles.isEmpty()
+                        || this.typed.length() > 0
                         : !ChatMessageValidator.isValid(this.message))
+                || !ChatTypedText.isValid(this.typed)
                 || !LostTalesChatRoleMentionCodec.isValid(this.mentionedRoles)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(this.bodyJson,
                         LostTalesChatMessagePacket.MAX_BODY_BYTES)
                 || this.namedPlayers.size() > ChatNamedPlayer.MAX_PER_LINE) {
             throw new IllegalArgumentException("invalid chat update");
         }
-    }
-
-    /**
-     * The same edit as {@code reader}, who is not shown which account plays
-     * a character, is sent it: whom the new words name as characters is
-     * named without the account, unless it is the reader.
-     */
-    public LostTalesChatUpdatePacket withoutAccountsFor(java.util.UUID reader) {
-        if (this.removed || this.namedPlayers.isEmpty()) {
-            return this;
-        }
-        List<ChatNamedPlayer> named = new java.util.ArrayList<ChatNamedPlayer>(
-                this.namedPlayers.size());
-        for (ChatNamedPlayer player : this.namedPlayers) {
-            named.add(reader != null && reader.equals(player.getPlayerId())
-                    ? player : player.withoutAccount());
-        }
-        return new LostTalesChatUpdatePacket(this.messageId, false, this.message,
-                this.bodyJson, named, this.mentionedRoles);
     }
 
     /** The message this is about. */
@@ -173,6 +165,21 @@ public final class LostTalesChatUpdatePacket implements IMessage {
     public List<ChatNamedPlayer> getNamedPlayers() { return this.namedPlayers; }
     /** The roles the new words call, by id. */
     public List<String> getMentionedRoles() { return this.mentionedRoles; }
+
+    /** The same edit as its editor is told it: with what they typed for the new words. */
+    public LostTalesChatUpdatePacket withTyped(String typed) {
+        if (this.removed) {
+            return this;
+        }
+        LostTalesChatUpdatePacket copy = new LostTalesChatUpdatePacket(this.messageId,
+                false, this.message, this.bodyJson, this.namedPlayers,
+                this.mentionedRoles);
+        copy.typed = ChatTypedText.kept(typed, this.message);
+        return copy;
+    }
+
+    /** What the editor typed for the new words; empty on every other copy. */
+    public String getTyped() { return this.typed; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<

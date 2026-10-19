@@ -23,6 +23,28 @@ public final class LostTalesQuestActionPacketTest {
         assertEquals(LOTR_QUEST, decoded.getQuestId());
     }
 
+    /** A hand-in names the item taken from its pick; a choice past a pick's is malformed (QUEST-33). */
+    @Test
+    public void aHandInCarriesItsChoice() {
+        ByteBuf buffer = Unpooled.buffer();
+        new LostTalesQuestActionPacket(LostTalesQuestActionPacket.ACTION_HAND_IN,
+                "losttales:test/q", 2).toBytes(buffer);
+        LostTalesQuestActionPacket decoded = new LostTalesQuestActionPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(2, decoded.getChoice());
+        assertEquals(-1, roundTrip(LostTalesQuestActionPacket.ACTION_HAND_IN,
+                "losttales:test/q").getChoice());
+
+        ByteBuf forged = Unpooled.buffer();
+        new LostTalesQuestActionPacket(LostTalesQuestActionPacket.ACTION_HAND_IN,
+                "losttales:test/q").toBytes(forged);
+        forged.setByte(forged.writerIndex() - 1, 9);
+        LostTalesQuestActionPacket refused = new LostTalesQuestActionPacket();
+        refused.fromBytes(forged);
+        assertTrue(refused.isMalformed());
+    }
+
     @Test
     public void anActionThatNeedsAQuestIsRefusedWithoutOne() {
         assertTrue(roundTrip(LostTalesQuestActionPacket.ACTION_CLEAR, "")

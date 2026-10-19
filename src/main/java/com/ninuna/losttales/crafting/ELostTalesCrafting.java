@@ -42,29 +42,49 @@ public enum ELostTalesCrafting {
             }
         }
         registerWaystoneRecipe();
+        registerMissiveBoardRecipe();
 
         // LOTR has already populated these lists before required-after mods run.
         // Repeating its global initializer duplicates the base mod's recipes.
     }
 
     private static void registerWaystoneRecipe() {
-        if (!LostTalesConfig.enableWaystoneRecipe) {
-            return;
+        if (LostTalesConfig.enableWaystoneRecipe) {
+            registerRingRecipe("Waystone", ELostTalesBlock.WAYSTONE,
+                    LostTalesConfig.waystoneRecipeCornerIngredient,
+                    LostTalesConfig.waystoneRecipeEdgeIngredient,
+                    LostTalesConfig.waystoneRecipeCenterIngredient);
         }
-        Object corner = resolveIngredient(
-                LostTalesConfig.waystoneRecipeCornerIngredient);
-        Object edge = resolveIngredient(
-                LostTalesConfig.waystoneRecipeEdgeIngredient);
-        Object center = resolveIngredient(
-                LostTalesConfig.waystoneRecipeCenterIngredient);
+    }
+
+    /** The missive board, so a survival player finds boards by playing (QUEST-29). */
+    private static void registerMissiveBoardRecipe() {
+        if (LostTalesConfig.enableMissiveBoardRecipe) {
+            registerRingRecipe("Missive board", ELostTalesBlock.MISSIVE_BOARD,
+                    LostTalesConfig.missiveBoardRecipeCornerIngredient,
+                    LostTalesConfig.missiveBoardRecipeEdgeIngredient,
+                    LostTalesConfig.missiveBoardRecipeCenterIngredient);
+        }
+    }
+
+    /**
+     * A block made of three ingredients the server's settings name: one in
+     * the corners, one on the edges, one at the centre.
+     */
+    private static void registerRingRecipe(String name, ELostTalesBlock block,
+                                           String cornerName, String edgeName,
+                                           String centerName) {
+        Object corner = resolveIngredient(cornerName);
+        Object edge = resolveIngredient(edgeName);
+        Object center = resolveIngredient(centerName);
         if (corner == null || edge == null || center == null) {
             FMLLog.warning(
-                    "[%s] Waystone recipe was not registered because a configured ingredient is invalid",
-                    LostTalesMetaData.MOD_ID);
+                    "[%s] %s recipe was not registered because a configured ingredient is invalid",
+                    LostTalesMetaData.MOD_ID, name);
             return;
         }
         GameRegistry.addRecipe(new ShapedOreRecipe(
-                new ItemStack(ELostTalesBlock.WAYSTONE.getBlock()),
+                new ItemStack(block.getBlock()),
                 "CEC", "EKE", "CEC",
                 Character.valueOf('C'), corner,
                 Character.valueOf('E'), edge,

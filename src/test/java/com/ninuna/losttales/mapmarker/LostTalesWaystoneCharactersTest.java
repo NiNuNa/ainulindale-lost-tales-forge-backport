@@ -39,22 +39,8 @@ public final class LostTalesWaystoneCharactersTest {
         LostTalesMapMarkerRecord record = LostTalesMapMarkerRecord.createPlayerMarker(
                 "losttales:player/abc", "Aragorn", OWNER, 0, 1.0D, 64.0D, 1.0D,
                 UUID.randomUUID()).withSharedCharacters(
-                Collections.singleton(ownersCharacter),
-                LostTalesMapMarkerVisibility.SHARED);
+                Collections.singleton(ownersCharacter));
         assertTrue(record.getSharedCharacterIds().contains(ownersCharacter));
-    }
-
-    /**
-     * Naming a character of the owner's own account is turned down only
-     * for whoever knows it is theirs: the owner, or a sharer shown
-     * accounts.
-     */
-    @Test
-    public void theOwnersOwnCharacterIsRefusedOnlyWhereThatTellsNothing() {
-        assertTrue(LostTalesWaystoneSettingsService.refusesOwnerShare(true, false));
-        assertTrue(LostTalesWaystoneSettingsService.refusesOwnerShare(true, true));
-        assertTrue(LostTalesWaystoneSettingsService.refusesOwnerShare(false, true));
-        assertFalse(LostTalesWaystoneSettingsService.refusesOwnerShare(false, false));
     }
 
     private static RoleplayCharacter character(String name) {

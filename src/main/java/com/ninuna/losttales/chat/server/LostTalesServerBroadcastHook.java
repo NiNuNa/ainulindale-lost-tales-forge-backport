@@ -11,11 +11,9 @@ import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatReplyReference;
-import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
@@ -93,8 +91,6 @@ public final class LostTalesServerBroadcastHook {
     private static final long SHARED_COPY_MILLIS = 1000L;
     /** More shared lines going out at once than this is more than a tick holds. */
     private static final int MAX_SHARED_COPIES = 16;
-    /** How deep a line's parts are walked; far past any line the game builds. */
-    private static final int MAX_DEPTH = 32;
     /** The shared lines whose copies are going out, by their chat JSON. */
     private static final Map<String, SharedCopy> SHARED_COPIES =
             new LinkedHashMap<String, SharedCopy>();
@@ -343,8 +339,7 @@ public final class LostTalesServerBroadcastHook {
         if (recipients == null) {
             return ChatMessageIds.NONE;
         }
-        List<ChatNamedPlayer> named = withoutHiddenAccounts(message, channel,
-                namedPlayers(message, channel));
+        List<ChatNamedPlayer> named = namedPlayers(message, channel);
         long messageId = record(message, channel, "", recipients,
                 channel == ChatChannel.CLIENT_CONSOLE
                         ? ChatHistory.Audience.accounts(recipients, false)
@@ -383,8 +378,7 @@ public final class LostTalesServerBroadcastHook {
             mark(message, copy.messageId, copy.named);
             return;
         }
-        List<ChatNamedPlayer> named = withoutHiddenAccounts(message, channel,
-                namedPlayers(message, channel));
+        List<ChatNamedPlayer> named = namedPlayers(message, channel);
         List<UUID> recipients = onlineAccounts();
         if (recipients == null) {
             return;
@@ -401,52 +395,6 @@ public final class LostTalesServerBroadcastHook {
             while (SHARED_COPIES.size() > MAX_SHARED_COPIES && oldest.hasNext()) {
                 oldest.next();
                 oldest.remove();
-            }
-        }
-    }
-
-    /**
-     * The players an in-character line names, and the line itself, as
-     * they go out while the server shows no accounts: a death or an
-     * achievement names the character and goes to everyone alike, so its
-     * names and its whisper clicks carry no account at all. An
-     * out-of-character line, and every line while accounts are shown,
-     * stays as it is.
-     */
-    private static List<ChatNamedPlayer> withoutHiddenAccounts(
-            IChatComponent message, ChatChannel channel, List<ChatNamedPlayer> named) {
-        if (LostTalesConfig.showAccounts || !ChatRolePresentation.isInCharacter(channel)) {
-            return named;
-        }
-        withoutWhisperClicks(message, 0);
-        List<ChatNamedPlayer> shown = new ArrayList<ChatNamedPlayer>(named.size());
-        for (ChatNamedPlayer player : named) {
-            shown.add(player.withoutAccount());
-        }
-        return shown;
-    }
-
-    /** Takes the account out of every {@code /msg <account>} click in the line, keeping the click that marks a name. */
-    private static void withoutWhisperClicks(IChatComponent part, int depth) {
-        if (part == null || depth > MAX_DEPTH) {
-            return;
-        }
-        ClickEvent click = part.getChatStyle().getChatClickEvent();
-        if (click != null && click.getAction() == ClickEvent.Action.SUGGEST_COMMAND
-                && click.getValue() != null && click.getValue().startsWith(WHISPER_SUGGESTION)) {
-            part.getChatStyle().setChatClickEvent(new ClickEvent(
-                    ClickEvent.Action.SUGGEST_COMMAND, WHISPER_SUGGESTION));
-        }
-        if (part instanceof ChatComponentTranslation) {
-            for (Object argument : ((ChatComponentTranslation)part).getFormatArgs()) {
-                if (argument instanceof IChatComponent) {
-                    withoutWhisperClicks((IChatComponent)argument, depth + 1);
-                }
-            }
-        }
-        for (Object sibling : part.getSiblings()) {
-            if (sibling instanceof IChatComponent) {
-                withoutWhisperClicks((IChatComponent)sibling, depth + 1);
             }
         }
     }

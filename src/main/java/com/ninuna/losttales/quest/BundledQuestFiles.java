@@ -16,9 +16,11 @@ import java.util.Map;
  * and on the client: {@code quests/index.json} lists them, and each is
  * parsed in the index's order. A file that is missing or cannot be read,
  * an index that cannot be read, a file whose id is too long for the
- * {@link LostTalesQuestIds} bound, and a file whose id an earlier file has
- * are left out with a line saying why; the others still load. The server
- * reads the files from its classpath, the client from its resources.
+ * {@link LostTalesQuestIds} bound, a file whose id an earlier file has, and
+ * a file with any warning ({@link LostTalesQuestDefinitionValidator},
+ * QUEST-04) are left out with a line for each reason; the others still
+ * load. The server reads the files from its classpath, the client from its
+ * resources.
  *
  * <p>Each quest read is worded by the lang lines its id names
  * ({@link LostTalesQuestWords#bundled}); the files hold no words of their
@@ -55,7 +57,9 @@ public final class BundledQuestFiles {
                 new LinkedHashMap<String, LostTalesQuestDefinition>();
         Map<String, String> fileOf = new LinkedHashMap<String, String>();
         for (String file : index(source, problems)) {
-            LostTalesQuestDefinition quest = parse(source, file, problems);
+            List<String> unread = new ArrayList<String>();
+            LostTalesQuestDefinition quest = parse(source, file, problems,
+                    unread);
             if (quest == null) {
                 continue;
             }
@@ -76,9 +80,18 @@ public final class BundledQuestFiles {
                         + " is already " + earlier + "'s");
                 continue;
             }
+            LostTalesQuestDefinition worded = LostTalesQuestWords.bundled(
+                    quest, LostTalesLangFile.english());
+            List<String> warnings = LostTalesQuestDefinitionValidator
+                    .warningsOf(worded, unread);
+            if (!warnings.isEmpty()) {
+                for (String warning : warnings) {
+                    problems.add(file + ": " + warning);
+                }
+                continue;
+            }
             fileOf.put(quest.getId(), file);
-            byId.put(quest.getId(), LostTalesQuestWords.bundled(quest,
-                    LostTalesLangFile.english()));
+            byId.put(quest.getId(), worded);
         }
         return new Result(new ArrayList<LostTalesQuestDefinition>(
                 byId.values()), problems);
@@ -120,7 +133,7 @@ public final class BundledQuestFiles {
     }
 
     private static LostTalesQuestDefinition parse(Source source, String file,
-                                                  List<String> problems) {
+            List<String> problems, List<String> unread) {
         Reader reader = null;
         try {
             reader = source.open(file);
@@ -129,7 +142,8 @@ public final class BundledQuestFiles {
                 return null;
             }
             LostTalesQuestDefinition quest =
-                    LostTalesQuestDefinitionJsonParser.parseQuest(reader, file);
+                    LostTalesQuestDefinitionJsonParser.parseQuest(reader,
+                            file, unread);
             if (quest == null) {
                 problems.add(file + " is not a quest");
             }

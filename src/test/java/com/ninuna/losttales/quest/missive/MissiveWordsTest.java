@@ -127,7 +127,7 @@ public final class MissiveWordsTest {
         assertEquals("The stores are running short of iron ingots. Bring what"
                 + " is asked and take the posted reward.",
                 MissiveWords.description(iron));
-        assertEquals("hostile creatures", MissiveWords.targetNoun("hostile"));
+        assertEquals("enemies", MissiveWords.targetNoun("enemy"));
     }
 
     /**
@@ -145,14 +145,14 @@ public final class MissiveWordsTest {
                         .format(MissiveWords.targetKey("minecraft:log"))));
 
         LostTalesMissiveData zombies = counted("kill", "entity", "Zombie", 5);
-        LostTalesMissiveData hostile = counted("kill", "group", "hostile", 6);
+        LostTalesMissiveData enemies = counted("kill", "group", "enemy", 6);
         LostTalesMissiveData logs = counted("gather", "item", "minecraft:log", 10);
         LostTalesMissiveData iron = counted("gather", "item",
                 "minecraft:iron_ingot", 4);
         assertEquals("Defeat 5 zombies.", MissiveWords.objective(
                 zombies.getObjectives().get(0)));
-        assertEquals("Defeat 6 hostile creatures.", MissiveWords.objective(
-                hostile.getObjectives().get(0)));
+        assertEquals("Defeat 6 enemies.", MissiveWords.objective(
+                enemies.getObjectives().get(0)));
         assertEquals("Gather 10 logs.", MissiveWords.objective(
                 logs.getObjectives().get(0)));
         assertEquals("Gather 4 iron ingots.", MissiveWords.objective(
@@ -218,7 +218,8 @@ public final class MissiveWordsTest {
         assertEquals(MissiveWords.description(letter),
                 LostTalesQuestWords.description(quest));
         assertEquals("A steady blade and a brave heart will be paid in coin"
-                + " and thanks.", LostTalesQuestWords.journalLine(quest, 0));
+                + " and thanks.", LostTalesQuestWords.journalParagraphs(quest,
+                java.util.Collections.<String>emptyList(), false).get(0));
         for (LostTalesQuestObjectiveDefinition objective
                 : quest.getStages().get(0).getObjectives()) {
             assertEquals("", objective.getDescription());
@@ -266,7 +267,7 @@ public final class MissiveWordsTest {
     public void theQuestLogKeepsTheWordsAsIds() {
         LostTalesQuestDefinition quest = LostTalesMissiveQuestFactory
                 .createQuestDefinition(letter("kill", "clear_the_paths",
-                        "local_watch", "roads_open", "hostile"));
+                        "local_watch", "roads_open", "enemy"));
         NBTTagCompound tag = com.ninuna.losttales.quest.LostTalesQuestDefinitionNbt
                 .write(quest);
         LostTalesQuestDefinition read = com.ninuna.losttales.quest

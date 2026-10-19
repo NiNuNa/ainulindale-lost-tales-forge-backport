@@ -1,11 +1,15 @@
 package com.ninuna.losttales.network.packet.character;
 
+import com.ninuna.losttales.character.lore.LoreCharacterDefinition;
+import com.ninuna.losttales.character.lore.LoreCharacterDefinitionJsonParser;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSnapshot;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSummary;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.Test;
 
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.UUID;
 
@@ -47,6 +51,67 @@ public final class LoreCharacterSyncPacketTest {
         } finally {
             buffer.release();
         }
+    }
+
+    /**
+     * Whatever a lore file may hold travels: an id at its longest and a
+     * name of multi-byte letters at its longest, so one server file never
+     * stops the lore list reaching anyone.
+     */
+    @Test
+    public void aLoreFigureAtTheFilesBoundsTravels() {
+        StringBuilder id = new StringBuilder("myserver:");
+        while (id.length() < LoreCharacterDefinition.MAX_ID_LENGTH) {
+            id.append('a');
+        }
+        StringBuilder name = new StringBuilder();
+        while (name.toString().getBytes(StandardCharsets.UTF_8).length + 4
+                <= LoreCharacterDefinition.MAX_NAME_BYTES) {
+            name.append("𐍈");
+        }
+        LoreCharacterDefinitionJsonParser.ParseResult parsed =
+                LoreCharacterDefinitionJsonParser.parseDefinition(new StringReader(
+                        "{\"dataVersion\":1,\"id\":\"" + id + "\",\"name\":\""
+                                + name + "\",\"description\":\"\","
+                                + "\"appearance\":null}"), "long.json");
+        assertTrue(parsed.getErrors().toString(), parsed.isValid());
+        LoreCharacterSummary longest = new LoreCharacterSummary(
+                parsed.getDefinition().getId(), parsed.getDefinition().getName(),
+                "", "", "", "", "", false, false, false, false, "", null, 0L);
+        ByteBuf buffer = Unpooled.buffer();
+        try {
+            new LoreCharacterSyncPacket(new LoreCharacterSnapshot(
+                    Arrays.asList(longest), false, false)).toBytes(buffer);
+            LoreCharacterSyncPacket decoded = new LoreCharacterSyncPacket();
+            decoded.fromBytes(buffer);
+            assertFalse(decoded.isMalformed());
+            assertEquals(name.toString(),
+                    decoded.getSnapshot().getCharacters().get(0).getName());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    public void aLoreFileWithAnIdOrNamePastTheWiresBoundsIsRefused() {
+        StringBuilder id = new StringBuilder("myserver:");
+        while (id.length() <= LoreCharacterDefinition.MAX_ID_LENGTH) {
+            id.append('a');
+        }
+        assertFalse(LoreCharacterDefinitionJsonParser.parseDefinition(
+                new StringReader("{\"dataVersion\":1,\"id\":\"" + id
+                        + "\",\"name\":\"Long\",\"description\":\"\","
+                        + "\"appearance\":null}"), "id.json").isValid());
+        StringBuilder name = new StringBuilder();
+        for (int index = 0; index < LoreCharacterDefinition.MAX_NAME_BYTES / 3 + 1;
+                index++) {
+            name.append('ლ');
+        }
+        assertTrue(name.length() <= LoreCharacterDefinition.MAX_NAME_LENGTH);
+        assertFalse(LoreCharacterDefinitionJsonParser.parseDefinition(
+                new StringReader("{\"dataVersion\":1,\"id\":\"myserver:long\","
+                        + "\"name\":\"" + name + "\",\"description\":\"\","
+                        + "\"appearance\":null}"), "name.json").isValid());
     }
 
     @Test

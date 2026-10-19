@@ -8,18 +8,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Where each kind of sub-window was last locked, remembered per account
- * in the layout file, and which windows were open when the screen last
+ * Where each kind of sub-window was last put, remembered per account in
+ * the layout file, and which windows were open when the screen last
  * closed. A window opens where its opener puts it, such as hanging from
- * the control pressed, until the player unlocks it, moves or resizes it
- * and locks it again; from then on it opens there, until one of its kind
- * is closed while unlocked.
- * A place is kept from the corner of its window's room it was locked
- * nearest to, past that room's edges too, so a picker locked by a
- * window's bottom right corner opens by the bottom right corner of
- * whichever window it opens in, however large. A kind the player has only
- * moved keeps its content's own size, which changes with what it holds;
- * one they have resized keeps the size they gave it.
+ * the control pressed, until the player moves or resizes one of its kind;
+ * from then on it opens there, until a double-click on a strip of its kind
+ * puts it back (WIN-43).
+ * A place is kept from the corner of its window's room it was put
+ * nearest to, past that room's edges too, so a picker put by a window's
+ * bottom right corner opens by the bottom right corner of whichever window
+ * it opens in, however large. A kind the player has only moved keeps its
+ * content's own size, which changes with what it holds; one they have
+ * resized keeps the size they gave it.
  */
 public final class SubWindowPlaces {
     /** The widest and tallest a remembered size is read as. */
@@ -72,7 +72,7 @@ public final class SubWindowPlaces {
         }
     }
 
-    /** A window open as the screen closed: what it was, what it held, where it stood in which window, and whether it was locked. */
+    /** A window open as the screen closed: what it was, what it held, and where it stood in which window. */
     public static final class Reopening {
         public final SubWindowKind kind;
         final String key;
@@ -80,18 +80,23 @@ public final class SubWindowPlaces {
         public final Object state;
         /** The window it stood in; null for the bare screen. */
         final String parentId;
+        /** Where it stood from its window's room's top left. */
         final double x;
         final double y;
         final int width;
         final int height;
         /** Whether the player had given it its size. */
         final boolean sized;
-        /** Whether it stood locked: its place then counts from its window's room, else from the screen. */
-        final boolean locked;
+        /** Where its opener put it, and the size it gave: where a double-click puts it back. */
+        final double homeX;
+        final double homeY;
+        final int homeWidth;
+        final int homeHeight;
 
         Reopening(SubWindowKind kind, String key, Object state,
                   String parentId, double x, double y, int width, int height,
-                  boolean sized, boolean locked) {
+                  boolean sized, double homeX, double homeY, int homeWidth,
+                  int homeHeight) {
             this.kind = kind;
             this.key = key;
             this.state = state;
@@ -101,7 +106,10 @@ public final class SubWindowPlaces {
             this.width = width;
             this.height = height;
             this.sized = sized;
-            this.locked = locked;
+            this.homeX = homeX;
+            this.homeY = homeY;
+            this.homeWidth = homeWidth;
+            this.homeHeight = homeHeight;
         }
     }
 
@@ -119,8 +127,8 @@ public final class SubWindowPlaces {
     }
 
     /**
-     * Remembers where the player locked a window in its room, with its
-     * size when {@code sized}, and writes the layout file.
+     * Remembers where the player put a window in its room, with its size
+     * when {@code sized}, and writes the layout file.
      */
     static void remember(SubWindowKind kind, double x, double y,
                          int width, int height, boolean sized,
@@ -133,8 +141,9 @@ public final class SubWindowPlaces {
     }
 
     /**
-     * Forgets where the kind was locked, as one of it closes unlocked, and
-     * writes the layout file: the kind opens where its opener puts it.
+     * Forgets where the kind was put, as a double-click puts one of it
+     * back, and writes the layout file: the kind opens where its opener
+     * puts it.
      */
     static void forget(SubWindowKind kind) {
         boolean forgot;

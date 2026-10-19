@@ -67,7 +67,58 @@ public final class LostTalesClientQuestProgressStore {
                 ? "" : storedPinnedMarkerId;
     }
 
+    /**
+     * The running quests held, each one of {@code moved} standing in place
+     * of the quest it names; one the log does not hold is left out.
+     */
+    public static synchronized Collection<LostTalesQuestProgress> withCounts(
+            Collection<LostTalesQuestProgress> moved) {
+        Map<String, LostTalesQuestProgress> active =
+                new LinkedHashMap<String, LostTalesQuestProgress>();
+        for (LostTalesQuestProgress progress : ACTIVE_QUESTS.values()) {
+            active.put(progress.getQuestId(), progress.copy());
+        }
+        if (moved != null) {
+            for (LostTalesQuestProgress progress : moved) {
+                if (progress != null && active.containsKey(progress.getQuestId())) {
+                    active.put(progress.getQuestId(), progress.copy());
+                }
+            }
+        }
+        return Collections.unmodifiableCollection(
+                new ArrayList<LostTalesQuestProgress>(active.values()));
+    }
+
+    /** Puts {@code activeQuests} in place of the running quests held; the rest of the log stays. */
+    public static synchronized void replaceActiveQuests(
+            Collection<LostTalesQuestProgress> activeQuests) {
+        ACTIVE_QUESTS.clear();
+        if (activeQuests != null) {
+            for (LostTalesQuestProgress progress : activeQuests) {
+                if (progress != null && progress.getQuestId() != null
+                        && progress.getQuestId().length() > 0) {
+                    ACTIVE_QUESTS.put(progress.getQuestId(), progress.copy());
+                }
+            }
+        }
+    }
+
+    /** The quests whose rumours the character heard, as the server last said (QUEST-20). */
+    private static final Set<String> HEARD_RUMOURS = new LinkedHashSet<String>();
+
+    public static synchronized void setHeardRumours(Collection<String> rumours) {
+        HEARD_RUMOURS.clear();
+        if (rumours != null) {
+            HEARD_RUMOURS.addAll(rumours);
+        }
+    }
+
+    public static synchronized Set<String> getHeardRumours() {
+        return Collections.unmodifiableSet(new LinkedHashSet<String>(HEARD_RUMOURS));
+    }
+
     public static synchronized void clear() {
+        HEARD_RUMOURS.clear();
         ACTIVE_QUESTS.clear();
         QUEST_HISTORY.clear();
         DISCOVERED_MARKERS.clear();
@@ -85,10 +136,11 @@ public final class LostTalesClientQuestProgressStore {
         return Collections.unmodifiableCollection(copy);
     }
 
+    /** The quests ever completed, however a later run of each ended. */
     public static synchronized Set<String> getCompletedQuestIds() {
         LinkedHashSet<String> completed = new LinkedHashSet<String>();
         for (LostTalesQuestHistoryEntry entry : QUEST_HISTORY.values()) {
-            if (entry.isCompleted()) {
+            if (entry.wasEverCompleted()) {
                 completed.add(entry.getQuestId());
             }
         }
@@ -115,9 +167,10 @@ public final class LostTalesClientQuestProgressStore {
         return ACTIVE_QUESTS.containsKey(questId);
     }
 
+    /** Whether the quest was ever completed, however a later run of it ended. */
     public static synchronized boolean isQuestCompleted(String questId) {
         LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
-        return entry != null && entry.isCompleted();
+        return entry != null && entry.wasEverCompleted();
     }
 
     public static synchronized boolean isMarkerDiscovered(String markerId) {

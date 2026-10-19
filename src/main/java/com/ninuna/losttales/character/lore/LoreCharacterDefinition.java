@@ -13,6 +13,15 @@ public final class LoreCharacterDefinition {
     public static final int DEFAULT_AGE = 18;
     /** A description, in characters. */
     public static final int MAX_DESCRIPTION_LENGTH = 512;
+    /**
+     * An id, and each id of its appearance, in characters: the lore list
+     * every player is sent takes no longer.
+     */
+    public static final int MAX_ID_LENGTH = 128;
+    /** A name, in characters. */
+    public static final int MAX_NAME_LENGTH = 64;
+    /** A name, in UTF-8 bytes: the lore list every player is sent takes no longer. */
+    public static final int MAX_NAME_BYTES = 128;
 
     private final String id;
     private final String name;

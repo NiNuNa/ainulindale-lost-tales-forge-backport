@@ -8,24 +8,32 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
 /**
- * A giver offers the player a quest: the creature that speaks, by its
- * entity id, and the quest, by its id. The server sends it as the player
- * touches the giver, once the quest is one the client may know
+ * A giver offers the player a quest, or somebody tells its rumour
+ * (QUEST-20): the creature that speaks, by its entity id, the quest, by
+ * its id, and which of the two it is. The server sends it as the player
+ * touches them, once the quest is one the client may know
  * ({@link com.ninuna.losttales.quest.ServerQuestSync}); the client opens
- * the conversation. Taking the offer is a request the start gate checks
- * again.
+ * the conversation, or says the rumour. Taking an offer is a request the
+ * start gate checks again.
  */
 public final class LostTalesQuestOfferPacket implements IMessage {
-    private static final int MAX_PACKET_BYTES = 4 + 2 + LostTalesQuestIds.MAX_BYTES;
+    private static final int MAX_PACKET_BYTES = 4 + 2 + LostTalesQuestIds.MAX_BYTES + 1;
 
     private int entityId;
     private String questId = "";
+    private boolean rumour;
     private boolean malformed;
 
     public LostTalesQuestOfferPacket() {}
 
     public LostTalesQuestOfferPacket(int entityId, String questId) {
+        this(entityId, questId, false);
+    }
+
+    /** An offer, or with {@code rumour} the quest's rumour told. */
+    public LostTalesQuestOfferPacket(int entityId, String questId, boolean rumour) {
         this.entityId = entityId;
+        this.rumour = rumour;
         this.questId = questId == null ? "" : questId;
         if (!isValid()) {
             throw new IllegalArgumentException("invalid quest offer");
@@ -43,6 +51,7 @@ public final class LostTalesQuestOfferPacket implements IMessage {
             this.entityId = buf.readInt();
             this.questId = LostTalesPacketCodec.readUtf8String(buf,
                     LostTalesQuestIds.MAX_BYTES);
+            this.rumour = buf.readBoolean();
             LostTalesPacketCodec.requireFinished(buf);
             if (!isValid()) {
                 throw new LostTalesPacketCodec.DecodeException(
@@ -64,6 +73,12 @@ public final class LostTalesQuestOfferPacket implements IMessage {
         buf.writeInt(this.entityId);
         LostTalesPacketCodec.writeUtf8String(buf, this.questId,
                 LostTalesQuestIds.MAX_BYTES);
+        buf.writeBoolean(this.rumour);
+    }
+
+    /** Whether it tells the quest's rumour rather than offering the quest. */
+    public boolean isRumour() {
+        return this.rumour;
     }
 
     public int getEntityId() {

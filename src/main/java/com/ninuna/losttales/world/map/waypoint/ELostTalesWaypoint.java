@@ -28,16 +28,6 @@ public enum ELostTalesWaypoint {
         MOON_ELVES(LostTalesUtil.addWaypointRegion("MOON_ELVES")),
         SUN_ELVES(LostTalesUtil.addWaypointRegion("SUN_ELVES")),
         ODANE(LostTalesUtil.addWaypointRegion("ODANE")),
-        /**
-         * Kept although nothing places a waypoint in it any more. The Lossoth
-         * are served by LOTR's own Forochel waypoints now, but a character who
-         * has already unlocked this region has its name saved, and
-         * {@code LotrFastTravelRegionStateAdapter} rejects a region it cannot
-         * resolve — so removing it would quarantine that character's
-         * fast-travel state rather than tidy anything. It goes when a
-         * migration for it does.
-         */
-        LOSSOTH(LostTalesUtil.addWaypointRegion("LOSSOTH")),
         OROCARNI(LostTalesUtil.addWaypointRegion("OROCARNI"));
 
         final private LOTRWaypoint.Region region;

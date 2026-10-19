@@ -1479,8 +1479,9 @@ public final class LostTalesChatOverlayRenderer {
                     }
                     boolean dividerHere = lineIndex == dividerIndex;
                     int backdropRgb = LostTalesUiTheme.primaryRgb();
-                    boolean pinged = LostTalesChatPresentation.isPingedLine(
-                            line.getChatLineID());
+                    // A mention lights only the copies whose voice it names.
+                    boolean pinged = LostTalesChatPresentation.isPingedIn(
+                            line.getChatLineID(), frame.view);
                     int mentionRgb = LostTalesChatVisualStyle.mentionLineRgb();
                     // A line a jump just landed on is lit over whatever
                     // else it wears, and fades out of it.
@@ -1759,6 +1760,7 @@ public final class LostTalesChatOverlayRenderer {
                             line.getChatLineID());
                     drawHead(minecraft, font, component,
                             HEAD_TOP_OFFSET, alpha, open);
+                    ChatWorldMark.drawIn(font, component, open, alpha);
                     if (open && ChatLayoutMarker.isHeaderRow(component)) {
                         drawHeaderStamp(font, component, rowScale,
                                 sizes.small, alpha);

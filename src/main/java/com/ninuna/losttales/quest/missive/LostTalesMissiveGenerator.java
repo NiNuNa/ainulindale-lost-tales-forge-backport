@@ -41,7 +41,7 @@ public final class LostTalesMissiveGenerator {
     };
 
     private static final KillTemplate[] KILL_TEMPLATES = new KillTemplate[] {
-            new KillTemplate("hostile", true, 4, 8, 12),
+            new KillTemplate("enemy", true, 4, 8, 12),
             new KillTemplate("Zombie", false, 3, 7, 10),
             new KillTemplate("Skeleton", false, 3, 6, 12),
             new KillTemplate("Spider", false, 3, 6, 12),
@@ -123,15 +123,13 @@ public final class LostTalesMissiveGenerator {
                 .issuerId(issuer)
                 .flavorId(randomChoice(random, KILL_FLAVORS))
                 .target(template.selector)
-                .repeatable(true)
-                .firstComeFirstServed(true)
                 .generationWorldTime(worldTime)
                 .timeLimitTicks(randomTimeLimitTicks(random))
                 .context("generator", GENERATOR_VERSION)
                 .context("board", safeBoardKey(boardKey))
                 .context("dimension", String.valueOf(getDimensionId(world)))
                 .objective(objective)
-                .rewardData(LostTalesMissiveRewardData.experienceAndItems(xp, rewardItemsForDifficulty(random, count)))
+                .rewardData(LostTalesMissiveRewardData.experienceAndCoins(xp, coinsForDifficulty(random, count)))
                 .build();
     }
 
@@ -161,15 +159,13 @@ public final class LostTalesMissiveGenerator {
                 .issuerId(issuer)
                 .flavorId(randomChoice(random, GATHER_FLAVORS))
                 .target(template.itemId)
-                .repeatable(true)
-                .firstComeFirstServed(true)
                 .generationWorldTime(worldTime)
                 .timeLimitTicks(randomTimeLimitTicks(random))
                 .context("generator", GENERATOR_VERSION)
                 .context("board", safeBoardKey(boardKey))
                 .context("dimension", String.valueOf(getDimensionId(world)))
                 .objective(objective)
-                .rewardData(LostTalesMissiveRewardData.experienceAndItems(xp, rewardItemsForDifficulty(random, Math.max(1, count / 2))))
+                .rewardData(LostTalesMissiveRewardData.experienceAndCoins(xp, coinsForDifficulty(random, Math.max(1, count / 2))))
                 .build();
     }
 
@@ -188,13 +184,13 @@ public final class LostTalesMissiveGenerator {
         return randomBetween(random, minDays, maxDays) * ONE_INGAME_DAY_TICKS;
     }
 
-    private static String rewardItemsForDifficulty(Random random, int difficulty) {
-        int emeralds = Math.max(1, Math.min(3, difficulty / 4));
-        if (random.nextBoolean()) {
-            return "minecraft:emerald*" + emeralds;
-        }
-        int gold = Math.max(1, Math.min(6, difficulty / 2));
-        return "minecraft:gold_ingot*" + gold;
+    /**
+     * A notice's coins: four for each foe or every second item asked for,
+     * and a little more by chance, as LOTR's own mini-quests pay a few
+     * dozen coins for a small task.
+     */
+    private static int coinsForDifficulty(Random random, int difficulty) {
+        return Math.max(1, difficulty) * 4 + randomBetween(random, 5, 15);
     }
 
     private static String randomIssuer(Random random) {

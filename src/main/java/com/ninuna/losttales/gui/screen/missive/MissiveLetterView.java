@@ -1,5 +1,13 @@
 package com.ninuna.losttales.gui.screen.missive;
 
+import com.ninuna.losttales.quest.world.WorldQuestView;
+import com.ninuna.losttales.quest.world.WorldQuestRules;
+import com.ninuna.losttales.quest.LostTalesQuestWords;
+import com.ninuna.losttales.quest.LostTalesQuestRules;
+import com.ninuna.losttales.quest.LostTalesQuestRewardText;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.window.WindowLists;
@@ -121,6 +129,114 @@ final class MissiveLetterView {
             LostTalesUiClip.end(clipped);
         }
         drawScrollbar(box, inner, alpha);
+    }
+
+    /**
+     * Draws a running world quest's notice on the sheet (QUEST-36): what
+     * it asks of the whole server with its counts so far, what it pays,
+     * its podium, and the time it has left.
+     */
+    void drawWorld(Minecraft minecraft, LostTalesUiHitBox box,
+                   LostTalesQuestDefinition quest, WorldQuestView view,
+                   long ticksLeft, int alpha) {
+        if (box.width <= PADDING * 2 + 2 || box.height <= PADDING * 2 + 2
+                || quest == null || view == null) {
+            draw(minecraft, box, null, StatCollector.translateToLocal(
+                    "gui.losttales.missive_letter.invalid"), alpha);
+            return;
+        }
+        FontRenderer font = minecraft.fontRenderer;
+        LostTalesUiHitBox inner = inner(box);
+        List<Line> built = new ArrayList<Line>();
+        addWorldNotice(font, built, quest, view, ticksLeft, (int)inner.width);
+        if (this.builtFor != null || !quest.getId().equals(this.builtEmpty)) {
+            toTop();
+        }
+        this.builtFor = null;
+        this.builtEmpty = quest.getId();
+        this.builtWidth = -1;
+        this.lines = built;
+        int height = 0;
+        for (Line line : built) {
+            height += line.height();
+        }
+        this.contentHeight = height;
+        long now = System.nanoTime();
+        double seconds = this.glideNanos == 0L ? 0.0D
+                : Math.max(0.0D, (now - this.glideNanos) / 1.0E9D);
+        this.glideNanos = now;
+        this.scroll = Math.max(0, Math.min(this.scroll, maxScroll(inner)));
+        this.shownScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
+                this.shownScroll, this.scroll, seconds);
+        drawEdge(box, alpha);
+        boolean clipped = LostTalesUiClip.beginLocal(minecraft,
+                (float)inner.left, (float)inner.top, (float)inner.right(),
+                (float)inner.bottom());
+        GL11.glPushMatrix();
+        try {
+            int whole = (int)Math.floor(this.shownScroll);
+            GL11.glTranslatef(0.0F, (float)(whole - this.shownScroll), 0.0F);
+            int y = (int)inner.top - whole;
+            for (Line line : this.lines) {
+                int lineHeight = line.height();
+                if (y + lineHeight >= inner.top - 1 && y <= inner.bottom() + 1) {
+                    drawLine(font, line, (int)inner.left, (int)inner.right(),
+                            y, alpha);
+                }
+                y += lineHeight;
+            }
+        } finally {
+            GL11.glPopMatrix();
+            LostTalesUiClip.end(clipped);
+        }
+        drawScrollbar(box, inner, alpha);
+    }
+
+    private static void addWorldNotice(FontRenderer font, List<Line> lines,
+                                       LostTalesQuestDefinition quest,
+                                       WorldQuestView view, long ticksLeft,
+                                       int width) {
+        wrap(font, lines, Kind.TITLE, LostTalesQuestWords.title(quest), width, 0);
+        wrap(font, lines, Kind.ASIDE, StatCollector.translateToLocal(
+                "gui.losttales.missive_board.world.issuer"), width, 0);
+        lines.add(new Line(Kind.RULE, "", 0));
+        String body = LostTalesQuestWords.description(quest);
+        if (body.length() > 0) {
+            wrap(font, lines, Kind.TEXT, body, width, 0);
+            lines.add(new Line(Kind.GAP, "", 0));
+        }
+        lines.add(new Line(Kind.HEADING, StatCollector.translateToLocal(
+                "gui.losttales.missive_letter.work"), 0));
+        int indent = font.getStringWidth(DASH);
+        for (LostTalesQuestObjectiveDefinition objective : WorldQuestRules.objectives(quest)) {
+            int goal = WorldQuestRules.goal(objective);
+            String line = StatCollector.translateToLocalFormatted(
+                    "gui.losttales.quest.world.objective",
+                    LostTalesQuestObjectiveTextHelper.describe(objective),
+                    Integer.valueOf(Math.min(goal, view.getCount(objective.getId()))),
+                    Integer.valueOf(goal));
+            List<String> wrapped = split(font, line, Math.max(1, width - indent));
+            for (int index = 0; index < wrapped.size(); index++) {
+                lines.add(new Line(Kind.TEXT, index == 0
+                        ? DASH + wrapped.get(index) : wrapped.get(index),
+                        index == 0 ? 0 : indent));
+            }
+        }
+        lines.add(new Line(Kind.GAP, "", 0));
+        String reward = LostTalesQuestRewardText.summary(quest.getRewards());
+        if (reward.length() > 0) {
+            wrap(font, lines, Kind.REWARD, StatCollector.translateToLocalFormatted(
+                    "gui.losttales.missive_letter.reward", reward), width, 0);
+        }
+        String podium = LostTalesQuestRewardText.summary(
+                LostTalesQuestRules.podiumRewards(quest));
+        if (podium.length() > 0) {
+            wrap(font, lines, Kind.REWARD, StatCollector.translateToLocalFormatted(
+                    "gui.losttales.quest.world.podium_reward", podium), width, 0);
+        }
+        wrap(font, lines, Kind.TIME, StatCollector.translateToLocalFormatted(
+                "gui.losttales.quest.remaining",
+                LostTalesQuestTimeText.shortForm(Math.max(0L, ticksLeft))), width, 0);
     }
 
     /** The wheel over the sheet scrolls it; answers whether there was anything to scroll. */

@@ -4,7 +4,6 @@ import com.ninuna.losttales.block.base.LostTalesBlockDirectionalContainerBase;
 import com.ninuna.losttales.block.collision.LostTalesBlockBounds;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.user.ELostTalesUser;
-import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.sound.ELostTalesBlockSoundType;
 import com.ninuna.losttales.util.LostTalesBlockRotationHelper;
 import java.util.List;
@@ -24,10 +23,7 @@ import net.minecraft.world.World;
 
 public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBase {
     protected static final LostTalesBlockBounds STANDARD_URN_BOUNDS = new LostTalesBlockBounds(0.19F, 0.0F, 0.19F, 0.81F, 1.0F, 0.81F);
-    /**
-     * The modern branch seals urns with honeycomb. Minecraft 1.7.10 does not
-     * have honeycomb, so this backport intentionally uses vanilla clay balls.
-     */
+    /** What seals a vessel: a clay ball. */
     public static final Item SEALING_ITEM = Items.clay_ball;
 
     public LostTalesBlockUrnBase(ELostTalesUser credits) {
@@ -106,12 +102,6 @@ public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBas
 
         ItemStack held = player.getHeldItem();
         if (!world.isRemote) {
-            if (held != null && held.getItem() == ELostTalesItem.CREATION_TOOL_LOOT_RESPAWNER.getItem() && player.capabilities.isCreativeMode) {
-                urn.setRespawn(!urn.isRespawn());
-                world.playSoundEffect((double) bottom[0] + 0.5D, (double) bottom[1] + 0.5D, (double) bottom[2] + 0.5D, urn.isRespawn() ? "random.orb" : "random.fizz", 0.6F, 1.0F);
-                return true;
-            }
-
             if (urn.isSealed()) {
                 urn.playFullAnimation();
                 world.playSoundEffect((double) bottom[0] + 0.5D, (double) bottom[1] + 0.5D, (double) bottom[2] + 0.5D, "random.click", 0.5F, 0.8F);

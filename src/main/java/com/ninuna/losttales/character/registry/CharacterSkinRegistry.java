@@ -41,8 +41,7 @@ public final class CharacterSkinRegistry {
                 new LinkedHashMap<String, CharacterSkinDefinition>();
 
         // The account skin comes first in every race's list so a new
-        // character lands on it. The half-troll has none: its body has no
-        // sensible mapping onto a Minecraft skin.
+        // character lands on it.
         registerAccountSkin(definitions, CharacterRaceRegistry.HUMAN);
         registerAccountSkin(definitions, CharacterRaceRegistry.ELF);
         registerAccountSkin(definitions, CharacterRaceRegistry.DWARF);
@@ -112,8 +111,6 @@ public final class CharacterSkinRegistry {
                 "uruk_hai", "mob/orc/urukHai", 3);
         registerUnisexGroup(definitions, CharacterRaceRegistry.URUK,
                 "black_uruk", "mob/orc/blackUruk", 3);
-        registerUnisexGroup(definitions, CharacterRaceRegistry.HALF_TROLL,
-                "half_troll", "mob/halfTroll/halfTroll", 3);
 
         DEFINITIONS = Collections.unmodifiableMap(definitions);
 

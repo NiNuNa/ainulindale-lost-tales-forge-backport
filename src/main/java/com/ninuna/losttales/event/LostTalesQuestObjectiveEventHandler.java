@@ -18,6 +18,7 @@ import net.minecraft.entity.projectile.EntityThrowable;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.DamageSource;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import com.ninuna.losttales.compat.lotr.LotrNpcRelations;
 import net.minecraftforge.event.entity.player.EntityInteractEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 /**
@@ -35,6 +36,7 @@ public final class LostTalesQuestObjectiveEventHandler {
             return;
         }
 
+        LostTalesQuestManager.handleDeath(event.entityLiving);
         EntityPlayerMP player = resolveQuestKillCredit(event.source);
         if (player != null) {
             FellowshipQuestProgressCoordinator.getInstance().handleAuthoritativeKill(player, event.entityLiving);
@@ -91,12 +93,20 @@ public final class LostTalesQuestObjectiveEventHandler {
         }
     }
 
+    /**
+     * A creature touched: the quests it gives or waits on answer first.
+     * Where they did and it is a LOTR NPC, LOTR's own talk, trade or hire
+     * waits (QUEST-11): the touch goes no further.
+     */
     @SubscribeEvent
     public void onEntityInteract(EntityInteractEvent event) {
         if (event == null || !(event.entityPlayer instanceof EntityPlayerMP) || event.entityPlayer.worldObj == null || event.entityPlayer.worldObj.isRemote) {
             return;
         }
-        QuestStartGate.touchedCreature((EntityPlayerMP) event.entityPlayer, event.target);
+        if (QuestStartGate.touchedCreature((EntityPlayerMP) event.entityPlayer, event.target)
+                && LotrNpcRelations.isNpc(event.target) && event.isCancelable()) {
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent

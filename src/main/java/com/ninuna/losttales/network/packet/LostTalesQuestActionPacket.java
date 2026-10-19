@@ -4,6 +4,7 @@ import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.quest.LostTalesQuestIds;
+import com.ninuna.losttales.quest.LostTalesQuestRewards;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.QuestStartGate;
 import com.ninuna.losttales.quest.QuestStartProof;
@@ -40,19 +41,36 @@ public class LostTalesQuestActionPacket implements IMessage {
     public static final String ACTION_ACCEPT = "accept";
     /**
      * Giving over what a quest asked for, in conversation. Checked the
-     * same way, and it moves only the objectives of the quest named.
+     * same way, and it moves only the objectives of the quest named; a
+     * quest that went back to its giver is handed in, its {@code choice}
+     * the item taken from its pick (QUEST-31, QUEST-33).
      */
     public static final String ACTION_HAND_IN = "hand_in";
+    /**
+     * Making the choice a quest's stage waits for, with its giver
+     * (QUEST-32): its {@code choice} the reply's index. Checked the same
+     * way as a hand-in.
+     */
+    public static final String ACTION_CHOOSE = "choose";
+    /** The highest choice a request may name: the last of a pick or of a stage's choices. */
+    public static final int MAX_CHOICE = LostTalesQuestRewards.MAX_PICKS - 1;
 
     private String action = "";
     private String questId = "";
+    private int choice = -1;
     private boolean malformed;
 
     public LostTalesQuestActionPacket() {}
 
     public LostTalesQuestActionPacket(String action, String questId) {
+        this(action, questId, -1);
+    }
+
+    /** A request naming a choice: the item taken from a pick; -1 for none. */
+    public LostTalesQuestActionPacket(String action, String questId, int choice) {
         this.action = action == null ? "" : action;
         this.questId = questId == null ? "" : questId;
+        this.choice = choice < 0 || choice > MAX_CHOICE ? -1 : choice;
     }
 
     @Override
@@ -62,8 +80,10 @@ public class LostTalesQuestActionPacket implements IMessage {
                     buffer, LostTalesPacketCodec.MAX_ACTION_BYTES));
             this.questId = normalizeIdentifier(LostTalesPacketCodec.readUtf8String(
                     buffer, LostTalesQuestIds.MAX_BYTES));
+            this.choice = buffer.readByte();
             LostTalesPacketCodec.requireFinished(buffer);
-            if (!isKnownAction(this.action) || !hasValidIdentifierUsage(this.action, this.questId)) {
+            if (!isKnownAction(this.action) || !hasValidIdentifierUsage(this.action, this.questId)
+                    || this.choice < -1 || this.choice > MAX_CHOICE) {
                 throw new LostTalesPacketCodec.DecodeException("invalid quest action request");
             }
         } catch (RuntimeException exception) {
@@ -84,6 +104,11 @@ public class LostTalesQuestActionPacket implements IMessage {
         return this.questId;
     }
 
+    /** The choice the request names; -1 for none. */
+    public int getChoice() {
+        return this.choice;
+    }
+
     @Override
     public void toBytes(ByteBuf buffer) {
         LostTalesPacketCodec.writeUtf8String(
@@ -92,6 +117,7 @@ public class LostTalesQuestActionPacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.questId == null ? "" : this.questId,
                 LostTalesQuestIds.MAX_BYTES);
+        buffer.writeByte(this.choice);
     }
 
     private static String normalizeAction(String action) {
@@ -107,20 +133,23 @@ public class LostTalesQuestActionPacket implements IMessage {
                 || ACTION_ABANDON.equals(action)
                 || ACTION_CLEAR.equals(action)
                 || ACTION_ACCEPT.equals(action)
-                || ACTION_HAND_IN.equals(action);
+                || ACTION_HAND_IN.equals(action)
+                || ACTION_CHOOSE.equals(action);
     }
 
     private static boolean hasValidIdentifierUsage(String action, String identifier) {
         if (ACTION_PIN.equals(action) || ACTION_ABANDON.equals(action)
                 || ACTION_CLEAR.equals(action)
                 || ACTION_ACCEPT.equals(action)
-                || ACTION_HAND_IN.equals(action)) {
+                || ACTION_HAND_IN.equals(action)
+                || ACTION_CHOOSE.equals(action)) {
             return identifier.length() > 0;
         }
         return true;
     }
 
-    private static void execute(EntityPlayerMP player, String action, String questId) {
+    private static void execute(EntityPlayerMP player, String action, String questId,
+                                int choice) {
         if (ACTION_PIN.equals(action)) {
             LostTalesQuestManager.pinQuest(player, questId);
         } else if (ACTION_UNPIN.equals(action)) {
@@ -137,7 +166,9 @@ public class LostTalesQuestActionPacket implements IMessage {
             QuestStartGate.start(player, questId,
                     QuestStartProof.conversation());
         } else if (ACTION_HAND_IN.equals(action)) {
-            LostTalesQuestManager.handInFromConversation(player, questId);
+            LostTalesQuestManager.handInFromConversation(player, questId, choice);
+        } else if (ACTION_CHOOSE.equals(action)) {
+            LostTalesQuestManager.choose(player, questId, choice);
         }
     }
 
@@ -151,6 +182,7 @@ public class LostTalesQuestActionPacket implements IMessage {
 
             final String action = message.getAction();
             final String questId = message.getQuestId();
+            final int choice = message.getChoice();
             LostTalesServerPacketDispatcher.submit(
                     player,
                     LostTalesRequestRateLimiter.RequestType.QUEST_ACTION,
@@ -159,7 +191,7 @@ public class LostTalesQuestActionPacket implements IMessage {
                     new LostTalesServerTaskQueue.PlayerTask() {
                         @Override
                         public void run(EntityPlayerMP livePlayer) {
-                            execute(livePlayer, action, questId);
+                            execute(livePlayer, action, questId, choice);
                         }
                     }
             );

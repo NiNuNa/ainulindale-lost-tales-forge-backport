@@ -6,6 +6,7 @@ import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatTypedText;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareReference;
@@ -41,6 +42,7 @@ public final class LostTalesChatSendPacket implements IMessage {
     // The fixed fields, the action flag and the unkept-quote flag among them.
     private static final int MAX_PACKET_BYTES = 816
             + ChatMessageValidator.MAX_UTF8_BYTES
+            + 5 + ChatTypedText.MAX_UTF8_BYTES
             + ChatShareTokenParser.MAX_TOKENS
             * (ChatShareReference.MAX_MARKER_ID_BYTES + 8);
     private static final int MAX_CHANNEL_BYTES = 16;
@@ -125,6 +127,11 @@ public final class LostTalesChatSendPacket implements IMessage {
      * record, and only for a sender who may read it.
      */
     private long forwardOf = ChatMessageIds.NONE;
+    /**
+     * What the player typed for the line, where it differs from its words
+     * ({@link ChatTypedText}): kept by the server so they can edit it later.
+     */
+    private String typed = "";
     private boolean malformed;
 
     public LostTalesChatSendPacket() {}
@@ -262,6 +269,8 @@ public final class LostTalesChatSendPacket implements IMessage {
             // the message a forward carries on.
             this.quotesUnkept = buffer.readBoolean();
             this.forwardOf = buffer.readLong();
+            this.typed = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatTypedText.MAX_UTF8_BYTES);
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -278,6 +287,7 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.targetIdentity = "";
             this.echoNonce = 0L;
             this.forwardOf = ChatMessageIds.NONE;
+            this.typed = "";
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -326,6 +336,8 @@ public final class LostTalesChatSendPacket implements IMessage {
                 : this.targetCharacterId.getLeastSignificantBits());
         buffer.writeBoolean(this.quotesUnkept);
         buffer.writeLong(this.forwardOf);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.typed,
+                ChatTypedText.MAX_UTF8_BYTES);
     }
 
     private void validate() {
@@ -360,6 +372,8 @@ public final class LostTalesChatSendPacket implements IMessage {
                 // An action is words like a message's; an empty one is
                 // no action at all.
                 || (this.action && !ChatAction.isValid(this.message))
+                || !ChatTypedText.isValid(this.typed)
+                || (this.forwardOf != ChatMessageIds.NONE && this.typed.length() > 0)
                 || this.references.size() > ChatShareTokenParser.MAX_TOKENS) {
             throw new IllegalArgumentException("invalid chat request");
         }
@@ -382,6 +396,16 @@ public final class LostTalesChatSendPacket implements IMessage {
                 && !this.quotesUnkept && this.echoNonce == 0L
                 && !this.action && !this.narrating;
     }
+
+    /** The same request keeping {@code typed}, what the player typed for it ({@link ChatTypedText#kept}). */
+    public LostTalesChatSendPacket typed(String typed) {
+        this.typed = ChatTypedText.kept(typed, this.message);
+        validate();
+        return this;
+    }
+
+    /** What the player typed for the line; empty where it is its words. */
+    public String getTyped() { return this.typed; }
 
     /** The same request signing as the Narrator, or not. */
     public LostTalesChatSendPacket narrating(boolean on) {

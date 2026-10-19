@@ -85,6 +85,30 @@ public final class LostTalesWorldQuestPacketsTest {
         assertEquals(1000L, view.getEndsAt());
     }
 
+    /** A run's podium, its best helpers' names and parts, reaches every player (QUEST-36). */
+    @Test
+    public void thePodiumTravelsWithTheRun() {
+        WorldQuestWorldData data = new WorldQuestWorldData(WorldQuestWorldData.DATA_NAME);
+        data.start("losttales:world/greenway", 0L, 1000L);
+        data.add("losttales:world/greenway", "orcs", 4, 500, this.aldric);
+        java.util.Map<String, WorldQuestView> podiums =
+                new java.util.HashMap<String, WorldQuestView>();
+        podiums.put("losttales:world/greenway", WorldQuestView.of(
+                data.run("losttales:world/greenway"), null,
+                java.util.Arrays.asList("Aldric", "Tobin"),
+                java.util.Arrays.asList(Integer.valueOf(40), Integer.valueOf(22))));
+        ByteBuf buffer = Unpooled.buffer();
+        LostTalesWorldQuestSyncPacket.of(data.runs(), this.aldric, podiums)
+                .toBytes(buffer);
+        LostTalesWorldQuestSyncPacket decoded = new LostTalesWorldQuestSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        WorldQuestView view = decoded.getViews().get(0);
+        assertEquals(java.util.Arrays.asList("Aldric", "Tobin"), view.getPodiumNames());
+        assertEquals(Integer.valueOf(22), view.getPodiumParts().get(1));
+        assertEquals("the player's own part stays theirs", 4, view.getMine());
+    }
+
     /** The fullest store the world keeps still goes in one packet a client reads. */
     @Test
     public void everyRunTheWorldKeepsFitsOnePacket() {

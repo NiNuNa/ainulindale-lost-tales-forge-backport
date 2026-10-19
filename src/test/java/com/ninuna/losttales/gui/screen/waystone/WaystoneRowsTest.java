@@ -39,13 +39,17 @@ public final class WaystoneRowsTest {
         String lore = "";
         String defaultName = "";
         boolean stands = true;
+        int sharedCharacters = 3;
+        String ownerName = "Aragorn";
+        boolean playerPlaced = true;
+        boolean manages;
 
         @Override public WaystoneDraft draft() { return this.draft; }
         @Override public boolean canEdit() { return this.canEdit; }
         @Override public boolean isWaiting() { return this.waiting; }
         @Override public String markerId() { return "losttales:player/bree"; }
-        @Override public int sharedCharacters() { return 3; }
-        @Override public int sharedFellowships() { return 1; }
+        @Override public int sharedCharacters() { return this.sharedCharacters; }
+        @Override public int sharedFellowships() { return this.sharedCharacters > 0 ? 1 : 0; }
         @Override public boolean sharesWithFellowship() { return this.fellowship; }
         @Override public String shareTarget() { return this.target; }
         @Override public void setShareTarget(String name) { this.target = name; }
@@ -59,6 +63,9 @@ public final class WaystoneRowsTest {
         @Override public boolean stands() { return this.stands; }
         @Override public MenuWindow.Picture iconPicture() { return null; }
         @Override public int colorRgb(String color) { return 0x123456; }
+        @Override public String ownerName() { return this.ownerName; }
+        @Override public boolean isPlayerPlaced() { return this.playerPlaced; }
+        @Override public boolean managesMarkers() { return this.manages; }
     }
 
     private static MenuWindow.Entry row(List<MenuWindow.Entry> rows,
@@ -102,8 +109,11 @@ public final class WaystoneRowsTest {
         assertEquals("16", row(rows, LANG + "radius").value);
         assertEquals(LANG + "relevance.medium",
                 row(rows, LANG + "relevance").value);
-        assertEquals(LANG + "visibility.private",
+        assertEquals("a waystone that is not public reads Shared while it has shares",
+                LANG + "visibility.shared",
                 row(rows, LANG + "visibility").value);
+        assertEquals("Aragorn", row(rows, LANG + "owner").value);
+        assertTrue("the owner only reads", row(rows, LANG + "owner").passive);
         assertEquals("losttales:player/bree",
                 row(rows, LANG + "marker_id").value);
         assertEquals("3", row(rows, LANG + "shared.characters").value);
@@ -248,5 +258,76 @@ public final class WaystoneRowsTest {
                 row(section, LANG + "fast_travel"));
         assertTrue(new WaystoneRows(new FakeHost(), 13)
                 .build("nothing holds this").isEmpty());
+    }
+
+    /** Without shares a waystone that is not public reads Private; Public is a manager's to choose (WAY-14). */
+    @Test
+    public void accessReadsPrivateWithoutSharesAndOnlyAManagerStepsToPublic() {
+        FakeHost host = new FakeHost();
+        host.sharedCharacters = 0;
+        List<MenuWindow.Entry> rows = new WaystoneRows(host, 13).build("");
+        MenuWindow.Entry access = row(rows, LANG + "visibility");
+        assertEquals(LANG + "visibility.private", access.value);
+        assertEquals("the row shows the state and cannot step to Public",
+                LANG + "why.public", access.unavailable);
+
+        host.manages = true;
+        access = row(new WaystoneRows(host, 13).build(""), LANG + "visibility");
+        assertTrue(access.isTakeable());
+    }
+
+    /** The Owner row names the owning character, else no one or an unknown character. */
+    @Test
+    public void theOwnerRowNamesTheOwningCharacter() {
+        FakeHost host = new FakeHost();
+        host.ownerName = "";
+        assertEquals(LANG + "owner.unknown", row(new WaystoneRows(host, 13)
+                .build(""), LANG + "owner").value);
+        host.playerPlaced = false;
+        assertEquals(LANG + "owner.none", row(new WaystoneRows(host, 13)
+                .build(""), LANG + "owner").value);
+    }
+
+    /** Hand Over stands only for a manager, names a character and needs a placed waystone (WAY-08). */
+    @Test
+    public void handOverIsAManagersAndNamesACharacter() {
+        FakeHost host = new FakeHost();
+        host.target = "Aragorn";
+        assertNull("not offered to a player who does not manage markers",
+                row(new WaystoneRows(host, 13).build(""), LANG + "hand_over"));
+
+        host.manages = true;
+        assertTrue(row(new WaystoneRows(host, 13).build(""),
+                LANG + "hand_over").isTakeable());
+
+        host.fellowship = true;
+        assertEquals(LANG + "why.hand_over_character", row(new WaystoneRows(
+                host, 13).build(""), LANG + "hand_over").unavailable);
+
+        host.fellowship = false;
+        host.playerPlaced = false;
+        assertEquals(LANG + "why.hand_over_generated", row(new WaystoneRows(
+                host, 13).build(""), LANG + "hand_over").unavailable);
+
+        host.playerPlaced = true;
+        host.target = "";
+        assertEquals(LANG + "why.no_target", row(new WaystoneRows(host, 13)
+                .build(""), LANG + "hand_over").unavailable);
+    }
+
+    /** A placed waystone's discovery radius stops at 1,024 blocks; a generated one keeps the marker's bound (WAY-15). */
+    @Test
+    public void aPlacedWaystonesDiscoveryRadiusStopsAtTheScansReach() {
+        FakeHost host = new FakeHost();
+        WaystoneRows rows = new WaystoneRows(host, 13);
+        assertTrue(rows.discoveryRadius.take("1024"));
+        assertEquals(1024.0D, host.draft.discoveryRadius(), 0.0D);
+        assertFalse(rows.discoveryRadius.take("1025"));
+        assertFalse("the stepper stops there",
+                rows.discoveryRadius.move(true, false));
+
+        host.playerPlaced = false;
+        assertTrue(rows.discoveryRadius.take("5000"));
+        assertEquals(5000.0D, host.draft.discoveryRadius(), 0.0D);
     }
 }

@@ -169,7 +169,7 @@ public final class LostTalesMissiveCodec {
         Map<String, String> rewards = readEntries(buffer);
         LostTalesMissiveData missive = new LostTalesMissiveData(questId,
                 questType, titleId, descriptionId, issuerId, flavorId,
-                target, true, true, 0L, timeLimitTicks,
+                target, 0L, timeLimitTicks,
                 Collections.<String, String>emptyMap(), objectives,
                 new LostTalesMissiveRewardData(rewards));
         if (!missive.isValid()

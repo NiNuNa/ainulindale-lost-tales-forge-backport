@@ -22,21 +22,23 @@ import java.util.Set;
  * {@code config/losttales/quests/}, in the same form as the quests bundled
  * with the mod. They
  * are read when the server starts and again on
- * {@code /losttales quest reload}, and sent to every player, so a server
- * adds quests without a new build of the mod.
+ * {@code /losttales quest reload}, and a player's game is sent one as it
+ * needs it ({@link ServerQuestSync}), so a server adds quests without a new
+ * build of the mod.
  *
- * <p>A file is left out, with a line in the log saying why, when it is too
- * large, cannot be read, takes an id a bundled quest or an earlier file
- * already has, takes a missive's id, raises any warning the bundled
- * quests are checked for, or cannot be sent to a player whole. The others
- * still load, until together they would pass {@link #MAX_SENT_BYTES}.</p>
+ * <p>A file is left out, with a line in the log for each reason, when it
+ * is too large, cannot be read, takes an id a bundled quest or an earlier
+ * file already has, takes a missive's id, raises any warning
+ * ({@link LostTalesQuestDefinitionValidator}, QUEST-04), or cannot be sent
+ * to a player whole. The others still load, until together they would
+ * pass {@link #MAX_SENT_BYTES}.</p>
  */
 public final class ServerQuestFiles {
     /** The folder under Forge's config directory. */
     public static final String DIRECTORY = "losttales/quests";
     public static final int MAX_FILES = 256;
     public static final long MAX_FILE_BYTES = 64L * 1024L;
-    /** The most every server quest together may take on the wire: what each player is sent as they join. */
+    /** The most every server quest together may take on the wire, should one player be sent them all. */
     public static final int MAX_SENT_BYTES = 4 * 1024 * 1024;
     /** The id path missives are made under; no written quest may take it. */
     private static final String MISSIVE_PATH = "missive/";
@@ -122,13 +124,16 @@ public final class ServerQuestFiles {
                         + " bytes");
                 continue;
             }
-            LostTalesQuestDefinition quest = parse(file, problems);
+            List<String> unread = new ArrayList<String>();
+            LostTalesQuestDefinition quest = parse(file, problems, unread);
             if (quest == null) {
                 continue;
             }
-            String problem = refusal(quest, ids);
-            if (problem.length() > 0) {
-                problems.add(name + ": " + problem);
+            List<String> refusals = refusals(quest, ids, unread);
+            if (!refusals.isEmpty()) {
+                for (String refusal : refusals) {
+                    problems.add(name + ": " + refusal);
+                }
                 continue;
             }
             int size = LostTalesQuestDefinitionCodec.encodedSize(quest);
@@ -145,40 +150,42 @@ public final class ServerQuestFiles {
     }
 
     /**
-     * Why a quest cannot load beside the ones already taken, in words;
-     * empty when it can.
+     * Every reason a quest cannot load beside the ones already taken, in
+     * words: its id taken, each warning its file raises ({@code unread}
+     * those the reading found), and a quest too large to send. Empty when
+     * it can load.
      */
-    static String refusal(LostTalesQuestDefinition quest, Set<String> taken) {
+    static List<String> refusals(LostTalesQuestDefinition quest,
+            Set<String> taken, List<String> unread) {
+        List<String> refusals = new ArrayList<String>();
         String id = quest.getId();
         if (taken.contains(id)) {
-            return "the id " + id + " is already a quest's";
+            refusals.add("the id " + id + " is already a quest's");
         }
         int colon = id.indexOf(':');
         String path = (colon >= 0 ? id.substring(colon + 1) : id)
                 .toLowerCase(Locale.ROOT);
         if (path.startsWith(MISSIVE_PATH)) {
-            return "the id " + id + " is a missive's";
+            refusals.add("the id " + id + " is a missive's");
         }
-        List<String> warnings = LostTalesQuestDefinitionValidator
-                .describeWarnings(Collections.singletonList(quest));
-        if (!warnings.isEmpty()) {
-            return warnings.get(0);
+        refusals.addAll(LostTalesQuestDefinitionValidator.warningsOf(quest,
+                unread));
+        if (LostTalesQuestDefinitionCodec.encodedSize(quest) < 0) {
+            refusals.add("it cannot be sent to a player: an id, a name or a"
+                    + " text is too long, or it holds too many stages,"
+                    + " objectives or parameters");
         }
-        return LostTalesQuestDefinitionCodec.encodedSize(quest) < 0
-                ? "it cannot be sent to a player: an id, a name or a text is"
-                        + " too long, or it holds too many stages, objectives"
-                        + " or parameters"
-                : "";
+        return refusals;
     }
 
     private static LostTalesQuestDefinition parse(File file,
-                                                  List<String> problems) {
+            List<String> problems, List<String> unread) {
         Reader reader = null;
         try {
             reader = new InputStreamReader(new FileInputStream(file),
                     StandardCharsets.UTF_8);
             LostTalesQuestDefinition quest = LostTalesQuestDefinitionJsonParser
-                    .parseQuest(reader, "quests/" + file.getName());
+                    .parseQuest(reader, "quests/" + file.getName(), unread);
             if (quest == null) {
                 problems.add(file.getName() + " is not a quest");
             }

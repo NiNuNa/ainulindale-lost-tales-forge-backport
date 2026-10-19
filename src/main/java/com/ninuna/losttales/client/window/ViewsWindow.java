@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
+import com.ninuna.losttales.client.input.LostTalesInputBinding;
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
@@ -13,6 +14,7 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.util.StatCollector;
+import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
 /**
@@ -258,12 +260,12 @@ final class ViewsWindow extends SubWindowContent {
     }
 
     @Override
-    public String tipKey() {
-        return this.pointed == -1 ? "" : tip();
+    public PointerTip tip(FontRenderer font) {
+        return this.pointed == -1 ? null : PointerTip.of(font, tipWords());
     }
 
     /** The view's name with its key, {@code Map (M)}; the {@code +}'s, {@code New View}. */
-    private String tip() {
+    private String tipWords() {
         if (this.pointed == MAKE) {
             return Views.canMake() ? StatCollector.translateToLocal(
                     "gui.losttales.window.views.new") : "";
@@ -274,31 +276,16 @@ final class ViewsWindow extends SubWindowContent {
         }
         View view = views.get(this.pointed);
         if (view.category() == PageCategory.SETTINGS) {
-            return StatCollector.translateToLocalFormatted(
-                    "gui.losttales.window.views.settings_key", view.title());
+            int key = LostTalesKeyBindings.getSettingsKeyBinding()
+                    .getKeyCode();
+            return key == Keyboard.KEY_NONE ? view.title()
+                    : StatCollector.translateToLocalFormatted(
+                            "gui.losttales.window.views.settings_key",
+                            view.title(), LostTalesInputBinding.getFallbackLabel(
+                                    LostTalesInputBinding.Type.KEYBOARD, key));
         }
         return view.key() <= 0 ? view.title()
                 : WindowBar.withKey(view.title(), view.key());
-    }
-
-    @Override
-    public void drawTip(Minecraft minecraft, int tipX, int tipY,
-                        int screenWidth, float share) {
-        String label = tip();
-        if (label.length() == 0) {
-            return;
-        }
-        FontRenderer font = minecraft.fontRenderer;
-        int width = WindowStyle.popupLineWidth(font, label);
-        int x = Math.max(2, Math.min(screenWidth - width - 2,
-                tipX - width / 2));
-        int y = tipY - 3 - WindowStyle.POPUP_LINE_HEIGHT;
-        LostTalesTooltipSmoothing.begin(tipX, tipY);
-        try {
-            WindowStyle.drawPopupLine(font, label, x, y, share);
-        } finally {
-            LostTalesTooltipSmoothing.end();
-        }
     }
 
     /** Where it first stands in {@code room}: hung from the Views button pressed. */

@@ -369,12 +369,11 @@ public final class ChatLayout {
     }
 
     /**
-     * The copy's notification choice: its default unless the player chose
-     * another there. Each copy is its own person and chooses for itself;
-     * a conversation with no copy open keeps its first copy's.
+     * The conversation's notification choice, one for all its copies
+     * (CHAT-02): its default unless the player chose another in a copy.
      */
     public static synchronized ChatLineChoice notification(ConversationPage tab) {
-        ConversationPage row = ConversationPage.row(tab);
+        ConversationPage row = sharedRow(tab);
         ChatLineChoice choice = row == null ? null : NOTIFICATIONS.get(row);
         return choice == null ? defaultNotification(row) : choice;
     }
@@ -386,7 +385,7 @@ public final class ChatLayout {
      */
     public static synchronized void setNotification(ConversationPage tab,
                                                     ChatLineChoice choice) {
-        ConversationPage row = ConversationPage.row(tab);
+        ConversationPage row = sharedRow(tab);
         if (row == null || choice == null || notification(row) == choice) {
             return;
         }
@@ -398,9 +397,9 @@ public final class ChatLayout {
         WindowLayout.persist();
     }
 
-    /** The copy's feed choice: Everything unless the player chose another there. */
+    /** The conversation's feed choice, one for all its copies: Everything unless the player chose another. */
     public static synchronized ChatLineChoice feedChoice(ConversationPage tab) {
-        ConversationPage row = ConversationPage.row(tab);
+        ConversationPage row = sharedRow(tab);
         ChatLineChoice choice = row == null ? null : FEED_CHOICES.get(row);
         return choice == null ? ChatLineChoice.EVERYTHING : choice;
     }
@@ -412,7 +411,7 @@ public final class ChatLayout {
      */
     public static synchronized void setFeedChoice(ConversationPage tab,
                                                   ChatLineChoice choice) {
-        ConversationPage row = ConversationPage.row(tab);
+        ConversationPage row = sharedRow(tab);
         if (row == null || choice == null || feedChoice(row) == choice) {
             return;
         }
@@ -433,35 +432,14 @@ public final class ChatLayout {
     }
 
     /**
-     * Whether a new line of the conversation chimes: when any copy showing
-     * it lets it through by its Notifications choice — any line where it is
-     * Everything, one {@code addressed} to the player, a mention or a
-     * reply, where it is Only Mentions — or, with no copy open, its first
-     * copy's choice does. The caller leaves out the player's own lines and
+     * Whether a new line of the conversation chimes: when its Notifications
+     * choice lets it through — any line where it is Everything, one
+     * {@code addressed} to the player, a mention or a reply, where it is
+     * Only Mentions. The caller leaves out the player's own lines and
      * replayed ones; Do Not Disturb holds the chime still.
      */
     public static synchronized boolean chimes(ConversationPage tab, boolean addressed) {
-        if (tab == null) {
-            return false;
-        }
-        for (ConversationPage reader : choosers(tab)) {
-            if (notification(reader).lets(addressed)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * The copies whose choices decide for a line of {@code conversation}:
-     * every open copy showing it, or with none its first copy.
-     */
-    private static List<ConversationPage> choosers(ConversationPage conversation) {
-        List<ConversationPage> readers = readersOf(conversation);
-        if (readers.isEmpty()) {
-            readers.add(ConversationPage.row(conversation));
-        }
-        return readers;
+        return tab != null && notification(tab).lets(addressed);
     }
 
     /**
@@ -544,12 +522,13 @@ public final class ChatLayout {
         return null;
     }
 
-    /** A copy opening anew keeps none of an earlier copy's choices or view. */
+    /**
+     * A copy opening anew keeps none of an earlier copy's view; the
+     * conversation's two settings stay, shared by its copies.
+     */
     static synchronized void forgetCopy(ConversationPage copy) {
         ConversationPage row = ConversationPage.row(copy);
         if (row != null) {
-            NOTIFICATIONS.remove(row);
-            FEED_CHOICES.remove(row);
             VIEWS.remove(row.id());
         }
     }
@@ -599,9 +578,8 @@ public final class ChatLayout {
     /**
      * The conversations whose every line the closed feed carries, in its
      * order, each as the character played reads it, whoever the copies
-     * speak as: every channel the player can see that some copy showing
-     * it, or with none its first copy, lets through with
-     * {@link ChatLineChoice#EVERYTHING}, in presentation order, whether or
+     * speak as: every channel the player can see whose feed choice lets it through
+     * with {@link ChatLineChoice#EVERYTHING}, in presentation order, whether or
      * not it has a tab — closing a tab hides the tab, not the channel's
      * messages — then every open whisper and fellowship conversation the
      * same way. Conversations are read from their open tabs only: a closed
@@ -645,8 +623,8 @@ public final class ChatLayout {
     }
 
     /**
-     * Adds the conversation where the most the copies showing it let
-     * through is {@code choice}, and no window pinned to the HUD shows it.
+     * Adds the conversation where its feed choice is {@code choice} and no
+     * window pinned to the HUD shows a copy of it.
      */
     private static void addToFeed(Set<ConversationPage> shown,
                                   ConversationPage conversation,
@@ -654,17 +632,12 @@ public final class ChatLayout {
         if (conversation == null || shown.contains(conversation)) {
             return;
         }
-        ChatLineChoice most = ChatLineChoice.NOTHING;
-        for (ConversationPage reader : choosers(conversation)) {
+        for (ConversationPage reader : readersOf(conversation)) {
             if (PinnedWindows.shows(reader)) {
                 return;
             }
-            ChatLineChoice chosen = feedChoice(reader);
-            if (chosen.ordinal() < most.ordinal()) {
-                most = chosen;
-            }
         }
-        if (most == choice) {
+        if (feedChoice(conversation) == choice) {
             shown.add(conversation);
         }
     }
@@ -1306,8 +1279,8 @@ public final class ChatLayout {
      * <p>The {@code feed} line stands only once the player has placed the
      * chat feed; without it the feed stands at its default place.</p>
      *
-     * <p>A conversation's notification choice, where it is not the
-     * conversation's default, stands on a {@code notify} line: the choice
+     * <p>A conversation's notification choice, one for all its copies, where
+     * it is not the conversation's default, stands on a {@code notify} line: the choice
      * ({@code everything}, {@code mentions} or {@code nothing}) and the
      * tab id. Its feed choice, where it is not {@code everything}, stands on a
      * {@code feedchoice} line the same way ({@code mentions} or
@@ -1403,7 +1376,7 @@ public final class ChatLayout {
                 return;
             }
             ChatLineChoice choice = ChatLineChoice.fromId(fields[1]);
-            ConversationPage row = ConversationPage.row(ConversationPage.fromId(fields[2]));
+            ConversationPage row = sharedRow(ConversationPage.fromId(fields[2]));
             if (choice != null && row != null && !row.isNpc()
                     && choice != defaultNotification(row)) {
                 NOTIFICATIONS.put(row, choice);
@@ -1440,7 +1413,7 @@ public final class ChatLayout {
                 return;
             }
             ChatLineChoice choice = ChatLineChoice.fromId(fields[1]);
-            ConversationPage row = ConversationPage.row(ConversationPage.fromId(fields[2]));
+            ConversationPage row = sharedRow(ConversationPage.fromId(fields[2]));
             if (choice != null && row != null && !row.isNpc()
                     && choice != ChatLineChoice.EVERYTHING) {
                 FEED_CHOICES.put(row, choice);

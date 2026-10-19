@@ -80,8 +80,8 @@ public final class WaystoneDraftTest {
                 draft.name());
         assertEquals("what the player left follows", "red", draft.color());
         assertEquals("Towns", draft.category());
-        assertEquals(LostTalesMapMarkerVisibility.SHARED,
-                draft.visibility());
+        assertFalse("shared is not public, as private is not",
+                draft.isPublic());
         assertEquals(EnumSet.of(WaystoneDraft.Field.NAME), draft.changed());
     }
 
@@ -170,18 +170,59 @@ public final class WaystoneDraftTest {
         assertTrue(draft.changed().contains(WaystoneDraft.Field.RELEVANCE));
     }
 
+    /** Access steps Private and Public alone; only a manager turns a waystone public (WAY-13, WAY-14). */
     @Test
-    public void onlyAPlayerWhoMayMakeItPublicStepsOntoPublic() {
+    public void onlyAManagerStepsAPrivateWaystoneOntoPublic() {
         WaystoneDraft draft = new WaystoneDraft(bree());
-        draft.stepVisibility(false, false);
-        assertEquals(LostTalesMapMarkerVisibility.SHARED, draft.visibility());
-        draft.stepVisibility(false, false);
+        draft.stepVisibility(false);
+        assertFalse("a player who does not manage markers stays private",
+                draft.isPublic());
+        assertFalse(draft.mayBePublic(false));
+        assertFalse(draft.isChanged());
+        draft.stepVisibility(true);
+        assertTrue(draft.isPublic());
+        assertEquals(LostTalesMapMarkerVisibility.PUBLIC,
+                draft.toSettings().getVisibility());
+        draft.stepVisibility(true);
+        assertFalse("public steps back to private, never to shared",
+                draft.isPublic());
         assertEquals(LostTalesMapMarkerVisibility.PRIVATE,
-                draft.visibility());
-        draft.stepVisibility(true, true);
-        assertEquals(LostTalesMapMarkerVisibility.PUBLIC, draft.visibility());
-        draft.stepVisibility(false, false);
-        assertEquals("public, for a player who may not, steps back in",
-                LostTalesMapMarkerVisibility.PRIVATE, draft.visibility());
+                draft.toSettings().getVisibility());
+    }
+
+    /** An owner may take a public waystone private and step it back before saving. */
+    @Test
+    public void aWaystoneSavedPublicStepsBackForItsOwner() {
+        WaystoneDraft draft = new WaystoneDraft(
+                new LostTalesMapMarkerEditableSettings(
+                        "Bree Gate", "camp", "gold", "Waystones", "",
+                        true, 100, 12.0D, 64.0D, -8.0D, 256.0D, 16.0D,
+                        false, true, false, true,
+                        "losttales:glowstone_house", 73,
+                        LostTalesMapMarkerVisibility.PUBLIC));
+        assertTrue(draft.isPublic());
+        draft.stepVisibility(false);
+        assertFalse(draft.isPublic());
+        assertTrue(draft.changed().contains(WaystoneDraft.Field.VISIBILITY));
+        assertTrue(draft.mayBePublic(false));
+        draft.stepVisibility(false);
+        assertTrue(draft.isPublic());
+        assertFalse(draft.isChanged());
+    }
+
+    /** A shared waystone is not public: its draft reads as not changed and sends Private. */
+    @Test
+    public void aSharedWaystoneIsReadAsNotPublic() {
+        WaystoneDraft draft = new WaystoneDraft(
+                new LostTalesMapMarkerEditableSettings(
+                        "Bree Gate", "camp", "gold", "Waystones", "",
+                        true, 100, 12.0D, 64.0D, -8.0D, 256.0D, 16.0D,
+                        false, true, false, true,
+                        "losttales:glowstone_house", 73,
+                        LostTalesMapMarkerVisibility.SHARED));
+        assertFalse(draft.isPublic());
+        assertFalse(draft.isChanged());
+        assertEquals(LostTalesMapMarkerVisibility.PRIVATE,
+                draft.toSettings().getVisibility());
     }
 }

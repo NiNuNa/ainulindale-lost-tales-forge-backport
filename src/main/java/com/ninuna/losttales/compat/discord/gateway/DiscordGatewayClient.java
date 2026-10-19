@@ -137,7 +137,15 @@ public final class DiscordGatewayClient extends Thread {
                     url = this.gatewayUrl;
                 }
                 if (url == null || url.length() == 0) {
+                    this.gatewayUrl = "";
                     throw new IOException("Discord did not say where its gateway is");
+                }
+                if (!DiscordGatewayProtocol.isDiscordGateway(url)) {
+                    // The token goes to whatever the address names, so
+                    // only Discord's own is used; the next try asks again.
+                    this.gatewayUrl = "";
+                    this.protocol.forgetSession();
+                    throw new IOException("the gateway address is not Discord's");
                 }
                 resumed = session(url);
             } catch (IOException failure) {

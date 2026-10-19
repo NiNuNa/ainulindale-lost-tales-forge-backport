@@ -209,7 +209,8 @@ public final class ClientChatReadMarks {
         if (serverKey == null || serverKey.length() == 0 || view == null) {
             return null;
         }
-        String viewId = ConversationPage.viewed(view).id();
+        // One mark for every copy of the conversation (CHAT-02).
+        String viewId = ConversationPage.viewedConversation(view).id();
         if (viewId.indexOf(SEPARATOR) >= 0
                 || serverKey.indexOf(SEPARATOR) >= 0) {
             return null;
@@ -217,7 +218,8 @@ public final class ClientChatReadMarks {
         return serverKey + SEPARATOR + viewId;
     }
 
+    /** The file's lines: its heading and a mark a line, no more than it may hold. */
     private static List<String> readLines(File file) {
-        return LostTalesTextFiles.readLines(file, Integer.MAX_VALUE);
+        return LostTalesTextFiles.readLines(file, MAX_MARKS + 1);
     }
 }

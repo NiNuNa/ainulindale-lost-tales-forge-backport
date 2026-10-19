@@ -14,41 +14,30 @@ import org.lwjgl.input.Mouse;
  * The dent at the top of a window whose page fills it ({@link
  * ContentView}): the selected tab's shape turned upside down, hanging from
  * the middle of the window's top edge for as long as the page fills it.
- * On it the exit, which gives the window its row, strip and bar back, as
- * Escape does, and a padlock that holds the page filling its window: held,
- * neither Escape nor the exit nor Alt+Enter ends it, the screen closing
- * keeps it, and the layout keeps it too. The exit stands greyed while
- * held; a press on it lights the padlock.
+ * It holds the exit alone, which gives the window its row, strip and bar
+ * back, as Escape does (WIN-42).
  */
 final class ContentViewDent {
     /** What a point on a dent is. */
-    enum Part { EXIT, LOCK }
+    enum Part { EXIT }
 
     private static final int EDGE = WindowStyle.EDGE_GAP;
-    private static final int GAP = WindowStyle.BUTTON_GAP;
     private static final int EXIT_WIDTH =
             LostTalesUiSheet.FULLSCREEN_EXIT.getWidth();
     private static final int EXIT_HEIGHT =
             LostTalesUiSheet.FULLSCREEN_EXIT.getHeight();
     /** Clear pixels round a control that answer with it, as the tab row's end controls do. */
     private static final int SLACK = 2;
-    /** How long a held dent's padlock stays lit after a try to leave. */
-    private static final long NUDGE_NANOS = 600L * 1000000L;
-    /** How wide a dent stands: its border pieces, the exit and the padlock, the spacing rule's gaps. */
-    static final int WIDTH = TabRow.DENT_BORDER + EDGE + EXIT_WIDTH + GAP
-            + LockAnimation.WIDTH + EDGE + TabRow.DENT_BORDER;
+    /** How wide a dent stands: its border pieces and the exit, the spacing rule's gap either side. */
+    static final int WIDTH = TabRow.DENT_BORDER + EDGE + EXIT_WIDTH + EDGE
+            + TabRow.DENT_BORDER;
 
-    /** One window's dent: its padlock's swing, its controls' motions, and where they stood when last drawn. */
+    /** One window's dent: its exit's motion, and where it stood when last drawn. */
     private static final class Dent {
-        final LockAnimation lock = new LockAnimation();
         final LostTalesUiButtonMotion exitMotion =
-                new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
-        final LostTalesUiButtonMotion lockMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         LostTalesUiHitBox box;
         LostTalesUiHitBox exit;
-        LostTalesUiHitBox padlock;
-        long nudgedNanos;
     }
 
     /** Each window's dent, by its id. */
@@ -99,7 +88,6 @@ final class ContentViewDent {
                 net.minecraft.client.Minecraft.getMinecraft()));
         TabRow.drawDentShape(left, left + WIDTH, top, alpha, surface);
         long now = System.nanoTime();
-        boolean held = window.isBorderlessHeld();
         boolean pressed = Mouse.isButtonDown(0);
         int exitX = left + TabRow.DENT_BORDER + EDGE;
         // Centred in the dent's body, the odd pixel up.
@@ -108,36 +96,11 @@ final class ContentViewDent {
         dent.exit = new LostTalesUiHitBox(exitX, exitY, EXIT_WIDTH,
                 EXIT_HEIGHT).grown(SLACK);
         LostTalesUiInk.beginContent();
-        if (held) {
-            LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.FULLSCREEN_EXIT,
-                    LostTalesUiSheet.FULLSCREEN_EXIT, 0.0F, exitX, exitY,
-                    Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY));
-        } else {
-            boolean onExit = under == Part.EXIT;
-            dent.exitMotion.advance(now, onExit, onExit, onExit && pressed);
-            LostTalesUiButton.drawGlyph(LostTalesUiSheet.FULLSCREEN_EXIT,
-                    LostTalesUiSheet.FULLSCREEN_EXIT_HOVER, dent.exitMotion,
-                    exitX, exitY, alpha);
-        }
-        int lockX = exitX + EXIT_WIDTH + GAP;
-        // The resting padlock is centred, the swing reaching up out of it,
-        // as on the tab row.
-        int lockTop = top + Math.floorDiv(TabRow.DENT_BODY_HEIGHT
-                - LockAnimation.SHUT_HEIGHT, 2)
-                - (LockAnimation.HEIGHT - LockAnimation.SHUT_HEIGHT);
-        dent.padlock = new LostTalesUiHitBox(lockX,
-                lockTop + LockAnimation.HEIGHT - LockAnimation.SHUT_HEIGHT,
-                LockAnimation.WIDTH, LockAnimation.SHUT_HEIGHT).grown(SLACK);
-        boolean onLock = under == Part.LOCK;
-        boolean lit = onLock || now - dent.nudgedNanos < NUDGE_NANOS;
-        dent.lockMotion.advance(now, lit, onLock, onLock && pressed);
-        LostTalesUiButton.beginPose(dent.lockMotion, lockX, lockTop,
-                LockAnimation.WIDTH, LockAnimation.HEIGHT);
-        try {
-            dent.lock.draw(lockX, lockTop, held, lit, alpha);
-        } finally {
-            LostTalesUiButton.endPose();
-        }
+        boolean onExit = under == Part.EXIT;
+        dent.exitMotion.advance(now, onExit, onExit, onExit && pressed);
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.FULLSCREEN_EXIT,
+                LostTalesUiSheet.FULLSCREEN_EXIT_HOVER, dent.exitMotion,
+                exitX, exitY, alpha);
         regions.add(left, top, left + WIDTH, top + TabRow.DENT_HEIGHT);
     }
 
@@ -148,19 +111,11 @@ final class ContentViewDent {
             if (dent.box == null || !dent.box.contains(x, y)) {
                 continue;
             }
-            Part part = dent.exit != null && dent.exit.contains(x, y) ? Part.EXIT
-                    : dent.padlock != null && dent.padlock.contains(x, y)
-                            ? Part.LOCK : null;
+            Part part = dent.exit != null && dent.exit.contains(x, y)
+                    ? Part.EXIT : null;
             return new Hit(entry.getKey(), part);
         }
         return null;
-    }
-
-    /** Lights a held dent's padlock a moment: something tried to end what it holds. */
-    void nudge(String windowId) {
-        if (windowId != null) {
-            dentOf(windowId).nudgedNanos = System.nanoTime();
-        }
     }
 
     /** A point on a dent: its window, and the control it is on (null for the bare dent). */

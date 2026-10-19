@@ -47,6 +47,19 @@ public final class WindowLayoutStoreTest {
         ChatChannel.resetToBuiltIn();
     }
 
+    /** A window's line is read with no more pages than a window is read with. */
+    @Test
+    public void aWindowsLineNamesNoMoreThanItsPages() {
+        StringBuilder tabs = new StringBuilder();
+        for (int index = 0; index < WindowLayoutStore.MAX_PAGES + 50; index++) {
+            tabs.append(index == 0 ? "" : ",").append(index % 2 == 0 ? "global" : "ooc");
+        }
+        assertEquals(WindowLayoutStore.MAX_PAGES,
+                WindowLayoutStore.pagesOf(tabs.toString()).size());
+        assertEquals(Arrays.asList(ConversationPage.of(ChatChannel.GLOBAL)),
+                WindowLayoutStore.pagesOf("nowhere,global"));
+    }
+
     /**
      * A split is kept on its window's line: its two pages, its way and
      * its share. One naming a page the window does not hold, or written
@@ -74,12 +87,12 @@ public final class WindowLayoutStoreTest {
     }
 
     /**
-     * Every window names the view it stands in, and a page held filling
-     * its window is kept as held; custom views come first, with the names
-     * the player gave them. A line naming no custom view is left out.
+     * Every window names the view it stands in, and Borderless is never
+     * written (WIN-41); custom views come first, with the names the player
+     * gave them. A line naming no custom view is left out.
      */
     @Test
-    public void viewsAndHeldPagesRoundTrip() {
+    public void viewsRoundTripAndBorderlessIsNeverKept() {
         WindowLayoutStore.load(Arrays.asList(
                 "view v2 name=Hunting%20Party",
                 "view v9",
@@ -89,12 +102,10 @@ public final class WindowLayoutStoreTest {
         assertEquals("Hunting Party", Views.byId("v2").title());
         assertEquals(1, Views.custom().size());
         assertEquals(Views.byId("v2"), WindowLayout.viewOf(WindowLayout.window("w1")));
-        assertTrue(WindowLayout.window("w1").isBorderlessHeld());
-        assertFalse(WindowLayout.window("w2").isBorderlessHeld());
         List<String> described = WindowLayoutStore.describe();
         assertEquals("view v2 name=Hunting+Party", described.get(1));
         assertTrue(described.toString(), described.get(2).startsWith(
-                "window w1 view=v2 locked=true borderless=held "));
+                "window w1 view=v2 locked=true x="));
         assertFalse(described.get(3).contains("borderless="));
         WindowLayoutStore.load(described);
         assertEquals(described, WindowLayoutStore.describe());

@@ -54,4 +54,16 @@ public final class ChatActionTest {
         assertFalse(ChatAction.isValid(words + "a"));
         assertFalse(ChatAction.isValid("draws §chis sword"));
     }
+
+    /** /me is an action in every conversation, in character and out of it, never in a console (CHAT-37). */
+    @Test
+    public void everyConversationButTheConsolesTakesActions() {
+        assertTrue(ChatAction.takesActions(ChatChannel.GLOBAL));
+        assertTrue(ChatAction.takesActions(ChatChannel.OOC));
+        assertTrue(ChatAction.takesActions(ChatChannel.OPERATOR));
+        assertTrue(ChatAction.takesActions(ChatChannel.WHISPER));
+        assertFalse(ChatAction.takesActions(ChatChannel.CLIENT_CONSOLE));
+        assertFalse(ChatAction.takesActions(ChatChannel.SERVER_CONSOLE));
+        assertFalse(ChatAction.takesActions(null));
+    }
 }

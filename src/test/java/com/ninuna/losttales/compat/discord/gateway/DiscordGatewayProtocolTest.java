@@ -73,13 +73,14 @@ public final class DiscordGatewayProtocolTest {
         DiscordGatewayProtocol protocol = new DiscordGatewayProtocol(TOKEN, 0);
         List<DiscordGatewayProtocol.Action> ready = protocol.onPayload(
                 "{\"op\":0,\"s\":1,\"t\":\"READY\",\"d\":{\"session_id\":\"abc\","
-                        + "\"resume_gateway_url\":\"wss://resume.example\","
+                        + "\"resume_gateway_url\":\"wss://gateway-us-east1-b.discord.gg\","
                         + "\"application\":{\"id\":\"42\"},"
                         + "\"guilds\":[{\"id\":\"g1\"},{\"id\":\"g2\"}]}}");
         assertEquals(1, ready.size());
         assertEquals(DiscordGatewayProtocol.Action.Type.READY, ready.get(0).type);
         assertTrue(protocol.canResume());
-        assertEquals("wss://resume.example", protocol.getResumeGatewayUrl());
+        assertEquals("wss://gateway-us-east1-b.discord.gg",
+                protocol.getResumeGatewayUrl());
         assertEquals("42", DiscordGatewayProtocol.applicationId(ready.get(0).data));
         assertEquals(Arrays.asList("g1", "g2"),
                 DiscordGatewayProtocol.guildIds(ready.get(0).data));
@@ -98,6 +99,35 @@ public final class DiscordGatewayProtocolTest {
         assertEquals(6, resume.get("op").getAsInt());
         assertEquals("abc", resume.getAsJsonObject("d").get("session_id").getAsString());
         assertEquals(2, resume.getAsJsonObject("d").get("seq").getAsInt());
+    }
+
+    /** Only Discord's own gateway addresses are taken: the bot token travels there. */
+    @Test
+    public void onlyDiscordsGatewayAddressesAreTaken() {
+        assertTrue(DiscordGatewayProtocol.isDiscordGateway("wss://gateway.discord.gg"));
+        assertTrue(DiscordGatewayProtocol.isDiscordGateway("wss://gateway.discord.gg/"));
+        assertTrue(DiscordGatewayProtocol.isDiscordGateway(
+                "wss://gateway-us-east1-c.discord.gg:443"));
+        assertTrue(DiscordGatewayProtocol.isDiscordGateway("WSS://Gateway.Discord.GG"));
+        String[] refused = {
+                "", null, "ws://gateway.discord.gg", "https://gateway.discord.gg",
+                "wss://resume.example", "wss://discord.gg.example.com",
+                "wss://evildiscord.gg", "wss://gateway.discord.gg:8443",
+                "wss://user@gateway.discord.gg", "wss://gateway.discord.gg/path",
+                "wss://gateway.discord.gg/?v=9", "wss://gateway.discord.gg#x",
+                "wss://gateway.discord.gg\r\nHost: x", "not a url at all"};
+        for (String url : refused) {
+            assertFalse(String.valueOf(url), DiscordGatewayProtocol.isDiscordGateway(url));
+        }
+    }
+
+    @Test
+    public void aResumeAddressThatIsNotDiscordsIsNotFollowed() {
+        DiscordGatewayProtocol protocol = new DiscordGatewayProtocol(TOKEN, 0);
+        protocol.onPayload("{\"op\":0,\"s\":1,\"t\":\"READY\",\"d\":{"
+                + "\"session_id\":\"abc\",\"resume_gateway_url\":\"wss://attacker.example\"}}");
+        assertTrue("the session still resumes", protocol.canResume());
+        assertEquals("on the gateway's own address", "", protocol.getResumeGatewayUrl());
     }
 
     /** Whatever interval a HELLO names, the beat stays within sane bounds. */

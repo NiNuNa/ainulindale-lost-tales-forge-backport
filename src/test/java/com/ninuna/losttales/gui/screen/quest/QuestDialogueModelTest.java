@@ -17,6 +17,34 @@ public final class QuestDialogueModelTest {
             "I'll do it.", "Tell me more.", "Here you are.", "Not now.",
             "Farewell."};
 
+    /** The kinds of reply the model offers, in its order. */
+    private static java.util.List<QuestDialogueModel.Reply> replies(QuestDialogueModel model) {
+        java.util.List<QuestDialogueModel.Reply> kinds =
+                new java.util.ArrayList<QuestDialogueModel.Reply>();
+        for (QuestDialogueModel.Option option : model.getReplies()) {
+            kinds.add(option.getReply());
+        }
+        return kinds;
+    }
+
+    /** A hand-in with a pick offers one hand-over per item, each naming its choice (QUEST-33). */
+    @Test
+    public void aHandInWithAPickOffersEachItem() {
+        QuestDialogueModel model = QuestDialogueModel.of("Nia", "",
+                "A Word with Nia", "Return to Nia.",
+                QuestDialogueModel.Mood.HAND_IN, "You came back!", "",
+                EVERY_LABEL).withChoices(Arrays.asList(
+                        "I'll take the sword.", "I'll take the bow."));
+        java.util.List<QuestDialogueModel.Option> options = model.getReplies();
+        assertEquals(3, options.size());
+        assertEquals(QuestDialogueModel.Reply.HAND_OVER, options.get(0).getReply());
+        assertEquals(0, options.get(0).getChoice());
+        assertEquals("I'll take the bow.", options.get(1).getLabel());
+        assertEquals(1, options.get(1).getChoice());
+        assertEquals(QuestDialogueModel.Reply.LEAVE, options.get(2).getReply());
+        assertEquals(-1, options.get(2).getChoice());
+    }
+
     private static QuestDialogueModel offer(String more, String... labels) {
         return QuestDialogueModel.of("Nia", "Bree", "A Word with Nia",
                 "Gather 4 sticks", QuestDialogueModel.Mood.OFFER,
@@ -30,7 +58,7 @@ public final class QuestDialogueModelTest {
         assertEquals(Arrays.asList(QuestDialogueModel.Reply.ACCEPT,
                         QuestDialogueModel.Reply.MORE,
                         QuestDialogueModel.Reply.DECLINE),
-                model.getReplies());
+                replies(model));
         assertEquals("Four sticks would do it.", model.getSaid());
         assertEquals("I'll do it.",
                 model.labelOf(QuestDialogueModel.Reply.ACCEPT));
@@ -44,7 +72,7 @@ public final class QuestDialogueModelTest {
         assertEquals("Any dry stick will do.", told.getSaid());
         assertEquals(Arrays.asList(QuestDialogueModel.Reply.ACCEPT,
                         QuestDialogueModel.Reply.DECLINE),
-                told.getReplies());
+                replies(told));
         assertSame("being told twice changes nothing", told, told.told());
         assertEquals("the first conversation is untouched",
                 "Four sticks would do it.", model.getSaid());
@@ -55,7 +83,7 @@ public final class QuestDialogueModelTest {
         QuestDialogueModel model = offer("");
         assertEquals(Arrays.asList(QuestDialogueModel.Reply.ACCEPT,
                         QuestDialogueModel.Reply.DECLINE),
-                model.getReplies());
+                replies(model));
         assertSame("and asking is not possible", model, model.told());
     }
 
@@ -67,7 +95,7 @@ public final class QuestDialogueModelTest {
                 EVERY_LABEL);
         assertEquals(Arrays.asList(QuestDialogueModel.Reply.HAND_OVER,
                         QuestDialogueModel.Reply.LEAVE),
-                model.getReplies());
+                replies(model));
         assertEquals("Here you are.",
                 model.labelOf(QuestDialogueModel.Reply.HAND_OVER));
     }
@@ -78,7 +106,7 @@ public final class QuestDialogueModelTest {
                 "A Word with Nia", "", QuestDialogueModel.Mood.PROGRESS,
                 "Still looking?", "", EVERY_LABEL);
         assertEquals(Arrays.asList(QuestDialogueModel.Reply.LEAVE),
-                model.getReplies());
+                replies(model));
     }
 
     @Test
@@ -86,7 +114,7 @@ public final class QuestDialogueModelTest {
         QuestDialogueModel model = offer("", "", "", "", "", "");
         assertEquals("nothing may be taken without words for it",
                 Arrays.asList(QuestDialogueModel.Reply.LEAVE),
-                model.getReplies());
+                replies(model));
     }
 
     @Test

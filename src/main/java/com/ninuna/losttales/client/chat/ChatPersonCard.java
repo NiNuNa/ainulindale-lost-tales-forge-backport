@@ -1,23 +1,18 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.character.model.CharacterProfile;
-import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.PointerTip;
 import com.ninuna.losttales.client.window.SubWindowContent;
 import com.ninuna.losttales.client.window.WindowHover;
 import com.ninuna.losttales.client.window.WindowScreen;
-import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WordButton;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
-import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
-import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
-import java.util.Collections;
-import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.multiplayer.ServerData;
@@ -220,58 +215,19 @@ final class ChatPersonCard extends SubWindowContent {
         return hover.part != null && hover.part.startsWith(GLANCE_PREFIX);
     }
 
-    @Override
-    public String tipKey() {
-        return this.hoveredGlance == null ? ""
-                : this.hoveredGlance.getTitle() + "|" + this.hoveredGlance.getLine();
-    }
-
     /**
-     * A glance's title and line beside the pointer, as every tip is
-     * drawn: a popup of lines, its title in the accent on the first and its
-     * line under it in ivory, broken where a tip breaks.
+     * A glance's title in the accent and its line under it in ivory,
+     * broken where a tip breaks.
      */
     @Override
-    public void drawTip(Minecraft minecraft, int tipX, int tipY,
-                        int screenWidth, float share) {
+    public PointerTip tip(FontRenderer font) {
         CharacterProfile.Glance glance = this.hoveredGlance;
         if (glance == null) {
-            return;
+            return null;
         }
-        FontRenderer font = minecraft.fontRenderer;
-        String title = ClientChatProfanity.filter(glance.getTitle());
-        List<String> words = glance.getLine().length() == 0
-                ? Collections.<String>emptyList()
-                : WindowStyle.tipLines(font, ClientChatProfanity.filter(
-                        glance.getLine()));
-        int boxWidth = WindowStyle.popupLineWidth(font, title);
-        for (String line : words) {
-            boxWidth = Math.max(boxWidth,
-                    WindowStyle.popupLineWidth(font, line));
-        }
-        int boxHeight = WindowStyle.popupLinesHeight(1 + words.size());
-        int x = Math.max(2, Math.min(screenWidth - boxWidth - 2,
-                tipX - boxWidth / 2));
-        int y = tipY - 3 - boxHeight;
-        // Beside the pointer, so it keeps pace with the cursor, as every
-        // other tip does.
-        LostTalesTooltipSmoothing.begin(tipX, tipY);
-        try {
-            int alpha = Math.round(255.0F * Math.max(0.0F,
-                    Math.min(1.0F, share)));
-            WindowStyle.drawPopup(x, y, x + boxWidth, y + boxHeight, share);
-            int textX = x + WindowStyle.POPUP_INSET;
-            int lineY = y + WindowStyle.POPUP_INSET;
-            LostTalesUiInk.drawText(font, title, textX, lineY,
-                    LostTalesUiTheme.accentRgb(), alpha);
-            for (String line : words) {
-                lineY += WindowStyle.LINE_HEIGHT;
-                LostTalesUiInk.drawText(font, line, textX, lineY,
-                        LostTalesUiInk.IVORY, alpha);
-            }
-        } finally {
-            LostTalesTooltipSmoothing.end();
-        }
+        return PointerTip.titled(font,
+                ClientChatProfanity.filter(glance.getTitle()),
+                ClientChatProfanity.filter(glance.getLine()));
     }
 
     /** The person the card is about comes back with the chat. */

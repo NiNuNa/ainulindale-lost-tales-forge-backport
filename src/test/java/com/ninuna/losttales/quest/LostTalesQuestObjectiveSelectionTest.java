@@ -26,7 +26,8 @@ public final class LostTalesQuestObjectiveSelectionTest {
         LostTalesQuestDefinition quest = quest(firstRequired, firstOptional,
                 secondRequired, secondOptional);
 
-        LostTalesQuestProgress progress = progressAt(quest, 99, "second");
+        LostTalesQuestProgress progress = new LostTalesQuestProgress(quest.getId(),
+                99, "second", null, 0L, 0L, Arrays.asList("first"));
         progress.setObjectiveProgress("first_optional", 2);
 
         List<LostTalesQuestObjectiveDefinition> selected =
@@ -39,6 +40,18 @@ public final class LostTalesQuestObjectiveSelectionTest {
                 .getCurrentStageIndex(quest, progress));
         assertTrue(LostTalesQuestObjectiveSelection.isComplete(progress,
                 firstOptional));
+    }
+
+    /** An optional objective of a stage the quest branched past stays quiet (QUEST-32). */
+    @Test
+    public void aStageNotTakenKeepsItsOptionalsQuiet() {
+        LostTalesQuestDefinition quest = quest(objective("a", false),
+                objective("b", true), objective("c", false),
+                objective("d", true));
+        LostTalesQuestProgress skipped = new LostTalesQuestProgress(quest.getId(),
+                1, "second", null, 0L, 0L, Arrays.asList("elsewhere"));
+        assertEquals(Arrays.asList("c", "d"), ids(LostTalesQuestObjectiveSelection
+                .getProgressibleObjectives(quest, skipped)));
     }
 
     @Test

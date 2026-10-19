@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelIconSpec;
@@ -912,6 +913,14 @@ public final class ChatMemberList {
             nameLine.add(new Part(ChatEpithet.titleSuffix(false, epithet), "",
                     member.getTitleColor()));
         }
+        // The account behind a character trails the row's name and title,
+        // faint, while this player's Show Accounts is on.
+        String account = LostTalesConfig.chatShowAccounts && !member.isNpc()
+                ? ChatAccountAside.suffix(nameOf(member), member.getAccount(),
+                        member.getCharacterId() != null) : "";
+        if (account.length() > 0) {
+            nameLine.add(new Part(account, "", LostTalesChatVisualStyle.asideRgb()));
+        }
         ChatPresenceIdentity identity = member.getCharacterId() == null
                 ? ChatPresenceIdentity.ACCOUNT
                 : ChatPresenceIdentity.character(member.getCharacterId());
@@ -928,8 +937,15 @@ public final class ChatMemberList {
         final ChatRoleplayStatus roleplay = member.isNpc() || !member.isOnline()
                 ? null : ChatRoleplayMark.markedFor(member.getPlayerId(),
                         identity);
-        final float nameRight = roleplay == null ? roomRight
+        // A character spoken as but not played wears the quiet square
+        // before the role-play mark (CHAT-05).
+        final boolean notInWorld = member.isNotInWorld();
+        final float roleplayRight = roomRight;
+        final float worldRight = roleplay == null ? roomRight
                 : roomRight - ChatRoleplayMark.SIZE - ChatRoleplayMark.GAP;
+        final float nameRight = notInWorld
+                ? worldRight - ChatWorldMark.SIZE - ChatWorldMark.GAP
+                : worldRight;
         final List<Part> statusRun = statusLine.length() == 0
                 ? Collections.<Part>emptyList()
                 : Collections.singletonList(new Part(statusLine, "\u00a7o",
@@ -973,10 +989,17 @@ public final class ChatMemberList {
                                     textLeft, nameTop, alpha, nameRight,
                                     nameSlide, rowsOriginX, unitScale,
                                     listRight, clipTop, clipBottom);
+                            if (notInWorld) {
+                                LostTalesUiFlatLayers.nextLayer();
+                                ChatWorldMark.draw(worldRight - ChatWorldMark.SIZE,
+                                        nameTop + (capitals
+                                                - ChatWorldMark.SIZE) / 2,
+                                        alpha);
+                            }
                             if (roleplay != null) {
                                 LostTalesUiFlatLayers.nextLayer();
                                 ChatRoleplayMark.draw(roleplay,
-                                        roomRight - ChatRoleplayMark.SIZE,
+                                        roleplayRight - ChatRoleplayMark.SIZE,
                                         nameTop + (capitals
                                                 - ChatRoleplayMark.SIZE) / 2,
                                         alpha);

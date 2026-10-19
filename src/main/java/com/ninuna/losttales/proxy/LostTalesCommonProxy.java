@@ -33,12 +33,7 @@ import com.ninuna.losttales.compat.lotr.structure.LotrStructureBans;
 import com.ninuna.losttales.character.server.CharacterStateCheckpointHandler;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
-import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
-import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
-import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
-import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
-import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
-import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
+import com.ninuna.losttales.block.tileentity.ELostTalesTileEntity;
 import com.ninuna.losttales.command.ELostTalesCommand;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
@@ -76,11 +71,14 @@ import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestFellowsPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestProgressPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestOfferPacket;
 import com.ninuna.losttales.network.packet.LostTalesWorldQuestSyncPacket;
 import com.ninuna.losttales.quest.ServerQuestFiles;
+import com.ninuna.losttales.quest.QuestLogSync;
 import com.ninuna.losttales.quest.ServerQuestSync;
 import com.ninuna.losttales.quest.world.WorldQuests;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
@@ -248,7 +246,7 @@ public class LostTalesCommonProxy {
         ELostTalesItem.initAndRegisterItems();
         AccessoryBootstrap.initialize();
         ELostTalesBlock.initAndRegisterBlocks();
-        registerTileEntities();
+        ELostTalesTileEntity.initAndRegisterTileEntities();
         ELostTalesEntity.initAndRegisterEntities();
         ELostTalesBiome.initAndRegisterBiomes();
         ELostTalesSpawnList.initAndRegisterSpawnLists();
@@ -283,18 +281,6 @@ public class LostTalesCommonProxy {
                 LotrCharacterAdapter.getInstance().getFactionIds());
     }
 
-    protected void registerTileEntities() {
-        // Keep the original short IDs for world-save compatibility. Registering from the
-        // common proxy ensures dedicated servers know these tile entities too.
-        GameRegistry.registerTileEntity(LostTalesTileEntityUrn.class, "pot");
-        GameRegistry.registerTileEntity(LostTalesTileEntityStatue.class, "statue");
-        GameRegistry.registerTileEntity(LostTalesTileEntityLamp.class, "lamp");
-        GameRegistry.registerTileEntity(LostTalesTileEntityPlushie.class, "plushie");
-        GameRegistry.registerTileEntity(LostTalesTileEntityMissiveBoard.class, "missive_board");
-        GameRegistry.registerTileEntity(
-                LostTalesTileEntityWaystone.class, "losttales_waystone");
-    }
-
     /**
      * Opens the page of the missive letter in the player's inventory slot
      * {@code inventorySlot}, on the client. The common/server proxy does
@@ -312,6 +298,10 @@ public class LostTalesCommonProxy {
     public void handleQuickLootContainerSync(LostTalesQuickLootContainerSyncPacket packet) {}
 
     public void handleQuestSync(LostTalesQuestSyncPacket packet) {}
+
+    public void handleQuestProgress(LostTalesQuestProgressPacket packet) {}
+
+    public void handleQuestFellows(LostTalesQuestFellowsPacket packet) {}
 
     public void handleServerQuestSync(LostTalesServerQuestSyncPacket packet) {}
 
@@ -459,7 +449,11 @@ public class LostTalesCommonProxy {
         LostTalesQuestRegistry.clearRuntimeQuests();
         // The server's own quest files, as they are on disk now.
         LostTalesQuestRegistry.loadServerQuests();
+        com.ninuna.losttales.quest.world.WorldQuestSchedules.logProblems();
         ServerQuestSync.clear();
+        QuestLogSync.clear();
+        com.ninuna.losttales.quest.QuestFellows.clear();
+        com.ninuna.losttales.quest.QuestOfferPause.clear();
         WorldQuests.clear();
         LostTalesServerBroadcastHook.clear();
         ChatArrivals.clear();
@@ -563,6 +557,9 @@ public class LostTalesCommonProxy {
         MissiveBoardWatches.clear();
         LostTalesQuestRegistry.clearServerQuests();
         ServerQuestSync.clear();
+        QuestLogSync.clear();
+        com.ninuna.losttales.quest.QuestFellows.clear();
+        com.ninuna.losttales.quest.QuestOfferPause.clear();
         WorldQuests.clear();
         LostTalesMapMarkerSyncManager.clear();
         LostTalesLotrWaystoneTravelAdapter.clear();

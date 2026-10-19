@@ -20,7 +20,9 @@ public final class ClientQuestEntry {
         ACTIVE,
         COMPLETED,
         FAILED,
-        ABANDONED
+        ABANDONED,
+        /** A lead heard for a quest not taken (QUEST-20). */
+        RUMOUR
     }
 
     private final Source source;
@@ -40,6 +42,7 @@ public final class ClientQuestEntry {
     private final LostTalesQuestDefinition lostTalesDefinition;
     private final LostTalesQuestProgress lostTalesProgress;
     private final LostTalesQuestHistoryEntry historyEntry;
+    private final List<String> podium;
 
     public ClientQuestEntry(Source source, String reference, String title,
             String subtitle, String category, String journalText, Status status,
@@ -62,6 +65,21 @@ public final class ClientQuestEntry {
             LostTalesQuestDefinition lostTalesDefinition,
             LostTalesQuestProgress lostTalesProgress,
             LostTalesQuestHistoryEntry historyEntry) {
+        this(source, reference, title, subtitle, category, journalText,
+                status, tracked, stageNumber, stageCount, remainingTicks,
+                objectives, rewards, targets, lostTalesDefinition,
+                lostTalesProgress, historyEntry, null);
+    }
+
+    /** An entry with a world quest's podium, a line for each of its best helpers (QUEST-36). */
+    public ClientQuestEntry(Source source, String reference, String title,
+            String subtitle, String category, String journalText, Status status,
+            boolean tracked, int stageNumber, int stageCount,
+            long remainingTicks, List<Objective> objectives,
+            List<String> rewards, List<Target> targets,
+            LostTalesQuestDefinition lostTalesDefinition,
+            LostTalesQuestProgress lostTalesProgress,
+            LostTalesQuestHistoryEntry historyEntry, List<String> podium) {
         this.source = source == null ? Source.LOST_TALES : source;
         this.reference = safe(reference);
         this.title = safe(title);
@@ -80,6 +98,12 @@ public final class ClientQuestEntry {
         this.lostTalesProgress = lostTalesProgress == null
                 ? null : lostTalesProgress.copy();
         this.historyEntry = historyEntry;
+        this.podium = immutableStringCopy(podium);
+    }
+
+    /** A world quest's best helpers, a line each, best first; empty for any other quest. */
+    public List<String> getPodium() {
+        return this.podium;
     }
 
     public Source getSource() {
@@ -120,6 +144,10 @@ public final class ClientQuestEntry {
 
     public boolean isAbandoned() {
         return this.status == Status.ABANDONED;
+    }
+
+    public boolean isRumour() {
+        return this.status == Status.RUMOUR;
     }
 
     public boolean isTracked() {

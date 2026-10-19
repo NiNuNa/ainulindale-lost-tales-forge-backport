@@ -82,17 +82,31 @@ public final class DiscordServerNoticesTest {
     }
 
 
+    /**
+     * The topic carries the status line, the players against the cap, the
+     * address and the ticks a second, and never the time up: two hours
+     * apart, the topic reads the same.
+     */
+    @Test
+    public void theTopicLeavesTheTimeUpOut() {
+        String early = DiscordServerNotices.onlineTopic(ENGLISH,
+                ChatServerStatus.topicPartsOf(ENGLISH, 3, 20, "play.example.org", 19));
+        assertEquals("Server online • 3/20 players • play.example.org • 20 TPS", early);
+        assertTrue(!early.contains("up "));
+        assertEquals(early, DiscordServerNotices.onlineTopic(ENGLISH,
+                ChatServerStatus.topicPartsOf(ENGLISH, 3, 20, "play.example.org", 20)));
+    }
+
     /** The topic says the server's status, the parts the game's member lists show. */
     @Test
     public void topicStatesTheServersStatus() {
         assertEquals("Server online • 14/40 players • 20 TPS",
                 DiscordServerNotices.onlineTopic(ENGLISH,
-                        ChatServerStatus.partsOf(ENGLISH, 14, 40, "", 20, 0L)));
-        assertEquals("Server online • 1 player • play.example.org • 18 TPS"
-                + " • up 1h 30m",
+                        ChatServerStatus.topicPartsOf(ENGLISH, 14, 40, "", 20)));
+        assertEquals("Server online • 1 player • play.example.org • 10 TPS",
                 DiscordServerNotices.onlineTopic(ENGLISH,
-                        ChatServerStatus.partsOf(ENGLISH, 1, 0,
-                                "play.example.org", 18, 90L * 60000L)));
+                        ChatServerStatus.topicPartsOf(ENGLISH, 1, 0,
+                                "play.example.org", 11)));
         assertEquals("Server offline",
                 DiscordServerNotices.offlineTopic(ENGLISH));
         assertEquals("{\"topic\":\"Server offline\"}",

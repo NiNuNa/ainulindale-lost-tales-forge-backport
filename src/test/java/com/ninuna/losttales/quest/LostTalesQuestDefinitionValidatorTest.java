@@ -1,6 +1,7 @@
 package com.ninuna.losttales.quest;
 
 import java.io.StringReader;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
@@ -20,11 +21,12 @@ public final class LostTalesQuestDefinitionValidatorTest {
     private static final String GATHER = "{\"id\":\"%s\",\"type\":\"gather\","
             + "\"params\":{\"item\":\"minecraft:log\",\"count\":\"4\"}}";
 
+    /** Every warning the file raises, what reading it found nothing reads first. */
     private static List<String> warnings(String json) {
+        List<String> unread = new ArrayList<String>();
         LostTalesQuestDefinition quest = LostTalesQuestDefinitionJsonParser
-                .parseQuest(new StringReader(json), "quests/test/q.json");
-        return LostTalesQuestDefinitionValidator.describeWarnings(
-                Collections.singletonList(quest));
+                .parseQuest(new StringReader(json), "quests/test/q.json", unread);
+        return LostTalesQuestDefinitionValidator.warningsOf(quest, unread);
     }
 
     private static String stage(String id, String... objectives) {
@@ -36,9 +38,16 @@ public final class LostTalesQuestDefinitionValidatorTest {
     }
 
     private static void assertOneWarning(String json, String about) {
+        assertWarnings(json, about);
+    }
+
+    /** The file raises exactly these warnings, in this order, each found by a part of it. */
+    private static void assertWarnings(String json, String... about) {
         List<String> found = warnings(json);
-        assertEquals(found.toString(), 1, found.size());
-        assertTrue(found.get(0), found.get(0).contains(about));
+        assertEquals(found.toString(), about.length, found.size());
+        for (int index = 0; index < about.length; index++) {
+            assertTrue(found.get(index), found.get(index).contains(about[index]));
+        }
     }
 
     /** Only a required gather hands its items over, and {@code take} says true or false. */
@@ -106,9 +115,10 @@ public final class LostTalesQuestDefinitionValidatorTest {
         assertOneWarning(HEAD + "\"stages\":[" + stage("10",
                 "{\"id\":\"a\",\"type\":\"kill\",\"params\":{\"group\":"
                         + "\"hostiles\"}}") + "]}", "the group 'hostiles'");
-        assertOneWarning(HEAD + "\"stages\":[" + stage("10",
+        assertWarnings(HEAD + "\"stages\":[" + stage("10",
                 "{\"id\":\"a\",\"type\":\"talk\",\"params\":{\"tag\":"
-                        + "\"npc\"}}") + "]}", "names no 'entity' or 'group'");
+                        + "\"npc\"}}") + "]}", "the parameter 'tag'",
+                "names no 'entity' or 'group'");
         assertOneWarning(HEAD + "\"interaction\":{\"block\":\"minecraft:chest\","
                 + "\"metadata\":\"2\"},\"stages\":[" + stage("10",
                 String.format(GATHER, "a")) + "]}", "interaction names 'metadata'");
@@ -125,6 +135,82 @@ public final class LostTalesQuestDefinitionValidatorTest {
         }
         assertOneWarning("{\"id\":\"" + id + "\",\"stages\":[" + stage("10",
                 String.format(GATHER, "a")) + "]}", "longer than 256 bytes");
+    }
+
+    /** A key nothing reads is a warning wherever it stands (QUEST-04). */
+    @Test
+    public void aKeyNothingReadsIsAWarning() {
+        assertOneWarning(HEAD + "\"repeatible\":true,\"stages\":["
+                + stage("10", String.format(GATHER, "a")) + "]}",
+                "writes 'repeatible', which nothing reads");
+        assertOneWarning(HEAD + "\"stages\":[{\"id\":\"10\",\"name\":\"x\","
+                + "\"objectives\":[" + String.format(GATHER, "a") + "]}]}",
+                "stage=10 writes 'name'");
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10",
+                "{\"id\":\"a\",\"type\":\"gather\",\"optinal\":true,"
+                        + "\"params\":{\"item\":\"minecraft:log\"}}") + "]}",
+                "objective=a writes 'optinal'");
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10",
+                "{\"id\":\"a\",\"type\":\"gather\",\"params\":{"
+                        + "\"item\":\"minecraft:log\",\"amount\":\"4\"}}") + "]}",
+                "the parameter 'amount'");
+        assertOneWarning(HEAD + "\"rewards\":{\"xp\":\"5\"},\"stages\":["
+                + stage("10", String.format(GATHER, "a")) + "]}",
+                "rewards names 'xp'");
+        assertOneWarning(HEAD + "\"prerequisites\":{\"done\":\"x\"},"
+                + "\"stages\":[" + stage("10", String.format(GATHER, "a"))
+                + "]}", "prerequisites names 'done'");
+    }
+
+    /** A value of a shape its key never takes is a warning, never quietly dropped. */
+    @Test
+    public void aValueOfTheWrongShapeIsAWarning() {
+        assertOneWarning(HEAD + "\"repeatable\":\"yes\",\"stages\":["
+                + stage("10", String.format(GATHER, "a")) + "]}",
+                "it is true or false");
+        assertOneWarning(HEAD + "\"rewards\":{\"items\":[\"minecraft:log\"]},"
+                + "\"stages\":[" + stage("10", String.format(GATHER, "a"))
+                + "]}", "'rewards.items' as a list or a block");
+        assertWarnings(HEAD + "\"stages\":{\"id\":\"10\"}}",
+                "'stages' as something other than a list", "has no stages");
+    }
+
+    /** Numbers are numbers, flags are true or false, lists are parted by commas. */
+    @Test
+    public void numbersFlagsAndListsAreChecked() {
+        assertOneWarning(HEAD + "\"prerequisites\":{\"minLevel\":\"ten\"},"
+                + "\"stages\":[" + stage("10", String.format(GATHER, "a"))
+                + "]}", "'minLevel' ten");
+        assertOneWarning(HEAD + "\"prerequisites\":{\"completed\":"
+                + "\"losttales:a;losttales:b\"},\"stages\":[" + stage("10",
+                String.format(GATHER, "a")) + "]}", "parted by ';'");
+        assertOneWarning(HEAD + "\"rewards\":{\"experience\":\"lots\"},"
+                + "\"stages\":[" + stage("10", String.format(GATHER, "a"))
+                + "]}", "'experience' lots");
+        assertOneWarning(HEAD + "\"rewards\":{\"count\":\"2\"},"
+                + "\"stages\":[" + stage("10", String.format(GATHER, "a"))
+                + "]}", "but no 'item'");
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10",
+                "{\"id\":\"a\",\"type\":\"kill\",\"params\":{\"group\":"
+                        + "\"hostile\",\"fellowshipShared\":\"no\"}}") + "]}",
+                "'fellowshipShared' no");
+    }
+
+    /** Only an optional objective writes an outcome or pays a reward of its own. */
+    @Test
+    public void anOutcomeOrRewardIsAnOptionalObjectives() {
+        String optional = "{\"id\":\"b\",\"type\":\"gather\",\"optional\":%s,"
+                + "\"params\":{\"item\":\"minecraft:log\",\"outcome\":\"Kind.\","
+                + "\"reward.experience\":\"%s\"}}";
+        assertEquals(Collections.<String>emptyList(), warnings(HEAD
+                + "\"stages\":[" + stage("10", String.format(GATHER, "a"),
+                String.format(optional, "true", "5")) + "]}"));
+        List<String> found = warnings(HEAD + "\"stages\":[" + stage("10",
+                String.format(optional, "false", "5")) + "]}");
+        assertEquals(found.toString(), 2, found.size());
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10",
+                String.format(GATHER, "a"), String.format(optional, "true",
+                        "many")) + "]}", "'experience' many");
     }
 
     @Test

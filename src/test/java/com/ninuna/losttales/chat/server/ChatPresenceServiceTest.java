@@ -132,4 +132,22 @@ public final class ChatPresenceServiceTest {
         assertEquals(ChatPresence.DO_NOT_DISTURB, shown.get(ALDRIC));
         assertEquals(ChatPresence.AWAY, shown.get(BERIC));
     }
+
+    /**
+     * A mute freezes the status lines and role-play statuses as they stood
+     * (CHAT-63); without a mute, or with nothing stood yet, the statement
+     * stands.
+     */
+    @Test
+    public void aMuteFreezesWhatStood() {
+        Map<ChatPresenceIdentity, String> held = Collections.singletonMap(ALDRIC, "On watch");
+        Map<ChatPresenceIdentity, String> stated = Collections.singletonMap(ALDRIC, "Shouting");
+        assertEquals(held, ChatPresenceService.frozen(true, held, stated));
+        assertEquals(stated, ChatPresenceService.frozen(false, held, stated));
+        assertEquals(stated, ChatPresenceService.frozen(true, null, stated));
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> roleplay =
+                Collections.singletonMap(ALDRIC, ChatRoleplayStatus.LOOKING_FOR_SCENE);
+        assertEquals(roleplay, ChatPresenceService.frozen(true, roleplay,
+                new HashMap<ChatPresenceIdentity, ChatRoleplayStatus>()));
+    }
 }

@@ -30,7 +30,7 @@ public final class LostTalesWaystoneSettingsRequestPacket
     private String markerId = "";
     private long expectedRevision;
     private LostTalesMapMarkerEditableSettings settings;
-    /** The character or fellowship a share names. */
+    /** The character or fellowship a share names, or the character a hand over names. */
     private String targetName = "";
     private boolean malformed;
 
@@ -91,6 +91,24 @@ public final class LostTalesWaystoneSettingsRequestPacket
         packet.expectedRevision = expectedRevision;
         packet.targetName =
                 fellowshipName == null ? "" : fellowshipName;
+        packet.validate();
+        return packet;
+    }
+
+    /** A manager's request that the character named own the waystone. */
+    public static LostTalesWaystoneSettingsRequestPacket handOver(
+            int x, int y, int z, String markerId, long expectedRevision,
+            String characterName) {
+        LostTalesWaystoneSettingsRequestPacket packet =
+                new LostTalesWaystoneSettingsRequestPacket();
+        packet.operation = LostTalesWaystoneSettingsOperation.HAND_OVER;
+        packet.x = x;
+        packet.y = y;
+        packet.z = z;
+        packet.markerId = markerId == null ? "" : markerId;
+        packet.expectedRevision = expectedRevision;
+        packet.targetName =
+                characterName == null ? "" : characterName;
         packet.validate();
         return packet;
     }

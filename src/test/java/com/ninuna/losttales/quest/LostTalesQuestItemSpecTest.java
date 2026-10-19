@@ -104,7 +104,38 @@ public final class LostTalesQuestItemSpecTest {
                 ids(LostTalesQuestRewardHelper.itemsGranted(
                         rewards("items", "bread_crumb*x,,"))));
         assertTrue(LostTalesQuestRewardHelper.itemsGranted(
-                rewards("item", "*3", "items", " ; ")).isEmpty());
+                rewards("item", "*3", "items", " , ")).isEmpty());
+    }
+
+    /**
+     * A reward never grants more of one item than a whole inventory of
+     * full stacks, and the text names what is granted; the item comes in
+     * stacks no larger than its own limit.
+     */
+    @Test
+    public void aRewardIsCappedAndGrantedInLegalStacks() {
+        assertGranted(rewards("item", "losttales_test:silver_coin*2147483647"),
+                "losttales_test:silver_coin",
+                LostTalesQuestItemSpec.MAX_REWARD_COUNT, 0);
+        assertGranted(rewards("items", "losttales_test:silver_coin@1*99999"),
+                "losttales_test:silver_coin",
+                LostTalesQuestItemSpec.MAX_REWARD_COUNT, 1);
+        assertEquals(Arrays.asList(LostTalesQuestItemSpec.MAX_REWARD_COUNT
+                        + "x Silver coin"),
+                LostTalesQuestRewardText.phrases(rewards(
+                        "item", "losttales_test:silver_coin", "count", "99999")));
+        assertEquals("[64, 64, 2]", Arrays.toString(
+                LostTalesQuestRewardHelper.stackSizes(130, 64)));
+        assertEquals("[16, 16]", Arrays.toString(
+                LostTalesQuestRewardHelper.stackSizes(32, 16)));
+        assertEquals("[1, 1, 1]", Arrays.toString(
+                LostTalesQuestRewardHelper.stackSizes(3, 1)));
+        assertEquals("[1, 1]", Arrays.toString(
+                LostTalesQuestRewardHelper.stackSizes(2, 0)));
+        assertEquals("[]", Arrays.toString(
+                LostTalesQuestRewardHelper.stackSizes(0, 64)));
+        assertEquals(36, LostTalesQuestRewardHelper.stackSizes(
+                LostTalesQuestItemSpec.MAX_REWARD_COUNT, 64).length);
     }
 
     @Test

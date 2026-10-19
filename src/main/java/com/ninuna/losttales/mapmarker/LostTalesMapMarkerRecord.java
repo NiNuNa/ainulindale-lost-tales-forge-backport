@@ -15,6 +15,12 @@ import net.minecraft.world.World;
  * its placer has not named keeps an empty name and is called after them
  * ({@link LostTalesMapMarkerNamedAfter}); an empty category or description
  * is drawn with the words for its kind, in each player's language.</p>
+ *
+ * <p>A placed waystone belongs to the character that placed it
+ * ({@link #getOwnerCharacterId}), never to its account (WAY-08). Its
+ * access is public or not; a waystone that is not public reads as shared
+ * while it has any share and private without one ({@link #access}), so
+ * sharing and unsharing keep no access of their own (WAY-14).</p>
  */
 public final class LostTalesMapMarkerRecord {
     public static final int MAX_ID_LENGTH = 256;
@@ -25,6 +31,12 @@ public final class LostTalesMapMarkerRecord {
     public static final int MAX_SHARED_FELLOWSHIPS = 64;
     public static final double MAX_ABSOLUTE_COORDINATE = 30000000.0D;
     public static final double MAX_RADIUS = 1000000.0D;
+    /**
+     * The widest discovery radius a placed waystone keeps, in blocks: as
+     * far as the discovery scan reaches, 64 chunks (WAY-15). Bundled
+     * markers keep theirs, up to {@link #MAX_RADIUS}.
+     */
+    public static final double MAX_PLACED_DISCOVERY_RADIUS = 1024.0D;
 
     private final String id;
     private final LostTalesMapMarkerSource source;
@@ -47,7 +59,7 @@ public final class LostTalesMapMarkerRecord {
     private final boolean hasWaystone;
     private final String waystoneStructureType;
     private final int priority;
-    private final UUID ownerPlayerId;
+    private final UUID ownerCharacterId;
     private final LostTalesMapMarkerVisibility visibility;
     private final Set<UUID> sharedCharacterIds;
     private final Set<UUID> sharedFellowshipIds;
@@ -86,9 +98,11 @@ public final class LostTalesMapMarkerRecord {
         this.y = requireCoordinate(builder.y, "y");
         this.z = requireCoordinate(builder.z, "z");
         this.compassFadeInRadius = requireRadius(
-                builder.compassFadeInRadius, "compass fade radius");
+                builder.compassFadeInRadius, "compass fade radius",
+                MAX_RADIUS);
         this.discoveryRadius = requireRadius(
-                builder.discoveryRadius, "discovery radius");
+                builder.discoveryRadius, "discovery radius",
+                maxDiscoveryRadius(this.source));
         this.hiddenUntilDiscovered =
                 builder.discoverable && builder.hiddenUntilDiscovered;
         this.discoverable = builder.discoverable;
@@ -101,14 +115,12 @@ public final class LostTalesMapMarkerRecord {
             throw new IllegalArgumentException("marker priority is out of range");
         }
         this.priority = builder.priority;
-        this.ownerPlayerId = builder.ownerPlayerId;
+        this.ownerCharacterId = builder.ownerCharacterId;
         if (this.source == LostTalesMapMarkerSource.PLAYER_CREATED
-                && this.ownerPlayerId == null) {
+                && this.ownerCharacterId == null) {
             throw new IllegalArgumentException(
                     "player-created marker must have an owner");
         }
-        this.visibility = builder.visibility == null
-                ? LostTalesMapMarkerVisibility.PRIVATE : builder.visibility;
         LinkedHashSet<UUID> shared = new LinkedHashSet<UUID>();
         if (builder.sharedCharacterIds != null) {
             for (UUID characterId : builder.sharedCharacterIds) {
@@ -136,6 +148,9 @@ public final class LostTalesMapMarkerRecord {
         }
         this.sharedFellowshipIds =
                 Collections.unmodifiableSet(sharedFellowships);
+        this.visibility = access(
+                builder.visibility == LostTalesMapMarkerVisibility.PUBLIC,
+                !shared.isEmpty() || !sharedFellowships.isEmpty());
         this.generationState = builder.generationState == null
                 ? (builder.hasWaystone
                     ? LostTalesWaystoneGenerationState.NOT_ATTEMPTED
@@ -195,15 +210,16 @@ public final class LostTalesMapMarkerRecord {
     }
 
     /**
-     * A waystone a player just placed: unnamed, called after
-     * {@code placerName} ({@code Nils's Waystone}), with no category or
-     * description of its own, until its owner gives it some.
+     * A waystone a character just placed: unnamed, called after
+     * {@code placerName} ({@code Nils's Waystone}), owned by that character
+     * ({@code ownerCharacterId}), with no category or description of its
+     * own, until its owner gives it some.
      */
     public static LostTalesMapMarkerRecord createPlayerMarker(
-            String id, String placerName, UUID ownerPlayerId,
+            String id, String placerName, UUID ownerCharacterId,
             int dimensionId, double x, double y, double z,
             UUID linkToken) {
-        if (ownerPlayerId == null) {
+        if (ownerCharacterId == null) {
             throw new IllegalArgumentException(
                     "player marker owner must not be null");
         }
@@ -219,7 +235,7 @@ public final class LostTalesMapMarkerRecord {
                 .radii(128.0D, 8.0D)
                 .discovery(true, true, false)
                 .waystone(true, "losttales:player_placed")
-                .ownerPlayerId(ownerPlayerId)
+                .ownerCharacterId(ownerCharacterId)
                 .visibility(LostTalesMapMarkerVisibility.PRIVATE)
                 .generationState(LostTalesWaystoneGenerationState.PLACED, "")
                 .link(dimensionId, (int)Math.floor(x), (int)Math.floor(y),
@@ -291,24 +307,60 @@ public final class LostTalesMapMarkerRecord {
                 .build();
     }
 
+    /** The record shared with these characters; its access follows ({@link #access}). */
     public LostTalesMapMarkerRecord withSharedCharacters(
-            Set<UUID> sharedCharacterIds,
-            LostTalesMapMarkerVisibility visibility) {
+            Set<UUID> sharedCharacterIds) {
         return toBuilder()
                 .sharedCharacterIds(sharedCharacterIds)
-                .visibility(visibility)
                 .revision(this.revision + 1L)
                 .build();
     }
 
+    /** The record shared with these fellowships of ours; its access follows ({@link #access}). */
     public LostTalesMapMarkerRecord withSharedFellowships(
-            Set<UUID> sharedFellowshipIds,
-            LostTalesMapMarkerVisibility visibility) {
+            Set<UUID> sharedFellowshipIds) {
         return toBuilder()
                 .sharedFellowshipIds(sharedFellowshipIds)
-                .visibility(visibility)
                 .revision(this.revision + 1L)
                 .build();
+    }
+
+    /**
+     * The record owned by another character, handed over by a manager.
+     * Its shares and what it is called after stay as they are, so the
+     * character it was called after keeps it only through a share.
+     */
+    public LostTalesMapMarkerRecord withOwner(UUID characterId) {
+        if (characterId == null) {
+            throw new IllegalArgumentException(
+                    "a waystone is handed over to a character");
+        }
+        return toBuilder()
+                .ownerCharacterId(characterId)
+                .revision(this.revision + 1L)
+                .build();
+    }
+
+    /**
+     * The one rule for a record's access: public, else shared while it has
+     * a share, else private.
+     */
+    public static LostTalesMapMarkerVisibility access(
+            boolean open, boolean shared) {
+        return open ? LostTalesMapMarkerVisibility.PUBLIC
+                : shared ? LostTalesMapMarkerVisibility.SHARED
+                : LostTalesMapMarkerVisibility.PRIVATE;
+    }
+
+    /**
+     * The widest discovery radius a marker from {@code source} keeps:
+     * {@link #MAX_PLACED_DISCOVERY_RADIUS} for a placed waystone,
+     * {@link #MAX_RADIUS} for every other.
+     */
+    public static double maxDiscoveryRadius(
+            LostTalesMapMarkerSource source) {
+        return source == LostTalesMapMarkerSource.PLAYER_CREATED
+                ? MAX_PLACED_DISCOVERY_RADIUS : MAX_RADIUS;
     }
 
     public String getId() { return this.id; }
@@ -342,7 +394,9 @@ public final class LostTalesMapMarkerRecord {
     public boolean hasWaystone() { return this.hasWaystone; }
     public String getWaystoneStructureType() { return this.waystoneStructureType; }
     public int getPriority() { return this.priority; }
-    public UUID getOwnerPlayerId() { return this.ownerPlayerId; }
+    /** The character that owns it; null for a marker nobody placed. */
+    public UUID getOwnerCharacterId() { return this.ownerCharacterId; }
+    /** Public, or not: shared while it has any share, else private. */
     public LostTalesMapMarkerVisibility getVisibility() { return this.visibility; }
     /** The characters it is shared with: a share holds for that character alone, whoever plays it. */
     public Set<UUID> getSharedCharacterIds() { return this.sharedCharacterIds; }
@@ -392,8 +446,9 @@ public final class LostTalesMapMarkerRecord {
         return value;
     }
 
-    private static double requireRadius(double value, String field) {
-        if (!Double.isFinite(value) || value < 0.0D || value > MAX_RADIUS) {
+    private static double requireRadius(double value, String field,
+                                        double maximum) {
+        if (!Double.isFinite(value) || value < 0.0D || value > maximum) {
             throw new IllegalArgumentException(field + " is invalid");
         }
         return value;
@@ -436,7 +491,7 @@ public final class LostTalesMapMarkerRecord {
         private boolean hasWaystone;
         private String waystoneStructureType = "";
         private int priority;
-        private UUID ownerPlayerId;
+        private UUID ownerCharacterId;
         private LostTalesMapMarkerVisibility visibility =
                 LostTalesMapMarkerVisibility.PRIVATE;
         private Set<UUID> sharedCharacterIds = Collections.emptySet();
@@ -479,7 +534,7 @@ public final class LostTalesMapMarkerRecord {
             this.hasWaystone = record.hasWaystone;
             this.waystoneStructureType = record.waystoneStructureType;
             this.priority = record.priority;
-            this.ownerPlayerId = record.ownerPlayerId;
+            this.ownerCharacterId = record.ownerCharacterId;
             this.visibility = record.visibility;
             this.sharedCharacterIds = record.sharedCharacterIds;
             this.sharedFellowshipIds =
@@ -536,7 +591,8 @@ public final class LostTalesMapMarkerRecord {
             this.priority = value;
             return this;
         }
-        public Builder ownerPlayerId(UUID value) { this.ownerPlayerId = value; return this; }
+        public Builder ownerCharacterId(UUID value) { this.ownerCharacterId = value; return this; }
+        /** Public or not; a record that is not public reads as shared or private by its shares. */
         public Builder visibility(LostTalesMapMarkerVisibility value) { this.visibility = value; return this; }
         public Builder sharedCharacterIds(Set<UUID> value) { this.sharedCharacterIds = value; return this; }
         public Builder sharedFellowshipIds(Set<UUID> value) {

@@ -46,7 +46,7 @@ public final class WorldQuestWorldDataTest {
         data.add(QUEST, "orcs", 3, 5, this.aldric);
         data.add(QUEST, "orcs", 1, 5, this.borin);
         assertTrue(data.end(QUEST, WorldQuestRun.State.COMPLETED, 500L, 2,
-                WorldQuestPayees.EACH_ITS_OWN));
+                WorldQuestPayees.EACH_ITS_OWN, false));
         assertFalse(data.run(QUEST).isRunning());
         assertTrue(data.hasRewards(this.aldric));
         assertFalse("added less than the least", data.hasRewards(this.borin));
@@ -64,11 +64,11 @@ public final class WorldQuestWorldDataTest {
         data.start(QUEST, 0L, 1000L);
         data.add(QUEST, "orcs", 5, 5, this.aldric);
         data.end(QUEST, WorldQuestRun.State.COMPLETED, 100L, 1,
-                WorldQuestPayees.EACH_ITS_OWN);
+                WorldQuestPayees.EACH_ITS_OWN, false);
         data.start(QUEST, 200L, 1200L);
         data.add(QUEST, "orcs", 5, 5, this.aldric);
         data.end(QUEST, WorldQuestRun.State.COMPLETED, 300L, 1,
-                WorldQuestPayees.EACH_ITS_OWN);
+                WorldQuestPayees.EACH_ITS_OWN, false);
         assertEquals(2, data.takeRewards(this.aldric).size());
     }
 
@@ -101,7 +101,7 @@ public final class WorldQuestWorldDataTest {
         data.add(QUEST, "orcs", 2, 50, this.borin);
         data.add(QUEST, "orcs", 1, 50, this.aldric);
         assertTrue(data.end(QUEST, WorldQuestRun.State.COMPLETED, 500L, 2,
-                accounts));
+                accounts, false));
         assertTrue("the account's largest part", data.hasRewards(second));
         assertFalse(data.hasRewards(first));
         assertFalse("the account's own identity is one of its three",
@@ -172,7 +172,7 @@ public final class WorldQuestWorldDataTest {
         data.start("losttales:world/other", 30L, 40L);
         data.add("losttales:world/other", "arrows", 5, 5, this.borin);
         data.end("losttales:world/other", WorldQuestRun.State.COMPLETED, 35L,
-                1, WorldQuestPayees.EACH_ITS_OWN);
+                1, WorldQuestPayees.EACH_ITS_OWN, false);
         NBTTagCompound saved = new NBTTagCompound();
         data.writeToNBT(saved);
 
@@ -221,5 +221,30 @@ public final class WorldQuestWorldDataTest {
         data.writeToNBT(written);
         assertEquals(1, written.getCompoundTag("Quarantine")
                 .getTagList("Entries", 10).tagCount());
+    }
+
+    /**
+     * A podium pays the three best helpers, one per account, best first
+     * (QUEST-36), its reward waiting beside the quest's own.
+     */
+    @Test
+    public void aPodiumPaysTheThreeBestOnePerAccount() {
+        final UUID a = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+        final UUID b = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
+        final UUID c = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+        final UUID d = UUID.fromString("00000000-0000-0000-0000-0000000000d1");
+        WorldQuestWorldData data = new WorldQuestWorldData(WorldQuestWorldData.DATA_NAME);
+        data.start(QUEST, 0L, 1000L);
+        data.add(QUEST, "orcs", 2, 99, a);
+        data.add(QUEST, "orcs", 9, 99, b);
+        data.add(QUEST, "orcs", 5, 99, c);
+        data.add(QUEST, "orcs", 5, 99, d);
+        assertEquals(java.util.Arrays.asList(b, c, d), WorldQuestPayees.podium(
+                data.run(QUEST).getHelpers(), 1, WorldQuestPayees.EACH_ITS_OWN, 3));
+        assertTrue(data.end(QUEST, WorldQuestRun.State.COMPLETED, 500L, 1,
+                WorldQuestPayees.EACH_ITS_OWN, true));
+        assertEquals(java.util.Arrays.asList(QUEST,
+                WorldQuestRules.PODIUM_REWARD_PREFIX + QUEST), data.takeRewards(b));
+        assertEquals(java.util.Arrays.asList(QUEST), data.takeRewards(a));
     }
 }

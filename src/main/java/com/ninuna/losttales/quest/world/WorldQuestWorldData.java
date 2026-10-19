@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest.world;
 
+import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.storage.NbtTags;
 import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
@@ -172,18 +173,21 @@ public final class WorldQuestWorldData extends WorldSavedData {
                                     long now) {
         return state != WorldQuestRun.State.COMPLETED
                 && end(questId, state, now, Integer.MAX_VALUE,
-                        WorldQuestPayees.EACH_ITS_OWN);
+                        WorldQuestPayees.EACH_ITS_OWN, false);
     }
 
     /**
      * Ends a running quest. On success each account is paid once: of its
      * identities that added at least {@code least}, the one that added
-     * most gets the quest's reward waiting for it ({@link WorldQuestPayees}).
-     * Answers whether it ended.
+     * most gets the quest's reward waiting for it ({@link WorldQuestPayees});
+     * where {@code podium} says the quest has one, its three best helpers
+     * get its podium reward waiting too (QUEST-36). Answers whether it
+     * ended.
      */
     public synchronized boolean end(String questId, WorldQuestRun.State state,
                                     long now, int least,
-                                    WorldQuestPayees.Accounts accounts) {
+                                    WorldQuestPayees.Accounts accounts,
+                                    boolean podium) {
         WorldQuestRun run = this.runs.get(questId);
         if (isReadOnly() || run == null || !run.isRunning()
                 || state == WorldQuestRun.State.RUNNING) {
@@ -198,10 +202,23 @@ public final class WorldQuestWorldData extends WorldSavedData {
                     lost++;
                 }
             }
+            String podiumId = WorldQuestRules.PODIUM_REWARD_PREFIX + questId;
+            if (podium && LostTalesQuestIds.fits(podiumId)) {
+                for (UUID best : WorldQuestPayees.podium(run.getHelpers(),
+                        least, accounts, WorldQuestRules.PODIUM_PLACES)) {
+                    if (!waitReward(best, podiumId)) {
+                        lost++;
+                    }
+                }
+            } else if (podium) {
+                LostTalesLog.warning("The world quest %s has an id too long to"
+                        + " keep its podium reward with; its podium is not paid",
+                        questId);
+            }
             if (lost > 0) {
                 LostTalesLog.warning("The world quest %s was won, but %d"
-                        + " helpers already wait for as many rewards as the"
-                        + " world keeps; they are not paid for it", questId,
+                        + " rewards wait already for helpers who wait for as"
+                        + " many as the world keeps; they are not paid", questId,
                         Integer.valueOf(lost));
             }
         }

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.quest.missive;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestRules;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import java.util.ArrayList;
@@ -13,7 +14,9 @@ import java.util.Map;
  * objectives, its reward, the letter's template ids as the words it is
  * read by ({@link MissiveWords}: its title, its description, and its
  * flavour line as the journal's), and a locked start, so only the letter
- * starts it.
+ * starts it. A missive is taken once, by one player, and never again
+ * (QUEST-34): its quest is neither repeatable nor restartable. It ends at
+ * any missive board, where it is handed in (QUEST-31).
  */
 public final class LostTalesMissiveQuestFactory {
     private static final String DEFAULT_STAGE_ID = "10";
@@ -51,8 +54,8 @@ public final class LostTalesMissiveQuestFactory {
                 missive.getQuestId(),
                 "",
                 "",
-                missive.isRepeatable(),
-                missive.isRepeatable(),
+                false,
+                false,
                 LostTalesQuestDefinition.START_MODE_LOCKED,
                 prerequisites,
                 missive.getRewardData().getRewards(),
@@ -63,7 +66,9 @@ public final class LostTalesMissiveQuestFactory {
                 Collections.<String, String>emptyMap(),
                 stages,
                 false,
-                MissiveWords.wordsOf(missive)
+                MissiveWords.wordsOf(missive),
+                Collections.singletonMap(LostTalesQuestRules.RETURN_TO,
+                        LostTalesQuestRules.RETURN_BOARD)
         );
     }
 }

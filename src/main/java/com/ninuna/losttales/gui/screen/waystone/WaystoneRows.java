@@ -6,6 +6,7 @@ import com.ninuna.losttales.client.window.PageRows;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +38,8 @@ final class WaystoneRows {
     static final String SHARE_KIND = "share_kind";
     static final String SHARE = "share";
     static final String UNSHARE = "unshare";
-    /** The longest name a share is sent for, in characters: past any player's and fellowship's name. */
+    static final String HAND_OVER = "hand_over";
+    /** The longest name a share is sent for, in characters: past any character's and fellowship's name. */
     static final int MAX_SHARE_NAME = 32;
 
     /** What the rows read from, and what the typed rows write to: the page. */
@@ -78,8 +80,17 @@ final class WaystoneRows {
         /** What an empty description reads: the place's lore, else the words for a player's waystone. */
         String defaultDescription();
 
-        /** The players, or the fellowships, whose names hold {@code typed}. */
+        /** The characters, or the fellowships, whose names hold {@code typed}. */
         List<String> offers(String typed);
+
+        /** The owning character's name as the server sent it; empty for none it could name. */
+        String ownerName();
+
+        /** Whether a player placed the waystone, rather than the server building it. */
+        boolean isPlayerPlaced();
+
+        /** Whether the reader holds {@code mapmarker.manage}: Public and Hand Over are theirs. */
+        boolean managesMarkers();
 
         /** Whether the page still shows the waystone its rows were made for. */
         boolean stands();
@@ -242,6 +253,16 @@ final class WaystoneRows {
         };
         this.discoveryRadius = new Radius("waystone_discovery_radius",
                 LANG + "radius", 1.0D) {
+            /** A placed waystone's radius stops where the discovery scan does (WAY-15). */
+            @Override
+            protected double[] bounds() {
+                return new double[] {1.0D,
+                        LostTalesMapMarkerRecord.maxDiscoveryRadius(
+                                WaystoneRows.this.host.isPlayerPlaced()
+                                        ? LostTalesMapMarkerSource.PLAYER_CREATED
+                                        : LostTalesMapMarkerSource.CUSTOM_PRESET)};
+            }
+
             @Override
             protected double get() {
                 WaystoneDraft draft = draft();
@@ -333,12 +354,34 @@ final class WaystoneRows {
         rows.add(new MenuWindow.Entry(FAST_TRAVEL, word("fast_travel"))
                 .withValue(Settings.onOff(draft.hasFastTravel()))
                 .unavailable(readOnly));
+        // Access steps Private and Public; a waystone that is not public
+        // reads Shared while it has a share (WAY-14).
         rows.add(new MenuWindow.Entry(VISIBILITY, word("visibility"))
                 .withValue(word("visibility."
-                        + draft.visibility().getSerializedName()))
-                .unavailable(readOnly));
+                        + LostTalesMapMarkerRecord.access(draft.isPublic(),
+                                this.host.sharedCharacters() > 0
+                                        || this.host.sharedFellowships() > 0)
+                                .getSerializedName()))
+                .unavailable(first(readOnly, draft.isPublic()
+                        || draft.mayBePublic(this.host.managesMarkers())
+                        ? "" : word("why.public"))));
+        rows.add(quiet(word("owner"), ownerWord()));
         rows.add(quiet(word("marker_id"), this.host.markerId()));
         return rows;
+    }
+
+    /**
+     * Who owns the waystone, as its Owner row reads: the owning
+     * character's name; for a generated waystone, no one; for a placed one
+     * whose owner the server could not name, an unknown character.
+     */
+    private String ownerWord() {
+        String owner = this.host.ownerName();
+        if (owner != null && owner.trim().length() > 0) {
+            return owner.trim();
+        }
+        return word(this.host.isPlayerPlaced() ? "owner.unknown"
+                : "owner.none");
     }
 
     private List<MenuWindow.Entry> sharing(String readOnly) {
@@ -357,6 +400,17 @@ final class WaystoneRows {
                 .unavailable(why));
         rows.add(new MenuWindow.Entry(UNSHARE, word("unshare"))
                 .unavailable(why));
+        if (this.host.managesMarkers()) {
+            // Hand Over is a manager's alone, and names a character
+            // (WAY-08); a generated waystone belongs to nobody.
+            rows.add(new MenuWindow.Entry(HAND_OVER, word("hand_over"))
+                    .unavailable(first(readOnly,
+                            this.host.isPlayerPlaced() ? ""
+                                    : word("why.hand_over_generated"),
+                            this.host.sharesWithFellowship()
+                                    ? word("why.hand_over_character") : "",
+                            why)));
+        }
         rows.add(quiet(word("shared.characters"),
                 String.valueOf(this.host.sharedCharacters())));
         rows.add(quiet(word("shared.fellowships"),
@@ -422,16 +476,16 @@ final class WaystoneRows {
 
     /* ---- The typed settings ---- */
 
-    /**
-     * A line of the waystone's, typed into Settings' own field beside
-     * the row: kept by the page until Save ({@link Settings.Store#NONE}),
-     * and gone with the waystone the page shows.
-     */
     /** {@code words}, or the row's name where there are none. */
     private static String orLabelOr(String words, String label) {
         return words == null || words.trim().length() == 0 ? label : words;
     }
 
+    /**
+     * A line of the waystone's, typed into Settings' own field beside
+     * the row: kept by the page until Save ({@link Settings.Store#NONE}),
+     * and gone with the waystone the page shows.
+     */
     private abstract class Typed extends Settings.Line {
         private final boolean mayBeEmpty;
         private final int maxLength;

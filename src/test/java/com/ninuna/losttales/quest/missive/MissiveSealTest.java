@@ -22,7 +22,7 @@ public final class MissiveSealTest {
         return key;
     }
 
-    private static LostTalesMissiveData missive(String reward, long posted) {
+    private static LostTalesMissiveData missive(int coins, long posted) {
         Map<String, String> params = new HashMap<String, String>();
         params.put("group", "zombie");
         params.put("count", "5");
@@ -32,20 +32,18 @@ public final class MissiveSealTest {
                 .descriptionId("kill")
                 .flavorId("roads_open")
                 .target("Zombie")
-                .repeatable(true)
-                .firstComeFirstServed(true)
                 .generationWorldTime(posted)
                 .timeLimitTicks(48000L)
                 .context("board", "dim0_4_65_9")
                 .objective(new LostTalesMissiveObjectiveData("kill_zombies",
                         "kill", false, params))
-                .rewardData(LostTalesMissiveRewardData.experienceAndItems(40, reward))
+                .rewardData(LostTalesMissiveRewardData.experienceAndCoins(40, coins))
                 .build();
     }
 
     @Test
     public void aLetterTheServerSealedIsGenuine() {
-        LostTalesMissiveData letter = missive("minecraft:emerald*2", 1200L);
+        LostTalesMissiveData letter = missive(12, 1200L);
         byte[] seal = MissiveSeal.sign(key(1), letter);
         assertNotNull(seal);
         assertEquals(MissiveSeal.LENGTH, seal.length);
@@ -54,9 +52,9 @@ public final class MissiveSealTest {
 
     @Test
     public void aChangedRewardOrPostingTimeBreaksTheSeal() {
-        byte[] seal = MissiveSeal.sign(key(1), missive("minecraft:emerald*2", 1200L));
-        assertFalse(MissiveSeal.verifies(key(1), missive("minecraft:diamond*64", 1200L), seal));
-        assertFalse(MissiveSeal.verifies(key(1), missive("minecraft:emerald*2", 999999L), seal));
+        byte[] seal = MissiveSeal.sign(key(1), missive(12, 1200L));
+        assertFalse(MissiveSeal.verifies(key(1), missive(999, 1200L), seal));
+        assertFalse(MissiveSeal.verifies(key(1), missive(12, 999999L), seal));
     }
 
     /** A gather notice hands its items over; a letter changed by hand to keep them has no seal that fits. */
@@ -82,24 +80,22 @@ public final class MissiveSealTest {
                 .descriptionId("gather")
                 .flavorId("plain_notice")
                 .target("minecraft:coal")
-                .repeatable(true)
-                .firstComeFirstServed(true)
                 .generationWorldTime(1200L)
                 .objective(new LostTalesMissiveObjectiveData("gather_coal",
                         "gather", false, params))
-                .rewardData(LostTalesMissiveRewardData.experienceAndItems(30, "minecraft:emerald"))
+                .rewardData(LostTalesMissiveRewardData.experienceAndCoins(30, 20))
                 .build();
     }
 
     @Test
     public void anotherWorldsKeyFindsNoSeal() {
-        LostTalesMissiveData letter = missive("minecraft:emerald*2", 1200L);
+        LostTalesMissiveData letter = missive(12, 1200L);
         assertFalse(MissiveSeal.verifies(key(2), letter, MissiveSeal.sign(key(1), letter)));
     }
 
     @Test
     public void noKeyOrNoSealIsNeverGenuine() {
-        LostTalesMissiveData letter = missive("minecraft:emerald*2", 1200L);
+        LostTalesMissiveData letter = missive(12, 1200L);
         assertNull(MissiveSeal.sign(null, letter));
         assertFalse(MissiveSeal.verifies(null, letter, MissiveSeal.sign(key(1), letter)));
         assertFalse(MissiveSeal.verifies(key(1), letter, null));
@@ -108,7 +104,7 @@ public final class MissiveSealTest {
 
     @Test
     public void theSealSurvivesTheLettersOwnSave() {
-        LostTalesMissiveData letter = missive("minecraft:emerald*2", 1200L);
+        LostTalesMissiveData letter = missive(12, 1200L);
         byte[] seal = MissiveSeal.sign(key(7), letter);
         LostTalesMissiveData reread = LostTalesMissiveNbt.readFromNBT(
                 LostTalesMissiveNbt.writeToNBT(letter));

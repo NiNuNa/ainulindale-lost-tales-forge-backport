@@ -87,6 +87,21 @@ public final class ServerQuestFilesTest {
         assertEquals(4, result.problems.size());
     }
 
+    /** Every warning a file raises is a line of its own, so a reload can list them all. */
+    @Test
+    public void everyWarningOfAFileIsListed() throws IOException {
+        write("two.json", String.format(GOOD, "two", "Two").replace(
+                "\"startMode\"", "\"colour\":\"red\",\"startMode\"").replace(
+                "\"count\":\"4\"", "\"count\":\"four\""));
+        ServerQuestFiles.Result result = ServerQuestFiles.read(
+                this.folder.getRoot(), Collections.<String>emptySet());
+        assertTrue(result.quests.isEmpty());
+        assertEquals(result.problems.toString(), 2, result.problems.size());
+        assertTrue(result.problems.get(0).startsWith("two.json: "));
+        assertTrue(result.problems.get(0).contains("'colour'"));
+        assertTrue(result.problems.get(1).contains("non-integer 'count'"));
+    }
+
     /** A quest a player could not be sent whole is left out, so nobody is ever sent half of one. */
     @Test
     public void aQuestThatCannotBeSentIsLeftOut() throws IOException {

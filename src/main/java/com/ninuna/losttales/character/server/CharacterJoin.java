@@ -6,6 +6,7 @@ import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.EventPriority;
@@ -47,9 +48,10 @@ import net.minecraftforge.event.world.BlockEvent;
  *
  * <p>Whether a player waits is decided as the server reads their saved
  * data, before the game announces the join, from whether their roster
- * plays a character. A store that cannot be read lets them in as they
- * are rather than holding them. Who waits is kept for the session only,
- * cleared with the server's other state.</p>
+ * plays a character. A player whose characters the store cannot read
+ * waits the same way (CHAR-01): the creator says the server cannot read
+ * characters right now, and staff are told in the Server Log. Who waits is
+ * kept for the session only, cleared with the server's other state.</p>
  */
 public final class CharacterJoin {
     /** The players waiting, by account id. Touched on the server thread; read from any. */
@@ -99,10 +101,15 @@ public final class CharacterJoin {
             return;
         }
         EntityPlayerMP player = (EntityPlayerMP)event.entityPlayer;
-        if (!playsNoCharacter(player)) {
+        Boolean noCharacter = playsNoCharacter(player);
+        if (Boolean.FALSE.equals(noCharacter)) {
             return;
         }
-        WAITING.put(player.getUniqueID(), new Waiting());
+        Waiting waiting = new Waiting();
+        // Null: the store could not say, so the player waits as a ghost
+        // until it can, rather than walking in as the account.
+        waiting.storeUnreadable = noCharacter == null;
+        WAITING.put(player.getUniqueID(), waiting);
         if (player.getGameProfile() != null
                 && player.getGameProfile().getName() != null) {
             NAMES.put(player.getGameProfile().getName().trim()
@@ -121,6 +128,7 @@ public final class CharacterJoin {
         if (waiting == null) {
             return;
         }
+        waiting.storeUnreadable = false;
         if (roster != null && roster.getActiveCharacterId() != null) {
             forget(player);
             return;
@@ -167,20 +175,59 @@ public final class CharacterJoin {
         return result;
     }
 
-    /** Whether the player's roster plays no character; a store that cannot say lets them in. */
-    private static boolean playsNoCharacter(EntityPlayerMP player) {
+    /**
+     * Whether the player's roster plays no character; null where the store
+     * cannot say: one written by a newer version, or one that fails to read.
+     */
+    static Boolean playsNoCharacter(EntityPlayerMP player) {
         try {
             CharacterWorldData data = CharacterStorage.get(player.worldObj);
             if (data.isReadOnlyForNewerVersion()) {
-                return false;
+                return null;
             }
             CharacterRoster roster = data.getRoster(player.getUniqueID());
-            return roster == null || roster.getActiveCharacterId() == null;
+            return Boolean.valueOf(roster == null || roster.getActiveCharacterId() == null);
         } catch (RuntimeException unreadable) {
             FMLLog.warning("[%s] Could not read the roster of %s on arrival: %s",
                     LostTalesMetaData.MOD_ID, player.getUniqueID(),
                     unreadable.toString());
-            return false;
+            return null;
+        }
+    }
+
+    /** Whether the player waits because the server cannot read their characters now. */
+    public static boolean waitsOnUnreadableStore(EntityPlayerMP player) {
+        Waiting waiting = player == null ? null : WAITING.get(player.getUniqueID());
+        return waiting != null && waiting.storeUnreadable;
+    }
+
+    /**
+     * The player has logged in and the server cannot read their characters:
+     * they are held as a ghost where the world put them, told so in the
+     * creator, and staff are told in the Server Log (CHAR-01).
+     */
+    static void arriveUnreadable(EntityPlayerMP player) {
+        Waiting waiting = player == null ? null : WAITING.get(player.getUniqueID());
+        if (waiting == null) {
+            return;
+        }
+        waiting.storeUnreadable = true;
+        waiting.hold(player.posX, player.posY, player.posZ);
+        player.capabilities.disableDamage = true;
+        player.sendPlayerAbilities();
+        String account = player.getGameProfile() == null
+                ? player.getCommandSenderName() : player.getGameProfile().getName();
+        LostTalesChatService.console(ChatConsoleEvent.Kind.WARNING,
+                ChatConsoleEvent.Severity.WARNING, "",
+                account + " joined while the server cannot read characters; they wait"
+                        + " as a ghost until the character store reads again");
+    }
+
+    /** The store reads again: a player held for it waits for their first character as anyone else. */
+    static void readsAgain(EntityPlayerMP player) {
+        Waiting waiting = player == null ? null : WAITING.get(player.getUniqueID());
+        if (waiting != null) {
+            waiting.storeUnreadable = false;
         }
     }
 
@@ -312,6 +359,8 @@ public final class CharacterJoin {
         volatile double y;
         volatile double z;
         volatile IChatComponent joinLine;
+        /** Whether they wait because the server cannot read their characters. */
+        volatile boolean storeUnreadable;
 
         void hold(double x, double y, double z) {
             this.x = x;

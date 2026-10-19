@@ -17,14 +17,13 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A sub-window opens locked: measured from its window's room, riding
- * along as the window moves, carried by nothing and held on the screen.
- * Unlocked, it goes anywhere on the screen and stays there while its
- * window moves, resized by the band just outside it; locked again, where
- * it stands becomes its kind's place in the layout file, measured from
- * the corner of the room it stands nearest, with the size the player
- * gave it if they gave it one. Closed unlocked, it forgets where it was
- * carried and its kind's place too.
+ * A sub-window is measured from its window's room, riding along as the
+ * window moves, and held on the screen (WIN-43). Moved or resized, it stays
+ * where it was put in that room, and where it stands becomes its kind's
+ * place in the layout file, measured from the corner of the room it stands
+ * nearest, with the size the player gave it if they gave it one. A
+ * double-click on its strip puts it back where its opener put it, and its
+ * kind forgets the place. It has no padlock.
  */
 public final class SubWindowsTest {
     private static final int SCREEN_WIDTH = 480;
@@ -53,7 +52,7 @@ public final class SubWindowsTest {
     }
 
     @Test
-    public void aLockedWindowRidesWithItsRoomAndIsHeldOnTheScreen() {
+    public void aWindowRidesWithItsRoomAndIsHeldOnTheScreen() {
         SubWindow window = standing(150, 20, 120, 90);
         LostTalesUiHitBox screen = box(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         window.layOut(box(50, 40, 200, 150), screen);
@@ -71,22 +70,26 @@ public final class SubWindowsTest {
     }
 
     @Test
-    public void anUnlockedWindowStaysWhereItIsWhileItsWindowMoves() {
+    public void aMovedWindowStaysWhereItWasPutInItsRoomAndRidesWithIt() {
         SubWindows windows = screen();
         SubWindow window = windows.open(PICKER, "", new StubContent(), null,
                 box(100, 100, 100, 60));
-        assertTrue("every window opens locked", window.isLocked());
-        windows.setLocked(window, false);
-        assertFalse(window.isLocked());
         double left = window.left;
-        window.layOut(box(300, 10, 100, 100), windows.screenRoom());
-        assertEquals(left, window.left, 1.0E-9D);
+        windows.armMove(window, 150, 90);
+        assertTrue("nothing holds it back", windows.isHolding());
+        windows.drag(190, 90);
+        windows.release();
+        assertEquals(left + 40.0D, window.left, 1.0E-9D);
+        LostTalesUiHitBox room = windows.roomOf(null);
+        window.layOut(box(room.left + 20.0D, room.top, room.width,
+                room.height), windows.screenRoom());
+        assertEquals("it rides along as its window moves", left + 60.0D,
+                window.left, 1.0E-9D);
     }
 
     @Test
-    public void theResizeBandLiesJustOutsideAnUnlockedBox() {
+    public void theResizeBandLiesJustOutsideTheBox() {
         SubWindow window = standing(100, 60, 120, 90);
-        window.locked = false;
         window.layOut(box(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT),
                 box(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
         window.drawnLeft = window.left;
@@ -99,8 +102,6 @@ public final class SubWindowsTest {
                 window.edgeAt(221, 151));
         assertNull("inside, the window's own", window.edgeAt(150, 100));
         assertNull("far off, nobody's", window.edgeAt(10, 10));
-        window.locked = true;
-        assertNull("a locked window keeps its size", window.edgeAt(98, 110));
     }
 
     @Test
@@ -131,7 +132,7 @@ public final class SubWindowsTest {
     }
 
     @Test
-    public void aKindLockedResizedOpensWhereAndAsLargeAsItWasLeft() {
+    public void aKindResizedOpensWhereAndAsLargeAsItWasLeft() {
         SubWindows windows = screen();
         LostTalesUiHitBox room = windows.roomOf(null);
         SubWindowPlaces.remember(PICKER, 250.0D,
@@ -139,7 +140,6 @@ public final class SubWindowsTest {
         SubWindow window = windows.open(PICKER, "",
                 new StubContent(), null, box(10, 10, 100, 60));
         assertTrue(window.sized);
-        assertTrue(window.isLocked());
         assertEquals(200, window.width);
         assertEquals(150, window.height);
         assertEquals(MARGIN + 250.0D, window.left, 1.0E-9D);
@@ -176,17 +176,14 @@ public final class SubWindowsTest {
     }
 
     @Test
-    public void aLockedWindowIsCarriedByNothingAndAnUnlockedOneGoesAnywhere() {
+    public void aMoveIsHeldOnTheScreenAndRememberedForItsKind() {
         SubWindows windows = screen();
         LostTalesUiHitBox screen = windows.screenRoom();
         SubWindow window = windows.open(SubWindowKind.TAB, "",
                 new StubContent(), null, box(100, 100, 100, 60));
         double left = window.left;
-        windows.armMove(window, 150, 90);
-        assertFalse("the padlock holds it", windows.isHolding());
-        windows.drag(300, 90);
-        assertEquals(left, window.left, 1.0E-9D);
-        windows.setLocked(window, false);
+        assertNull("nothing is remembered before a move",
+                SubWindowPlaces.of(SubWindowKind.TAB));
         windows.armMove(window, 150, 90);
         windows.drag(150 + 1000, 90);
         assertEquals("never past the screen's edge",
@@ -195,66 +192,70 @@ public final class SubWindowsTest {
         windows.drag(150 - 30, 90);
         assertEquals(left - 30.0D, window.left, 1.0E-9D);
         windows.release();
-        assertNull("nothing is remembered while it is unlocked",
-                SubWindowPlaces.of(SubWindowKind.TAB));
-        windows.setLocked(window, true);
-        assertEquals("locking it makes where it stands its kind's place",
-                "tl", SubWindowPlaces.of(SubWindowKind.TAB).corner());
+        assertEquals("where it was put is its kind's place", "tl",
+                SubWindowPlaces.of(SubWindowKind.TAB).corner());
         windows.close(window);
+        assertTrue("closing keeps the place",
+                SubWindowPlaces.of(SubWindowKind.TAB) != null);
         windows.beginFrame();
         window.shownShare = 0.0F;
         windows.beginFrame();
         SubWindow again = windows.open(SubWindowKind.TAB, "",
                 new StubContent(), null, box(100, 100, 100, 60));
-        assertEquals("it opens where it was locked", left - 30.0D,
+        assertEquals("it opens where it was put", left - 30.0D,
                 again.left, 1.0E-9D);
     }
 
+    /**
+     * A double-click on the strip puts a window back where its opener put
+     * it, at the size it gave, and its kind forgets the place: it opens
+     * where its opener puts it again.
+     */
     @Test
-    public void aWindowClosedUnlockedOpensAtItsKindsPlaceAgain() {
+    public void putBackGoesWhereTheOpenerPutItAndForgetsTheKindsPlace() {
         SubWindows windows = screen();
         SubWindow window = windows.open(PICKER, "", new StubContent(), null,
                 box(100, 100, 100, 60));
         double left = window.left;
-        windows.setLocked(window, false);
-        windows.armMove(window, 150, 90);
-        windows.drag(250, 90);
+        double top = window.top;
+        windows.armResize(window, WindowGestures.ResizeEdge.RIGHT, 200, 120);
+        windows.drag(260, 120);
         windows.release();
+        windows.armMove(window, 150, 90);
+        windows.drag(250, 140);
+        windows.release();
+        assertTrue(window.sized);
+        assertTrue(SubWindowPlaces.of(PICKER) != null);
+        windows.putBack(window);
+        assertNull(SubWindowPlaces.of(PICKER));
+        assertFalse("the opener's size again", window.sized);
+        assertEquals(Math.max(100, window.minWidth()), window.width);
+        assertEquals(left, window.left, 1.0E-9D);
+        assertEquals(top, window.top, 1.0E-9D);
         windows.close(window);
         window.shownShare = 0.0F;
         windows.beginFrame();
         SubWindow again = windows.open(PICKER, "", new StubContent(), null,
-                box(100, 100, 100, 60));
-        assertTrue(again.isLocked());
-        assertEquals("where its opener puts it", left, again.left, 1.0E-9D);
+                box(120, 110, 100, 60));
+        assertEquals("where its opener puts it", 120.0D, again.left,
+                1.0E-9D);
     }
 
-    /**
-     * A window closed while unlocked forgets where its kind was locked:
-     * the kind opens where its opener puts it again, locked, and so does
-     * the same window caught while it still fades.
-     */
+    /** A window closed and caught while it still fades stays where it was put. */
     @Test
-    public void aWindowClosedUnlockedForgetsItsKindsPlace() {
+    public void aWindowCaughtFadingStaysWhereItWasPut() {
         SubWindows windows = screen();
         SubWindow window = windows.open(PICKER, "", new StubContent(), null,
                 box(100, 100, 100, 60));
         double left = window.left;
-        windows.setLocked(window, false);
         windows.armMove(window, 150, 90);
         windows.drag(250, 90);
         windows.release();
-        windows.setLocked(window, true);
-        assertTrue(SubWindowPlaces.of(PICKER) != null);
-        windows.setLocked(window, false);
         windows.close(window);
-        assertNull(SubWindowPlaces.of(PICKER));
         SubWindow revived = windows.open(PICKER, "", new StubContent(), null,
                 box(100, 100, 100, 60));
         assertSame(window, revived);
-        assertTrue(revived.isLocked());
-        assertEquals("where its opener puts it", left, revived.left,
-                1.0E-9D);
+        assertEquals(left + 100.0D, revived.left, 1.0E-9D);
     }
 
     @Test

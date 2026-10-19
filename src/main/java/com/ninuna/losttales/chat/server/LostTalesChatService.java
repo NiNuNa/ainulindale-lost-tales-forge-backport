@@ -21,6 +21,7 @@ import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.ChatTypedText;
 import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.moderation.ChatMuteDurations;
@@ -31,7 +32,6 @@ import com.ninuna.losttales.chat.share.ChatShareReference;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.character.model.CharacterRoster;
-import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.character.server.CharacterJoin;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.state.CharacterLastSeen;
@@ -59,6 +59,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatReactionSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
+import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.quest.LostTalesQuestShareResolver;
 import com.ninuna.losttales.permission.LostTalesCapability;
@@ -154,7 +155,8 @@ public final class LostTalesChatService {
                 request.getReplyToMessageId(), request.getTargetIdentity(),
                 request.getEchoNonce(), request.getTargetCharacterId(),
                 request.quotesUnkept(), forward,
-                forward == null ? request.isAction() : forward.action);
+                forward == null ? request.isAction() : forward.action,
+                forward == null ? request.getTyped() : "");
     }
 
     private static void send(EntityPlayerMP sender,
@@ -166,35 +168,24 @@ public final class LostTalesChatService {
                              long echoNonce, UUID targetCharacterId,
                              boolean quotesUnkept,
                              ChatHistory.Forwardable forward,
-                             boolean action) {
+                             boolean action, String typed) {
         String targetIdentity = requestedIdentity == null ? "" : requestedIdentity;
-        if (action && forward == null) {
-            // Words typed as an action are kept as the sentence they
-            // read as; an empty one is refused like an empty message.
-            message = ChatAction.sentence(message);
-        }
         if (sender == null || sender.worldObj == null
-                || sender.worldObj.isRemote || channel == null
-                || !ChatMessageValidator.isValid(message)) {
+                || sender.worldObj.isRemote || channel == null || message == null) {
             return;
         }
-        if (action && forward == null
-                && !ChatRolePresentation.isInCharacter(channel)) {
-            // Out of character /me is the game's own command, which
-            // never arrives here; a request that says otherwise is not
-            // this client's to make.
+        // The line passes the pipeline's stages in their order
+        // (ChatLinePipeline): the gate first.
+        ChatLinePipeline.Source source = narrating
+                && ChatRolePresentation.isInCharacter(channel)
+                ? ChatLinePipeline.Source.NARRATOR : ChatLinePipeline.Source.PLAYER;
+        if (action && forward == null && !ChatAction.takesActions(channel)) {
+            // In a console /me is the game's own command, which never
+            // arrives here; a request that says otherwise is not this
+            // client's to make.
             sender.addChatMessage(new ChatComponentTranslation(
-                    "chat.losttales.action.out_of_character"));
+                    "chat.losttales.action.console"));
             return;
-        }
-        // A muted account sends nothing anywhere but its own console; the
-        // Discord relay sits behind this gate, so nothing leaks out either.
-        if (channel.getRecipientRule() != ChatRecipientRule.SELF) {
-            ChatMuteEntry mute = activeMute(sender);
-            if (mute != null) {
-                tellMuted(sender, mute);
-                return;
-            }
         }
         EntityPlayerMP whisperTarget = null;
         String whisperIdentity = "";
@@ -203,6 +194,12 @@ public final class LostTalesChatService {
             Whispered whispered = addressWhisper(sender, target, targetIdentity,
                     targetCharacterId);
             whisperTarget = whispered == null ? null : whispered.partner;
+            if (whispered != null && whispered.absent != null) {
+                // A character nobody wears now is not here to talk to.
+                sender.addChatMessage(new ChatComponentTranslation(
+                        "chat.losttales.whisper.not_here", whispered.absent));
+                return;
+            }
             if (whisperTarget == null || whisperTarget == sender) {
                 sender.addChatMessage(new ChatComponentTranslation(
                         whisperTarget == sender
@@ -248,10 +245,6 @@ public final class LostTalesChatService {
         }
         Speaking speaking = speaking(sender, channel, target, named.character);
         RoleplayCharacter worn = speaking.worn;
-        if (roleplaying) {
-            CharacterLastSeen.saw(sender.worldObj,
-                    worn == null ? sender.getUniqueID() : worn.getCharacterId());
-        }
         boolean narrator = roleplaying && narrating;
         Fellowship fellowship = speaking.fellowship;
         String factionId = speaking.factionId;
@@ -265,6 +258,28 @@ public final class LostTalesChatService {
             }
             sender.addChatMessage(new ChatComponentTranslation(refusal));
             return;
+        }
+        // The mute: a muted account sends nothing anywhere but its own
+        // console; the Discord relay sits behind it, so nothing leaks out
+        // either.
+        if (channel.getRecipientRule() != ChatRecipientRule.SELF) {
+            ChatMuteEntry mute = activeMute(sender);
+            if (mute != null) {
+                tellMuted(sender, mute);
+                return;
+            }
+        }
+        // The rate limit was asked at the door (CHAT_MESSAGE). Then the
+        // words: an action is kept as the sentence it reads as, and an
+        // empty one is refused like an empty message.
+        message = forward != null ? message
+                : ChatLinePipeline.words(message, action);
+        if (message == null || !ChatMessageValidator.isValid(message)) {
+            return;
+        }
+        if (roleplaying) {
+            CharacterLastSeen.saw(sender.worldObj,
+                    worn == null ? sender.getUniqueID() : worn.getCharacterId());
         }
 
         String accountName = sender.getGameProfile() == null
@@ -374,6 +389,10 @@ public final class LostTalesChatService {
                 // An action is what the speaker did: the words stay the
                 // message and the line says what they are.
                 .withAction(action)
+                // A character a copy speaks as while another is played is
+                // here, but not in the world (CHAT-05); the Narrator is
+                // nobody's body.
+                .withNotInWorld(!narrator && notPlayed(sender, worn))
                 // Which conversation of a scoped channel this is: the
                 // faction it was spoken to, or the fellowship it was spoken
                 // in. The client files it under that conversation's tab
@@ -391,18 +410,16 @@ public final class LostTalesChatService {
                                 LostTalesServerBroadcastHook.namedAs(sender, worn),
                                 channel, replyScope,
                                 whisperTarget == null ? null
-                                        : LostTalesServerBroadcastHook.namedAs(
-                                                whisperTarget,
-                                                whisperCharacterId == null ? null
-                                                        : ChatIdentitySelection.owned(
-                                                                whisperTarget,
-                                                                whisperCharacterId)),
+                                        : whisperedAs(whisperTarget, whisperCharacterId),
                                 message))
                 // Which roles its @names call, read in every language the
                 // server knows: a client pings its player by these.
-                .withMentionedRoles(forward != null
-                        ? Collections.<String>emptyList()
-                        : ChatMentionTargets.rolesOf(message));
+                .withMentionedRoles(ChatLinePipeline.rolesOf(source,
+                        forward != null, message))
+                // What the sender typed, kept with their own copy so they
+                // can edit the line later (CHAT-83); every other copy
+                // leaves it off (withoutEcho).
+                .withTyped(typed);
 
         FMLLog.info(action ? "[losttales/chat/%s] * %s (%s) %s%s%s"
                         : "[losttales/chat/%s] <%s (%s)> %s%s%s",
@@ -438,9 +455,8 @@ public final class LostTalesChatService {
                     packet.withoutEcho(), accountName, identityName)
                     .withConversation(whisperCharacterId, wornId)
                     .narratedForOthers();
-            LostTalesNetworkHandler.CHANNEL.sendTo(asShownTo(packet, sender), sender);
-            LostTalesNetworkHandler.CHANNEL.sendTo(asShownTo(partnerCopy, whisperTarget),
-                    whisperTarget);
+            LostTalesNetworkHandler.CHANNEL.sendTo(packet, sender);
+            LostTalesNetworkHandler.CHANNEL.sendTo(partnerCopy, whisperTarget);
             List<UUID> pair = Arrays.asList(sender.getUniqueID(),
                     whisperTarget.getUniqueID());
             ChatHistory.record(packet.getMessageId(),
@@ -468,9 +484,7 @@ public final class LostTalesChatService {
         // sender's name — a line spoken as a character carries the title
         // the game shows — with the account's head as the picture, since
         // a character's skin is a resource of the game and not a picture
-        // Discord can fetch; in character, while the server shows no
-        // accounts, the webhook's own picture instead, since the head names
-        // the account (DiscordAvatarUrl.shownIn); emoji shortcodes go as the Unicode emoji
+        // Discord can fetch; emoji shortcodes go as the Unicode emoji
         // Discord renders, share tokens as the text they were typed as.
         // The Narrator tells its own lines and every action, as in the
         // game: they go under its name alone, an action as the sentence
@@ -504,6 +518,19 @@ public final class LostTalesChatService {
     }
 
     /**
+     * The game's own {@code /me}, typed in a console or by anything but the
+     * chat's bar: an action in OOC Chat under the account (CHAT-37), never
+     * in Global, through the very send a typed line takes.
+     */
+    public static void actOutOfCharacter(EntityPlayerMP sender, String words) {
+        send(sender, ChatChannel.OOC, words,
+                Collections.<ChatShareReference>emptyList(), "",
+                LostTalesChatSendPacket.IDENTITY_ACCOUNT, null, false,
+                ChatMessageIds.NONE, "", 0L, null, false, null, true,
+                ChatTypedText.ACTION_PREFIX + words);
+    }
+
+    /**
      * A message from Discord, delivered by the bridge on the server
      * thread into the channel its binding names — the game's own Discord
      * channel, or any other channel that may be bridged; for Faction
@@ -512,7 +539,10 @@ public final class LostTalesChatService {
      * the sender id that stands for that member
      * ({@link LostTalesChatMessagePacket#discordSenderId}) — so a client
      * can ignore them, and a mute stored against that id silences them
-     * here, silently, exactly as an account's mute does. Nothing here
+     * here, silently, exactly as an account's mute does. The member is
+     * held to the budget a player's lines have, and their mentions to the
+     * pings a player may make on Discord
+     * ({@link LostTalesDiscordBridge#pingsFromDiscord}). Nothing here
      * posts it to Discord: the bridge itself carries it on to the game
      * channel's other Discord channels, never back to its own. A Discord
      * member is an
@@ -557,6 +587,10 @@ public final class LostTalesChatService {
                     + "member %s", displayName);
             return ChatMessageIds.NONE;
         }
+        if (!discordMemberWithinBudget(senderId,
+                LostTalesRequestRateLimiter.RequestType.CHAT_MESSAGE, "Discord line")) {
+            return ChatMessageIds.NONE;
+        }
         int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
         long messageId = ChatMessageIdAllocator.next();
         // Routed by the channel's own rule with no sender behind the
@@ -574,8 +608,9 @@ public final class LostTalesChatService {
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, reply)
                 .withScope(factionScope == null ? "" : factionScope)
-                .withServerBody(bodyJson, ChatMentionTargets.ofDiscordLine(channel,
-                        factionScope, routing.recipients, message));
+                .withServerBody(bodyJson, LostTalesDiscordBridge.getInstance()
+                        .pingsFromDiscord(senderId, ChatMentionTargets.ofDiscordLine(
+                                channel, factionScope, routing.recipients, message)));
         FMLLog.info("[losttales/chat/%s] <%s (discord)> %s",
                 logName(channel, factionScope), displayName,
                 ChatMessageValidator.logged(message));
@@ -645,7 +680,11 @@ public final class LostTalesChatService {
                 || displayName == null || displayName.length() == 0
                 || server == null || server.getConfigurationManager() == null
                 || isDiscordSenderMuted(server,
-                        LostTalesChatMessagePacket.discordSenderId(discordUserId))) {
+                        LostTalesChatMessagePacket.discordSenderId(discordUserId))
+                || !discordMemberWithinBudget(
+                        LostTalesChatMessagePacket.discordSenderId(discordUserId),
+                        LostTalesRequestRateLimiter.RequestType.CHAT_TYPING,
+                        "Discord typing")) {
             return;
         }
         String scope = factionScope == null ? "" : factionScope;
@@ -669,21 +708,27 @@ public final class LostTalesChatService {
     }
 
     /**
+     * Whether a Discord member is still inside the budget a player's
+     * request of {@code type} has: a member is held to what a player is
+     * held to, by the sender id the chat signs them with. Past it what
+     * they do is dropped without a word, as a muted member's is, and the
+     * server's log says so now and then.
+     */
+    static boolean discordMemberWithinBudget(UUID senderId,
+                                             LostTalesRequestRateLimiter.RequestType type,
+                                             String what) {
+        return ChatLinePipeline.withinBudget(ChatLinePipeline.Source.DISCORD,
+                senderId, type, what);
+    }
+
+    /**
      * Whether a mute is stored against a Discord member's sender id.
      * Mutes live in the overworld's storage like every other; a world
      * that cannot be read silences nobody.
      */
     private static boolean isDiscordSenderMuted(MinecraftServer server,
                                                 UUID senderId) {
-        try {
-            return server.worldServerForDimension(0) != null
-                    && ChatMuteStorage.get(server.worldServerForDimension(0))
-                            .getActiveMute(senderId,
-                                    System.currentTimeMillis()) != null;
-        } catch (RuntimeException exception) {
-            noteStorageFailure("the mute list", exception);
-            return false;
-        }
+        return ChatLinePipeline.muteOf(senderId) != null;
     }
 
     /**
@@ -694,8 +739,8 @@ public final class LostTalesChatService {
      */
     private static boolean storageFailureLogged;
 
-    private static void noteStorageFailure(String what,
-                                           RuntimeException exception) {
+    static void noteStorageFailure(String what,
+                                   RuntimeException exception) {
         if (storageFailureLogged) {
             return;
         }
@@ -853,14 +898,24 @@ public final class LostTalesChatService {
      */
     public static void editFromDiscord(long messageId, String message,
                                        String bodyJson) {
-        if (!ChatMessageValidator.isValid(message)) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (!ChatMessageValidator.isValid(message) || server == null) {
             return;
         }
         ChatNamedPlayer author = ChatHistory.authorOf(messageId);
+        // An edit puts new words in front of the readers, so a mute
+        // refuses it, as it refuses a player's.
+        if (author == null || isDiscordSenderMuted(server, author.getPlayerId())
+                || !discordMemberWithinBudget(author.getPlayerId(),
+                        LostTalesRequestRateLimiter.RequestType.CHAT_REVISION,
+                        "Discord edit")) {
+            return;
+        }
         ChatChannel channel = ChatHistory.channelOf(messageId);
-        List<ChatNamedPlayer> named = ChatMentionTargets.ofDiscordLine(channel,
-                ChatHistory.factionScopeOf(messageId),
-                onlineOf(ChatHistory.recipientsOf(messageId)), message);
+        List<ChatNamedPlayer> named = LostTalesDiscordBridge.getInstance()
+                .pingsFromDiscord(author.getPlayerId(), ChatMentionTargets.ofDiscordLine(
+                        channel, ChatHistory.factionScopeOf(messageId),
+                        onlineOf(ChatHistory.recipientsOf(messageId)), message));
         String body = bodyJson == null ? "" : bodyJson;
         Set<UUID> recipients = ChatHistory.applyEdit(messageId,
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID, message, body, named,
@@ -873,10 +928,8 @@ public final class LostTalesChatService {
         body = ChatHistory.bodyOf(messageId);
         FMLLog.info("[losttales/chat/discord] edited message %d: %s",
                 Long.valueOf(messageId), ChatMessageValidator.logged(message));
-        if (author != null) {
-            ChatAuditLog.logDiscordEdit(messageId, author.getPlayerId(),
-                    author.getAccount(), message);
-        }
+        ChatAuditLog.logDiscordEdit(messageId, author.getPlayerId(),
+                author.getAccount(), message);
         tellReaders(messageId, recipients,
                 LostTalesChatUpdatePacket.edited(messageId, message, body, named,
                         Collections.<String>emptyList()));
@@ -960,20 +1013,11 @@ public final class LostTalesChatService {
                 String recipientKey = addressed.characterId == null ? ""
                         : addressed.characterId.toString();
                 // Typing shows where the whisper will land: with the
-                // character addressed, while one of its copies reads as it.
-                // The whisper is filed under the typist's account, or for
-                // a reader not shown accounts under the character typing.
-                String typistKey = worn != null
-                        && !AccountVisibility.seesAccounts(whisperTarget)
-                        ? identityName : accountName;
-                if (addressed.characterId == null
-                        || ChatIdentitySelection.reads(whisperTarget,
-                                addressed.characterId)) {
-                    LostTalesNetworkHandler.CHANNEL.sendTo(
-                            new LostTalesChatTypingSyncPacket(channel, typistKey,
-                                    identityName, narrating, typing, "", recipientKey),
-                            whisperTarget);
-                }
+                // character addressed, which someone wears now (addressWhisper).
+                LostTalesNetworkHandler.CHANNEL.sendTo(
+                        new LostTalesChatTypingSyncPacket(channel, accountName,
+                                identityName, narrating, typing, "", recipientKey),
+                        whisperTarget);
             }
             return;
         }
@@ -1070,6 +1114,12 @@ public final class LostTalesChatService {
      */
     public static void edit(EntityPlayerMP editor, long messageId,
                             String message) {
+        edit(editor, messageId, message, "");
+    }
+
+    /** As above, keeping {@code typed}, what the editor typed for the new words. */
+    public static void edit(EntityPlayerMP editor, long messageId,
+                            String message, String typed) {
         if (editor == null || editor.worldObj == null
                 || editor.worldObj.isRemote
                 || !ChatMessageValidator.isValid(message)) {
@@ -1122,11 +1172,14 @@ public final class LostTalesChatService {
         List<ChatNamedPlayer> named = ChatMentionTargets.of(editor,
                 LostTalesServerBroadcastHook.namedAs(editor, speaking.worn),
                 channel, scope,
-                partner == null ? null : LostTalesServerBroadcastHook.namedPlayer(partner),
+                // The other party as the identity the whisper is with, as a
+                // sent line names them (CHAT-82).
+                partner == null ? null : whisperedAs(partner,
+                        ChatHistory.partnerCharacterOf(messageId)),
                 message);
         List<String> roles = ChatMentionTargets.rolesOf(message);
         Set<UUID> recipients = ChatHistory.applyEdit(messageId,
-                editor.getUniqueID(), message, "", named, roles);
+                editor.getUniqueID(), message, "", named, roles, typed);
         if (recipients == null) {
             return;
         }
@@ -1135,8 +1188,9 @@ public final class LostTalesChatService {
                 ChatMessageValidator.logged(message));
         ChatAuditLog.logEdit(messageId, editor.getUniqueID(),
                 editor.getCommandSenderName(), message);
-        tellReaders(messageId, recipients,
-                LostTalesChatUpdatePacket.edited(messageId, message, "", named, roles));
+        LostTalesChatUpdatePacket update = LostTalesChatUpdatePacket.edited(
+                messageId, message, "", named, roles);
+        tellReaders(messageId, recipients, update, editor, update.withTyped(typed));
         // A line carried to Discord is corrected there too: the bridge
         // rewrites its own webhook post by the id it kept. A message of
         // any other channel resolves to no post and nothing happens.
@@ -1317,15 +1371,70 @@ public final class LostTalesChatService {
                                         boolean add) {
         boolean named = ChatForeignEmoji.isReactionKey(emoji);
         boolean byId = ChatForeignEmoji.isCustomId(emojiId);
+        MinecraftServer server = MinecraftServer.getServer();
         if (!(named || byId) || discordUserId == null
-                || discordUserId.length() == 0) {
+                || discordUserId.length() == 0 || server == null) {
+            return;
+        }
+        UUID senderId = LostTalesChatMessagePacket.discordSenderId(discordUserId);
+        // A reaction puts something in front of the readers, so a mute
+        // refuses one, as it refuses a player's.
+        if (isDiscordSenderMuted(server, senderId)
+                || !discordMemberWithinBudget(senderId,
+                        LostTalesRequestRateLimiter.RequestType.CHAT_REACTION,
+                        "Discord reaction")) {
             return;
         }
         ChatHistory.ReactionChange change = ChatHistory.reactFromDiscord(
                 messageId,
-                LostTalesChatMessagePacket.discordSenderId(discordUserId),
+                senderId,
                 name, named ? emoji : null, byId ? emojiId : "",
                 originChannelId, add);
+        if (change != null) {
+            tellReactions(messageId, change.readers);
+            relayReaction(messageId, change);
+        }
+    }
+
+    /**
+     * The Discord members' reactions with one emoji to a message that
+     * crossed the bridge, as Discord lists them in the Discord channel
+     * {@code originChannelId} once the bridge's live connection is back:
+     * no reader hears a reaction while it is down. {@code reactors} is
+     * each member's Discord id and name; each one the message lacks gains
+     * a reaction, unless muted, and with {@code complete} each one made
+     * in that channel whom Discord no longer lists is taken back, a muted
+     * member's too, since Discord has it no more. {@code emoji} and
+     * {@code emojiId} are as {@link #reactFromDiscord} takes them. The
+     * bridge bounds how many it asks for, so no member's reaction budget
+     * is spent. Told to every reader and carried on as one change.
+     */
+    public static void setDiscordReactions(long messageId, String emoji,
+                                           String emojiId, String originChannelId,
+                                           java.util.Map<String, String> reactors,
+                                           boolean complete) {
+        boolean named = ChatForeignEmoji.isReactionKey(emoji);
+        boolean byId = ChatForeignEmoji.isCustomId(emojiId);
+        MinecraftServer server = MinecraftServer.getServer();
+        if (!(named || byId) || reactors == null || originChannelId == null
+                || originChannelId.length() == 0 || server == null) {
+            return;
+        }
+        java.util.Map<UUID, String> listed = new java.util.LinkedHashMap<UUID, String>();
+        Set<UUID> muted = new HashSet<UUID>();
+        for (java.util.Map.Entry<String, String> member : reactors.entrySet()) {
+            if (member.getKey() == null || member.getKey().length() == 0) {
+                continue;
+            }
+            UUID senderId = LostTalesChatMessagePacket.discordSenderId(member.getKey());
+            listed.put(senderId, member.getValue());
+            if (isDiscordSenderMuted(server, senderId)) {
+                muted.add(senderId);
+            }
+        }
+        ChatHistory.ReactionChange change = ChatHistory.setDiscordReactions(messageId,
+                named ? emoji : null, byId ? emojiId : "", originChannelId, listed,
+                muted, complete);
         if (change != null) {
             tellReactions(messageId, change.readers);
             relayReaction(messageId, change);
@@ -1389,10 +1498,17 @@ public final class LostTalesChatService {
     /** Sends an edit of a kept line to its online readers who may still read it. */
     private static void tellReaders(long messageId, Set<UUID> readers,
                                     LostTalesChatUpdatePacket update) {
+        tellReaders(messageId, readers, update, null, update);
+    }
+
+    /** As above, {@code editor} told {@code forEditor}, which keeps what they typed. */
+    private static void tellReaders(long messageId, Set<UUID> readers,
+                                    LostTalesChatUpdatePacket update,
+                                    EntityPlayerMP editor,
+                                    LostTalesChatUpdatePacket forEditor) {
         for (EntityPlayerMP player : onlineReaders(messageId, readers)) {
             LostTalesNetworkHandler.CHANNEL.sendTo(
-                    AccountVisibility.seesAccounts(player) ? update
-                            : update.withoutAccountsFor(player.getUniqueID()), player);
+                    player == editor ? forEditor : update, player);
         }
     }
 
@@ -1502,8 +1618,7 @@ public final class LostTalesChatService {
                 ChatChannelPolicy.selectedFactions(player),
                 ChatIdentitySelection.fellowshipIds(player),
                 readableChannels(player),
-                ChatIdentitySelection.identityIds(player),
-                AccountVisibility.seesAccounts(player));
+                ChatIdentitySelection.identityIds(player));
     }
 
     /**
@@ -1519,6 +1634,22 @@ public final class LostTalesChatService {
                 : player.getGameProfile().getName();
         return as != null && ChatRolePresentation.isInCharacter(channel)
                 ? characterNameOrFallback(as, account) : account;
+    }
+
+    /** The other party of a whisper as the identity it is with: a character of theirs by id, else their account. */
+    private static ChatNamedPlayer whisperedAs(EntityPlayerMP partner, UUID characterId) {
+        return LostTalesServerBroadcastHook.namedAs(partner, characterId == null ? null
+                : ChatIdentitySelection.owned(partner, characterId));
+    }
+
+    /** Whether {@code worn} is a character of the sender's that they do not play now. */
+    static boolean notPlayed(EntityPlayerMP sender, RoleplayCharacter worn) {
+        if (worn == null) {
+            return false;
+        }
+        RoleplayCharacter played = ChatIdentitySelection.played(sender);
+        return played == null
+                || !worn.getCharacterId().equals(played.getCharacterId());
     }
 
     /** The players among {@code accounts} who are online now. */
@@ -1575,7 +1706,7 @@ public final class LostTalesChatService {
     }
 
     /** The identity of a whisper's target the sender addressed: a character by id, or the account. */
-    private static final class AddressedIdentity {
+    static final class AddressedIdentity {
         final String name;
         final UUID characterId;
 
@@ -1626,77 +1757,97 @@ public final class LostTalesChatService {
         return null;
     }
 
-    /** Whom a whisper reaches, and as which of their identities. */
-    private static final class Whispered {
+    /**
+     * Whom a whisper reaches, and as which of their identities; or, with
+     * no partner, the character it names that nobody wears now.
+     */
+    static final class Whispered {
         final EntityPlayerMP partner;
         final AddressedIdentity addressed;
+        /** The character named while nobody wears it; null when the whisper reaches someone. */
+        final String absent;
 
         Whispered(EntityPlayerMP partner, AddressedIdentity addressed) {
             this.partner = partner;
             this.addressed = addressed;
+            this.absent = null;
+        }
+
+        private Whispered(String absent) {
+            this.partner = null;
+            this.addressed = null;
+            this.absent = absent;
+        }
+
+        static Whispered absent(String characterName) {
+            return new Whispered(characterName);
         }
     }
 
     /**
      * Whom a whisper reaches and as which of their identities, the same
-     * answer for a line and for its typing; null for nobody. A sender shown
-     * accounts names an account, or a name someone plays under, and the
-     * identity of it they address. One not shown them names a character,
-     * by its id or its name, reaching whoever holds it while they are
-     * online, or an account by its name alone, as that account: never an
-     * account and a character of it at once, so no refusal tells them which
-     * characters an account holds.
+     * answer for a line and for its typing, whatever the sender is shown;
+     * null for nobody. An account online by the name is reached whatever it
+     * plays, as the identity of it the whisper names; else whoever wears a
+     * character of that name now, played or spoken as by a copy. A
+     * character named while nobody wears it reaches nobody
+     * ({@link Whispered#absent}).
      */
     private static Whispered addressWhisper(EntityPlayerMP sender, String target,
                                             String targetIdentity,
                                             UUID targetCharacterId) {
-        if (AccountVisibility.seesAccounts(sender)) {
-            EntityPlayerMP partner = whisperPartner(target);
-            AddressedIdentity addressed = partner == null ? null
-                    : resolveIdentity(partner, addressedAs(partner, target,
-                            targetIdentity, targetCharacterId), targetCharacterId);
-            return addressed == null ? null : new Whispered(partner, addressed);
+        EntityPlayerMP partner = LostTalesServerPlayers.findOnline(target);
+        if (partner == null) {
+            partner = findOnlinePlayingAs(target);
         }
-        String typed = target == null ? "" : target.trim();
+        AddressedIdentity addressed = partner == null ? null
+                : resolveIdentity(partner, addressedAs(partner, target,
+                        targetIdentity, targetCharacterId), targetCharacterId);
+        return decide(partner, addressed, addressed != null
+                        && addressed.characterId != null
+                        && ChatIdentitySelection.reads(partner, addressed.characterId),
+                addressed == null ? absentCharacter(sender, target, targetIdentity)
+                        : null);
+    }
+
+    /**
+     * The one whisper rule (CHAT-30): the account {@code addressed} is
+     * reached whatever it plays, a character only while it is
+     * {@code worn}; a character nobody wears, or {@code absent} where the
+     * name found nobody online, is not here. Null for nobody at all.
+     */
+    static Whispered decide(EntityPlayerMP partner, AddressedIdentity addressed,
+                            boolean worn, String absent) {
+        if (addressed == null) {
+            return absent == null ? null : Whispered.absent(absent);
+        }
+        if (addressed.characterId != null && !worn) {
+            return Whispered.absent(addressed.name);
+        }
+        return new Whispered(partner, addressed);
+    }
+
+    /**
+     * The name of the character a whisper names when it reaches nobody:
+     * one of that name in any roster, worn by nobody now; null for a name
+     * no character goes by.
+     */
+    private static String absentCharacter(EntityPlayerMP sender, String target,
+                                          String targetIdentity) {
         String identity = targetIdentity == null ? "" : targetIdentity.trim();
-        if (identity.equalsIgnoreCase(typed)) {
-            identity = "";
+        String named = identity.length() > 0 ? identity
+                : target == null ? "" : target.trim();
+        if (named.length() == 0) {
+            return null;
         }
-        RoleplayCharacter character;
         try {
-            CharacterWorldData characters = CharacterStorage.get(sender.worldObj);
-            if (targetCharacterId != null) {
-                character = characters.characterIndex().countOf(targetCharacterId) == 1
-                        ? characters.characterIndex().find(targetCharacterId) : null;
-            } else if (identity.length() > 0) {
-                character = CharacterNames.named(characters.getRosters(), identity);
-            } else {
-                EntityPlayerMP account = LostTalesServerPlayers.findOnline(typed);
-                if (account != null) {
-                    return new Whispered(account,
-                            new AddressedIdentity(account.getCommandSenderName(), null));
-                }
-                character = CharacterNames.named(characters.getRosters(), typed);
-            }
+            RoleplayCharacter character = CharacterNames.named(
+                    CharacterStorage.get(sender.worldObj).getRosters(), named);
+            return character == null ? null : character.getName();
         } catch (RuntimeException exception) {
             noteStorageFailure("the character roster", exception);
             return null;
         }
-        EntityPlayerMP owner = character == null ? null
-                : LostTalesServerPlayers.findOnline(character.getOwnerId());
-        return owner == null ? null : new Whispered(owner,
-                new AddressedIdentity(character.getName(), character.getCharacterId()));
-    }
-
-    /**
-     * Whom a whisper to {@code target} reaches, for a sender shown
-     * accounts: the account of that name online, else whoever plays a
-     * character of that name. A conversation is with a person as they
-     * present themselves, so the name on their lines reaches them.
-     */
-    private static EntityPlayerMP whisperPartner(String target) {
-        EntityPlayerMP partner = LostTalesServerPlayers.findOnline(target);
-        return partner != null ? partner : findOnlinePlayingAs(target);
     }
 
     /**
@@ -1749,6 +1900,12 @@ public final class LostTalesChatService {
         return null;
     }
 
+    /** Whether the player's account is under a mute now; nothing is said to them. */
+    public static boolean isMuted(EntityPlayerMP player) {
+        return player != null && player.worldObj != null
+                && !player.worldObj.isRemote && ChatLinePipeline.isMuted(player);
+    }
+
     /**
      * Whether a muted account is refused a way to speak that does not
      * pass through {@link #send} ({@link ChatSpeechGate}); a refused
@@ -1768,9 +1925,9 @@ public final class LostTalesChatService {
     }
 
     /** The mute currently silencing the player's account, or null. */
+    /** The mute standing against the player's account now; the pipeline's one mute rule. */
     private static ChatMuteEntry activeMute(EntityPlayerMP player) {
-        return ChatMuteStorage.get(player.worldObj).getActiveMute(
-                player.getUniqueID(), System.currentTimeMillis());
+        return ChatLinePipeline.muteOf(player.getUniqueID());
     }
 
     /** Tells a refused sender they are muted, for how long, and why. */
@@ -1830,8 +1987,7 @@ public final class LostTalesChatService {
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new LostTalesChatAccessPacket(
                         roles,
-                        AccountVisibility.seesAccounts(player) ? roleHolders
-                                : holdersWithoutAccounts(roleHolders),
+                        roleHolders,
                         moderator ? mutedSenders(player)
                                 : Collections.<UUID>emptyList(),
                         ChatRoleCatalog.server().roles(),
@@ -1848,13 +2004,49 @@ public final class LostTalesChatService {
                         ChatChannelIconCatalog.current(),
                         ChatProfanityCatalog.serverWords())
                         .withPrivateCommands(ChatCommandText.serverNames())
-                        .withDiscordLinks(
-                                LostTalesDiscordBridge.getInstance().linkedKeys())
+                        .withDiscordLinks(linksReadBy(
+                                LostTalesDiscordBridge.getInstance().links(),
+                                readerOf(player, roles)))
                         .withDiscordStatuses(LostTalesDiscordBridge.getInstance()
-                                .followsMemberStatuses())
-                        .withSeesAccounts(AccountVisibility.seesAccounts(player)),
+                                .followsMemberStatuses()),
                 player);
         ChatIdentitySelection.sendState(player);
+    }
+
+    /** Whether someone may read a conversation: a channel, and a faction's for a faction's chat. */
+    interface ConversationReader {
+        boolean reads(ChatChannel channel, String factionScope);
+    }
+
+    /**
+     * The keys of the Discord links of the conversations {@code reader}
+     * may read: a link to a channel they may not read, or to another
+     * faction's chat, is none of their business.
+     */
+    static List<String> linksReadBy(List<LostTalesDiscordBridge.Link> links,
+                                    ConversationReader reader) {
+        List<String> keys = new ArrayList<String>();
+        for (LostTalesDiscordBridge.Link link : links) {
+            if (link != null && link.channel != null
+                    && reader.reads(link.channel, link.factionScope)) {
+                keys.add(link.key);
+            }
+        }
+        return keys;
+    }
+
+    /** The player as a reader of conversations, as the router judges them. */
+    private static ConversationReader readerOf(final EntityPlayerMP player,
+                                               final int roles) {
+        return new ConversationReader() {
+            @Override
+            public boolean reads(ChatChannel channel, String factionScope) {
+                return ChatChannelPolicy.canRead(player, channel, roles)
+                        && (factionScope.length() == 0
+                                || ChatIdentitySelection.readsFaction(player,
+                                        factionScope));
+            }
+        };
     }
 
     /**
@@ -1991,36 +2183,6 @@ public final class LostTalesChatService {
     }
 
     /** Every online account holding a role, {@code excluded} left out. */
-    /**
-     * The role holders as a player not shown which account plays a
-     * character reads them: the account's own roles under the account, the
-     * roles the character played holds under that character's name, never
-     * the two joined.
-     */
-    static List<LostTalesChatAccessPacket.RoleHolder> holdersWithoutAccounts(
-            List<LostTalesChatAccessPacket.RoleHolder> holders) {
-        List<LostTalesChatAccessPacket.RoleHolder> shown =
-                new ArrayList<LostTalesChatAccessPacket.RoleHolder>(holders.size());
-        for (LostTalesChatAccessPacket.RoleHolder holder : holders) {
-            if (holder.getAccountMask() != 0) {
-                shown.add(new LostTalesChatAccessPacket.RoleHolder(holder.getName(),
-                        holder.getAccountMask(), holder.getAccountMask(), null));
-            }
-            int characterRoles = holder.getMask() & ~holder.getAccountMask();
-            if (characterRoles == 0 || holder.getCharacterId() == null) {
-                continue;
-            }
-            EntityPlayerMP player = LostTalesServerPlayers.findOnline(holder.getName());
-            RoleplayCharacter active = player == null ? null
-                    : CharacterActiveResolver.get(player);
-            if (active != null && holder.getCharacterId().equals(active.getCharacterId())) {
-                shown.add(new LostTalesChatAccessPacket.RoleHolder(active.getName(),
-                        characterRoles, 0, active.getCharacterId()));
-            }
-        }
-        return shown;
-    }
-
     private static List<LostTalesChatAccessPacket.RoleHolder> roleHolders(
             EntityPlayerMP excluded) {
         MinecraftServer server = MinecraftServer.getServer();
@@ -2203,23 +2365,12 @@ public final class LostTalesChatService {
         LostTalesChatMessagePacket shared = packet.withoutEcho()
                 .narratedForOthers();
         for (EntityPlayerMP recipient : routing.recipients) {
-            LostTalesNetworkHandler.CHANNEL.sendTo(asShownTo(
+            LostTalesNetworkHandler.CHANNEL.sendTo(
                     sender != null && recipient == sender ? packet : shared,
-                    recipient), recipient);
+                    recipient);
         }
         ChatHistory.record(packet.getMessageId(), authorId, identityName,
                 packet.withoutEcho(), shared, routing.recipientIds(), routing.audience);
-    }
-
-    /**
-     * A line as {@code reader} is sent it: as it is to a player shown which
-     * account plays a character, else without those accounts
-     * ({@link LostTalesChatMessagePacket#withoutAccountsFor}).
-     */
-    static LostTalesChatMessagePacket asShownTo(LostTalesChatMessagePacket line,
-                                                EntityPlayerMP reader) {
-        return reader == null || AccountVisibility.seesAccounts(reader) ? line
-                : line.withoutAccountsFor(reader.getUniqueID());
     }
 
     /** The channels the player may read right now. */

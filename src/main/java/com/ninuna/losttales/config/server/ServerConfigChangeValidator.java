@@ -6,8 +6,8 @@ import java.util.Locale;
 /**
  * Whether a change fits the entry it names: the right shape (single or
  * list), a value of the entry's type inside its bounds, one of the valid
- * values where the entry lists them, and within the size the transport
- * allows. Answers why a change is refused, as a lang key under
+ * values where the entry lists them, on one line of the file, and within
+ * the size the transport allows. Answers why a change is refused, as a lang key under
  * {@link #REASON} and its arguments, or null when it fits.
  */
 public final class ServerConfigChangeValidator {
@@ -52,6 +52,9 @@ public final class ServerConfigChangeValidator {
         }
         if (value.length() > MAX_VALUE_LENGTH) {
             return refused(name, "too_long", String.valueOf(MAX_VALUE_LENGTH));
+        }
+        if (!isOneLine(value)) {
+            return refused(name, "not_one_line");
         }
         switch (entry.getType()) {
             case INTEGER:
@@ -125,6 +128,25 @@ public final class ServerConfigChangeValidator {
             }
         }
         return refused(name, "expects_one_of", validValues.toString());
+    }
+
+    /**
+     * Whether a value stays on its own line of the file, as written: no
+     * line break, no other control character and no formatting code. The
+     * config files keep one value a line, so a line break inside one would
+     * write lines of its own, other options among them.
+     */
+    static boolean isOneLine(String value) {
+        for (int index = 0; index < value.length(); index++) {
+            char letter = value.charAt(index);
+            int type = Character.getType(letter);
+            if (Character.isISOControl(letter) || letter == '\u00a7'
+                    || type == Character.LINE_SEPARATOR
+                    || type == Character.PARAGRAPH_SEPARATOR) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** A refusal of the change named {@code name}, its reason the line under {@link #REASON}. */

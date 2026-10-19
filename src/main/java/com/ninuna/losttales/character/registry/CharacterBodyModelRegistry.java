@@ -22,7 +22,6 @@ public final class CharacterBodyModelRegistry {
     public static final String LOTR_HOBBIT = "lotr:hobbit";
     public static final String LOTR_ORC = "lotr:orc";
     public static final String LOTR_URUK = "lotr:uruk";
-    public static final String LOTR_HALF_TROLL = "lotr:half_troll";
 
     /**
      * The plain player body: a human without race geometry, drawn with the
@@ -51,9 +50,6 @@ public final class CharacterBodyModelRegistry {
                 LOTR_ORC, CharacterSkinLayout.LOTR_64X32, false, true, true));
         register(definitions, new CharacterBodyModelDefinition(
                 LOTR_URUK, CharacterSkinLayout.LOTR_64X32, false, true, true));
-        // The half-troll's shoulders sit far outside vanilla's.
-        register(definitions, new CharacterBodyModelDefinition(
-                LOTR_HALF_TROLL, CharacterSkinLayout.LOTR_64X64, false, true, false));
         register(definitions, new CharacterBodyModelDefinition(
                 LOSTTALES_PLAYER, CharacterSkinLayout.MINECRAFT_64X64, true, true, true));
         DEFINITIONS = Collections.unmodifiableMap(definitions);
@@ -65,7 +61,6 @@ public final class CharacterBodyModelRegistry {
         defaults.put(CharacterRaceRegistry.HOBBIT, LOTR_HOBBIT);
         defaults.put(CharacterRaceRegistry.ORC, LOTR_ORC);
         defaults.put(CharacterRaceRegistry.URUK, LOTR_URUK);
-        defaults.put(CharacterRaceRegistry.HALF_TROLL, LOTR_HALF_TROLL);
         DEFAULT_MODEL_BY_RACE = Collections.unmodifiableMap(defaults);
 
         LinkedHashMap<String, Set<String>> extras = new LinkedHashMap<String, Set<String>>();

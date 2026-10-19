@@ -27,6 +27,9 @@ public final class ChatSpeechGate {
             new HashSet<String>(Arrays.asList(
                     "me", "say", "tell", "msg", "w")));
 
+    /** The game's emote command. */
+    static final String EMOTE = "me";
+
     /** After the Server Log has recorded the attempt, which stands either way. */
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onCommand(CommandEvent event) {
@@ -40,9 +43,29 @@ public final class ChatSpeechGate {
             event.setCanceled(true);
             return;
         }
+        if (isEmote(event.command)) {
+            // The game's /me is said as the chat's own action in OOC Chat,
+            // under the account, and never in Global (CHAT-37): the chat's
+            // send holds it to every rule a typed line passes.
+            event.setCanceled(true);
+            if (words.length() > 0) {
+                LostTalesChatService.actOutOfCharacter((EntityPlayerMP)event.sender,
+                        words);
+            }
+            return;
+        }
         if (LostTalesChatService.refuseIfMuted((EntityPlayerMP)event.sender)) {
             event.setCanceled(true);
         }
+    }
+
+    /** Whether the command is the game's {@code /me}, by its name or an alias. */
+    static boolean isEmote(ICommand command) {
+        if (EMOTE.equals(command.getCommandName())) {
+            return true;
+        }
+        List<?> aliases = command.getCommandAliases();
+        return aliases != null && aliases.contains(EMOTE);
     }
 
     /** Before anything decorates the line. */

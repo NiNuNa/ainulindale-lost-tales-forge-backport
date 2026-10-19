@@ -23,8 +23,9 @@ import java.util.Map;
  * <p>{@code days} is how many in-game days it runs before it fails,
  * 1 to 365, and must be written. {@code least} is how much a helper has to
  * add to be paid when it succeeds, 1 by default. It has one stage, and its
- * objectives are kills and crafts, which add up across players; the counts
- * are the whole server's goal.</p>
+ * objectives are kills, crafts and deliveries (to a person, or at any
+ * missive board), which add up across players; the counts are the whole
+ * server's goal. Its {@code podium} pays its three best helpers again.</p>
  */
 public final class WorldQuestRules {
     public static final String DAYS = "days";
@@ -56,10 +57,20 @@ public final class WorldQuestRules {
         return Math.max(1, Math.min(MAX_GOAL, least));
     }
 
-    /** Whether an objective's count adds up across players: kills and crafts. */
+    /** How many helpers a podium honours. */
+    public static final int PODIUM_PLACES = 3;
+    /** What a podium reward waiting for a helper is kept as, before its quest's id. */
+    public static final String PODIUM_REWARD_PREFIX = "#podium#";
+
+    /**
+     * Whether an objective's count adds up across players: kills, crafts
+     * and deliveries, a delivery's count being what was handed in
+     * (QUEST-36).
+     */
     public static boolean adds(LostTalesQuestObjectiveDefinition objective) {
         return LostTalesQuestObjectiveType.KILL.is(objective)
-                || LostTalesQuestObjectiveType.CRAFT.is(objective);
+                || LostTalesQuestObjectiveType.CRAFT.is(objective)
+                || LostTalesQuestObjectiveType.DELIVER.is(objective);
     }
 
     /** The objectives a world quest counts: its one stage's. */
@@ -129,7 +140,7 @@ public final class WorldQuestRules {
             if (!adds(objective)) {
                 problems.add("objective " + objective.getId() + " is a '"
                         + objective.getType() + "'; a world quest counts"
-                        + " only kills and crafts");
+                        + " only kills, crafts and deliveries");
             }
             if (objective.getParams().containsKey("radius")) {
                 problems.add("objective " + objective.getId()

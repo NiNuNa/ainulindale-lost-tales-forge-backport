@@ -1,9 +1,11 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.quest.QuestChatAnswer;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.event.HoverEvent;
 import net.minecraft.util.IChatComponent;
+import com.ninuna.losttales.chat.share.QuestShareInvite;
 import com.ninuna.losttales.fellowship.sync.FellowshipInvitationNotice;
 
 /**
@@ -50,6 +52,10 @@ final class ChatInteractions {
         QUEST_SHARE,
         /** Accept or Decline on a fellowship invitation answers it. */
         FELLOWSHIP_INVITATION,
+        /** An answer to a quest giver: Accept or Decline, or a pick's item (QUEST-37). */
+        QUEST_ANSWER,
+        /** Join or Not now under a quest card shared in a fellowship (QUEST-25). */
+        QUEST_INVITE,
         /** A web address opens. */
         LINK,
         /** A suggestion is put into the input field. */
@@ -63,6 +69,20 @@ final class ChatInteractions {
         ClickEvent click = part == null || part.getChatStyle() == null ? null
                 : part.getChatStyle().getChatClickEvent();
         return click == null ? null : FellowshipInvitationNotice.parse(click.getValue());
+    }
+
+    /** The quest giver's answer the run carries, or null. */
+    static QuestChatAnswer questAnswer(IChatComponent part) {
+        ClickEvent click = part == null || part.getChatStyle() == null ? null
+                : part.getChatStyle().getChatClickEvent();
+        return click == null ? null : QuestChatAnswer.parse(click.getValue());
+    }
+
+    /** The answer to a shared quest's invitation the run carries, or null. */
+    static QuestShareInvite.Answer questInvite(IChatComponent part) {
+        ClickEvent click = part == null || part.getChatStyle() == null ? null
+                : part.getChatStyle().getChatClickEvent();
+        return click == null ? null : QuestShareInvite.parse(click.getValue());
     }
 
     /** LOTR's own hover action for one of its achievements, by the name it serializes under. */
@@ -95,6 +115,12 @@ final class ChatInteractions {
         }
         if (invitationAnswer(part) != null) {
             return Action.FELLOWSHIP_INVITATION;
+        }
+        if (questAnswer(part) != null) {
+            return Action.QUEST_ANSWER;
+        }
+        if (questInvite(part) != null) {
+            return Action.QUEST_INVITE;
         }
         // A person is not a link either: the head, the name, its
         // brackets and title, or a mention.
@@ -134,6 +160,8 @@ final class ChatInteractions {
                 || ChatStampMarker.isMarker(part)
                 || ChatEmojiMarker.isMarker(part)
                 || ChatTitleMarker.isMarker(part)
+                || ChatAccountMarker.isMarker(part)
+                || ChatWorldMark.isMarker(part)
                 || ChatBodyMarker.isMarker(part)
                 || ChatLayoutMarker.isMarker(part)
                 || ChatSpacerMarker.isMarker(part)) {
@@ -258,6 +286,8 @@ final class ChatInteractions {
                 || ChatStampMarker.isMarker(part)
                 || ChatEmojiMarker.isMarker(part)
                 || ChatTitleMarker.isMarker(part)
+                || ChatAccountMarker.isMarker(part)
+                || ChatWorldMark.isMarker(part)
                 || ChatReplyMarker.isMarker(part)
                 || ChatChannelLinkMarker.isMarker(part)
                 || ChatBodyMarker.isMarker(part)

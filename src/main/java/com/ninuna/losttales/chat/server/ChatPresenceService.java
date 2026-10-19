@@ -76,7 +76,9 @@ public final class ChatPresenceService {
      * A player's client states its whole presence: the status chosen for
      * each identity, the line set for each, the role-play status of each
      * that is not its default, and whether it is idle. Everyone is told
-     * what that changes.
+     * what that changes. A mute freezes the status lines and the role-play
+     * statuses as they stood (CHAT-63): the player is told, and only the
+     * presence and the idle flag move.
      */
     public static synchronized void state(EntityPlayerMP player,
                                           Map<ChatPresenceIdentity, ChatPresence> choices,
@@ -90,10 +92,23 @@ public final class ChatPresenceService {
         CHOSEN.put(account, choices == null
                 ? new HashMap<ChatPresenceIdentity, ChatPresence>()
                 : new HashMap<ChatPresenceIdentity, ChatPresence>(choices));
-        LINES.put(account, cleaned(lines));
-        ROLEPLAY.put(account, roleplay == null
+        Map<ChatPresenceIdentity, String> statedLines = cleaned(lines);
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> statedRoleplay = roleplay == null
                 ? new HashMap<ChatPresenceIdentity, ChatRoleplayStatus>()
-                : new HashMap<ChatPresenceIdentity, ChatRoleplayStatus>(roleplay));
+                : new HashMap<ChatPresenceIdentity, ChatRoleplayStatus>(roleplay);
+        boolean muted = LostTalesChatService.isMuted(player);
+        Map<ChatPresenceIdentity, String> keptLines = frozen(muted,
+                LINES.get(account), statedLines);
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> keptRoleplay = frozen(muted,
+                ROLEPLAY.get(account), statedRoleplay);
+        if (keptLines != statedLines && !keptLines.equals(statedLines)
+                || keptRoleplay != statedRoleplay && !keptRoleplay.equals(statedRoleplay)) {
+            // What they set stays theirs to see; everyone else is shown
+            // what stood before the mute, and they are told why.
+            LostTalesChatService.refuseIfMuted(player);
+        }
+        LINES.put(account, keptLines);
+        ROLEPLAY.put(account, keptRoleplay);
         if (idle) {
             IDLE.add(account);
         } else {
@@ -137,6 +152,16 @@ public final class ChatPresenceService {
             // Who shows, and as whom, is what the member lists group by.
             ChatMemberWatches.markChanged();
         }
+    }
+
+    /**
+     * What is kept of a muted player's statement: {@code held}, what stood
+     * before, while muted and something stood, else {@code stated}.
+     */
+    static <V> Map<ChatPresenceIdentity, V> frozen(boolean muted,
+                                                   Map<ChatPresenceIdentity, V> held,
+                                                   Map<ChatPresenceIdentity, V> stated) {
+        return muted && held != null ? held : stated;
     }
 
     /** A player's lines as they are kept: cleaned, the empty ones gone. */

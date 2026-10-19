@@ -19,16 +19,14 @@ import org.lwjgl.opengl.GL11;
  * to the window whose control opened it and is drawn over it, right after
  * it, so a window lying over that one covers it too.
  *
- * <p>Every sub-window opens locked: at the place its kind was last locked
- * in, else where its opener puts it, measured from its window, so it
- * rides along as the window moves and can be neither moved nor resized;
- * a press on its strip lights its padlock. Unlocked by its padlock, it is
- * carried by its strip or its grip and resized by its edges anywhere on
- * the screen, past its window's edges too, and stays where it is put while
- * the window moves. Locking it again makes where it stands, and its size,
- * the place its kind opens at from then on. Closed while unlocked, it
- * forgets that place too: its kind opens where its opener puts it again,
- * locked. Every sub-window is drawn just over its own window, the one
+ * <p>Every sub-window opens at the place its kind was last put, else where
+ * its opener puts it, measured from its window, so it rides along as the
+ * window moves. It is carried by its strip or its grip and resized by its
+ * edges, past its window's edges too, and stays where it is put in its
+ * window's room; where it stands then, and its size, is the place its kind
+ * opens at from then on. A double-click on its strip puts it back where its
+ * opener put it, and its kind forgets the place (WIN-43). It has no
+ * padlock. Every sub-window is drawn just over its own window, the one
  * being typed in too, so a window in front covers it; one opened with no
  * window open, or one that belongs to the screen (the Views sub-window),
  * stands on the bare screen, over every window.</p>
@@ -52,8 +50,6 @@ public final class SubWindows {
     static final int ROOM_INSET = LostTalesUiWindowFrame.WIDTH + 2;
     /** Offset a window of a kind already standing at that place opens at: a window's cascade. */
     private static final int CASCADE_STEP = 24;
-    /** How long a padlock that held a press back stays lit. */
-    private static final long LOCK_NUDGE_NANOS = 600L * 1000000L;
 
     /** Back to front. */
     private final List<SubWindow> stack = new ArrayList<SubWindow>();
@@ -86,7 +82,7 @@ public final class SubWindows {
 
     /**
      * The room the sub-windows of window {@code parentId} are measured
-     * from while locked, and first placed in: that window's box as drawn,
+     * from: that window's box as drawn,
      * {@link #ROOM_INSET} in from its edges; for none, the screen inside
      * its margins. Null while the window is not drawn.
      */
@@ -119,8 +115,8 @@ public final class SubWindows {
 
     /**
      * Opens a window of {@code kind} holding {@code content} in window
-     * {@code parentId}, in front and locked: where its kind was last
-     * locked — at the size it was given, or else its content's own — and
+     * {@code parentId}, in front: where its kind was last put — at the
+     * size it was given, or else its content's own — and
      * otherwise round {@code firstContentBox}, a screen box its opener
      * gives, hanging from the control pressed; a step down and along from
      * another of its kind standing there already. The window of that kind
@@ -138,16 +134,9 @@ public final class SubWindows {
             if (!window.isOpen()) {
                 window.setOpen(true);
                 window.content.opened();
-                if (!window.locked) {
-                    // Closed unlocked and caught while it still fades: it
-                    // opens as a closed one does, locked at its first place.
-                    window.locked = true;
-                    place(window, room, firstContentBox);
-                }
             }
             if (!window.belongsTo(parent)) {
                 window.parentId = parent;
-                window.locked = true;
                 place(window, room, firstContentBox);
             }
             focus(window);
@@ -160,14 +149,21 @@ public final class SubWindows {
     }
 
     /**
-     * Puts a locked window in its room where its kind was last locked, or
-     * round {@code firstContentBox} while it never was.
+     * Puts a window in its room where its kind was last put, or round
+     * {@code firstContentBox} while it never was; either way that box is
+     * where a double-click puts it back.
      */
     private void place(SubWindow window, LostTalesUiHitBox room,
                        LostTalesUiHitBox firstContentBox) {
         SubWindowPlaces.Placement placed =
                 SubWindowPlaces.of(window.kind);
         LostTalesUiHitBox screen = screenRoom();
+        window.homeWidth = (int)Math.round(firstContentBox.width);
+        window.homeHeight = (int)Math.round(firstContentBox.height)
+                + SubWindow.STRIP_HEIGHT;
+        window.homeX = firstContentBox.left - room.left;
+        window.homeY = firstContentBox.top - SubWindow.STRIP_HEIGHT
+                - room.top;
         if (placed != null) {
             window.sized = placed.isSized();
             if (window.sized) {
@@ -180,20 +176,42 @@ public final class SubWindows {
             window.x = placed.x(room.width, window.width);
             window.y = placed.y(room.height, window.height);
         } else {
-            window.wantedWidth = (int)Math.round(firstContentBox.width);
-            window.wantedHeight = (int)Math.round(firstContentBox.height)
-                    + SubWindow.STRIP_HEIGHT;
-            window.x = firstContentBox.left - room.left;
-            window.y = firstContentBox.top - SubWindow.STRIP_HEIGHT
-                    - room.top;
+            goHome(window);
         }
         window.layOut(room, screen);
     }
 
+    /** Gives a window the place and size its opener gave it. */
+    private static void goHome(SubWindow window) {
+        window.sized = false;
+        window.wantedWidth = window.homeWidth;
+        window.wantedHeight = window.homeHeight;
+        window.x = window.homeX;
+        window.y = window.homeY;
+    }
+
+    /**
+     * A double-click on a window's strip: it goes back where its opener put
+     * it, at the size it gave, and its kind forgets the place it was put.
+     */
+    public void putBack(SubWindow window) {
+        if (window == null || !window.isOpen()) {
+            return;
+        }
+        if (this.gesture != null && this.gesture.window == window) {
+            this.gesture = null;
+        }
+        SubWindowPlaces.forget(window.kind);
+        goHome(window);
+        if (window.room != null) {
+            window.layOut(window.room, screenRoom());
+        }
+    }
+
     /**
      * Opens a window exactly as it stood as the screen closed, in the
-     * window it stood in, locked or not: what comes back with the screen.
-     * One whose window has closed since stays closed.
+     * window it stood in: what comes back with the screen. One whose window
+     * has closed since stays closed.
      */
     public SubWindow reopen(SubWindowPlaces.Reopening where,
                            SubWindowContent content) {
@@ -209,7 +227,10 @@ public final class SubWindows {
                 where.parentId);
         window.x = where.x;
         window.y = where.y;
-        window.locked = where.locked;
+        window.homeX = where.homeX;
+        window.homeY = where.homeY;
+        window.homeWidth = where.homeWidth;
+        window.homeHeight = where.homeHeight;
         window.wantedWidth = where.width;
         window.wantedHeight = where.height;
         window.sized = where.sized;
@@ -270,17 +291,10 @@ public final class SubWindows {
         }
     }
 
-    /**
-     * Closes the window: it fades out where it stands. One closed while
-     * unlocked forgets its kind's place, so the kind opens where its opener
-     * puts it again.
-     */
+    /** Closes the window: it fades out where it stands, and its kind keeps its place. */
     public void close(SubWindow window) {
         if (window == null || !window.isOpen()) {
             return;
-        }
-        if (!window.locked) {
-            SubWindowPlaces.forget(window.kind);
         }
         window.setOpen(false);
         window.content.closed();
@@ -364,48 +378,11 @@ public final class SubWindows {
                         window.key, window.content.sessionState(),
                         window.parentId, window.x, window.y,
                         window.wantedWidth, window.wantedHeight,
-                        window.sized, window.locked));
+                        window.sized, window.homeX, window.homeY,
+                        window.homeWidth, window.homeHeight));
             }
         }
         return open;
-    }
-
-    /* ---- The padlock ---- */
-
-    /**
-     * Locks the window where it stands, or unlocks it. Locked again, it is
-     * measured from its window's room, and where it stands and its size
-     * become the place its kind opens at from then on.
-     */
-    public void setLocked(SubWindow window, boolean locked) {
-        if (window == null || window.locked == locked
-                || window.room == null) {
-            return;
-        }
-        if (locked) {
-            window.x = window.left - window.room.left;
-            window.y = window.top - window.room.top;
-            window.locked = true;
-            SubWindowPlaces.remember(window.kind, window.x, window.y,
-                    window.width, window.height, window.sized,
-                    window.room.width, window.room.height);
-        } else {
-            window.x = window.left;
-            window.y = window.top;
-            window.locked = false;
-        }
-    }
-
-    /** Lights a locked window's padlock a moment: it held a press back. */
-    public void nudgeLock(SubWindow window) {
-        if (window != null) {
-            window.lockNudgeNanos = System.nanoTime();
-        }
-    }
-
-    private static boolean isLockLit(SubWindow window, long now) {
-        return window.lockNudgeNanos != 0L
-                && now - window.lockNudgeNanos < LOCK_NUDGE_NANOS;
     }
 
     /* ---- The pointer ---- */
@@ -413,7 +390,7 @@ public final class SubWindows {
     /**
      * What a point is on among the sub-windows, front to back: a list a
      * window's field opens, over everything; then an edge, a strip's
-     * padlock, cross or grip, a strip, or the content, which answers for
+     * cross or grip, a strip, or the content, which answers for
      * itself. A window a window in front of its own covers at the point
      * is not there; null where no sub-window is.
      */
@@ -447,9 +424,7 @@ public final class SubWindows {
                 continue;
             }
             WindowHover hover;
-            if (window.lockContains(x, y)) {
-                hover = new WindowHover(WindowHover.Kind.SUB_WINDOW_LOCK);
-            } else if (window.closeContains(x, y)) {
+            if (window.closeContains(x, y)) {
                 hover = new WindowHover(WindowHover.Kind.SUB_WINDOW_CLOSE);
             } else if (window.gripContains(x, y)) {
                 hover = new WindowHover(WindowHover.Kind.SUB_WINDOW_GRIP);
@@ -595,19 +570,17 @@ public final class SubWindows {
         int stripSurface = WindowStyle.stripArgb(opacity);
         boolean mine = hover != null && hover.subWindow == window;
         boolean onClose = mine && hover.is(WindowHover.Kind.SUB_WINDOW_CLOSE);
-        boolean onLock = mine && hover.is(WindowHover.Kind.SUB_WINDOW_LOCK);
         boolean pressed = Mouse.isButtonDown(0);
         window.closeMotion.advance(now, onClose, onClose, onClose && pressed);
-        window.lockMotion.advance(now, onLock, onLock, onLock && pressed);
         boolean carried = this.gesture != null && this.gesture.window == window
                 && this.gesture.edge == null && this.gesture.active;
         double sinceGrip = window.gripNanos == 0L ? 0.0D
                 : (now - window.gripNanos) / 1.0E9D;
         window.gripNanos = now;
         window.gripFade = WindowStyle.hoverFade(window.gripFade, carried
-                || mine && hover.is(WindowHover.Kind.SUB_WINDOW_GRIP)
-                        && !window.locked, sinceGrip);
-        boolean onContent = mine && !onClose && !onLock
+                || mine && hover.is(WindowHover.Kind.SUB_WINDOW_GRIP),
+                sinceGrip);
+        boolean onContent = mine && !onClose
                 && !hover.is(WindowHover.Kind.SUB_WINDOW_STRIP)
                 && !hover.is(WindowHover.Kind.SUB_WINDOW_GRIP)
                 && !hover.is(WindowHover.Kind.SUB_WINDOW_RESIZE);
@@ -641,8 +614,7 @@ public final class SubWindows {
             SubWindowStrip.drawSurfaces(left, top, right, bottom,
                     stripSurface, surface, alpha);
             window.strip.drawContent(font, wholeLeft, wholeTop,
-                    window.content.stripIcon(), window,
-                    onLock || isLockLit(window, now), alpha);
+                    window.content.stripIcon(), window, alpha);
             window.content.draw(minecraft, window.wholeContentBox(),
                     exactLeft, exactTop + SubWindow.STRIP_HEIGHT,
                     onContent ? pointerX - window.fractionX : WindowHover.AWAY,
@@ -663,45 +635,40 @@ public final class SubWindows {
         }
     }
 
-    /** The tip of what the pointer rests on in a sub-window, over everything. */
-    public void drawTip(Minecraft minecraft, WindowHover hover, int tipX, int tipY,
-                        float share) {
-        if (share > 0.0F && hover != null && hover.subWindow != null
-                && hover.subWindow.isOpen()) {
-            hover.subWindow.content.drawTip(minecraft, tipX, tipY,
-                    this.screenWidth, share);
-        }
-    }
-
-    /** What the pointer rests on in a sub-window, for the tip's timing; empty for no tip. */
-    public static String tipKey(WindowHover hover) {
+    /** The tip of what the pointer rests on in a sub-window; null for none. */
+    public static PointerTip tip(FontRenderer font, WindowHover hover) {
         if (hover == null || hover.subWindow == null
                 || !hover.subWindow.isOpen()) {
+            return null;
+        }
+        return hover.subWindow.content.tip(font);
+    }
+
+    /**
+     * What the pointer rests on in a sub-window, for the tip's timing: the
+     * tip's words in that sub-window; empty for no tip.
+     */
+    public static String tipKey(WindowHover hover, PointerTip tip) {
+        if (tip == null || hover == null || hover.subWindow == null) {
             return "";
         }
-        String key = hover.subWindow.content.tipKey();
-        return key.length() == 0 ? ""
-                : System.identityHashCode(hover.subWindow) + ":" + key;
+        return System.identityHashCode(hover.subWindow) + ":" + tip.key();
     }
 
     /* ---- Moving and resizing ---- */
 
-    /** Takes hold of an unlocked window's strip or grip: it moves once the pointer travels. */
+    /** Takes hold of a window's strip or grip: it moves once the pointer travels. */
     public void armMove(SubWindow window, double x, double y) {
         focus(window);
-        if (!window.locked) {
-            this.gesture = new Gesture(window, null, x, y);
-        }
+        this.gesture = new Gesture(window, null, x, y);
     }
 
-    /** Takes hold of an unlocked window's edge: it resizes as the pointer moves. */
+    /** Takes hold of a window's edge: it resizes as the pointer moves. */
     public void armResize(SubWindow window,
                    WindowGestures.ResizeEdge edge, double x, double y) {
         focus(window);
-        if (!window.locked) {
-            this.gesture = new Gesture(window, edge, x, y);
-            this.gesture.active = true;
-        }
+        this.gesture = new Gesture(window, edge, x, y);
+        this.gesture.active = true;
     }
 
     /** Whether a window is held, moving or not yet. */
@@ -720,9 +687,9 @@ public final class SubWindows {
     }
 
     /**
-     * Follows the pointer with the window held, on the screen: asked on
-     * every frame as well as on every move of the pointer, so the window
-     * glides with it as a window does.
+     * Follows the pointer with the window held, in its window's room:
+     * asked on every frame as well as on every move of the pointer, so the
+     * window glides with it as a window does.
      */
     public void drag(double x, double y) {
         Gesture held = this.gesture;
@@ -742,8 +709,8 @@ public final class SubWindows {
         double dx = x - held.pressX;
         double dy = y - held.pressY;
         if (held.edge == null) {
-            window.x = held.startX + dx;
-            window.y = held.startY + dy;
+            window.x = held.startLeft + dx - window.room.left;
+            window.y = held.startTop + dy - window.room.top;
             window.layOut(window.room, screen);
             return;
         }
@@ -759,10 +726,10 @@ public final class SubWindows {
         WindowGestures.ResizeEdge edge = held.edge;
         double screenRight = screen.left + screen.width;
         double screenBottom = screen.top + screen.height;
-        double left = held.startX;
-        double top = held.startY;
-        double right = held.startX + held.startWidth;
-        double bottom = held.startY + held.startHeight;
+        double left = held.startLeft;
+        double top = held.startTop;
+        double right = held.startLeft + held.startWidth;
+        double bottom = held.startTop + held.startHeight;
         if (edge.horizontal) {
             if (edge.fromLeft) {
                 left = Math.max(screen.left, left + dx);
@@ -783,16 +750,17 @@ public final class SubWindows {
                 window.minHeight(), (int)Math.floor(screen.height));
         window.wantedWidth = width;
         window.wantedHeight = height;
-        window.x = edge.horizontal && edge.fromLeft ? right - width
-                : held.startX;
-        window.y = edge.vertical && edge.fromTop ? bottom - height
-                : held.startY;
+        window.x = (edge.horizontal && edge.fromLeft ? right - width
+                : held.startLeft) - window.room.left;
+        window.y = (edge.vertical && edge.fromTop ? bottom - height
+                : held.startTop) - window.room.top;
         window.layOut(window.room, screen);
     }
 
     /**
      * Lets go of the window held where it stands; a resize has given it
-     * its size. Nothing of it is remembered until it is locked again.
+     * its size. Where it stands in its window's room, and its size, become
+     * the place its kind opens at.
      */
     public void release() {
         Gesture held = this.gesture;
@@ -804,8 +772,14 @@ public final class SubWindows {
         if (held.edge != null) {
             window.sized = true;
         }
-        window.x = window.left;
-        window.y = window.top;
+        if (window.room == null) {
+            return;
+        }
+        window.x = window.left - window.room.left;
+        window.y = window.top - window.room.top;
+        SubWindowPlaces.remember(window.kind, window.x, window.y,
+                window.width, window.height, window.sized,
+                window.room.width, window.room.height);
     }
 
     /** Puts the window held back where it was taken from. */
@@ -820,13 +794,17 @@ public final class SubWindows {
         }
     }
 
-    /** An unlocked window held by its strip or an edge, from where it stood on the screen. */
+    /** A window held by its strip or an edge, from where it stood. */
     private static final class Gesture {
         final SubWindow window;
         /** The edge held; null while the window is moved by its strip. */
         final WindowGestures.ResizeEdge edge;
         final double pressX;
         final double pressY;
+        /** Where it stood on the screen. */
+        final double startLeft;
+        final double startTop;
+        /** Where it stood in its room: what a cancelled hold gives back. */
         final double startX;
         final double startY;
         final int startWidth;
@@ -841,8 +819,10 @@ public final class SubWindows {
             this.edge = edge;
             this.pressX = pressX;
             this.pressY = pressY;
-            this.startX = window.left;
-            this.startY = window.top;
+            this.startLeft = window.left;
+            this.startTop = window.top;
+            this.startX = window.x;
+            this.startY = window.y;
             this.startWidth = window.width;
             this.startHeight = window.height;
             this.startWantedWidth = window.wantedWidth;

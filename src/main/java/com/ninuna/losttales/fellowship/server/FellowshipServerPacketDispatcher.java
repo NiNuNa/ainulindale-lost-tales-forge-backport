@@ -1,21 +1,29 @@
 package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
+import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.fellowship.sync.FellowshipOperationType;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import net.minecraft.entity.player.EntityPlayerMP;
 
-/** Shared validation, throttling, and queue boundary for fellowship C2S packets. */
+/**
+ * The safety boundary for the fellowship requests clients send: the
+ * per-player request window, the throttled diagnostics and the server
+ * task queue. A refused request is answered, since a fellowship page
+ * waits on a reply; a request refused for its rate is answered at most
+ * once every {@link #RATE_LIMIT_REPLY_INTERVAL_MILLIS} per player and
+ * request kind, or a flood of requests would be a flood of answers.
+ */
 public final class FellowshipServerPacketDispatcher {
+
+    /** How often a request refused for its rate may be answered, per player. */
+    private static final long RATE_LIMIT_REPLY_INTERVAL_MILLIS = 1000L;
 
     private FellowshipServerPacketDispatcher() {}
 
     public static EntityPlayerMP getPlayer(MessageContext context) {
-        if (context == null || context.getServerHandler() == null) {
-            return null;
-        }
-        return context.getServerHandler().playerEntity;
+        return LostTalesServerPacketDispatcher.getPlayer(context);
     }
 
     public static void submit(EntityPlayerMP player,
@@ -39,13 +47,16 @@ public final class FellowshipServerPacketDispatcher {
         if (!LostTalesRequestRateLimiter.allow(player, requestType)) {
             LostTalesRequestRateLimiter.logRateLimited(
                     player, requestType, packetName);
-            FellowshipSyncManager.sendFailure(
-                    player,
-                    requestId,
-                    responseOperation,
-                    FellowshipErrorId.RATE_LIMITED,
-                    -1L,
-                    false);
+            if (LostTalesRequestRateLimiter.allowReply(player, requestType,
+                    RATE_LIMIT_REPLY_INTERVAL_MILLIS)) {
+                FellowshipSyncManager.sendFailure(
+                        player,
+                        requestId,
+                        responseOperation,
+                        FellowshipErrorId.RATE_LIMITED,
+                        -1L,
+                        false);
+            }
             return;
         }
         if (malformed) {

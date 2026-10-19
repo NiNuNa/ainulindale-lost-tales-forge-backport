@@ -27,8 +27,10 @@ import java.util.UUID;
  * <p>LOTR builds the copies its members see from the waypoints of the
  * character an account plays now, so the copies of a character played by
  * nobody are handed out here, from the waypoints it saved as it was last
- * played, to every member online: named after the character, as LOTR's
- * own are ({@link LostTalesLotrSharedWaypointNames}). Waypoint numbers
+ * played, to every account online that plays a member: named after the
+ * character, as LOTR's own are ({@link LostTalesLotrSharedWaypointNames}).
+ * The leader's account holding a fellowship for the record only gets none
+ * (FEL-02). Waypoint numbers
  * are one count per account, so no two characters' copies are ever taken
  * for one.</p>
  *
@@ -119,9 +121,10 @@ public final class LotrSharedWaypoints {
 
     /**
      * Brings the copies of LOTR's fellowship {@code mirrorId} up to date:
-     * the shares of characters played again are made again, the members
-     * online are handed the copies of every character in {@code away},
-     * and copies handed out before that no longer stand are taken back.
+     * the shares of characters played again are made again, the accounts
+     * online with the fellowship on their own list are handed the copies of
+     * every character in {@code away}, and copies handed out before that no
+     * longer stand are taken back.
      */
     public static synchronized void update(UUID mirrorId, List<Away> away) {
         if (mirrorId == null) {
@@ -135,7 +138,11 @@ public final class LotrSharedWaypoints {
             }
             Set<UUID> recipients = new LinkedHashSet<UUID>();
             for (UUID account : fellowship.getAllPlayerUUIDs()) {
-                if (LostTalesServerPlayers.findOnline(account) != null) {
+                // The leader's account holding the fellowship for the record
+                // only is off its own list and takes no part (FEL-02).
+                if (LostTalesServerPlayers.findOnline(account) != null
+                        && LOTRLevelData.getData(account).getFellowshipIDs()
+                                .contains(mirrorId)) {
                     recipients.add(account);
                 }
             }

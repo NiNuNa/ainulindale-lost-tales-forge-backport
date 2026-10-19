@@ -179,21 +179,6 @@ public final class CharacterAppearance {
                         active.getChestTypeId());
     }
 
-    /**
-     * The same projection without the account's name, as a player not
-     * shown which account plays a character is sent it: a character keeps
-     * everything else; a ghost and a removal are themselves.
-     */
-    public CharacterAppearance withoutAccountName() {
-        if (this.kind != CharacterAppearanceKind.CHARACTER || this.accountName.isEmpty()) {
-            return this;
-        }
-        return new CharacterAppearance(this.kind, this.playerId, this.characterId, "",
-                this.characterName, this.raceId, this.genderId, this.skinId,
-                this.showMinecraftCape, this.cosmeticCapeId, this.factionId, this.age,
-                this.bodyTypeId, this.chestTypeId);
-    }
-
     public static CharacterAppearance removed(UUID playerId) {
         return new CharacterAppearance(CharacterAppearanceKind.NONE, playerId,
                 "", "", "", "", "",

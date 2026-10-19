@@ -109,18 +109,15 @@ public final class CharacterSkinRegistryTest {
     }
 
     @Test
-    public void everyRaceButTheHalfTrollOffersTheAccountSkinFirst() {
+    public void everyRaceOffersTheAccountSkinFirst() {
         for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
             CharacterSkinDefinition first = CharacterSkinRegistry.getCompatibleSkins(
                     race.getId(), race.getAllowedGenderIds().iterator().next()).get(0);
-            boolean halfTroll = CharacterRaceRegistry.HALF_TROLL.equals(race.getId());
-            assertEquals(race.getId(), !halfTroll, first.isAccountSkin());
-            if (!halfTroll) {
-                assertEquals(race.getId(), CharacterSkinLayout.MINECRAFT_64X64,
-                        first.getLayout());
-                assertTrue(race.getId(), CharacterBodyModelRegistry.isCompatible(
-                        race.getId(), first.getModelId()));
-            }
+            assertTrue(race.getId(), first.isAccountSkin());
+            assertEquals(race.getId(), CharacterSkinLayout.MINECRAFT_64X64,
+                    first.getLayout());
+            assertTrue(race.getId(), CharacterBodyModelRegistry.isCompatible(
+                    race.getId(), first.getModelId()));
         }
         assertEquals("losttales:account_skin_elf",
                 CharacterSkinRegistry.getCompatibleSkins(

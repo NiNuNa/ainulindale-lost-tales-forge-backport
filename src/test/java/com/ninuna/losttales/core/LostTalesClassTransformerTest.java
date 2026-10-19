@@ -3,6 +3,7 @@ package com.ninuna.losttales.core;
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -1088,6 +1089,137 @@ public final class LostTalesClassTransformerTest {
                 "net.minecraft.entity.player.EntityPlayer");
         assertTrue(containsConstructedType(
                 transformed, ACCESSORY_CONTAINER_CLASS));
+    }
+
+    /**
+     * The constructor's container is changed whole or not at all: an
+     * allocation whose constructor call does not match stays vanilla, and
+     * the container's flag stays down, while the death hook still lands.
+     */
+    @Test
+    public void aPlayerContainerThatMatchesOnlyHalfIsLeftAlone() throws Exception {
+        String name = "net.minecraft.entity.player.EntityPlayer";
+        System.clearProperty(LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY);
+        System.clearProperty(LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY);
+        byte[] result = new LostTalesClassTransformer().transform(name, name,
+                syntheticPlayer(false, 0));
+        ClassNode patched = new ClassNode();
+        new ClassReader(result).accept(patched, 0);
+        assertTrue(containsConstructedType(patched, "net/minecraft/inventory/ContainerPlayer"));
+        assertFalse(containsConstructedType(patched, ACCESSORY_CONTAINER_CLASS));
+        assertEquals(null, System.getProperty(
+                LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY));
+        assertEquals("true", System.getProperty(
+                LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY));
+        assertTrue(containsStaticHook(patched, "onDeath", ACCESSORY_DEATH_HOOK_OWNER,
+                "captureAccessoryDrop"));
+
+        System.clearProperty(LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY);
+        ClassNode whole = new ClassNode();
+        new ClassReader(new LostTalesClassTransformer().transform(name, name,
+                syntheticPlayer(true, 0))).accept(whole, 0);
+        assertTrue(containsConstructedType(whole, ACCESSORY_CONTAINER_CLASS));
+        assertEquals("true", System.getProperty(
+                LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY));
+        System.clearProperty(LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY);
+        System.clearProperty(LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY);
+    }
+
+    /**
+     * A class that cannot be written once patched comes back as it was,
+     * and no flag says it was patched: here the death hook pushes
+     * {@code onDeath} past the longest code a method may hold.
+     */
+    @Test
+    public void aPatchThatCannotBeWrittenSetsNoFlag() throws Exception {
+        String name = "net.minecraft.entity.player.EntityPlayer";
+        System.clearProperty(LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY);
+        System.setProperty(LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY,
+                "as it was");
+        byte[] original = syntheticPlayer(true, 65529);
+        byte[] result = new LostTalesClassTransformer().transform(name, name, original);
+        assertTrue("the class comes back as it was", result == original);
+        assertEquals(null, System.getProperty(
+                LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY));
+        assertEquals("a flag goes back to what it held", "as it was", System.getProperty(
+                LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY));
+        System.clearProperty(LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY);
+    }
+
+    /**
+     * A flag a patch sets before its class is written is taken back when
+     * the writing fails: here the invisibility guard pushes
+     * {@code isInvisible} past the longest code a method may hold.
+     */
+    @Test
+    public void aFlagSetBeforeAFailedWriteIsTakenBack() throws Exception {
+        String name = "net.minecraft.entity.Entity";
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V1_6, Opcodes.ACC_PUBLIC, "net/minecraft/entity/Entity",
+                null, "java/lang/Object", null);
+        MethodVisitor invisible = writer.visitMethod(Opcodes.ACC_PUBLIC, "isInvisible",
+                "()Z", null, null);
+        invisible.visitCode();
+        for (int index = 0; index < 65532; index++) {
+            invisible.visitInsn(Opcodes.NOP);
+        }
+        invisible.visitInsn(Opcodes.ICONST_0);
+        invisible.visitInsn(Opcodes.IRETURN);
+        invisible.visitMaxs(0, 0);
+        invisible.visitEnd();
+        writer.visitEnd();
+        byte[] original = writer.toByteArray();
+        System.clearProperty(LostTalesClassTransformer.ACCESSORY_INVISIBILITY_ACTIVE_PROPERTY);
+        byte[] result = new LostTalesClassTransformer().transform(name, name, original);
+        assertTrue("the class comes back as it was", result == original);
+        assertEquals(null, System.getProperty(
+                LostTalesClassTransformer.ACCESSORY_INVISIBILITY_ACTIVE_PROPERTY));
+    }
+
+    /**
+     * A stand-in player: a constructor that builds the vanilla container,
+     * its constructor call matching the patch or not, and an
+     * {@code onDeath} that closes the drop capture after {@code padding}
+     * no-ops.
+     */
+    private static byte[] syntheticPlayer(boolean matchingCall, int padding) {
+        String player = "net/minecraft/entity/player/EntityPlayer";
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V1_6, Opcodes.ACC_PUBLIC, player, null,
+                "java/lang/Object", null);
+        writer.visitField(Opcodes.ACC_PUBLIC, "captureDrops", "Z", null, null).visitEnd();
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>",
+                "(Lnet/minecraft/world/World;Lcom/mojang/authlib/GameProfile;)V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitTypeInsn(Opcodes.NEW, "net/minecraft/inventory/ContainerPlayer");
+        init.visitInsn(Opcodes.DUP);
+        init.visitInsn(Opcodes.ACONST_NULL);
+        init.visitInsn(Opcodes.ICONST_1);
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "net/minecraft/inventory/ContainerPlayer",
+                "<init>", matchingCall
+                        ? "(Lnet/minecraft/entity/player/InventoryPlayer;ZL" + player + ";)V"
+                        : "(Lnet/minecraft/entity/player/InventoryPlayer;Z)V", false);
+        init.visitInsn(Opcodes.POP);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(0, 0);
+        init.visitEnd();
+        MethodVisitor death = writer.visitMethod(Opcodes.ACC_PUBLIC, "onDeath",
+                "(Lnet/minecraft/util/DamageSource;)V", null, null);
+        death.visitCode();
+        for (int index = 0; index < padding; index++) {
+            death.visitInsn(Opcodes.NOP);
+        }
+        death.visitVarInsn(Opcodes.ALOAD, 0);
+        death.visitInsn(Opcodes.ICONST_0);
+        death.visitFieldInsn(Opcodes.PUTFIELD, player, "captureDrops", "Z");
+        death.visitInsn(Opcodes.RETURN);
+        death.visitMaxs(0, 0);
+        death.visitEnd();
+        writer.visitEnd();
+        return writer.toByteArray();
     }
 
     @Test

@@ -66,6 +66,52 @@ public final class WorldQuestRulesTest {
                 .isEmpty());
     }
 
+    /**
+     * A world quest may ask for deliveries, to someone or at any board,
+     * and name a podium; neither is a quest a player takes alone's
+     * (QUEST-36).
+     */
+    @Test
+    public void deliveriesAndAPodiumAreAWorldQuests() {
+        String world = "{\"id\":\"losttales:server/stores\",\"title\":\"Stores\","
+                + "\"world\":{\"days\":\"3\"},"
+                + "\"podium\":{\"coins\":\"200\",\"alignment\":\"lotr:bree*30\"},"
+                + "\"stages\":[{\"id\":\"1\",\"objectives\":["
+                + "{\"id\":\"grain\",\"type\":\"deliver\",\"params\":{\"item\":"
+                + "\"minecraft:wheat\",\"count\":\"500\",\"board\":\"true\"}},"
+                + "{\"id\":\"arrows\",\"type\":\"deliver\",\"params\":{\"item\":"
+                + "\"minecraft:arrow\",\"count\":\"200\",\"entity\":\"lotr.BreeGuard\"}},"
+                + "{\"id\":\"wolves\",\"type\":\"kill\",\"params\":{\"group\":"
+                + "\"enemy\",\"count\":\"50\"}}]}]}";
+        assertEquals(Collections.<String>emptyList(), warnings(world));
+        LostTalesQuestDefinition quest = parse(world);
+        assertEquals("200", com.ninuna.losttales.quest.LostTalesQuestRules
+                .podiumRewards(quest).get("coins"));
+        assertTrue(WorldQuestRules.adds(WorldQuestRules.objectives(quest).get(0)));
+
+        String personal = "{\"id\":\"losttales:server/own\",\"startMode\":\"locked\","
+                + "\"podium\":{\"coins\":\"5\"},\"stages\":[{\"id\":\"1\","
+                + "\"objectives\":[{\"id\":\"grain\",\"type\":\"deliver\","
+                + "\"params\":{\"item\":\"minecraft:wheat\",\"board\":\"true\"}}]}]}";
+        List<String> found = warnings(personal);
+        assertEquals(found.toString(), 2, found.size());
+        assertTrue(found.toString().contains("only a world quest pays"));
+        assertTrue(found.toString().contains("only a world quest's delivery is"));
+    }
+
+    private static LostTalesQuestDefinition parse(String json) {
+        return com.ninuna.losttales.quest.LostTalesQuestDefinitionJsonParser.parseQuest(
+                new java.io.StringReader(json), "quests/test.json");
+    }
+
+    private static List<String> warnings(String json) {
+        List<String> unread = new java.util.ArrayList<String>();
+        LostTalesQuestDefinition quest = com.ninuna.losttales.quest
+                .LostTalesQuestDefinitionJsonParser.parseQuest(
+                        new java.io.StringReader(json), "quests/test.json", unread);
+        return LostTalesQuestDefinitionValidator.warningsOf(quest, unread);
+    }
+
     @Test
     public void everyIdAndObjectiveFitsWhatPlayersAreSent() {
         LostTalesQuestObjectiveDefinition[] many =

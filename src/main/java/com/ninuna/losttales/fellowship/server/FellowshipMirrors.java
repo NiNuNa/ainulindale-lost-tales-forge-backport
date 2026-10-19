@@ -39,9 +39,10 @@ import java.util.UUID;
  * character not played is away, not gone, and LOTR keeps the waypoints it
  * shares while its account stays. It is held by the leader's account
  * while that plays the leader, else by the first such account, and while
- * nobody plays one by the leader's account alone. The shared waypoints of
- * members whose account plays another character are handed out after
- * each change ({@link LotrSharedWaypoints}).
+ * nobody plays one by the leader's account alone, for the record only:
+ * that account takes no part in the fellowship's waypoints (FEL-02). The
+ * shared waypoints of members whose account plays another character are
+ * handed out after each change ({@link LotrSharedWaypoints}).
  */
 public final class FellowshipMirrors {
     /** Whether every mirror was set right since the server started. */
@@ -163,6 +164,10 @@ public final class FellowshipMirrors {
 
     /** The custom waypoints a member saved as it was last played; null where none can be read. */
     private static NBTTagCompound savedWaypointsOf(World world, FellowshipMember member) {
+        if (member.isUnheld()) {
+            // A released figure's state waits with the figure, not with an account.
+            return null;
+        }
         try {
             CharacterPlayerStateWorldData states = CharacterPlayerStateStorage.get(world,
                     member.getOwnerId());
@@ -194,9 +199,32 @@ public final class FellowshipMirrors {
     }
 
     /**
+     * Whether {@code account} plays a member of the fellowship, now or as
+     * it logged out. Only such an account takes part in the waypoints
+     * LOTR's fellowship shares: copies of them, and a row to share one
+     * into it. The leader's account holding it while nobody plays a member
+     * holds it for the record only (FEL-02).
+     */
+    static boolean playsAMember(UUID account, Fellowship fellowship,
+                                FellowshipSnapshot.Presence presence,
+                                LastPlayed lastPlayed) {
+        if (account == null) {
+            return false;
+        }
+        for (FellowshipMember member : fellowship.getMembers()) {
+            if (account.equals(member.getOwnerId())
+                    && inMirror(member, presence, lastPlayed)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * What LOTR's fellowship behind {@code fellowship} should hold, as its
      * members stand now: the accounts playing one, those online first,
-     * then those that logged out playing one.
+     * then those that logged out playing one, and whether its owner plays
+     * one ({@link #playsAMember}).
      */
     static LotrFellowshipMirror.Shape shapeOf(Fellowship fellowship,
                                               FellowshipSnapshot.Presence presence,
@@ -221,7 +249,8 @@ public final class FellowshipMirrors {
         return new LotrFellowshipMirror.Shape(fellowship.getName(), fellowship.getIcon(),
                 fellowship.isOn(FellowshipSwitch.NO_FIGHTING),
                 fellowship.isOn(FellowshipSwitch.NO_HIRED_HARM),
-                owner, present, guides);
+                owner, playsAMember(owner, fellowship, presence, lastPlayed),
+                present, guides);
     }
 
     private static FellowshipOnlineView onlineView(World world) {

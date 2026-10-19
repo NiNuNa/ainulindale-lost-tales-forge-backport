@@ -35,6 +35,7 @@ public final class LostTalesQuestDefinition {
     private final List<LostTalesQuestStageDefinition> stages;
     private final boolean bundled;
     private final Map<String, String> words;
+    private final Map<String, String> rules;
 
     public LostTalesQuestDefinition(String id, String title, String description, boolean repeatable, String startMode, Map<String, String> prerequisites, Map<String, String> rewards, Map<String, String> interaction, Map<String, String> markers, Map<String, String> journalLog, List<LostTalesQuestStageDefinition> stages) {
         this(id, title, description, repeatable, repeatable, startMode,
@@ -80,6 +81,25 @@ public final class LostTalesQuestDefinition {
             Map<String, String> dialogue, Map<String, String> world,
             List<LostTalesQuestStageDefinition> stages, boolean bundled,
             Map<String, String> words) {
+        this(id, title, description, repeatable, restartable, startMode,
+                prerequisites, rewards, interaction, markers, journalLog,
+                dialogue, world, stages, bundled, words,
+                Collections.<String, String>emptyMap());
+    }
+
+    /**
+     * A quest with {@code rules}: the keys its file writes at the top level
+     * beside its blocks, how it ends and how long it may take among them
+     * ({@link LostTalesQuestRules}).
+     */
+    public LostTalesQuestDefinition(String id, String title,
+            String description, boolean repeatable, boolean restartable,
+            String startMode, Map<String, String> prerequisites,
+            Map<String, String> rewards, Map<String, String> interaction,
+            Map<String, String> markers, Map<String, String> journalLog,
+            Map<String, String> dialogue, Map<String, String> world,
+            List<LostTalesQuestStageDefinition> stages, boolean bundled,
+            Map<String, String> words, Map<String, String> rules) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -100,6 +120,12 @@ public final class LostTalesQuestDefinition {
                 ? MissiveWords.wordedStages(stages) : stages));
         this.bundled = bundled;
         this.words = Collections.unmodifiableMap(new LinkedHashMap<String, String>(words == null ? Collections.<String, String>emptyMap() : words));
+        this.rules = Collections.unmodifiableMap(new LinkedHashMap<String, String>(rules == null ? Collections.<String, String>emptyMap() : rules));
+    }
+
+    /** The quest's rules as written; read them through {@link LostTalesQuestRules}. */
+    public Map<String, String> getRules() {
+        return this.rules;
     }
 
     /**
@@ -236,34 +262,6 @@ public final class LostTalesQuestDefinition {
     /** The journal's lines, each under the id of the stage it is written for. */
     public Map<String, String> getJournalLog() {
         return this.journalLog;
-    }
-
-    /**
-     * The journal line for the stage at {@code stageIndex}, as written: the
-     * one under that stage's id, else the one under the latest stage before
-     * it that has a line; empty where none has. A player reads it through
-     * {@link LostTalesQuestWords#journalLine}.
-     */
-    public String journalLine(int stageIndex) {
-        String stageId = journalStageId(stageIndex);
-        return stageId.length() == 0 ? "" : this.journalLog.get(stageId);
-    }
-
-    /**
-     * The id of the stage whose journal line stands for the stage at
-     * {@code stageIndex}: that stage's, else the latest before it with a
-     * line; empty where none has one.
-     */
-    public String journalStageId(int stageIndex) {
-        for (int index = Math.min(stageIndex, this.stages.size() - 1);
-                index >= 0; index--) {
-            String stageId = this.stages.get(index).getId();
-            String line = this.journalLog.get(stageId);
-            if (line != null && line.trim().length() > 0) {
-                return stageId;
-            }
-        }
-        return "";
     }
 
     public List<LostTalesQuestStageDefinition> getStages() {

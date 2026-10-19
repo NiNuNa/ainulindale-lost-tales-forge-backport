@@ -14,6 +14,7 @@ import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.chat.ChatNarrator;
+import com.ninuna.losttales.chat.ChatTypedText;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -161,7 +162,11 @@ public final class LostTalesChatMessagePacket implements IMessage {
             // The reactions on the line as this reader is shown them.
             + LostTalesChatReactionCodec.MAX_BYTES
             // The roles the line calls, after the tab a command's answer is filed under.
-            + LostTalesChatRoleMentionCodec.MAX_BYTES;
+            + LostTalesChatRoleMentionCodec.MAX_BYTES
+            // Whether the character it wears was not in the world.
+            + 1
+            // What its author typed for it, on the author's copy alone.
+            + 5 + ChatTypedText.MAX_UTF8_BYTES;
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_IDENTITY_BYTES = 256;
     private static final int MAX_ACCOUNT_NAME_BYTES = 64;
@@ -200,11 +205,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * the title in its own words; empty when untitled.
      */
     private String factionId = "";
-    /**
-     * For a whisper, the other party as this recipient files the
-     * conversation under: their account's name, or for a reader not shown
-     * accounts the name of the character they speak as.
-     */
+    /** For a whisper, the other party's account name as this recipient sees it. */
     private String partner = "";
     /**
      * For a whisper, the identity of that other party the conversation
@@ -315,6 +316,18 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * one, whatever language the writer typed the role's name in.
      */
     private List<String> mentionedRoles = Collections.emptyList();
+    /**
+     * Whether the character the line wears was spoken as in a copy while
+     * its player played another: said by someone here, but not in the
+     * world (CHAT-05). Only a character's line may say so.
+     */
+    private boolean notInWorld;
+    /**
+     * What the author typed for the line where it differs from its words
+     * ({@link ChatTypedText}): carried on the author's own copy alone, as
+     * the echo name is, so they can edit the line after a relog too.
+     */
+    private String typed = "";
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -570,6 +583,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.tabId = LostTalesPacketCodec.readUtf8String(buffer,
                     MAX_TAB_ID_BYTES);
             this.mentionedRoles = LostTalesChatRoleMentionCodec.read(buffer);
+            this.notInWorld = buffer.readBoolean();
+            this.typed = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatTypedText.MAX_UTF8_BYTES);
             LostTalesPacketCodec.requireFinished(buffer);
             validate(false);
         } catch (RuntimeException exception) {
@@ -589,6 +605,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.scopeValue = "";
             this.tabId = "";
             this.mentionedRoles = Collections.emptyList();
+            this.notInWorld = false;
+            this.typed = "";
             this.messageId = ChatMessageIds.NONE;
             this.reply = ChatReplyReference.NONE;
             this.partnerIdentity = "";
@@ -866,6 +884,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
         LostTalesChatReactionCodec.write(buffer, this.reactions);
         LostTalesPacketCodec.writeUtf8String(buffer, this.tabId, MAX_TAB_ID_BYTES);
         LostTalesChatRoleMentionCodec.write(buffer, this.mentionedRoles);
+        buffer.writeBoolean(this.notInWorld);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.typed,
+                ChatTypedText.MAX_UTF8_BYTES);
     }
 
     /** A presence flag and a UUID, 17 bytes whether the id is there or not. */
@@ -918,10 +939,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || this.identityName.length() == 0
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.identityName, MAX_IDENTITY_BYTES)
-                // Only a character's line may name no account: what a
-                // reader not shown accounts is sent of it.
-                || (this.accountName.length() == 0
-                        && this.identityCharacterId == null)
+                || this.accountName.length() == 0
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.accountName, MAX_ACCOUNT_NAME_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
@@ -956,6 +974,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || (this.tabId.length() > 0 && !isSystemSender(this.senderId))
                 || this.namedPlayers.size() > ChatNamedPlayer.MAX_PER_LINE
                 || !LostTalesChatRoleMentionCodec.isValid(this.mentionedRoles)
+                || !ChatTypedText.isValid(this.typed)
+                // Only a character's own line may stand not in the world.
+                || (this.notInWorld && (this.accountLine
+                        || this.identityCharacterId == null))
                 || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
                         && this.partner.length() == 0)
                 || this.timestampMillis <= 0L
@@ -993,6 +1015,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
         LostTalesChatMessagePacket copy = rebuild(message, this.partner,
                 this.partnerIdentity, this.reply, this.echoNonce);
         copy.bodyJson = "";
+        // The typed words were the old words'; an edit gives its own.
+        copy.typed = "";
         return copy;
     }
 
@@ -1062,6 +1086,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
         copy.reactions = this.reactions;
         copy.tabId = this.tabId;
         copy.mentionedRoles = this.mentionedRoles;
+        copy.notInWorld = this.notInWorld
+                && !copy.accountLine && copy.identityCharacterId != null;
+        copy.typed = this.typed;
         return copy;
     }
 
@@ -1123,6 +1150,34 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /** The roles the line calls, by id; never null. */
     public List<String> getMentionedRoles() { return this.mentionedRoles; }
+
+    /**
+     * The same line said, or not, by a character not in the world: one a
+     * copy spoke as while its player played another. Only a character's
+     * line keeps it, whatever it is handed.
+     */
+    public LostTalesChatMessagePacket withNotInWorld(boolean away) {
+        LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
+        copy.notInWorld = away && !copy.accountLine
+                && copy.identityCharacterId != null;
+        return copy;
+    }
+
+    /** Whether the character the line wears was not in the world when it was said. */
+    public boolean isNotInWorld() { return this.notInWorld; }
+
+    /**
+     * The same line keeping what its author typed for it
+     * ({@link ChatTypedText#kept}): the author's own copy alone.
+     */
+    public LostTalesChatMessagePacket withTyped(String typed) {
+        LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
+        copy.typed = ChatTypedText.kept(typed, this.message);
+        return copy;
+    }
+
+    /** What the author typed for the line; empty where it is its words, and on every other copy. */
+    public String getTyped() { return this.typed; }
 
     /** The same line wearing {@code reactions}, as one reader is shown them. */
     public LostTalesChatMessagePacket withReactions(ChatReactionSummary reactions) {
@@ -1248,44 +1303,6 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.ownCharacterId, this.partnerCharacterId, this.scopeValue));
     }
 
-    /**
-     * The same line as {@code reader}, who is not shown which account plays
-     * a character, is sent it: a line worn by a character names no account
-     * unless it is the reader's own; a player it names as a character is
-     * named without the account unless it is the reader; a whisper with a
-     * character is filed under that character's name rather than the
-     * account behind it. An account's line names its account as before:
-     * out of character the account is who speaks.
-     */
-    public LostTalesChatMessagePacket withoutAccountsFor(UUID reader) {
-        boolean own = reader != null && reader.equals(this.senderId);
-        String account = this.identityCharacterId != null && !own ? "" : this.accountName;
-        String partnerName = this.partnerCharacterId != null
-                && this.partnerIdentity.length() > 0 ? this.partnerIdentity : this.partner;
-        List<ChatNamedPlayer> named = new ArrayList<ChatNamedPlayer>(this.namedPlayers.size());
-        boolean namedChanged = false;
-        for (ChatNamedPlayer player : this.namedPlayers) {
-            ChatNamedPlayer shown = reader != null && reader.equals(player.getPlayerId())
-                    ? player : player.withoutAccount();
-            namedChanged |= shown != player;
-            named.add(shown);
-        }
-        if (account.equals(this.accountName) && partnerName.equals(this.partner)
-                && !namedChanged) {
-            return this;
-        }
-        LostTalesChatMessagePacket copy = carrying(new LostTalesChatMessagePacket(getChannel(),
-                this.senderId, this.identityName, account, this.title,
-                this.titleColor, this.nameColor, this.message,
-                this.timestampMillis, this.skinId, this.showcases,
-                this.factionId, partnerName, this.roles,
-                this.accountLine, this.messageId, this.reply,
-                this.partnerIdentity, this.echoNonce, this.identityCharacterId,
-                this.ownCharacterId, this.partnerCharacterId, this.scopeValue));
-        copy.namedPlayers = Collections.unmodifiableList(named);
-        return copy;
-    }
-
     /** Whether the channel is as many conversations as it has scope values. */
     private static boolean scopedChannel(ChatChannel channel) {
         return channel != null && channel.isScoped();
@@ -1322,9 +1339,14 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * nothing to them and is not theirs to carry.
      */
     public LostTalesChatMessagePacket withoutEcho() {
-        return this.echoNonce == 0L ? this
-                : rebuild(this.message, this.partner, this.partnerIdentity,
-                        this.reply, 0L);
+        if (this.echoNonce == 0L && this.typed.length() == 0) {
+            return this;
+        }
+        LostTalesChatMessagePacket copy = rebuild(this.message, this.partner,
+                this.partnerIdentity, this.reply, 0L);
+        // What the author typed is theirs alone too.
+        copy.typed = "";
+        return copy;
     }
     /**
      * The stable id of the character the line wears; null for an account

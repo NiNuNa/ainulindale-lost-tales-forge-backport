@@ -39,8 +39,11 @@ public class LostTalesQuestDialogueGui extends GuiScreen
         /** The player refused it, or simply left. */
         void leave();
 
-        /** The player gave over what was asked for. */
-        void handOver();
+        /** The player gave over what was asked for, taking {@code choice} of its pick; -1 for none. */
+        void handOver(int choice);
+
+        /** The player made {@code choice} of the stage's choices (QUEST-32). */
+        void choose(int choice);
 
         /**
          * The speaker says this. The screen holds no words of its own:
@@ -79,8 +82,19 @@ public class LostTalesQuestDialogueGui extends GuiScreen
             }
 
             @Override
-            public void handOver() {
-                send(LostTalesQuestActionPacket.ACTION_HAND_IN, questReference);
+            public void handOver(int choice) {
+                LostTalesNetworkHandler.CHANNEL.sendToServer(
+                        new LostTalesQuestActionPacket(
+                                LostTalesQuestActionPacket.ACTION_HAND_IN,
+                                questReference, choice));
+            }
+
+            @Override
+            public void choose(int choice) {
+                LostTalesNetworkHandler.CHANNEL.sendToServer(
+                        new LostTalesQuestActionPacket(
+                                LostTalesQuestActionPacket.ACTION_CHOOSE,
+                                questReference, choice));
             }
 
             @Override
@@ -225,7 +239,7 @@ public class LostTalesQuestDialogueGui extends GuiScreen
      * surface being drawn behind it.
      */
     private void drawReplies(QuestDialogueLayout layout) {
-        List<QuestDialogueModel.Reply> replies = this.model.getReplies();
+        List<QuestDialogueModel.Option> replies = this.model.getReplies();
         LostTalesSkyrimUiStyle.beginContent();
         for (int index = 0; index < replies.size(); index++) {
             LostTalesUiHitBox row = layout.replyAt(index, this.chosenShown);
@@ -237,7 +251,7 @@ public class LostTalesQuestDialogueGui extends GuiScreen
                     : LostTalesColors.TEXT_MUTED);
             drawShadowed(LostTalesSkyrimUiStyle.trimToWidth(
                             this.fontRendererObj,
-                            this.model.labelOf(replies.get(index)),
+                            replies.get(index).getLabel(),
                             (int)row.width),
                     (int)row.left, (int)Math.round(row.top + 2), rgb, alpha);
         }
@@ -314,7 +328,7 @@ public class LostTalesQuestDialogueGui extends GuiScreen
     protected void keyTyped(char typedChar, int keyCode) {
         int count = this.model.getReplies().size();
         if (keyCode == Keyboard.KEY_ESCAPE) {
-            choose(QuestDialogueModel.Reply.LEAVE);
+            leave();
             return;
         }
         if (keyCode == Keyboard.KEY_UP && count > 0) {
@@ -346,7 +360,8 @@ public class LostTalesQuestDialogueGui extends GuiScreen
      * Says a reply: asking for more carries the conversation on, and
      * everything else does what it says and closes.
      */
-    private void choose(QuestDialogueModel.Reply reply) {
+    private void choose(QuestDialogueModel.Option option) {
+        QuestDialogueModel.Reply reply = option.getReply();
         if (reply == QuestDialogueModel.Reply.MORE) {
             this.model = this.model.told();
             this.chosen = 0;
@@ -357,10 +372,20 @@ public class LostTalesQuestDialogueGui extends GuiScreen
             if (reply == QuestDialogueModel.Reply.ACCEPT) {
                 this.action.accept();
             } else if (reply == QuestDialogueModel.Reply.HAND_OVER) {
-                this.action.handOver();
+                this.action.handOver(option.getChoice());
+            } else if (reply == QuestDialogueModel.Reply.CHOOSE) {
+                this.action.choose(option.getChoice());
             } else {
                 this.action.leave();
             }
+        }
+        this.mc.displayGuiScreen(this.parent);
+    }
+
+    /** Escape: the conversation ends, nothing said. */
+    private void leave() {
+        if (this.action != null) {
+            this.action.leave();
         }
         this.mc.displayGuiScreen(this.parent);
     }

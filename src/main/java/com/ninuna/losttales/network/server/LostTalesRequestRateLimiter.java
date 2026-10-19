@@ -1,14 +1,17 @@
 package com.ninuna.losttales.network.server;
 
-import com.ninuna.losttales.LostTalesMetaData;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-/** Per-player request windows and throttled diagnostics for legacy C2S packets. */
+/**
+ * Per-player request windows and throttled diagnostics for the requests
+ * clients send. Every window runs on the JVM's monotonic clock, so a
+ * server clock set back or forward never holds a window shut.
+ */
 public final class LostTalesRequestRateLimiter {
 
     private static final long LOG_INTERVAL_MILLIS = 10000L;
@@ -99,16 +102,42 @@ public final class LostTalesRequestRateLimiter {
         if (player == null || player.getUniqueID() == null || requestType == null) {
             return false;
         }
-        long now = System.currentTimeMillis();
-        RequestWindow window = getWindow(player.getUniqueID(), requestType, now);
+        return allow(player.getUniqueID(), requestType, monotonicMillis());
+    }
+
+    /**
+     * Counts one request of a sender who is no player on this server, a
+     * Discord member by the sender id the chat signs them with, against
+     * the budget a player's request of that kind has.
+     */
+    public static boolean allowSender(UUID senderId, RequestType requestType) {
+        if (senderId == null || requestType == null) {
+            return false;
+        }
+        return allow(senderId, requestType, monotonicMillis());
+    }
+
+    /**
+     * Counts one request of {@code ownerId}'s at {@code now} on the
+     * monotonic clock: a window starts over once its time is up, and
+     * also should {@code now} ever lie before its start.
+     */
+    static boolean allow(UUID ownerId, RequestType requestType, long now) {
+        RequestWindow window = getWindow(ownerId, requestType, now);
         synchronized (window) {
-            if (now - window.startedAt >= requestType.windowMillis) {
+            if (now - window.startedAt >= requestType.windowMillis
+                    || now < window.startedAt) {
                 window.startedAt = now;
                 window.requestCount = 0;
             }
             window.requestCount++;
             return window.requestCount <= requestType.maximumRequests;
         }
+    }
+
+    /** Milliseconds on the JVM's monotonic clock, which no change to the server's clock moves. */
+    static long monotonicMillis() {
+        return System.nanoTime() / 1000000L;
     }
 
     public static void logMalformed(EntityPlayerMP player, String packetName) {
@@ -118,6 +147,16 @@ public final class LostTalesRequestRateLimiter {
     public static void logRateLimited(EntityPlayerMP player, RequestType requestType, String packetName) {
         logThrottled(player, requestType,
                 "Rate-limited " + safePacketName(packetName) + " requests");
+    }
+
+    /** The diagnostic for a sender who is no player held to {@link #allowSender}. */
+    public static void logSenderRateLimited(UUID senderId, RequestType requestType,
+                                            String what) {
+        if (senderId == null) {
+            return;
+        }
+        logThrottled(senderId, requestType, "Rate-limited " + safePacketName(what)
+                + " requests", "sender");
     }
 
     public static void logQueueFull(EntityPlayerMP player, String packetName) {
@@ -154,12 +193,20 @@ public final class LostTalesRequestRateLimiter {
         if (player == null || player.getUniqueID() == null) {
             return false;
         }
-        long now = System.currentTimeMillis();
-        RequestWindow window = getWindow(player.getUniqueID(), requestType, now);
+        return allowReply(player.getUniqueID(), requestType, intervalMillis,
+                monotonicMillis());
+    }
+
+    /** {@link #allowReply(EntityPlayerMP, RequestType, long)} at {@code now} on the monotonic clock. */
+    static boolean allowReply(UUID ownerId, RequestType requestType,
+                              long intervalMillis, long now) {
+        RequestWindow window = getWindow(ownerId, requestType, now);
         synchronized (window) {
-            if (now - window.lastReplyAt < intervalMillis) {
+            if (window.replied && now >= window.lastReplyAt
+                    && now - window.lastReplyAt < intervalMillis) {
                 return false;
             }
+            window.replied = true;
             window.lastReplyAt = now;
             return true;
         }
@@ -169,16 +216,22 @@ public final class LostTalesRequestRateLimiter {
         if (player == null || player.getUniqueID() == null) {
             return;
         }
-        long now = System.currentTimeMillis();
-        RequestWindow window = getWindow(player.getUniqueID(), requestType, now);
+        logThrottled(player.getUniqueID(), requestType, message, "player");
+    }
+
+    private static void logThrottled(UUID ownerId, RequestType requestType,
+                                     String message, String who) {
+        long now = monotonicMillis();
+        RequestWindow window = getWindow(ownerId, requestType, now);
         synchronized (window) {
-            if (now - window.lastLogAt < LOG_INTERVAL_MILLIS) {
+            if (window.logged && now >= window.lastLogAt
+                    && now - window.lastLogAt < LOG_INTERVAL_MILLIS) {
                 return;
             }
+            window.logged = true;
             window.lastLogAt = now;
         }
-        FMLLog.warning("[%s] %s from player %s",
-                LostTalesMetaData.MOD_ID, message, player.getUniqueID());
+        LostTalesLog.warning("%s from %s %s", message, who, ownerId);
     }
 
     private static RequestWindow getWindow(UUID ownerId, RequestType requestType, long now) {
@@ -226,7 +279,9 @@ public final class LostTalesRequestRateLimiter {
     private static final class RequestWindow {
         private long startedAt;
         private int requestCount;
+        private boolean logged;
         private long lastLogAt;
+        private boolean replied;
         /** When the player was last answered about this request type. */
         private long lastReplyAt;
 

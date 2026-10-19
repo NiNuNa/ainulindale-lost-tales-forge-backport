@@ -609,6 +609,182 @@ public final class DiscordJson {
                 user != null && bool(user, "bot"));
     }
 
+    /** The most emoji Discord lets one message carry as reactions. */
+    static final int MAX_REACTION_KINDS = 20;
+    /** The most members one read of an emoji's reactions lists; Discord's own most. */
+    public static final int MAX_REACTORS_READ = 100;
+
+    /**
+     * One emoji's reactions on a message as a channel listing shows them:
+     * the emoji, how many members reacted with it, the bot left out, and
+     * whether some of them are super reactions, which Discord lists apart.
+     */
+    public static final class ReactionCount {
+        /** A custom emoji's id; empty for a Unicode one. */
+        public final String emojiId;
+        /** A Unicode emoji itself, or a custom emoji's name; empty for a deleted custom emoji. */
+        public final String emojiName;
+        /** The members who reacted with it, the bot's own reaction not counted. */
+        public final int members;
+        /** Whether Discord counts super reactions among them. */
+        public final boolean burst;
+
+        ReactionCount(String emojiId, String emojiName, int members, boolean burst) {
+            this.emojiId = emojiId == null ? "" : emojiId;
+            this.emojiName = emojiName == null ? "" : emojiName;
+            this.members = Math.max(0, members);
+            this.burst = burst;
+        }
+
+        /** The chat's key for the emoji, as a live reaction with it finds it; null for none. */
+        public String reactionKey() {
+            return new Reaction("", "", "", this.emojiId, this.emojiName, "", false)
+                    .reactionKey();
+        }
+
+        /**
+         * The emoji as a path of Discord's reactions takes it, before
+         * encoding: {@code name:id} for a custom emoji, the Unicode for
+         * any other; empty for one that has no such form.
+         */
+        public String pathForm() {
+            if (this.emojiId.length() > 0) {
+                return isCustomPathForm(this.emojiName + ":" + this.emojiId)
+                        ? this.emojiName + ":" + this.emojiId : "";
+            }
+            return this.emojiName;
+        }
+    }
+
+    /**
+     * Whether {@code form} is a custom emoji's {@code name:id} as Discord's
+     * paths take it: letters, digits and underscores, then its id.
+     */
+    static boolean isCustomPathForm(String form) {
+        int colon = form == null ? -1 : form.indexOf(':');
+        return colon > 0 && form.substring(0, colon).matches("\\w{1,32}")
+                && ChatForeignEmoji.isCustomId(form.substring(colon + 1));
+    }
+
+    /**
+     * The reactions on each message of a channel listing, by message id,
+     * or null for a reply that is not a listing. A message with none is
+     * left out; at most {@link #MAX_REACTION_KINDS} emoji each.
+     */
+    public static Map<String, List<ReactionCount>> parseReactionCounts(String json) {
+        JsonArray array = parseArray(json);
+        if (array == null) {
+            return null;
+        }
+        Map<String, List<ReactionCount>> byMessage =
+                new HashMap<String, List<ReactionCount>>();
+        for (JsonElement element : array) {
+            if (!element.isJsonObject()) {
+                continue;
+            }
+            JsonObject message = element.getAsJsonObject();
+            String id = string(message, "id");
+            if (id.length() == 0 || !message.has("reactions")
+                    || !message.get("reactions").isJsonArray()) {
+                continue;
+            }
+            List<ReactionCount> counts = new ArrayList<ReactionCount>();
+            for (JsonElement value : message.getAsJsonArray("reactions")) {
+                if (counts.size() >= MAX_REACTION_KINDS) {
+                    break;
+                }
+                if (!value.isJsonObject()) {
+                    continue;
+                }
+                JsonObject reaction = value.getAsJsonObject();
+                JsonObject emoji = reaction.has("emoji")
+                        && reaction.get("emoji").isJsonObject()
+                        ? reaction.getAsJsonObject("emoji") : null;
+                if (emoji == null) {
+                    continue;
+                }
+                JsonObject details = reaction.has("count_details")
+                        && reaction.get("count_details").isJsonObject()
+                        ? reaction.getAsJsonObject("count_details") : null;
+                int burst = details == null ? 0 : number(details, "burst");
+                int members = number(reaction, "count")
+                        - (bool(reaction, "me") ? 1 : 0)
+                        - (bool(reaction, "me_burst") ? 1 : 0);
+                counts.add(new ReactionCount(string(emoji, "id"), string(emoji, "name"),
+                        members, burst > (bool(reaction, "me_burst") ? 1 : 0)));
+            }
+            if (!counts.isEmpty()) {
+                byMessage.put(id, Collections.unmodifiableList(counts));
+            }
+        }
+        return byMessage;
+    }
+
+    /** A member who reacted, as Discord lists them for one emoji. */
+    public static final class Reactor {
+        public final String userId;
+        /** Their own name on Discord: their display name, else their username. */
+        public final String name;
+        public final boolean bot;
+
+        Reactor(String userId, String name, boolean bot) {
+            this.userId = userId;
+            this.name = name;
+            this.bot = bot;
+        }
+    }
+
+    /**
+     * The members Discord lists for one emoji's reactions, at most
+     * {@link #MAX_REACTORS_READ}, or null for a reply that is not such a
+     * list: a list that cannot be read says nothing about who reacted.
+     */
+    public static List<Reactor> parseReactors(String json) {
+        JsonArray array = parseArray(json);
+        if (array == null) {
+            return null;
+        }
+        List<Reactor> reactors = new ArrayList<Reactor>();
+        for (JsonElement element : array) {
+            if (!element.isJsonObject()) {
+                return null;
+            }
+            JsonObject user = element.getAsJsonObject();
+            String id = string(user, "id");
+            if (id.length() == 0) {
+                return null;
+            }
+            if (reactors.size() < MAX_REACTORS_READ) {
+                reactors.add(new Reactor(id, memberName(null, user), bool(user, "bot")));
+            }
+        }
+        return reactors;
+    }
+
+    /** The JSON array a reply is, or null for anything else. */
+    private static JsonArray parseArray(String json) {
+        if (json == null || json.trim().length() == 0) {
+            return null;
+        }
+        try {
+            JsonElement root = new JsonParser().parse(json);
+            return root != null && root.isJsonArray() ? root.getAsJsonArray() : null;
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    /** A whole number of a field; 0 when it is missing or no number. */
+    private static int number(JsonObject object, String key) {
+        JsonElement value = object.get(key);
+        try {
+            return value != null && value.isJsonPrimitive()
+                    && value.getAsJsonPrimitive().isNumber() ? value.getAsInt() : 0;
+        } catch (RuntimeException exception) {
+            return 0;
+        }
+    }
+
     /**
      * The name a member goes by in a Discord server, as the server shows
      * it: their nickname there, else their global display name, else
@@ -836,6 +1012,15 @@ public final class DiscordJson {
      * longest pause the headers may ask for too; 0 if absent.
      */
     public static long retryAfterMillis(String json) {
+        return retryAfterMillis(json, DiscordRateLimit.MAX_RESET_MILLIS);
+    }
+
+    /**
+     * {@code retry_after} of a rate-limit reply, in milliseconds rounded
+     * up and at most {@code maxMillis}: a topic edit's pause runs to
+     * Discord's whole window for them; 0 if absent.
+     */
+    public static long retryAfterMillis(String json, long maxMillis) {
         if (json == null) {
             return 0L;
         }
@@ -849,8 +1034,7 @@ public final class DiscordJson {
                     return 0L;
                 }
                 double millis = Math.ceil(seconds * 1000.0D);
-                return millis >= DiscordRateLimit.MAX_RESET_MILLIS
-                        ? DiscordRateLimit.MAX_RESET_MILLIS : (long)millis;
+                return millis >= maxMillis ? maxMillis : (long)millis;
             }
         } catch (RuntimeException ignored) {
             // Not the shape Discord documents; back off by default instead.

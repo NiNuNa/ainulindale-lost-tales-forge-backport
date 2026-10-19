@@ -35,8 +35,6 @@ final class LostTalesPlayerCapeRenderer {
      */
     private static final ModelBiped CAPE_MODEL = new LOTRModelBiped();
     private static final float VANILLA_BACK_OFFSET = 2.0F * MODEL_UNIT;
-    /** The half-troll's torso is four pixels deeper than a biped's. */
-    private static final float HALF_TROLL_BACK_OFFSET = 4.0F * MODEL_UNIT;
     private static final float MAXIMUM_FORWARD_LIFT = 80.0F;
     private static final float MAXIMUM_SIDE_SWING = 65.0F;
     private static final float WALKING_RESPONSE_SPEED = 12.0F;
@@ -329,14 +327,6 @@ final class LostTalesPlayerCapeRenderer {
                         PlayerBodyShape.DWARF_WIDTH_SCALE, 1.0F, 1.0F,
                         PlayerBodyShape.DWARF_WIDTH_SCALE, 1.0F, 1.0F,
                         VANILLA_BACK_OFFSET);
-            }
-            if (shape.isHalfTroll()) {
-                return new CapeTransform(
-                        1.0F, 1.0F, 1.0F,
-                        PlayerBodyShape.HALF_TROLL_WIDTH_SCALE,
-                        PlayerBodyShape.HALF_TROLL_LENGTH_SCALE,
-                        1.0F,
-                        HALF_TROLL_BACK_OFFSET);
             }
             return new CapeTransform(
                     1.0F, 1.0F, 1.0F,

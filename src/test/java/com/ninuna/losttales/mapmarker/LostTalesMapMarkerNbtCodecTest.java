@@ -51,7 +51,8 @@ public final class LostTalesMapMarkerNbtCodecTest {
         LostTalesMapMarkerRecord decoded =
                 result.getRecords().get(marker.getId());
         assertNotNull(decoded);
-        assertEquals(owner, decoded.getOwnerPlayerId());
+        assertEquals("the owner is the placing character", owner,
+                decoded.getOwnerCharacterId());
         assertEquals("an unnamed waystone keeps no words", "",
                 decoded.getName());
         assertEquals("player:Aldric", decoded.getNamedAfter());
@@ -65,6 +66,57 @@ public final class LostTalesMapMarkerNbtCodecTest {
         assertTrue(decoded.getSharedCharacterIds().contains(shared));
         assertTrue(decoded.getSharedFellowshipIds().contains(
                 sharedFellowship));
+    }
+
+    /** The owning character is saved under its own key, and no account owner is (WAY-08). */
+    @Test
+    public void theOwningCharacterIsSavedByItsOwnKey() {
+        UUID owner = UUID.fromString(
+                "10000000-0000-0000-0000-000000000009");
+        LostTalesMapMarkerRecord marker =
+                LostTalesMapMarkerRecord.createPlayerMarker(
+                        "losttales:player/owner", "Aldric", owner,
+                        100, 10, 65, 20, UUID.randomUUID())
+                        .withOwner(UUID.fromString(
+                                "10000000-0000-0000-0000-00000000000a"));
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(
+                encoded, Collections.singleton(marker),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagCompound stored = encoded.getTagList(
+                "Markers", Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
+        assertTrue(stored.hasKey(
+                LostTalesMapMarkerNbtCodec.OWNER_CHARACTER + "Most"));
+        assertFalse(stored.hasKey("OwnerMost"));
+        assertEquals(marker.getOwnerCharacterId(),
+                LostTalesMapMarkerNbtCodec.read(encoded).getRecords()
+                        .get(marker.getId()).getOwnerCharacterId());
+        assertEquals("handed over, it keeps whom it is called after",
+                "player:Aldric", marker.getNamedAfter());
+    }
+
+    /** Access is saved public or not; shared is read back from the shares alone (WAY-14). */
+    @Test
+    public void sharedIsReadBackFromTheShares() {
+        LostTalesMapMarkerRecord marker =
+                LostTalesMapMarkerRecord.createPlayerMarker(
+                        "losttales:player/access", "Aldric",
+                        UUID.randomUUID(), 100, 10, 65, 20,
+                        UUID.randomUUID()).toBuilder()
+                        .visibility(LostTalesMapMarkerVisibility.SHARED)
+                        .build();
+        assertEquals("shared without a share reads private",
+                LostTalesMapMarkerVisibility.PRIVATE, marker.getVisibility());
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(
+                encoded, Collections.singleton(marker),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagCompound stored = encoded.getTagList(
+                "Markers", Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
+        stored.setString("Visibility", "shared");
+        assertEquals(LostTalesMapMarkerVisibility.PRIVATE,
+                LostTalesMapMarkerNbtCodec.read(encoded).getRecords()
+                        .get(marker.getId()).getVisibility());
     }
 
     @Test

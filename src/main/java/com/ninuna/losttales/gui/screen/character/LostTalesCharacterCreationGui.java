@@ -11,6 +11,7 @@ import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.character.validation.CharacterNames;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.client.camera.InspectionCameraMath;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraInspection;
@@ -850,7 +851,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 I18n.format("gui.losttales.character.creation"),
                 // With no stage the status takes the subtitle's line.
                 isStatusInHeader() ? "" : this.firstCharacter
-                        ? I18n.format("gui.losttales.character.first.subtitle")
+                        ? I18n.format(storeUnreadable()
+                                ? "gui.losttales.character.first.unreadable"
+                                : "gui.losttales.character.first.subtitle")
                         : I18n.format("gui.losttales.character.slot",
                                 Integer.valueOf(this.slotIndex + 1)),
                 this.width, HEADER_TEXT_Y);
@@ -1050,6 +1053,12 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private boolean canSubmit() {
         return !isPending() && appearanceReady()
                 && this.factionIds.size() > 0 && this.waypointIds.size() > 0;
+    }
+
+    /** Whether the server cannot read characters right now: the first visit waits, told why (CHAR-01). */
+    private static boolean storeUnreadable() {
+        CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
+        return roster != null && roster.isStoreUnreadable();
     }
 
     /** Whether the status shows on the header's subtitle line, there being no stage to show it over. */
@@ -1291,7 +1300,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
         if (snapshot != null) {
             for (CharacterSummary character : snapshot.getCharacters()) {
-                if (account.equalsIgnoreCase(character.getName())) {
+                if (CharacterNames.same(account, character.getName())) {
                     return "";
                 }
             }

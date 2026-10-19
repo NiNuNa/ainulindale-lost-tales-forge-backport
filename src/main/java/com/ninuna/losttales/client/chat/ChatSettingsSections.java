@@ -190,6 +190,18 @@ public final class ChatSettingsSections {
                     LostTalesConfig.enableChatMessageGrouping = on;
                 }
             });
+            look.add(new Settings.ModSwitch("chatShowAccounts",
+                    Settings.optionName("chatShowAccounts")) {
+                @Override
+                protected boolean get() {
+                    return LostTalesConfig.chatShowAccounts;
+                }
+
+                @Override
+                protected void set(boolean on) {
+                    LostTalesConfig.chatShowAccounts = on;
+                }
+            });
             return look;
         }
 

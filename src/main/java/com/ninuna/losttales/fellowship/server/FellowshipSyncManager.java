@@ -1,7 +1,6 @@
 package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipOperationResultPacket;
@@ -70,8 +69,7 @@ public final class FellowshipSyncManager {
                 player, state);
         FellowshipStateSnapshot snapshot = FellowshipStateSnapshot.fromState(
                 ownerId, sequence, FellowshipService.memberLimit(), state,
-                onlineView(player.worldObj).forViewer(
-                        AccountVisibility.seesAccounts(player)),
+                onlineView(player.worldObj),
                 FellowshipService.getInstance().marksSeenBy(player.worldObj, state),
                 inviteTargets.targets, inviteTargets.truncated);
         LostTalesNetworkHandler.CHANNEL.sendTo(
@@ -416,8 +414,6 @@ public final class FellowshipSyncManager {
 
         ArrayList<FellowshipInviteTargetSnapshot> candidates =
                 new ArrayList<FellowshipInviteTargetSnapshot>();
-        // The account behind each offer is named only to a receiver shown accounts.
-        boolean seesAccounts = AccountVisibility.seesAccounts(receiver);
         for (Object value : onlinePlayers) {
             if (!(value instanceof EntityPlayerMP)) {
                 continue;
@@ -439,7 +435,7 @@ public final class FellowshipSyncManager {
             candidates.add(new FellowshipInviteTargetSnapshot(
                     targetOwnerId,
                     target.gameplayId(),
-                    seesAccounts ? targetPlayer.getCommandSenderName() : "",
+                    targetPlayer.getCommandSenderName(),
                     target.displayName));
         }
 

@@ -16,8 +16,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * The shapes must carry the geometry the catalogue skins were painted for:
  * mirrored left limbs on LOTR layouts, the (0,32) hair cuboid, the chest
- * types, elf ears, orc nose and ears, hobbit feet and lowered pivots, the
- * half-troll's own boxes. Armor variants keep proportions only.
+ * types, elf ears, orc nose and ears, hobbit feet and lowered pivots.
+ * Armor variants keep proportions only.
  */
 public final class LostTalesPlayerModelShapeTest {
 
@@ -104,9 +104,6 @@ public final class LostTalesPlayerModelShapeTest {
         LostTalesPlayerModel armor = new LostTalesPlayerModel(
                 1.0F, false, PlayerBodyShape.HUMAN, LOTR, ROUNDED, true);
         assertFalse(armor.hasChest());
-        LostTalesPlayerModel troll = new LostTalesPlayerModel(
-                0.0F, false, PlayerBodyShape.HALF_TROLL, LOTR, ROUNDED, false);
-        assertFalse(troll.hasChest());
     }
 
     @Test
@@ -145,51 +142,6 @@ public final class LostTalesPlayerModelShapeTest {
                 1.0F, false, PlayerBodyShape.ORC, CLASSIC, null, true);
         assertNull(armor.bipedHead.childModels);
         assertEquals(32.0F, armor.textureHeight, 0.0F);
-    }
-
-    @Test
-    public void halfTrollKeepsLotrsBoxesAndPivots() {
-        LostTalesPlayerModel troll = new LostTalesPlayerModel(
-                0.0F, false, PlayerBodyShape.HALF_TROLL, LOTR, null, false);
-        assertEquals(64.0F, troll.textureHeight, 0.0F);
-        assertEquals(10.0F, width(troll.bipedHead), 0.0F);
-        assertEquals(2, troll.bipedHead.cubeList.size());
-        assertEquals(-8.0F, troll.bipedHead.rotationPointY, 0.0F);
-        assertEquals(-8.0F, troll.bipedBody.rotationPointY, 0.0F);
-        assertEquals(12.0F, width(troll.bipedBody), 0.0F);
-        assertEquals(-8.5F, troll.bipedRightArm.rotationPointX, 0.0001F);
-        assertEquals(8.5F, troll.bipedLeftArm.rotationPointX, 0.0001F);
-        assertEquals(-6.0F, troll.bipedRightArm.rotationPointY, 0.0F);
-        assertEquals(2, troll.bipedRightArm.cubeList.size());
-        assertEquals(6.0F, width(troll.bipedRightArm), 0.0F);
-        assertEquals(8.0F, troll.bipedRightLeg.rotationPointY, 0.0F);
-        assertEquals(-3.2F, troll.bipedRightLeg.rotationPointX, 0.0001F);
-        assertEquals(6.0F, width(troll.bipedRightLeg), 0.0F);
-        assertTrue(troll.bipedHeadwear.isHidden);
-        // Nose, tusks, two ears, mohawk, four horn pieces.
-        assertEquals(9, troll.bipedHead.childModels.size());
-
-        // Vanilla's pose rewrites every pivot; the troll's come back.
-        troll.isSneak = true;
-        troll.setRotationAngles(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0625F, null);
-        assertEquals(-7.0F, troll.bipedHead.rotationPointY, 0.0F);
-        assertEquals(5.0F, troll.bipedRightLeg.rotationPointY, 0.0F);
-        assertEquals(4.0F, troll.bipedRightLeg.rotationPointZ, 0.0F);
-        assertEquals(-8.5F, troll.bipedRightArm.rotationPointX, 0.0001F);
-        assertEquals(-6.0F, troll.bipedLeftArm.rotationPointY, 0.0F);
-
-        LostTalesPlayerModel slim = new LostTalesPlayerModel(
-                0.0F, true, PlayerBodyShape.HALF_TROLL, LOTR, null, false);
-        assertEquals(5.0F, width(slim.bipedRightArm), 0.0F);
-        assertEquals(-6.0F, slim.bipedRightArm.rotationPointY, 0.0F);
-
-        // Armor is painted for the same 64x64 boxes, without the head features.
-        LostTalesPlayerModel armor = new LostTalesPlayerModel(
-                1.0F, false, PlayerBodyShape.HALF_TROLL, LOTR, null, true);
-        assertEquals(64.0F, armor.textureHeight, 0.0F);
-        assertEquals(10.0F, width(armor.bipedHead), 0.0F);
-        assertNull(armor.bipedHead.childModels);
-        assertTrue(armor.bipedHeadwear.isHidden);
     }
 
     @Test
@@ -244,7 +196,7 @@ public final class LostTalesPlayerModelShapeTest {
         assertEquals(PlayerBodyShape.HOBBIT, PlayerBodyShape.forModelId("lotr:hobbit"));
         assertEquals(PlayerBodyShape.ORC, PlayerBodyShape.forModelId("lotr:orc"));
         assertEquals(PlayerBodyShape.ORC, PlayerBodyShape.forModelId("lotr:uruk"));
-        assertEquals(PlayerBodyShape.HALF_TROLL, PlayerBodyShape.forModelId("lotr:half_troll"));
+        assertNull(PlayerBodyShape.forModelId("lotr:half_troll"));
         assertNull(PlayerBodyShape.forModelId("lotr:balrog"));
     }
 

@@ -23,12 +23,6 @@ public final class Window {
     private boolean pinnedToHud;
     /** Whether every view of the window screen shows the window, whichever key opened it. */
     private boolean pinnedToGui;
-    /**
-     * Whether its page fills it and is held there ({@link ContentView}):
-     * Escape and the dent's exit no longer end it, and it is kept with
-     * the layout.
-     */
-    private boolean borderlessHeld;
     /** The view the window stands in; null until the layout gives it one. */
     private View view;
     /** Percent of the available screen travel, see HudPlacementLayout. */
@@ -315,8 +309,6 @@ public final class Window {
     public boolean isLocked() { return this.locked; }
     public boolean isPinnedToHud() { return this.pinnedToHud; }
     public boolean isPinnedToGui() { return this.pinnedToGui; }
-    /** Whether its page fills it and is held there until the player lets it go. */
-    public boolean isBorderlessHeld() { return this.borderlessHeld; }
     /** The view it stands in; null until the layout gives it one ({@link WindowLayout#viewOf}). */
     View getView() { return this.view; }
     public double getOffsetX() { return this.offsetX; }
@@ -384,8 +376,6 @@ public final class Window {
     void setPinnedToHud(boolean pinned) { this.pinnedToHud = pinned; }
 
     void setPinnedToGui(boolean pinned) { this.pinnedToGui = pinned; }
-
-    void setBorderlessHeld(boolean held) { this.borderlessHeld = held; }
 
     void setView(View view) { this.view = view; }
 

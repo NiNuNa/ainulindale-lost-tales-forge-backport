@@ -10,7 +10,6 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import javax.imageio.ImageIO;
 import lotr.common.LOTRAchievement;
@@ -206,10 +205,6 @@ public abstract class LostTalesUtil {
         ModContainer modContainer = Loader.instance().getIndexedModList().get(res.getResourceDomain());
         if(modContainer == null) throw new IllegalArgumentException("Can't find the mod container for the domain " + res.getResourceDomain());
         return modContainer;
-    }
-
-    public static void clearControlZones (LOTRFaction faction) {
-        ReflectionHelper.setPrivateValue (LOTRFaction.class, faction, new ArrayList<LOTRControlZone>(), "controlZones");
     }
 
     public static LOTRWaypoint.Region addWaypointRegion(String name) {

@@ -12,15 +12,21 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.world.World;
 
 /**
- * Server-authoritative, conservative fellowship quest event distributor.
- *
- * Kill and destination-arrival events are shared. Every participant is
- * revalidated against live server state, and each backing quest adapter
- * independently checks whether that player possesses a matching objective.
+ * Shares kills and arrivals inside one company (FEL-28): one counts for a
+ * member only when its maker and the member both travel with that
+ * fellowship ({@link #sharingCredit}). Every member is checked again
+ * against the live server, and each quest adapter checks whether that
+ * player has a matching objective.
  */
 public final class FellowshipQuestProgressCoordinator {
+
+    /** The fellowship each character travels with, by id; null for none. */
+    interface TravelledWith {
+        UUID of(UUID identityId);
+    }
 
     private static final FellowshipQuestProgressCoordinator INSTANCE =
             new FellowshipQuestProgressCoordinator();
@@ -71,8 +77,9 @@ public final class FellowshipQuestProgressCoordinator {
                 creditedPlayer);
         Fellowship fellowship = FellowshipService.getInstance()
                 .getTravellingFellowshipForActiveIdentity(creditedPlayer);
-        if (creditedId == null || fellowship == null
-                || !fellowship.containsMember(creditedId)) {
+        List<FellowshipMember> sharing = sharingCredit(fellowship, creditedId,
+                travelledWith(creditedPlayer.worldObj));
+        if (sharing.isEmpty()) {
             return;
         }
 
@@ -86,11 +93,7 @@ public final class FellowshipQuestProgressCoordinator {
             return;
         }
 
-        for (FellowshipMember member : fellowship.getMembers()) {
-            if (member == null
-                    || creditedId.equals(member.getIdentityId())) {
-                continue;
-            }
+        for (FellowshipMember member : sharing) {
             EntityPlayerMP participant = findOnlinePlayer(
                     onlinePlayers, member.getOwnerId());
             if (!isEligibleParticipant(
@@ -116,8 +119,9 @@ public final class FellowshipQuestProgressCoordinator {
                 source);
         Fellowship fellowship = FellowshipService.getInstance()
                 .getTravellingFellowshipForActiveIdentity(source);
-        if (sourceId == null || fellowship == null
-                || !fellowship.containsMember(sourceId)) {
+        List<FellowshipMember> sharing = sharingCredit(fellowship, sourceId,
+                travelledWith(source.worldObj));
+        if (sharing.isEmpty()) {
             return;
         }
         double radius = Math.max(1, LostTalesConfig.fellowshipSharedQuestRadius);
@@ -129,11 +133,7 @@ public final class FellowshipQuestProgressCoordinator {
         if (onlinePlayers == null) {
             return;
         }
-        for (FellowshipMember member : fellowship.getMembers()) {
-            if (member == null
-                    || sourceId.equals(member.getIdentityId())) {
-                continue;
-            }
+        for (FellowshipMember member : sharing) {
             EntityPlayerMP participant = findOnlinePlayer(
                     onlinePlayers, member.getOwnerId());
             if (isEligibleParticipant(source, participant, member,
@@ -141,6 +141,43 @@ public final class FellowshipQuestProgressCoordinator {
                 applyTravelAdapters(participant, source, true);
             }
         }
+    }
+
+    /**
+     * The members a kill or an arrival of {@code makerId} counts for besides
+     * the maker (FEL-28): those of {@code fellowship} who travel with it,
+     * while the maker travels with it too. None while the maker travels
+     * with none, or with another.
+     */
+    static List<FellowshipMember> sharingCredit(Fellowship fellowship, UUID makerId,
+                                                TravelledWith travelledWith) {
+        List<FellowshipMember> sharing = new ArrayList<FellowshipMember>();
+        if (fellowship == null || makerId == null || travelledWith == null
+                || !fellowship.containsMember(makerId)) {
+            return sharing;
+        }
+        UUID fellowshipId = fellowship.getFellowshipId();
+        if (!fellowshipId.equals(travelledWith.of(makerId))) {
+            return sharing;
+        }
+        for (FellowshipMember member : fellowship.getMembers()) {
+            if (member != null && !makerId.equals(member.getIdentityId())
+                    && fellowshipId.equals(travelledWith.of(member.getIdentityId()))) {
+                sharing.add(member);
+            }
+        }
+        return sharing;
+    }
+
+    /** The fellowship each character travels with, as the server's store says now. */
+    private static TravelledWith travelledWith(final World world) {
+        return new TravelledWith() {
+            @Override
+            public UUID of(UUID identityId) {
+                return FellowshipService.getInstance()
+                        .getTravellingFellowshipId(world, identityId);
+            }
+        };
     }
 
     private void applyKillAdapters(EntityPlayerMP participant, Entity victim,

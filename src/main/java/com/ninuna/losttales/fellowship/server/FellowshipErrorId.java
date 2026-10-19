@@ -27,8 +27,6 @@ public enum FellowshipErrorId {
     TARGET_ALREADY_MEMBER("target_already_member"),
     TARGET_TOO_MANY_FELLOWSHIPS("target_too_many_fellowships"),
     ACCOUNT_ALREADY_IN_FELLOWSHIP("account_already_in_fellowship"),
-    /** What an inviter not shown accounts hears for a refusal kept by account. */
-    TARGET_CANNOT_BE_INVITED("target_cannot_be_invited"),
     CANNOT_INVITE_SELF("cannot_invite_self"),
     INVITATION_NOT_FOUND("invitation_not_found"),
     INVITATION_EXPIRED("invitation_expired"),

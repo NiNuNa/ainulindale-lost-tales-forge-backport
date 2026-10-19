@@ -174,7 +174,8 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
             return Collections.emptyList();
         }
         int radiusChunks = (int)Math.ceil(
-                Math.min(1024.0D, maximum.doubleValue()) / 16.0D) + 1;
+                Math.min(LostTalesMapMarkerRecord.MAX_PLACED_DISCOVERY_RADIUS,
+                        maximum.doubleValue()) / 16.0D) + 1;
         return getRecordsNearChunks(
                 dimensionId, floor(x) >> 4, floor(z) >> 4,
                 Math.min(64, radiusChunks));

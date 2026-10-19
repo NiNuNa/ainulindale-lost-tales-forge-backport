@@ -1,11 +1,19 @@
 package com.ninuna.losttales.quest.progress;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
-/** Immutable terminal record of a completed, failed, or abandoned quest. */
+/**
+ * A quest's History line: how it last ended (completed, failed or
+ * abandoned), why and when, the optional objectives it achieved, the
+ * stages it reached, and how many times it was ever completed. The line
+ * stays while the quest is taken again, and the next end replaces it,
+ * keeping the count (QUEST-10).
+ */
 public final class LostTalesQuestHistoryEntry {
     public enum Outcome {
         COMPLETED,
@@ -29,6 +37,8 @@ public final class LostTalesQuestHistoryEntry {
     private final String detail;
     private final long worldTime;
     private final Set<String> completedOptionalObjectiveIds;
+    private final int completions;
+    private final List<String> stagePath;
 
     public LostTalesQuestHistoryEntry(String questId, Outcome outcome,
             String detail, long worldTime) {
@@ -39,6 +49,20 @@ public final class LostTalesQuestHistoryEntry {
     public LostTalesQuestHistoryEntry(String questId, Outcome outcome,
             String detail, long worldTime,
             Collection<String> completedOptionalObjectiveIds) {
+        this(questId, outcome, detail, worldTime,
+                completedOptionalObjectiveIds, 0,
+                Collections.<String>emptyList());
+    }
+
+    /**
+     * A line counting {@code completions}, at least one for a completed
+     * quest, and the {@code stagePath} reached, bounded as a running
+     * quest's path is.
+     */
+    public LostTalesQuestHistoryEntry(String questId, Outcome outcome,
+            String detail, long worldTime,
+            Collection<String> completedOptionalObjectiveIds,
+            int completions, Collection<String> stagePath) {
         this.questId = questId == null ? "" : questId;
         this.outcome = outcome == null ? Outcome.FAILED : outcome;
         this.detail = detail == null ? "" : detail;
@@ -54,6 +78,38 @@ public final class LostTalesQuestHistoryEntry {
         }
         this.completedOptionalObjectiveIds =
                 Collections.unmodifiableSet(completedOptional);
+        this.completions = Math.max(this.outcome == Outcome.COMPLETED ? 1 : 0,
+                completions);
+        List<String> path = new ArrayList<String>();
+        if (stagePath != null) {
+            for (String reached : stagePath) {
+                if (reached != null && reached.length() > 0
+                        && reached.length() <= LostTalesQuestProgress.MAX_IDENTIFIER_CHARACTERS
+                        && !path.contains(reached)
+                        && path.size() < LostTalesQuestProgress.MAX_PATH_STAGES) {
+                    path.add(reached);
+                }
+            }
+        }
+        this.stagePath = Collections.unmodifiableList(path);
+    }
+
+    /** How many times the quest was ever completed, this end included. */
+    public int getCompletions() {
+        return this.completions;
+    }
+
+    /**
+     * Whether the quest was completed at least once, however its last run
+     * ended: what a {@code completed} prerequisite reads (QUEST-10).
+     */
+    public boolean wasEverCompleted() {
+        return this.completions > 0;
+    }
+
+    /** The stages the quest had reached when it ended, in order. */
+    public List<String> getStagePath() {
+        return this.stagePath;
     }
 
     public String getQuestId() {

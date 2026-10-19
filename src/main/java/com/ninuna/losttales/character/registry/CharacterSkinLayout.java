@@ -10,8 +10,7 @@ public enum CharacterSkinLayout {
     /**
      * LOTR Legacy's 64x64 layout: the top half matches the classic 64x32
      * biped layout, the hanging hair and beard cuboid sits at (0,32), and
-     * the feminine chest cuboid samples (24,0). The half-troll body reads
-     * its own boxes from this size.
+     * the feminine chest cuboid samples (24,0).
      */
     LOTR_64X64,
 

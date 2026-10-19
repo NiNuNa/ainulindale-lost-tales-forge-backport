@@ -72,6 +72,19 @@ public final class CharacterSyncManager {
         return true;
     }
 
+    /**
+     * Tells a player the server cannot read their characters right now: an
+     * empty roster that says so, which keeps them in the creator as a ghost
+     * (CHAR-01).
+     */
+    public static void sendUnreadable(EntityPlayerMP player, int requestId) {
+        if (player == null || player.getUniqueID() == null) {
+            return;
+        }
+        LostTalesNetworkHandler.CHANNEL.sendTo(new CharacterRosterSyncPacket(requestId,
+                CharacterRosterSnapshot.unreadable(player.getUniqueID())), player);
+    }
+
     public static void sendCreationCatalog(EntityPlayerMP player) {
         if (player == null || player.worldObj == null || player.worldObj.isRemote) {
             return;

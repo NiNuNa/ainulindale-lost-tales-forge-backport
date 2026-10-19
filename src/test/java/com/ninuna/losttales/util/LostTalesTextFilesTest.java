@@ -3,6 +3,7 @@ package com.ninuna.losttales.util;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.StringReader;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
@@ -58,6 +59,44 @@ public final class LostTalesTextFilesTest {
         assertNull(LostTalesTextFiles.readLines(
                 new File(temporaryFolder.getRoot(), "missing.txt"), 10));
         assertNull(LostTalesTextFiles.readLines(null, 10));
+    }
+
+    /**
+     * A line past the bound is left out whole, the lines around it
+     * stay, and every way a line may end ends one.
+     */
+    @Test
+    public void aLineTooLongIsLeftOutAndTheRestRead() throws IOException {
+        StringBuilder text = new StringBuilder("first\r\n");
+        for (int index = 0; index <= LostTalesTextFiles.MAX_LINE_CHARACTERS; index++) {
+            text.append('x');
+        }
+        text.append("\nsecond\rthird\n\nlast");
+        assertEquals(Arrays.asList("first", "second", "third", "", "last"),
+                LostTalesTextFiles.linesOf(new StringReader(text.toString()), 100));
+        StringBuilder longest = new StringBuilder();
+        for (int index = 0; index < LostTalesTextFiles.MAX_LINE_CHARACTERS; index++) {
+            longest.append('y');
+        }
+        assertEquals(Arrays.asList(longest.toString()), LostTalesTextFiles.linesOf(
+                new StringReader(longest + "\n"), 100));
+    }
+
+    /** No more of a file than the bound is read, whatever it holds. */
+    @Test
+    public void aReadStopsAtTheFilesBound() throws IOException {
+        StringBuilder line = new StringBuilder();
+        for (int index = 0; index < 1023; index++) {
+            line.append('z');
+        }
+        StringBuilder text = new StringBuilder();
+        int lines = LostTalesTextFiles.MAX_FILE_CHARACTERS / 1024 + 10;
+        for (int index = 0; index < lines; index++) {
+            text.append(line).append('\n');
+        }
+        assertEquals(LostTalesTextFiles.MAX_FILE_CHARACTERS / 1024,
+                LostTalesTextFiles.linesOf(new StringReader(text.toString()),
+                        Integer.MAX_VALUE).size());
     }
 
     @Test

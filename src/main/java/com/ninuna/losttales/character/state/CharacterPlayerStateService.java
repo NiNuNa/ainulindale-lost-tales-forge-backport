@@ -287,7 +287,7 @@ public final class CharacterPlayerStateService {
         requireIdentityOwner(player, identity);
         validateSnapshot(snapshot);
         applyPhase(player, snapshot, CharacterStateApplyPhase.BEFORE_ATTRIBUTES);
-        CharacterRaceGameplayHandler.applyProvisional(player, character);
+        CharacterRaceGameplayHandler.apply(player, character);
         applyPhase(player, snapshot, CharacterStateApplyPhase.AFTER_ATTRIBUTES);
     }
 

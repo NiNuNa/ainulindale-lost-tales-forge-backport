@@ -39,6 +39,7 @@ public final class LostTalesQuestDefinitionNbt {
     private static final String KEY_JOURNAL_LOG = "JournalLog";
     private static final String KEY_DIALOGUE = "Dialogue";
     private static final String KEY_WORDS = "Words";
+    private static final String KEY_RULES = "Rules";
     private static final String KEY_STAGES = "Stages";
     private static final String KEY_STAGE_ID = "StageId";
     private static final String KEY_OBJECTIVES = "Objectives";
@@ -71,6 +72,7 @@ public final class LostTalesQuestDefinitionNbt {
         tag.setTag(KEY_JOURNAL_LOG, writeStringMap(quest.getJournalLog()));
         tag.setTag(KEY_DIALOGUE, writeStringMap(quest.getDialogue()));
         tag.setTag(KEY_WORDS, writeStringMap(quest.getWords()));
+        tag.setTag(KEY_RULES, writeStringMap(quest.getRules()));
 
         NBTTagList stages = new NBTTagList();
         for (LostTalesQuestStageDefinition stage : quest.getStages()) {
@@ -79,6 +81,7 @@ public final class LostTalesQuestDefinitionNbt {
             }
             NBTTagCompound stageTag = new NBTTagCompound();
             stageTag.setString(KEY_STAGE_ID, safe(stage.getId()));
+            stageTag.setTag(KEY_RULES, writeStringMap(stage.getRules()));
 
             NBTTagList objectives = new NBTTagList();
             for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
@@ -133,7 +136,9 @@ public final class LostTalesQuestDefinitionNbt {
                         readStringMap(objectiveTag.getTagList(KEY_OBJECTIVE_PARAMS, Constants.NBT.TAG_COMPOUND))
                 ));
             }
-            stages.add(new LostTalesQuestStageDefinition(stageId, objectives));
+            stages.add(new LostTalesQuestStageDefinition(stageId, objectives,
+                    readStringMap(stageTag.getTagList(KEY_RULES,
+                            Constants.NBT.TAG_COMPOUND))));
         }
 
         return new LostTalesQuestDefinition(
@@ -152,7 +157,8 @@ public final class LostTalesQuestDefinitionNbt {
                 Collections.<String, String>emptyMap(),
                 stages,
                 false,
-                readStringMap(tag.getTagList(KEY_WORDS, Constants.NBT.TAG_COMPOUND))
+                readStringMap(tag.getTagList(KEY_WORDS, Constants.NBT.TAG_COMPOUND)),
+                readStringMap(tag.getTagList(KEY_RULES, Constants.NBT.TAG_COMPOUND))
         );
     }
 
@@ -173,6 +179,7 @@ public final class LostTalesQuestDefinitionNbt {
                 || !isStringMapReasonable(tag, KEY_JOURNAL_LOG)
                 || !isStringMapReasonable(tag, KEY_DIALOGUE)
                 || !isStringMapReasonable(tag, KEY_WORDS)
+                || !isStringMapReasonable(tag, KEY_RULES)
                 || !MissiveWords.isWellFormed(readStringMap(tag.getTagList(
                         KEY_WORDS, Constants.NBT.TAG_COMPOUND)))
                 || !NbtTags.hasCompoundListWithinLimit(tag, KEY_STAGES,
@@ -186,6 +193,7 @@ public final class LostTalesQuestDefinitionNbt {
             NBTTagCompound stage = stages.getCompoundTagAt(i);
             if (!NbtTags.hasReasonableString(
                     stage, KEY_STAGE_ID, MAX_IDENTIFIER_CHARACTERS, false)
+                    || !isStringMapReasonable(stage, KEY_RULES)
                     || !NbtTags.hasCompoundListWithinLimit(stage, KEY_OBJECTIVES,
                     MAX_OBJECTIVES_PER_STAGE)) {
                 return false;

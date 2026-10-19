@@ -30,7 +30,11 @@ public final class MissiveSeal {
 
     /** The seal of the missive under {@code key}; null for a missive a letter cannot carry. */
     public static byte[] sign(byte[] key, LostTalesMissiveData missive) {
-        byte[] content = canonicalBytes(missive);
+        return signBytes(key, canonicalBytes(missive));
+    }
+
+    /** The seal of {@code content} under {@code key}, a starter item's among them; null for none. */
+    public static byte[] signBytes(byte[] key, byte[] content) {
         if (key == null || key.length != LENGTH || content == null) {
             return null;
         }
@@ -45,18 +49,22 @@ public final class MissiveSeal {
 
     /** Whether {@code seal} is the missive's seal under {@code key}, compared in constant time. */
     public static boolean verifies(byte[] key, LostTalesMissiveData missive, byte[] seal) {
+        return verifiesBytes(key, canonicalBytes(missive), seal);
+    }
+
+    /** Whether {@code seal} is the seal of {@code content} under {@code key}, compared in constant time. */
+    public static boolean verifiesBytes(byte[] key, byte[] content, byte[] seal) {
         if (seal == null || seal.length != LENGTH) {
             return false;
         }
-        byte[] expected = sign(key, missive);
+        byte[] expected = signBytes(key, content);
         return expected != null && MessageDigest.isEqual(expected, seal);
     }
 
     /**
      * Everything the missive says, in one fixed order: the letter as the
-     * page is sent it, then what the page is not sent (who may take it, when
-     * it was posted, where it came from). Null for a missive that does not
-     * fit a letter.
+     * page is sent it, then what the page is not sent (when it was posted,
+     * where it came from). Null for a missive that does not fit a letter.
      */
     static byte[] canonicalBytes(LostTalesMissiveData missive) {
         if (missive == null || !missive.isValid() || !LostTalesMissiveCodec.fits(missive)) {
@@ -65,8 +73,6 @@ public final class MissiveSeal {
         ByteBuf buffer = Unpooled.buffer();
         try {
             LostTalesMissiveCodec.write(buffer, missive);
-            buffer.writeBoolean(missive.isRepeatable());
-            buffer.writeBoolean(missive.isFirstComeFirstServed());
             buffer.writeLong(missive.getGenerationWorldTime());
             Map<String, String> context = missive.getGenerationContext();
             buffer.writeInt(context.size());

@@ -1,6 +1,10 @@
 package com.ninuna.losttales.mapmarker;
 
-/** Server-owned visibility policy for player-created markers. */
+/**
+ * Who may see a marker. A record is saved public or not; one that is not
+ * public reads SHARED while it has a share and PRIVATE without one
+ * ({@link LostTalesMapMarkerRecord#access}).
+ */
 public enum LostTalesMapMarkerVisibility {
     PRIVATE("private"),
     SHARED("shared"),

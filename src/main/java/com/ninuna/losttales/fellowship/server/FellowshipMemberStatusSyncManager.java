@@ -2,7 +2,6 @@ package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
-import com.ninuna.losttales.character.server.AccountVisibility;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.compat.lotr.LotrMapLocations;
@@ -101,8 +100,7 @@ public final class FellowshipMemberStatusSyncManager {
                 recipient.getUniqueID(), 1L,
                 receiver.gameplayId)
                 : buildFellowshipContent(recipient.getUniqueID(),
-                receiver.gameplayId, fellowship, view,
-                AccountVisibility.seesAccounts(recipient));
+                receiver.gameplayId, fellowship, view);
 
         SentState sent = SENT_STATES.get(recipient.getUniqueID());
         if (!content.hasFellowship() && !force
@@ -135,14 +133,13 @@ public final class FellowshipMemberStatusSyncManager {
             UUID recipientOwnerId,
             UUID activeIdentityId,
             Fellowship fellowship,
-            ServerView view,
-            boolean seesAccounts) {
+            ServerView view) {
         ArrayList<FellowshipMemberStatusSnapshot> statuses =
                 new ArrayList<FellowshipMemberStatusSnapshot>(fellowship.getMemberCount());
         boolean ruleOn = fellowship.isOn(FellowshipSwitch.SHOWN_ON_MAP);
         for (FellowshipMember member : fellowship.getMembers()) {
             statuses.add(buildMemberStatus(member,
-                    view.online.get(member.getOwnerId()), ruleOn, view, seesAccounts));
+                    view.online.get(member.getOwnerId()), ruleOn, view));
         }
         return new FellowshipStatusSnapshot(
                 recipientOwnerId,
@@ -155,16 +152,14 @@ public final class FellowshipMemberStatusSyncManager {
 
     private static FellowshipMemberStatusSnapshot buildMemberStatus(
             FellowshipMember member, FellowshipOnlineView.Online online,
-            boolean ruleOn, ServerView view, boolean seesAccounts) {
+            boolean ruleOn, ServerView view) {
         UUID identityId = member.getIdentityId();
         if (online == null) {
             return FellowshipMemberStatusSnapshot.offline(identityId);
         }
-        // The owner is online as another character, or still making one:
-        // to a recipient not shown accounts the member is simply offline.
+        // The owner is online as another character, or still making one.
         if (!identityId.equals(online.gameplayId)) {
-            return seesAccounts ? FellowshipMemberStatusSnapshot.inactive(identityId)
-                    : FellowshipMemberStatusSnapshot.offline(identityId);
+            return FellowshipMemberStatusSnapshot.inactive(identityId);
         }
 
         EntityPlayerMP player = online.player;

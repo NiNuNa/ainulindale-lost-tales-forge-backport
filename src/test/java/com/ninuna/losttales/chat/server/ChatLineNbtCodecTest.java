@@ -60,6 +60,21 @@ public final class ChatLineNbtCodecTest {
         assertSameOnTheWire(whisper, ChatLineNbtCodec.read(ChatLineNbtCodec.write(whisper)));
     }
 
+    /** What the author typed and whether the character was in the world are kept with the line. */
+    @Test
+    public void whatWasTypedAndTheWorldMarkComeBack() {
+        LostTalesChatMessagePacket line = new LostTalesChatMessagePacket(
+                ChatChannel.GLOBAL, ALICE, "Beren", "alice", "", 0, 0,
+                "hello there", 1000000L, "skin", null, "", "", 0, false,
+                43L, ChatReplyReference.NONE, "", 0L, BEREN)
+                .withNotInWorld(true)
+                .withTyped("hello there :)");
+        LostTalesChatMessagePacket read = ChatLineNbtCodec.read(ChatLineNbtCodec.write(line));
+        assertSameOnTheWire(line, read);
+        assertEquals("hello there :)", read.getTyped());
+        assertTrue(read.isNotInWorld());
+    }
+
     @Test
     public void aForwardAndAMarkerComeBackAsTheyWere() {
         LostTalesChatMessagePacket forward = new LostTalesChatMessagePacket(

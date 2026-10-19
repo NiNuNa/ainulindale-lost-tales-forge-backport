@@ -607,17 +607,6 @@ public final class CharacterSwitchCoordinator {
                     this.playerStateService.ensureBootstrapped(
                             player, roster, stores.playerStates);
 
-            if (sourceCharacter != null) {
-                if (!CharacterRaceGameplayHandler.prepareEquipmentForCharacterSwitch(
-                        player, sourceCharacter)) {
-                    return CharacterOperationResult.failure(
-                            CharacterErrorId.SWITCH_PLAYER_STATE_INVALID, roster);
-                }
-                // Armor normalization may have moved stacks between the armor
-                // and main inventories. Synchronize before any later validation
-                // can fail so the client never retains a stale pre-switch view.
-                this.playerStateService.synchronize(player);
-            }
             // The source's hired units hold still from here: whichever
             // identity is played next, they are not its to command.
             LotrHiredUnitCustody.park(player, source, roster);
@@ -711,12 +700,7 @@ public final class CharacterSwitchCoordinator {
             playerStateApplied = true;
             this.playerStateService.apply(player, target, targetCharacter, targetSnapshot);
             this.playerStateService.transitionLocation(player, targetSnapshot);
-            if (!CharacterRaceGameplayHandler.prepareEquipmentForCharacterSwitch(
-                    player, targetCharacter)) {
-                throw new CharacterStateValidationException(
-                        "Target armor cannot be normalized without dropping items");
-            }
-            // Persist any deterministic equipment normalization before identity commit.
+            // Persist the target as it now stands before identity commit.
             targetSnapshot = this.playerStateService.captureOrCreate(
                     player, playerStateAccount, stores.playerStates, target);
             // Commit the normalized target generation before publishing its
@@ -797,11 +781,6 @@ public final class CharacterSwitchCoordinator {
                             player, source, sourceCharacter, sourceSnapshot);
                     this.playerStateService.transitionLocation(
                             player, sourceSnapshot);
-                    if (!CharacterRaceGameplayHandler.prepareEquipmentForCharacterSwitch(
-                            player, sourceCharacter)) {
-                        throw new CharacterStateValidationException(
-                                "Source equipment could not be restored safely");
-                    }
                     CharacterRaceGameplayHandler.apply(player, sourceCharacter);
                     LotrHiredUnitCustody.settle(player, source, roster);
                     this.playerStateService.synchronize(player);
@@ -987,12 +966,6 @@ public final class CharacterSwitchCoordinator {
                         player, identity, activeCharacter, snapshot);
                 this.playerStateService.transitionLocation(
                         player, snapshot);
-                if (!CharacterRaceGameplayHandler
-                        .prepareEquipmentForCharacterSwitch(
-                                player, activeCharacter)) {
-                    throw new CharacterStateValidationException(
-                            "Recovered equipment cannot be normalized safely");
-                }
                 CharacterRaceGameplayHandler.apply(
                         player, activeCharacter);
                 this.playerStateService.synchronize(player);

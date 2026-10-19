@@ -29,9 +29,9 @@ public final class LostTalesWorldQuestSyncPacket implements IMessage {
     /**
      * Room for every run the world keeps at its largest: each id and
      * objective id at its longest, every run counting as many objectives
-     * as it may.
+     * as it may and naming its podium.
      */
-    static final int MAX_PACKET_BYTES = 288 * 1024;
+    static final int MAX_PACKET_BYTES = 304 * 1024;
     static final int MAX_ID_BYTES = WorldQuestRules.MAX_ID_BYTES;
 
     private final List<WorldQuestView> views = new ArrayList<WorldQuestView>();
@@ -50,17 +50,42 @@ public final class LostTalesWorldQuestSyncPacket implements IMessage {
      */
     public static LostTalesWorldQuestSyncPacket of(
             Collection<WorldQuestRun> runs, UUID viewer) {
+        return of(runs, viewer, null);
+    }
+
+    /** As above, each run with the podium {@code podiums} names for it (QUEST-36). */
+    public static LostTalesWorldQuestSyncPacket of(
+            Collection<WorldQuestRun> runs, UUID viewer,
+            Map<String, WorldQuestView> podiums) {
         List<WorldQuestView> views = new ArrayList<WorldQuestView>();
         if (runs != null) {
             for (WorldQuestRun run : runs) {
                 if (run != null && views.size() < WorldQuestNbtCodec.MAX_RUNS
                         && fits(run)) {
-                    views.add(WorldQuestView.of(run, viewer));
+                    WorldQuestView podium = podiums == null ? null
+                            : podiums.get(run.getQuestId());
+                    views.add(podium == null ? WorldQuestView.of(run, viewer)
+                            : WorldQuestView.of(run, viewer,
+                                    fitting(podium.getPodiumNames()),
+                                    podium.getPodiumParts()));
                 }
             }
         }
         return new LostTalesWorldQuestSyncPacket(views);
     }
+
+    /** Podium names cut to what the packet carries. */
+    private static List<String> fitting(List<String> names) {
+        List<String> fitted = new ArrayList<String>();
+        for (String name : names) {
+            fitted.add(name.getBytes(StandardCharsets.UTF_8).length
+                    <= MAX_NAME_BYTES ? name : "");
+        }
+        return fitted;
+    }
+
+    /** The longest podium name carried, in UTF-8 bytes. */
+    static final int MAX_NAME_BYTES = 256;
 
     private static boolean fits(WorldQuestRun run) {
         if (!fitsId(run.getQuestId())
@@ -114,6 +139,20 @@ public final class LostTalesWorldQuestSyncPacket implements IMessage {
                     }
                     counts.put(objective, Integer.valueOf(value));
                 }
+                int places = LostTalesPacketCodec.readCount(buf,
+                        WorldQuestRules.PODIUM_PLACES, "podium place");
+                List<String> podiumNames = new ArrayList<String>();
+                List<Integer> podiumParts = new ArrayList<Integer>();
+                for (int j = 0; j < places; j++) {
+                    podiumNames.add(LostTalesPacketCodec.readUtf8String(buf,
+                            MAX_NAME_BYTES));
+                    int part = buf.readInt();
+                    if (part < 0) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "invalid podium part");
+                    }
+                    podiumParts.add(Integer.valueOf(part));
+                }
                 if (questId.length() == 0
                         || state >= WorldQuestRun.State.values().length
                         || helpers < 0 || mine < 0) {
@@ -122,7 +161,7 @@ public final class LostTalesWorldQuestSyncPacket implements IMessage {
                 }
                 this.views.add(new WorldQuestView(questId,
                         WorldQuestRun.State.values()[state], endsAt, endedAt,
-                        counts, helpers, mine));
+                        counts, helpers, mine, podiumNames, podiumParts));
             }
             LostTalesPacketCodec.requireFinished(buf);
         } catch (RuntimeException malformedPayload) {
@@ -151,6 +190,13 @@ public final class LostTalesWorldQuestSyncPacket implements IMessage {
                 LostTalesPacketCodec.writeUtf8String(buf, count.getKey(),
                         MAX_ID_BYTES);
                 buf.writeInt(count.getValue().intValue());
+            }
+            LostTalesPacketCodec.writeCount(buf, view.getPodiumNames().size(),
+                    WorldQuestRules.PODIUM_PLACES, "podium place");
+            for (int index = 0; index < view.getPodiumNames().size(); index++) {
+                LostTalesPacketCodec.writeUtf8String(buf,
+                        view.getPodiumNames().get(index), MAX_NAME_BYTES);
+                buf.writeInt(view.getPodiumParts().get(index).intValue());
             }
         }
     }

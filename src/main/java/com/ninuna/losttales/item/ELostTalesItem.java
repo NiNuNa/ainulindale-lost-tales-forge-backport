@@ -240,14 +240,10 @@ public enum ELostTalesItem {
             .setUnlocalizedName("the_one_ring")
             .setCreativeTab(ELostTalesCreativeTabs.STORY.getCreativeTab())),
 
-    // Backported utility/tools.
-    CREATION_TOOL_LOOT_RESPAWNER(new LostTalesItemSimple(
-            ELostTalesItemMaterial.NEUTRAL, Type.TOOL
-    ).setUnlocalizedName("creation_tool_loot_respawner").setCreativeTab(ELostTalesCreativeTabs.MISC.getCreativeTab())),
-
-    HORN_TEST(new LostTalesItemHorn(
+    // Instruments.
+    PRACTICE_HORN(new LostTalesItemHorn(
             ELostTalesItemMaterial.NEUTRAL, Type.INSTRUMENT
-    ).setUnlocalizedName("horn_test").setCreativeTab(ELostTalesCreativeTabs.MISC.getCreativeTab())),
+    ).setUnlocalizedName("practice_horn").setCreativeTab(ELostTalesCreativeTabs.MISC.getCreativeTab())),
 
     // Quest - Items.
     MISSIVE_LETTER(new LostTalesItemMissiveLetter()
@@ -360,7 +356,6 @@ public enum ELostTalesItem {
         CONSUMABLE_FOOD("food"),
         CONSUMABLE_DRINK("drink"),
         ACCESSORY("accessory"),
-        TOOL("tool"),
         INSTRUMENT("instrument");
 
         private final String nameKey;

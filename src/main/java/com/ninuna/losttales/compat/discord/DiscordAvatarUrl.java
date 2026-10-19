@@ -1,7 +1,5 @@
 package com.ninuna.losttales.compat.discord;
 
-import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.config.LostTalesConfig;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -13,9 +11,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * with {@code {name}} and {@code {uuid}} filled in from the sender's
  * Minecraft account, so each line shows its sender's head. Discord
  * fetches the image itself; the template must be an {@code https} URL
- * or it is not used at all. A head's URL names its account, so with the
- * server's Show Accounts off a post to an in-character channel's Discord
- * channels wears the webhook's own picture instead ({@link #shownIn}).
+ * or it is not used at all.
  */
 public final class DiscordAvatarUrl {
     private DiscordAvatarUrl() {}
@@ -33,23 +29,6 @@ public final class DiscordAvatarUrl {
                 : player.getGameProfile().getName();
         return of(LostTalesConfig.discordAvatarUrlTemplate, accountName,
                 player.getUniqueID());
-    }
-
-    /**
-     * The picture a post to {@code channel}'s Discord channels may wear:
-     * {@code avatarUrl} as it is, or none in an in-character channel
-     * while the server's Show Accounts is off.
-     */
-    public static String shownIn(ChatChannel channel, String avatarUrl) {
-        return shown(ChatRolePresentation.isInCharacter(channel),
-                LostTalesConfig.showAccounts, avatarUrl);
-    }
-
-    /** {@code avatarUrl}, or empty for an in-character post while accounts are hidden. */
-    static String shown(boolean inCharacter, boolean showAccounts,
-                        String avatarUrl) {
-        return avatarUrl == null || (inCharacter && !showAccounts) ? ""
-                : avatarUrl;
     }
 
     /** The avatar URL for the sender, or empty when the template gives none. */

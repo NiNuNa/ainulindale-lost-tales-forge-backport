@@ -25,8 +25,7 @@ public final class PlayerBodyShapeLookupTest {
                 CharacterBodyModelRegistry.LOTR_DWARF,
                 CharacterBodyModelRegistry.LOTR_HOBBIT,
                 CharacterBodyModelRegistry.LOTR_ORC,
-                CharacterBodyModelRegistry.LOTR_URUK,
-                CharacterBodyModelRegistry.LOTR_HALF_TROLL}) {
+                CharacterBodyModelRegistry.LOTR_URUK}) {
             assertNotNull(modelId, PlayerBodyShape.forModelId(modelId));
             assertEquals(modelId, PlayerBodyShape.forModelId(modelId),
                     PlayerBodyShape.forModelIdOrDefault(modelId));
@@ -35,7 +34,7 @@ public final class PlayerBodyShapeLookupTest {
 
     @Test
     public void anUnknownModelIsNothingToOneAskerAndABipedToTheOther() {
-        for (String modelId : new String[] {"", null, "lotr:ent"}) {
+        for (String modelId : new String[] {"", null, "lotr:ent", "lotr:half_troll"}) {
             assertNull(PlayerBodyShape.forModelId(modelId));
             assertEquals(PlayerBodyShape.PLAYER,
                     PlayerBodyShape.forModelIdOrDefault(modelId));

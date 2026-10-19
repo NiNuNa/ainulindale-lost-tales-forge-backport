@@ -78,6 +78,7 @@ public final class ClientQuestCatalog {
             }
         }
         entries.addAll(LotrClientQuestAdapter.getEntries(minecraft));
+        entries.addAll(rumours());
         Collections.sort(entries, new Comparator<ClientQuestEntry>() {
             @Override
             public int compare(ClientQuestEntry left, ClientQuestEntry right) {
@@ -100,7 +101,7 @@ public final class ClientQuestCatalog {
                 if (entry.isCompleted()) {
                     return 1;
                 }
-                return 2;
+                return entry.isRumour() ? 3 : 2;
             }
         });
         return Collections.unmodifiableList(entries);
@@ -113,24 +114,30 @@ public final class ClientQuestCatalog {
         }
         LostTalesQuestProgress progress =
                 LostTalesClientQuestProgressStore.getActiveQuest(quest.getId());
-        boolean completed = LostTalesClientQuestProgressStore
-                .isQuestCompleted(quest.getId());
         LostTalesQuestHistoryEntry history =
                 LostTalesClientQuestProgressStore.getQuestHistoryEntry(
                         quest.getId());
-        if (progress == null && !completed && history == null) {
+        if (progress == null && history == null) {
             return null;
         }
-        ClientQuestEntry.Status status = completed
-                ? ClientQuestEntry.Status.COMPLETED
-                : history != null && history.isFailed()
-                ? ClientQuestEntry.Status.FAILED
-                : history != null && history.isAbandoned()
-                ? ClientQuestEntry.Status.ABANDONED
-                : ClientQuestEntry.Status.ACTIVE;
+        // A quest taken again runs, its History line kept beside it until
+        // this run ends (QUEST-10).
+        boolean completed = progress == null && history.isCompleted();
+        ClientQuestEntry.Status status = progress != null
+                ? ClientQuestEntry.Status.ACTIVE
+                : completed ? ClientQuestEntry.Status.COMPLETED
+                : history.isFailed() ? ClientQuestEntry.Status.FAILED
+                : ClientQuestEntry.Status.ABANDONED;
         ArrayList<ClientQuestEntry.Objective> objectives =
                 new ArrayList<ClientQuestEntry.Objective>();
-        if (progress != null || completed) {
+        if (progress != null && (progress.isReturning() || progress.isChoosing())) {
+            // Every stage is done and the hand-in is left (QUEST-31), or the
+            // stage is done and waits for a choice (QUEST-32).
+            objectives.add(new ClientQuestEntry.Objective(progress.isChoosing()
+                    ? LostTalesQuestWords.chooseLine(quest, progress)
+                    : LostTalesQuestWords.returnLine(quest, progress), 0, 1,
+                    false, false));
+        } else if (progress != null || completed) {
             for (LostTalesQuestObjectiveDefinition objective
                     : visibleObjectives(quest, progress, completed)) {
                 int target = LostTalesQuestObjectiveTextHelper
@@ -228,12 +235,52 @@ public final class ClientQuestCatalog {
         if (summary.length() > 0) {
             rewards.add(summary);
         }
+        String podiumReward = LostTalesQuestRewardText.summary(
+                com.ninuna.losttales.quest.LostTalesQuestRules.podiumRewards(quest));
+        if (podiumReward.length() > 0) {
+            rewards.add(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.quest.world.podium_reward", podiumReward));
+        }
+        // The best helpers, a small board of names (QUEST-36).
+        List<String> podium = new ArrayList<String>();
+        for (int index = 0; index < view.getPodiumNames().size(); index++) {
+            podium.add(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.quest.world.podium_place",
+                    Integer.valueOf(index + 1), view.getPodiumNames().get(index),
+                    view.getPodiumParts().get(index)));
+        }
         return new ClientQuestEntry(ClientQuestEntry.Source.WORLD,
                 quest.getId(), LostTalesQuestWords.title(quest), subtitle,
                 categoryName(LostTalesQuestCategory.of(quest)),
                 LostTalesQuestWords.description(quest), status, view.isRunning(), 1, 1,
                 remainingTicks, objectives, rewards,
-                Collections.<ClientQuestEntry.Target>emptyList(), null, null);
+                Collections.<ClientQuestEntry.Target>emptyList(), null, null,
+                null, podium);
+    }
+
+    /**
+     * The rumours heard of quests the character has not taken (QUEST-20),
+     * under Rumours: each its teller's words alone, never what the quest
+     * asks or pays.
+     */
+    private static List<ClientQuestEntry> rumours() {
+        List<ClientQuestEntry> rumours = new ArrayList<ClientQuestEntry>();
+        for (String questId : LostTalesClientQuestProgressStore.getHeardRumours()) {
+            LostTalesQuestDefinition quest =
+                    LostTalesClientQuestDefinitionStore.getQuest(questId);
+            if (quest == null || LostTalesClientQuestProgressStore.isQuestActive(questId)) {
+                continue;
+            }
+            rumours.add(new ClientQuestEntry(ClientQuestEntry.Source.LOST_TALES,
+                    questId, LostTalesQuestWords.title(quest), "",
+                    categoryName(LostTalesQuestCategory.RUMOURS),
+                    LostTalesQuestWords.rumourLine(quest),
+                    ClientQuestEntry.Status.RUMOUR, false, 0, 0, -1L,
+                    Collections.<ClientQuestEntry.Objective>emptyList(),
+                    Collections.<String>emptyList(),
+                    Collections.<ClientQuestEntry.Target>emptyList(), null, null));
+        }
+        return rumours;
     }
 
     private static List<LostTalesQuestObjectiveDefinition> visibleObjectives(

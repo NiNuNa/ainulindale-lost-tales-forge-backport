@@ -34,17 +34,11 @@ public final class ClientCharacterDisplayNames {
 
     private ClientCharacterDisplayNames() {}
 
-    /**
-     * The races the creation form offers. A race nobody may choose is
-     * left out, because the server would refuse it; a character that
-     * already is one keeps its race.
-     */
+    /** The races the creation form offers: every race of the mod. */
     public static List<String> getRaceIds() {
         ArrayList<String> ids = new ArrayList<String>();
         for (CharacterRaceDefinition definition : CharacterRaceRegistry.getAll()) {
-            if (definition.isSelectable()) {
-                ids.add(definition.getId());
-            }
+            ids.add(definition.getId());
         }
         return Collections.unmodifiableList(ids);
     }

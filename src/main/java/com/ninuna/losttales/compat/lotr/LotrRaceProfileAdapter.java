@@ -9,7 +9,6 @@ import com.ninuna.losttales.util.LostTalesIdentifiers;
 import cpw.mods.fml.common.FMLLog;
 import lotr.common.entity.npc.LOTREntityBreeMan;
 import lotr.common.entity.npc.LOTREntityDwarf;
-import lotr.common.entity.npc.LOTREntityHalfTroll;
 import lotr.common.entity.npc.LOTREntityHighElf;
 import lotr.common.entity.npc.LOTREntityHobbit;
 import lotr.common.entity.npc.LOTREntityMordorOrc;
@@ -245,13 +244,6 @@ public final class LotrRaceProfileAdapter {
                     @Override
                     public LOTREntityNPC create(World world) {
                         return new LOTREntityUrukHai(world);
-                    }
-                });
-        factories.put(CharacterRaceRegistry.HALF_TROLL,
-                new RepresentativeFactory() {
-                    @Override
-                    public LOTREntityNPC create(World world) {
-                        return new LOTREntityHalfTroll(world);
                     }
                 });
         return factories;

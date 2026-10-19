@@ -11,6 +11,5 @@ public enum CharacterFactionCategory {
     ELF,
     DWARF,
     ORC,
-    TROLL,
     TREE
 }

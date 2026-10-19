@@ -62,6 +62,50 @@ public final class LostTalesQuestWords {
         return keyPrefix(questId) + ".dialogue." + line;
     }
 
+    /** A bundled quest's rumour line (QUEST-20). */
+    public static String rumourKey(String questId) {
+        return keyPrefix(questId) + ".rumour";
+    }
+
+    /** The quest's rumour, as the teller says it, in this side's language; empty for none. */
+    public static String rumourLine(LostTalesQuestDefinition quest) {
+        if (quest == null) {
+            return "";
+        }
+        String written = LostTalesQuestParams.value(quest.getRules(),
+                LostTalesQuestRules.RUMOUR_PREFIX + "line");
+        return quest.isBundled() ? line(rumourKey(quest.getId()), written) : written;
+    }
+
+    /** A bundled quest's line for what its giver asks at a stage's choice. */
+    public static String askKey(String questId, String stageId) {
+        return keyPrefix(questId) + ".ask." + stageId;
+    }
+
+    /** A bundled quest's line for one reply of a stage's choice, {@code index} from 0. */
+    public static String choiceKey(String questId, String stageId, int index) {
+        return keyPrefix(questId) + ".choice." + stageId + "." + index;
+    }
+
+    /** What the giver asks at the stage's choice, in this side's language (QUEST-32). */
+    public static String askLine(LostTalesQuestDefinition quest,
+                                 LostTalesQuestStageDefinition stage) {
+        String written = LostTalesQuestParams.value(stage.getRules(),
+                LostTalesQuestRules.ASK);
+        return quest.isBundled() ? line(askKey(quest.getId(), stage.getId()), written)
+                : written;
+    }
+
+    /** One reply of the stage's choice, in this side's language. */
+    public static String choiceWords(LostTalesQuestDefinition quest,
+            LostTalesQuestStageDefinition stage, int index) {
+        String written = LostTalesQuestParams.value(stage.getRules(),
+                LostTalesQuestRules.CHOICE_PREFIX + index + ".say");
+        return quest.isBundled()
+                ? line(choiceKey(quest.getId(), stage.getId(), index), written)
+                : written;
+    }
+
     /**
      * A bundled quest as its file was read, worded by its lang lines: each
      * title, description, objective, journal and conversation line the file
@@ -92,8 +136,22 @@ public final class LostTalesQuestWords {
                         objective.isOptional(), objective.getParams(),
                         lined ? key : ""));
             }
-            stages.add(new LostTalesQuestStageDefinition(stage.getId(), objectives));
+            Map<String, String> rules = new LinkedHashMap<String, String>(stage.getRules());
+            fill(rules, LostTalesQuestRules.ASK, english, askKey(id, stage.getId()));
+            for (int index = 0; index < LostTalesQuestRules.MAX_CHOICES
+                    && rules.containsKey(LostTalesQuestRules.CHOICE_PREFIX + index + ".next");
+                    index++) {
+                fill(rules, LostTalesQuestRules.CHOICE_PREFIX + index + ".say", english,
+                        choiceKey(id, stage.getId(), index));
+            }
+            stages.add(new LostTalesQuestStageDefinition(stage.getId(), objectives,
+                    rules));
             fill(journal, stage.getId(), english, journalKey(id, stage.getId()));
+        }
+        Map<String, String> rules = new LinkedHashMap<String, String>(quest.getRules());
+        if (!LostTalesQuestRules.rumour(quest).isEmpty()) {
+            fill(rules, LostTalesQuestRules.RUMOUR_PREFIX + "line", english,
+                    rumourKey(id));
         }
         Map<String, String> dialogue =
                 new LinkedHashMap<String, String>(quest.getDialogue());
@@ -111,7 +169,7 @@ public final class LostTalesQuestWords {
                 quest.getStartMode(), quest.getPrerequisites(),
                 quest.getRewards(), quest.getInteraction(), quest.getMarkers(),
                 journal, dialogue, quest.getWorld(), stages, true,
-                quest.getWords());
+                quest.getWords(), rules);
     }
 
     /** A quest's title as this side reads it; its id where it has no words. */
@@ -143,24 +201,90 @@ public final class LostTalesQuestWords {
     }
 
     /**
-     * The journal line for the stage at {@code stageIndex} as this side
-     * reads it ({@link LostTalesQuestDefinition#journalStageId}); a
-     * missive's is its flavour line, else its description.
+     * The journal's tale of a quest as this side reads it (QUEST-30): the
+     * line of each stage on {@code stagePath}, in the order it was
+     * reached, a stage without a line left out. An empty path stands for
+     * the first stage alone, or for every stage when {@code whole} says
+     * the quest was finished. A missive's tale is its one line.
      */
-    public static String journalLine(LostTalesQuestDefinition quest, int stageIndex) {
+    public static List<String> journalParagraphs(LostTalesQuestDefinition quest,
+            List<String> stagePath, boolean whole) {
+        List<String> paragraphs = new ArrayList<String>();
         if (quest == null) {
-            return "";
+            return paragraphs;
         }
         if (MissiveWords.isMissive(quest.getWords())) {
-            return MissiveWords.journalLine(quest.getWords());
+            addParagraph(paragraphs, MissiveWords.journalLine(quest.getWords()));
+            return paragraphs;
         }
-        String stageId = quest.journalStageId(stageIndex);
-        if (stageId.length() == 0) {
-            return "";
+        List<String> path = new ArrayList<String>();
+        if (stagePath != null && !stagePath.isEmpty()) {
+            path.addAll(stagePath);
+        } else {
+            for (LostTalesQuestStageDefinition stage : quest.getStages()) {
+                path.add(stage.getId());
+                if (!whole) {
+                    break;
+                }
+            }
         }
-        String written = safe(quest.getJournalLog().get(stageId));
-        return quest.isBundled()
-                ? line(journalKey(quest.getId(), stageId), written) : written;
+        for (String stageId : path) {
+            String written = safe(quest.getJournalLog().get(stageId));
+            addParagraph(paragraphs, quest.isBundled()
+                    ? line(journalKey(quest.getId(), stageId), written) : written);
+        }
+        return paragraphs;
+    }
+
+    private static void addParagraph(List<String> paragraphs, String paragraph) {
+        if (paragraph != null && paragraph.trim().length() > 0) {
+            paragraphs.add(paragraph);
+        }
+    }
+
+    /**
+     * What a quest waiting for its hand-in asks, in this side's language
+     * (QUEST-31): <em>Return to Nia.</em>, or a missive's <em>Hand it in at
+     * a missive board.</em>
+     */
+    public static String returnLine(LostTalesQuestDefinition quest,
+            com.ninuna.losttales.quest.progress.LostTalesQuestProgress progress) {
+        if (LostTalesQuestRules.returnsToBoard(quest)) {
+            return StatCollector.translateToLocal("gui.losttales.quest.return.board");
+        }
+        return StatCollector.translateToLocalFormatted(
+                "gui.losttales.quest.return.giver", giverName(quest, progress));
+    }
+
+    /** What a quest waiting for a choice asks of the player (QUEST-32): <em>Talk to Nia and decide.</em> */
+    public static String chooseLine(LostTalesQuestDefinition quest,
+            com.ninuna.losttales.quest.progress.LostTalesQuestProgress progress) {
+        return StatCollector.translateToLocalFormatted(
+                "gui.losttales.quest.choose.giver", giverName(quest, progress));
+    }
+
+    /**
+     * Who gave a running quest, in this side's language: their own name
+     * where they have one, else their kind's name, else the first kind the
+     * quest's interaction names.
+     */
+    public static String giverName(LostTalesQuestDefinition quest,
+            com.ninuna.losttales.quest.progress.LostTalesQuestProgress progress) {
+        String own = progress == null ? "" : progress.getGiverName();
+        if (own.length() > 0) {
+            return own;
+        }
+        String kind = progress == null ? "" : progress.getGiverKind();
+        if (kind.length() == 0 && quest != null) {
+            kind = LostTalesQuestParams.value(quest.getInteraction(), "entity")
+                    .split(",")[0].trim();
+        }
+        String key = "entity." + kind + ".name";
+        if (StatCollector.canTranslate(key)) {
+            return StatCollector.translateToLocal(key);
+        }
+        int dot = kind.lastIndexOf('.');
+        return dot >= 0 ? kind.substring(dot + 1) : kind;
     }
 
     /**

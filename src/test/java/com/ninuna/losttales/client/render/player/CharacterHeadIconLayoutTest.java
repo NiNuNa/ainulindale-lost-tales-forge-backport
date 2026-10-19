@@ -34,14 +34,6 @@ public final class CharacterHeadIconLayoutTest {
     }
 
     @Test
-    public void halfTrollUsesItsTenPixelHeadFace() {
-        assertFeatureLayout(CharacterRaceRegistry.HALF_TROLL,
-                10.0F, 64.0F,
-                CharacterHeadIconLayout.OverlayKind
-                        .LOTR_HALF_TROLL_FEATURES);
-    }
-
-    @Test
     public void accountFallbackRetainsMinecraftHatLayer() {
         CharacterHeadIconLayout layout =
                 CharacterHeadIconLayout.minecraftSkin();

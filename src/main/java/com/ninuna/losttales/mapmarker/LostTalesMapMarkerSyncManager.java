@@ -2,6 +2,7 @@ package com.ninuna.losttales.mapmarker;
 
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerSnapshotPacket;
+import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.util.ArrayList;
@@ -10,11 +11,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * Sends each player the markers they may see, as one snapshot.
+ * Sends each player the markers they may see, as one snapshot; a marker
+ * hidden until discovered only once the character played discovered it
+ * ({@link #select}).
  *
  * <p>A change only marks who needs a fresh snapshot; every
  * {@link #FLUSH_TICKS} the marked players are sent one each, so however
@@ -41,18 +45,73 @@ public final class LostTalesMapMarkerSyncManager {
         }
         LostTalesMapMarkerWorldData data =
                 LostTalesMapMarkerStorage.get(player.worldObj);
-        ArrayList<LostTalesMapMarkerDefinition> visible =
-                new ArrayList<LostTalesMapMarkerDefinition>();
-        LostTalesMapMarkerVisibilityPolicy.Viewer viewer =
-                LostTalesMapMarkerVisibilityPolicy.Viewer.of(player);
-        for (LostTalesMapMarkerRecord record : data.getRecords()) {
-            if (LostTalesMapMarkerVisibilityPolicy.canView(
-                    record, viewer)) {
-                visible.add(record.toDefinition());
-            }
-        }
+        final LostTalesQuestPlayerData quests =
+                LostTalesQuestPlayerData.get(player);
+        List<LostTalesMapMarkerDefinition> visible = select(
+                data.getRecords(),
+                LostTalesMapMarkerVisibilityPolicy.Viewer.of(player),
+                new Discoveries() {
+                    @Override
+                    public boolean has(String markerId) {
+                        return quests != null
+                                && quests.isMarkerDiscovered(markerId);
+                    }
+                });
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new LostTalesMapMarkerSnapshotPacket(visible), player);
+    }
+
+    /**
+     * What a snapshot holds for {@code viewer}: every marker it may see,
+     * but a marker hidden until discovered only once the character played
+     * has discovered it (WAY-11). A manager is sent every marker it may
+     * see, discovered or not.
+     */
+    static List<LostTalesMapMarkerDefinition> select(
+            Collection<LostTalesMapMarkerRecord> records,
+            LostTalesMapMarkerVisibilityPolicy.Viewer viewer,
+            Discoveries discovered) {
+        ArrayList<LostTalesMapMarkerDefinition> visible =
+                new ArrayList<LostTalesMapMarkerDefinition>();
+        if (records == null || viewer == null) {
+            return visible;
+        }
+        for (LostTalesMapMarkerRecord record : records) {
+            if (!LostTalesMapMarkerVisibilityPolicy.canView(record, viewer)) {
+                continue;
+            }
+            if (record.isHiddenUntilDiscovered() && !viewer.isManager()
+                    && (discovered == null
+                        || !discovered.has(record.getId()))) {
+                continue;
+            }
+            visible.add(record.toDefinition());
+        }
+        return visible;
+    }
+
+    /**
+     * The character played found a marker, or forgot one: where it is
+     * hidden until discovered, the player is sent a fresh snapshot within
+     * a second, which now holds it, or no longer does.
+     */
+    public static void discoveryChanged(EntityPlayer player,
+                                        String markerId) {
+        if (!(player instanceof EntityPlayerMP) || player.worldObj == null
+                || player.worldObj.isRemote || markerId == null) {
+            return;
+        }
+        LostTalesMapMarkerRecord record =
+                LostTalesMapMarkerStorage.get(player.worldObj)
+                        .getRecord(markerId.trim());
+        if (record != null && record.isHiddenUntilDiscovered()) {
+            mark((EntityPlayerMP)player);
+        }
+    }
+
+    /** The markers the character played has discovered, as a snapshot asks. */
+    interface Discoveries {
+        boolean has(String markerId);
     }
 
     /** Every online player is sent a fresh snapshot within a second. */

@@ -1,9 +1,11 @@
 package com.ninuna.losttales.event;
 
 import com.ninuna.losttales.quest.LostTalesQuestManager;
+import com.ninuna.losttales.quest.QuestLogSync;
 import com.ninuna.losttales.quest.ServerQuestSync;
 import com.ninuna.losttales.quest.world.WorldQuests;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
 import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -12,14 +14,10 @@ import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerChangedDimensionEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerRespawnEvent;
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import lotr.common.LOTRLevelData;
-import lotr.common.LOTRPlayerData;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.event.entity.EntityEvent;
@@ -64,6 +62,9 @@ public final class LostTalesQuestPlayerEventHandler {
                     (EntityPlayerMP)event.player);
             WorldQuests.forget(event.player.getUniqueID());
             ServerQuestSync.forget(event.player.getUniqueID());
+            QuestLogSync.forget(event.player.getUniqueID());
+            com.ninuna.losttales.quest.QuestFellows.leaving((EntityPlayerMP)event.player);
+            com.ninuna.losttales.quest.QuestOfferPause.forget(event.player.getUniqueID());
             // The missives only this player's log held leave the server's
             // list with them.
             LostTalesQuestManager.forgetUnheldMissives(event.player);
@@ -110,14 +111,13 @@ public final class LostTalesQuestPlayerEventHandler {
         }
     }
 
+    /**
+     * The fellowships of ours the played character is in, as the markers'
+     * policy reads them: a waystone shared with a fellowship shows while
+     * the character played is a member (WAY-09).
+     */
     private static Set<UUID> getFellowshipIds(
             EntityPlayerMP player) {
-        LOTRPlayerData data = LOTRLevelData.getData(player);
-        if (data == null || data.getFellowshipIDs() == null
-                || data.getFellowshipIDs().isEmpty()) {
-            return Collections.emptySet();
-        }
-        return Collections.unmodifiableSet(
-                new LinkedHashSet<UUID>(data.getFellowshipIDs()));
+        return LostTalesMapMarkerVisibilityPolicy.fellowshipIdsOf(player);
     }
 }

@@ -1,8 +1,5 @@
 package com.ninuna.losttales.gui.hud.quest;
 
-import com.ninuna.losttales.client.camera.ThirdPersonCameraController;
-import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
-import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
@@ -11,17 +8,9 @@ import com.ninuna.losttales.client.quest.QuestMarks;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
-import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
-import com.ninuna.losttales.quest.LostTalesQuestDefinition;
-import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
-import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
-import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
-import com.ninuna.losttales.quest.LostTalesQuestObjectiveType;
-import com.ninuna.losttales.quest.LostTalesQuestParams;
-import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,12 +18,16 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
 import com.ninuna.losttales.quest.LostTalesQuestTimeText;
-/** Shared Lost Tales and LOTR quest tracker plus sync-derived notifications. */
+/**
+ * The quest tracker, Lost Tales and LOTR quests together, and the banners
+ * the quest log's changes raise. Every tracked running quest stands on the
+ * tracker, up to its size and then a count of the rest (QUEST-21); where a
+ * quest's places lie is the compass's and the world labels' to show.
+ */
 public final class LostTalesQuestHudRenderer {
     private static final int PANEL_WIDTH = 238;
     private static final int PANEL_PADDING = 6;
@@ -42,8 +35,6 @@ public final class LostTalesQuestHudRenderer {
     private static final int QUEST_ENTRY_LINE_HEIGHT = 10;
     private static final int QUEST_ENTRY_PROGRESS_HEIGHT = 5;
     private static final int QUEST_ENTRY_GAP = 5;
-    private static final float QUEST_MARKER_VISIBLE_HALF_ANGLE_DEGREES = 42.0F;
-    private static final double QUEST_MARKER_NEAR_DISTANCE_SQ = 16.0D;
     private static final int NOTIFICATION_WIDTH = 272;
     private static final int NOTIFICATION_HEIGHT = 34;
     private static final int MAX_VISIBLE_NOTIFICATIONS = 4;
@@ -75,14 +66,14 @@ public final class LostTalesQuestHudRenderer {
         GL11.glPushMatrix();
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_DEPTH_TEST);
-        renderActiveQuestTracker(minecraft, resolution, partialTicks);
+        renderActiveQuestTracker(minecraft, resolution);
         renderNotifications(minecraft, resolution);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glPopMatrix();
     }
 
-    private static void renderActiveQuestTracker(Minecraft minecraft, ScaledResolution resolution, float partialTicks) {
-        List<TrackedQuestHudEntry> entries = collectVisibleTrackedQuestEntries(minecraft, partialTicks);
+    private static void renderActiveQuestTracker(Minecraft minecraft, ScaledResolution resolution) {
+        List<TrackedQuestHudEntry> entries = collectTrackedQuestEntries(minecraft);
         if (entries.isEmpty()) {
             return;
         }
@@ -192,20 +183,10 @@ public final class LostTalesQuestHudRenderer {
         LostTalesSkyrimUiStyle.beginContent();
     }
 
-    private static List<TrackedQuestHudEntry> collectVisibleTrackedQuestEntries(Minecraft minecraft, float partialTicks) {
+    private static List<TrackedQuestHudEntry> collectTrackedQuestEntries(Minecraft minecraft) {
         List<TrackedQuestHudEntry> entries = new ArrayList<TrackedQuestHudEntry>();
         for (ClientQuestEntry entry : ClientQuestCatalog.getEntries(minecraft)) {
             if (!entry.isActive() || !entry.isTracked()) {
-                continue;
-            }
-            LostTalesQuestDefinition quest = entry.getLostTalesDefinition();
-            LostTalesQuestProgress progress = entry.getLostTalesProgress();
-            if (quest != null
-                    ? !shouldShowQuestForCurrentView(minecraft, quest,
-                            progress, partialTicks)
-                    : requiresReturnFacing(entry)
-                            && !shouldShowQuestForCurrentView(minecraft,
-                                    entry.getTargets(), partialTicks)) {
                 continue;
             }
             ArrayList<String> objectiveLines = new ArrayList<String>();
@@ -240,147 +221,6 @@ public final class LostTalesQuestHudRenderer {
                     minecraft.fontRenderer));
         }
         return entries;
-    }
-
-    /** LOTR's stored target is its giver; it gates the HUD only at turn-in. */
-    private static boolean requiresReturnFacing(ClientQuestEntry entry) {
-        if (entry == null || entry.getObjectives().isEmpty()) {
-            return false;
-        }
-        boolean required = false;
-        for (ClientQuestEntry.Objective objective : entry.getObjectives()) {
-            if (objective.isOptional()) continue;
-            required = true;
-            if (!objective.isComplete()) return false;
-        }
-        return required;
-    }
-
-    private static boolean shouldShowQuestForCurrentView(Minecraft minecraft,
-            List<ClientQuestEntry.Target> targets, float partialTicks) {
-        if (targets == null || targets.isEmpty() || minecraft == null
-                || minecraft.theWorld == null) {
-            return true;
-        }
-        int dimension = minecraft.theWorld.provider.dimensionId;
-        EntityPlayer player = minecraft.thePlayer;
-        LostTalesCompassHudRenderHelper.PlayerPos playerPos =
-                LostTalesCompassHudRenderHelper.lerpPlayerPos(player,
-                        partialTicks);
-        float viewYaw = ThirdPersonCameraController.resolveViewYaw(
-                player.prevRotationYaw, player.rotationYaw, partialTicks);
-        float normalizedYaw = LostTalesCompassHudRenderHelper
-                .normalizeViewYaw(viewYaw);
-        boolean hasCurrentDimensionTarget = false;
-        for (ClientQuestEntry.Target target : targets) {
-            if (target.getDimensionId() != dimension) {
-                continue;
-            }
-            hasCurrentDimensionTarget = true;
-            double dx = target.getX() - playerPos.x;
-            double dz = target.getZ() - playerPos.z;
-            if (dx * dx + dz * dz <= QUEST_MARKER_NEAR_DISTANCE_SQ) {
-                return true;
-            }
-            float targetDeg = LostTalesCompassHudRenderHelper
-                    .angleDegToTarget(dx, dz);
-            float delta = Math.abs(LostTalesCompassHudRenderHelper
-                    .shortestDeltaDegrees(targetDeg, normalizedYaw));
-            if (delta <= QUEST_MARKER_VISIBLE_HALF_ANGLE_DEGREES) {
-                return true;
-            }
-        }
-        return !hasCurrentDimensionTarget;
-    }
-
-    private static boolean shouldShowQuestForCurrentView(Minecraft minecraft,
-            LostTalesQuestDefinition quest, LostTalesQuestProgress progress,
-            float partialTicks) {
-        List<HudQuestTarget> targets = collectProgressibleTargets(minecraft,
-                quest, progress);
-        if (targets.isEmpty()) {
-            return true;
-        }
-
-        EntityPlayer player = minecraft.thePlayer;
-        LostTalesCompassHudRenderHelper.PlayerPos playerPos = LostTalesCompassHudRenderHelper.lerpPlayerPos(player, partialTicks);
-        float viewYaw = ThirdPersonCameraController.resolveViewYaw(
-                player.prevRotationYaw, player.rotationYaw, partialTicks);
-        float normalizedYaw = LostTalesCompassHudRenderHelper.normalizeViewYaw(viewYaw);
-
-        for (HudQuestTarget target : targets) {
-            double dx = target.x - playerPos.x;
-            double dz = target.z - playerPos.z;
-            double distSq = dx * dx + dz * dz;
-            if (distSq <= QUEST_MARKER_NEAR_DISTANCE_SQ) {
-                return true;
-            }
-            float targetDeg = LostTalesCompassHudRenderHelper.angleDegToTarget(dx, dz);
-            float delta = Math.abs(LostTalesCompassHudRenderHelper.shortestDeltaDegrees(targetDeg, normalizedYaw));
-            if (delta <= QUEST_MARKER_VISIBLE_HALF_ANGLE_DEGREES) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static List<HudQuestTarget> collectProgressibleTargets(
-            Minecraft minecraft, LostTalesQuestDefinition quest,
-            LostTalesQuestProgress progress) {
-        List<HudQuestTarget> targets = new ArrayList<HudQuestTarget>();
-        if (minecraft == null || minecraft.theWorld == null || quest == null
-                || progress == null) {
-            return targets;
-        }
-        int dimension = minecraft.theWorld.provider.dimensionId;
-        for (LostTalesQuestObjectiveDefinition objective
-                : LostTalesQuestObjectiveSelection
-                .getProgressibleObjectives(quest, progress)) {
-            if (objective == null || LostTalesQuestObjectiveSelection
-                    .isComplete(progress, objective)) {
-                continue;
-            }
-            addMarkerTargets(targets, objective, dimension);
-            HudQuestTarget coordinateTarget = coordinateTargetFromObjective(quest, objective, dimension);
-            if (coordinateTarget != null) {
-                targets.add(coordinateTarget);
-            }
-        }
-        return targets;
-    }
-
-    private static void addMarkerTargets(List<HudQuestTarget> targets, LostTalesQuestObjectiveDefinition objective, int dimension) {
-        String markerId = LostTalesQuestParams.value(objective.getParams(), "marker");
-        if (markerId == null || markerId.length() == 0) {
-            return;
-        }
-        String[] split = markerId.split(",");
-        for (String part : split) {
-            String normalized = LostTalesQuestMarkerHelper.normalizeMarkerId(part);
-            if (normalized.length() == 0) {
-                continue;
-            }
-            LostTalesMapMarkerData marker = LostTalesClientMapMarkerStore.getSharedMarker(normalized);
-            if (marker != null && marker.getDimensionId() == dimension) {
-                targets.add(new HudQuestTarget(marker.getX(), marker.getZ()));
-            }
-        }
-    }
-
-    private static HudQuestTarget coordinateTargetFromObjective(LostTalesQuestDefinition quest, LostTalesQuestObjectiveDefinition objective, int currentDimension) {
-        if (!isGotoObjective(objective)) {
-            return null;
-        }
-        LostTalesQuestParams.Location location =
-                LostTalesQuestParams.location(objective.getParams(), currentDimension);
-        if (location == null || location.getDimensionId() != currentDimension) {
-            return null;
-        }
-        return new HudQuestTarget(location.getX(), location.getZ());
-    }
-
-    private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {
-        return LostTalesQuestObjectiveType.GOTO.is(objective);
     }
 
     private static void renderNotifications(Minecraft minecraft, ScaledResolution resolution) {
@@ -485,16 +325,6 @@ public final class LostTalesQuestHudRenderer {
                 wrapped.add(noObjective());
             }
             this.objectiveLines = wrapped;
-        }
-    }
-
-    private static final class HudQuestTarget {
-        private final double x;
-        private final double z;
-
-        private HudQuestTarget(double x, double z) {
-            this.x = x;
-            this.z = z;
         }
     }
 }

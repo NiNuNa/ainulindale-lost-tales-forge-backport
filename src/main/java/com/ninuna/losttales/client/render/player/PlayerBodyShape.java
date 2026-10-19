@@ -15,30 +15,23 @@ import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
 enum PlayerBodyShape {
 
     /** A plain human: no race features. */
-    PLAYER(0, false, false, false, false, false,
+    PLAYER(0, false, false, false, false,
             0.0F, 0.0F, 0.0F, Float.NaN, 5.0F, 0.0F),
     /** Hanging hair and beard cuboid, 16 rows tall. */
-    HUMAN(16, false, false, false, false, false,
+    HUMAN(16, false, false, false, false,
             0.0F, 0.0F, 0.0F, Float.NaN, 5.0F, 0.0F),
     /** Human plus pointed ears on the head. */
-    ELF(16, true, false, false, false, false,
+    ELF(16, true, false, false, false,
             0.0F, 0.0F, 0.0F, Float.NaN, 5.0F, 0.0F),
     /** Shorter beard cuboid; torso and legs a quarter wider, arms pushed out. */
-    DWARF(12, false, true, false, false, false,
+    DWARF(12, false, true, false, false,
             0.0F, 0.0F, 0.0F, Float.NaN, 5.0F, 0.0F),
     /** Shorter beard cuboid; head and limbs lowered, legs shortened, bare feet. */
-    HOBBIT(12, false, false, true, false, false,
+    HOBBIT(12, false, false, true, false,
             4.0F, 4.8F, 4.8F, Float.NaN, 5.0F, 4.8F),
     /** Classic biped with a nose and swept-back ears. */
-    ORC(0, false, false, false, true, false,
-            0.0F, 0.0F, 0.0F, Float.NaN, 5.0F, 0.0F),
-    /**
-     * LOTR's half-troll: a ten-pixel head with muzzle, nose, tusks, ears,
-     * mohawk and horns on a twelve-pixel torso, broad two-piece arms and
-     * thick legs, eight pixels taller than a biped.
-     */
-    HALF_TROLL(0, false, false, false, false, true,
-            -8.0F, -8.0F, 0.0F, -6.0F, 8.5F, -4.0F);
+    ORC(0, false, false, false, true,
+            0.0F, 0.0F, 0.0F, Float.NaN, 5.0F, 0.0F);
 
     /**
      * How much wider than a biped a dwarf's torso, arms and legs are
@@ -50,13 +43,6 @@ enum PlayerBodyShape {
     static final float DWARF_WIDTH_SCALE = 1.25F;
     /** How much shorter a hobbit's limbs are: ten rows where twelve fit. */
     static final float HOBBIT_VERTICAL_SCALE = 10.0F / 12.0F;
-    /**
-     * The half-troll's torso against a biped's, in both directions: its
-     * box is twelve wide and sixteen long where a biped's is eight and
-     * twelve, and a cape hangs on the box rather than on the biped.
-     */
-    static final float HALF_TROLL_WIDTH_SCALE = 12.0F / 8.0F;
-    static final float HALF_TROLL_LENGTH_SCALE = 16.0F / 12.0F;
     /** How far out of the torso a dwarf's arms are pushed. */
     static final float DWARF_ARM_SHIFT = 1.0F;
     /** And its legs, which are widened rather than only moved. */
@@ -67,7 +53,6 @@ enum PlayerBodyShape {
     private final boolean dwarfProportions;
     private final boolean hobbitProportions;
     private final boolean orcFeatures;
-    private final boolean halfTroll;
     private final float headDrop;
     private final float bodyPivotY;
     private final float armDrop;
@@ -76,7 +61,7 @@ enum PlayerBodyShape {
     private final float legDrop;
 
     PlayerBodyShape(int lotrHeadwearHeight, boolean elfEars, boolean dwarfProportions,
-                    boolean hobbitProportions, boolean orcFeatures, boolean halfTroll,
+                    boolean hobbitProportions, boolean orcFeatures,
                     float headDrop, float bodyPivotY, float armDrop,
                     float armPivotOverride, float armReach, float legDrop) {
         this.lotrHeadwearHeight = lotrHeadwearHeight;
@@ -84,7 +69,6 @@ enum PlayerBodyShape {
         this.dwarfProportions = dwarfProportions;
         this.hobbitProportions = hobbitProportions;
         this.orcFeatures = orcFeatures;
-        this.halfTroll = halfTroll;
         this.headDrop = headDrop;
         this.bodyPivotY = bodyPivotY;
         this.armDrop = armDrop;
@@ -112,10 +96,6 @@ enum PlayerBodyShape {
 
     boolean hasOrcFeatures() {
         return this.orcFeatures;
-    }
-
-    boolean isHalfTroll() {
-        return this.halfTroll;
     }
 
     /** True when any pivot differs from vanilla's and must be restored after a pose. */
@@ -182,9 +162,6 @@ enum PlayerBodyShape {
         if (CharacterBodyModelRegistry.LOTR_ORC.equals(modelId)
                 || CharacterBodyModelRegistry.LOTR_URUK.equals(modelId)) {
             return ORC;
-        }
-        if (CharacterBodyModelRegistry.LOTR_HALF_TROLL.equals(modelId)) {
-            return HALF_TROLL;
         }
         return null;
     }
