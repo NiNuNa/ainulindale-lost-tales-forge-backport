@@ -53,9 +53,15 @@ final class DiscordReturnCheck {
          * that emoji, and only adds.
          */
         final boolean alone;
+        /**
+         * Where the reactions heard live stood as the page this fix comes
+         * from was read ({@link DiscordLiveReactions#mark}): a fix that
+         * reads nothing gives way to what was heard since.
+         */
+        final long heardMark;
 
         Fix(String channelId, String messageId, String key, String customId,
-            String pathForm, boolean burst, boolean alone) {
+            String pathForm, boolean burst, boolean alone, long heardMark) {
             this.channelId = channelId;
             this.messageId = messageId;
             this.key = key == null ? "" : key;
@@ -63,6 +69,7 @@ final class DiscordReturnCheck {
             this.pathForm = pathForm == null ? "" : pathForm;
             this.burst = burst;
             this.alone = alone;
+            this.heardMark = heardMark;
         }
 
         /** Whether Discord's members are to be read; otherwise Discord holds none of them. */
@@ -127,11 +134,12 @@ final class DiscordReturnCheck {
      * counts and names no way the chat can key is left alone. Two of
      * Discord's emoji the game holds under one key (a custom emoji named
      * as one of the chat's own, beside that emoji) are counted together,
-     * and their fixes only add.
+     * and their fixes only add. {@code heardMark} is where the reactions
+     * heard live stood as the page was read.
      */
     static List<Fix> fixesFor(String channelId, String messageId,
                               List<DiscordJson.ReactionCount> onDiscord,
-                              Map<String, Integer> inGame) {
+                              Map<String, Integer> inGame, long heardMark) {
         List<DiscordJson.ReactionCount> counted = onDiscord == null
                 ? Collections.<DiscordJson.ReactionCount>emptyList() : onDiscord;
         List<String> keyOf = new ArrayList<String>(counted.size());
@@ -180,14 +188,14 @@ final class DiscordReturnCheck {
             }
             fixes.add(new Fix(channelId, messageId,
                     key != null ? key : keys.get(0), count.emojiId, form,
-                    count.burst, alone));
+                    count.burst, alone, heardMark));
         }
         if (inGame != null) {
             for (Map.Entry<String, Integer> kind : inGame.entrySet()) {
                 if (!claims.containsKey(kind.getKey()) && kind.getValue() != null
                         && kind.getValue().intValue() > 0) {
                     fixes.add(new Fix(channelId, messageId, kind.getKey(),
-                            customIdOf(kind.getKey()), "", false, true));
+                            customIdOf(kind.getKey()), "", false, true, heardMark));
                 }
             }
         }

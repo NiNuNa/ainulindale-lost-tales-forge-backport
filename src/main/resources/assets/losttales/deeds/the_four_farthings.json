@@ -1,0 +1,9 @@
+{
+  "id": "losttales:the_four_farthings",
+  "category": "journeys",
+  "icon": "minecraft:compass",
+  "kind": "places",
+  "places": ["lotr:MICHEL_DELVING", "lotr:LONGBOTTOM", "lotr:FROGMORTON", "lotr:OATBARTON"],
+  "alignment": "lotr:hobbit*50",
+  "title": true
+}

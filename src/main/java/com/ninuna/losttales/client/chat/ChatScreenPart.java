@@ -411,7 +411,7 @@ public final class ChatScreenPart extends ScreenPart {
         return this.bar.activeFrame() != null;
     }
 
-    /** The head button on the live bar, where a new player's tip about it points. */
+    /** The identity button on the live bar, where a new player's tip about it points. */
     @Override
     public LostTalesUiHitBox tipTarget(String tip) {
         if (!FirstTips.Tip.HEAD.id.equals(tip) || !hasField()) {
@@ -917,7 +917,7 @@ public final class ChatScreenPart extends ScreenPart {
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.bar.tab");
             default:
-                // The head button's hover shows the chosen identity's card
+                // The identity button's hover shows the chosen identity's card
                 // instead of words.
                 return "";
         }
@@ -1470,7 +1470,7 @@ public final class ChatScreenPart extends ScreenPart {
                 ? chat.line : null, mouseX, mouseY);
         this.bar.drawNotice();
         // A person's or a role's card opens on a click, not under the
-        // pointer; only the head button's hover shows one: the chosen
+        // pointer; only the identity button's hover shows one: the chosen
         // identity's own brief card, who the roleplaying channels speak
         // as right now, while the button's own menu is not out.
         if (ChatHover.is(hover, ChatHover.Kind.CHARACTER_BUTTON)
@@ -2609,8 +2609,8 @@ public final class ChatScreenPart extends ScreenPart {
     }
 
     /**
-     * Opens the full card of whoever the pointer rests on, exactly where
-     * the hover card shows; a click that lands on nobody — the gap after
+     * Opens the full card of whoever the pointer rests on, as the card's
+     * own hit test finds them; a click that lands on nobody — the gap after
      * a closing bracket — opens nothing.
      */
     private void openPersonCard(LostTalesChatHoverCard.Found person) {
@@ -2821,7 +2821,7 @@ public final class ChatScreenPart extends ScreenPart {
     }
 
     /**
-     * Where the character menu hangs: the head button, toward the middle
+     * Where the character menu hangs: the identity button, toward the middle
      * of the window it is typed in, which is above the bar.
      */
     private SubWindowAnchor characterButtonAnchor() {

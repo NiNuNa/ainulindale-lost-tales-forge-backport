@@ -59,6 +59,14 @@ public abstract class LostTalesUtil {
         return EnumHelper.addEnum(LOTRAchievement.Category.class, enumName, classArr, args);
     }
 
+    /** A LOTR achievement category of no faction, in a colour of its own (the deeds', PROG-11). */
+    public static LOTRAchievement.Category addAchievementCategory(String enumName, int colour) {
+        Class<?>[] classArr = {int.class};
+        Object[] args = {Integer.valueOf(colour)};
+
+        return EnumHelper.addEnum(LOTRAchievement.Category.class, enumName, classArr, args);
+    }
+
     public static void setFactionAchievementCategory (LOTRFaction faction, LOTRAchievement.Category category) {
         ReflectionHelper.setPrivateValue (LOTRFaction.class, faction, category, "achieveCategory");
     }

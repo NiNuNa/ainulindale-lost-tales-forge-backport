@@ -6,8 +6,12 @@ import com.ninuna.losttales.client.window.PageRows;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -17,28 +21,27 @@ import net.minecraft.util.StatCollector;
 /**
  * The waystone page's rows: Marker, Location, Rules and Sharing,
  * each a section of Settings' own rows — typed lines and numbers between
- * chevrons as Settings' own kinds, switches and few-word options as
- * Settings words them, rows that act, and quiet rows that only read —
- * made afresh from the page's draft whenever they are asked for, the
- * page's search keeping what holds its words. A waystone the player may
- * not edit shows every row greyed, saying why.
+ * chevrons as Settings' own kinds, few-word options whose words open in a
+ * pick as every page's do (WIN-36), switches as Settings words them, rows
+ * that act, and quiet rows that only read — made afresh from the page's
+ * draft whenever they are asked for, the page's search keeping what holds
+ * its words. A waystone the player may not edit shows every row greyed,
+ * saying why.
  */
 final class WaystoneRows {
     private static final String LANG = "gui.losttales.waystone.";
 
     /* Rows of the page's own, by id. */
-    static final String ICON = "icon";
-    static final String COLOR = "color";
-    static final String RELEVANCE = "relevance";
     static final String DISCOVERABLE = "discoverable";
     static final String HIDDEN = "hidden";
     static final String REGION = "region";
     static final String FAST_TRAVEL = "fast_travel";
-    static final String VISIBILITY = "visibility";
-    static final String SHARE_KIND = "share_kind";
     static final String SHARE = "share";
     static final String UNSHARE = "unshare";
     static final String HAND_OVER = "hand_over";
+    /** What the Share with pick offers. */
+    private static final String CHARACTER = "character";
+    private static final String FELLOWSHIP = "fellowship";
     /** The longest name a share is sent for, in characters: past any character's and fellowship's name. */
     static final int MAX_SHARE_NAME = 32;
 
@@ -60,6 +63,9 @@ final class WaystoneRows {
         int sharedFellowships();
 
         boolean sharesWithFellowship();
+
+        /** Shares with a fellowship, or with a character; a change empties the name typed. */
+        void setSharesWithFellowship(boolean fellowship);
 
         String shareTarget();
 
@@ -110,7 +116,12 @@ final class WaystoneRows {
     final Settings.Line target;
     final Settings.Numeric compassRadius;
     final Settings.Numeric discoveryRadius;
-    /** The typed rows' settings, by the id their rows carry. */
+    final Pick icon;
+    final Pick color;
+    final Pick relevance;
+    final Pick access;
+    final Pick shareKind;
+    /** The typed rows' and the picks' settings, by the id their rows carry. */
     private final Map<String, Settings.Setting> typed =
             new HashMap<String, Settings.Setting>();
 
@@ -277,13 +288,168 @@ final class WaystoneRows {
                 }
             }
         };
+        this.icon = new Pick("waystone_icon", LANG + "icon") {
+            @Override
+            protected List<String> ids() {
+                WaystoneDraft draft = draft();
+                return draft == null ? Collections.<String>emptyList()
+                        : draft.icons();
+            }
+
+            @Override
+            protected String current() {
+                WaystoneDraft draft = draft();
+                return draft == null ? "" : draft.icon();
+            }
+
+            @Override
+            protected void take(String id) {
+                WaystoneDraft draft = draft();
+                if (draft != null) {
+                    draft.setIcon(id);
+                }
+            }
+
+            @Override
+            protected String word(String id) {
+                return iconWord(id);
+            }
+        };
+        this.color = new Pick("waystone_color", LANG + "color") {
+            @Override
+            protected List<String> ids() {
+                WaystoneDraft draft = draft();
+                return draft == null ? Collections.<String>emptyList()
+                        : draft.colors();
+            }
+
+            @Override
+            protected String current() {
+                WaystoneDraft draft = draft();
+                return draft == null ? "" : draft.color();
+            }
+
+            @Override
+            protected void take(String id) {
+                WaystoneDraft draft = draft();
+                if (draft != null) {
+                    draft.setColor(id);
+                }
+            }
+
+            @Override
+            protected String word(String id) {
+                return colorWord(id);
+            }
+        };
+        this.relevance = new Pick("waystone_relevance", LANG + "relevance") {
+            @Override
+            protected List<String> ids() {
+                List<String> ids = new ArrayList<String>();
+                for (LostTalesMapMarkerRelevance level
+                        : LostTalesMapMarkerRelevance.values()) {
+                    ids.add(level.getSerializedName());
+                }
+                return ids;
+            }
+
+            @Override
+            protected String current() {
+                WaystoneDraft draft = draft();
+                return draft == null ? ""
+                        : draft.relevance().getSerializedName();
+            }
+
+            @Override
+            protected void take(String id) {
+                WaystoneDraft draft = draft();
+                if (draft != null) {
+                    draft.setRelevance(
+                            LostTalesMapMarkerRelevance.fromSerializedName(id));
+                }
+            }
+
+            @Override
+            protected String word(String id) {
+                return WaystoneRows.word("relevance." + id.replace('-', '_'));
+            }
+        };
+        // Access offers Private and Public; a waystone that is not public
+        // reads Shared while it has a share (WAY-14).
+        this.access = new Pick("waystone_access", LANG + "visibility") {
+            @Override
+            protected List<String> ids() {
+                return Arrays.asList(
+                        LostTalesMapMarkerVisibility.PRIVATE.getSerializedName(),
+                        LostTalesMapMarkerVisibility.PUBLIC.getSerializedName());
+            }
+
+            @Override
+            protected String current() {
+                WaystoneDraft draft = draft();
+                return (draft != null && draft.isPublic()
+                        ? LostTalesMapMarkerVisibility.PUBLIC
+                        : LostTalesMapMarkerVisibility.PRIVATE)
+                        .getSerializedName();
+            }
+
+            @Override
+            protected void take(String id) {
+                WaystoneDraft draft = draft();
+                if (draft != null) {
+                    draft.setPublic(LostTalesMapMarkerVisibility.PUBLIC
+                                    .getSerializedName().equals(id),
+                            WaystoneRows.this.host.managesMarkers());
+                }
+            }
+
+            @Override
+            protected String word(String id) {
+                return WaystoneRows.word("visibility." + id);
+            }
+
+            @Override
+            public String value() {
+                WaystoneDraft draft = draft();
+                return WaystoneRows.word("visibility."
+                        + LostTalesMapMarkerRecord.access(
+                                draft != null && draft.isPublic(),
+                                WaystoneRows.this.host.sharedCharacters() > 0
+                                        || WaystoneRows.this.host
+                                                .sharedFellowships() > 0)
+                                .getSerializedName());
+            }
+        };
+        this.shareKind = new Pick("waystone_share_kind", LANG + "share_with") {
+            @Override
+            protected List<String> ids() {
+                return Arrays.asList(CHARACTER, FELLOWSHIP);
+            }
+
+            @Override
+            protected String current() {
+                return WaystoneRows.this.host.sharesWithFellowship()
+                        ? FELLOWSHIP : CHARACTER;
+            }
+
+            @Override
+            protected void take(String id) {
+                WaystoneRows.this.host.setSharesWithFellowship(
+                        FELLOWSHIP.equals(id));
+            }
+
+            @Override
+            protected String word(String id) {
+                return WaystoneRows.word("share_target." + id);
+            }
+        };
     }
 
     private WaystoneDraft draft() {
         return this.host.draft();
     }
 
-    /** The setting a typed row stands for, a line or a number; null for any other row. */
+    /** The setting a row stands for, a line, a number or a few-word pick; null for any other row. */
     Settings.Setting typedFor(String rowId) {
         return this.typed.get(rowId);
     }
@@ -315,12 +481,10 @@ final class WaystoneRows {
                                           String readOnly) {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
         rows.add(typedRow(this.name, readOnly));
-        rows.add(new MenuWindow.Entry(ICON, word("icon"))
-                .withValuePicture(this.host.iconPicture(), this.iconWidth)
-                .withValue(iconWord(draft.icon())).unavailable(readOnly));
-        rows.add(new MenuWindow.Entry(COLOR, word("color"))
-                .withValueChip(this.host.colorRgb(draft.color()))
-                .withValue(colorWord(draft.color())).unavailable(readOnly));
+        rows.add(pickRow(this.icon, readOnly)
+                .withValuePicture(this.host.iconPicture(), this.iconWidth));
+        rows.add(pickRow(this.color, readOnly)
+                .withValueChip(this.host.colorRgb(draft.color())));
         rows.add(typedRow(this.category, readOnly));
         rows.add(typedRow(this.description, readOnly));
         return rows;
@@ -331,10 +495,7 @@ final class WaystoneRows {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
         rows.add(typedRow(this.compassRadius, readOnly));
         rows.add(typedRow(this.discoveryRadius, readOnly));
-        rows.add(new MenuWindow.Entry(RELEVANCE, word("relevance"))
-                .withValue(word("relevance." + draft.relevance()
-                        .getSerializedName().replace('-', '_')))
-                .unavailable(readOnly));
+        rows.add(pickRow(this.relevance, readOnly));
         return rows;
     }
 
@@ -354,17 +515,9 @@ final class WaystoneRows {
         rows.add(new MenuWindow.Entry(FAST_TRAVEL, word("fast_travel"))
                 .withValue(Settings.onOff(draft.hasFastTravel()))
                 .unavailable(readOnly));
-        // Access steps Private and Public; a waystone that is not public
-        // reads Shared while it has a share (WAY-14).
-        rows.add(new MenuWindow.Entry(VISIBILITY, word("visibility"))
-                .withValue(word("visibility."
-                        + LostTalesMapMarkerRecord.access(draft.isPublic(),
-                                this.host.sharedCharacters() > 0
-                                        || this.host.sharedFellowships() > 0)
-                                .getSerializedName()))
-                .unavailable(first(readOnly, draft.isPublic()
-                        || draft.mayBePublic(this.host.managesMarkers())
-                        ? "" : word("why.public"))));
+        rows.add(pickRow(this.access, first(readOnly, draft.isPublic()
+                || draft.mayBePublic(this.host.managesMarkers())
+                ? "" : word("why.public"))));
         rows.add(quiet(word("owner"), ownerWord()));
         rows.add(quiet(word("marker_id"), this.host.markerId()));
         return rows;
@@ -386,11 +539,7 @@ final class WaystoneRows {
 
     private List<MenuWindow.Entry> sharing(String readOnly) {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
-        rows.add(new MenuWindow.Entry(SHARE_KIND, word("share_with"))
-                .withValue(word(this.host.sharesWithFellowship()
-                        ? "share_target.fellowship"
-                        : "share_target.character"))
-                .unavailable(readOnly));
+        rows.add(pickRow(this.shareKind, readOnly));
         rows.add(typedRow(this.target, readOnly));
         String why = first(readOnly,
                 this.host.shareTarget().trim().length() == 0
@@ -435,6 +584,16 @@ final class WaystoneRows {
                     stepper.format(stepper.max));
         }
         return row.unavailable(readOnly);
+    }
+
+    /**
+     * A few-word option's row as Settings makes it, its words opening in
+     * a pick once it is taken; greyed with {@code why} where it cannot be.
+     */
+    private MenuWindow.Entry pickRow(Pick setting, String why) {
+        MenuWindow.Entry row = setting.row();
+        this.typed.put(row.id, setting);
+        return row.unavailable(why);
     }
 
     /** A quiet row that only reads: its name in the aside tone and its value, never taken. */
@@ -526,6 +685,69 @@ final class WaystoneRows {
         String orNone(String words) {
             return words == null || words.trim().length() == 0
                     ? super.emptyValue() : shown(words.trim());
+        }
+    }
+
+    /**
+     * A few-word option of the waystone's: its words open in a pick named
+     * after it, the one in force lit, and a word picked stands at once on
+     * the page until Save (WIN-36). No word is marked as the default, as
+     * the waystone's saved value is what it goes back to.
+     */
+    abstract class Pick extends Settings.Setting {
+        Pick(String key, String labelKey) {
+            super(key, labelKey);
+        }
+
+        /** The words' ids, in the order the pick lists them. */
+        protected abstract List<String> ids();
+
+        /** The id in force. */
+        protected abstract String current();
+
+        protected abstract void take(String id);
+
+        /** An id as the pick and the row read it. */
+        protected abstract String word(String id);
+
+        @Override
+        public String value() {
+            return word(current());
+        }
+
+        @Override
+        public List<String> words() {
+            List<String> words = new ArrayList<String>();
+            for (String id : ids()) {
+                words.add(word(id));
+            }
+            return words;
+        }
+
+        @Override
+        public int wordIndex() {
+            return WaystoneDraft.indexOf(ids(), current());
+        }
+
+        @Override
+        public void pickWord(int index) {
+            List<String> ids = ids();
+            if (index >= 0 && index < ids.size()) {
+                take(ids.get(index));
+            }
+        }
+
+        @Override
+        public void restore() {}
+
+        @Override
+        public Settings.Store store() {
+            return Settings.Store.NONE;
+        }
+
+        @Override
+        public boolean stands() {
+            return WaystoneRows.this.host.stands();
         }
     }
 

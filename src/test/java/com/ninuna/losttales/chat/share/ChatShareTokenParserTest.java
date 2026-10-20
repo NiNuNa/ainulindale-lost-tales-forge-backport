@@ -30,17 +30,17 @@ public final class ChatShareTokenParserTest {
     @Test
     public void tokensCarryKindSpanNameAndOrdinal() {
         List<ChatShareTokenParser.Token> tokens = ChatShareTokenParser.parse(
-                "meet at [m:Northgate Test City] with [i: Bow #2 ]!");
+                "meet at [m:Greenway Market] with [i: Bow #2 ]!");
         assertEquals(2, tokens.size());
         assertEquals(ChatShareKind.MARKER, tokens.get(0).kind);
         assertEquals(8, tokens.get(0).start);
-        assertEquals(31, tokens.get(0).end);
-        assertEquals("Northgate Test City", tokens.get(0).name);
+        assertEquals(27, tokens.get(0).end);
+        assertEquals("Greenway Market", tokens.get(0).name);
         assertEquals(1, tokens.get(0).ordinal);
         assertEquals(ChatShareKind.ITEM, tokens.get(1).kind);
         assertEquals("Bow", tokens.get(1).name);
         assertEquals(2, tokens.get(1).ordinal);
-        assertEquals("northgate test city", tokens.get(0).normalizedName());
+        assertEquals("greenway market", tokens.get(0).normalizedName());
     }
 
     @Test

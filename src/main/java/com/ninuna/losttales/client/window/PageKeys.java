@@ -22,9 +22,10 @@ import org.lwjgl.input.Keyboard;
  * reads Cmd for it.
  *
  * <p>The window system's own areas — pages, windows, menus — work on
- * every page, so every page's help ends with them. A system whose tabs
- * are no pages, the chat, adds its own ({@link #addKind}); a page gives
- * its own ({@link PageContent#keyAreas}).</p>
+ * every page, so every page's help ends with them. A system whose pages
+ * are not registered ones, the chat with its conversations, adds its own
+ * ({@link #addKind}); a registered page gives its own
+ * ({@link PageContent#keyAreas}).</p>
  */
 public final class PageKeys {
     /** Stands for the key shortcuts are made with: Ctrl, or Cmd on a Mac. */
@@ -80,13 +81,13 @@ public final class PageKeys {
         }
     }
 
-    /** The keys of each kind of tab that is no page, as its system added them: the chat's. */
+    /** The keys of each kind of page that is not registered, as its system added them: the chat's. */
     private static final List<List<Area>> KINDS =
             new CopyOnWriteArrayList<List<Area>>();
 
     private PageKeys() {}
 
-    /** Adds the keys of a kind of tab that is no page; once, as its system installs. */
+    /** Adds the keys of a kind of page that is not registered; once, as its system installs. */
     public static void addKind(List<Area> areas) {
         if (areas != null && !areas.isEmpty()) {
             KINDS.add(Collections.unmodifiableList(new ArrayList<Area>(areas)));

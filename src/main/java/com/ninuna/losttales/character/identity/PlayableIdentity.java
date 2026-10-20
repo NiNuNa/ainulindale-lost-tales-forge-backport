@@ -7,12 +7,13 @@ import java.util.UUID;
 
 /**
  * Who a player is in the world: one of the account's roleplay characters,
- * or the Minecraft account itself while its first character is being made.
- * The account keeps saved state of its own, which a switch starts from.
+ * or, while the first character is being made, the ghost, named by the
+ * account. The ghost is the source of the first switch and never a
+ * switch's target.
  *
  * <p>The gameplay id is what gameplay systems key on — fellowship membership,
  * saved player state, LOTR bounty records: the character's UUID for a
- * character, the account's own UUID for the account. Character UUIDs are
+ * character, the account's own UUID for the ghost. Character UUIDs are
  * random, so the two never collide.</p>
  */
 public final class PlayableIdentity {
@@ -28,7 +29,7 @@ public final class PlayableIdentity {
         this.characterId = characterId;
     }
 
-    /** The account itself. */
+    /** The ghost a player is until their first character is made. */
     public static PlayableIdentity account(UUID ownerId) {
         return new PlayableIdentity(ownerId, null);
     }

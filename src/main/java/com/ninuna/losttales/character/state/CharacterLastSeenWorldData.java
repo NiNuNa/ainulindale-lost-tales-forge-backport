@@ -50,7 +50,7 @@ public final class CharacterLastSeenWorldData extends WorldSavedData {
         this.seen.clear();
         this.quarantined.clear();
         this.unsupported = null;
-        NbtQuarantine.Read quarantine = NbtQuarantine.readCurrentVersionOnly(compound);
+        NbtQuarantine.Read quarantine = NbtQuarantine.read(compound);
         if (compound.getInteger(TAG_VERSION) != DATA_VERSION || !quarantine.isSupported()
                 || !compound.hasKey(TAG_SEEN, Constants.NBT.TAG_LIST)) {
             this.unsupported = (NBTTagCompound) compound.copy();

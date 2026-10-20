@@ -2,6 +2,7 @@ package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatMessageIds;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.nbt.NBTTagCompound;
@@ -27,6 +28,9 @@ public final class DiscordMessageLinkNbtCodecTest {
             "https://discord.com/api/webhooks/654321/OTHER-TOKEN";
     private static final List<NBTTagCompound> NO_QUARANTINE =
             Collections.<NBTTagCompound>emptyList();
+    private static final List<DiscordTopicMemory.SavedTopic> NO_TOPICS =
+            Collections.<DiscordTopicMemory.SavedTopic>emptyList();
+    private static final long START = 1000000000L;
     private static final DiscordMessageLinks.MessageIndex EVERYTHING =
             new DiscordMessageLinks.MessageIndex() {
                 @Override
@@ -38,10 +42,9 @@ public final class DiscordMessageLinkNbtCodecTest {
     @Test
     public void linksRoundTripWithoutTheirWebhooks() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        // A game line posted through two bindings: one into a channel
-        // Discord named, one through a webhook whose channel it never did.
+        // A game line posted through two bindings into two channels.
         links.link(1000L, "111", "-# ↩ header\n", "channel:5", WEBHOOK, "ooc");
-        links.link(1000L, "222", "", OTHER_WEBHOOK, OTHER_WEBHOOK, "ooc#2");
+        links.link(1000L, "222", "", "channel:6", OTHER_WEBHOOK, "ooc#2");
         // A Discord member's line, read from a channel.
         links.link(2000L, "333", "", "channel:5", "");
 
@@ -59,14 +62,15 @@ public final class DiscordMessageLinkNbtCodecTest {
         assertEquals(1000L, restored.messageIdOf("222"));
         assertEquals(2000L, restored.messageIdOf("333"));
         assertEquals("111", restored.discordIdOf(1000L, "channel:5"));
+        assertEquals("222", restored.discordIdOf(1000L, "channel:6"));
         assertEquals("333", restored.discordIdOf(2000L, "channel:5"));
         List<DiscordMessageLinks.Copy> copies = restored.copiesOf(1000L);
         assertEquals(2, copies.size());
         assertEquals("-# ↩ header\n", copies.get(0).header);
         assertEquals("ooc", copies.get(0).bindingId);
         assertEquals("", copies.get(0).webhookUrl);
-        // The copy whose channel was never learnt comes back under its binding.
-        assertEquals("binding:ooc#2", copies.get(1).destination);
+        // Each copy comes back under the channel it is in.
+        assertEquals("channel:6", copies.get(1).destination);
         assertEquals("ooc#2", copies.get(1).bindingId);
         assertEquals("", copies.get(1).webhookUrl);
         assertEquals("", restored.copiesOf(2000L).get(0).bindingId);
@@ -81,16 +85,17 @@ public final class DiscordMessageLinkNbtCodecTest {
         links.link(1000L, "111",
                 "-# ↩ [**A** — hi](https://discord.com/channels/1/5/99)\n",
                 "channel:5", WEBHOOK, "ooc");
+        // A post known by its webhook alone is left out.
         links.link(2000L, "222", "", WEBHOOK, WEBHOOK, "ooc");
-        // A post named by neither a channel nor a binding is left out.
         links.link(3000L, "333", "", OTHER_WEBHOOK, OTHER_WEBHOOK, "");
-        // So is one under a binding id that could pass for a URL.
-        links.link(4000L, "444", "", OTHER_WEBHOOK, OTHER_WEBHOOK,
+        // A binding id that could pass for a URL is not written.
+        links.link(4000L, "444", "", "channel:6", OTHER_WEBHOOK,
                 "https://evil.example/x");
 
         NBTTagCompound written = write(links);
         assertNoWebhook(written);
         assertEquals(2, DiscordMessageLinkNbtCodec.read(written).getEntries().size());
+        assertFalse(written.toString().contains("evil"));
         // The store writes nothing else, attached or after the stop.
         DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData(DiscordMessageLinkWorldData.DATA_NAME);
         data.attach(links, false);
@@ -170,9 +175,10 @@ public final class DiscordMessageLinkNbtCodecTest {
         NBTTagCompound urlDestination = entryLike(second, 4000L, "400");
         firstCopyOf(urlDestination).setString("Destination", WEBHOOK);
         NBTTagCompound badDiscordId = entryLike(second, 5000L, "not-a-snowflake");
-        // Kept under a binding it does not name.
-        NBTTagCompound unnamedBinding = entryLike(second, 6000L, "600");
-        firstCopyOf(unnamedBinding).setString("Destination", "binding:ooc");
+        // Kept under a binding rather than its channel.
+        NBTTagCompound underBinding = entryLike(second, 6000L, "600");
+        firstCopyOf(underBinding).setString("Destination", "binding:ooc");
+        firstCopyOf(underBinding).setString("Binding", "ooc");
         NBTTagCompound noCopies = entryLike(second, 7000L, "700");
         noCopies.setTag("Copies", new NBTTagList());
         // Another message under a Discord id the second already names.
@@ -185,7 +191,7 @@ public final class DiscordMessageLinkNbtCodecTest {
         rewritten.appendTag(noId);
         rewritten.appendTag(urlDestination);
         rewritten.appendTag(badDiscordId);
-        rewritten.appendTag(unnamedBinding);
+        rewritten.appendTag(underBinding);
         rewritten.appendTag(noCopies);
         rewritten.appendTag(takenDiscordId);
         rewritten.appendTag(sameMessage);
@@ -201,7 +207,7 @@ public final class DiscordMessageLinkNbtCodecTest {
         assertEquals("invalid_message_id", quarantine.get(0).getString("Reason"));
         assertEquals("invalid_destination", quarantine.get(1).getString("Reason"));
         assertEquals("invalid_discord_id", quarantine.get(2).getString("Reason"));
-        assertEquals("invalid_binding", quarantine.get(3).getString("Reason"));
+        assertEquals("invalid_destination", quarantine.get(3).getString("Reason"));
         assertEquals("missing_copies", quarantine.get(4).getString("Reason"));
         assertEquals("duplicate_discord_id", quarantine.get(5).getString("Reason"));
         assertEquals("duplicate_message", quarantine.get(6).getString("Reason"));
@@ -212,7 +218,7 @@ public final class DiscordMessageLinkNbtCodecTest {
         // The quarantine rides along on the next write, and the rest
         // reads back clean.
         NBTTagCompound again = new NBTTagCompound();
-        DiscordMessageLinkNbtCodec.write(again, result.getEntries(), quarantine);
+        DiscordMessageLinkNbtCodec.write(again, result.getEntries(), NO_TOPICS, quarantine);
         DiscordMessageLinkNbtCodec.ReadResult reread =
                 DiscordMessageLinkNbtCodec.read(again);
         assertEquals(7, reread.getQuarantineEntriesCopy().size());
@@ -231,7 +237,7 @@ public final class DiscordMessageLinkNbtCodecTest {
                             Long.toString(100000L + index), "channel:5", "", ""))));
         }
         NBTTagCompound written = new NBTTagCompound();
-        DiscordMessageLinkNbtCodec.write(written, many, NO_QUARANTINE);
+        DiscordMessageLinkNbtCodec.write(written, many, NO_TOPICS, NO_QUARANTINE);
         DiscordMessageLinkNbtCodec.ReadResult result =
                 DiscordMessageLinkNbtCodec.read(written);
         assertTrue(result.wasRepaired());
@@ -266,7 +272,7 @@ public final class DiscordMessageLinkNbtCodecTest {
         }
         NBTTagCompound written = new NBTTagCompound();
         DiscordMessageLinkNbtCodec.write(written, Collections.singletonList(
-                new DiscordMessageLinks.SavedLink(1000L, copies)), NO_QUARANTINE);
+                new DiscordMessageLinks.SavedLink(1000L, copies)), NO_TOPICS, NO_QUARANTINE);
         DiscordMessageLinkNbtCodec.ReadResult result =
                 DiscordMessageLinkNbtCodec.read(written);
         assertFalse(result.wasRepaired());
@@ -280,19 +286,274 @@ public final class DiscordMessageLinkNbtCodecTest {
     }
 
     @Test
-    public void aMissingSaveReadsAsNothingKept() {
+    public void anEmptyListReadsAsNothingKept() {
         DiscordMessageLinkNbtCodec.ReadResult result =
-                DiscordMessageLinkNbtCodec.read(null);
+                DiscordMessageLinkNbtCodec.read(write(new DiscordMessageLinks()));
         assertFalse(result.isReadOnly());
+        assertFalse(result.wasRepaired());
         assertTrue(result.getEntries().isEmpty());
         assertTrue(result.getQuarantineEntriesCopy().isEmpty());
+    }
+
+    /**
+     * A save without its version or its list is data of another shape:
+     * kept as it is, the store read-only, never filled in.
+     */
+    @Test
+    public void aSaveOfAnotherShapeIsKeptReadOnly() {
+        assertTrue(DiscordMessageLinkNbtCodec.read(new NBTTagCompound()).isReadOnly());
+        DiscordMessageLinks links = new DiscordMessageLinks();
+        links.link(1000L, "111", "", "channel:5", "");
+        NBTTagCompound unversioned = write(links);
+        unversioned.removeTag("DataVersion");
+        assertTrue(DiscordMessageLinkNbtCodec.read(unversioned).isReadOnly());
+        NBTTagCompound older = write(links);
+        older.setInteger("DataVersion", 0);
+        assertTrue(DiscordMessageLinkNbtCodec.read(older).isReadOnly());
+        NBTTagCompound noList = write(links);
+        noList.removeTag("Messages");
+        DiscordMessageLinkNbtCodec.ReadResult result = DiscordMessageLinkNbtCodec.read(noList);
+        assertTrue(result.isReadOnly());
+        assertTrue(result.getOriginalDataCopy().hasKey("DataVersion"));
+    }
+
+    /** A copy without a field the writer always writes is quarantined with its message. */
+    @Test
+    public void aCopyMissingAFieldIsQuarantined() {
+        for (String field : new String[] {"Binding", "Header"}) {
+            DiscordMessageLinks links = new DiscordMessageLinks();
+            links.link(1000L, "111", "", "channel:5", "");
+            NBTTagCompound written = write(links);
+            firstCopyOf(written.getTagList("Messages", Constants.NBT.TAG_COMPOUND)
+                    .getCompoundTagAt(0)).removeTag(field);
+            DiscordMessageLinkNbtCodec.ReadResult result =
+                    DiscordMessageLinkNbtCodec.read(written);
+            assertFalse(field, result.isReadOnly());
+            assertTrue(field, result.getEntries().isEmpty());
+            assertEquals(field, 1, result.getQuarantineEntriesCopy().size());
+        }
+    }
+
+    /**
+     * Each kept topic's last two writes and their words round-trip beside
+     * the links, and a memory restored from them paces as the one that
+     * wrote them.
+     */
+    @Test
+    public void topicsRoundTripBesideTheLinks() {
+        DiscordTopicMemory memory = new DiscordTopicMemory();
+        DiscordTopicPacing first = memory.pacingOf("111");
+        first.want("Server online • 2/20 players");
+        first.posted("Server online • 2/20 players", START - 60000L);
+        first.want("Server offline");
+        first.posted("Server offline", START);
+        DiscordTopicPacing second = memory.pacingOf("222");
+        second.want("Server offline");
+        second.posted("Server offline", START - 1L);
+
+        DiscordMessageLinks links = new DiscordMessageLinks();
+        links.link(1000L, "999", "", "channel:5", "");
+        NBTTagCompound written = new NBTTagCompound();
+        DiscordMessageLinkNbtCodec.write(written, links.snapshot().links,
+                memory.snapshot().topics, NO_QUARANTINE);
+        DiscordMessageLinkNbtCodec.ReadResult result = DiscordMessageLinkNbtCodec.read(written);
+        assertFalse(result.isReadOnly());
+        assertFalse(result.wasRepaired());
+        assertEquals(1, result.getEntries().size());
+        assertEquals(2, result.getTopics().size());
+        DiscordTopicMemory.SavedTopic read = result.getTopics().get(0);
+        assertEquals("111", read.channelId);
+        assertEquals("Server offline", read.words);
+        assertEquals(START, read.lastWrite);
+        assertEquals(START - 60000L, read.writeBefore);
+        assertEquals(DiscordTopicMemory.SavedTopic.NO_WRITE,
+                result.getTopics().get(1).writeBefore);
+
+        DiscordTopicMemory restored = new DiscordTopicMemory();
+        assertEquals(2, restored.restore(result.getTopics(), START + 60000L));
+        assertEquals("Server offline", restored.pacingOf("111").posted());
+        assertEquals(first.nextTurn(DiscordTopicPacing.WINDOW_MILLIS, false),
+                restored.pacingOf("111").nextTurn(DiscordTopicPacing.WINDOW_MILLIS, false));
+        assertEquals(first.nextTurn(DiscordTopicPacing.WINDOW_MILLIS, true),
+                restored.pacingOf("111").nextTurn(DiscordTopicPacing.WINDOW_MILLIS, true));
+        // Written again, the save says exactly the same.
+        NBTTagCompound again = new NBTTagCompound();
+        DiscordMessageLinkNbtCodec.write(again, result.getEntries(),
+                restored.snapshot().topics, NO_QUARANTINE);
+        assertEquals(written, again);
+    }
+
+    /**
+     * A save of another shape is kept read-only, never read in part: one
+     * without its list of topics, one of the version before the topics,
+     * and one whose topics are not compounds.
+     */
+    @Test
+    public void aSaveWithoutItsTopicsIsKeptReadOnly() {
+        NBTTagCompound noTopics = writeTopics();
+        noTopics.removeTag("Topics");
+        assertTrue(DiscordMessageLinkNbtCodec.read(noTopics).isReadOnly());
+        NBTTagCompound before = writeTopics();
+        before.removeTag("Topics");
+        before.setInteger("DataVersion", 1);
+        DiscordMessageLinkNbtCodec.ReadResult result = DiscordMessageLinkNbtCodec.read(before);
+        assertTrue(result.isReadOnly());
+        assertEquals(1, result.getUnsupportedVersion());
+        assertTrue(result.getEntries().isEmpty());
+        NBTTagCompound strings = writeTopics();
+        NBTTagList odd = new NBTTagList();
+        odd.appendTag(new NBTTagString("111"));
+        strings.setTag("Topics", odd);
+        assertTrue(DiscordMessageLinkNbtCodec.read(strings).isReadOnly());
+        // A topic from a newer build makes the whole store read-only too.
+        NBTTagCompound newer = writeTopics(topic("111", "Server offline", START, 0L));
+        newer.getTagList("Topics", Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0)
+                .setInteger("DataVersion",
+                        DiscordMessageLinkNbtCodec.CURRENT_TOPIC_DATA_VERSION + 1);
+        assertTrue(DiscordMessageLinkNbtCodec.read(newer).isReadOnly());
+    }
+
+    /** A topic the save cannot vouch for is quarantined whole, where it stood, and the rest read. */
+    @Test
+    public void topicsTheSaveCannotVouchForAreQuarantined() {
+        NBTTagCompound written = writeTopics(topic("111", "Server offline", START, 0L));
+        NBTTagCompound good = written.getTagList("Topics", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0);
+        NBTTagList rewritten = new NBTTagList();
+        rewritten.appendTag(good.copy());
+        NBTTagCompound badChannel = (NBTTagCompound) good.copy();
+        badChannel.setString("ChannelId", "https://evil.example/x");
+        NBTTagCompound noWords = (NBTTagCompound) good.copy();
+        noWords.setString("ChannelId", "222");
+        noWords.setString("Words", "");
+        NBTTagCompound longWords = (NBTTagCompound) good.copy();
+        longWords.setString("ChannelId", "333");
+        StringBuilder text = new StringBuilder();
+        for (int index = 0; index <= DiscordMessageLinkNbtCodec.MAX_TOPIC_LENGTH; index++) {
+            text.append('x');
+        }
+        longWords.setString("Words", text.toString());
+        NBTTagCompound noTime = (NBTTagCompound) good.copy();
+        noTime.setString("ChannelId", "444");
+        noTime.setLong("LastWrite", 0L);
+        NBTTagCompound laterBefore = (NBTTagCompound) good.copy();
+        laterBefore.setString("ChannelId", "555");
+        laterBefore.setLong("WriteBefore", START + 1L);
+        NBTTagCompound missingField = (NBTTagCompound) good.copy();
+        missingField.setString("ChannelId", "666");
+        missingField.removeTag("WriteBefore");
+        NBTTagCompound unversioned = (NBTTagCompound) good.copy();
+        unversioned.setString("ChannelId", "777");
+        unversioned.removeTag("DataVersion");
+        NBTTagCompound sameChannel = (NBTTagCompound) good.copy();
+        rewritten.appendTag(badChannel);
+        rewritten.appendTag(noWords);
+        rewritten.appendTag(longWords);
+        rewritten.appendTag(noTime);
+        rewritten.appendTag(laterBefore);
+        rewritten.appendTag(missingField);
+        rewritten.appendTag(unversioned);
+        rewritten.appendTag(sameChannel);
+        written.setTag("Topics", rewritten);
+
+        DiscordMessageLinkNbtCodec.ReadResult result = DiscordMessageLinkNbtCodec.read(written);
+        assertFalse(result.isReadOnly());
+        assertTrue(result.wasRepaired());
+        assertEquals(1, result.getEntries().size());
+        assertEquals(1, result.getTopics().size());
+        assertEquals("111", result.getTopics().get(0).channelId);
+        List<NBTTagCompound> quarantine = result.getQuarantineEntriesCopy();
+        assertEquals(8, quarantine.size());
+        assertEquals("invalid_topic_channel", quarantine.get(0).getString("Reason"));
+        assertEquals("invalid_topic_words", quarantine.get(1).getString("Reason"));
+        assertEquals("invalid_topic_words", quarantine.get(2).getString("Reason"));
+        assertEquals("invalid_topic_writes", quarantine.get(3).getString("Reason"));
+        assertEquals("invalid_topic_writes", quarantine.get(4).getString("Reason"));
+        assertEquals("invalid_topic_writes", quarantine.get(5).getString("Reason"));
+        assertEquals("invalid_topic_version", quarantine.get(6).getString("Reason"));
+        assertEquals("duplicate_topic_channel", quarantine.get(7).getString("Reason"));
+        assertEquals(1, quarantine.get(0).getInteger("TopicIndex"));
+        assertFalse(quarantine.get(0).hasKey("EntryIndex"));
+        assertTrue(quarantine.get(0).hasKey("OriginalData", Constants.NBT.TAG_COMPOUND));
+
+        // The quarantine rides along on the next write, and the rest
+        // reads back clean.
+        NBTTagCompound again = new NBTTagCompound();
+        DiscordMessageLinkNbtCodec.write(again, result.getEntries(), result.getTopics(),
+                quarantine);
+        DiscordMessageLinkNbtCodec.ReadResult reread = DiscordMessageLinkNbtCodec.read(again);
+        assertFalse(reread.wasRepaired());
+        assertEquals(8, reread.getQuarantineEntriesCopy().size());
+        assertEquals(1, reread.getTopics().size());
+    }
+
+    /** Topics past the bound are quarantined on read, and never written. */
+    @Test
+    public void theTopicBoundHolds() {
+        int max = DiscordMessageLinkNbtCodec.MAX_TOPICS;
+        NBTTagCompound written = writeTopics();
+        NBTTagList many = new NBTTagList();
+        NBTTagCompound one = writeTopics(topic("1000", "Server offline", START, 0L))
+                .getTagList("Topics", Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
+        for (int index = 0; index < max + 2; index++) {
+            NBTTagCompound entry = (NBTTagCompound) one.copy();
+            entry.setString("ChannelId", Long.toString(1000L + index));
+            many.appendTag(entry);
+        }
+        written.setTag("Topics", many);
+        DiscordMessageLinkNbtCodec.ReadResult result = DiscordMessageLinkNbtCodec.read(written);
+        assertEquals(max, result.getTopics().size());
+        assertEquals(2, result.getQuarantineEntriesCopy().size());
+        assertEquals("topics_over_capacity",
+                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+
+        List<DiscordTopicMemory.SavedTopic> topics =
+                new ArrayList<DiscordTopicMemory.SavedTopic>();
+        for (int index = 0; index < max + 2; index++) {
+            topics.add(topic(Long.toString(1000L + index), "Server offline", START, 0L));
+        }
+        NBTTagCompound bounded = writeTopics(topics.toArray(
+                new DiscordTopicMemory.SavedTopic[topics.size()]));
+        assertEquals(max, bounded.getTagList("Topics", Constants.NBT.TAG_COMPOUND).tagCount());
+        assertFalse(DiscordMessageLinkNbtCodec.read(bounded).wasRepaired());
+    }
+
+    /** A topic a read would refuse is not written, and a channel is written once. */
+    @Test
+    public void topicsAReadWouldRefuseAreNotWritten() {
+        NBTTagCompound written = writeTopics(
+                topic("111", "Server offline", START, START - 1L),
+                topic("111", "Server online", START + 1L, 0L),
+                topic("not-a-channel", "Server offline", START, 0L),
+                topic("222", "", START, 0L),
+                topic("333", "Server offline", 0L, 0L),
+                topic("444", "Server offline", START, START + 1L));
+        DiscordMessageLinkNbtCodec.ReadResult result = DiscordMessageLinkNbtCodec.read(written);
+        assertFalse(result.wasRepaired());
+        assertEquals(1, result.getTopics().size());
+        assertEquals("Server offline", result.getTopics().get(0).words);
     }
 
     private static NBTTagCompound write(DiscordMessageLinks links) {
         NBTTagCompound written = new NBTTagCompound();
         DiscordMessageLinkNbtCodec.write(written, links.snapshot().links,
-                NO_QUARANTINE);
+                NO_TOPICS, NO_QUARANTINE);
         return written;
+    }
+
+    /** A save holding one link and the topics given. */
+    private static NBTTagCompound writeTopics(DiscordTopicMemory.SavedTopic... topics) {
+        DiscordMessageLinks links = new DiscordMessageLinks();
+        links.link(1000L, "111", "", "channel:5", "");
+        NBTTagCompound written = new NBTTagCompound();
+        DiscordMessageLinkNbtCodec.write(written, links.snapshot().links,
+                Arrays.asList(topics), NO_QUARANTINE);
+        return written;
+    }
+
+    private static DiscordTopicMemory.SavedTopic topic(String channelId, String words,
+                                                       long lastWrite, long writeBefore) {
+        return new DiscordTopicMemory.SavedTopic(channelId, words, lastWrite, writeBefore);
     }
 
     /** A copy of {@code entry} under another message id, its first copy under another Discord id. */

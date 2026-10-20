@@ -1,7 +1,5 @@
 package com.ninuna.losttales.mapmarker;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import java.util.Locale;
 
 /** Human-readable importance levels used when overlapping map markers compete. */
@@ -23,17 +21,11 @@ public enum LostTalesMapMarkerRelevance {
     public String getSerializedName() { return this.serializedName; }
     public int getRank() { return this.rank; }
 
+    /** The level a marker file names, {@code very-high} or {@code very_high}; null for a name no level has. */
     public static LostTalesMapMarkerRelevance fromSerializedName(
             String value) {
         String normalized = value == null ? ""
                 : value.trim().toLowerCase(Locale.ROOT).replace('_', '-');
-        // Read the two names used by the short-lived six-level format so
-        // existing resource packs do not stop loading after this cleanup.
-        if ("normal".equals(normalized)) {
-            normalized = MEDIUM.serializedName;
-        } else if ("landmark".equals(normalized)) {
-            normalized = VERY_HIGH.serializedName;
-        }
         for (LostTalesMapMarkerRelevance relevance : values()) {
             if (relevance.serializedName.equals(normalized)) {
                 return relevance;
@@ -42,7 +34,7 @@ public enum LostTalesMapMarkerRelevance {
         return null;
     }
 
-    /** Maps old numeric saves to the nearest named level. */
+    /** The level nearest a marker's rank, as its waystone page reads it. */
     public static LostTalesMapMarkerRelevance fromRank(int rank) {
         LostTalesMapMarkerRelevance closest = MEDIUM;
         int closestDistance = Integer.MAX_VALUE;
@@ -54,47 +46,5 @@ public enum LostTalesMapMarkerRelevance {
             }
         }
         return closest;
-    }
-
-    /**
-     * Reads the named JSON setting. The former numeric key remains accepted
-     * so resource packs authored against the transitional build still load.
-     */
-    public static Integer parseJsonRank(JsonObject object) {
-        if (object == null) {
-            return null;
-        }
-        JsonElement relevanceElement = object.get("relevance");
-        if (relevanceElement != null && !relevanceElement.isJsonNull()) {
-            if (!relevanceElement.isJsonPrimitive()
-                    || !relevanceElement.getAsJsonPrimitive().isString()) {
-                return null;
-            }
-            LostTalesMapMarkerRelevance relevance = fromSerializedName(
-                    relevanceElement.getAsString());
-            return relevance == null ? null
-                    : Integer.valueOf(relevance.rank);
-        }
-
-        JsonElement legacy = object.get("priority");
-        if (legacy == null || legacy.isJsonNull()) {
-            return Integer.valueOf(MEDIUM.rank);
-        }
-        if (!legacy.isJsonPrimitive()
-                || !legacy.getAsJsonPrimitive().isNumber()) {
-            return null;
-        }
-        try {
-            double value = legacy.getAsDouble();
-            if (Double.isNaN(value) || Double.isInfinite(value)
-                    || value != Math.rint(value)
-                    || value < LostTalesMapMarkerDefinition.MIN_PRIORITY
-                    || value > LostTalesMapMarkerDefinition.MAX_PRIORITY) {
-                return null;
-            }
-            return Integer.valueOf((int)value);
-        } catch (RuntimeException ignored) {
-            return null;
-        }
     }
 }

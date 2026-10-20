@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.hud.placement;
 
+import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import org.junit.Test;
 
@@ -9,7 +11,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * The HUD Placement page shows the game's screen in small, kept to its
  * own shape, whole inside its side of the page with a margin, centred on
- * whole pixels.
+ * whole pixels; its boxes wear the windows' colours.
  */
 public final class HudPlacementPageTest {
     @Test
@@ -26,5 +28,23 @@ public final class HudPlacementPageTest {
         assertEquals(Math.floor(fitted[1]), fitted[1], 0.0D);
         assertEquals("centred across", Math.floor(10.0D + (200.0D - fitted[2]) / 2.0D),
                 fitted[0], 0.0D);
+    }
+
+    /** A panel's box wears the theme's colours: the primary, the secondary while lit. */
+    @Test
+    public void aBoxWearsTheThemesColours() {
+        String primary = LostTalesConfig.windowPrimaryColor;
+        String secondary = LostTalesConfig.windowSecondaryColor;
+        try {
+            LostTalesConfig.windowPrimaryColor = "indigo";
+            LostTalesConfig.windowSecondaryColor = "teal";
+            assertEquals(LostTalesColors.rgb(LostTalesColors.INDIGO),
+                    HudPlacementPage.boxRgb(false));
+            assertEquals(LostTalesColors.rgb(LostTalesColors.TEAL),
+                    HudPlacementPage.boxRgb(true));
+        } finally {
+            LostTalesConfig.windowPrimaryColor = primary;
+            LostTalesConfig.windowSecondaryColor = secondary;
+        }
     }
 }

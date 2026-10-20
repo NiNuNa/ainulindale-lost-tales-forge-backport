@@ -1,0 +1,5 @@
+{
+  "view": "quest_journal",
+  "locked": true,
+  "pages": ["journal", "map"]
+}

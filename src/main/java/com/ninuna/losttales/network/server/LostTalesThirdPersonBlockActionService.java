@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.server;
 
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.play.server.S02PacketChat;
@@ -20,12 +21,14 @@ public final class LostTalesThirdPersonBlockActionService {
 
     private LostTalesThirdPersonBlockActionService() {}
 
+    /**
+     * Uses the block face the player aimed at, with what is in their hand
+     * now; runs on the server thread.
+     */
     public static void execute(
-            EntityPlayerMP player, int expectedDimension,
-            int x, int y, int z, int side,
-            float hitOffsetX, float hitOffsetY, float hitOffsetZ,
-            int expectedHotbarSlot, ItemStack expectedHeldItem) {
-        if (!hasUsablePlayerContext(player, expectedDimension)
+            EntityPlayerMP player, int x, int y, int z, int side,
+            float hitOffsetX, float hitOffsetY, float hitOffsetZ) {
+        if (!hasUsablePlayerContext(player)
                 || !isValidBlockPosition(x, y, z)
                 || !isValidSide(side)
                 || !areValidOffsets(
@@ -48,68 +51,45 @@ public final class LostTalesThirdPersonBlockActionService {
             return;
         }
 
-        if (!hasExpectedHeldItem(
-                player, expectedHotbarSlot, expectedHeldItem)) {
+        int hotbarSlot = player.inventory.currentItem;
+        if (hotbarSlot < 0 || hotbarSlot >= InventoryPlayer.getHotbarSize()
+                || hotbarSlot >= player.inventory.mainInventory.length) {
             sendBlockCorrections(player, world, x, y, z, side);
-            sendHeldItemCorrection(player, expectedHotbarSlot);
             return;
         }
+        ItemStack heldBefore = ItemStack.copyItemStack(
+                player.inventory.mainInventory[hotbarSlot]);
 
         boolean validTarget = rayMatchesBlock(
                 world, eye, hit, x, y, z, side);
-        int selectedSlotAtExecution = player.inventory.currentItem;
-        player.inventory.currentItem = expectedHotbarSlot;
-        try {
-            player.func_143004_u();
-            boolean placeResult = false;
-            if (validTarget) {
-                MinecraftServer server = player.mcServer;
-                if (isAboveBuildLimit(server, y, side)) {
-                    sendBuildLimitWarning(player, server.getBuildLimit());
-                } else if (!server.isBlockProtected(
-                        world, x, y, z, player)) {
-                    placeResult = player.theItemInWorldManager
-                            .activateBlockOrUseItem(
-                                    player, world,
-                                    player.inventory.getCurrentItem(),
-                                    x, y, z, side,
-                                    hitOffsetX, hitOffsetY, hitOffsetZ);
-                }
-            }
-
-            sendBlockCorrections(player, world, x, y, z, side);
-            synchronizeHeldItem(
-                    player, expectedHotbarSlot,
-                    expectedHeldItem, placeResult);
-        } finally {
-            if (selectedSlotAtExecution != expectedHotbarSlot
-                    && player.inventory.currentItem
-                    == expectedHotbarSlot) {
-                player.inventory.currentItem = selectedSlotAtExecution;
+        player.func_143004_u();
+        boolean placeResult = false;
+        if (validTarget) {
+            MinecraftServer server = player.mcServer;
+            if (isAboveBuildLimit(server, y, side)) {
+                sendBuildLimitWarning(player, server.getBuildLimit());
+            } else if (!server.isBlockProtected(
+                    world, x, y, z, player)) {
+                placeResult = player.theItemInWorldManager
+                        .activateBlockOrUseItem(
+                                player, world,
+                                player.inventory.getCurrentItem(),
+                                x, y, z, side,
+                                hitOffsetX, hitOffsetY, hitOffsetZ);
             }
         }
+
+        sendBlockCorrections(player, world, x, y, z, side);
+        synchronizeHeldItem(player, hotbarSlot, heldBefore, placeResult);
     }
 
-    private static boolean hasUsablePlayerContext(
-            EntityPlayerMP player, int expectedDimension) {
+    private static boolean hasUsablePlayerContext(EntityPlayerMP player) {
         return player != null && player.worldObj instanceof WorldServer
                 && player.mcServer != null
                 && player.worldObj.provider != null
-                && player.worldObj.provider.dimensionId == expectedDimension
                 && player.isEntityAlive() && !player.isDead
                 && !player.isPlayerSleeping()
                 && player.openContainer == player.inventoryContainer;
-    }
-
-    private static boolean hasExpectedHeldItem(
-            EntityPlayerMP player, int expectedHotbarSlot,
-            ItemStack expectedHeldItem) {
-        return expectedHotbarSlot >= 0 && expectedHotbarSlot < 9
-                && expectedHotbarSlot
-                < player.inventory.mainInventory.length
-                && ItemStack.areItemStacksEqual(
-                expectedHeldItem,
-                player.inventory.mainInventory[expectedHotbarSlot]);
     }
 
     static boolean isWithinReach(Vec3 eye, Vec3 hit, double reach) {
@@ -215,9 +195,14 @@ public final class LostTalesThirdPersonBlockActionService {
                         adjacentX, adjacentY, adjacentZ, world));
     }
 
+    /**
+     * Sends the player's hand back to their game when the action changed
+     * it from {@code heldBefore} or did not take place, so their own copy
+     * cannot drift from the server's.
+     */
     private static void synchronizeHeldItem(
             EntityPlayerMP player, int hotbarSlot,
-            ItemStack expectedHeldItem, boolean placeResult) {
+            ItemStack heldBefore, boolean placeResult) {
         ItemStack current = player.inventory.mainInventory[hotbarSlot];
         if (current != null && current.stackSize == 0) {
             player.inventory.mainInventory[hotbarSlot] = null;
@@ -240,28 +225,11 @@ public final class LostTalesThirdPersonBlockActionService {
         }
         current = player.inventory.mainInventory[hotbarSlot];
         if (slot != null && (!ItemStack.areItemStacksEqual(
-                current, expectedHeldItem) || !placeResult)) {
+                current, heldBefore) || !placeResult)) {
             player.playerNetServerHandler.sendPacket(
                     new S2FPacketSetSlot(
                             player.openContainer.windowId,
                             slot.slotNumber, current));
-        }
-    }
-
-    private static void sendHeldItemCorrection(
-            EntityPlayerMP player, int hotbarSlot) {
-        if (hotbarSlot < 0 || hotbarSlot >= 9
-                || hotbarSlot >= player.inventory.mainInventory.length) {
-            return;
-        }
-        Slot slot = player.openContainer.getSlotFromInventory(
-                player.inventory, hotbarSlot);
-        if (slot != null) {
-            player.playerNetServerHandler.sendPacket(
-                    new S2FPacketSetSlot(
-                            player.openContainer.windowId,
-                            slot.slotNumber,
-                            player.inventory.mainInventory[hotbarSlot]));
         }
     }
 

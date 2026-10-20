@@ -38,6 +38,7 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdResolver;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
+import com.ninuna.losttales.mapmarker.LostTalesWaystoneSettingsService;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneStateReason;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
@@ -74,11 +75,14 @@ import org.lwjgl.input.Keyboard;
  * brings back what stands now and the page says so. Share, Unshare and,
  * for a player who manages markers, Hand Over are sent at once.</p>
  *
- * <p>Destinations opens the map in travel mode beside the waystone's tab.
- * The tab closes by itself, fading as tabs close, once the
- * player is more than eight blocks away, in another world, or the
- * waystone is gone, and a notice over the window's bar says
- * which; the server checks every request whatever the page thinks.</p>
+ * <p>Destinations asks the server, which opens the player's window of two
+ * minutes to travel from the waystone, and on its answer opens the map in
+ * travel mode beside the waystone's tab. The tab closes by itself, fading
+ * as tabs close, once the player is more than eight blocks away, in
+ * another world, or the waystone is gone, and a notice over the window's
+ * bar says which; it closes too once the server says the waystone is
+ * private to the player. The server checks every request whatever the
+ * page thinks.</p>
  */
 public final class WaystonePage extends PageContent
         implements WorldPageWatch.Watched {
@@ -236,10 +240,11 @@ public final class WaystonePage extends PageContent
     }
 
     /**
-     * The server's answer to a request: saved, or refused. A stale
-     * revision brings back what stands now in place of every change;
-     * otherwise each change the player made since the request was sent
-     * stays on top of the newer state.
+     * The server's answer to a request: saved, Destinations taken, or
+     * refused. A stale revision brings back what stands now in place of
+     * every change; otherwise each change the player made since the
+     * request was sent stays on top of the newer state. Destinations
+     * taken opens the map and says nothing.
      */
     private void answer(LostTalesWaystoneStatePacket packet) {
         if (!isShown(packet)) {
@@ -257,6 +262,10 @@ public final class WaystonePage extends PageContent
         this.lore = loreOf(packet);
         this.waiting = false;
         this.sent = null;
+        if (reason == LostTalesWaystoneStateReason.DESTINATIONS) {
+            openMap();
+            return;
+        }
         String words = StatCollector.translateToLocal(reason.getMessageKey());
         if (reason.isRefusal()) {
             sayRefused(words);
@@ -274,10 +283,26 @@ public final class WaystonePage extends PageContent
     /**
      * The server's line stands over the bar in the chat's place: done for
      * a save, a refusal otherwise; either way the request has its answer.
+     * The server saying the player can no longer see the waystone, or
+     * answering the page's own request that it is private, closes the
+     * tab, the line its notice, as the server refuses every press from
+     * then on. The private line for another waystone used leaves the page
+     * alone.
      */
     @Override
     public void answerLine(String key, String words) {
+        boolean asked = this.waiting;
         this.waiting = false;
+        if (LostTalesWaystoneSettingsService.OUT_OF_SIGHT_LINE.equals(key)
+                || asked && LostTalesWaystoneSettingsService.PRIVATE_LINE
+                        .equals(key)) {
+            OtherPage tab = WindowPages.tab(PAGE_ID);
+            if (tab != null && WindowLayout.isOpen(tab)) {
+                WorldPageWatch.close(tab, words);
+            }
+            forget();
+            return;
+        }
         if (LostTalesWaystoneStateReason.SAVED.getMessageKey().equals(key)) {
             sayDone(words);
         } else {
@@ -418,9 +443,9 @@ public final class WaystonePage extends PageContent
 
     /**
      * A row taken: a number's chevrons step it and its value opens the
-     * field it is typed into, as does a line; a switch flips, a few-word
-     * option steps on, or back with the right button; Share, Unshare and
-     * Hand Over are sent at once. A row greyed is never taken.
+     * field it is typed into, as does a line; a few-word option opens its
+     * words in a pick (WIN-36); a switch flips; Share, Unshare and Hand
+     * Over are sent at once. A row greyed is never taken.
      */
     private void take(MenuWindow.Entry entry, String part, boolean back,
                       LostTalesUiHitBox row) {
@@ -446,13 +471,7 @@ public final class WaystonePage extends PageContent
             return;
         }
         String id = entry.id;
-        if (WaystoneRows.ICON.equals(id)) {
-            this.draft.stepIcon(back);
-        } else if (WaystoneRows.COLOR.equals(id)) {
-            this.draft.stepColor(back);
-        } else if (WaystoneRows.RELEVANCE.equals(id)) {
-            this.draft.stepRelevance(back);
-        } else if (WaystoneRows.DISCOVERABLE.equals(id)) {
+        if (WaystoneRows.DISCOVERABLE.equals(id)) {
             this.draft.setDiscoverable(!this.draft.isDiscoverable());
         } else if (WaystoneRows.HIDDEN.equals(id)) {
             this.draft.setHidden(!this.draft.isHidden());
@@ -460,11 +479,6 @@ public final class WaystonePage extends PageContent
             this.draft.setRequiresRegion(!this.draft.requiresRegion());
         } else if (WaystoneRows.FAST_TRAVEL.equals(id)) {
             this.draft.setFastTravel(!this.draft.hasFastTravel());
-        } else if (WaystoneRows.VISIBILITY.equals(id)) {
-            this.draft.stepVisibility(this.state.managesMarkers());
-        } else if (WaystoneRows.SHARE_KIND.equals(id)) {
-            this.shareWithFellowship = !this.shareWithFellowship;
-            this.shareTarget = "";
         } else if (WaystoneRows.SHARE.equals(id) && !back) {
             share(false);
         } else if (WaystoneRows.UNSHARE.equals(id) && !back) {
@@ -580,15 +594,38 @@ public final class WaystonePage extends PageContent
     /* ---- Destinations ---- */
 
     /**
-     * The map in travel mode, beside the waystone's tab in its window, or
-     * in a window of its own while that one is locked: the next place
-     * picked on the map is travelled to from this waystone, which the
-     * server checks again. Where the map cannot stand in a window it opens
-     * on a screen of its own.
+     * Destinations asks the server, which checks the waystone, opens the
+     * player's window of two minutes to travel from it, and answers; the
+     * map opens on that answer ({@link #openMap}).
      */
     private void travel() {
-        if (this.state == null || !this.state.hasFastTravel()
-                || !inMiddleEarth()) {
+        if (this.state == null || this.waiting
+                || whyNoDestinations().length() > 0) {
+            return;
+        }
+        LostTalesWaystoneSettingsRequestPacket packet;
+        try {
+            packet = LostTalesWaystoneSettingsRequestPacket.destinations(
+                    this.state.getX(), this.state.getY(), this.state.getZ(),
+                    this.state.getMarkerId(), this.state.getRevision());
+        } catch (IllegalArgumentException invalid) {
+            return;
+        }
+        LostTalesNetworkHandler.CHANNEL.sendToServer(packet);
+        this.sent = null;
+        this.waiting = true;
+        this.waitedTicks = 0;
+    }
+
+    /**
+     * The map in travel mode, beside the waystone's tab in its window, or
+     * in a window of its own while that one is locked: the next place
+     * picked on the map within two minutes is travelled to from this
+     * waystone, which the server checks again. Where the map cannot stand
+     * in a window it opens on a screen of its own.
+     */
+    private void openMap() {
+        if (this.state == null || this.mc.thePlayer == null) {
             return;
         }
         LostTalesClientWaystoneTravelContext.begin(
@@ -685,7 +722,7 @@ public final class WaystonePage extends PageContent
         return PageKeys.pageArea("gui.losttales.page.waystone",
                 PageKeys.pageKey(PAGE_ID, "destinations", Keyboard.KEY_D),
                 PageKeys.pageKey(PAGE_ID, "save", Keyboard.KEY_S),
-                PageKeys.pageKey(PAGE_ID, "step", PageKeys.CLICK),
+                PageKeys.pageKey(PAGE_ID, "take", PageKeys.CLICK),
                 PageKeys.pageKey(PAGE_ID, "back", PageKeys.RIGHT_CLICK),
                 PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
     }
@@ -733,7 +770,8 @@ public final class WaystonePage extends PageContent
     /** Why Destinations cannot be taken now; empty while it can. */
     private String whyNoDestinations() {
         return !this.state.hasFastTravel() ? word("why.no_fast_travel")
-                : !inMiddleEarth() ? word("why.not_middle_earth") : "";
+                : !inMiddleEarth() ? word("why.not_middle_earth")
+                : this.waiting ? word("why.waiting") : "";
     }
 
     /** Why Save cannot be taken now; empty while it can. */
@@ -825,6 +863,14 @@ public final class WaystonePage extends PageContent
         @Override
         public boolean sharesWithFellowship() {
             return WaystonePage.this.shareWithFellowship;
+        }
+
+        @Override
+        public void setSharesWithFellowship(boolean fellowship) {
+            if (WaystonePage.this.shareWithFellowship != fellowship) {
+                WaystonePage.this.shareWithFellowship = fellowship;
+                WaystonePage.this.shareTarget = "";
+            }
         }
 
         @Override

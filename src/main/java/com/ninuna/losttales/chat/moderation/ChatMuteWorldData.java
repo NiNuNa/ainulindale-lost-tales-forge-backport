@@ -15,9 +15,9 @@ import java.util.UUID;
 /**
  * Persistent account-keyed chat mute list. Expiry is lazy: an expired
  * entry is dropped by the check that finds it, so no tick ever scans the
- * list. A store made read-only by newer-version data answers as if
- * nobody were muted — chat must keep working — and the mute and unmute
- * commands say why they refuse.
+ * list. A store made read-only by data this build cannot read answers
+ * as if nobody were muted — chat must keep working — and the mute and
+ * unmute commands say why they refuse.
  */
 public final class ChatMuteWorldData extends WorldSavedData {
 
@@ -150,17 +150,6 @@ public final class ChatMuteWorldData extends WorldSavedData {
             markDirty();
         }
         return removed;
-    }
-
-    /**
-     * Lifts the mute of the account last known by this name, for lifting
-     * a mute after its target left the server. Case-insensitive; null
-     * when no stored mute carries the name.
-     */
-    public synchronized ChatMuteEntry unmuteByName(String accountName) {
-        ensureWritable();
-        ChatMuteEntry found = findByName(accountName);
-        return found == null ? null : unmute(found.getAccountId());
     }
 
     /** The mute stored for an account, running or not; null for none. Nothing is lifted. */

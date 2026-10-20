@@ -26,7 +26,8 @@ public final class WorldQuestFixtures {
                 Collections.<String, String>emptyMap(),
                 Collections.<String, String>emptyMap(),
                 Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(), world, stages);
+                Collections.<String, String>emptyMap(), world, stages, false,
+                null, null);
     }
 
     /** A world quest that can run: seven days, two kills and a craft to reach. */

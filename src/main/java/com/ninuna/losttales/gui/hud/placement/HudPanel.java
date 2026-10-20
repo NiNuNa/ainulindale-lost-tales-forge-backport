@@ -19,8 +19,9 @@ import net.minecraft.util.StatCollector;
  * The HUD's panels the HUD Placement page moves: the compass, the
  * fellowship panel, quick loot, the quest tracker, the notices' one slot
  * and the chat feed. Each answers its box on a screen of a given size and
- * takes a new place there. The first five keep their places as shares of
- * the screen in the client file; the chat feed keeps its own in the window
+ * takes a new place there. The first five keep their places in the client
+ * file, each number a share of the room the box can move in
+ * ({@link HudPlacementLayout}); the chat feed keeps its own in the window
  * layout, in fractions of a pixel, and stands at its default place over
  * the hotbar until it is moved.
  */
@@ -54,8 +55,7 @@ public enum HudPanel {
         }
         HudPlacementLayout.Bounds bounds = HudPlacementLayout.calculate(
                 screenWidth, screenHeight, width(), height(), offsetX(),
-                offsetY(), horizontalMode(), verticalMode(), 0,
-                pixelOffsetY(minecraft));
+                offsetY());
         return new double[] {bounds.x, bounds.y, bounds.width, bounds.height};
     }
 
@@ -75,12 +75,10 @@ public enum HudPanel {
             return;
         }
         LostTalesConfig.updateHudOffset(this.element,
-                HudPlacementLayout.percentForPosition((int)Math.round(x),
-                        screenWidth, (int)Math.round(box[2]),
-                        horizontalMode(), 0),
-                HudPlacementLayout.percentForPosition((int)Math.round(y),
-                        screenHeight, (int)Math.round(box[3]),
-                        verticalMode(), pixelOffsetY(minecraft)));
+                HudPlacementLayout.share(Math.round(x), screenWidth,
+                        (int)Math.round(box[2])),
+                HudPlacementLayout.share(Math.round(y), screenHeight,
+                        (int)Math.round(box[3])));
     }
 
     /** Writes its place down, once a drag or a nudge is over. */
@@ -90,6 +88,12 @@ public enum HudPanel {
         } else {
             LostTalesConfig.save();
         }
+    }
+
+    /** Whether it has a default place to go back to: the feed always, a panel while the Default layout loaded. */
+    public boolean hasDefaultPlace() {
+        return this == CHAT_FEED
+                || LostTalesConfig.defaultHudOffset(this.element) != null;
     }
 
     /** Whether it stands at its default place: the Default layout's, the feed over the hotbar. */
@@ -113,7 +117,7 @@ public enum HudPanel {
         }
     }
 
-    /** Where it stands as a share of the screen, for the bar to read; the feed's at its default place reads none. */
+    /** Where it stands, its two numbers, for the bar to read; the feed's at its default place reads none. */
     public double[] offsets() {
         if (this == CHAT_FEED) {
             return ChatLayout.isFeedPlaced() ? new double[] {
@@ -143,7 +147,7 @@ public enum HudPanel {
                 return LostTalesCompassHudRenderer.getPlacementHeight();
             case FELLOWSHIP:
                 return FellowshipHudLayout.height(
-                        LostTalesFellowshipHudRenderer.placementRows());
+                        LostTalesFellowshipHudRenderer.boxRows());
             case QUICK_LOOT:
                 return LostTalesQuickLootHudRenderer.getPlacementHeight();
             case QUEST_TRACKER:
@@ -183,25 +187,4 @@ public enum HudPanel {
         }
     }
 
-    private HudPlacementLayout.CoordinateMode horizontalMode() {
-        return this == FELLOWSHIP || this == QUICK_LOOT || this == QUEST_TRACKER
-                ? HudPlacementLayout.CoordinateMode.SCREEN_PERCENT
-                : HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT;
-    }
-
-    private HudPlacementLayout.CoordinateMode verticalMode() {
-        return this == NOTIFICATIONS
-                ? HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT
-                : HudPlacementLayout.CoordinateMode.SCREEN_PERCENT;
-    }
-
-    /** The compass is placed by its strip, its distance labels standing above it. */
-    private int pixelOffsetY(Minecraft minecraft) {
-        return this == COMPASS && minecraft != null
-                && minecraft.fontRenderer != null
-                ? minecraft.fontRenderer.FONT_HEIGHT
-                        + LostTalesCompassHudRenderer
-                                .MAP_MARKER_DISTANCE_LABEL_OFFSET_Y
-                : 0;
-    }
 }

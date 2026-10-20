@@ -54,14 +54,6 @@ public class CharacterRoster {
         return this.unlockedSlotCount;
     }
 
-    public void setUnlockedSlotCount(int unlockedSlotCount) {
-        int highestOccupiedSlot = getHighestOccupiedSlot();
-        int minimumForExistingCharacters = highestOccupiedSlot < 0
-                ? INITIAL_UNLOCKED_SLOTS
-                : highestOccupiedSlot + 1;
-        this.unlockedSlotCount = clampUnlockedSlotCount(Math.max(unlockedSlotCount, minimumForExistingCharacters));
-    }
-
     /**
      * Opens the next slot when {@code slotIndex}, just filled, was the
      * last open one, so an empty slot is always there to fill until all
@@ -211,16 +203,6 @@ public class CharacterRoster {
         if (!isValidSlotIndex(slotIndex)) {
             throw new IllegalArgumentException("slotIndex must be between 0 and " + (MAX_SLOTS - 1));
         }
-    }
-
-    private int getHighestOccupiedSlot() {
-        int highest = -1;
-        for (Integer slot : this.charactersBySlot.keySet()) {
-            if (slot != null && slot.intValue() > highest) {
-                highest = slot.intValue();
-            }
-        }
-        return highest;
     }
 
     private static int clampUnlockedSlotCount(int count) {

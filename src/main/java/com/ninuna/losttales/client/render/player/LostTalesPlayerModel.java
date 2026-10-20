@@ -279,6 +279,11 @@ public final class LostTalesPlayerModel extends ModelBiped {
         }
         this.setRotationAngles(limbSwing, limbSwingAmount, ageInTicks,
                 netHeadYaw, headPitch, scale, entity);
+        if (this.chestShape == CharacterChestTypeRegistry.Shape.CLASSIC) {
+            // The slab is a child of the body, drawn with it; it stands
+            // out past a chestplate, so it hides under one.
+            this.chestLeft.showModel = !wearsChestplate(entity);
+        }
         this.bipedHead.render(scale);
         if (this.shape.hasDwarfProportions()) {
             renderDwarfLimbs(entity, limbSwing, limbSwingAmount, ageInTicks, scale);
@@ -295,10 +300,16 @@ public final class LostTalesPlayerModel extends ModelBiped {
         this.bipedHeadwear.render(scale);
     }
 
+    /** Whether a chestplate covers the chest, which then is not drawn. */
+    private static boolean wearsChestplate(Entity entity) {
+        return entity instanceof EntityPlayer
+                && ((EntityPlayer)entity).getCurrentArmor(CHESTPLATE_SLOT) != null;
+    }
+
     /**
      * The chest, drawn in the torso's own space so sneaking and turning
      * carry it, swayed by its physics. The classic slab is a child of the
-     * body and needs nothing here. A chestplate covers every shape.
+     * body, drawn with it. A chestplate covers every shape.
      */
     private void renderChest(Entity entity, float limbSwing, float limbSwingAmount,
                              float ageInTicks, float scale) {
@@ -307,8 +318,7 @@ public final class LostTalesPlayerModel extends ModelBiped {
                 || this.chestShape == CharacterChestTypeRegistry.Shape.NONE) {
             return;
         }
-        if (entity instanceof EntityPlayer
-                && ((EntityPlayer)entity).getCurrentArmor(CHESTPLATE_SLOT) != null) {
+        if (wearsChestplate(entity)) {
             return;
         }
         float sway = 0.0F;

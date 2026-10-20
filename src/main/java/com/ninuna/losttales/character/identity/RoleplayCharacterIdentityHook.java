@@ -1,10 +1,12 @@
 package com.ninuna.losttales.character.identity;
 
 import com.mojang.authlib.GameProfile;
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
+import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -28,9 +30,11 @@ import java.util.UUID;
  */
 public final class RoleplayCharacterIdentityHook {
 
+    private static volatile boolean failureLogged;
+
     private RoleplayCharacterIdentityHook() {}
 
-    /** The gameplay id: the active character's UUID, or the account's own when on the account. */
+    /** The gameplay id: the active character's UUID, or the account's own for a ghost. */
     public static UUID resolveGameplayId(EntityPlayer player) {
         UUID accountId = player == null ? null : player.getUniqueID();
         RoleplayCharacter character = resolveActive(player);
@@ -46,14 +50,32 @@ public final class RoleplayCharacterIdentityHook {
 
     /**
      * Resolves either a roleplay-character UUID or a normal account UUID.
-     * LOTR's bounty target records call this after their identity key has been
-     * changed to a character UUID.
+     * LOTR's bounty target records call this in place of their own name
+     * lookup, after their identity key has been changed to a character
+     * UUID. It never throws into LOTR's code: a failure is logged once and
+     * answers with the account name Forge last saw for the id, as LOTR's
+     * own lookup would.
      */
     public static String resolveGameplayName(UUID identityId) {
         if (identityId == null) {
             return "";
         }
+        try {
+            return gameplayName(identityId);
+        } catch (RuntimeException failure) {
+            logFailureOnce("bounty target names", failure);
+        } catch (LinkageError failure) {
+            logFailureOnce("bounty target names", failure);
+        }
+        try {
+            String cachedName = UsernameCache.getLastKnownUsername(identityId);
+            return cachedName == null ? "" : cachedName;
+        } catch (RuntimeException unavailable) {
+            return "";
+        }
+    }
 
+    private static String gameplayName(UUID identityId) {
         MinecraftServer server = MinecraftServer.getServer();
         if (server != null) {
             RoleplayCharacter character = findCharacter(server, identityId);
@@ -78,12 +100,28 @@ public final class RoleplayCharacterIdentityHook {
         return cachedName == null ? "" : cachedName;
     }
 
-    /** Rewrites only online account-name arguments in a death component. */
+    /**
+     * Rewrites only online account-name arguments in a death component.
+     * The player's death calls this; it never throws into it: a failure is
+     * logged once and answers with vanilla's own message.
+     */
     public static IChatComponent resolveDeathMessage(
             IChatComponent vanillaMessage, EntityPlayerMP victim) {
         if (vanillaMessage == null) {
             return null;
         }
+        try {
+            return deathMessage(vanillaMessage, victim);
+        } catch (RuntimeException failure) {
+            logFailureOnce("death messages", failure);
+        } catch (LinkageError failure) {
+            logFailureOnce("death messages", failure);
+        }
+        return vanillaMessage;
+    }
+
+    private static IChatComponent deathMessage(
+            IChatComponent vanillaMessage, EntityPlayerMP victim) {
         Map<String, String> replacements =
                 new LinkedHashMap<String, String>();
         MinecraftServer server = victim == null
@@ -233,5 +271,16 @@ public final class RoleplayCharacterIdentityHook {
 
     private static boolean isBlank(String value) {
         return value == null || value.trim().length() == 0;
+    }
+
+    /** The first failure of a hook is logged; the rest would only repeat it. */
+    private static void logFailureOnce(String what, Throwable failure) {
+        if (failureLogged) {
+            return;
+        }
+        failureLogged = true;
+        FMLLog.warning("[%s] Naming characters in %s failed and falls back to "
+                        + "the account's name: %s",
+                LostTalesMetaData.MOD_ID, what, failure.toString());
     }
 }

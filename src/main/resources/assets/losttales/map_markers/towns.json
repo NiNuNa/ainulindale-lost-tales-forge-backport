@@ -1,26 +1,9 @@
 {
   "map_markers": [
     {
-      "id": "losttales:test_town",
-      "relevance": "medium",
-      "icon": "town",
-      "color": "red",
-      "dimension": "lotr:middle_earth",
-      "x": 15.0,
-      "z": 15.0,
-      "compassFadeInRadius": 180.0,
-      "discoveryRadius": 12.0,
-      "isDiscoverable": false,
-      "hiddenUntilDiscovered": false,
-      "requiresRegionUnlock": true,
-      "hasFastTravel": true,
-      "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house"
-    },
-    {
       "id": "losttales:greenway_market",
       "relevance": "medium",
-      "icon": "town",
+      "icon": "shack",
       "color": "yellow",
       "dimension": "lotr:middle_earth",
       "x": 180.0,
@@ -37,7 +20,7 @@
     {
       "id": "losttales:south_road_hamlet",
       "relevance": "low",
-      "icon": "town",
+      "icon": "shack",
       "color": "green",
       "dimension": "lotr:middle_earth",
       "x": -210.0,

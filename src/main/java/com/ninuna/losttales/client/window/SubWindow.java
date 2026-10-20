@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
@@ -63,6 +64,8 @@ public final class SubWindow {
     /** How far the grip has lit under the pointer, and when that was last stepped. */
     float gripFade;
     long gripNanos;
+    /** How far its name has slid along its strip while the pointer rests there (LOOK-37). */
+    final LostTalesUiCutName.Slide nameSlide = new LostTalesUiCutName.Slide();
     /** Where the box was drawn this frame, laid on the display's grid. */
     double drawnLeft;
     double drawnTop;

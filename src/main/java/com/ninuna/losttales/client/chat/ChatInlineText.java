@@ -11,7 +11,7 @@ import net.minecraft.client.gui.FontRenderer;
  * line draws them: every {@code :name:} that names an emoji is its sprite
  * in the slot a message line gives one, and everything else is text with
  * the chat's shadow. What a status line is drawn with wherever it shows —
- * the member list, a card, the head button's menu.
+ * the member list, a card, the identity button's menu.
  */
 final class ChatInlineText {
     private ChatInlineText() {}

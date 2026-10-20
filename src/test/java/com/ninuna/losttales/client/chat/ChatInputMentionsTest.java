@@ -21,7 +21,7 @@ public final class ChatInputMentionsTest {
             ChatMentionCandidate.player("2", "Aldric of Bree", "2", "",
                     Arrays.asList("rw", "Aldric of Bree"));
     private static final ChatMentionCandidate OPERATOR =
-            ChatMentionCandidate.role("role:operator", "Operator", 0xA94B54);
+            ChatMentionCandidate.role("role:operator", "Operator", null, 0xA94B54);
     private static final List<ChatMentionCandidate> NAMES =
             Arrays.asList(OPERATOR, ALDRIC, ALDRIC_OF_BREE);
 

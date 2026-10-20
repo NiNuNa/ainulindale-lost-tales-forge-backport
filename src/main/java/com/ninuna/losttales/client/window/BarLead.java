@@ -1,9 +1,8 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
-import com.ninuna.losttales.gui.style.LostTalesUiFading;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -19,10 +18,11 @@ import net.minecraft.client.gui.FontRenderer;
  * {@link #BUTTON_GAP} apart.
  *
  * <p>Where a bar is short of room the tab's name gives way first, cut at
- * the room it keeps, down to the icon alone; resting the pointer on a cut
- * name reads it whole with the tabs' own marquee. A tab without an icon
- * keeps its name whole. Each live bar keeps its own instance for the tab
- * button's light and marquee and the identity button's beat.</p>
+ * the room it keeps and fading into its end, down to the icon alone;
+ * resting the pointer on a cut name slides it along as a tab's does
+ * (LOOK-37). A tab without an icon keeps its name whole. Each live bar
+ * keeps its own instance for the tab button's light and slide and the
+ * identity button's beat.</p>
  */
 public final class BarLead {
     /** Clear space between the two buttons, frame to frame. */
@@ -106,9 +106,9 @@ public final class BarLead {
             new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
     /** How far the tab button's frame has lit under the pointer. */
     private float tabLit;
-    /** How long the pointer has rested on a cut name, and how far it is slid. */
-    private double hoverSeconds;
-    private float marquee;
+    /** How far a cut name has slid under the pointer. */
+    private final LostTalesUiCutName.Slide nameSlide =
+            new LostTalesUiCutName.Slide();
     private long nanos;
 
     /* ---- The layout ---- */
@@ -169,44 +169,37 @@ public final class BarLead {
     /* ---- The tab button ---- */
 
     /**
-     * Moves the tab button's light and its name's marquee on to now: the
-     * marquee runs while the pointer rests on a cut name and glides home
-     * once it leaves, as a tab's does.
+     * Moves the tab button's light and its name's slide on to now: a cut
+     * name slides while the pointer rests on it and glides home once it
+     * leaves, as a tab's does (LOOK-37).
      */
     public void advanceTab(Fit fit, boolean pointed) {
         long now = System.nanoTime();
         double elapsed = this.nanos == 0L ? 0.0D : (now - this.nanos) / 1.0E9D;
         this.nanos = now;
         this.tabLit = WindowStyle.hoverFade(this.tabLit, pointed, elapsed);
-        int overflow = fit.labelWidth - fit.labelRoom;
-        if (pointed && overflow > 0 && fit.labelRoom > 0 && Motions.enabled()) {
-            this.hoverSeconds += elapsed;
-            this.marquee = (float)TabRow.marqueeOffset(this.hoverSeconds,
-                    overflow);
-        } else {
-            this.hoverSeconds = 0.0D;
-            this.marquee = TabRow.eased(this.marquee, 0.0F, elapsed);
-        }
+        this.nameSlide.step(pointed && fit.labelRoom > 0,
+                LostTalesUiCutName.overflow(fit.labelWidth, fit.labelRoom),
+                elapsed);
     }
 
     /**
      * The tab button as laid out in {@code fit}, lit as far as the pointer
-     * lit it, its name slid by the marquee. {@code fractionX} is how far
-     * the bar is drawn shifted across, for the cut name's scissor.
+     * lit it, its name slid along as far as it has slid.
      */
     public void drawTab(Minecraft minecraft, FontRenderer font, Fit fit,
-                        int frameTop, int textTop, float fractionX,
-                        int surfaceAlpha, int alpha) {
+                        int frameTop, int textTop, int surfaceAlpha,
+                        int alpha) {
         drawTab(minecraft, font, fit, frameTop, textTop, this.tabLit,
-                this.marquee, fractionX, surfaceAlpha, alpha);
+                this.nameSlide.offset(), surfaceAlpha, alpha);
     }
 
-    /** The tab button of a bar nobody types in: unlit, a cut name simply ending where its room does. */
+    /** The tab button of a bar nobody types in: unlit, a cut name fading where its room ends and never sliding. */
     public static void drawTabAtRest(Minecraft minecraft, FontRenderer font,
                                      Fit fit, int frameTop, int textTop,
                                      int surfaceAlpha, int alpha) {
-        drawTab(minecraft, font, fit, frameTop, textTop, 0.0F, Float.NaN,
-                0.0F, surfaceAlpha, alpha);
+        drawTab(minecraft, font, fit, frameTop, textTop, 0.0F, 0.0F,
+                surfaceAlpha, alpha);
     }
 
     /**
@@ -217,8 +210,7 @@ public final class BarLead {
      */
     private static void drawTab(Minecraft minecraft, FontRenderer font, Fit fit,
                                 int frameTop, int textTop, float lit,
-                                float marquee, float fractionX,
-                                int surfaceAlpha, int alpha) {
+                                float slide, int surfaceAlpha, int alpha) {
         int frameWidth = fit.frameRight - fit.frameLeft;
         LostTalesUiFramedButton.drawSurface(fit.frameLeft, frameTop, frameWidth,
                 LostTalesUiFramedButton.HEIGHT, lit, surfaceAlpha);
@@ -231,49 +223,26 @@ public final class BarLead {
                     TabMark.NONE);
         }
         if (fit.labelRoom > 0 && fit.tab != null) {
-            drawLabel(minecraft, font, fit, textTop, lit, marquee, fractionX,
-                    alpha);
+            drawLabel(font, fit, textTop, lit, slide, alpha);
         }
         LostTalesUiFramedButton.drawInk(fit.frameLeft, frameTop, frameWidth,
                 LostTalesUiFramedButton.HEIGHT, lit, alpha);
     }
 
     /**
-     * The name: whole in the room it keeps, or cut at the room's end and
-     * slid by the marquee, its offset laid on a display pixel so the
-     * glyphs stay on theirs. A cut name sinks into the edges it is cut at
-     * the way a tab's does. A resting bar's ({@code marquee} NaN) simply
-     * ends where its room does.
+     * The name: whole in the room it keeps, or cut at the room's end,
+     * fading into it and slid along by {@code slide}, as a tab's
+     * (LOOK-37).
      */
-    private static void drawLabel(Minecraft minecraft, FontRenderer font,
-                                  Fit fit, int textTop, float lit,
-                                  float marquee, float fractionX, int alpha) {
+    private static void drawLabel(FontRenderer font, Fit fit, int textTop,
+                                  float lit, float slide, int alpha) {
         // Text is always at full opacity: a tab nothing can be sent in
         // reads italic rather than faint.
         String text = fit.tab.isReadOnly() ? "§o" + fit.label : fit.label;
         int color = LostTalesUiInk.blend(fit.tab.tone(), LostTalesUiInk.IVORY,
                 lit);
-        if (fit.labelRoom >= fit.labelWidth) {
-            LostTalesUiInk.drawText(font, text, fit.labelLeft, textTop, color,
-                    alpha);
-            return;
-        }
-        if (Float.isNaN(marquee)) {
-            LostTalesUiInk.drawText(font, font.trimStringToWidth(text,
-                    fit.labelRoom), fit.labelLeft, textTop, color, alpha);
-            return;
-        }
-        // The scissor is in screen space, and the bar is drawn shifted by
-        // its fraction.
-        double offset = TabRow.snapped(marquee, TabRow.displayStep());
-        float depth = LostTalesUiFading.sideFadeDepth(fit.labelRoom);
-        LostTalesUiFading.drawFadingText(minecraft, font, text, fit.labelLeft,
-                (float)-offset, textTop, color, alpha,
-                fit.labelLeft + fractionX,
-                fit.labelLeft + fit.labelRoom + fractionX, Double.NaN, depth,
-                LostTalesUiFading.sideFadeStrength(offset, depth),
-                LostTalesUiFading.sideFadeStrength(
-                        fit.labelWidth - offset - fit.labelRoom, depth));
+        LostTalesUiCutName.drawTextSlid(font, text, fit.labelLeft, textTop,
+                fit.labelRoom, color, alpha, slide);
     }
 
     /* ---- The identity button ---- */

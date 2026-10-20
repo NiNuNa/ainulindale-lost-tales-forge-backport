@@ -15,11 +15,10 @@ import net.minecraftforge.common.util.Constants;
  * {@code Quarantine} in its root: a data version and the list of records
  * under {@code Entries}.
  *
- * <p>A quarantine this build cannot read keeps the whole store
- * read-only: one that is not a compound, one with a newer version, or
- * one whose records are not a list of compounds. One that is missing, at
- * an older version, or without its list reads as it stands and is
- * written back in the current form.</p>
+ * <p>Every store writes its quarantine, so one this build cannot read
+ * keeps the whole store read-only: one that is missing or not a
+ * compound, one at any version but the current, and one whose records
+ * are not a list of compounds.</p>
  */
 public final class NbtQuarantine {
     /** The version every quarantine is written at. */
@@ -50,35 +49,23 @@ public final class NbtQuarantine {
         root.setTag(TAG_QUARANTINE, quarantine);
     }
 
-    /** Reads the quarantine under a store's root, at the current version or an older one. */
+    /** Reads the quarantine under a store's root, as this build writes it. */
     public static Read read(NBTTagCompound root) {
-        return read(root, 0);
-    }
-
-    /**
-     * Reads the quarantine under a store's root only at the version this
-     * build writes; one at any other version is unsupported.
-     */
-    public static Read readCurrentVersionOnly(NBTTagCompound root) {
-        return read(root, CURRENT_DATA_VERSION);
-    }
-
-    private static Read read(NBTTagCompound root, int oldestVersion) {
-        if (root == null || !root.hasKey(TAG_QUARANTINE)) {
-            return new Read(true, -1, Collections.<NBTTagCompound>emptyList(),
-                    true);
-        }
-        if (!root.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND)) {
+        if (root == null
+                || !root.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND)) {
             return Read.unsupported(-1);
         }
         NBTTagCompound quarantine = root.getCompoundTag(TAG_QUARANTINE);
-        int version = quarantine.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? quarantine.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_DATA_VERSION || version < oldestVersion) {
+        if (!quarantine.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)) {
+            return Read.unsupported(-1);
+        }
+        int version = quarantine.getInteger(TAG_DATA_VERSION);
+        if (version != CURRENT_DATA_VERSION) {
             return Read.unsupported(version);
         }
-        if (!NbtTags.hasCompoundListWithinLimit(quarantine, TAG_ENTRIES,
-                Integer.MAX_VALUE)) {
+        if (!quarantine.hasKey(TAG_ENTRIES, Constants.NBT.TAG_LIST)
+                || !NbtTags.hasCompoundListWithinLimit(quarantine, TAG_ENTRIES,
+                        Integer.MAX_VALUE)) {
             return Read.unsupported(-1);
         }
         List<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
@@ -87,10 +74,7 @@ public final class NbtQuarantine {
         for (int index = 0; index < list.tagCount(); index++) {
             entries.add((NBTTagCompound) list.getCompoundTagAt(index).copy());
         }
-        return new Read(true, -1, entries,
-                version != CURRENT_DATA_VERSION
-                        || !quarantine.hasKey(TAG_ENTRIES,
-                                Constants.NBT.TAG_LIST));
+        return new Read(true, -1, entries);
     }
 
     /**
@@ -113,19 +97,17 @@ public final class NbtQuarantine {
         private final boolean supported;
         private final int unsupportedVersion;
         private final List<NBTTagCompound> entries;
-        private final boolean repaired;
 
         private Read(boolean supported, int unsupportedVersion,
-                     List<NBTTagCompound> entries, boolean repaired) {
+                     List<NBTTagCompound> entries) {
             this.supported = supported;
             this.unsupportedVersion = unsupportedVersion;
             this.entries = Collections.unmodifiableList(entries);
-            this.repaired = repaired;
         }
 
         private static Read unsupported(int version) {
             return new Read(false, version,
-                    Collections.<NBTTagCompound>emptyList(), false);
+                    Collections.<NBTTagCompound>emptyList());
         }
 
         /** Whether this build can read it; if not, the store stays read-only. */
@@ -143,9 +125,5 @@ public final class NbtQuarantine {
             return this.entries;
         }
 
-        /** Whether it differs from how it is written, so the store should be saved again. */
-        public boolean isRepaired() {
-            return this.repaired;
-        }
     }
 }

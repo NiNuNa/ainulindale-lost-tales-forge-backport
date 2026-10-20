@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFading;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -1707,23 +1708,15 @@ public final class TabRow {
                     tab.labelWidth, drawnDraftWidth(tab, roomPhase(draftFade)),
                     roomPhase(closeFade), roomPhase(optionsFade));
             // A name the row has cut short is read whole by resting the
-            // pointer on it: the marquee runs on the clock while the tab
-            // is hovered and glides home once it is not, so a pointer
+            // pointer on it: it slides on the clock while the tab is
+            // hovered and glides home once it is not, so a pointer
             // sweeping the row starts nothing and a name that fits never
-            // moves.
-            int overflow = tab.labelWidth - (int)Math.floor(room.labelRoom);
+            // moves (LOOK-37).
             boolean labelHovered = hovered != null
                     && hovered.kind == HitKind.TAB
                     && tab.tab.equals(hovered.tab);
-            if (labelHovered && overflow > 0 && Motions.enabled()) {
-                tab.hoverSeconds += this.frameElapsed;
-                tab.marqueeOffset = (float)marqueeOffset(tab.hoverSeconds,
-                        overflow);
-            } else {
-                tab.hoverSeconds = 0.0D;
-                tab.marqueeOffset = eased(tab.marqueeOffset, 0.0F,
-                        this.frameElapsed);
-            }
+            tab.nameSlide.step(labelHovered, LostTalesUiCutName.overflow(
+                    tab.labelWidth, (float)room.labelRoom), this.frameElapsed);
             // Everything inside the tab is cut off at the tab's own edge
             // as it narrows, the way a browser cuts a tab's label. The
             // row's own lower cut goes with it, since a scissor replaces
@@ -1839,13 +1832,10 @@ public final class TabRow {
 
     /**
      * The name, whole, in the room its drawn width leaves it. A name
-     * wider than its room is cut at the room's end — inside the tab's
-     * own cut, both given to the scissor at once since one replaces the
-     * other — and slid left by the marquee while hovered, its offset
-     * laid on a display pixel so the glyphs stay on theirs. A cut name
-     * thins out into the edges it is cut at, as far as it runs past
-     * each, the words themselves fading, so the cut is seamless on the
-     * tab's surface.
+     * wider than its room is cut at the room's end, or at the tab's own
+     * edge where that comes first as the tab grows or shrinks, fading
+     * into it, and slides along while hovered (LOOK-37), inside the
+     * tab's own cut.
      */
     private void drawTabLabel(FontRenderer font, Tab tab, int textX,
                               float fraction, int textY, int labelRgb,
@@ -1857,28 +1847,11 @@ public final class TabRow {
                     textAlpha);
             return;
         }
-        double roomLeft = textX + fraction;
-        double clipLeft = Math.max(tabLeft, roomLeft);
-        double clipRight = Math.min(tabRight - BORDER_WIDTH,
-                roomLeft + labelRoom);
-        if (clipRight <= clipLeft) {
-            return;
-        }
-        // A cut name thins out into the edge it is cut at, as far as
-        // it has gone past it: the words themselves fade, so the cut is
-        // seamless on the tab's surface.
-        double offset = snapped(tab.marqueeOffset, displayStep());
-        float depth = LostTalesUiFading.sideFadeDepth(
-                clipRight - clipLeft);
-        double wordsLeft = roomLeft - offset;
-        LostTalesUiFading.drawFadingText(Minecraft.getMinecraft(),
-                font, text, textX, (float)(fraction - offset), textY,
-                labelRgb, textAlpha, clipX(clipLeft),
-                clipX(clipRight), this.rowClipBottom, depth,
-                LostTalesUiFading.sideFadeStrength(
-                        clipLeft - wordsLeft, depth),
-                LostTalesUiFading.sideFadeStrength(
-                        wordsLeft + tab.labelWidth - clipRight, depth));
+        float roomLeft = textX + fraction;
+        float room = (float)Math.min(labelRoom,
+                tabRight - BORDER_WIDTH - roomLeft);
+        LostTalesUiCutName.drawTextSlid(font, text, roomLeft, textY, room,
+                labelRgb, textAlpha, tab.nameSlide.offset());
     }
 
     /**
@@ -2754,74 +2727,6 @@ public final class TabRow {
         return tab != null && row.draggedLeft != Integer.MIN_VALUE
                 && (tab.equals(row.dragging)
                         || row.draggedGroup.contains(tab));
-    }
-
-    /**
-     * How far left a hovered name is shifted after {@code elapsedSeconds}
-     * of hovering, as {@code window.tab.marquee} times it at the speed in
-     * force; under reduced motion the slides are jumps. Every cut name
-     * that slides under the pointer reads it: a tab's, the channel
-     * button's, a member row's.
-     */
-    public static double marqueeOffset(double elapsedSeconds, int overflowPx) {
-        double speed = Motions.speed();
-        double pxPerSecond = Motions.reduced() ? Double.POSITIVE_INFINITY
-                : Motions.param(MotionIds.WINDOW_TAB_MARQUEE, "speed", 20.0F)
-                        * speed;
-        return marqueeOffset(elapsedSeconds, overflowPx,
-                Motions.nanos(MotionIds.WINDOW_TAB_MARQUEE) / 1.0E9D,
-                pxPerSecond, Motions.param(MotionIds.WINDOW_TAB_MARQUEE,
-                        "pause", 800.0F) / 1000.0D / speed);
-    }
-
-    /**
-     * How far left a hovered name is shifted after {@code elapsedSeconds}
-     * of hovering, given the {@code overflowPx} of it the tab cannot
-     * show: nothing for {@code delaySeconds}, then out to the overflow at
-     * {@code pxPerSecond} (infinite for a jump), {@code pauseSeconds}
-     * there, back to nothing, a pause, and round again. Zero when nothing
-     * overflows. A pure reading of the clock, so it looks the same at any
-     * frame rate.
-     */
-    static double marqueeOffset(double elapsedSeconds, int overflowPx,
-                                double delaySeconds, double pxPerSecond,
-                                double pauseSeconds) {
-        if (overflowPx <= 0) {
-            return 0.0D;
-        }
-        double time = elapsedSeconds - delaySeconds;
-        if (time <= 0.0D) {
-            return 0.0D;
-        }
-        double slide = pxPerSecond > 0.0D ? overflowPx / pxPerSecond : 0.0D;
-        double cycle = 2.0D * (slide + pauseSeconds);
-        if (cycle <= 0.0D) {
-            return 0.0D;
-        }
-        double phase = time % cycle;
-        if (phase < slide) {
-            return phase * pxPerSecond;
-        }
-        if (phase < slide + pauseSeconds) {
-            return overflowPx;
-        }
-        if (phase < 2.0D * slide + pauseSeconds) {
-            return overflowPx - (phase - slide - pauseSeconds) * pxPerSecond;
-        }
-        return 0.0D;
-    }
-
-    /** One step toward {@code target}, arriving rather than creeping. */
-    public static float eased(float current, float target, double elapsed) {
-        float value = (float)Motions.followTravel(MotionIds.WINDOW_MARQUEE_RETURN,
-                current, target, elapsed);
-        // Inside one display pixel there is nothing left to draw, and
-        // an exponential tail spends longer and longer covering it — the
-        // last steps arriving further and further apart, which reads as
-        // stepping rather than as the end of a slide. So the last one is
-        // simply arrived at, and no sooner: snapping a whole GUI pixel
-        // would itself be a jump of three at GUI scale three.
-        return Math.abs(target - value) < displayStep() ? target : value;
     }
 
     /**
@@ -3701,8 +3606,7 @@ public final class TabRow {
             // and the tabs the row leaves where they were keep theirs.
             built.carryOn(was);
             if (turned) {
-                built.marqueeOffset = 0.0F;
-                built.hoverSeconds = 0.0D;
+                built.nameSlide.reset();
             }
             if (Math.abs(was.toLeft - built.toLeft) > 1.0E-6D
                     || Math.abs(was.exactWidth - built.exactWidth)
@@ -4104,12 +4008,10 @@ public final class TabRow {
         final String label;
         final int labelWidth;
         /**
-         * How far the name is shifted left to show its hidden end while
-         * the tab is hovered, and how long the pointer has rested on it;
-         * both carried on when the row is laid out again.
+         * How far the name slides to show its hidden end while the tab is
+         * hovered; carried on when the row is laid out again.
          */
-        float marqueeOffset;
-        double hoverSeconds;
+        LostTalesUiCutName.Slide nameSlide = new LostTalesUiCutName.Slide();
         /** Whether the tab holds unsent text and is not being typed in. */
         final boolean draft;
         /** Resting left edge before the row's horizontal motion. */
@@ -4218,8 +4120,7 @@ public final class TabRow {
             this.closeMotion = was.closeMotion;
             this.draftMotion = was.draftMotion;
             this.optionsMotion = was.optionsMotion;
-            this.hoverSeconds = was.hoverSeconds;
-            this.marqueeOffset = was.marqueeOffset;
+            this.nameSlide = was.nameSlide;
         }
 
         /** Stands still at a place and width, which a glide sets out from. */

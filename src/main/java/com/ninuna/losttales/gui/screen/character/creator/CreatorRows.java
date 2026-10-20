@@ -3,8 +3,8 @@ package com.ninuna.losttales.gui.screen.character.creator;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import net.minecraft.client.gui.FontRenderer;
@@ -62,25 +62,37 @@ public final class CreatorRows {
         }
     }
 
-    /** A row's label from {@code x}, in ivory, cut at {@code right}. */
+    /** A row's label from {@code x}, in ivory, cut at {@code right} and fading into it (LOOK-37). */
     static void drawLabel(CreatorContext context, String label, int x,
                           int rowY, int right) {
-        FontRenderer font = context.getFont();
-        LostTalesUiInk.drawText(font, trimmed(font, label, right - x), x,
-                textTop(rowY), LostTalesUiInk.IVORY, context.alpha());
+        drawLabel(context, label, x, rowY, right, null, null, false);
+    }
+
+    /**
+     * As above, sliding along while the pointer is {@code rested} on its
+     * row: {@code owner} and {@code key} name it to the shared state of
+     * cut names.
+     */
+    static void drawLabel(CreatorContext context, String label, int x,
+                          int rowY, int right, Object owner, Object key,
+                          boolean rested) {
+        LostTalesUiCutName.drawText(context.getFont(),
+                label == null ? "" : label, x, textTop(rowY), right - x,
+                LostTalesUiInk.IVORY, context.alpha(), owner, key, rested);
     }
 
     /**
      * A row's value ending at {@code right}, cut where it would pass
-     * {@code left}: in the aside tone, in ivory while {@code lit}.
-     * Answers where it starts.
+     * {@code left} and fading into its end there (LOOK-37): in the aside
+     * tone, in ivory while {@code lit}. Answers where it starts.
      */
     static int drawValue(CreatorContext context, String value, int left,
                          int right, int rowY, boolean lit) {
         FontRenderer font = context.getFont();
-        String text = trimmed(font, value, right - left);
-        int x = right - font.getStringWidth(text);
-        LostTalesUiInk.drawText(font, text, x, textTop(rowY),
+        String text = value == null ? "" : value;
+        int x = right - (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(text), right - left);
+        LostTalesUiCutName.drawText(font, text, x, textTop(rowY), right - x,
                 lit ? LostTalesUiInk.IVORY : WindowStyle.asideRgb(),
                 context.alpha());
         return x;
@@ -119,10 +131,24 @@ public final class CreatorRows {
         }
     }
 
-    /** {@code text} cut to {@code width}, whole when it fits. */
-    static String trimmed(FontRenderer font, String text, int width) {
-        return font.getStringWidth(text) <= width ? text
-                : LostTalesSkyrimUiStyle.trimToWidth(font, text,
-                        Math.max(0, width));
+    /**
+     * A note of one line from {@code top}, as {@link #drawNote} places it,
+     * cut at {@code room} and fading into its end (LOOK-37).
+     */
+    public static void drawNoteLine(CreatorContext context, String text, int x,
+                                    int top, int room, int rgb) {
+        LostTalesUiCutName.drawText(context.getFont(),
+                text == null ? "" : text, x, top + MenuWindow.NOTE_PADDING
+                        + LostTalesUiInk.centredStart(MenuWindow.NOTE_LINE,
+                                LostTalesUiInk.CAP_HEIGHT), room, rgb,
+                context.alpha());
+    }
+
+    /** One line of words from {@code x} at a row's capitals, cut at {@code right} and fading into it (LOOK-37). */
+    static void drawLine(CreatorContext context, String text, int x, int rowY,
+                         int right, int rgb) {
+        LostTalesUiCutName.drawText(context.getFont(),
+                text == null ? "" : text, x, textTop(rowY), right - x, rgb,
+                context.alpha());
     }
 }

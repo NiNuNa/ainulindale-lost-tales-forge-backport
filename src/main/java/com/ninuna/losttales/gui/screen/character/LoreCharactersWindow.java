@@ -17,10 +17,10 @@ import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.WindowFields;
 import com.ninuna.losttales.client.window.WindowHover;
 import com.ninuna.losttales.client.window.WindowLists;
-import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -75,6 +75,8 @@ final class LoreCharactersWindow extends SubWindowContent {
     }
 
     private final GuiTextField find;
+    /** The copy of the Characters page this window was opened from, which a claim fills and a release answers in; null before it opens. */
+    private CharactersPage page;
     /** Pixels the list is asked to be scrolled by; the drawn offset glides after it, as a menu's does. */
     private int scroll;
     private double renderedScroll;
@@ -90,8 +92,9 @@ final class LoreCharactersWindow extends SubWindowContent {
         this.find.setFocused(false);
     }
 
-    /** Opens afresh: the list from its top. */
-    void restart() {
+    /** Opens afresh for the copy of the page that opened it: the list from its top. */
+    void restart(CharactersPage opener) {
+        this.page = opener;
         this.scroll = 0;
         this.renderedScroll = 0.0D;
     }
@@ -122,7 +125,7 @@ final class LoreCharactersWindow extends SubWindowContent {
         if (lore == null || roster == null) {
             return lines;
         }
-        CharactersPage page = CharactersPage.current();
+        CharactersPage page = this.page;
         String busy = page != null && page.isPending()
                 ? I18n.format("gui.losttales.character.working") : "";
         String frozen = lore.canMutate() ? "" : I18n.format(
@@ -336,9 +339,9 @@ final class LoreCharactersWindow extends SubWindowContent {
                 : lines.isEmpty() ? I18n.format(query().length() > 0
                         ? "gui.losttales.lore.none_found"
                         : "gui.losttales.lore.none")
-                : target(CharactersPage.current());
-        LostTalesUiInk.drawText(font, font.trimStringToWidth(note, width),
-                left, listTop(box) - NOTE_LINE, WindowStyle.asideRgb(), alpha);
+                : target(this.page);
+        LostTalesUiCutName.drawText(font, note, left, listTop(box) - NOTE_LINE,
+                width, WindowStyle.asideRgb(), alpha);
         boolean clipped = SubWindowContent.beginClip(minecraft,
                 clipX, clipY + (listTop(box) - box.top), box.width,
                 boxHeight);
@@ -405,11 +408,12 @@ final class LoreCharactersWindow extends SubWindowContent {
         int raceWidth = font.getStringWidth(race);
         int nameTop = y + LostTalesUiInk.centredStart(nameLine(),
                 LostTalesUiInk.CAP_HEIGHT);
-        LostTalesUiInk.drawText(font, font.trimStringToWidth(
-                        line.character.getName(), Math.max(0,
-                                width - raceWidth - 6)), left, nameTop,
+        // A name too long for its row fades into the row's end and slides
+        // along under the pointer (LOOK-37).
+        LostTalesUiCutName.drawText(font, line.character.getName(), left,
+                nameTop, width - raceWidth - 6,
                 takeable ? LostTalesUiInk.IVORY : WindowStyle.asideRgb(),
-                alpha);
+                alpha, this, line.character.getName(), line == this.hovered);
         LostTalesUiInk.drawText(font, race, left + width - raceWidth, nameTop,
                 WindowStyle.asideRgb(), alpha);
         int lineY = y + nameLine();
@@ -496,9 +500,9 @@ final class LoreCharactersWindow extends SubWindowContent {
         return true;
     }
 
-    /** Claiming is sent at once; releasing asks first. */
-    private static void act(final LoreCharacterSummary character) {
-        final CharactersPage page = CharactersPage.current();
+    /** Claiming is sent at once; releasing asks first, over the page that opened the window. */
+    private void act(final LoreCharacterSummary character) {
+        final CharactersPage page = this.page;
         final CharacterRosterSnapshot roster =
                 ClientCharacterRosterCache.getSnapshot();
         if (page == null || roster == null || page.isPending()) {
@@ -517,7 +521,7 @@ final class LoreCharactersWindow extends SubWindowContent {
         }
         WindowScreen screen = WindowScreen.current();
         if (screen != null) {
-            screen.ask(WindowPages.tab(CharactersPage.PAGE_ID),
+            screen.ask(page.tab(),
                     I18n.format("gui.losttales.lore.release_question",
                             character.getName()),
                     I18n.format("gui.losttales.lore.release_detail"),

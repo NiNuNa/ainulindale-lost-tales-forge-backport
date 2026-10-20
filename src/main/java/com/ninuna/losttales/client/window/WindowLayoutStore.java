@@ -22,15 +22,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * per sub-window the player has placed — and the lines of each system with
  * windows of its own ({@link Part}: the chat keeps its closed channels and
  * preferences here), so a hand edit or a stale entry cannot corrupt
- * anything: whatever does not parse is skipped and the layout repairs
- * itself on load.
+ * anything: a line that does not parse is skipped. A custom view's key
+ * is not here but in Controls, with the game's other keys.
  *
  * <pre>
- * view menu key=58
- * view v1 key=34 name=Hunting
+ * view v1 name=Hunting
  * window w1 view=consoles locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
  * window w2 view=v1 locked=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
- * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
+ * sub help from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00
  * tips seen=3
  * </pre>
@@ -43,9 +42,6 @@ public final class WindowLayoutStore {
 
         /** A line that is not the window system's own; answers whether it was this part's. */
         boolean read(String line);
-
-        /** Once every line is read and the windows stand. */
-        void loaded();
 
         /** This part's own lines. */
         void describe(List<String> lines);
@@ -209,9 +205,6 @@ public final class WindowLayoutStore {
         WindowLayout.load(specs);
         SubWindowPlaces.load(placed);
         FirstTips.load(tipsSeen);
-        for (Part part : PARTS) {
-            part.loaded();
-        }
     }
 
     /**
@@ -264,8 +257,8 @@ public final class WindowLayoutStore {
         }
         List<WindowPage> tabs = new ArrayList<WindowPage>();
         WindowPage active = null;
-        // A line that says nothing of them: unlocked, as a window opens
-        // that is not a new player's first, and pinned nowhere.
+        // Pinned only where the line says so; the writer leaves a pin
+        // out while it is off.
         boolean locked = false;
         boolean hud = false;
         boolean gui = false;

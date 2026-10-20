@@ -272,7 +272,9 @@ public final class ChatChannelPolicy {
      * read it at the moment of asking, so a role granted afterwards
      * opens everything said before, as a Discord channel shows its past
      * to whoever is let in. A fellowship line reaches the accounts of the
-     * fellowship's members then, while they are still in it; a faction line
+     * fellowship's members then, while the character each plays is in it,
+     * from when that character joined it (FEL-29), as its live lines
+     * reach the character played; a faction line
      * the characters of the faction then and now; everything else —
      * proximity, whispers, a private channel's line — exactly who was
      * sent it, since where a player stood cannot be asked again and a

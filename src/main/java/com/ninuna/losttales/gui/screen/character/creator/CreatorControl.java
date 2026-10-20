@@ -109,8 +109,12 @@ public abstract class CreatorControl {
         return this.y + LABEL_HEIGHT;
     }
 
-    /** The row's label, in the top-left corner every labelled row shares. */
+    /**
+     * The row's label, in the top-left corner every labelled row shares,
+     * fading into the row's end where it is too long for it (LOOK-37).
+     */
     protected final void drawLabel(String label) {
-        CreatorWidgets.drawLabel(this.context.getFont(), label, this.x, this.y);
+        CreatorWidgets.drawLabel(this.context.getFont(), label, this.x, this.y,
+                this.width);
     }
 }

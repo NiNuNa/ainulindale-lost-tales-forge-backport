@@ -24,11 +24,9 @@ public enum ELostTalesWaypoint {
         return waypoint;
     }
 
+    /** The fast-travel regions Lost Tales adds to LOTR's. */
     public enum Region {
-        MOON_ELVES(LostTalesUtil.addWaypointRegion("MOON_ELVES")),
-        SUN_ELVES(LostTalesUtil.addWaypointRegion("SUN_ELVES")),
-        ODANE(LostTalesUtil.addWaypointRegion("ODANE")),
-        OROCARNI(LostTalesUtil.addWaypointRegion("OROCARNI"));
+        ODANE(LostTalesUtil.addWaypointRegion("ODANE"));
 
         final private LOTRWaypoint.Region region;
 

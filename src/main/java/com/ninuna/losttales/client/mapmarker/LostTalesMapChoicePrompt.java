@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.client.gui.FontRenderer;
@@ -129,15 +130,15 @@ final class LostTalesMapChoicePrompt {
         Gui.drawRect(right, top, screenWidth, bottom, SCREEN_SHADE);
     }
 
+    /** Words centred in the panel; too long for it, they fill it and fade into its end (LOOK-37). */
     private static void drawCentered(
             FontRenderer font, Layout layout, String text, int y,
             int contentWidth, int color) {
-        String visible = LostTalesSkyrimUiStyle.trimToWidth(
-                font, text, contentWidth);
-        font.drawStringWithShadow(visible,
-                layout.x + (layout.width
-                        - font.getStringWidth(visible)) / 2,
-                y, color);
+        int shown = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(text), contentWidth);
+        LostTalesUiCutName.drawShadowed(font, text,
+                layout.x + (layout.width - shown) / 2, y, contentWidth,
+                color);
     }
 
     static void drawButton(
@@ -152,19 +153,24 @@ final class LostTalesMapChoicePrompt {
                     bounds.x + bounds.width, bounds.y + 1,
                     LostTalesSkyrimUiStyle.BORDER);
         }
-        String visible = LostTalesSkyrimUiStyle.trimToWidth(
-                font, label, Math.max(0, bounds.width - 6));
+        int room = Math.max(0, bounds.width - 6);
+        int shown = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(label), room);
         int color = enabled
                 ? hovered
                         ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
                         : LostTalesSkyrimUiStyle.TEXT
                 : LostTalesSkyrimUiStyle.TEXT_DIM;
-        font.drawStringWithShadow(visible,
-                bounds.x + (bounds.width
-                        - font.getStringWidth(visible)) / 2,
-                bounds.y + (bounds.height - font.FONT_HEIGHT) / 2,
-                color);
+        // A label too long for its button fades into the button's end and
+        // slides along under the pointer (LOOK-37).
+        LostTalesUiCutName.drawShadowed(font, label,
+                bounds.x + (bounds.width - shown) / 2,
+                bounds.y + (bounds.height - font.FONT_HEIGHT) / 2, room,
+                color, BUTTON_LABELS, label, hovered && enabled);
     }
+
+    /** What the prompts' button labels name themselves to as cut names. */
+    private static final Object BUTTON_LABELS = new Object();
 
     static Layout calculateLayout(int screenWidth, int screenHeight) {
         int availableWidth = Math.max(0,

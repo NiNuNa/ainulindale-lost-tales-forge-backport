@@ -42,6 +42,8 @@ public final class CharacterSwitchRecoveryReconciler {
                 transaction.markRecoveryRequired(safeTimestamp);
                 account.setFrozen(true);
                 break;
+            case HOLD:
+                return new Result(false, CharacterErrorId.SWITCH_RECOVERY_REQUIRED);
             default:
                 throw new IllegalStateException(
                         "Unhandled character switch recovery action " + action);
@@ -77,13 +79,14 @@ public final class CharacterSwitchRecoveryReconciler {
      * reconciled against, from its status alone.
      *
      * <p>An {@code ABORTED} journal describes a switch whose rollback
-     * already put the player back on the source, and a
-     * {@code RECOVERY_REQUIRED} one describes an attempt that failed
-     * part-way and is held for an operator. Applying either journal's
-     * generation again would replace the state the player is on with the
-     * state they were on when the attempt was made — for a
+     * already put the player back on the source. A held journal is either
+     * an attempt that failed part-way, held for an operator, or one an
+     * operator discarded, whose source comes back by
+     * {@link CharacterSwitchSourceRestore} and not by this. Applying a
+     * generation of either again would replace the state the player is on
+     * with the state they were on when the attempt was made — for a
      * {@code RECOVERY_REQUIRED} journal by repeating the failure that
-     * marked it, on every login. Both are answered here rather than by
+     * marked it, on every login. All are answered here rather than by
      * {@link #decide}, because they are true whichever identity the
      * roster ended up on.</p>
      */
@@ -92,15 +95,18 @@ public final class CharacterSwitchRecoveryReconciler {
         if (transaction == null) {
             return false;
         }
-        CharacterSwitchTransactionStatus status = transaction.getStatus();
-        return status != CharacterSwitchTransactionStatus.ABORTED
-                && status != CharacterSwitchTransactionStatus.RECOVERY_REQUIRED;
+        return transaction.getStatus() != CharacterSwitchTransactionStatus.ABORTED
+                && !transaction.isHeld();
     }
 
+    /** What to do with the journal; a held journal is always left as it is. */
     public static Action decide(UUID activeCharacterId,
                                 CharacterSwitchTransaction transaction) {
         if (transaction == null) {
             return Action.NO_JOURNAL;
+        }
+        if (transaction.isHeld()) {
+            return Action.HOLD;
         }
         boolean targetActive = equalsUuid(
                 activeCharacterId, transaction.getTargetCharacterId());
@@ -133,7 +139,9 @@ public final class CharacterSwitchRecoveryReconciler {
         CLEAR_JOURNAL,
         COMMIT_TARGET,
         ABORT_TO_SOURCE,
-        REQUIRE_MANUAL_RECOVERY
+        REQUIRE_MANUAL_RECOVERY,
+        /** A held journal: nothing changes, and switching stays off. */
+        HOLD
     }
 
     public static final class Result {

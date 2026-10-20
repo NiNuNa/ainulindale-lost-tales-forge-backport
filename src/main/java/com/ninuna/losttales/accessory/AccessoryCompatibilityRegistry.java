@@ -1,7 +1,6 @@
 package com.ninuna.losttales.accessory;
 
 import cpw.mods.fml.common.FMLLog;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
@@ -49,7 +48,6 @@ public final class AccessoryCompatibilityRegistry {
             String id,
             AccessorySlotType slotType,
             final Item item,
-            AccessoryEligibility eligibility,
             String serverEffectId,
             String ownerVisualEffectId,
             String publicEffectId) {
@@ -65,7 +63,6 @@ public final class AccessoryCompatibilityRegistry {
                         return stack != null && stack.getItem() == item;
                     }
                 },
-                eligibility,
                 serverEffectId,
                 ownerVisualEffectId,
                 publicEffectId));
@@ -104,20 +101,6 @@ public final class AccessoryCompatibilityRegistry {
 
     public boolean isCompatible(AccessorySlotType slotType, ItemStack stack) {
         return find(slotType, stack) != null;
-    }
-
-    public boolean canEquip(EntityPlayer player,
-                            AccessorySlotType slotType,
-                            ItemStack stack) {
-        AccessoryDefinition definition = find(slotType, stack);
-        if (definition == null) {
-            return false;
-        }
-        // Client containers may predict structural compatibility, but only the
-        // server is allowed to decide character-specific eligibility.
-        return player == null || player.worldObj == null
-                || player.worldObj.isRemote
-                || definition.canEquip(player, stack);
     }
 
     public synchronized AccessoryDefinition getDefinition(String id) {

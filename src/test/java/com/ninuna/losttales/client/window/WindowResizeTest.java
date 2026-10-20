@@ -36,7 +36,7 @@ public final class WindowResizeTest {
      */
     @Test
     public void aWindowStandsAtTheDefaultPlaceUntilItIsGivenASize() {
-        Window window = WindowLayout.firstWindow();
+        Window window = WindowLayout.windows().get(0);
         assertTrue(WindowPlacement.atDefaultPlace(window));
         assertTrue(WindowLayout.setWindowHeight(window.getId(), 180.0D, true));
         assertEquals(180.0D, window.getOwnHeight(), 0.0D);
@@ -60,7 +60,7 @@ public final class WindowResizeTest {
      */
     @Test
     public void aResetTakesThePinsAndTheSplitsAndBringsThePanelsBack() {
-        Window window = WindowLayout.firstWindow();
+        Window window = WindowLayout.windows().get(0);
         window.setLocked(false);
         List<WindowPage> tabs = window.getTabs();
         int pages = tabs.size();
@@ -86,14 +86,14 @@ public final class WindowResizeTest {
      */
     @Test
     public void heightsKeepTheFractionTheyWereGiven() {
-        Window window = WindowLayout.firstWindow();
+        Window window = WindowLayout.windows().get(0);
         WindowLayout.setWindowHeight(window.getId(), 180.37D, true);
         assertEquals(180.37D, window.getOwnHeight(), 1.0E-9D);
     }
 
     @Test
     public void heightsAreBounded() {
-        Window window = WindowLayout.firstWindow();
+        Window window = WindowLayout.windows().get(0);
         WindowLayout.setWindowHeight(window.getId(), 99999.0D, true);
         assertEquals(WindowLayout.MAX_WINDOW_SIZE, window.getOwnHeight(),
                 0.0D);

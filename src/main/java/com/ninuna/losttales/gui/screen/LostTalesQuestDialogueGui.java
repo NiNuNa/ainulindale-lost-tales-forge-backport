@@ -7,6 +7,7 @@ import com.ninuna.losttales.gui.screen.quest.QuestDialogueLayout;
 import com.ninuna.losttales.gui.screen.quest.QuestDialogueModel;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
@@ -197,12 +198,8 @@ public class LostTalesQuestDialogueGui extends GuiScreen
      */
     private void drawSpeaker(QuestDialogueLayout layout) {
         LostTalesSkyrimUiStyle.beginContent();
-        String name = LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
-                this.model.getSpeaker(), layout.nameWidth());
-        this.fontRendererObj.drawStringWithShadow(name,
-                layout.nameRight() - this.fontRendererObj.getStringWidth(name),
-                layout.nameY(),
-                LostTalesColors.rgb(LostTalesColors.TEXT_BRIGHT));
+        drawRightAligned(layout, this.model.getSpeaker(), layout.nameY(),
+                LostTalesColors.TEXT_BRIGHT);
 
         // Who they are and what the talk is about, quietly under the
         // name and written up to the rule like it, so everything left of
@@ -223,13 +220,22 @@ public class LostTalesQuestDialogueGui extends GuiScreen
         if (note == null || note.length() == 0) {
             return 0;
         }
-        String trimmed = LostTalesSkyrimUiStyle.trimToWidth(
-                this.fontRendererObj, note, layout.nameWidth());
-        this.fontRendererObj.drawStringWithShadow(trimmed,
-                layout.nameRight()
-                        - this.fontRendererObj.getStringWidth(trimmed),
-                layout.noteY(row), LostTalesColors.rgb(rgb));
+        drawRightAligned(layout, note, layout.noteY(row), rgb);
         return 1;
+    }
+
+    /**
+     * Words ending at the rule, in vanilla's shadowed text; too long for
+     * the room left of it, they fill it from its left and fade into its
+     * end (LOOK-37).
+     */
+    private void drawRightAligned(QuestDialogueLayout layout, String text,
+                                  int y, int color) {
+        int room = layout.nameWidth();
+        int shown = (int)LostTalesUiCutName.shownWidth(
+                this.fontRendererObj.getStringWidth(text), room);
+        LostTalesUiCutName.drawShadowed(this.fontRendererObj, text,
+                layout.nameRight() - shown, y, room, color);
     }
 
     /**
@@ -249,11 +255,12 @@ public class LostTalesQuestDialogueGui extends GuiScreen
             boolean lit = index == this.chosen || index == this.hovered;
             int rgb = LostTalesColors.rgb(lit ? LostTalesColors.TEXT_BRIGHT
                     : LostTalesColors.TEXT_MUTED);
-            drawShadowed(LostTalesSkyrimUiStyle.trimToWidth(
-                            this.fontRendererObj,
-                            replies.get(index).getLabel(),
-                            (int)row.width),
-                    (int)row.left, (int)Math.round(row.top + 2), rgb, alpha);
+            // A reply too long for its row fades into the row's end and
+            // slides along under the pointer (LOOK-37).
+            LostTalesUiCutName.drawText(this.fontRendererObj,
+                    replies.get(index).getLabel(), (int)row.left,
+                    (int)Math.round(row.top + 2), (int)row.width, rgb, alpha,
+                    this, Integer.valueOf(index), index == this.hovered);
         }
         drawMarker(layout);
     }

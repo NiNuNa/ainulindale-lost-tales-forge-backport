@@ -16,6 +16,7 @@ import com.ninuna.losttales.character.state.CharacterPlayerStateWorldData;
 import com.ninuna.losttales.character.state.CharacterStateValidationException;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
+import com.ninuna.losttales.character.switching.CharacterSwitchSourceRestore;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.DeletedCharacterSummary;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
@@ -90,6 +91,12 @@ public final class CharacterDeletionService {
                 || playerStateData.isOwnerBlocked(player.getUniqueID())) {
             return CharacterOperationResult.failure(
                     CharacterErrorId.DELETE_PLAYER_STATE_STORAGE_READ_ONLY, roster);
+        }
+        // A held switch journal names the character it puts back (CHAR-37).
+        CharacterErrorId journal = CharacterSwitchSourceRestore
+                .characterRemovalRefusal(player.worldObj, player.getUniqueID());
+        if (journal != CharacterErrorId.NONE) {
+            return CharacterOperationResult.failure(journal, roster);
         }
 
         CharacterDeletionTombstone existing = deletionData.getTombstone(
@@ -188,22 +195,14 @@ public final class CharacterDeletionService {
         return CharacterOperationResult.success(true, roster, removed);
     }
 
-    /** An administrator's restore for a player online: see {@link #restore(World, UUID, String, EntityPlayerMP, UUID)}. */
-    public synchronized CharacterDeletionMaintenanceResult restore(
-            EntityPlayerMP target, UUID characterId) {
-        if (!isValidTarget(target, characterId)) {
-            return CharacterDeletionMaintenanceResult.NOT_FOUND;
-        }
-        return restore(target.worldObj, target.getUniqueID(),
-                SeenAccountNames.accountNameOf(target), target, characterId);
-    }
-
     /**
      * An administrator's restore of one of {@code ownerId}'s deleted
-     * characters into its own slot, its player online or not:
-     * {@code accountName} is the account's own name, which its characters
-     * may bear, and {@code online} the player, sent the roster at once, or
-     * null while they are away, who finds it on their next visit.
+     * characters into its own slot, its player online or not, within its
+     * retention as the player's own restore is: {@code accountName} is the
+     * account's own name, which its characters may bear, and {@code online}
+     * the player, sent the roster at once, or null while they are away,
+     * who finds it on their next visit. Filling the last open slot opens
+     * the next.
      */
     public synchronized CharacterDeletionMaintenanceResult restore(
             World world, UUID ownerId, String accountName,
@@ -238,6 +237,12 @@ public final class CharacterDeletionService {
             if (characterData.containsCharacter(characterId)) {
                 return CharacterDeletionMaintenanceResult.CHARACTER_ID_CONFLICT;
             }
+            if (!tombstone.isCommitted()) {
+                return CharacterDeletionMaintenanceResult.NOT_COMMITTED;
+            }
+            if (!isRestorable(tombstone, ownerId, System.currentTimeMillis())) {
+                return CharacterDeletionMaintenanceResult.RETENTION_OVER;
+            }
 
             RoleplayCharacter character = tombstone.getCharacterCopy();
             if (roster.getCharacterAtSlot(character.getSlotIndex()) != null) {
@@ -271,6 +276,7 @@ public final class CharacterDeletionService {
             if (!roster.addCharacter(character)) {
                 return CharacterDeletionMaintenanceResult.SLOT_OCCUPIED;
             }
+            roster.unlockNextSlotAfter(character.getSlotIndex());
             roster.incrementRevision();
             characterData.saveRoster(roster);
             // Publish the restored roster while the tombstone is still

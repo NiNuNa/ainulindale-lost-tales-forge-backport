@@ -1,0 +1,10 @@
+{
+  "id": "losttales:hobbit",
+  "race": "losttales:hobbit",
+  "items": [
+    {"item": "lotr:item.hobbitPipe", "count": 1},
+    {"item": "lotr:item.pipeweed", "count": 8},
+    {"item": "minecraft:bread", "count": 8},
+    {"item": "minecraft:torch", "count": 8}
+  ]
+}

@@ -204,6 +204,23 @@ public final class WorldQuestWorldDataTest {
     }
 
     @Test
+    public void aSaveWithoutItsVersionOrListsIsKeptReadOnly() {
+        NBTTagCompound noVersion = new NBTTagCompound();
+        noVersion.setTag("Runs", new NBTTagList());
+        noVersion.setTag("Rewards", new NBTTagList());
+        WorldQuestWorldData data = new WorldQuestWorldData(WorldQuestWorldData.DATA_NAME);
+        data.readFromNBT(noVersion);
+        assertTrue(data.isReadOnly());
+
+        NBTTagCompound noRewards = new NBTTagCompound();
+        noRewards.setInteger("DataVersion", WorldQuestNbtCodec.CURRENT_DATA_VERSION);
+        noRewards.setTag("Runs", new NBTTagList());
+        WorldQuestWorldData other = new WorldQuestWorldData(WorldQuestWorldData.DATA_NAME);
+        other.readFromNBT(noRewards);
+        assertTrue(other.isReadOnly());
+    }
+
+    @Test
     public void aRunThatCannotBeReadIsSetAsideNotDropped() {
         NBTTagCompound saved = new NBTTagCompound();
         saved.setInteger("DataVersion", WorldQuestNbtCodec.CURRENT_DATA_VERSION);
@@ -213,6 +230,9 @@ public final class WorldQuestWorldDataTest {
         broken.setString("State", "SOMEDAY");
         runs.appendTag(broken);
         saved.setTag("Runs", runs);
+        saved.setTag("Rewards", new NBTTagList());
+        com.ninuna.losttales.storage.NbtQuarantine.write(saved,
+                java.util.Collections.<NBTTagCompound>emptyList());
         WorldQuestWorldData data = new WorldQuestWorldData(WorldQuestWorldData.DATA_NAME);
         data.readFromNBT(saved);
         assertNull(data.run(QUEST));

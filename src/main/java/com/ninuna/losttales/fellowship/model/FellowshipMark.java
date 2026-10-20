@@ -17,8 +17,8 @@ public final class FellowshipMark {
     public static final int CURRENT_DATA_VERSION = 1;
     /** The most marks one fellowship holds at once. */
     public static final int MAX_PER_FELLOWSHIP = 4;
-    /** The longest name a mark may have, in characters. */
-    public static final int MAX_NAME_LENGTH = 32;
+    /** The longest name a mark may have, in characters: as long as a fellowship's. */
+    public static final int MAX_NAME_LENGTH = Fellowship.MAX_NAME_LENGTH;
     /** The farthest from the world's middle a mark may stand, in blocks. */
     public static final double MAX_HORIZONTAL_COORDINATE = 30000000.0D;
     /** What a mark's marker id on the map and in a chat link begins with. */
@@ -145,25 +145,15 @@ public final class FellowshipMark {
     }
 
     /**
-     * A name a fellowship's mark may carry: some words, no longer than
-     * {@link #MAX_NAME_LENGTH}, with no formatting code and none of what the
-     * chat reads in a line, {@code @} and square brackets, since the
+     * A name a fellowship's mark may carry: well formed as a fellowship's
+     * name is ({@link Fellowship#isWellFormedName}), and with none of what
+     * the chat reads in a line, {@code @} and square brackets, since the
      * fellowship's conversation names each mark.
      */
     public static boolean isValidName(String name) {
-        if (name == null || name.trim().length() == 0
-                || !name.equals(name.trim())
-                || name.length() > MAX_NAME_LENGTH) {
-            return false;
-        }
-        for (int index = 0; index < name.length(); index++) {
-            char character = name.charAt(index);
-            if (character == '§' || character == '@' || character == '['
-                    || character == ']' || Character.isISOControl(character)) {
-                return false;
-            }
-        }
-        return true;
+        return Fellowship.isWellFormedName(name)
+                && name.indexOf('@') < 0 && name.indexOf('[') < 0
+                && name.indexOf(']') < 0;
     }
 
     public static boolean isValidPosition(double x, double z) {

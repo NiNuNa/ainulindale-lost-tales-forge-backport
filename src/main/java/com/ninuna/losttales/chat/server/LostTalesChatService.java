@@ -14,7 +14,6 @@ import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatMessageIds;
-import com.ninuna.losttales.chat.ChatMessageOrigin;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatNames;
@@ -96,10 +95,12 @@ public final class LostTalesChatService {
      * <ul>
      * <li>the share references pair, in order, with the share tokens
      * found in the message; an item slot is re-read from the sender's
-     * live inventory and a marker id from world data under the sender's
-     * own visibility, and only a match whose real name agrees with the
-     * token is attached — tokens that cannot be verified are delivered
-     * as the literal text the sender typed;</li>
+     * live inventory, a marker id from world data under the sender's
+     * own visibility and visits, and a quest from the sender's own
+     * running quests. The name typed in a token never decides what is
+     * attached; every reader sees the thing's own name. A token that
+     * cannot be verified is delivered as the literal text the sender
+     * typed;</li>
      * <li>a whisper goes to the sender and the one online account it
      * names, each told who the other party is, and to the identity of
      * that account it names — a conversation is with a person as they
@@ -495,7 +496,7 @@ public final class LostTalesChatService {
         // point at the Discord original; so does the sender's id, since
         // the sender alone is told when the post is slow or will not
         // arrive.
-        if (DiscordBridgePolicy.relaysOutbound(ChatMessageOrigin.PLAYER, channel)) {
+        if (DiscordBridgePolicy.relaysOutbound(channel)) {
             boolean forwarded = reply != null && reply.isForward();
             boolean told = narrator || (packet.isAction() && !forwarded);
             LostTalesDiscordBridge.getInstance().relayToDiscord(channel,
@@ -1028,8 +1029,7 @@ public final class LostTalesChatService {
         }
         Fellowship fellowship = speaking.fellowship;
         String factionId = speaking.factionId;
-        if (typing && DiscordBridgePolicy.relaysOutbound(
-                ChatMessageOrigin.PLAYER, channel)) {
+        if (typing && DiscordBridgePolicy.relaysOutbound(channel)) {
             // A bound channel has readers on the other side too, and
             // Discord shows its own indicator when the bot says it is
             // typing. Nothing but presence crosses, and only through a
@@ -1337,7 +1337,11 @@ public final class LostTalesChatService {
         }
         ChatIdentitySelection.Worn worn = ChatIdentitySelection.worn(player,
                 channel, identityKind, identityCharacterId);
-        if (worn.refused) {
+        // Only an identity in use reacts: the character played or one a
+        // copy reads as, never any other character of the roster.
+        if (worn.refused || (worn.character != null
+                && !ChatIdentitySelection.reads(player,
+                        worn.character.getCharacterId()))) {
             return;
         }
         RoleplayCharacter as = worn.character;
@@ -1612,11 +1616,18 @@ public final class LostTalesChatService {
                 .withHead(LostTalesChatMessagePacket.SERVER_SENDER_ID, true, "");
     }
 
-    /** What the server knows of a player asking about a kept message, read live. */
+    /**
+     * What the server knows of a player asking about a kept message, read
+     * live: each faction from when an identity reading it came to it, and
+     * each fellowship of the character played from when it joined
+     * (FEL-29), since a fellowship's conversation is read as that
+     * character alone (FEL-22).
+     */
     public static ChatHistory.Requester requesterFor(EntityPlayerMP player) {
         return new ChatHistory.Requester(player.getUniqueID(),
                 ChatChannelPolicy.selectedFactions(player),
-                ChatIdentitySelection.fellowshipIds(player),
+                Fellowship.joinings(ChatIdentitySelection.fellowships(player),
+                        ChatIdentitySelection.playedId(player)),
                 readableChannels(player),
                 ChatIdentitySelection.identityIds(player));
     }
@@ -1959,7 +1970,7 @@ public final class LostTalesChatService {
      * server's view without the client ever deciding it; the roles travel
      * with it so the client can notice a mention addressed to one of
      * them. The roster of every online role holder rides along, which
-     * is what the role hover card names its members from.
+     * is what the role card names its members from.
      */
     public static void sendAccess(EntityPlayerMP player) {
         sendAccess(player, roleHolders(null));
@@ -2483,7 +2494,7 @@ public final class LostTalesChatService {
                                 String scope) {
         if (channel.getScope() == ChatChannelScope.FELLOWSHIP) {
             UUID fellowshipId = ChatFellowship.idOf(scope);
-            return fellowshipId != null && reader.fellowshipIds.contains(fellowshipId);
+            return reader.inFellowship(fellowshipId);
         }
         return reader.ownedFactions.containsKey(scope);
     }

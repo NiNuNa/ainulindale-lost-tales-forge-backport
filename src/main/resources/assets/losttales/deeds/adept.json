@@ -1,0 +1,8 @@
+{
+  "id": "losttales:adept",
+  "category": "growth",
+  "icon": "minecraft:stone_pickaxe",
+  "kind": "skill_level",
+  "skill": "any",
+  "level": 50
+}

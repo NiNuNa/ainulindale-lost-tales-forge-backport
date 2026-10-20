@@ -7,7 +7,6 @@ import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
-import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.window.TabRow;
@@ -18,6 +17,7 @@ import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.compat.lotr.LotrFactionBannerResolver;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFading;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -932,20 +932,12 @@ public final class ChatMemberList {
                         ? ClientServerStatus.line()
                         : ClientChatProfanity.filter(ClientChatPresence.lineOf(
                                 member.getPlayerId(), identity));
-        // The role-play status's mark stands at the end of the name's line,
-        // which gives it its room; an NPC and an offline member wear none.
-        final ChatRoleplayStatus roleplay = member.isNpc() || !member.isOnline()
-                ? null : ChatRoleplayMark.markedFor(member.getPlayerId(),
-                        identity);
-        // A character spoken as but not played wears the quiet square
-        // before the role-play mark (CHAT-05).
+        // A character spoken as but not played wears the quiet square at
+        // the end of the name's line, which gives it its room (CHAT-05).
         final boolean notInWorld = member.isNotInWorld();
-        final float roleplayRight = roomRight;
-        final float worldRight = roleplay == null ? roomRight
-                : roomRight - ChatRoleplayMark.SIZE - ChatRoleplayMark.GAP;
         final float nameRight = notInWorld
-                ? worldRight - ChatWorldMark.SIZE - ChatWorldMark.GAP
-                : worldRight;
+                ? roomRight - ChatWorldMark.SIZE - ChatWorldMark.GAP
+                : roomRight;
         final List<Part> statusRun = statusLine.length() == 0
                 ? Collections.<Part>emptyList()
                 : Collections.singletonList(new Part(statusLine, "\u00a7o",
@@ -991,17 +983,9 @@ public final class ChatMemberList {
                                     listRight, clipTop, clipBottom);
                             if (notInWorld) {
                                 LostTalesUiFlatLayers.nextLayer();
-                                ChatWorldMark.draw(worldRight - ChatWorldMark.SIZE,
+                                ChatWorldMark.draw(roomRight - ChatWorldMark.SIZE,
                                         nameTop + (capitals
                                                 - ChatWorldMark.SIZE) / 2,
-                                        alpha);
-                            }
-                            if (roleplay != null) {
-                                LostTalesUiFlatLayers.nextLayer();
-                                ChatRoleplayMark.draw(roleplay,
-                                        roleplayRight - ChatRoleplayMark.SIZE,
-                                        nameTop + (capitals
-                                                - ChatRoleplayMark.SIZE) / 2,
                                         alpha);
                             }
                             if (said) {
@@ -1023,8 +1007,8 @@ public final class ChatMemberList {
     /**
      * How far a row's name ({@code name}) or title has slid, in the list's
      * units: along while the pointer rests on the row and the words run
-     * past their {@code room}, by the tab's own marquee, home again after
-     * — laid on a display pixel, so the glyphs stay on theirs.
+     * past their {@code room}, on a cut name's own timing (LOOK-37), home
+     * again after — laid on a display pixel, so the glyphs stay on theirs.
      */
     private static float slide(State state, boolean rested, boolean name,
                                int width, float room, float unitScale,
@@ -1033,10 +1017,10 @@ public final class ChatMemberList {
         float current = name ? state.nameSlide : state.titleSlide;
         float next;
         if (rested && overflow > 0 && room > 0.0F && Motions.enabled()) {
-            next = (float)TabRow.marqueeOffset(state.hoverSeconds,
+            next = (float)LostTalesUiCutName.slideOffset(state.hoverSeconds,
                     overflow);
         } else {
-            next = TabRow.eased(current, 0.0F, elapsed);
+            next = LostTalesUiCutName.glideHome(current, elapsed);
         }
         if (name) {
             state.nameSlide = next;

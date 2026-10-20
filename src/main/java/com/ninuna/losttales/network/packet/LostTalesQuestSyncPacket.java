@@ -47,6 +47,8 @@ public class LostTalesQuestSyncPacket implements IMessage {
     private final List<LostTalesQuestDefinition> dynamicQuestDefinitions = new ArrayList<LostTalesQuestDefinition>();
     private String pinnedMapMarkerId = "";
     private final Set<String> heardRumours = new LinkedHashSet<String>();
+    /** Whether the log is another character's, taken in place of the one held without news. */
+    private boolean replaces;
     private boolean malformed;
 
     public LostTalesQuestSyncPacket() {}
@@ -126,6 +128,20 @@ public class LostTalesQuestSyncPacket implements IMessage {
     /** The quests whose rumours the character heard. */
     public Set<String> getHeardRumours() {
         return Collections.unmodifiableSet(new LinkedHashSet<String>(this.heardRumours));
+    }
+
+    /**
+     * The same log as the one a character switch put in place: the client
+     * takes it instead of the log it holds, with no banner and no news.
+     */
+    public LostTalesQuestSyncPacket replacing() {
+        this.replaces = true;
+        return this;
+    }
+
+    /** Whether the log replaces the one the client holds, as after a character switch. */
+    public boolean isReplacement() {
+        return this.replaces;
     }
 
     @Override
@@ -239,6 +255,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
             }
             readIdentifierSet(buf, this.heardRumours, "heard rumour",
                     LostTalesQuestPlayerData.MAX_RUMOURS);
+            this.replaces = buf.readBoolean();
             LostTalesPacketCodec.requireFinished(buf);
         } catch (RuntimeException exception) {
             clearState();
@@ -316,6 +333,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
         }
         writeIdentifierSet(buf, this.heardRumours, "heard rumour",
                 LostTalesQuestPlayerData.MAX_RUMOURS);
+        buf.writeBoolean(this.replaces);
         if (buf.writerIndex() - startIndex > MAX_PACKET_BYTES) {
             throw new IllegalStateException(
                     "quest snapshot exceeds packet limit");
@@ -475,6 +493,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
     }
 
     private void clearState() {
+        this.replaces = false;
         this.heardRumours.clear();
         this.activeQuests.clear();
         this.questHistory.clear();

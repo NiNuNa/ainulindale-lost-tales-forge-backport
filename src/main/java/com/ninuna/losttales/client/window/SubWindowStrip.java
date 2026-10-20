@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
@@ -41,7 +41,9 @@ final class SubWindowStrip {
     private static final int CONTROLS_WIDTH = CLOSE_WIDTH + EDGE_GAP
             + DIVIDER_WIDTH + EDGE_GAP + GRIP_WIDTH + EDGE_GAP;
 
+    /** The whole name, and the room the controls leave it. */
     final String label;
+    final int labelRoom;
     final boolean icon;
     final int textX;
     /** What the cross answers on: its ink and the end controls' clearing. */
@@ -55,9 +57,10 @@ final class SubWindowStrip {
     private final int gripX;
     private final int gripTop;
 
-    private SubWindowStrip(String label, boolean icon, int textX, int top,
-                           int right) {
+    private SubWindowStrip(String label, int labelRoom, boolean icon,
+                           int textX, int top, int right) {
         this.label = label;
+        this.labelRoom = labelRoom;
         this.icon = icon;
         this.textX = textX;
         int textTop = top + TEXT_TOP;
@@ -76,17 +79,22 @@ final class SubWindowStrip {
 
     /**
      * Lays the strip out across {@code left} to {@code right} from
-     * {@code top}, whole pixels: the icon when {@code icon}, the name cut
-     * to the room the controls leave it, and the controls.
+     * {@code top}, whole pixels: the icon when {@code icon}, the name in
+     * the room the controls leave it, and the controls.
      */
-    static SubWindowStrip layOut(FontRenderer font, int left, int right,
-                                 int top, String title, boolean icon) {
+    static SubWindowStrip layOut(int left, int right, int top, String title,
+                                 boolean icon) {
         int textX = left + EDGE_GAP
                 + (icon ? TabIcons.SLOT + TabIcons.GAP : 0);
         int room = Math.max(0, right - CONTROLS_WIDTH - NAME_GAP - textX);
-        String shown = font.getStringWidth(title) <= room ? title
-                : LostTalesSkyrimUiStyle.trimToWidth(font, title, room);
-        return new SubWindowStrip(shown, icon, textX, top, right);
+        return new SubWindowStrip(title == null ? "" : title, room, icon,
+                textX, top, right);
+    }
+
+    /** How many pixels of the name its room cannot show: how far it slides. */
+    int nameOverflow(FontRenderer font) {
+        return LostTalesUiCutName.overflow(font.getStringWidth(this.label),
+                this.labelRoom);
     }
 
     /**
@@ -140,7 +148,9 @@ final class SubWindowStrip {
 
     /**
      * The icon, the name in ivory, and the controls: the cross, the
-     * hairline and the grip lit by the window's {@code gripFade}.
+     * hairline and the grip lit by the window's {@code gripFade}. A name
+     * too long for its room fades into its end and slides along as far as
+     * the window's {@code nameSlide} has slid (LOOK-37).
      */
     void drawContent(FontRenderer font, int left, int top,
                      LostTalesUiSheet iconGlyph, SubWindow window, int alpha) {
@@ -156,8 +166,10 @@ final class SubWindowStrip {
                     textTop + WindowStyle.centredBoxTop(iconGlyph.getHeight()),
                     alpha);
         }
-        LostTalesUiInk.drawText(font, this.label, this.textX, textTop,
-                LostTalesUiInk.IVORY, alpha);
+        LostTalesUiCutName.drawTextSlid(font, this.label, this.textX, textTop,
+                this.labelRoom, LostTalesUiInk.IVORY, alpha,
+                window.nameSlide.offset());
+        LostTalesUiInk.beginContent();
         int divider = Math.round(WindowStyle.DIVIDER_ALPHA * alpha / 255.0F);
         LostTalesUiButton.drawGlyph(LostTalesUiSheet.CLOSE,
                 LostTalesUiSheet.CLOSE_HOVER, window.closeMotion,

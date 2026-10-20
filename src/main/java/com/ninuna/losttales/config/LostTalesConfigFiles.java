@@ -11,9 +11,12 @@ import java.io.File;
  * <pre>
  * config/losttales/
  *   client/   client.cfg, third-person.cfg, camera_presets/, chat/, map_markers.txt,
- *             windows/&lt;account uuid&gt;.txt
+ *             windows/&lt;account uuid&gt;.txt, views/ (the player's own view files),
+ *             hud_layouts/ (the player's own HUD layouts)
  *   server/   server.cfg, roles.cfg, channels.cfg
  *   lore_characters/   content both sides read; not configuration
+ *   quests/, skills/, deeds/, races/, capes/, kits/, missives/, map_markers/,
+ *   structures/        the server's own content files (MOD-17), read as it starts
  * </pre>
  *
  * <p>The client folder holds what one installation decides for itself
@@ -42,6 +45,8 @@ public final class LostTalesConfigFiles {
     public static final String CAMERA_OPTIONS = "third-person.cfg";
     /** The editable camera presets, a folder under the client folder. */
     public static final String CAMERA_PRESETS = "camera_presets";
+    /** The player's own HUD layouts, a folder under the client folder (MAP-11). */
+    public static final String HUD_LAYOUTS = "hud_layouts";
     /**
      * The window layouts, a folder under the client folder holding
      * one file per Minecraft account: windows are the account's, so two

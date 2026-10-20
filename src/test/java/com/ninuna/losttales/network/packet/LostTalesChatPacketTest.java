@@ -280,6 +280,54 @@ public final class LostTalesChatPacketTest {
         assertTrue(rejectedCoordinate);
     }
 
+    /** A waystone called after a lore figure of 64 three-byte letters can be shared. */
+    @Test
+    public void aMarkerCalledAfterALongNameInManyByteLettersIsShared() {
+        StringBuilder placer = new StringBuilder();
+        for (int index = 0; index < 64; index++) {
+            placer.append('მ');
+        }
+        String namedAfter = "player:" + placer;
+        LostTalesChatMessagePacket original = ChatPacketFixtures.line(
+                ChatChannel.OOC, "Steve", "Steve", "near [m:Waystone]").at(5L)
+                .showcases(Collections.singletonList(ChatShowcase.marker(0,
+                        "losttales:player/lore", "", namedAfter, "shack",
+                        "white", 100, 1.0D, 2.0D)))
+                .build();
+        ByteBuf buffer = Unpooled.buffer();
+        original.toBytes(buffer);
+        LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+
+        assertFalse(decoded.isMalformed());
+        assertEquals(namedAfter,
+                decoded.getShowcases().get(0).getMarkerNamedAfter());
+    }
+
+    @Test
+    public void aMarkerWithTheLongestNameInManyByteLettersIsShared() {
+        StringBuilder name = new StringBuilder();
+        for (int index = 0;
+             index < com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord.MAX_NAME_LENGTH;
+             index++) {
+            name.append('მ');
+        }
+        LostTalesChatMessagePacket original = ChatPacketFixtures.line(
+                ChatChannel.OOC, "Steve", "Steve", "near [m:Waystone]").at(5L)
+                .showcases(Collections.singletonList(ChatShowcase.marker(0,
+                        "losttales:player/lore", name.toString(), "", "shack",
+                        "white", 100, 1.0D, 2.0D)))
+                .build();
+        ByteBuf buffer = Unpooled.buffer();
+        original.toBytes(buffer);
+        LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+
+        assertFalse(decoded.isMalformed());
+        assertEquals(name.toString(),
+                decoded.getShowcases().get(0).getMarkerName());
+    }
+
     @Test
     public void whisperPacketsCarryTheirTargetAndPartner() {
         LostTalesChatSendPacket send = ChatPacketFixtures.send(ChatChannel.WHISPER, "psst")
@@ -322,7 +370,7 @@ public final class LostTalesChatPacketTest {
              index < ChatMessageValidator.MAX_CHARACTERS - 1; index++) {
             filler.append('x');
         }
-        String withToken = filler + "[m:Northgate Test City]";
+        String withToken = filler + "[m:Greenway Market]";
         assertEquals(ChatMessageValidator.MAX_CHARACTERS,
                 ChatMessageValidator.visibleLength(withToken));
         assertTrue(ChatMessageValidator.isValid(withToken));
@@ -775,7 +823,7 @@ public final class LostTalesChatPacketTest {
         assertEquals(2, decoded.getReactions().getReactions().size());
         ChatReactionSummary.Reaction smile = decoded.getReactions().find("smile");
         assertEquals(3, smile.count);
-        assertTrue(smile.isMine(READER));
+        assertTrue(smile.mineAs.contains(READER));
         assertEquals(Arrays.asList("Aldric", "Beren"), smile.names);
         assertEquals(1, decoded.withMessage("edited").getReactions()
                 .find("joy").count);
@@ -867,7 +915,7 @@ public final class LostTalesChatPacketTest {
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
         assertEquals(2, decoded.getReactions().find(parrot).count);
-        assertTrue(decoded.getReactions().find(parrot).isMine(READER));
+        assertTrue(decoded.getReactions().find(parrot).mineAs.contains(READER));
         assertEquals(Arrays.asList("Nils"),
                 decoded.getReactions().find(family).names);
 

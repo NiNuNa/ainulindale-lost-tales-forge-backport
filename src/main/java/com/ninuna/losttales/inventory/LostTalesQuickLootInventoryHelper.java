@@ -3,10 +3,12 @@ package com.ninuna.losttales.inventory;
 import com.ninuna.losttales.block.custom.LostTalesBlockUrnTall;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.compat.lotr.LotrContainerProtection;
+import cpw.mods.fml.common.eventhandler.Event;
 import java.lang.reflect.Method;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockChest;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryLargeChest;
 import net.minecraft.tileentity.TileEntity;
@@ -14,6 +16,8 @@ import net.minecraft.tileentity.TileEntityChest;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
+import net.minecraftforge.event.ForgeEventFactory;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
 /**
  * Shared resolver for the Quick Loot HUD.
@@ -30,6 +34,8 @@ public final class LostTalesQuickLootInventoryHelper {
 
     private static Method vanillaChestResolver;
     private static boolean lookedUpVanillaChestResolver;
+    /** Set on the server thread while {@link #mayUseAsRightClick} asks quietly. */
+    private static boolean askingQuietly;
 
     private LostTalesQuickLootInventoryHelper() {}
 
@@ -133,6 +139,46 @@ public final class LostTalesQuickLootInventoryHelper {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether every mod lets the player use the block at x, y, z, asked as a
+     * right-click on it would ask: a claim or protection mod that cancels the
+     * click keeps it shut. Asked {@code quietly}, this mod's own right-click
+     * handlers let the question pass ({@link #isAskingQuietly}), so it starts
+     * no quest and counts as no touch.
+     */
+    public static boolean mayUseAsRightClick(EntityPlayerMP player, int x, int y,
+                                             int z, boolean quietly) {
+        boolean wasQuiet = askingQuietly;
+        askingQuietly = quietly;
+        try {
+            PlayerInteractEvent event = ForgeEventFactory.onPlayerInteract(
+                    player, PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK,
+                    x, y, z, sideFacing(player, x, y, z), player.worldObj);
+            return !event.isCanceled() && event.useBlock != Event.Result.DENY;
+        } finally {
+            askingQuietly = wasQuiet;
+        }
+    }
+
+    /** Whether the right-click being handled is only {@link #mayUseAsRightClick} asking quietly. */
+    public static boolean isAskingQuietly() {
+        return askingQuietly;
+    }
+
+    /** The face of the block at x, y, z turned most toward the player. */
+    private static int sideFacing(EntityPlayer player, int x, int y, int z) {
+        double dx = player.posX - ((double) x + 0.5D);
+        double dy = player.posY + (double) player.getEyeHeight() - ((double) y + 0.5D);
+        double dz = player.posZ - ((double) z + 0.5D);
+        if (Math.abs(dy) >= Math.abs(dx) && Math.abs(dy) >= Math.abs(dz)) {
+            return dy > 0.0D ? 1 : 0;
+        }
+        if (Math.abs(dx) >= Math.abs(dz)) {
+            return dx > 0.0D ? 5 : 4;
+        }
+        return dz > 0.0D ? 3 : 2;
     }
 
     public static boolean isSealed(IInventory inventory) {

@@ -57,6 +57,35 @@ public final class MissiveSealTest {
         assertFalse(MissiveSeal.verifies(key(1), missive(12, 999999L), seal));
     }
 
+    /** A server's letter is sealed over its words as written, and over its being written (QUEST-42). */
+    @Test
+    public void aWrittenLettersWordsAreSealed() {
+        LostTalesMissiveData letter = wolves(true, "Wanted: Wolf Pelts");
+        byte[] seal = MissiveSeal.sign(key(1), letter);
+        assertNotNull(seal);
+        assertTrue(MissiveSeal.verifies(key(1), letter, seal));
+        assertFalse(MissiveSeal.verifies(key(1), wolves(true, "Wanted: Wolf Pelts!"), seal));
+        byte[] asWords = MissiveSeal.sign(key(1), wolves(true, "clear_the_paths"));
+        assertFalse("the same words as ids are another letter",
+                MissiveSeal.verifies(key(1), wolves(false, "clear_the_paths"), asWords));
+    }
+
+    private static LostTalesMissiveData wolves(boolean written, String title) {
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("entity", "lotr.Wolf");
+        params.put("count", "5");
+        return LostTalesMissiveData.builder(QUEST, "kill")
+                .written(written)
+                .titleId(title)
+                .issuerId("road_warden")
+                .descriptionId("kill")
+                .target("lotr.Wolf")
+                .generationWorldTime(1200L)
+                .objective(new LostTalesMissiveObjectiveData("kill_lotr_wolf",
+                        "kill", false, params))
+                .build();
+    }
+
     /** A gather notice hands its items over; a letter changed by hand to keep them has no seal that fits. */
     @Test
     public void aGatherLettersHandOverIsSealed() {

@@ -1,0 +1,55 @@
+{
+  "id": "losttales:defence",
+  "icon": "minecraft:iron_chestplate",
+  "order": 5,
+  "counts": [
+    {
+      "act": "guard",
+      "per": 1.0
+    }
+  ],
+  "perks": [
+    {
+      "id": "hardy",
+      "levels": [10, 30, 50],
+      "effect": "armour_absorb",
+      "amount": 0.04
+    },
+    {
+      "id": "fall_breaker",
+      "levels": [20],
+      "effect": "fall_damage",
+      "amount": 0.3
+    },
+    {
+      "id": "mender",
+      "levels": [40],
+      "effect": "armour_wear",
+      "amount": 0.25
+    },
+    {
+      "id": "fireproof",
+      "levels": [50],
+      "effect": "burn_shorter",
+      "amount": 0.3
+    },
+    {
+      "id": "steadfast",
+      "levels": [70],
+      "effect": "steadfast",
+      "amount": 0.5
+    },
+    {
+      "id": "last_stand",
+      "levels": [100],
+      "effect": "last_stand",
+      "amount": 0.3,
+      "needs": "steadfast",
+      "params": {
+        "health": 0.25,
+        "seconds": 5,
+        "cooldown": 60
+      }
+    }
+  ]
+}

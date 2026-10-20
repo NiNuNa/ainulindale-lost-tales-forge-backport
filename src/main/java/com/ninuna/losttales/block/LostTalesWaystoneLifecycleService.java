@@ -43,14 +43,10 @@ public final class LostTalesWaystoneLifecycleService {
                             tileEntity.getWorldObj());
             LostTalesMapMarkerRecord record =
                     data.getRecord(tileEntity.getMarkerId());
-            if (record == null || !record.isLinked()
-                    || !tileEntity.getLinkToken().equals(
-                            record.getLinkToken())
-                    || record.getLinkedDimensionId()
-                            != tileEntity.getWorldObj().provider.dimensionId
-                    || record.getLinkedX() != tileEntity.xCoord
-                    || record.getLinkedY() != tileEntity.yCoord
-                    || record.getLinkedZ() != tileEntity.zCoord) {
+            if (record == null || !record.isLinkedTo(
+                    tileEntity.getWorldObj().provider.dimensionId,
+                    tileEntity.xCoord, tileEntity.yCoord, tileEntity.zCoord,
+                    tileEntity.getLinkToken())) {
                 return;
             }
             data.removeRecord(record.getId());

@@ -18,7 +18,7 @@ public final class ChatSubWindows {
     public static final SubWindowKind MESSAGE = kind("message");
     /** A person's: message them, ignore them. */
     public static final SubWindowKind PERSON = kind("person");
-    /** The identities and the statuses, behind the head button. */
+    /** The identities and the statuses, behind the identity button. */
     public static final SubWindowKind CHARACTERS = kind("characters");
     /** The status line's field. */
     public static final SubWindowKind STATUS_LINE = kind("status_line");

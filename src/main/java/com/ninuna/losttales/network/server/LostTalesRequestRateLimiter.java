@@ -83,11 +83,20 @@ public final class LostTalesRequestRateLimiter {
         // They are all deliberate, and a screen full of them is a handful
         // of clicks rather than a stream.
         CHARACTER_REQUEST(40, 5000L),
+        // Claiming or giving back a lore figure is a choice made now and
+        // then, and each one writes the character stores eight or nine
+        // times and tells every player; four in a minute covers a player
+        // changing their mind. Drawn on besides CHARACTER_REQUEST.
+        LORE_TRANSFER(4, 60000L),
         // A profile is asked for as a card, a person's profile or the
         // roster's selection shows one, and again only after half a
         // minute; a player clicking through a crowd's cards stays inside
         // a dozen in five seconds.
-        CHARACTER_PROFILE(12, 5000L);
+        CHARACTER_PROFILE(12, 5000L),
+        // Taking a perk is a click on the Skills page, and a reset at a
+        // statue a confirmed choice; ten in five seconds covers a player
+        // spending a few points at once.
+        PROGRESSION_REQUEST(10, 5000L);
 
         private final int maximumRequests;
         private final long windowMillis;

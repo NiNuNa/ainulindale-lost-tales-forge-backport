@@ -171,7 +171,9 @@ public final class DiscordCopyLivenessTest {
         for (DiscordChannelBindings bindings : Arrays.asList(
                 DiscordChannelBindings.EMPTY,
                 bound("ooc=BIDIRECTIONAL;channel=6;webhook=" + HOOK_B),
-                bound("ooc=DISABLED;channel=5;webhook=" + HOOK_A))) {
+                // OOC's entry switched off: Global has channel 5 already.
+                bound("global=BIDIRECTIONAL;channel=5;webhook=" + HOOK_B,
+                        "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A))) {
             assertFalse(live(bindings, ChatChannel.OOC, "", line, TO, hooks));
             assertFalse(live(bindings, ChatChannel.OOC, "", line, FROM, hooks));
             assertFalse(live(bindings, ChatChannel.OOC, "", posted, TO, hooks));
@@ -313,9 +315,6 @@ public final class DiscordCopyLivenessTest {
                         + "so the bot does not react there",
                 live(reading, ChatChannel.OOC, "", line, TO, NOTHING_KNOWN));
         assertTrue(live(reading, ChatChannel.OOC, "", line, FROM, NOTHING_KNOWN));
-        DiscordChannelBindings noWebhook = bound("ooc=BIDIRECTIONAL;channel=5");
-        assertFalse(live(noWebhook, ChatChannel.OOC, "", line, TO, NOTHING_KNOWN));
-        assertTrue(live(noWebhook, ChatChannel.OOC, "", line, FROM, NOTHING_KNOWN));
     }
 
     @Test
@@ -372,29 +371,26 @@ public final class DiscordCopyLivenessTest {
     public void aCopyKnownOnlyByItsWebhookGoesWithTheWebhook() {
         DiscordMessageLinks.Copy byWebhook = new DiscordMessageLinks.Copy("444",
                 HOOK_A, HOOK_A, "", "global");
-        DiscordChannelBindings bindings = bound("global=GAME_TO_DISCORD;webhook=" + HOOK_A);
+        DiscordChannelBindings bindings = bound(
+                "global=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A);
         assertTrue(live(bindings, ChatChannel.GLOBAL, "", byWebhook, TO, NOTHING_KNOWN));
         assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
                 ChatChannel.GLOBAL, "", byWebhook, NOTHING_KNOWN));
         assertFalse("word from Discord always names its channel",
                 live(bindings, ChatChannel.GLOBAL, "", byWebhook, FROM, NOTHING_KNOWN));
         // The webhook given to another game channel takes the copy with it.
-        DiscordChannelBindings moved = bound("ooc=GAME_TO_DISCORD;webhook=" + HOOK_A);
+        DiscordChannelBindings moved = bound(
+                "ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A);
         assertFalse(live(moved, ChatChannel.GLOBAL, "", byWebhook, TO, NOTHING_KNOWN));
         assertEquals("", DiscordCopyLiveness.correctionWebhook(moved,
                 ChatChannel.GLOBAL, "", byWebhook, NOTHING_KNOWN));
-        // A copy the save kept under its binding alone is never live.
-        Hooks hooks = new Hooks().posting(HOOK_A, "5");
-        DiscordMessageLinks.Copy underBinding = new DiscordMessageLinks.Copy("555",
-                "binding:global", "", "", "global");
-        assertFalse(live(bindings, ChatChannel.GLOBAL, "", underBinding, TO, hooks));
-        assertEquals("", DiscordCopyLiveness.correctionWebhook(bindings,
-                ChatChannel.GLOBAL, "", underBinding, hooks));
     }
 
     @Test
     public void aWebhookPostingElsewhereOrRefusedPostsNothingThere() {
-        DiscordChannelBindings bindings = bound("global=GAME_TO_DISCORD;webhook=" + HOOK_A);
+        // The entry names channel 7; where its webhook posts is Discord's word.
+        DiscordChannelBindings bindings = bound(
+                "global=GAME_TO_DISCORD;channel=7;webhook=" + HOOK_A);
         DiscordMessageLinks.Copy inFive = new DiscordMessageLinks.Copy("222",
                 "channel:5", HOOK_A, "", "global");
         assertTrue(live(bindings, ChatChannel.GLOBAL, "", inFive, TO,
@@ -453,7 +449,8 @@ public final class DiscordCopyLivenessTest {
                 links, bound("ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A),
                 said, "5", "111"));
         assertEquals("read into another game channel", "",
-                DiscordCopyLiveness.gameLink(links, bound("global=DISCORD_TO_GAME;channel=5"),
+                DiscordCopyLiveness.gameLink(links,
+                        bound("global=DISCORD_TO_GAME;channel=5;webhook=" + HOOK_B),
                         said, "5", "111"));
         assertEquals("a message the history no longer keeps", "",
                 DiscordCopyLiveness.gameLink(links, bindings, new Said(), "5", "111"));
@@ -481,13 +478,14 @@ public final class DiscordCopyLivenessTest {
         Said said = new Said().put(MESSAGE, ChatChannel.OOC, "");
         Hooks hooks = new Hooks().posting(HOOK_A, "5").posting(HOOK_B, "6");
         DiscordChannelBindings both = bound(
-                "ooc=GAME_TO_DISCORD;webhook=" + HOOK_A,
-                "ooc=GAME_TO_DISCORD;webhook=" + HOOK_B);
+                "ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A,
+                "ooc=GAME_TO_DISCORD;channel=6;webhook=" + HOOK_B);
         assertEquals("222", DiscordCopyLiveness.jumpTarget(links, both, said, MESSAGE,
                 "channel:6", hooks).discordId);
         assertEquals("111", DiscordCopyLiveness.jumpTarget(links, both, said, MESSAGE,
                 "channel:7", hooks).discordId);
-        DiscordChannelBindings onlySix = bound("ooc=GAME_TO_DISCORD;webhook=" + HOOK_B);
+        DiscordChannelBindings onlySix = bound(
+                "ooc=GAME_TO_DISCORD;channel=6;webhook=" + HOOK_B);
         assertEquals("222", DiscordCopyLiveness.jumpTarget(links, onlySix, said,
                 MESSAGE, "channel:5", hooks).discordId);
         assertNull(DiscordCopyLiveness.jumpTarget(links, DiscordChannelBindings.EMPTY,
@@ -502,7 +500,7 @@ public final class DiscordCopyLivenessTest {
     public void onlyTheReadingBindingAnswersForADiscordChannel() {
         DiscordChannelBindings bindings = bound(
                 "ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A,
-                "global=DISCORD_TO_GAME;channel=6");
+                "global=DISCORD_TO_GAME;channel=6;webhook=" + HOOK_B);
         assertNull(bindings.readerOf("5"));
         assertEquals("global", bindings.readerOf("6").id());
         assertNull(bindings.readerOf(""));

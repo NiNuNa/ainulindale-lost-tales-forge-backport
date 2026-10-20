@@ -2,6 +2,7 @@ package com.ninuna.losttales.fellowship.storage;
 
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
 
@@ -158,8 +159,32 @@ public final class FellowshipMarkWorldData extends WorldSavedData {
         return removed;
     }
 
+    /**
+     * Whether the quarantine has room for {@code records} more. When it has
+     * not, the store closes, read-only as a save it could not read, so that
+     * no mark leaves it without being kept.
+     */
+    public synchronized boolean hasQuarantineRoomFor(int records) {
+        if (this.readOnlyForNewerVersion) {
+            return false;
+        }
+        if (this.quarantinedEntries.size() + Math.max(0, records)
+                <= FellowshipNbtCodec.MAX_QUARANTINED) {
+            return true;
+        }
+        this.readOnlyForNewerVersion = true;
+        LostTalesLog.warning("The fellowship mark quarantine holds its %d records; "
+                        + "the marks stay read-only until it is emptied",
+                Integer.valueOf(FellowshipNbtCodec.MAX_QUARANTINED));
+        return false;
+    }
+
+    /** Sets a mark's record aside; the caller asked {@link #hasQuarantineRoomFor} first. */
     public synchronized void quarantine(String reason, FellowshipMark mark) {
         ensureWritable();
+        if (this.quarantinedEntries.size() >= FellowshipNbtCodec.MAX_QUARANTINED) {
+            throw new IllegalStateException("The fellowship mark quarantine is full");
+        }
         this.quarantinedEntries.add(
                 FellowshipMarkNbtCodec.createQuarantineEntry(reason, mark));
         markDirty();

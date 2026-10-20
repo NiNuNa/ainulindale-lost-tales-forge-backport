@@ -9,10 +9,9 @@ import net.minecraft.util.StatCollector;
 /**
  * What a marker with no name of its own is called after, kept beside its
  * empty name so each game words it in its own language:
- * {@code player:Nils} for a waystone its placer has not named
- * ({@code Nils's Waystone}), by their account's name, or their
- * character's while the server shows no accounts,
- * {@code entity:losttales.Nia} for a quest
+ * {@code player:Aragorn} for a waystone its placer has not named
+ * ({@code Aragorn's Waystone}), by the name of the character that placed
+ * it (WAY-01), {@code entity:losttales.Nia} for a quest
  * giver known by its kind, {@code block:losttales:cheese_wheel} for a
  * block that gives a quest. A name a player or an operator gave a marker
  * always stands over it.
@@ -30,7 +29,7 @@ public final class LostTalesMapMarkerNamedAfter {
 
     private LostTalesMapMarkerNamedAfter() {}
 
-    /** A waystone called after the player who placed it, by their account's or their character's name. */
+    /** A waystone called after the character that placed it, by its name. */
     public static String player(String placerName) {
         return of(PLAYER, placerName);
     }
@@ -85,12 +84,6 @@ public final class LostTalesMapMarkerNamedAfter {
             }
         }
         return "";
-    }
-
-    /** Whether it names a waystone after its placer. */
-    public static boolean isPlayer(String namedAfter) {
-        return namedAfter != null && namedAfter.startsWith(PLAYER)
-                && subject(namedAfter).length() > 0;
     }
 
     /**

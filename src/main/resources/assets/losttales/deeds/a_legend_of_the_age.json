@@ -1,0 +1,8 @@
+{
+  "id": "losttales:a_legend_of_the_age",
+  "category": "growth",
+  "icon": "minecraft:nether_star",
+  "kind": "character_level",
+  "level": 50,
+  "title": true
+}

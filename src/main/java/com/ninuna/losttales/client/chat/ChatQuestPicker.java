@@ -5,7 +5,6 @@ import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -99,11 +98,9 @@ final class ChatQuestPicker extends ChatPickerPanel {
                         TabIcons.SIZE, mark.getWidth()),
                 labelTop + Math.floorDiv(LostTalesUiInk.CAP_HEIGHT
                         - mark.getHeight(), 2), alpha);
-        String label = LostTalesSkyrimUiStyle.trimToWidth(
-                minecraft.fontRenderer, quest.label(),
-                width - LABEL_LEFT - MenuWindow.PADDING_X);
-        LostTalesChatVisualStyle.drawPlain(minecraft.fontRenderer, label,
-                x + LABEL_LEFT, labelTop, alpha);
+        drawName(minecraft.fontRenderer, quest.label(), x + LABEL_LEFT,
+                labelTop, width - LABEL_LEFT - MenuWindow.PADDING_X, alpha,
+                hovered);
     }
 
     @Override

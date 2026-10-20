@@ -1,0 +1,7 @@
+{
+  "id": "losttales:troll_slayer",
+  "category": "foes",
+  "icon": "minecraft:bone",
+  "kind": "kill",
+  "creatures": ["lotr.Troll", "lotr.MountainTroll", "lotr.MountainTrollChieftain", "lotr.OlogHai", "lotr.MirkTroll", "lotr.SnowTroll", "lotr.UtumnoTroll", "lotr.UtumnoSnowTroll"]
+}

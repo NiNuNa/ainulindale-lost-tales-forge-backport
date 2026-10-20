@@ -27,7 +27,7 @@ public final class CharacterBodyTypePacketTest {
         CharacterAppearance appearance = new CharacterAppearance(
                 playerId, "Steve123", "Aragorn", "losttales:human",
                 "losttales:male", CharacterSkinRegistry.ACCOUNT_SKIN_ID,
-                true, 0, "lotr:gondor", 87, CharacterBodyTypeRegistry.SLIM,
+                true, "", "lotr:gondor", 87, CharacterBodyTypeRegistry.SLIM,
                 CharacterChestTypeRegistry.FULL_MEDIUM);
         ByteBuf buffer = Unpooled.buffer();
         try {
@@ -81,7 +81,7 @@ public final class CharacterBodyTypePacketTest {
         CharacterSummary unknown = new CharacterSummary(
                 characterId, 0, "Ranger", "losttales:human",
                 "losttales:female", "losttales:human_bree_female_0",
-                true, 0, 32, "lotr:bree", "losttales:huge", "");
+                true, "", 32, "lotr:bree", "losttales:huge", "");
         assertEquals(CharacterBodyTypeRegistry.SLIM, unknown.getBodyTypeId());
     }
 }

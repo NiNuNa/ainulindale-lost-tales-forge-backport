@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificatio
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -65,7 +66,9 @@ public final class LostTalesMapMarkerHudRenderer {
                 resolution.getScaledHeight(), DISCOVERY_NOTICE_HEIGHT);
         String title = StatCollector.translateToLocal(
                 "gui.losttales.hud.location_discovered");
-        String name = trimToWidth(font, notice.getName(), DISCOVERY_NOTICE_WIDTH);
+        String name = notice.getName() == null ? "" : notice.getName();
+        int nameWidth = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(name), DISCOVERY_NOTICE_WIDTH);
 
         int titleColor = colorWithAlpha(LostTalesColors.SAND, alpha * 0.78F);
         int nameColor = colorWithAlpha(LostTalesColors.IVORY, alpha);
@@ -75,9 +78,12 @@ public final class LostTalesMapMarkerHudRenderer {
         }
 
         int titleX = centerX - font.getStringWidth(title) / 2;
-        int nameX = centerX - font.getStringWidth(name) / 2;
+        int nameX = centerX - nameWidth / 2;
         font.drawStringWithShadow(title, titleX, y, titleColor);
-        font.drawStringWithShadow(name, nameX, y + 13, nameColor);
+        // A name too long for the notice fills it and fades into its end
+        // (LOOK-37).
+        LostTalesUiCutName.drawShadowed(font, name, nameX, y + 13,
+                DISCOVERY_NOTICE_WIDTH, nameColor);
 
         int lineY = y + 26;
         Gui.drawRect(centerX - DISCOVERY_LINE_GAP - DISCOVERY_LINE_WIDTH, lineY, centerX - DISCOVERY_LINE_GAP, lineY + 1, lineColor);
@@ -104,15 +110,19 @@ public final class LostTalesMapMarkerHudRenderer {
         int y = LostTalesNotificationHud.claim(resolution.getScaledWidth(),
                 resolution.getScaledHeight(), AREA_NOTICE_HEIGHT);
 
-        String text = trimToWidth(font, notice.getName(),
-                Math.round(AREA_NOTICE_WIDTH / 0.72F));
+        String text = notice.getName() == null ? "" : notice.getName();
+        int room = Math.round(AREA_NOTICE_WIDTH / 0.72F);
         int color = colorWithAlpha(LostTalesColors.IVORY, alpha * 0.74F);
         if (color != 0) {
             float scale = 0.72F;
+            int shown = (int)LostTalesUiCutName.shownWidth(
+                    font.getStringWidth(text), room);
             GL11.glPushMatrix();
             GL11.glTranslatef(x, y, 0.0F);
             GL11.glScalef(scale, scale, 1.0F);
-            font.drawStringWithShadow(text, -font.getStringWidth(text) / 2, 0, color);
+            // A name too long for the notice fades into its end (LOOK-37).
+            LostTalesUiCutName.drawShadowed(font, text, -shown / 2, 0, room,
+                    color);
             GL11.glPopMatrix();
         }
     }
@@ -148,13 +158,5 @@ public final class LostTalesMapMarkerHudRenderer {
     private static void drawSmallDiamond(int centerX, int centerY, int color) {
         Gui.drawRect(centerX, centerY - 3, centerX + 1, centerY + 4, color);
         Gui.drawRect(centerX - 2, centerY - 1, centerX + 3, centerY + 2, color);
-    }
-
-    private static String trimToWidth(FontRenderer font,
-                                      String text, int width) {
-        if (text == null || text.length() == 0) {
-            return "";
-        }
-        return font.trimStringToWidth(text, Math.max(1, width));
     }
 }

@@ -1,0 +1,10 @@
+{
+  "id": "losttales:bones",
+  "kind": "gather",
+  "item": "minecraft:bone",
+  "count": [4, 10],
+  "experience": 5,
+  "titles": ["materials_wanted", "gatherers_pay", "stores_run_low"],
+  "issuers": ["local_watch", "road_warden", "village_reeve", "caravan_master", "quartermaster"],
+  "flavours": ["small_stores", "plain_notice", "useful_materials"]
+}

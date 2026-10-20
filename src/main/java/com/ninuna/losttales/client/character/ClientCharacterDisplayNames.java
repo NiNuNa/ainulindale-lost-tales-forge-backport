@@ -34,10 +34,13 @@ public final class ClientCharacterDisplayNames {
 
     private ClientCharacterDisplayNames() {}
 
-    /** The races the creation form offers: every race of the mod. */
+    /**
+     * The races the creation form offers: every race of the list the server
+     * sent (the bundled six before one arrives), none a stand-in.
+     */
     public static List<String> getRaceIds() {
         ArrayList<String> ids = new ArrayList<String>();
-        for (CharacterRaceDefinition definition : CharacterRaceRegistry.getAll()) {
+        for (CharacterRaceDefinition definition : CharacterRaceRegistry.getOffered()) {
             ids.add(definition.getId());
         }
         return Collections.unmodifiableList(ids);
@@ -119,7 +122,12 @@ public final class ClientCharacterDisplayNames {
         return catalog == null ? LOTR_ADAPTER.isAvailable() : catalog.isLotrAvailable();
     }
 
+    /** A race's words: a server's as its file writes them, a bundled one's from the lang file. */
     public static String race(String id) {
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(id);
+        if (race != null && race.getName().length() > 0) {
+            return race.getName();
+        }
         return translatedIdentifier("gui.losttales.character.race.", id, "losttales:");
     }
 
@@ -134,7 +142,8 @@ public final class ClientCharacterDisplayNames {
         }
         String groupKey = "gui.losttales.character.skin_group."
                 + definition.getDisplayGroupId();
-        String group = I18n.format(groupKey);
+        String group = definition.getDisplayGroupName().length() > 0
+                ? definition.getDisplayGroupName() : I18n.format(groupKey);
         if (groupKey.equals(group)) {
             group = prettifyIdentifier(definition.getDisplayGroupId());
         }
@@ -195,13 +204,17 @@ public final class ClientCharacterDisplayNames {
                 ? prettifyIdentifier(id) : displayName;
     }
 
-    public static String cape(int cosmeticCapeId) {
-        if (cosmeticCapeId == CharacterCapeCatalog.NONE_ID) {
+    /** A cape's words: a server's as its file writes them, a bundled one's from the lang file. */
+    public static String cape(String cosmeticCapeId) {
+        if (CharacterCapeCatalog.NONE_ID.equals(cosmeticCapeId)) {
             return I18n.format("gui.losttales.character.cape.none");
         }
         CharacterCapeDefinition definition = CharacterCapeCatalog.get(cosmeticCapeId);
         if (definition == null) {
             return I18n.format("gui.losttales.character.unknown");
+        }
+        if (definition.getName().length() > 0) {
+            return definition.getName();
         }
         String key = definition.getTranslationKey();
         String translated = I18n.format(key);

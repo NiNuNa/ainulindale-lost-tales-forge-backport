@@ -28,8 +28,10 @@ public final class ClientConfigChoicesTest {
         ConfigCategory client = definedClientOptions();
         assertArrayEquals(new String[] {"LEFT", "CENTRE", "RIGHT"},
                 client.get("chatFeedAlignment").getValidValues());
-        assertArrayEquals(LostTalesConfig.HUD_PRESET_VALUES,
-                client.get("hudPlacementPreset").getValidValues());
+        // The HUD layout takes the ids of the layout files that loaded
+        // (MAP-11), so it is defined with none before they are read.
+        String[] layouts = client.get("hudPlacementPreset").getValidValues();
+        assertTrue(layouts == null || layouts.length == 0);
         for (String colour : new String[] {"windowPrimaryColor",
                 "windowSecondaryColor", "windowAccentColor",
                 "chatMentionLineColor", "chatReplyHighlightColor"}) {
@@ -48,9 +50,6 @@ public final class ClientConfigChoicesTest {
         ConfigCategory client = definedClientOptions();
         for (String alignment : client.get("chatFeedAlignment").getValidValues()) {
             assertEquals(alignment, LostTalesConfig.normalizeFeedAlignment(alignment));
-        }
-        for (String preset : client.get("hudPlacementPreset").getValidValues()) {
-            assertEquals(preset, LostTalesConfig.normalizeHudPreset(preset));
         }
         for (String colour : client.get("chatReplyHighlightColor").getValidValues()) {
             assertTrue(LostTalesColors.isPaletteName(colour));

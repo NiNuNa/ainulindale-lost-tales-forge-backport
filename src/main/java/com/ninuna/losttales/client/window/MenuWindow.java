@@ -7,10 +7,11 @@ import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
+import com.ninuna.losttales.gui.style.LostTalesUiFading;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -1306,9 +1307,9 @@ public final class MenuWindow extends SubWindowContent {
                     break;
                 }
                 if (listTop + tops[index + 1] > at.rowsTop) {
-                    drawRow(minecraft, font, at, this.entries.get(index), rowY,
-                            index == hoveredIndex, pointerX, pointerY,
-                            elapsed, alpha);
+                    drawRow(minecraft, font, at, this.entries.get(index),
+                            index, rowY, index == hoveredIndex, pointerX,
+                            pointerY, elapsed, alpha);
                 }
             }
         } finally {
@@ -1327,12 +1328,14 @@ public final class MenuWindow extends SubWindowContent {
      * window's opacity always; a muted channel is italic, the hovered row
      * is told by its light, and a row naming a tab takes the tab's colour
      * as it lights, as the tab's own name does. A row's value stands at
-     * its right end, and its label gives way before it.
+     * its right end, and its label gives way before it, fading into its
+     * room's end and sliding along while the row is hovered (LOOK-37).
      */
     private void drawRow(Minecraft minecraft, FontRenderer font, Layout at,
-                         Entry entry, int rowY, boolean hovered,
+                         Entry entry, int index, int rowY, boolean hovered,
                          double pointerX, double pointerY, double elapsed,
                          int alpha) {
+        Integer key = Integer.valueOf(index);
         if (entry.separator) {
             WindowLists.drawSeparator(at.left + PADDING_X,
                     at.left + at.width - PADDING_X, rowY, alpha);
@@ -1359,11 +1362,12 @@ public final class MenuWindow extends SubWindowContent {
             // timestamps wear, so it reads as a label, not a row; one that
             // folds wears its sign before it, and lights to ivory under
             // the pointer as a row's name does.
+            int right = at.left + at.width - PADDING_X;
             WindowLists.drawHeading(font, entry.headerPrefix() + entry.label,
                     at.left + PADDING_X,
-                    at.left + PADDING_X + entry.headerIndent(font),
-                    at.left + at.width - PADDING_X, rowY, rowHeight(),
-                    hovered, alpha);
+                    at.left + PADDING_X + entry.headerIndent(font), right,
+                    right, rowY, rowHeight(), hovered, alpha, this, key,
+                    hovered);
             return;
         }
         if (entry.group) {
@@ -1410,22 +1414,39 @@ public final class MenuWindow extends SubWindowContent {
             right = (int)Math.floor(right - value) - VALUE_GAP;
         }
         if (entry.labelStyle != null) {
-            // A styled label cannot be cut by the letter; the clip cuts a
-            // line longer than the window at its edge.
-            entry.labelStyle.draw(minecraft, font, entry.label,
-                    entry.dim ? "§o" : "", labelLeft, labelTop, labelRgb,
-                    markAlpha);
+            // A styled label, its emojis drawn, is cut as plain words are.
+            final Minecraft drawing = minecraft;
+            final FontRenderer letters = font;
+            final Entry styled = entry;
+            final int x = labelLeft;
+            final int y = labelTop;
+            final int rgb = labelRgb;
+            final int strength = markAlpha;
+            int width = entry.labelStyle.width(font, entry.label);
+            float room = right - labelLeft;
+            LostTalesUiCutName.draw(labelLeft, width, room,
+                    LostTalesUiCutName.slideOf(this, key, hovered,
+                            LostTalesUiCutName.overflow(width, room)),
+                    new LostTalesUiFading.FadingPainter() {
+                        @Override
+                        public void paint(float share) {
+                            styled.labelStyle.draw(drawing, letters,
+                                    styled.label, styled.dim ? "§o" : "", x,
+                                    y, rgb, Math.round(strength * share));
+                        }
+                    });
         } else {
-            String label = trimmed(font, entry.label, right - labelLeft);
-            LostTalesUiInk.drawText(font,
-                    entry.dim ? "§o" + label : label, labelLeft, labelTop,
-                    labelRgb, markAlpha);
+            LostTalesUiCutName.drawText(font,
+                    entry.dim ? "§o" + entry.label : entry.label, labelLeft,
+                    labelTop, right - labelLeft, labelRgb, markAlpha, this,
+                    key, hovered);
         }
     }
 
     /**
      * A group's name at the padding, as a header's is, a channel's icon
-     * before it, in the group's own colour — sand for a part of a system.
+     * before it, in the group's own colour — sand for a part of a system;
+     * cut and fading where its row ends. Never hovered, so it never slides.
      */
     private void drawGroup(Minecraft minecraft, FontRenderer font, Layout at,
                            Entry entry, int labelTop, int alpha) {
@@ -1436,8 +1457,8 @@ public final class MenuWindow extends SubWindowContent {
                     TabMark.of(entry.icon));
             x += TabIcons.SLOT + TabIcons.GAP;
         }
-        LostTalesUiInk.drawText(font, trimmed(font, entry.label,
-                        at.left + at.width - PADDING_X - x), x, labelTop,
+        LostTalesUiCutName.drawText(font, entry.label, x, labelTop,
+                at.left + at.width - PADDING_X - x,
                 entry.labelColor >= 0 ? entry.labelColor
                         : LostTalesColors.rgb(LostTalesColors.SAND), alpha);
     }
@@ -1618,11 +1639,14 @@ public final class MenuWindow extends SubWindowContent {
                 lessLeft, chevronY, alpha);
         drawChevron(MORE, MORE_LIT, more, PART_MORE.equals(pointed),
                 moreLeft, chevronY, alpha);
-        LostTalesUiInk.drawText(font, value,
+        // A value wider than its room fills it and fades into its end
+        // (LOOK-37).
+        LostTalesUiCutName.drawText(font, value,
                 textLeft + LostTalesUiInk.centredStart(textWidth,
-                        font.getStringWidth(value)),
-                labelTop, PART_VALUE.equals(pointed) ? LostTalesUiInk.IVORY
-                        : valueRgb, alpha);
+                        (int)LostTalesUiCutName.shownWidth(
+                                font.getStringWidth(value), textWidth)),
+                labelTop, textWidth, PART_VALUE.equals(pointed)
+                        ? LostTalesUiInk.IVORY : valueRgb, alpha);
     }
 
     /** The motion a row's chevron keeps while it can move; null at its bound. */
@@ -1791,13 +1815,6 @@ public final class MenuWindow extends SubWindowContent {
      */
     private static String keyJoiner() {
         return StatCollector.translateToLocal("quickLootHud.losttales.plus");
-    }
-
-    /** {@code text} cut to {@code width}, whole when it fits. */
-    private static String trimmed(FontRenderer font, String text, int width) {
-        return font.getStringWidth(text) <= width ? text
-                : LostTalesSkyrimUiStyle.trimToWidth(font, text,
-                        Math.max(0, width));
     }
 
     /* ---- Scrolling and hit testing ---- */

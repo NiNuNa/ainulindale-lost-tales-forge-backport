@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 /**
  * The screen-space bands the chat renderer actually drew this frame, one per
- * visible line, in GUI coordinates. Every mouse-to-line mapping (hover card,
+ * visible line, in GUI coordinates. Every mouse-to-line mapping (person card,
  * component hover, clicks, clipboard) resolves against these instead of
  * re-deriving the layout, so the hit test can never drift from the picture:
  * scroll, view filtering, chat scale, entry motion and view transitions are

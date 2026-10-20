@@ -7,6 +7,7 @@ import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRende
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberAvailability;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberSnapshot;
@@ -53,14 +54,16 @@ public final class LostTalesFellowshipHudRenderer {
     private LostTalesFellowshipHudRenderer() {}
 
     /**
-     * The rows a full fellowship shows, for placing the HUD: the server's
-     * member limit less the player, at most the panel's rows; the panel's
-     * rows before the server has said.
+     * The rows the panel's box holds, which its two numbers place:
+     * {@link FellowshipHudLayout#BOX_ROWS}, or a full fellowship's rows
+     * where the server's fellowships hold fewer members (its member limit
+     * less the player).
      */
-    public static int placementRows() {
+    public static int boxRows() {
         FellowshipStateSnapshot state = ClientFellowshipStateCache.getSnapshot();
-        return state == null ? FellowshipHudLayout.MAX_ROWS
-                : Math.min(FellowshipHudLayout.MAX_ROWS, state.getMemberLimit() - 1);
+        return state == null ? FellowshipHudLayout.BOX_ROWS
+                : Math.max(1, Math.min(FellowshipHudLayout.BOX_ROWS,
+                        state.getMemberLimit() - 1));
     }
 
     public static void render(Minecraft minecraft, float partialTicks) {
@@ -97,7 +100,7 @@ public final class LostTalesFellowshipHudRenderer {
                 resolution.getScaledHeight(),
                 LostTalesConfig.fellowshipHudOffsetX,
                 LostTalesConfig.fellowshipHudOffsetY,
-                others.size());
+                others.size(), boxRows());
 
         GL11.glPushMatrix();
         GL11.glDisable(GL11.GL_LIGHTING);
@@ -183,10 +186,10 @@ public final class LostTalesFellowshipHudRenderer {
                 ? x + width - 7 : heldItemX - 7;
         int nameRight = leader ? leaderX - 5
                 : (heldItem == null ? x + width - 4 : heldItemX - 3);
-        String name = LostTalesSkyrimUiStyle.trimToWidth(
-                font, member.getCharacterName(),
-                Math.max(8, nameRight - textX));
-        font.drawStringWithShadow(name, textX, y + 3,
+        // A name too long for the panel fades into its end; nothing
+        // points at the HUD, so it never slides (LOOK-37).
+        LostTalesUiCutName.drawShadowed(font, member.getCharacterName(),
+                textX, y + 3, Math.max(8, nameRight - textX),
                 muted ? LostTalesSkyrimUiStyle.TEXT_MUTED
                         : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
         if (leader) {
@@ -214,11 +217,8 @@ public final class LostTalesFellowshipHudRenderer {
                     brightness);
         } else {
             String statusText = describeUnavailableStatus(status, stale);
-            font.drawStringWithShadow(
-                    LostTalesSkyrimUiStyle.trimToWidth(
-                            font, statusText,
-                            Math.max(8, contentRight - textX)),
-                    textX, y + 15,
+            LostTalesUiCutName.drawShadowed(font, statusText, textX, y + 15,
+                    Math.max(8, contentRight - textX),
                     statusColor(status, stale));
         }
     }

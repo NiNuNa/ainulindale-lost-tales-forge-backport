@@ -82,7 +82,6 @@ public final class FellowshipInvitationNbtCodec {
             LostTalesLog.warning("Fellowship invitation quarantine is malformed or unsupported; data will remain read-only");
             return ReadResult.unsupported(safeSource, quarantineResult.getUnsupportedVersion());
         }
-        repaired |= quarantineResult.isRepaired();
         ArrayList<NBTTagCompound> quarantine =
                 new ArrayList<NBTTagCompound>(quarantineResult.getEntries());
 
@@ -133,6 +132,13 @@ public final class FellowshipInvitationNbtCodec {
                     count(perTargetAccount, result.invitation.getTargetOwnerId()) + 1));
             invitations.put(invitationId, result.invitation);
             repaired |= result.repaired;
+        }
+        if (quarantine.size() > FellowshipNbtCodec.MAX_QUARANTINED) {
+            LostTalesLog.warning("Fellowship invitation quarantine would hold %d records, past "
+                            + "its %d; data will remain read-only",
+                    Integer.valueOf(quarantine.size()),
+                    Integer.valueOf(FellowshipNbtCodec.MAX_QUARANTINED));
+            return ReadResult.unsupported(safeSource, -1);
         }
         return ReadResult.success(invitations, repaired, quarantine);
     }

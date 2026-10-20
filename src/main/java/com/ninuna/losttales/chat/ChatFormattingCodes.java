@@ -44,20 +44,6 @@ public final class ChatFormattingCodes {
         return stripped.toString();
     }
 
-    /** Whether the text holds a section sign or a control character, which no player's words may. */
-    public static boolean hasCodeOrControl(String text) {
-        if (text == null) {
-            return false;
-        }
-        for (int index = 0; index < text.length(); index++) {
-            char character = text.charAt(index);
-            if (character == SECTION_SIGN || character < 32 || character == 127) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static boolean isFormattingCode(char character) {
         char lower = Character.toLowerCase(character);
         return (lower >= '0' && lower <= '9')

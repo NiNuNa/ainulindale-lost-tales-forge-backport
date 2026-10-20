@@ -8,6 +8,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipMarks;
 import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
+import com.ninuna.losttales.client.fellowship.LostTalesLotrFellowshipShareRows;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipDisplayNames;
 import com.ninuna.losttales.client.window.NamingWindow;
@@ -1326,10 +1327,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      * Tales markers.
      *
      * <p>The base method owns the waypoint artwork and its clipping, but it
-     * derives opacity from the old, shorter zoom range. Supplying the native
-     * exponent that represents our desired alpha removes the late faint pop;
-     * restoring the real exponent immediately keeps every other map system on
-     * the smooth zoom.</p>
+     * derives opacity from LOTR's own, shorter zoom range. It is handed the
+     * native exponent that gives the shared fade's alpha, so no waypoint pops
+     * in faint and late; the real exponent comes back at once, which keeps
+     * every other map system on the smooth zoom.</p>
      */
     private void renderWaypointsWithSharedFade(
             List<LOTRAbstractWaypoint> waypoints, int pass,
@@ -2760,8 +2761,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                 return targets;
             }
             for (LOTRFellowshipClient fellowship : fellowships) {
+                // One the account holds for the record only has no row (FEL-02).
                 if (fellowship == null
-                        || fellowship.getName() == null) {
+                        || fellowship.getName() == null
+                        || !LostTalesLotrFellowshipShareRows.mayShareInto(
+                                fellowship.getFellowshipID())) {
                     continue;
                 }
                 targets.add(new LostTalesMapWaypointPrompt.ShareTarget(

@@ -138,9 +138,8 @@ public final class WindowLayout {
 
     /**
      * Adds a window holding {@code tabs}, {@code active} in front, in the
-     * view of its front page's category: at the default place, locked. How
-     * tabs a loaded layout placed nowhere find a home. Null with no tabs; a
-     * tab already open elsewhere stays where it is.
+     * view of its front page's category: at the default place, locked.
+     * Null with no tabs; a tab already open elsewhere stays where it is.
      */
     public static synchronized Window addWindow(List<? extends WindowPage> tabs,
                                                 WindowPage active) {
@@ -921,31 +920,6 @@ public final class WindowLayout {
     }
 
     /**
-     * Opens a tab in a window of its own, a step on from {@code reference},
-     * else from the window in front, unlocked and in front of it: where a
-     * new page goes when the window it was asked for takes none. Refused
-     * for a tab a window holds.
-     */
-    public static synchronized WindowPage openInNewWindow(WindowPage tab,
-                                                          Window reference) {
-        if (tab == null || holds(tab)) {
-            return null;
-        }
-        Window created = newWindow();
-        Window from = reference != null && WINDOWS.contains(reference)
-                ? reference : frontWindow();
-        // It stands in the view of the window it steps on from.
-        created.setView(from != null ? viewOf(from) : WindowView.handView(tab));
-        cascadeFrom(created, from);
-        created.tabs().add(tab);
-        created.setActiveTab(tab);
-        WINDOWS.add(created);
-        raise(created.getId());
-        changed();
-        return tab;
-    }
-
-    /**
      * Moves a tab to {@code index} of the target window: the place it
      * ends up at once the move is done, clamped to the row, in a window
      * that may be its own — a reorder — or another one — a dock. A locked
@@ -1474,9 +1448,8 @@ public final class WindowLayout {
 
     /**
      * Adds tabs to the end of a window's row, locked or not, leaving its
-     * front tab alone: how a layout being put back as it was gets the tabs
-     * its file placed nowhere, and the whispers a window held on this
-     * server. Not written; the caller decides.
+     * front tab alone: how the whispers a window held on this server come
+     * back to it as they stood. Not written; the caller decides.
      */
     public static synchronized void appendTabs(Window window,
                                                List<? extends WindowPage> tabs) {
@@ -1587,33 +1560,10 @@ public final class WindowLayout {
         return WINDOWS.isEmpty();
     }
 
-    /** The first window, or null once every one has been closed. */
-    public static synchronized Window firstWindow() {
-        return isEmpty() ? null : WINDOWS.get(0);
-    }
-
     public static synchronized Window window(String id) {
         for (int index = 0; index < WINDOWS.size(); index++) {
             if (WINDOWS.get(index).getId().equals(id)) {
                 return WINDOWS.get(index);
-            }
-        }
-        return null;
-    }
-
-    /**
-     * The window drawn in front of the others that the view shows: a new
-     * window steps on from it. A window the view hides is not seen, so
-     * one that would step on from it opens at the default place instead.
-     * Null with none.
-     */
-    private static Window frontWindow() {
-        List<Window> order = stacked();
-        for (int index = order.size() - 1; index >= 0; index--) {
-            for (WindowPage tab : order.get(index).tabs()) {
-                if (WindowView.shows(tab)) {
-                    return order.get(index);
-                }
             }
         }
         return null;

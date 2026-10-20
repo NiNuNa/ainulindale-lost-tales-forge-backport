@@ -1,0 +1,7 @@
+{
+  "id": "losttales:teller_of_tales",
+  "category": "tales",
+  "icon": "minecraft:writable_book",
+  "kind": "quests",
+  "count": 10
+}

@@ -36,7 +36,9 @@ public final class CharacterBodyModelRegistryTest {
             CharacterBodyModelDefinition model = CharacterBodyModelRegistry.get(
                     CharacterBodyModelRegistry.getDefaultModelId(race.getId()));
             assertEquals(race.getId() + " chest variant",
-                    race.hasGenderedModels(), model.hasChestVariant());
+                    race.isGenderAllowed(CharacterGenderRegistry.MALE)
+                            && race.isGenderAllowed(CharacterGenderRegistry.FEMALE),
+                    model.hasChestVariant());
             assertTrue(race.getId() + " body types", model.supportsBodyTypes());
         }
     }

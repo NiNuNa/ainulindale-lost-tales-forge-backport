@@ -11,27 +11,18 @@ import net.minecraft.item.ItemFood;
 import net.minecraft.item.ItemStack;
 
 public class LostTalesItemFood extends ItemFood {
-    private final String credits;
     private final ELostTalesItemMaterial material;
     private final ELostTalesItem.Type itemType;
-
-    public LostTalesItemFood(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, int healAmount, float saturationModifier, boolean isWolfsFavoriteMeat, String credits) {
-        super(healAmount, saturationModifier, isWolfsFavoriteMeat);
-        this.material = material;
-        this.itemType = itemType;
-        this.credits = credits;
-    }
 
     public LostTalesItemFood(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, int healAmount, float saturationModifier, boolean isWolfsFavoriteMeat) {
         super(healAmount, saturationModifier, isWolfsFavoriteMeat);
         this.material = material;
         this.itemType = itemType;
-        this.credits = null;
     }
 
     @Override
     @SideOnly(Side.CLIENT)
     public void addInformation(ItemStack itemStack, EntityPlayer player, List list, boolean advancedTooltips) {
-        LostTalesClientUtil.addItemInformation(list, itemStack, this.material, this.credits, player, this.itemType);
+        LostTalesClientUtil.addItemInformation(list, itemStack, this.material, null, player, this.itemType);
     }
 }

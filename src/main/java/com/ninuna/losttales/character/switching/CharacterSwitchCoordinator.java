@@ -27,6 +27,7 @@ import cpw.mods.fml.common.FMLLog;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.play.server.S40PacketDisconnect;
 import net.minecraft.server.MinecraftServer;
@@ -67,21 +68,19 @@ public final class CharacterSwitchCoordinator {
         return INSTANCE;
     }
 
-    /**
-     * Switches the player to one of their characters. A target owned by
-     * another account is refused.
-     */
-    public CharacterOperationResult selectIdentity(EntityPlayerMP player,
-                                                   int requestId,
-                                                   long expectedRosterRevision,
-                                                   PlayableIdentity target) {
+    /** Switches the player to one of their own characters. */
+    public CharacterOperationResult selectCharacter(EntityPlayerMP player,
+                                                    int requestId,
+                                                    long expectedRosterRevision,
+                                                    UUID characterId) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterOperationResult.failure(CharacterErrorId.INVALID_PLAYER, null);
         }
         UUID ownerId = player.getUniqueID();
-        if (target == null || !ownerId.equals(target.getOwnerId())) {
+        if (characterId == null) {
             return CharacterOperationResult.failure(CharacterErrorId.INVALID_CHARACTER_ID, null);
         }
+        PlayableIdentity target = PlayableIdentity.character(ownerId, characterId);
         synchronized (getAccountLock(ownerId)) {
             long requestEpoch = CharacterLifecycleStateTracker.captureRequestEpoch(player);
             CharacterOperationResult cached = getCached(ownerId, requestEpoch, requestId);
@@ -89,7 +88,7 @@ public final class CharacterSwitchCoordinator {
                 return cached;
             }
             CharacterOperationResult result = selectLocked(
-                    player, requestId, requestEpoch,
+                    player, requestEpoch,
                     expectedRosterRevision, target, false);
             cache(ownerId, requestEpoch, requestId, result);
             return result;
@@ -102,8 +101,7 @@ public final class CharacterSwitchCoordinator {
      * and the session ({@link CharacterSwitchPolicy#evaluateFirstCharacter}),
      * and spending no cooldown.
      */
-    public CharacterOperationResult joinAs(EntityPlayerMP player, int requestId,
-                                           UUID characterId) {
+    public CharacterOperationResult joinAs(EntityPlayerMP player, UUID characterId) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterOperationResult.failure(CharacterErrorId.INVALID_PLAYER, null);
         }
@@ -121,7 +119,7 @@ public final class CharacterSwitchCoordinator {
                 logFailure(player, "join_storage_access", exception);
                 return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
             }
-            return selectLocked(player, requestId, requestEpoch, revision,
+            return selectLocked(player, requestEpoch, revision,
                     PlayableIdentity.character(ownerId, characterId), true);
         }
     }
@@ -159,7 +157,7 @@ public final class CharacterSwitchCoordinator {
                 }
 
                 CharacterErrorId journalResult = recoverJournalLocked(
-                        player, roster, account, stores);
+                        player, roster, account, stores, true);
                 if (journalResult != CharacterErrorId.NONE) {
                     return journalResult;
                 }
@@ -197,6 +195,16 @@ public final class CharacterSwitchCoordinator {
                         player.getUniqueID());
                 CharacterSwitchAccountState account =
                         stores.switches.getOrCreateAccount(player.getUniqueID());
+                CharacterSwitchTransaction held = account.getTransaction();
+                if (held != null && held.isHeld()) {
+                    // The journal names the saved state an operator's discard
+                    // puts back, so nothing is captured over it; the death is
+                    // settled all the same.
+                    account.clearDeathPending();
+                    stores.switches.saveAccount(account);
+                    CharacterSwitchStorage.flush(player.worldObj);
+                    return CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
+                }
                 this.playerStateService.ensureBootstrapped(
                         player, roster, stores.playerStates);
                 CharacterPlayerStateSnapshot snapshot =
@@ -419,64 +427,297 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** What discarding an account's switch journal did. */
-    public enum JournalDiscard {
-        /** The store is read-only, or this owner's entry is quarantined. */
-        UNAVAILABLE,
-        /** The account holds no journal. */
-        NONE,
-        /** The journal was discarded and the account thawed. */
-        DISCARDED
+    /**
+     * What an operator's discard of an account's switch journal did
+     * (CHAR-37), with the character it brings back: its id, null for the
+     * ghost, and its name while the roster holds it.
+     */
+    public static final class JournalDiscard {
+
+        public enum Outcome {
+            /** The switch store is read-only, or this owner's entry is quarantined. */
+            UNAVAILABLE,
+            /** The account holds no journal. */
+            NONE,
+            /** The player plays the source again; what they held was set aside. */
+            RESTORED,
+            /** The player is away or dead: the source comes back at their next join. */
+            AT_NEXT_JOIN,
+            /** The restore cannot be made yet ({@link #getRefusal}); every join tries again. */
+            WAITING,
+            /** The restore failed once the player was touched: disconnected, held again. */
+            FAILED
+        }
+
+        private static final JournalDiscard UNAVAILABLE =
+                new JournalDiscard(Outcome.UNAVAILABLE, null, null, null);
+        private static final JournalDiscard NONE =
+                new JournalDiscard(Outcome.NONE, null, null, null);
+
+        private final Outcome outcome;
+        private final UUID sourceId;
+        private final String sourceName;
+        private final CharacterSwitchSourceRestore.Refusal refusal;
+
+        private JournalDiscard(Outcome outcome, UUID sourceId, String sourceName,
+                               CharacterSwitchSourceRestore.Refusal refusal) {
+            this.outcome = outcome;
+            this.sourceId = sourceId;
+            this.sourceName = sourceName;
+            this.refusal = refusal;
+        }
+
+        private static JournalDiscard of(Outcome outcome,
+                                         CharacterSwitchTransaction transaction,
+                                         CharacterRoster roster,
+                                         CharacterSwitchSourceRestore.Refusal refusal) {
+            UUID sourceId = transaction.getSourceCharacterId();
+            RoleplayCharacter source = roster == null || sourceId == null
+                    ? null : roster.getCharacter(sourceId);
+            return new JournalDiscard(outcome, sourceId,
+                    source == null ? null : source.getName(), refusal);
+        }
+
+        public Outcome getOutcome() { return this.outcome; }
+        /** The character the switch was leaving; null for the ghost. */
+        public UUID getSourceId() { return this.sourceId; }
+        /** Its name; null for the ghost and for a character no longer in the roster. */
+        public String getSourceName() { return this.sourceName; }
+        /** Why a waiting restore cannot be made yet; null otherwise. */
+        public CharacterSwitchSourceRestore.Refusal getRefusal() { return this.refusal; }
     }
 
     /**
-     * Discards an account's switch journal and thaws the account, by owner
-     * id and without a live player, so an account that is refused at login
-     * can be repaired while it is offline.
-     *
-     * <p>The account's own player files are left exactly as they are and
-     * become authoritative by default: a journal held for recovery is what
-     * said they might not be. Whatever the interrupted switch had written
-     * to the state store stays there as an unreferenced generation.</p>
+     * Discards an account's switch journal (CHAR-37), by owner id, so an
+     * account refused at login can be settled while it is offline. The
+     * character the switch was leaving comes back exactly as the journal's
+     * source generation holds it, and what the player holds then is set
+     * aside in their player-state quarantine: at once for {@code online},
+     * the account's player when they are alive, else at their next join.
+     * The journal waits for its restore, switching off, until it is made.
      */
-    public JournalDiscard discardJournal(World world, UUID ownerId) {
+    public JournalDiscard discardJournal(World world, UUID ownerId,
+                                         EntityPlayerMP online) {
         if (world == null || world.isRemote || ownerId == null) {
             return JournalDiscard.UNAVAILABLE;
         }
         synchronized (getAccountLock(ownerId)) {
+            CharacterSwitchAccountState state;
+            CharacterSwitchTransaction transaction;
             try {
                 CharacterSwitchWorldData data = CharacterSwitchStorage.get(world);
                 if (data.isReadOnlyForNewerVersion() || data.isOwnerBlocked(ownerId)) {
                     return JournalDiscard.UNAVAILABLE;
                 }
-                CharacterSwitchAccountState state = data.getAccount(ownerId);
-                CharacterSwitchTransaction discarded =
-                        state == null ? null : state.getTransaction();
-                if (discarded == null) {
+                state = data.getAccount(ownerId);
+                transaction = state == null ? null : state.getTransaction();
+                if (transaction == null) {
                     return JournalDiscard.NONE;
                 }
-                state.setTransaction(null);
-                state.setFrozen(false);
+                CharacterSwitchTransactionStatus was = transaction.getStatus();
+                CharacterSwitchSourceRestore.markForRestore(
+                        state, System.currentTimeMillis());
                 data.saveAccount(state);
                 CharacterSwitchStorage.flush(world);
-                FMLLog.warning("[%s] Character switch journal %s discarded for "
-                                + "owner %s: status=%s source=%s target=%s "
-                                + "sourceState=%d targetState=%d",
-                        LostTalesMetaData.MOD_ID,
-                        discarded.getTransactionId(), ownerId,
-                        discarded.getStatus().getId(),
-                        discarded.getSourceCharacterId(),
-                        discarded.getTargetCharacterId(),
-                        Long.valueOf(discarded.getSourceStateGeneration()),
-                        Long.valueOf(discarded.getTargetStateGeneration()));
-                return JournalDiscard.DISCARDED;
+                FMLLog.warning("[%s] An operator discarded character switch journal %s "
+                                + "of owner %s (status %s, source %s, target %s): the "
+                                + "source comes back from state generation %d, and what "
+                                + "the player holds then is set aside",
+                        LostTalesMetaData.MOD_ID, transaction.getTransactionId(),
+                        ownerId, was.getId(),
+                        describe(transaction.getSourceCharacterId()),
+                        describe(transaction.getTargetCharacterId()),
+                        Long.valueOf(transaction.getSourceStateGeneration()));
             } catch (RuntimeException exception) {
                 FMLLog.warning("[%s] Could not discard the character switch "
                                 + "journal for owner %s: %s",
                         LostTalesMetaData.MOD_ID, ownerId, exception.toString());
                 return JournalDiscard.UNAVAILABLE;
             }
+
+            if (online != null && ownerId.equals(online.getUniqueID())
+                    && LostTalesServerPlayers.isServerPlayer(online)
+                    && online.isEntityAlive() && !online.isDead
+                    && online.getHealth() > 0.0F && !state.isDeathPending()) {
+                Stores stores;
+                try {
+                    stores = loadStores(online.worldObj, ownerId);
+                } catch (RuntimeException exception) {
+                    return refused(ownerId, transaction, null,
+                            CharacterSwitchSourceRestore.Refusal.STORE_UNAVAILABLE,
+                            exception);
+                }
+                return restoreSourceLocked(online, stores, state);
+            }
+            return awaitJoin(world, ownerId, transaction);
         }
+    }
+
+    /**
+     * The answer for a player away or dead: their next join makes the
+     * restore, unless the stores already say why it cannot be made.
+     */
+    private static JournalDiscard awaitJoin(World world, UUID ownerId,
+                                            CharacterSwitchTransaction transaction) {
+        CharacterRoster roster = null;
+        CharacterSwitchSourceRestore.Refusal refusal;
+        try {
+            CharacterWorldData rosters = CharacterStorage.get(world);
+            CharacterPlayerStateWorldData states =
+                    CharacterPlayerStateStorage.get(world, ownerId);
+            roster = rosters.getRoster(ownerId);
+            refusal = CharacterSwitchSourceRestore.refusal(transaction, roster,
+                    states.getAccount(ownerId),
+                    !rosters.isReadOnlyForNewerVersion()
+                            && !states.isReadOnlyForNewerVersion()
+                            && !states.isOwnerBlocked(ownerId),
+                    states.getQuarantinedEntryCount()
+                            < CharacterPlayerStateWorldData.MAX_QUARANTINED);
+        } catch (RuntimeException exception) {
+            return refused(ownerId, transaction, roster,
+                    CharacterSwitchSourceRestore.Refusal.STORE_UNAVAILABLE, exception);
+        }
+        if (refusal != null) {
+            return refused(ownerId, transaction, roster, refusal, null);
+        }
+        return JournalDiscard.of(JournalDiscard.Outcome.AT_NEXT_JOIN,
+                transaction, roster, null);
+    }
+
+    /**
+     * Puts the character a journal's switch was leaving back on the live
+     * player, exactly as the generation the journal names for it, after
+     * setting what the player holds aside in their player-state quarantine
+     * (CHAR-37). It goes the way a switch goes: the state applied and the
+     * player moved, the roster on the source, its LOTR record, its race and
+     * its hired units, every part synchronized, and the player's own files
+     * saved before the journal goes. Refused before the player is touched,
+     * the journal keeps waiting; failed after, it is held for an operator
+     * again and the player is disconnected.
+     */
+    private JournalDiscard restoreSourceLocked(EntityPlayerMP player,
+                                               Stores stores,
+                                               CharacterSwitchAccountState account) {
+        UUID ownerId = player.getUniqueID();
+        World world = player.worldObj;
+        CharacterSwitchTransaction transaction = account.getTransaction();
+        CharacterRoster roster = stores.rosters.getRoster(ownerId);
+        CharacterPlayerStateAccount states = stores.playerStates.getAccount(ownerId);
+        CharacterSwitchSourceRestore.Refusal refusal =
+                CharacterSwitchSourceRestore.refusal(transaction, roster, states,
+                        !stores.rosters.isReadOnlyForNewerVersion()
+                                && !stores.playerStates.isReadOnlyForNewerVersion()
+                                && !stores.playerStates.isOwnerBlocked(ownerId),
+                        stores.playerStates.getQuarantinedEntryCount()
+                                < CharacterPlayerStateWorldData.MAX_QUARANTINED);
+        if (refusal != null) {
+            return refused(ownerId, transaction, roster, refusal, null);
+        }
+
+        UUID sourceId = transaction.getSourceCharacterId();
+        PlayableIdentity source = PlayableIdentity.of(ownerId, sourceId);
+        PlayableIdentity played = PlayableIdentity.fromRoster(roster);
+        RoleplayCharacter sourceCharacter = sourceId == null
+                ? null : roster.getCharacter(sourceId);
+        CharacterPlayerStateSnapshot snapshot;
+        try {
+            snapshot = this.playerStateService.findGeneration(states,
+                    source.getGameplayId(), transaction.getSourceStateGeneration());
+        } catch (CharacterStateValidationException exception) {
+            return refused(ownerId, transaction, roster,
+                    CharacterSwitchSourceRestore.Refusal.STATE_GONE, exception);
+        }
+        NBTTagCompound held;
+        try {
+            held = this.playerStateService.captureAsIs(player);
+        } catch (Exception exception) {
+            return refused(ownerId, transaction, roster,
+                    CharacterSwitchSourceRestore.Refusal.STATE_UNREADABLE, exception);
+        }
+        if (!stores.playerStates.hasQuarantineRoomFor(1)) {
+            return refused(ownerId, transaction, roster,
+                    CharacterSwitchSourceRestore.Refusal.QUARANTINE_FULL, null);
+        }
+        try {
+            // Kept on disk before the player is touched.
+            stores.playerStates.setAside(
+                    CharacterPlayerStateWorldData.REASON_SWITCH_MIXED_STATE,
+                    CharacterSwitchSourceRestore.setAside(transaction,
+                            played.getCharacterId(), System.currentTimeMillis(), held));
+            CharacterPlayerStateStorage.flush(world);
+        } catch (RuntimeException exception) {
+            return refused(ownerId, transaction, roster,
+                    CharacterSwitchSourceRestore.Refusal.STORE_UNAVAILABLE, exception);
+        }
+
+        try {
+            this.playerStateService.apply(player, source, sourceCharacter, snapshot);
+            this.playerStateService.transitionLocation(player, snapshot);
+            if (!source.equals(played)) {
+                CharacterLastSeen.saw(world, played.getGameplayId());
+            }
+            if (CharacterSwitchSourceRestore.playSource(roster, transaction)) {
+                stores.rosters.saveRoster(roster);
+            }
+            CharacterLotrRecord.refresh(player, stores.rosters, roster, sourceCharacter);
+            CharacterRaceGameplayHandler.apply(player, sourceCharacter);
+            LotrHiredUnitCustody.settle(player, source, roster);
+            this.playerStateService.synchronize(player);
+            // The player's own files hold the source before the journal goes.
+            CharacterLiveStatePersistence.save(player);
+            CharacterSwitchSourceRestore.settle(account);
+            stores.switches.saveAccount(account);
+            CharacterSwitchStorage.flush(world);
+        } catch (Throwable failure) {
+            CharacterSwitchSourceRestore.holdAgain(account, System.currentTimeMillis());
+            try {
+                stores.switches.saveAccount(account);
+                CharacterSwitchStorage.flush(world);
+            } catch (Throwable journalFailure) {
+                // The next login fails closed if the journal cannot be written.
+                logFailure(player, "restore_journal", journalFailure);
+            }
+            disconnectForRecovery(player);
+            FMLLog.severe("[%s] Putting %s back from character switch journal %s "
+                            + "failed for owner %s: %s. The player was disconnected; "
+                            + "the journal is held for an operator again, and what "
+                            + "they held is in the player-state quarantine",
+                    LostTalesMetaData.MOD_ID, describe(sourceId),
+                    transaction.getTransactionId(), ownerId, failure.toString());
+            return JournalDiscard.of(JournalDiscard.Outcome.FAILED,
+                    transaction, roster, null);
+        }
+        FMLLog.warning("[%s] Character switch journal %s settled for owner %s: "
+                        + "%s is back from state generation %d (the roster played %s); "
+                        + "what the player held is set aside in the player-state "
+                        + "quarantine (%d of %d entries)",
+                LostTalesMetaData.MOD_ID, transaction.getTransactionId(), ownerId,
+                describe(sourceId), Long.valueOf(transaction.getSourceStateGeneration()),
+                describe(played.getCharacterId()),
+                Integer.valueOf(stores.playerStates.getQuarantinedEntryCount()),
+                Integer.valueOf(CharacterPlayerStateWorldData.MAX_QUARANTINED));
+        return JournalDiscard.of(JournalDiscard.Outcome.RESTORED,
+                transaction, roster, null);
+    }
+
+    /** A restore that cannot be made yet, said in the log; the journal keeps waiting. */
+    private static JournalDiscard refused(UUID ownerId,
+                                          CharacterSwitchTransaction transaction,
+                                          CharacterRoster roster,
+                                          CharacterSwitchSourceRestore.Refusal refusal,
+                                          Throwable cause) {
+        FMLLog.warning("[%s] Character switch journal %s of owner %s cannot put %s "
+                        + "back yet (%s)%s; it is tried again at their next join",
+                LostTalesMetaData.MOD_ID, transaction.getTransactionId(), ownerId,
+                describe(transaction.getSourceCharacterId()), refusal.getId(),
+                cause == null ? "" : ": " + cause);
+        return JournalDiscard.of(JournalDiscard.Outcome.WAITING,
+                transaction, roster, refusal);
+    }
+
+    /** A journal's side for the log: a character's id, or the ghost. */
+    private static String describe(UUID characterId) {
+        return characterId == null ? "the ghost" : "character " + characterId;
     }
 
     public boolean setFrozen(World world, UUID ownerId, boolean frozen) {
@@ -526,7 +767,6 @@ public final class CharacterSwitchCoordinator {
     }
 
     private CharacterOperationResult selectLocked(EntityPlayerMP player,
-                                                    int requestId,
                                                     long requestEpoch,
                                                     long expectedRosterRevision,
                                                     PlayableIdentity target,
@@ -544,8 +784,8 @@ public final class CharacterSwitchCoordinator {
         }
 
         CharacterRoster roster = stores.rosters.getOrCreateRoster(player.getUniqueID());
-        CharacterValidationResult reference = CharacterValidator.validateSelectionTarget(
-                roster, target, expectedRosterRevision);
+        CharacterValidationResult reference = CharacterValidator.validateCharacterReference(
+                roster, target.getCharacterId(), expectedRosterRevision);
         if (!reference.isValid()) {
             return CharacterOperationResult.failure(reference.getErrorId(), roster);
         }
@@ -555,7 +795,7 @@ public final class CharacterSwitchCoordinator {
         CharacterErrorId recovery;
         try {
             recovery = recoverJournalLocked(
-                    player, roster, account, stores);
+                    player, roster, account, stores, false);
         } catch (CharacterStateValidationException exception) {
             logFailure(player, "select_recovery_player_state", exception);
             return CharacterOperationResult.failure(
@@ -602,6 +842,7 @@ public final class CharacterSwitchCoordinator {
         boolean rosterChanged = false;
         boolean commitFlushed = false;
         boolean finalizationFlushed = false;
+        boolean unitsParked = false;
         try {
             CharacterPlayerStateAccount playerStateAccount =
                     this.playerStateService.ensureBootstrapped(
@@ -610,8 +851,9 @@ public final class CharacterSwitchCoordinator {
             // The source's hired units hold still from here: whichever
             // identity is played next, they are not its to command.
             LotrHiredUnitCustody.park(player, source, roster);
-            // The live state is the source's, whichever identity that is; an
-            // account that has never been left gets its record from this.
+            unitsParked = true;
+            // The live state is the source's, whichever identity that is;
+            // the ghost of a first switch gets its record from this.
             sourceSnapshot = this.playerStateService.captureOrCreate(
                     player, playerStateAccount, stores.playerStates, source);
             // The source's pledge and title as the player leaves it, while
@@ -634,17 +876,11 @@ public final class CharacterSwitchCoordinator {
                             ? account.planCooldownExemptSwitch(safeNow)
                             : account.planSuccessfulSwitch(
                                     safeNow, getCooldownDurationsMillis());
-            long targetRevision = roster.getRevision() == Long.MAX_VALUE
-                    ? Long.MAX_VALUE : roster.getRevision() + 1L;
             transaction = new CharacterSwitchTransaction(
                     UUID.randomUUID(),
                     source.getCharacterId(),
                     target.getCharacterId(),
-                    roster.getRevision(),
-                    targetRevision,
                     safeNow,
-                    requestEpoch,
-                    requestId,
                     account.getCooldownStage(),
                     account.getNextAllowedAt(),
                     account.getLastSuccessfulSwitchAt(),
@@ -677,8 +913,8 @@ public final class CharacterSwitchCoordinator {
                         commitPolicy.getRetryAtEpochMillis());
             }
             CharacterValidationResult finalReference =
-                    CharacterValidator.validateSelectionTarget(
-                            roster, target, expectedRosterRevision);
+                    CharacterValidator.validateCharacterReference(
+                            roster, target.getCharacterId(), expectedRosterRevision);
             if (!finalReference.isValid()) {
                 transaction.markAborted(System.currentTimeMillis());
                 stores.switches.saveAccount(account);
@@ -775,14 +1011,13 @@ public final class CharacterSwitchCoordinator {
             try {
                 if (playerStateApplied && sourceSnapshot != null) {
                     // The source generation captured above is exactly the
-                    // pre-switch live state, for the account as for a
+                    // pre-switch live state, for the ghost as for a
                     // character, so it goes back on before the roster does.
                     this.playerStateService.apply(
                             player, source, sourceCharacter, sourceSnapshot);
                     this.playerStateService.transitionLocation(
                             player, sourceSnapshot);
                     CharacterRaceGameplayHandler.apply(player, sourceCharacter);
-                    LotrHiredUnitCustody.settle(player, source, roster);
                     this.playerStateService.synchronize(player);
                 }
                 if (rosterChanged
@@ -821,6 +1056,11 @@ public final class CharacterSwitchCoordinator {
                     : CharacterErrorId.INTERNAL_ERROR;
             return CharacterOperationResult.failure(error, roster);
         } finally {
+            // A switch that ends with the source still played, refused late
+            // or rolled back, gives the source its parked units back.
+            if (unitsParked && source.equals(PlayableIdentity.fromRoster(roster))) {
+                LotrHiredUnitCustody.settle(player, source, roster);
+            }
             CharacterLifecycleStateTracker.endSwitch(player);
         }
     }
@@ -832,9 +1072,7 @@ public final class CharacterSwitchCoordinator {
             Stores stores)
             throws CharacterStateValidationException {
         CharacterSwitchTransaction transaction = account.getTransaction();
-        if (account.isFrozen() || transaction != null
-                && transaction.getStatus()
-                == CharacterSwitchTransactionStatus.RECOVERY_REQUIRED) {
+        if (account.isFrozen() || transaction != null && transaction.isHeld()) {
             return false;
         }
         if (account.isDeathPending() || !player.isEntityAlive()
@@ -875,13 +1113,12 @@ public final class CharacterSwitchCoordinator {
         if (transaction == null) {
             return CharacterErrorId.NONE;
         }
-        if (account.isFrozen() || transaction.getStatus()
-                == CharacterSwitchTransactionStatus.RECOVERY_REQUIRED) {
+        if (account.isFrozen() || transaction.isHeld()) {
             return CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
         }
 
-        // A null id on either side is the account, so a null active id
-        // matches a journal whose source or target is the account.
+        // A null source is the ghost of a first switch, so a null active
+        // id matches a journal still on its source.
         UUID activeId = roster.getActiveCharacterId();
         if (equalsUuid(activeId, transaction.getTargetCharacterId())) {
             transaction.setTargetStateGeneration(snapshot.getGeneration());
@@ -896,15 +1133,35 @@ public final class CharacterSwitchCoordinator {
         return CharacterErrorId.NONE;
     }
 
+    /**
+     * Settles the account's journal against the live player. With
+     * {@code restoreSource}, a journal an operator discarded puts its
+     * source back ({@link #restoreSourceLocked}): at a join and at an
+     * operator's recover, never at a switch the player asked for, which
+     * the journal refuses until it is made.
+     */
     private CharacterErrorId recoverJournalLocked(
             EntityPlayerMP player,
             CharacterRoster roster,
             CharacterSwitchAccountState account,
-            Stores stores)
+            Stores stores,
+            boolean restoreSource)
             throws CharacterStateValidationException {
         CharacterSwitchTransaction transaction = account.getTransaction();
         if (transaction == null || account.isDeathPending()) {
             return CharacterErrorId.NONE;
+        }
+
+        if (transaction.getStatus()
+                == CharacterSwitchTransactionStatus.RESTORE_SOURCE) {
+            if (!restoreSource || !player.isEntityAlive() || player.isDead
+                    || player.getHealth() <= 0.0F) {
+                return CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
+            }
+            return restoreSourceLocked(player, stores, account).getOutcome()
+                    == JournalDiscard.Outcome.RESTORED
+                    ? CharacterErrorId.NONE
+                    : CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
         }
 
         // A journal held for an operator is never acted on again. The
@@ -940,7 +1197,7 @@ public final class CharacterSwitchCoordinator {
                 && player.getHealth() > 0.0F) {
             UUID activeId = roster.getActiveCharacterId();
             try {
-                // Whichever side the roster is on, the account included,
+                // Whichever side the roster is on, the ghost included,
                 // is restored from the generation the journal names for it.
                 long generation;
                 if (equalsUuid(activeId,
@@ -1012,6 +1269,21 @@ public final class CharacterSwitchCoordinator {
         if (result.isChanged()) {
             switchData.saveAccount(account);
             CharacterSwitchStorage.flush(world);
+        }
+        // With no journal left, a first switch is done for good: the
+        // ghost's record it could roll back to goes. Housekeeping only:
+        // a failure leaves the record for the next pass.
+        if (account.getTransaction() == null) {
+            try {
+                if (this.playerStateService.forgetGhostState(roster,
+                        CharacterPlayerStateStorage.get(world, roster.getOwnerId()))) {
+                    CharacterPlayerStateStorage.flush(world);
+                }
+            } catch (RuntimeException exception) {
+                FMLLog.warning("[%s] Could not forget the first-visit state of "
+                                + "owner %s: %s", LostTalesMetaData.MOD_ID,
+                        roster.getOwnerId(), exception.toString());
+            }
         }
         return result.getErrorId();
     }
@@ -1100,7 +1372,7 @@ public final class CharacterSwitchCoordinator {
 
     private static long[] getDecayDurationsMillis() {
         return secondsToMillis(LostTalesConfig.characterSwitchDecaySeconds,
-                new int[] {0, 3600, 10800, 21600, 43200, 86400});
+                new int[] {3600, 10800, 21600, 43200, 86400});
     }
 
     private static long[] secondsToMillis(int[] configured, int[] fallback) {

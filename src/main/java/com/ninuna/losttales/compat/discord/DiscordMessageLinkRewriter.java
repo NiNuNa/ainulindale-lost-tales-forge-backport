@@ -18,13 +18,15 @@ import java.util.regex.Pattern;
  * {@link Resolver}'s: this class only finds the links and asks.
  */
 final class DiscordMessageLinkRewriter {
+    /** A Discord id in a link: as many digits as a Discord id has at most. */
+    private static final String ID = "(\\d{1," + DiscordChannelBindings.MAX_SNOWFLAKE_DIGITS + "})";
     /**
      * A Discord jump URL: the guild, the channel and the message, on
      * any of Discord's hosts.
      */
     static final Pattern JUMP_URL = Pattern.compile(
             "https?://(?:(?:ptb|canary)\\.)?discord(?:app)?\\.com/channels/"
-                    + "(\\d{1,24})/(\\d{1,24})/(\\d{1,24})(?![\\w/])");
+                    + ID + "/" + ID + "/" + ID + "(?![\\w/])");
 
     private DiscordMessageLinkRewriter() {}
 

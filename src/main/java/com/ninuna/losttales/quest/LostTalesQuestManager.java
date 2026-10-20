@@ -21,6 +21,9 @@ import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointUnlockHelper;
+import com.ninuna.losttales.progression.ProgressionHooks;
+import com.ninuna.losttales.progression.perk.Perks;
+import com.ninuna.losttales.progression.skill.PerkEffect;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -131,11 +134,11 @@ public final class LostTalesQuestManager {
         long worldTime = player == null || player.worldObj == null ? 0L
                 : player.worldObj.getTotalWorldTime();
         boolean changed = data != null && data.completeQuest(questId,
-                buildCompletionOutcome(quest, progress), worldTime,
-                getCompletedOptionalObjectiveIds(quest, progress));
+                worldTime, getCompletedOptionalObjectiveIds(quest, progress));
         if (changed) {
             revealQuestMarkers(player, quest, false);
             grantQuestRewards(player, quest, progress, -1);
+            ProgressionHooks.questCompleted(player, quest);
             syncToClient(player);
         }
         return changed;
@@ -719,7 +722,7 @@ public final class LostTalesQuestManager {
                         objective, player)) {
                     continue;
                 }
-                if (!isWithinObjectiveRadius(player, victim, objective)) {
+                if (!isWithinKillPlace(player, victim, objective)) {
                     continue;
                 }
                 changed |= addObjectiveProgressAndEvaluate(player, quest, objective, 1);
@@ -953,10 +956,34 @@ public final class LostTalesQuestManager {
         if (shouldScanMarkerDiscovery(player)) {
             changed |= discoverNearbyMapMarkers(player, false);
         }
-        changed |= ensureLotrWaypointsForDiscoveredMapMarkers(player);
+        changed |= keepLotrWaypoints(player);
         if (changed) {
             syncToClient(player);
         }
+    }
+
+    /**
+     * The once-a-second waypoint check: the walk over every discovered
+     * marker runs only when the discovered markers or LOTR's unlocked
+     * regions changed since it last ran.
+     */
+    private static boolean keepLotrWaypoints(EntityPlayerMP player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+        if (waypointState(player, data).equals(data.getWaypointCheckSeen())) {
+            return false;
+        }
+        boolean changed = ensureLotrWaypointsForDiscoveredMapMarkers(player);
+        data.setWaypointCheckSeen(waypointState(player, data));
+        return changed;
+    }
+
+    private static List<Object> waypointState(EntityPlayerMP player,
+                                              LostTalesQuestPlayerData data) {
+        return java.util.Arrays.<Object>asList(Integer.valueOf(data.getMarkerChanges()),
+                LostTalesMapMarkerWaypointUnlockHelper.unlockedRegions(player));
     }
 
     public static boolean handleTravelProgress(EntityPlayerMP player,
@@ -1192,9 +1219,11 @@ public final class LostTalesQuestManager {
         int playerDimension = player.worldObj.provider.dimensionId;
         LostTalesMapMarkerWorldData markerData =
                 LostTalesMapMarkerStorage.get(player.worldObj);
+        // Pathfinder finds every marker from farther away (PROG-06).
+        double reachScale = 1.0D + Perks.of(player).total(PerkEffect.DISCOVERY_RANGE);
         for (LostTalesMapMarkerRecord record
                 : markerData.getDiscoveryCandidates(
-                        playerDimension, player.posX, player.posZ)) {
+                        playerDimension, player.posX, player.posZ, reachScale)) {
             if (record == null
                     || !LostTalesMapMarkerVisibilityPolicy.canView(
                             record, player)
@@ -1203,7 +1232,7 @@ public final class LostTalesQuestManager {
                 continue;
             }
             double radius = Math.max(
-                    1.0D, record.getDiscoveryRadius());
+                    1.0D, record.getDiscoveryRadius()) * reachScale;
             double dx = player.posX - record.getX();
             double markerY = record.getEffectiveY(
                     player.worldObj, player.posY);
@@ -1212,6 +1241,8 @@ public final class LostTalesQuestManager {
             if (dx * dx + dy * dy + dz * dz <= radius * radius) {
                 if (data.discoverMarker(record.getId())) {
                     changed = true;
+                    ProgressionHooks.markerDiscovered(player, record.getId(),
+                            record.hasWaystone());
                     LostTalesMapMarkerSyncManager.discoveryChanged(
                             player, record.getId());
                     LostTalesMapMarkerDefinition marker =
@@ -1421,13 +1452,12 @@ public final class LostTalesQuestManager {
         LostTalesQuestProgress completedProgress = progress.copy();
         long worldTime = player.worldObj == null ? 0L
                 : player.worldObj.getTotalWorldTime();
-        boolean completed = data.completeQuest(quest.getId(),
-                buildCompletionOutcome(quest, completedProgress), worldTime,
-                getCompletedOptionalObjectiveIds(quest,
-                        completedProgress));
+        boolean completed = data.completeQuest(quest.getId(), worldTime,
+                getCompletedOptionalObjectiveIds(quest, completedProgress));
         if (completed) {
             revealQuestMarkers(player, quest, false);
             grantQuestRewards(player, quest, completedProgress, picked);
+            ProgressionHooks.questCompleted(player, quest);
         }
         return completed;
     }
@@ -1538,40 +1568,10 @@ public final class LostTalesQuestManager {
     }
 
     /**
-     * A finished quest's outcome line for the History: the {@code outcome}
-     * each optional objective it achieved writes, in order. An optional
-     * objective with no outcome adds nothing; the journal ticks it among
-     * the quest's objectives.
+     * The optional objectives a finished quest achieved, which its History
+     * line keeps; each reader's game words what they add to it
+     * ({@link LostTalesQuestWords#outcomeLine}).
      */
-    private static String buildCompletionOutcome(
-            LostTalesQuestDefinition quest,
-            LostTalesQuestProgress progress) {
-        if (quest == null || progress == null) {
-            return "";
-        }
-        StringBuilder outcome = new StringBuilder();
-        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
-            for (LostTalesQuestObjectiveDefinition objective
-                    : stage.getObjectives()) {
-                if (!objective.isOptional()
-                        || progress.getObjectiveProgress(objective.getId())
-                        < LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective)) {
-                    continue;
-                }
-                String detail = LostTalesQuestParams.value(
-                        objective.getParams(), "outcome");
-                if (detail.length() == 0) {
-                    continue;
-                }
-                if (outcome.length() > 0) {
-                    outcome.append(" ");
-                }
-                outcome.append(detail);
-            }
-        }
-        return outcome.toString();
-    }
-
     private static Set<String> getCompletedOptionalObjectiveIds(
             LostTalesQuestDefinition quest,
             LostTalesQuestProgress progress) {
@@ -1602,7 +1602,8 @@ public final class LostTalesQuestManager {
      * Brings the player's client up to their quest log, the server quests
      * it names first where their client was not sent them yet
      * ({@link ServerQuestSync}): the whole log, or only the counts that
-     * moved ({@link QuestLogSync}).
+     * moved ({@link QuestLogSync}). A log a character switch put in place
+     * goes whole, to be taken without news.
      */
     public static void syncToClient(EntityPlayerMP player) {
         if (player == null) {
@@ -1611,7 +1612,8 @@ public final class LostTalesQuestManager {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         LotrQuestJournalAdapter.prune(player, data);
         ServerQuestSync.revealLog(player, data);
-        QuestLogSync.send(player, LostTalesQuestSyncPacket.fromPlayerData(data));
+        QuestLogSync.send(player, LostTalesQuestSyncPacket.fromPlayerData(data),
+                data != null && data.takeReplaced());
         // The fellowships' members see where this player stands, and the
         // player where they do (QUEST-25).
         QuestFellows.refreshAround(player);
@@ -1667,32 +1669,52 @@ public final class LostTalesQuestManager {
         return LostTalesQuestObjectiveType.GOTO.is(objective);
     }
 
+    /** Whether a go-to's traveller stands within its {@code radius} (3 blocks) of its place. */
     private static boolean isAtObjectiveLocation(EntityPlayerMP player,
             Entity source, LostTalesQuestObjectiveDefinition objective) {
         if (player == null || source == null || source.worldObj == null) {
             return false;
         }
-        Map<String, String> params = objective.getParams();
+        int here = source.worldObj.provider.dimensionId;
+        double radius = Math.max(0.5D, LostTalesQuestParams.parseDouble(
+                objective.getParams().get("radius"), 3.0D));
+        return LostTalesQuestParams.isWithin(objectivePlace(player, objective, here),
+                here, source.posX, source.posY, source.posZ, radius);
+    }
+
+    /**
+     * The place an objective names: its map marker, the player's own or
+     * the catalogue's, else its {@code x}, {@code y}, {@code z} in the
+     * dimension {@code dimension} names, else in {@code here}; null for
+     * none.
+     */
+    private static LostTalesQuestParams.Location objectivePlace(EntityPlayerMP player,
+            LostTalesQuestObjectiveDefinition objective, int here) {
         LostTalesMapMarkerDefinition marker = getObjectiveLocationMarker(player, objective);
-        LostTalesQuestParams.Location location = marker != null ? null
-                : LostTalesQuestParams.location(params, source.worldObj.provider.dimensionId);
-        if (marker == null && location == null) {
+        return marker != null ? new LostTalesQuestParams.Location(marker.getDimensionId(),
+                marker.getX(), marker.getY(), marker.getZ())
+                : LostTalesQuestParams.location(objective.getParams(), here);
+    }
+
+    /**
+     * Whether a kill counts where the creature died (QUEST-40): a kill that
+     * names a place counts the creatures that die within its
+     * {@code radius} of it, in its dimension, wherever the killer stands;
+     * one that names none counts within its {@code radius} of the killer,
+     * or anywhere without one.
+     */
+    private static boolean isWithinKillPlace(EntityPlayerMP player, Entity victim,
+            LostTalesQuestObjectiveDefinition objective) {
+        if (!LostTalesQuestParams.namesPlace(objective.getParams())) {
+            return isWithinObjectiveRadius(player, victim, objective);
+        }
+        if (player == null || victim == null || victim.worldObj == null) {
             return false;
         }
-
-        double x = marker != null ? marker.getX() : location.getX();
-        double y = marker != null ? marker.getY() : location.getY();
-        double z = marker != null ? marker.getZ() : location.getZ();
-        double radius = Math.max(0.5D, LostTalesQuestParams.parseDouble(params.get("radius"), 3.0D));
-        int targetDimension = marker != null ? marker.getDimensionId() : location.getDimensionId();
-        if (source.worldObj.provider.dimensionId != targetDimension) {
-            return false;
-        }
-
-        double dx = source.posX - x;
-        double dy = source.posY - y;
-        double dz = source.posZ - z;
-        return dx * dx + dy * dy + dz * dz <= radius * radius;
+        int here = victim.worldObj.provider.dimensionId;
+        return LostTalesQuestParams.isWithin(objectivePlace(player, objective, here), here,
+                victim.posX, victim.posY, victim.posZ,
+                LostTalesQuestParams.parseDouble(objective.getParam("radius", "0"), 0.0D));
     }
 
     /**

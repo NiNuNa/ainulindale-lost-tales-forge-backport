@@ -25,7 +25,7 @@ public final class LostTalesChatSendPacketUnkeptQuoteTest {
     private static LostTalesChatSendPacket request(boolean unkept) {
         return new LostTalesChatSendPacket(ChatChannel.GLOBAL, "which one?",
                 null, "", LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
-                ChatMessageIds.NONE, "", 7L, null, unkept);
+                ChatMessageIds.NONE, "", 7L, null, unkept, false);
     }
 
     private static ByteBuf encode(LostTalesChatSendPacket packet) {
@@ -70,14 +70,14 @@ public final class LostTalesChatSendPacketUnkeptQuoteTest {
     public void theFlagBesideAMessageIdIsRefused() {
         new LostTalesChatSendPacket(ChatChannel.GLOBAL, "which one?",
                 null, "", LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
-                ChatMessageIdAllocator.next(), "", 7L, null, true);
+                ChatMessageIdAllocator.next(), "", 7L, null, true, false);
     }
 
     @Test
     public void theFlagBesideAMessageIdIsMalformedOffTheWire() {
         ByteBuf buffer = encode(new LostTalesChatSendPacket(ChatChannel.GLOBAL,
                 "which one?", null, "", LostTalesChatSendPacket.IDENTITY_DEFAULT,
-                null, ChatMessageIdAllocator.next(), "", 7L, null, false));
+                null, ChatMessageIdAllocator.next(), "", 7L, null, false, false));
         // The flag, before the eight bytes of the message a forward names.
         buffer.setByte(buffer.writerIndex() - TYPED_TAIL - 9, 1);
         LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();

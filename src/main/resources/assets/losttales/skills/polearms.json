@@ -1,0 +1,68 @@
+{
+  "id": "losttales:polearms",
+  "icon": "lotr:item.spearIron",
+  "order": 4,
+  "counts": [
+    {
+      "act": "hit",
+      "weapons": ["spear", "polearm", "pike", "lance"],
+      "per": 1.0
+    },
+    {
+      "act": "kill",
+      "weapons": ["spear", "polearm", "pike", "lance"],
+      "per": 0.5
+    }
+  ],
+  "perks": [
+    {
+      "id": "point",
+      "levels": [10, 30, 50],
+      "effect": "weapon_damage",
+      "amount": 0.05
+    },
+    {
+      "id": "thrower",
+      "levels": [20],
+      "effect": "throw_flight",
+      "amount": 0.2,
+      "with": ["spear"]
+    },
+    {
+      "id": "brace",
+      "levels": [40],
+      "effect": "brace",
+      "amount": 0.3
+    },
+    {
+      "id": "recovery",
+      "levels": [50],
+      "effect": "throw_recovery",
+      "amount": 0.5,
+      "with": ["spear"]
+    },
+    {
+      "id": "horse_breaker",
+      "levels": [60],
+      "effect": "beast_breaker",
+      "amount": 0.25,
+      "with": ["lotr.Troll", "lotr.OlogHai", "lotr.MountainTroll", "lotr.MountainTrollChieftain", "lotr.MirkTroll", "lotr.SnowTroll", "lotr.HalfTrollWarlord", "lotr.MordorWarg", "lotr.MordorWargBombardier", "lotr.GundabadWarg", "lotr.AngmarWarg", "lotr.AngmarWargBombardier", "lotr.UrukWarg", "lotr.UrukWargBombardier", "lotr.Balrog", "lotr.UtumnoTroll", "lotr.UtumnoSnowTroll", "lotr.UtumnoWarg", "lotr.UtumnoIceWarg", "lotr.UtumnoObsidianWarg", "lotr.UtumnoFireWarg", "lotr.Bear"]
+    },
+    {
+      "id": "phalanx",
+      "levels": [80],
+      "effect": "phalanx",
+      "amount": 0.1,
+      "needs": "brace",
+      "params": {
+        "radius": 4
+      }
+    },
+    {
+      "id": "pikemaster",
+      "levels": [100],
+      "effect": "unhorse",
+      "amount": 0.25
+    }
+  ]
+}

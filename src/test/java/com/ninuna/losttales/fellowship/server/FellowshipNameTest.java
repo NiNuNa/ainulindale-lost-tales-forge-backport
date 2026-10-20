@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
+import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import org.junit.Test;
@@ -71,6 +72,32 @@ public final class FellowshipNameTest {
         assertFalse("untrimmed", Fellowship.isWellFormedName(" Grey "));
         assertFalse(Fellowship.isWellFormedName(null));
         assertFalse(Fellowship.isWellFormedName("abcdefghijklmnopqrstuvwxyz0123456"));
+    }
+
+    /**
+     * A mark's name is counted and checked as a fellowship's is: in
+     * characters, not in the halves a character beyond the first plane is
+     * stored as, and refusing invisible marks as well as formatting codes.
+     */
+    @Test
+    public void aMarksNameIsCheckedAsAFellowshipsIs() {
+        StringBuilder gothic = new StringBuilder();
+        for (int index = 0; index < FellowshipMark.MAX_NAME_LENGTH; index++) {
+            gothic.appendCodePoint(0x10330 + index % 16);
+        }
+        String longest = gothic.toString();
+        assertEquals(2 * FellowshipMark.MAX_NAME_LENGTH, longest.length());
+        assertEquals(FellowshipErrorId.NONE, FellowshipNames.markNameError(longest, BUNDLED));
+        assertEquals(FellowshipErrorId.NAME_TOO_LONG,
+                FellowshipNames.markNameError(longest + "y", BUNDLED));
+        assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
+                FellowshipNames.markNameError("Weather​top", BUNDLED));
+        assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
+                FellowshipNames.markNameError("Weather‮top", BUNDLED));
+        assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
+                FellowshipNames.markNameError("§cWeathertop", BUNDLED));
+        assertEquals(FellowshipErrorId.NONE,
+                FellowshipNames.markNameError("Amon Hen #2", BUNDLED));
     }
 
     @Test

@@ -14,6 +14,7 @@ import com.ninuna.losttales.gui.style.FoldRule;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
@@ -528,7 +529,10 @@ final class CharacterProfileColumn {
         return end;
     }
 
-    /** One line from {@code y}; a pair's value stands at {@code labelWidth}. */
+    /**
+     * One line from {@code y}; a pair's value stands at {@code labelWidth}.
+     * Words too long for the column fade into its end (LOOK-37).
+     */
     private void drawLine(FontRenderer font, Line line, int left, int y,
                           int width, int labelWidth, int alpha) {
         switch (line.kind) {
@@ -537,21 +541,19 @@ final class CharacterProfileColumn {
             case TEXT:
             case FOLDED:
             case FOLD:
-                LostTalesUiInk.drawText(font,
-                        font.trimStringToWidth(line.text, width), left, y,
+                LostTalesUiCutName.drawText(font, line.text, left, y, width,
                         line.rgb, alpha);
                 break;
             case LABEL:
-                LostTalesUiInk.drawText(font,
-                        font.trimStringToWidth(line.text, width), left,
-                        y + 2, line.rgb, alpha);
+                LostTalesUiCutName.drawText(font, line.text, left, y + 2,
+                        width, line.rgb, alpha);
                 break;
             case GLANCE:
                 ChatEmojiIcon.draw(Minecraft.getMinecraft(),
                         ChatEmoji.fromName(line.value), left, y, alpha);
-                LostTalesUiInk.drawText(font, font.trimStringToWidth(
-                                line.text, width - GLANCE_INDENT),
-                        left + GLANCE_INDENT, y + 1, line.rgb, alpha);
+                LostTalesUiCutName.drawText(font, line.text,
+                        left + GLANCE_INDENT, y + 1, width - GLANCE_INDENT,
+                        line.rgb, alpha);
                 break;
             case GLANCE_LINE:
                 LostTalesUiInk.drawText(font, line.text,
@@ -571,9 +573,9 @@ final class CharacterProfileColumn {
             case PAIR:
                 LostTalesUiInk.drawText(font, line.text, left, y,
                         WindowStyle.asideRgb(), alpha);
-                LostTalesUiInk.drawText(font, font.trimStringToWidth(
-                                line.value, Math.max(0, width - labelWidth)),
-                        left + labelWidth, y, line.rgb, alpha);
+                LostTalesUiCutName.drawText(font, line.value,
+                        left + labelWidth, y, width - labelWidth, line.rgb,
+                        alpha);
                 break;
             default:
                 break;

@@ -1,0 +1,31 @@
+{
+  "capes": [
+    "capes/gondor.json",
+    "capes/tower_guard.json",
+    "capes/ranger.json",
+    "capes/ranger_ithilien.json",
+    "capes/lossarnach.json",
+    "capes/pelargir.json",
+    "capes/blackroot.json",
+    "capes/pinnath_gelin.json",
+    "capes/lamedon.json",
+    "capes/rohan.json",
+    "capes/dale.json",
+    "capes/dunlending_berserker.json",
+    "capes/galadhrim.json",
+    "capes/galadhrim_trader.json",
+    "capes/wood_elf.json",
+    "capes/high_elf.json",
+    "capes/rivendell.json",
+    "capes/rivendell_trader.json",
+    "capes/near_harad.json",
+    "capes/southron_champion.json",
+    "capes/gulf_harad.json",
+    "capes/taurethrim.json",
+    "capes/galadhrim_smith.json",
+    "capes/dorwinion_captain.json",
+    "capes/dorwinion_elf_captain.json",
+    "capes/gandalf.json",
+    "capes/gandalf_santa.json"
+  ]
+}

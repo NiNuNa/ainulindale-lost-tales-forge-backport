@@ -12,7 +12,7 @@ public enum ELostTalesTileEntity {
     STATUE(LostTalesTileEntityStatue.class, "losttales_statue"),
     LAMP(LostTalesTileEntityLamp.class, "losttales_lamp"),
     PLUSHIE(LostTalesTileEntityPlushie.class, "losttales_plushie"),
-    MISSIVE_BOARD(LostTalesTileEntityMissiveBoard.class, "missive_board"),
+    MISSIVE_BOARD(LostTalesTileEntityMissiveBoard.class, "losttales_missive_board"),
     WAYSTONE(LostTalesTileEntityWaystone.class, "losttales_waystone");
 
     private final Class<? extends TileEntity> tileEntityClass;

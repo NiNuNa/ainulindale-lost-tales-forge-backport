@@ -185,18 +185,19 @@ public final class ClientChatChannelStateTest {
         ConversationPage faction = ConversationPage.of(ChatChannel.FACTION);
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.FACTION));
         assertEquals(LotrCharacterAdapter.UNALIGNED_FACTION_ID,
-                ClientChatChannelState.wornFactionId(faction));
+                ClientChatChannelState.scopeKeyRead(ChatChannel.FACTION, faction));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FACTION));
         acceptRoster("lotr:gondor");
         ClientChatChannelState.select(faction);
-        assertEquals("lotr:gondor", ClientChatChannelState.wornFactionId(faction));
+        assertEquals("lotr:gondor",
+                ClientChatChannelState.scopeKeyRead(ChatChannel.FACTION, faction));
         assertEquals("lotr:gondor", ClientChatChannelState.playedFactionId());
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FACTION));
         acceptRoster("");
         ClientChatChannelState.ensureAvailable();
         assertEquals(ChatChannel.FACTION, ClientChatChannelState.getSelected().getChannel());
         assertEquals(LotrCharacterAdapter.UNALIGNED_FACTION_ID,
-                ClientChatChannelState.wornFactionId(faction));
+                ClientChatChannelState.scopeKeyRead(ChatChannel.FACTION, faction));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.FACTION));
     }
 

@@ -185,14 +185,10 @@ public final class ChatHistoryNbtCodecTest {
         assertEquals("duplicate_event",
                 result.getQuarantineEntriesCopy().get(3).getString("Reason"));
 
-        // A save without the console's list reads whole, as an empty
-        // console, and is marked to be written again.
+        // A save without the console's list, or with it under another
+        // tag type, is not this build's to read.
         written.removeTag("ConsoleEvents");
-        ChatHistoryNbtCodec.ReadResult older = ChatHistoryNbtCodec.read(written);
-        assertFalse(older.isReadOnly());
-        assertTrue(older.wasRepaired());
-        assertTrue(older.getConsoleEvents().isEmpty());
-        // The list under another tag type is not this build's to read.
+        assertTrue(ChatHistoryNbtCodec.read(written).isReadOnly());
         written.setString("ConsoleEvents", "?");
         assertTrue(ChatHistoryNbtCodec.read(written).isReadOnly());
     }
@@ -380,12 +376,39 @@ public final class ChatHistoryNbtCodecTest {
     }
 
     @Test
-    public void anEmptySaveReadsAsNothingKept() {
-        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(null);
+    public void anEmptyHistoryReadsAsNothingKept() {
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                ChatConsoleStream.snapshot(),
+                ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
         assertFalse(result.isReadOnly());
+        assertFalse(result.wasRepaired());
         assertTrue(result.getEntries().isEmpty());
+        assertTrue(result.getConsoleEvents().isEmpty());
         assertNull(result.getOriginalDataCopy());
         assertEquals(0, ChatHistory.restore(result.getEntries()));
+    }
+
+    /**
+     * A save without its version, or without the lines' list, is data of
+     * another shape: kept as it is, the store read-only, never filled in.
+     */
+    @Test
+    public void aSaveOfAnotherShapeIsKeptReadOnly() {
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                ChatConsoleStream.snapshot(),
+                ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
+        NBTTagCompound unversioned = (NBTTagCompound) written.copy();
+        unversioned.removeTag("DataVersion");
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(unversioned);
+        assertTrue(result.isReadOnly());
+        assertNotNull(result.getOriginalDataCopy());
+        NBTTagCompound noLines = (NBTTagCompound) written.copy();
+        noLines.removeTag("Entries");
+        assertTrue(ChatHistoryNbtCodec.read(noLines).isReadOnly());
+        assertTrue(ChatHistoryNbtCodec.read(new NBTTagCompound()).isReadOnly());
     }
 
     @Test
@@ -421,7 +444,7 @@ public final class ChatHistoryNbtCodecTest {
         assertTrue(result.getQuarantineEntriesCopy().isEmpty());
         ChatHistory.clear();
         ChatHistory.restore(result.getEntries());
-        assertTrue(ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find("smile").isMine(BOB));
+        assertTrue(ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find("smile").mineAs.contains(BOB));
         assertEquals("Nils",
                 ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find("joy").names.get(0));
         assertTrue(ChatHistory.reactionsFor(plain, Collections.singleton(BOB)).isEmpty());
@@ -518,7 +541,7 @@ public final class ChatHistoryNbtCodecTest {
         ChatHistory.clear();
         ChatHistory.restore(result.getEntries());
         assertEquals(1, ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find(parrot).count);
-        assertTrue(ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find(parrot).isMine(BOB));
+        assertTrue(ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find(parrot).mineAs.contains(BOB));
         assertEquals("Nils",
                 ChatHistory.reactionsFor(reacted, Collections.singleton(BOB)).find(unicorn).names.get(0));
     }
@@ -565,7 +588,7 @@ public final class ChatHistoryNbtCodecTest {
         assertEquals(2, ChatHistory.reactionsFor(reacted, Collections.singleton(BOB))
                 .find("grinning").count);
         assertTrue(ChatHistory.reactionsFor(reacted, Collections.singleton(BOB))
-                .find("grinning").isMine(BOB));
+                .find("grinning").mineAs.contains(BOB));
 
         NBTTagCompound again = new NBTTagCompound();
         ChatHistoryNbtCodec.write(again, ChatHistory.snapshot(),

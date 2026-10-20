@@ -1,0 +1,12 @@
+{
+  "views": [
+    "views/channels.json",
+    "views/consoles.json",
+    "views/map.json",
+    "views/quest_journal.json",
+    "views/fellowships.json",
+    "views/profile.json",
+    "views/settings.json",
+    "views/custom.json"
+  ]
+}

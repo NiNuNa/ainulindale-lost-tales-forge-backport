@@ -113,7 +113,9 @@ import net.minecraft.util.IChatComponent;
  * player list on the tick after a start, join or leave, so a burst of
  * joins is one write. At shutdown the offline topic is queued first and
  * the worker is given a bounded moment to send it; nothing waits longer
- * than that.</p>
+ * than that. Each topic's last two writes and their words are kept in the
+ * world save ({@link DiscordTopicMemory}), so a restart keeps Discord's
+ * pace and writes no words a channel already shows.</p>
  *
  * <p>Everything fails closed. A bad token or a missing permission stops
  * the inbound side (or the topic) for the session with one severe log
@@ -206,7 +208,7 @@ public final class LostTalesDiscordBridge {
      * the worker as posts are confirmed and by the tick as Discord lines
      * are delivered, read wherever a reply crosses the bridge. A map of
      * its own for every server run, brought back from the world save by
-     * {@link #restoreLinks} and left with it by {@link #releaseLinks};
+     * {@link #restoreSaved} and left with it by {@link #releaseSaved};
      * a stop or a reload keeps it. Each worker holds the map it was
      * started with.
      */
@@ -252,12 +254,19 @@ public final class LostTalesDiscordBridge {
      */
     private final DiscordHeardLines heard = new DiscordHeardLines();
     /**
-     * How each kept topic is paced, by Discord channel id, for the whole
-     * server run: a restart of the bridge keeps the words Discord took
-     * and the edits it spent.
+     * The reactions the live connection reported lately, which a return's
+     * read of an emoji's members gives way to.
      */
-    private final Map<String, DiscordTopicPacing> topicPacing =
-            new ConcurrentHashMap<String, DiscordTopicPacing>();
+    private final DiscordLiveReactions liveReactions = new DiscordLiveReactions();
+    /**
+     * How each kept topic is paced, by Discord channel id: the words
+     * Discord took and the edits it spent. One for every server run,
+     * brought back from the world save by {@link #restoreSaved} and left
+     * with it by {@link #releaseSaved}, so neither a restart of the bridge
+     * nor one of the server forgets them. Each worker holds the pacings
+     * it was started with.
+     */
+    private volatile DiscordTopicMemory topics = new DiscordTopicMemory();
     /** Whether a gateway was live in this server run: the next connection is then a return. */
     private final AtomicBoolean connectedThisRun = new AtomicBoolean();
     /** How often the live connection dropped this run; each drop is caught up once. */
@@ -334,8 +343,11 @@ public final class LostTalesDiscordBridge {
             Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
     /** Links whose webhook the bot made, waiting for the server thread to save them. */
     private final Queue<LinkResult> linkResults = new ConcurrentLinkedQueue<LinkResult>();
-    /** The name a webhook the bot makes for a link wears in its channel's settings. */
-    private static final String WEBHOOK_NAME = "Lost Tales";
+    /**
+     * The lang key of the name a webhook the bot makes for a link wears in
+     * its channel's settings, and on the notices posted under it.
+     */
+    static final String WEBHOOK_NAME_KEY = "chat.losttales.discord.webhook.name";
     /** The config key the links are kept under. */
     private static final String BINDINGS_KEY = "channelBindings";
 
@@ -508,9 +520,10 @@ public final class LostTalesDiscordBridge {
 
     /**
      * Stops the bridge as the server stops: waits a bounded moment for
-     * every worker's last posts, tells their senders what came of them,
-     * then forgets everything this run held but the message links, which
-     * belong to the world.
+     * every worker's last posts and its offline topic, tells their
+     * senders what came of them, then forgets everything this run held
+     * but the message links and the topic writes, which belong to the
+     * world.
      */
     public synchronized void stop() {
         retire();
@@ -552,12 +565,13 @@ public final class LostTalesDiscordBridge {
 
     /**
      * Forgets what the bridge keeps across its own restarts for one
-     * server run: the lines heard in each channel, how each topic was
-     * paced, and whether the live connection was up yet.
+     * server run: the lines and reactions heard in each channel, and
+     * whether the live connection was up yet. The topic writes go with
+     * the world save instead ({@link #releaseSaved}).
      */
     private void forgetRun() {
         this.heard.clear();
-        this.topicPacing.clear();
+        this.liveReactions.clear();
         this.connectedThisRun.set(false);
     }
 
@@ -612,15 +626,7 @@ public final class LostTalesDiscordBridge {
 
     /** How the topic of a Discord channel is paced this server run; made at its first use. */
     private DiscordTopicPacing pacingOf(String channelId) {
-        DiscordTopicPacing pacing = this.topicPacing.get(channelId);
-        if (pacing == null) {
-            DiscordTopicPacing fresh = new DiscordTopicPacing();
-            pacing = this.topicPacing.putIfAbsent(channelId, fresh);
-            if (pacing == null) {
-                pacing = fresh;
-            }
-        }
-        return pacing;
+        return this.topics.pacingOf(channelId);
     }
 
     /** Drops the Discord lines waiting to be delivered: no worker will deliver them. */
@@ -630,27 +636,31 @@ public final class LostTalesDiscordBridge {
     }
 
     /**
-     * Takes the links this world's save kept, as the server starts:
-     * after the chat history is restored, since only links to messages
-     * it still holds come back, and before the bridge starts. The map is
-     * a new one, so nothing reaches this world from the one before; a
-     * worker still finishing for that one writes into the map it was
-     * started with. Server thread.
+     * Takes the links and topic writes this world's save kept, as the
+     * server starts: after the chat history is restored, since only
+     * links to messages it still holds come back, and before the bridge
+     * starts. The map and the memory are new ones, so nothing reaches
+     * this world from the one before; a worker still finishing for that
+     * one writes into the ones it was started with. Server thread.
      */
-    public synchronized void restoreLinks(MinecraftServer server) {
+    public synchronized void restoreSaved(MinecraftServer server) {
         DiscordMessageLinks fresh = new DiscordMessageLinks();
+        DiscordTopicMemory freshTopics = new DiscordTopicMemory();
         this.links = fresh;
-        DiscordMessageLinkStorage.restore(server, fresh);
+        this.topics = freshTopics;
+        DiscordMessageLinkStorage.restore(server, fresh, freshTopics);
     }
 
     /**
-     * Leaves the links with the world save as the server stops, once
-     * the bridge has stopped, and empties the live map for whatever the
-     * process serves next. Server thread.
+     * Leaves the links and topic writes with the world save as the server
+     * stops, once the bridge has stopped and written its offline topic,
+     * and empties both for whatever the process serves next. Server
+     * thread.
      */
-    public synchronized void releaseLinks() {
+    public synchronized void releaseSaved() {
         DiscordMessageLinkStorage.release();
         this.links = new DiscordMessageLinks();
+        this.topics = new DiscordTopicMemory();
     }
 
     public boolean isRunning() {
@@ -890,9 +900,8 @@ public final class LostTalesDiscordBridge {
      * only for a binding that posts: no text crosses with it, and what
      * Discord sees is the bot typing rather than a name it has no
      * account for. Cheap and idempotent — the worker sends at most one
-     * ping per binding per {@link #TYPING_INTERVAL_MILLIS}, and drops
-     * the rest. A binding that names no Discord channel is asked its
-     * webhook's channel once, since the bot must know where to type.
+     * ping per binding per {@link #TYPING_INTERVAL_MILLIS}, into the
+     * Discord channel the binding names, and drops the rest.
      *
      * <p>The other way comes over the gateway: a Discord member typing in
      * a channel the bridge reads arrives as {@code TYPING_START} and is
@@ -1400,9 +1409,10 @@ public final class LostTalesDiscordBridge {
      * {@code /link}: pairs the Discord channel it was used in with the
      * game channel its code names. Checked here on the server thread — a
      * channel of a Discord server, a member who may manage its webhooks,
-     * a code still waiting, a channel no game channel has — then, on the
-     * gateway's thread, the code is spent and the bot makes the channel's
-     * webhook, and the link is saved back here ({@link #completeLink}).
+     * a code still waiting, a channel no game channel has, a game channel
+     * that may be linked now — then, on the gateway's thread, the code is
+     * spent and the bot makes the channel's webhook, and the link is saved
+     * back here ({@link #completeLink}).
      */
     private void beginLink(final DiscordJson.Interaction interaction,
                            DiscordGatewayClient client) {
@@ -1429,6 +1439,9 @@ public final class LostTalesDiscordBridge {
                                 gameChannelName(LostTalesWords.LANG, owner))
                         : DiscordSlashCommands.linkTaken(LostTalesWords.LANG,
                                 gameChannelName(LostTalesWords.LANG, owner));
+            } else if (!mayLink(pending.gameKey)) {
+                problem = DiscordSlashCommands.linkClosed(LostTalesWords.LANG,
+                        gameChannelName(LostTalesWords.LANG, pending.gameKey));
             }
         }
         if (problem != null) {
@@ -1454,7 +1467,8 @@ public final class LostTalesDiscordBridge {
                 try {
                     DiscordHttp.Reply made = DiscordHttp.createWebhook(token,
                             interaction.channelId,
-                            DiscordJson.createWebhookBody(WEBHOOK_NAME));
+                            DiscordJson.createWebhookBody(
+                                    LostTalesWords.LANG.format(WEBHOOK_NAME_KEY)));
                     String url = made.isSuccess()
                             ? DiscordJson.parseCreatedWebhookUrl(made.body) : "";
                     if (url.length() > 0) {
@@ -1483,15 +1497,16 @@ public final class LostTalesDiscordBridge {
      * answered through the restarted gateway, the operator who asked for
      * the code is told in the game, and the Server Log records it. A
      * link that can no longer be saved — the channel taken meanwhile, the
-     * file refusing — says so, and its webhook is deleted again. Server
-     * thread.
+     * game channel's gate closed meanwhile, the file refusing — says so,
+     * and its webhook is deleted again. Server thread.
      */
     private void completeLink(LinkResult result) {
         String channelId = result.interaction.channelId;
         Worker running = this.worker;
         String owner = running == null ? "" : ownerOfDiscordChannel(running, channelId);
+        boolean open = mayLink(result.link.gameKey);
         boolean saved = false;
-        if (owner.length() == 0 || owner.equals(result.link.gameKey)) {
+        if (open && (owner.length() == 0 || owner.equals(result.link.gameKey))) {
             List<String> entries = DiscordBindingEntries.link(
                     LostTalesConfig.discordChannelBindings, result.link.gameKey,
                     result.link.direction, channelId, result.webhookUrl);
@@ -1504,8 +1519,9 @@ public final class LostTalesDiscordBridge {
         String gameName = gameChannelName(LostTalesWords.LANG, result.link.gameKey);
         if (!saved) {
             retireWebhooks(Collections.singletonList(result.webhookUrl));
-            answerLater(result.interaction, owner.length() > 0
-                    && !owner.equals(result.link.gameKey)
+            answerLater(result.interaction, !open
+                    ? DiscordSlashCommands.linkClosed(LostTalesWords.LANG, gameName)
+                    : owner.length() > 0 && !owner.equals(result.link.gameKey)
                     ? DiscordSlashCommands.linkTaken(LostTalesWords.LANG,
                             gameChannelName(LostTalesWords.LANG, owner))
                     : DiscordSlashCommands.linkNotSaved(LostTalesWords.LANG));
@@ -1681,28 +1697,67 @@ public final class LostTalesDiscordBridge {
         return posting == null ? "" : posting;
     }
 
-    /**
-     * Whether a Discord channel can be paired now: the bridge runs with
-     * the bot's gateway up or coming back, and its slash commands on,
-     * since the pairing is the bot's {@code /link}. What the game's link
-     * command asks before it hands out a code. After Discord closed the
-     * gateway for good no {@code /link} can arrive, so nothing is paired
-     * until a reload.
-     */
-    public boolean canPair() {
-        DiscordGatewayClient client = this.gateway;
-        return this.worker != null && client != null && !client.isClosedForGood()
-                && LostTalesConfig.discordSlashCommands
-                && LostTalesConfig.discordBotToken.trim().length() > 0;
+    /** Whether a code handed out now could be typed with {@code /link}, and why not. */
+    public enum Pairing {
+        /** The bot is connected, with its slash commands in a Discord server. */
+        READY,
+        /** The bridge, the bot token, the gateway or the slash commands are off. */
+        NOT_SET_UP,
+        /** Discord closed the gateway for good this run; the log says why. */
+        CLOSED,
+        /** The gateway is connecting, or connecting again. */
+        CONNECTING,
+        /** No Discord server has taken the slash commands. */
+        NO_COMMANDS
     }
 
     /**
-     * Whether Discord closed the bot's gateway for good this run: a wrong
-     * token, an intent the application lacks. The log says which.
+     * Whether a Discord channel can be paired now: the bridge runs with
+     * the bot's gateway up and its slash commands registered in a Discord
+     * server, since the pairing is the bot's {@code /link}. What the
+     * game's link command asks before it hands out a code. After Discord
+     * closed the gateway for good no {@code /link} can arrive, so nothing
+     * is paired until a reload.
      */
-    public boolean isGatewayClosedForGood() {
+    public Pairing pairing() {
         DiscordGatewayClient client = this.gateway;
-        return client != null && client.isClosedForGood();
+        if (this.worker == null || client == null || !LostTalesConfig.discordSlashCommands
+                || LostTalesConfig.discordBotToken.trim().length() == 0) {
+            return Pairing.NOT_SET_UP;
+        }
+        if (client.isClosedForGood()) {
+            return Pairing.CLOSED;
+        }
+        if (!this.gatewayLive) {
+            return Pairing.CONNECTING;
+        }
+        return this.commandGuilds.isEmpty() ? Pairing.NO_COMMANDS : Pairing.READY;
+    }
+
+    /**
+     * Whether a game channel may be linked now: one that may reach
+     * Discord, whose gate lets somebody read it. Asked as a code is
+     * typed and again as its link is saved, since the gates may have
+     * moved since the code was handed out.
+     */
+    private static boolean mayLink(String key) {
+        ChatCodeNames.Named named = ChatCodeNames.parse(key);
+        return named != null && named.channel.isBridgeable()
+                && DiscordBridgePolicy.isOpenToTheBridge(named.channel);
+    }
+
+    /**
+     * The links as the bridge holds them, in config order: the running
+     * worker's, or, while the bridge is stopped, what it makes of the
+     * config. Never an entry it refuses. Server thread.
+     */
+    public DiscordChannelBindings bindingsInForce() {
+        Worker running = this.worker;
+        if (running != null) {
+            return running.bindings;
+        }
+        return DiscordChannelBindings.parse(LostTalesConfig.discordChannelBindings,
+                LostTalesConfig.discordBotToken.trim().length() > 0, null);
     }
 
     /** The lang key of a Discord channel named with its server ({@code #general of The Shire}). */
@@ -2050,7 +2105,7 @@ public final class LostTalesDiscordBridge {
             }
             if (batch.size() == LostTalesChatPresenceSyncPacket.MAX_ACCOUNTS) {
                 LostTalesNetworkHandler.CHANNEL.sendTo(
-                        new LostTalesChatPresenceSyncPacket(batch, lines, null),
+                        new LostTalesChatPresenceSyncPacket(batch, lines),
                         player);
                 batch = new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
                 lines = new LinkedHashMap<UUID, Map<ChatPresenceIdentity, String>>();
@@ -2058,7 +2113,7 @@ public final class LostTalesDiscordBridge {
         }
         if (!batch.isEmpty()) {
             LostTalesNetworkHandler.CHANNEL.sendTo(
-                    new LostTalesChatPresenceSyncPacket(batch, lines, null),
+                    new LostTalesChatPresenceSyncPacket(batch, lines),
                     player);
         }
     }
@@ -2067,9 +2122,9 @@ public final class LostTalesDiscordBridge {
      * Forgets what the bridge learnt in this server's run: the Discord
      * servers' names, who is typing there, what each player was told of
      * Discord members' statuses, where the slash commands were registered, the links
-     * waiting to be saved, the codes waiting to be typed, the lines heard
-     * and how each topic was paced. With the rest of the server's state,
-     * as the server starts and stops.
+     * waiting to be saved, the codes waiting to be typed and the lines
+     * heard. With the rest of the server's state, as the server starts
+     * and stops.
      */
     public void resetSession() {
         forgetRun();
@@ -2123,8 +2178,9 @@ public final class LostTalesDiscordBridge {
     /** The message's own link on Discord, or null where its server is not known. */
     private String messageLink(DiscordJson.Message message) {
         String guild = guildOf(message);
-        return guild.matches("\\d{1,24}") && message.channelId.matches("\\d{1,24}")
-                && message.id.matches("\\d{1,24}")
+        return DiscordChannelBindings.isSnowflake(guild)
+                && DiscordChannelBindings.isSnowflake(message.channelId)
+                && DiscordChannelBindings.isSnowflake(message.id)
                 ? "https://discord.com/channels/" + guild + "/" + message.channelId
                         + "/" + message.id
                 : null;
@@ -2359,10 +2415,21 @@ public final class LostTalesDiscordBridge {
                 if (!all && emoji == null && emojiId.length() == 0) {
                     return;
                 }
-                enqueueInbound(new Inbound(kind,
-                        DiscordMessageSanitizer.inboundName(reaction.memberName),
-                        reaction.userId, all || emoji == null ? "" : emoji,
-                        reaction.messageId, "", reaction.channelId, emojiId));
+                String key = all || emoji == null ? "" : emoji;
+                String member = DiscordMessageSanitizer.inboundName(reaction.memberName);
+                // Noted and queued as one, so a return's read of the same
+                // emoji either finds it noted or is queued ahead of it.
+                synchronized (liveReactions) {
+                    liveReactions.heard(all ? DiscordLiveReactions.Change.ALL_CLEARED
+                            : kind == Inbound.Kind.REACT_CLEAR
+                                    ? DiscordLiveReactions.Change.EMOJI_CLEARED
+                                    : kind == Inbound.Kind.REACT_ADD
+                                            ? DiscordLiveReactions.Change.ADDED
+                                            : DiscordLiveReactions.Change.REMOVED,
+                            reaction.messageId, key, emojiId, reaction.userId, member);
+                    enqueueInbound(new Inbound(kind, member, reaction.userId, key,
+                            reaction.messageId, "", reaction.channelId, emojiId));
+                }
             } else if ("INTERACTION_CREATE".equals(name)) {
                 final DiscordJson.Interaction interaction = DiscordJson.parseInteraction(data);
                 if (interaction == null || client == null
@@ -2377,7 +2444,7 @@ public final class LostTalesDiscordBridge {
                     public void run() {
                         try {
                             DiscordHttp.postInteractionCallback(interaction.id,
-                                    interaction.token, DiscordJson.deferredReplyBody(true));
+                                    interaction.token, DiscordJson.deferredReplyBody());
                         } catch (IOException exception) {
                             FMLLog.info("[%s] Could not acknowledge /%s on Discord: %s",
                                     LostTalesMetaData.MOD_ID, interaction.name,
@@ -3068,13 +3135,13 @@ public final class LostTalesDiscordBridge {
                 if (last != null && now - last.longValue() < TYPING_INTERVAL_MILLIS) {
                     continue;
                 }
-                String channel = typingChannelOf(binding);
-                if (channel.length() == 0) {
-                    continue;
-                }
                 this.typingSentMillis.put(key, Long.valueOf(now));
                 try {
-                    DiscordHttp.postTyping(token, channel);
+                    DiscordHttp.Reply reply = DiscordHttp.postTyping(token,
+                            binding.getDiscordChannelId());
+                    if (!reply.isSuccess() && reply.status != 429) {
+                        noteTypingRefused(reply.status);
+                    }
                 } catch (IOException exception) {
                     // Presence that did not arrive is presence not worth
                     // chasing; the next keystroke asks again. Said once,
@@ -3084,18 +3151,6 @@ public final class LostTalesDiscordBridge {
                     noteTypingFailure(exception);
                 }
             }
-        }
-
-        /**
-         * Where the bot types for a binding: the Discord channel it
-         * reads, or the channel its webhook posts to, asked once.
-         */
-        private String typingChannelOf(DiscordChannelBinding binding) {
-            if (binding.getDiscordChannelId().length() > 0) {
-                return binding.getDiscordChannelId();
-            }
-            DiscordJson.ChannelInfo info = webhookInfo(binding.getWebhookUrl());
-            return info == null || info.channelId == null ? "" : info.channelId;
         }
 
         /** The bindings a game line is waiting on a lane to be posted through. */
@@ -3158,11 +3213,10 @@ public final class LostTalesDiscordBridge {
 
         /**
          * The interval between two writes of one topic: the config's,
-         * never shorter than Discord's two edits in ten minutes shared out
-         * evenly.
+         * held to its bounds, Discord's ten-minute window to an hour.
          */
         private long statusIntervalMillis() {
-            return Math.max(DiscordTopicPacing.SHORTEST_INTERVAL_MILLIS,
+            return Math.max(DiscordTopicPacing.WINDOW_MILLIS,
                     Math.min(3600L, LostTalesConfig.discordChannelStatusIntervalSeconds)
                             * 1000L);
         }
@@ -3369,14 +3423,23 @@ public final class LostTalesDiscordBridge {
 
         /**
          * How a copy posted through a webhook names its destination: the
-         * Discord channel the webhook posts to when Discord has said,
-         * which is where a Discord line read from that channel names
-         * its own copy, else the webhook itself.
+         * Discord channel the webhook posts to when Discord has said, else
+         * the one the binding posting through it names, which is where a
+         * Discord line read from that channel names its own copy. Only a
+         * webhook no binding posts through is named by itself, and the
+         * save leaves such a copy out.
          */
         private String destinationOf(String webhookUrl) {
             DiscordJson.ChannelInfo info = webhookInfo(webhookUrl);
-            return info == null ? webhookUrl
-                    : channelDestination(info.channelId);
+            if (info != null) {
+                return channelDestination(info.channelId);
+            }
+            for (DiscordChannelBinding binding : this.bindings.destinations()) {
+                if (binding.getWebhookUrl().equals(webhookUrl)) {
+                    return channelDestination(binding.getDiscordChannelId());
+                }
+            }
+            return webhookUrl;
         }
 
         /**
@@ -3669,9 +3732,8 @@ public final class LostTalesDiscordBridge {
                 DiscordReturnCheck.Fix fix;
                 while ((fix = check.peekFix()) != null && !fix.reads()) {
                     check.pollFix();
-                    enqueueInbound(Inbound.reactionsListed(fix.messageId,
-                            fix.channelId, fix.key, fix.customId,
-                            Collections.<String, String>emptyMap(), fix.alone));
+                    queueListed(fix, fix.heardMark, new LinkedHashMap<String, String>(),
+                            fix.alone);
                 }
                 if (fix != null) {
                     readReactors(token, fix);
@@ -3714,6 +3776,7 @@ public final class LostTalesDiscordBridge {
             if (cursor.disabled) {
                 return;
             }
+            long heardMark = liveReactions.mark();
             DiscordHttp.Reply reply;
             try {
                 reply = DiscordHttp.getMessages(token, channelId, "",
@@ -3766,7 +3829,8 @@ public final class LostTalesDiscordBridge {
                 }
                 for (DiscordReturnCheck.Fix fix : DiscordReturnCheck.fixesFor(
                         channelId, message.id, counts.get(message.id),
-                        ChatHistory.discordReactionCounts(target, channelId))) {
+                        ChatHistory.discordReactionCounts(target, channelId),
+                        heardMark)) {
                     if (!check.offer(fix)) {
                         return;
                     }
@@ -3784,6 +3848,7 @@ public final class LostTalesDiscordBridge {
          * page was read is left as the game has it.
          */
         private void readReactors(String token, DiscordReturnCheck.Fix fix) {
+            long heardMark = liveReactions.mark();
             Map<String, String> listed = new LinkedHashMap<String, String>();
             boolean complete = fix.alone;
             for (int kind = 0; kind < (fix.burst ? 2 : 1); kind++) {
@@ -3822,8 +3887,26 @@ public final class LostTalesDiscordBridge {
                     }
                 }
             }
-            enqueueInbound(Inbound.reactionsListed(fix.messageId, fix.channelId,
-                    fix.key, fix.customId, listed, complete));
+            queueListed(fix, heardMark, listed, complete);
+        }
+
+        /**
+         * Hands the game the members behind one emoji as a return found
+         * them, with every reaction heard live on it since
+         * {@code heardMark} put on top, so a member who reacted or took it
+         * back meanwhile is not undone. When reactions heard since have
+         * gone from the record, nothing is handed and the game keeps what
+         * it holds.
+         */
+        private void queueListed(DiscordReturnCheck.Fix fix, long heardMark,
+                                 Map<String, String> listed, boolean complete) {
+            synchronized (liveReactions) {
+                if (liveReactions.overlay(heardMark, fix.messageId, fix.key,
+                        fix.customId, listed)) {
+                    enqueueInbound(Inbound.reactionsListed(fix.messageId,
+                            fix.channelId, fix.key, fix.customId, listed, complete));
+                }
+            }
         }
 
         /**
@@ -4185,7 +4268,7 @@ public final class LostTalesDiscordBridge {
                 }
             }
             if (copy == null) {
-                return 0L;
+                return SPENT;
             }
             String channelId = DiscordCopyLiveness.channelIdOf(copy.destination);
             if (channelId.length() == 0 && copy.webhookUrl.length() > 0) {
@@ -4194,11 +4277,11 @@ public final class LostTalesDiscordBridge {
             }
             String token = LostTalesConfig.discordBotToken.trim();
             if (channelId.length() == 0 || token.length() == 0) {
-                return 0L;
+                return SPENT;
             }
             boolean stands = next.standAfter.standsFor(channelId);
             if (stands == next.standBefore.standsFor(channelId)) {
-                return 0L;
+                return SPENT;
             }
             DiscordHttp.Reply reply = stands
                     ? DiscordHttp.putOwnReaction(token, channelId,
@@ -4228,7 +4311,7 @@ public final class LostTalesDiscordBridge {
                             + "is not in stays a game reaction only",
                             LostTalesMetaData.MOD_ID);
                 }
-                return 0L;
+                return SPENT;
             }
             if (reply.status == 400 || reply.status == 403
                     || reply.status == 404) {
@@ -4240,7 +4323,7 @@ public final class LostTalesDiscordBridge {
                             LostTalesMetaData.MOD_ID,
                             Integer.valueOf(reply.status));
                 }
-                return 0L;
+                return SPENT;
             }
             if (!reply.isSuccess()) {
                 throw new IOException("Discord replied HTTP " + reply.status
@@ -4300,7 +4383,7 @@ public final class LostTalesDiscordBridge {
                     && next.originChannelId.equals(channelOfWebhook(webhook))) {
                 // A Discord member's line, and this webhook posts into the
                 // very channel it was said in.
-                return 0L;
+                return SPENT;
             } else if (next.kind == Outbound.Kind.POST) {
                 header = replyHeader(next, webhook);
                 DiscordMentions.Post post = postFor(next, webhook, true);
@@ -4320,7 +4403,7 @@ public final class LostTalesDiscordBridge {
                 DiscordMessageLinks.Copy copy = copyThrough(next, webhook);
                 if (copy == null || (next.kind == Outbound.Kind.EDIT
                         && !patchSupported())) {
-                    return 0L;
+                    return SPENT;
                 }
                 reply = next.kind == Outbound.Kind.EDIT
                         ? DiscordHttp.editWebhookMessage(webhook, copy.discordId,
@@ -4335,7 +4418,7 @@ public final class LostTalesDiscordBridge {
                     System.currentTimeMillis());
             if (next.kind != Outbound.Kind.POST && reply.status == 404) {
                 // The copy is gone from Discord: nothing is left to correct.
-                return 0L;
+                return SPENT;
             }
             if (reply.status == 429) {
                 long asked = DiscordJson.retryAfterMillis(reply.body);
@@ -4358,7 +4441,7 @@ public final class LostTalesDiscordBridge {
                     emitMark(this.tracker.lost(next.messageId,
                             ChatDeliveryMark.Reason.WEBHOOK_OFF));
                 }
-                return 0L;
+                return SPENT;
             }
             if (reply.status >= 400 && reply.status < 500) {
                 // Discord refused the request itself — a name or a
@@ -4370,7 +4453,7 @@ public final class LostTalesDiscordBridge {
                     emitMark(this.tracker.lost(next.messageId,
                             ChatDeliveryMark.Reason.REFUSED));
                 }
-                return 0L;
+                return SPENT;
             }
             if (!reply.isSuccess()) {
                 throw new IOException("Discord replied HTTP " + reply.status
@@ -4569,6 +4652,7 @@ public final class LostTalesDiscordBridge {
         }
 
         private boolean typingFailureLogged;
+        private boolean typingRefusalLogged;
         private boolean webhookInfoFailureLogged;
 
         private void noteTypingFailure(Exception exception) {
@@ -4582,6 +4666,21 @@ public final class LostTalesDiscordBridge {
         }
 
         /**
+         * Said once a session: Discord answers a typing ping only to refuse
+         * it, most often for want of Send Messages in the linked channel.
+         */
+        private void noteTypingRefused(int status) {
+            if (this.typingRefusalLogged) {
+                return;
+            }
+            this.typingRefusalLogged = true;
+            FMLLog.warning("[%s] Discord refused the bot's typing (HTTP %d): the "
+                    + "bot needs Send Messages in the linked channel; typing is "
+                    + "not shown there, and it keeps trying quietly",
+                    LostTalesMetaData.MOD_ID, Integer.valueOf(status));
+        }
+
+        /**
          * Said once a session: what an unanswered lookup holds back
          * otherwise has no explanation anywhere.
          */
@@ -4592,11 +4691,9 @@ public final class LostTalesDiscordBridge {
             this.webhookInfoFailureLogged = true;
             FMLLog.warning("[%s] Discord did not say where a webhook posts (%s). "
                     + "While it does not, edits and deletions of copies restored "
-                    + "from the save are not sent through it, nor, for an entry "
-                    + "naming no Discord channel, the bot's reactions and jump "
-                    + "links on them; reply quotes posted through it carry no "
-                    + "jump link, and its new posts are saved without their "
-                    + "channel. %s", LostTalesMetaData.MOD_ID, cause,
+                    + "from the save are not sent through it, and reply quotes "
+                    + "posted through it carry no jump link. %s",
+                    LostTalesMetaData.MOD_ID, cause,
                     askedAgain ? "It is asked again after a pause."
                             : "Discord refused the webhook, so it is not asked again.");
         }

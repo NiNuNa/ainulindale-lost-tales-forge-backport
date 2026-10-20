@@ -40,12 +40,8 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
     private static final String TAG_TRANSACTION_UUID = "TransactionUUID";
     private static final String TAG_SOURCE_CHARACTER_UUID = "SourceCharacterUUID";
     private static final String TAG_TARGET_CHARACTER_UUID = "TargetCharacterUUID";
-    private static final String TAG_SOURCE_REVISION = "SourceRosterRevision";
-    private static final String TAG_TARGET_REVISION = "TargetRosterRevision";
     private static final String TAG_PREPARED_AT = "PreparedAt";
     private static final String TAG_COMPLETED_AT = "CompletedAt";
-    private static final String TAG_REQUEST_EPOCH = "RequestEpoch";
-    private static final String TAG_REQUEST_ID = "RequestId";
     private static final String TAG_STATUS = "Status";
     private static final String TAG_PREVIOUS = "PreviousCooldown";
     private static final String TAG_COMMITTED = "CommittedCooldown";
@@ -304,12 +300,8 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
         if (transaction.getTargetCharacterId() != null) {
             NbtTags.writeUuid(tag, TAG_TARGET_CHARACTER_UUID, transaction.getTargetCharacterId());
         }
-        tag.setLong(TAG_SOURCE_REVISION, transaction.getSourceRosterRevision());
-        tag.setLong(TAG_TARGET_REVISION, transaction.getTargetRosterRevision());
         tag.setLong(TAG_PREPARED_AT, transaction.getPreparedAt());
         tag.setLong(TAG_COMPLETED_AT, transaction.getCompletedAt());
-        tag.setLong(TAG_REQUEST_EPOCH, transaction.getRequestEpoch());
-        tag.setInteger(TAG_REQUEST_ID, transaction.getRequestId());
         tag.setString(TAG_STATUS, transaction.getStatus().getId());
         tag.setLong(TAG_SOURCE_STATE_GENERATION,
                 transaction.getSourceStateGeneration());
@@ -351,11 +343,7 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
                 transactionId,
                 sourceId,
                 targetId,
-                tag.getLong(TAG_SOURCE_REVISION),
-                tag.getLong(TAG_TARGET_REVISION),
                 tag.getLong(TAG_PREPARED_AT),
-                tag.getLong(TAG_REQUEST_EPOCH),
-                tag.getInteger(TAG_REQUEST_ID),
                 previous.getInteger(TAG_COOLDOWN_STAGE),
                 previous.getLong(TAG_NEXT_ALLOWED_AT),
                 previous.getLong(TAG_LAST_SWITCH_AT),

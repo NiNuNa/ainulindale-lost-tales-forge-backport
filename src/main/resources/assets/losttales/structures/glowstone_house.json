@@ -1,0 +1,7 @@
+{
+  "waystone": [1, 1, -2],
+  "arrival": [0, 0, 3],
+  "clearance": 5,
+  "foundation": 8,
+  "foundationBlock": "minecraft:glowstone"
+}

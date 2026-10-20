@@ -1,0 +1,3 @@
+{
+  "kits": ["kits/human.json", "kits/elf.json", "kits/dwarf.json", "kits/hobbit.json", "kits/orc.json", "kits/uruk.json"]
+}

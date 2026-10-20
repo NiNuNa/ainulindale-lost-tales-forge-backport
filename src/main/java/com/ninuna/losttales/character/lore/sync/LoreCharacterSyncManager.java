@@ -9,15 +9,27 @@ import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorld
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferStorage;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferWorldData;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.PacketDigest;
 import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-/** Builds a fresh viewer-specific ownership snapshot after every roster sync. */
+/**
+ * Builds each viewer's own lore list and sends it where it changed since
+ * that client was last sent it: what was sent is kept by account, as a
+ * digest, until its player leaves. Static state, cleared with the
+ * server's other stores.
+ */
 public final class LoreCharacterSyncManager {
+
+    private static final Map<UUID, byte[]> SENT = new HashMap<UUID, byte[]>();
 
     private LoreCharacterSyncManager() {}
 
@@ -42,8 +54,10 @@ public final class LoreCharacterSyncManager {
         }
     }
 
+    /** Sends the player their lore list, unless their client holds it as it is. */
     public static void send(EntityPlayerMP player) {
-        if (player == null || player.worldObj == null || player.worldObj.isRemote) return;
+        if (player == null || player.worldObj == null || player.worldObj.isRemote
+                || player.getUniqueID() == null) return;
         LoreCharacterOwnershipWorldData ownership =
                 LoreCharacterOwnershipStorage.get(player.worldObj);
         LoreCharacterTransferWorldData transfers =
@@ -65,9 +79,6 @@ public final class LoreCharacterSyncManager {
                     definition.getId(), definition.getName(),
                     definition.getDescription(),
                     appearance == null ? "" : appearance.getRaceId(),
-                    appearance == null ? "" : appearance.getGenderId(),
-                    appearance == null ? "" : appearance.getModelId(),
-                    appearance == null ? "" : appearance.getSkinId(),
                     appearance != null,
                     claimed, owned,
                     transfers.getTransaction(definition.getId()) != null,
@@ -75,9 +86,28 @@ public final class LoreCharacterSyncManager {
                     owned && record != null ? record.getCharacterId() : null,
                     record == null ? 0L : record.getRevision()));
         }
-        LostTalesNetworkHandler.CHANNEL.sendTo(
-                new LoreCharacterSyncPacket(new LoreCharacterSnapshot(
-                        summaries, ownership.isReadOnly(),
-                        transfers.isReadOnly())), player);
+        LoreCharacterSyncPacket list = new LoreCharacterSyncPacket(
+                new LoreCharacterSnapshot(summaries, ownership.isReadOnly(),
+                        transfers.isReadOnly()));
+        byte[] digest = PacketDigest.of(list);
+        synchronized (SENT) {
+            if (Arrays.equals(digest, SENT.get(player.getUniqueID()))) {
+                return;
+            }
+            SENT.put(player.getUniqueID(), digest);
+        }
+        LostTalesNetworkHandler.CHANNEL.sendTo(list, player);
+    }
+
+    public static void forget(UUID account) {
+        synchronized (SENT) {
+            SENT.remove(account);
+        }
+    }
+
+    public static void clear() {
+        synchronized (SENT) {
+            SENT.clear();
+        }
     }
 }

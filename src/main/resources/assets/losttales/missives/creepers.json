@@ -1,0 +1,10 @@
+{
+  "id": "losttales:creepers",
+  "kind": "kill",
+  "entity": "Creeper",
+  "count": [2, 4],
+  "experience": 18,
+  "titles": ["trouble_on_the_road", "dangerous_work", "clear_the_paths"],
+  "issuers": ["local_watch", "road_warden", "village_reeve", "caravan_master", "quartermaster"],
+  "flavours": ["shapes_beyond_firelight", "roads_open", "steady_blade"]
+}

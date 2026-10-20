@@ -215,19 +215,20 @@ public final class LostTalesQuestDialogueHooks {
 
     /**
      * A giver's offer, sent by the server as the player touched them: the
-     * conversation opens on it, or with the conversation screen switched
-     * off the giver's line goes to the chat with *Accept* and *Decline*
-     * to click (QUEST-37). An offer whose speaker or quest this client
-     * cannot find, or one that comes while another screen is open, is let
-     * go.
+     * conversation opens on it, or the giver's line goes to the chat with
+     * *Accept* and *Decline* to click, where the conversation screen is
+     * switched off or another screen is open, which stays open
+     * ({@link QuestOfferWay}, QUEST-37, QUEST-41). An offer whose speaker or quest
+     * this client cannot find is let go.
      */
     public static void offerFrom(int entityId, String questId) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || minecraft.theWorld == null
-                || minecraft.thePlayer == null
-                || minecraft.currentScreen != null) {
+                || minecraft.thePlayer == null) {
             return;
         }
+        boolean conversation = QuestOfferWay.of(LostTalesQuestDialogueGui.isEnabled(),
+                minecraft.currentScreen != null) == QuestOfferWay.CONVERSATION;
         Entity speaker = minecraft.theWorld.getEntityByID(entityId);
         LostTalesQuestDefinition quest =
                 LostTalesClientQuestDefinitionStore.getQuest(questId);
@@ -245,7 +246,7 @@ public final class LostTalesQuestDialogueHooks {
         if (exchange == null) {
             return;
         }
-        if (LostTalesQuestDialogueGui.isEnabled()) {
+        if (conversation) {
             minecraft.displayGuiScreen(conversation(exchange));
         } else {
             answer(exchange);

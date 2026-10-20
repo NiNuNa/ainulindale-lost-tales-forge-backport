@@ -11,7 +11,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -19,24 +18,25 @@ import java.util.regex.Pattern;
 /**
  * Every game channel bound to a Discord channel, read once from the
  * config when the bridge starts, and the one place that answers where
- * lines go. Each entry of the {@code channelBindings} list binds one
- * game channel to one Discord channel:
+ * lines go. The {@code channelBindings} list is written by the link
+ * commands alone ({@link DiscordBindingEntries#format}), and each of its
+ * entries binds one game channel to one Discord channel in that one
+ * form:
  *
  * <pre>
- * global=GAME_TO_DISCORD;webhook=https://discord.com/api/webhooks/...
- * ooc=BIDIRECTIONAL;channel=123456789012345678;webhook=https://...
- * ooc=GAME_TO_DISCORD;webhook=https://discord.com/api/webhooks/...
- * gondor=BIDIRECTIONAL;channel=...;webhook=...
+ * ooc=BIDIRECTIONAL;channel=123456789012345678;webhook=https://discord.com/api/webhooks/...
+ * gondor=GAME_TO_DISCORD;channel=...;webhook=...
  * </pre>
  *
  * The part before {@code =} is the game channel's code name
  * ({@link ChatCodeNames}), a faction's for that faction's chat; then the
- * direction, then {@code channel} (the Discord channel the bot reads)
- * and {@code webhook} (where the bridge posts) in any order. A game
- * channel may be bound as often as it has Discord channels to go to —
- * each entry is one destination, and a line goes to every one that
- * posts — while a Discord channel belongs to one game channel only,
- * whichever way lines cross it: the second game channel to name a
+ * direction, {@code channel} (the Discord channel the bot reads and the
+ * webhook posts into) and {@code webhook} (where the bridge posts). An
+ * entry of any other form is refused with a warning and left in the
+ * file. A game channel may be bound as often as it has Discord channels
+ * to go to — each entry is one destination, and a line goes to every
+ * one that posts — while a Discord channel belongs to one game channel
+ * only, whichever way lines cross it: the second game channel to name a
  * Discord channel another already reads or posts into is refused
  * outright, and the second to name a webhook another posts through is
  * refused that posting, since a Discord channel holds one conversation;
@@ -60,14 +60,16 @@ public final class DiscordChannelBindings {
     private static final char ENTRY_SEPARATOR = ';';
     private static final String CHANNEL_KEY = "channel";
     private static final String WEBHOOK_KEY = "webhook";
+    /** The most digits a Discord id has: it is a 64-bit number. */
+    static final int MAX_SNOWFLAKE_DIGITS = 20;
     /**
      * A Discord webhook's address: Discord's own host (the canary and
      * test builds' too), an optional API version, the webhook's id and
      * its token, nothing after.
      */
     private static final Pattern DISCORD_WEBHOOK = Pattern.compile(
-            "https://(?:(?:canary|ptb)\\.)?discord(?:app)?\\.com/api(?:/v\\d{1,2})?"
-                    + "/webhooks/\\d{1,24}/[A-Za-z0-9_-]{1,128}");
+            "https://(?:(?:canary|ptb)\\.)?discord\\.com/api(?:/v\\d{1,2})?"
+                    + "/webhooks/\\d{1," + MAX_SNOWFLAKE_DIGITS + "}/[A-Za-z0-9_-]{1,128}");
 
     /**
      * Where the parser's findings go; the bridge logs them, tests
@@ -168,28 +170,29 @@ public final class DiscordChannelBindings {
     }
 
     /**
-     * One entry, the {@code position}th of the list. A warning about an
-     * entry that cannot be read names it by that position alone and never
-     * repeats its text: a token or a webhook's address pasted into the
-     * wrong place would otherwise reach the log.
+     * One entry, the {@code position}th of the list, in the form the link
+     * commands write; any other is refused. A warning about an entry that
+     * cannot be read names it by that position alone and never repeats
+     * its text: a token or a webhook's address pasted into the wrong
+     * place would otherwise reach the log.
      */
     private static DiscordChannelBinding parseEntry(String entry, int position,
                                                     Warnings warnings) {
-        String text = entry == null ? "" : entry.trim();
-        if (text.length() == 0 || text.startsWith("#")) {
-            return null;
-        }
+        String text = entry == null ? "" : entry;
         int equals = text.indexOf('=');
-        if (equals <= 0) {
-            warn(warnings, "Discord binding entry " + position
-                    + " has no '=' between the channel and its direction; ignored");
+        String[] parts = equals <= 0 ? new String[0]
+                : text.substring(equals + 1).split(String.valueOf(ENTRY_SEPARATOR), -1);
+        if (parts.length != 3 || !parts[1].startsWith(CHANNEL_KEY + "=")
+                || !parts[2].startsWith(WEBHOOK_KEY + "=")) {
+            warn(warnings, "Discord binding entry " + position + " is not"
+                    + " <channel>=<direction>;channel=<id>;webhook=<address>,"
+                    + " the form the link commands write; ignored");
             return null;
         }
-        String target = text.substring(0, equals).trim().toLowerCase(Locale.ROOT);
-        String[] parts = text.substring(equals + 1).split(
-                String.valueOf(ENTRY_SEPARATOR));
+        String target = text.substring(0, equals);
         ChatCodeNames.Named named = ChatCodeNames.parse(target);
-        if (named == null) {
+        if (named == null || !target.equals(
+                DiscordChannelBinding.keyOf(named.channel, named.scope))) {
             warn(warnings, "Discord binding entry " + position
                     + " names no channel the game knows; ignored");
             return null;
@@ -207,50 +210,39 @@ public final class DiscordChannelBindings {
                     + " so nothing would cross");
             return null;
         }
-        DiscordBridgeDirection direction = DiscordBridgeDirection.parse(
-                parts.length == 0 ? "" : parts[0]);
+        DiscordBridgeDirection direction = linkedDirection(parts[0]);
         if (direction == null) {
             warn(warnings, "Discord binding '" + target + "' names no direction"
-                    + " (DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL); ignored");
+                    + " (GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL); ignored");
             return null;
         }
-        String discordChannel = "";
-        String webhook = "";
-        for (int index = 1; index < parts.length; index++) {
-            String part = parts[index].trim();
-            int split = part.indexOf('=');
-            if (split <= 0) {
-                if (part.length() > 0) {
-                    warn(warnings, "Discord binding '" + target
-                            + "' has an option without a value; ignored that option");
-                }
-                continue;
-            }
-            String key = part.substring(0, split).trim().toLowerCase(Locale.ROOT);
-            String value = part.substring(split + 1).trim();
-            if (CHANNEL_KEY.equals(key)) {
-                discordChannel = value;
-            } else if (WEBHOOK_KEY.equals(key)) {
-                webhook = value;
-            } else {
-                warn(warnings, "Discord binding '" + target + "' has an unknown option"
-                        + " in its part " + (index + 1) + "; ignored that option");
-            }
-        }
-        if (discordChannel.length() > 0 && !isSnowflake(discordChannel)) {
+        String discordChannel = parts[1].substring(CHANNEL_KEY.length() + 1);
+        if (!isSnowflake(discordChannel)) {
             warn(warnings, "Discord binding '" + target
-                    + "' has a channel id that is not a number; reading it is off");
-            discordChannel = "";
+                    + "' has a channel id that is not a Discord id; ignored");
+            return null;
         }
-        if (webhook.length() > 0 && !isDiscordWebhook(webhook)) {
+        String webhook = parts[2].substring(WEBHOOK_KEY.length() + 1);
+        if (!isDiscordWebhook(webhook)) {
             // Never repeated in the log: an address is as good as a
             // password to whoever reads it.
             warn(warnings, "Discord binding '" + target + "' has a webhook that is"
-                    + " not a Discord webhook address; posting is off");
-            webhook = "";
+                    + " not a Discord webhook address; ignored");
+            return null;
         }
         return new DiscordChannelBinding(channel, scope, discordChannel, webhook,
                 direction);
+    }
+
+    /** A direction a link can be made with, named exactly; null for any other. */
+    private static DiscordBridgeDirection linkedDirection(String name) {
+        for (DiscordBridgeDirection direction : DiscordBridgeDirection.values()) {
+            if (direction != DiscordBridgeDirection.DISABLED
+                    && direction.name().equals(name)) {
+                return direction;
+            }
+        }
+        return null;
     }
 
     /**
@@ -273,16 +265,12 @@ public final class DiscordChannelBindings {
         for (int index = 0; index < parsed.size(); index++) {
             DiscordChannelBinding binding = parsed.get(index);
             String key = binding.key();
-            boolean webhookSeen = binding.getWebhookUrl().length() > 0
-                    && !seen.add(key + "\nwebhook\n" + binding.getWebhookUrl());
-            boolean channelSeen = binding.getDiscordChannelId().length() > 0
-                    && !seen.add(key + "\nchannel\n" + binding.getDiscordChannelId());
-            if (webhookSeen || channelSeen || (binding.getWebhookUrl().length() == 0
-                    && binding.getDiscordChannelId().length() == 0
-                    && !seen.add(key + "\nnothing"))) {
+            boolean webhookSeen = !seen.add(key + "\nwebhook\n" + binding.getWebhookUrl());
+            boolean channelSeen = !seen.add(key + "\nchannel\n"
+                    + binding.getDiscordChannelId());
+            if (webhookSeen || channelSeen) {
                 warn(warnings, "Discord binding '" + key + "' names a "
-                        + (webhookSeen ? "webhook" : channelSeen
-                                ? "Discord channel" : "placeholder")
+                        + (webhookSeen ? "webhook" : "Discord channel")
                         + " it names already; the first stands");
                 continue;
             }
@@ -291,30 +279,21 @@ public final class DiscordChannelBindings {
             ordinals.put(key, Integer.valueOf(ordinal));
             String id = binding.withOrdinal(ordinal).id();
             DiscordBridgeDirection direction = binding.getDirection();
-            if (direction.sendsToDiscord() && binding.getWebhookUrl().length() == 0) {
-                warn(warnings, "Discord binding '" + id
-                        + "' posts to Discord but names no webhook; posting is off");
+            String poster = posters.get(binding.getWebhookUrl());
+            if (poster != null && !poster.equals(key)) {
+                refuse(warnings, "Discord binding '" + id + "' posts through"
+                        + " the webhook '" + posters.get(
+                                binding.getWebhookUrl() + "\nid")
+                        + "' posts through: a Discord channel belongs to"
+                        + " one game channel; posting is off for '" + id + "'");
                 direction = direction.withoutSends();
-            }
-            if (binding.getWebhookUrl().length() > 0) {
-                String poster = posters.get(binding.getWebhookUrl());
-                if (poster != null && !poster.equals(key)) {
-                    refuse(warnings, "Discord binding '" + id + "' posts through"
-                            + " the webhook '" + posters.get(
-                                    binding.getWebhookUrl() + "\nid")
-                            + "' posts through: a Discord channel belongs to"
-                            + " one game channel; posting is off for '" + id + "'");
-                    direction = direction.withoutSends();
-                } else if (poster == null && direction.sendsToDiscord()) {
-                    posters.put(binding.getWebhookUrl(), key);
-                    posters.put(binding.getWebhookUrl() + "\nid", id);
-                }
+            } else if (poster == null && direction.sendsToDiscord()) {
+                posters.put(binding.getWebhookUrl(), key);
+                posters.put(binding.getWebhookUrl() + "\nid", id);
             }
             if (direction.readsFromDiscord()) {
                 String why = null;
-                if (binding.getDiscordChannelId().length() == 0) {
-                    why = "names no Discord channel";
-                } else if (!botTokenPresent) {
+                if (!botTokenPresent) {
                     why = "needs the bot token to read";
                 } else if (binding.getChannel().getRecipientRule()
                         == ChatRecipientRule.PROXIMITY) {
@@ -327,9 +306,7 @@ public final class DiscordChannelBindings {
                 }
             }
             String discordChannel = binding.getDiscordChannelId();
-            if (discordChannel.length() > 0 && (direction.readsFromDiscord()
-                    || (direction.sendsToDiscord()
-                            && binding.getWebhookUrl().length() > 0))) {
+            if (direction.readsFromDiscord() || direction.sendsToDiscord()) {
                 String owner = owners.get(discordChannel);
                 if (owner != null && !owner.equals(key)) {
                     refuse(warnings, "Discord binding '" + id + "' names Discord"
@@ -373,9 +350,14 @@ public final class DiscordChannelBindings {
                 && DISCORD_WEBHOOK.matcher(url).matches();
     }
 
-    /** Whether the text is a Discord id: a number of at most 24 digits. */
+    /**
+     * Whether the text is a Discord id: digits alone, at most
+     * {@link #MAX_SNOWFLAKE_DIGITS} of them. Every Discord id the bridge
+     * reads, saves or sends is checked here.
+     */
     static boolean isSnowflake(String value) {
-        if (value == null || value.length() == 0 || value.length() > 24) {
+        if (value == null || value.length() == 0
+                || value.length() > MAX_SNOWFLAKE_DIGITS) {
             return false;
         }
         for (int index = 0; index < value.length(); index++) {

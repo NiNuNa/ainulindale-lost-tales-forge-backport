@@ -3,7 +3,6 @@ package com.ninuna.losttales.compat.discord;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.server.ChatChannelPolicy;
-import com.ninuna.losttales.chat.ChatMessageOrigin;
 
 /**
  * The one rule for what may leave the game: a line a player typed, in a
@@ -22,8 +21,13 @@ public final class DiscordBridgePolicy {
 
     private DiscordBridgePolicy() {}
 
-    public static boolean relaysOutbound(ChatMessageOrigin origin, ChatChannel channel) {
-        return origin == ChatMessageOrigin.PLAYER && isOpenToTheBridge(channel);
+    /**
+     * Whether a line a player typed, or their typing, may be posted to
+     * the channel's Discord links. A line from Discord takes the bridge's
+     * own way and is never asked about here.
+     */
+    public static boolean relaysOutbound(ChatChannel channel) {
+        return isOpenToTheBridge(channel);
     }
 
     /** Whether a Discord message may be delivered into the channel at all. */

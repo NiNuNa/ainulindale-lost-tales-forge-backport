@@ -4,10 +4,11 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.gui.FontRenderer;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -60,22 +61,21 @@ public final class CreatorKeyValues extends CreatorControl {
         LostTalesSkyrimUiStyle.drawSectionHeader(font, this.title, this.x,
                 this.y, this.width);
         LostTalesSkyrimUiStyle.beginContent();
+        // Words too long for their room fade into its end (LOOK-37).
         int rowY = this.y + HEADER;
         for (String[] row : this.rows) {
-            String value = LostTalesSkyrimUiStyle.trimToWidth(font, row[1],
-                    this.width / 2);
-            int valueX = this.x + this.width - font.getStringWidth(value);
-            font.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(font,
-                    row[0], valueX - this.x - 6), this.x, rowY,
-                    LostTalesSkyrimUiStyle.TEXT_MUTED);
-            font.drawStringWithShadow(value, valueX, rowY,
-                    LostTalesSkyrimUiStyle.TEXT_BRIGHT);
+            int valueRoom = this.width / 2;
+            int valueX = this.x + this.width - (int)LostTalesUiCutName
+                    .shownWidth(font.getStringWidth(row[1]), valueRoom);
+            LostTalesUiCutName.drawShadowed(font, row[0], this.x, rowY,
+                    valueX - this.x - 6, LostTalesSkyrimUiStyle.TEXT_MUTED);
+            LostTalesUiCutName.drawShadowed(font, row[1], valueX, rowY,
+                    valueRoom, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
             rowY += ROW;
         }
         if (this.footnote.length() > 0) {
-            font.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(font,
-                    this.footnote, this.width), this.x, rowY + 1,
-                    LostTalesSkyrimUiStyle.TEXT_DIM);
+            LostTalesUiCutName.drawShadowed(font, this.footnote, this.x,
+                    rowY + 1, this.width, LostTalesSkyrimUiStyle.TEXT_DIM);
         }
     }
 
@@ -99,9 +99,13 @@ public final class CreatorKeyValues extends CreatorControl {
             rowY += rowHeight;
         }
         if (this.footnote.length() > 0) {
-            CreatorRows.drawNote(this.context, Collections.singletonList(
-                    CreatorRows.trimmed(font, this.footnote, this.width)),
-                    this.x, rowY, WindowStyle.asideRgb());
+            // A note's one line, fading into its end where it is too long.
+            LostTalesUiCutName.drawText(font, this.footnote, this.x,
+                    rowY + MenuWindow.NOTE_PADDING
+                            + LostTalesUiInk.centredStart(MenuWindow.NOTE_LINE,
+                                    LostTalesUiInk.CAP_HEIGHT),
+                    this.width, WindowStyle.asideRgb(),
+                    this.context.alpha());
         }
     }
 }

@@ -312,15 +312,6 @@ public final class ChatIdentitySelection {
         return null;
     }
 
-    /** The ids of the played character's fellowships. */
-    public static Set<UUID> fellowshipIds(EntityPlayerMP player) {
-        Set<UUID> ids = new HashSet<UUID>();
-        for (Fellowship fellowship : fellowships(player)) {
-            ids.add(fellowship.getFellowshipId());
-        }
-        return ids;
-    }
-
     private static void warn(RuntimeException failure) {
         if (!storageWarning) {
             storageWarning = true;

@@ -1,0 +1,3 @@
+{
+  "layouts": ["hud_layouts/default.json", "hud_layouts/lotr-safe.json", "hud_layouts/compact.json", "hud_layouts/minimal.json"]
+}

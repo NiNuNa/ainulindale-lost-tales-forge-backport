@@ -137,6 +137,8 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.world.WorldEvent;
 import com.ninuna.losttales.client.chat.ChatFellowshipInvitationAnswers;
+import com.ninuna.losttales.client.progression.ClientProgression;
+import com.ninuna.losttales.progression.perk.PerkRuntime;
 
 public class LostTalesClientEventHandler implements IResourceManagerReloadListener {
 
@@ -181,8 +183,12 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuestDefinitionStore.clearServerSentDefinitions();
         ClientWorldQuests.clear();
         ClientQuestCatalog.forget();
+        ClientProgression.clear();
+        PerkRuntime.clearClient();
         LostTalesClientMapMarkerNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
+        // The next server numbers its snapshots afresh.
+        LostTalesClientMapMarkerStore.forgetServerParts();
         LostTalesLotrMapMarkerIconOverlay.clearClientState();
         // The map image is per-world, so what was learned about where its
         // water is cannot be carried into the next one — nor may a view of
@@ -205,6 +211,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientCharacterProfileCache.clear();
         PlayerAppearanceResolver.clear();
         LostTalesAccountSkins.clear();
+        LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
         ChestPhysicsStates.clear();
         ClientCharacterCreationCatalogCache.clear();
         ClientLoreCharacterCache.clear();
@@ -217,6 +224,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // Words over a head belong to the world they were spoken in.
         ChatSpeechBubbles.clear();
         ClientServerConfigCache.clear();
+        com.ninuna.losttales.gui.style.LostTalesUiCutName.forgetAll();
         // Chat is the one client state that outlives a disconnect: the
         // game keeps its own message history for as long as it runs, and
         // everything Lost Tales knows about those messages — their tabs,
@@ -249,6 +257,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         WraithWorldVisualEffect.reset();
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();
+        // The bundled races and capes again, until the next server sends its own.
+        com.ninuna.losttales.character.registry.CharacterRaceRegistry.resetToBundled();
+        com.ninuna.losttales.character.cape.CharacterCapeCatalog.resetToBundled();
         ThirdPersonCameraRuntime.resetSession();
     }
 
@@ -283,7 +294,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             ChatProfanityCatalog.resetToBundled();
             ClientChatShowcaseStore.clear();
             LostTalesChatPresentation.clear();
-            LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
         }
         // The place's remembered whisper tabs come back where they were,
         // before anything is replayed into them.

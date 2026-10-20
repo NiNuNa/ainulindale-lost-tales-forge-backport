@@ -1,0 +1,85 @@
+{
+  "id": "losttales:mining",
+  "icon": "minecraft:iron_pickaxe",
+  "order": 10,
+  "counts": [
+    {
+      "act": "mine",
+      "worth": {
+        "minecraft:coal_ore": 1,
+        "minecraft:iron_ore": 3,
+        "minecraft:gold_ore": 5,
+        "minecraft:redstone_ore": 2,
+        "minecraft:lit_redstone_ore": 2,
+        "minecraft:lapis_ore": 3,
+        "minecraft:diamond_ore": 10,
+        "minecraft:emerald_ore": 10,
+        "minecraft:quartz_ore": 2,
+        "lotr:tile.oreCopper": 2,
+        "lotr:tile.oreTin": 2,
+        "lotr:tile.oreSilver": 5,
+        "lotr:tile.oreMithril": 25,
+        "lotr:tile.oreNaurite": 3,
+        "lotr:tile.oreQuendite": 3,
+        "lotr:tile.oreGlowstone": 2,
+        "lotr:tile.oreMorgulIron": 3,
+        "lotr:tile.oreGulduril": 4,
+        "lotr:tile.oreSulfur": 1,
+        "lotr:tile.oreSaltpeter": 1,
+        "lotr:tile.oreSalt": 1,
+        "lotr:tile.oreGem": 8,
+        "minecraft:stone": 0.2,
+        "lotr:tile.rock": 0.2,
+        "minecraft:sandstone": 0.1,
+        "minecraft:netherrack": 0.05,
+        "minecraft:obsidian": 1
+      }
+    }
+  ],
+  "perks": [
+    {
+      "id": "prospector",
+      "levels": [10, 40],
+      "effect": "ore_bonus",
+      "amount": 0.1,
+      "with": ["lotr:tile.oreCopper", "lotr:tile.oreGem", "lotr:tile.oreGlowstone", "lotr:tile.oreGulduril", "lotr:tile.oreMithril", "lotr:tile.oreMorgulIron", "lotr:tile.oreNaurite", "lotr:tile.oreQuendite", "lotr:tile.oreSalt", "lotr:tile.oreSaltpeter", "lotr:tile.oreSilver", "lotr:tile.oreSulfur", "lotr:tile.oreTin", "minecraft:coal_ore", "minecraft:diamond_ore", "minecraft:emerald_ore", "minecraft:gold_ore", "minecraft:iron_ore", "minecraft:lapis_ore", "minecraft:lit_redstone_ore", "minecraft:quartz_ore", "minecraft:redstone_ore"]
+    },
+    {
+      "id": "steady_pick",
+      "levels": [20],
+      "effect": "wear",
+      "amount": 0.25,
+      "with": ["pickaxe"]
+    },
+    {
+      "id": "stonecutter",
+      "levels": [30],
+      "effect": "stone_speed",
+      "amount": 0.25
+    },
+    {
+      "id": "deep_delver",
+      "levels": [50],
+      "effect": "deep_speed",
+      "amount": 0.1,
+      "params": {
+        "below": 32
+      }
+    },
+    {
+      "id": "gem_cutter",
+      "levels": [70],
+      "effect": "gem_bonus",
+      "amount": 0.25,
+      "needs": "prospector:2",
+      "with": ["minecraft:diamond_ore", "minecraft:emerald_ore", "minecraft:lapis_ore", "lotr:tile.oreGem"]
+    },
+    {
+      "id": "dwarf_craft",
+      "levels": [100],
+      "effect": "mine_speed",
+      "amount": 0.15,
+      "with": ["pickaxe"]
+    }
+  ]
+}

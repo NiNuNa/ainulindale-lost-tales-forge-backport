@@ -57,6 +57,50 @@ public final class ServerConfigAuthorizationCategoriesTest {
     }
 
     /**
+     * A subcategory goes with its root, as the files route it: one under
+     * the roles is written into the roles' file, so it stays off the
+     * surface too.
+     */
+    @Test
+    public void aSubcategoryOfTheRolesIsNotOnTheSettingsSurface() {
+        Configuration config = new Configuration();
+        config.get(LostTalesConfig.CATEGORY_ROLES + Configuration.CATEGORY_SPLITTER + "extra",
+                "grants", new String[0]).set(new String[] {"guest=chat.moderate"});
+        config.get(LostTalesConfig.CATEGORY_CHANNELS + Configuration.CATEGORY_SPLITTER + "more",
+                "gates", new String[0]).set(new String[0]);
+        config.get(LostTalesConfig.CATEGORY_CHAT, "proximityRadius", 64).set(64);
+
+        List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(
+                config, ServerConfigSnapshot.EXCLUDED_CATEGORIES,
+                Collections.<String>emptySet(), ServerConfigSnapshot.SECRET_KEYS);
+
+        assertEquals("only the chat setting is offered", 1, entries.size());
+        assertEquals(LostTalesConfig.CATEGORY_CHAT, entries.get(0).getCategory());
+        assertEquals(LostTalesConfig.CATEGORY_ROLES,
+                ServerConfigSnapshot.rootCategory("Roles.extra"));
+        assertEquals(LostTalesConfig.CATEGORY_CHAT,
+                ServerConfigSnapshot.rootCategory(LostTalesConfig.CATEGORY_CHAT));
+    }
+
+    /** A secret is a secret however its key is spelled, as excluded keys are. */
+    @Test
+    public void aSecretIsBlankedWhateverTheCaseOfItsKey() {
+        Configuration config = new Configuration();
+        config.get(LostTalesConfig.CATEGORY_DISCORD, "BOTTOKEN", "").set("hunter2");
+        config.get(LostTalesConfig.CATEGORY_DISCORD, "CHANNELBINDINGS",
+                new String[0]).set(new String[] {"ooc=BIDIRECTIONAL;channel=1"});
+
+        List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(
+                config, ServerConfigSnapshot.EXCLUDED_CATEGORIES,
+                ServerConfigSnapshot.COMMAND_KEYS, ServerConfigSnapshot.SECRET_KEYS);
+
+        assertEquals("the links stay off, the token is offered blank", 1, entries.size());
+        ServerConfigEntry token = entries.get(0);
+        assertTrue(token.isSecret());
+        assertEquals(Collections.singletonList(""), token.getValues());
+    }
+
+    /**
      * The Discord links hold webhook addresses, which are passwords to
      * their Discord channels: the settings surface never shows them, and
      * {@code /losttales discord} is what makes them.

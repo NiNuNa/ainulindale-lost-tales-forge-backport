@@ -36,8 +36,10 @@ import net.minecraftforge.common.DimensionManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -1215,7 +1217,10 @@ public final class FellowshipService {
             return null;
         }
         int members = repairMemberReferences(fellowshipData, characterData,
-                loreFigures(world));
+                loreFigures(world), new ArrayList<UUID>());
+        if (members < 0) {
+            return null;
+        }
         fellowshipData.markCharacterReferencesValidated();
         int invitations = this.invitationCoordinator.pruneInvalidInvitations(
                 fellowshipData, invitationData, characterData, System.currentTimeMillis());
@@ -1255,8 +1260,15 @@ public final class FellowshipService {
                 || characterData.isReadOnlyForNewerVersion()) {
             return false;
         }
-        repairMemberReferences(fellowshipData, characterData, loreFigures(world));
+        List<UUID> changed = new ArrayList<UUID>();
+        if (repairMemberReferences(fellowshipData, characterData, loreFigures(world),
+                changed) < 0) {
+            return false;
+        }
         fellowshipData.markCharacterReferencesValidated();
+        for (UUID fellowshipId : changed) {
+            FellowshipMirrors.reconcile(world, fellowshipId);
+        }
         return true;
     }
 
@@ -1264,24 +1276,38 @@ public final class FellowshipService {
      * Quarantines every member that no longer stands, brings the names of
      * the others up to date, has a figure claimed since it was released
      * taken up by its holder, and mends a fellowship's leader or ends one
-     * nobody plays a member of. Returns how many members it removed.
+     * nobody plays a member of. Adds each fellowship it changed or ended to
+     * {@code changed}, and returns how many members it removed: -1, having
+     * changed nothing, where the quarantine has no room for them all, which
+     * leaves the store closed.
      */
-    private int repairMemberReferences(FellowshipWorldData fellowshipData,
-                                       CharacterWorldData characterData,
-                                       Set<UUID> figures) {
+    static int repairMemberReferences(FellowshipWorldData fellowshipData,
+                                      CharacterWorldData characterData,
+                                      Set<UUID> figures, List<UUID> changed) {
         int removed = 0;
         CharacterIndex index = characterData.characterIndex();
         List<Fellowship> fellowships = new ArrayList<Fellowship>(fellowshipData.getFellowships());
+        int toRemove = 0;
         for (Fellowship fellowship : fellowships) {
-            boolean changed = false;
+            for (FellowshipMember member : fellowship.getMembers()) {
+                if (memberRemovalReason(member, index, figures) != null) {
+                    toRemove++;
+                }
+            }
+        }
+        if (!fellowshipData.hasQuarantineRoomFor(toRemove)) {
+            return -1;
+        }
+        for (Fellowship fellowship : fellowships) {
+            boolean altered = false;
             for (FellowshipMember member : new ArrayList<FellowshipMember>(fellowship.getMembers())) {
                 UUID identityId = member.getIdentityId();
                 String removalReason = memberRemovalReason(member, index, figures);
                 if (removalReason != null) {
-                    fellowship.removeMember(identityId);
                     fellowshipData.quarantine(removalReason,
                             fellowship.getFellowshipId(), identityId);
-                    changed = true;
+                    fellowship.removeMember(identityId);
+                    altered = true;
                     removed++;
                     continue;
                 }
@@ -1290,7 +1316,7 @@ public final class FellowshipService {
                     // Claimed while its places waited: its holder takes them up.
                     if (character != null && takeUp(fellowship, identityId,
                             character.getOwnerId(), character.getName())) {
-                        changed = true;
+                        altered = true;
                     }
                     continue;
                 }
@@ -1299,18 +1325,20 @@ public final class FellowshipService {
                 if (name != null && name.length() > 0
                         && fellowship.refreshMemberIdentity(identityId,
                                 member.getOwnerId(), name)) {
-                    changed = true;
+                    altered = true;
                 }
             }
             if (!fellowship.hasHeldMemberBesides(null)) {
                 fellowshipData.removeFellowship(fellowship.getFellowshipId());
+                changed.add(fellowship.getFellowshipId());
                 continue;
             }
             if (fellowship.repairLeaderIfNecessary()) {
-                changed = true;
+                altered = true;
             }
-            if (changed) {
+            if (altered) {
                 fellowshipData.saveFellowship(fellowship);
+                changed.add(fellowship.getFellowshipId());
             }
         }
         return removed;
@@ -1453,22 +1481,28 @@ public final class FellowshipService {
 
     /**
      * Takes away, into the quarantine, every mark that no longer stands
-     * ({@link #markRemovalReason}). Answers how many went.
+     * ({@link #markRemovalReason}). Answers how many went: none where the
+     * quarantine has no room for them all, which leaves the store closed.
      */
     private static int pruneStaleMarks(FellowshipWorldData fellowshipData,
                                        CharacterWorldData characterData,
                                        FellowshipMarkWorldData marks) {
-        int removed = 0;
         CharacterIndex characters = characterData.characterIndex();
+        Map<FellowshipMark, String> stale = new LinkedHashMap<FellowshipMark, String>();
         for (FellowshipMark mark : marks.getAllMarks()) {
             String reason = markRemovalReason(mark, fellowshipData, characters);
             if (reason != null) {
-                marks.quarantine(reason, mark);
-                marks.removeMark(mark.getMarkId());
-                removed++;
+                stale.put(mark, reason);
             }
         }
-        return removed;
+        if (stale.isEmpty() || !marks.hasQuarantineRoomFor(stale.size())) {
+            return 0;
+        }
+        for (Map.Entry<FellowshipMark, String> entry : stale.entrySet()) {
+            marks.quarantine(entry.getValue(), entry.getKey());
+            marks.removeMark(entry.getKey().getMarkId());
+        }
+        return stale.size();
     }
 
     /**

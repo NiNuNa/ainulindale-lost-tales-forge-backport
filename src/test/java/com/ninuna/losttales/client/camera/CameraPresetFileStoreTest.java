@@ -2,9 +2,7 @@ package com.ninuna.losttales.client.camera;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -32,10 +30,7 @@ public final class CameraPresetFileStoreTest {
         File presetDirectory = new File(configDirectory, "camera_presets");
         assertTrue(new File(presetDirectory,
                 "modern_action_rpg.json").isFile());
-        assertFalse(new File(presetDirectory,
-                "wide_exploration.json").exists());
-        assertFalse(new File(presetDirectory,
-                "vanilla_plus.json").exists());
+        assertEquals(1, presetDirectory.list().length);
         assertArrayEquals(new String[] {
                         "modern_action_rpg"
                 }, CameraPresetFileStore.getConfigValues());
@@ -91,30 +86,6 @@ public final class CameraPresetFileStoreTest {
                 Files.readAllBytes(modernFile.toPath()),
                 StandardCharsets.UTF_8).contains(
                         "\"distance\": 4.75"));
-    }
-
-    @Test
-    public void retiredBundledIdsAreIgnoredWithoutDeletingFiles()
-            throws Exception {
-        File configDirectory = temporaryFolder.newFolder("retired-config");
-        CameraPresetFileStore.initialize(configDirectory);
-        File retired = new File(new File(configDirectory, "camera_presets"),
-                "wide_exploration.json");
-        String json = readBundled("modern_action_rpg.json")
-                .replace("\"id\": \"modern_action_rpg\"",
-                        "\"id\": \"wide_exploration\"")
-                .replace("\"name\": \"Modern Action RPG\"",
-                        "\"name\": \"Wide Exploration\"");
-        Files.write(retired.toPath(),
-                json.getBytes(StandardCharsets.UTF_8));
-
-        CameraPresetFileStore.reload();
-
-        assertTrue(retired.isFile());
-        assertNull(CameraPresetFileStore.getDefinition(
-                "wide_exploration"));
-        assertArrayEquals(new String[] {"modern_action_rpg"},
-                CameraPresetFileStore.getConfigValues());
     }
 
     private static String readBundled(String fileName) throws IOException {

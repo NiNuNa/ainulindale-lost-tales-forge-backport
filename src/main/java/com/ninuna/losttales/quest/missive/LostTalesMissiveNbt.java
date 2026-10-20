@@ -14,9 +14,10 @@ import net.minecraftforge.common.util.Constants;
 
 /**
  * A missive as a letter and a board keep it: in the letter's item data,
- * its words as template ids and a target ({@link MissiveWords}). A letter
- * written before the template ids, or with any field out of bounds, reads
- * as one that cannot be read.
+ * its words as template ids and a target ({@link MissiveWords}), or, for a
+ * letter from a server's template, its title, issuer and flavour as
+ * written ({@code Written}, QUEST-42). A letter with any field out of
+ * bounds reads as one that cannot be read.
  */
 public final class LostTalesMissiveNbt {
     public static final String TAG_MISSIVE = "LostTalesMissive";
@@ -61,6 +62,7 @@ public final class LostTalesMissiveNbt {
 
         tag.setString("QuestId", missive.getQuestId());
         tag.setString("QuestType", missive.getQuestType());
+        tag.setBoolean("Written", missive.isWritten());
         tag.setString("TitleId", missive.getTitleId());
         tag.setString("DescriptionId", missive.getDescriptionId());
         tag.setString("IssuerId", missive.getIssuerId());
@@ -82,6 +84,7 @@ public final class LostTalesMissiveNbt {
         LostTalesMissiveData missive = new LostTalesMissiveData(
                 tag.getString("QuestId"),
                 tag.getString("QuestType"),
+                tag.getBoolean("Written"),
                 tag.getString("TitleId"),
                 tag.getString("DescriptionId"),
                 tag.getString("IssuerId"),
@@ -97,19 +100,20 @@ public final class LostTalesMissiveNbt {
     }
 
     public static boolean isStructurallyReasonable(NBTTagCompound tag) {
+        // A written letter's words are longer than an id; isValid holds each to its bound.
+        int words = tag != null && tag.getBoolean("Written")
+                ? MissiveWords.MAX_WRITTEN_BYTES : MissiveWords.MAX_TEMPLATE_ID_BYTES;
         if (!NbtTags.hasReasonableString(tag, "QuestId",
                 MAX_IDENTIFIER_CHARACTERS, true)
                 || !LostTalesQuestIds.fits(tag.getString("QuestId"))
                 || !NbtTags.hasReasonableString(tag, "QuestType",
                 MAX_IDENTIFIER_CHARACTERS, true)
-                || !NbtTags.hasReasonableString(tag, "TitleId",
-                MissiveWords.MAX_TEMPLATE_ID_BYTES, true)
+                || !tag.hasKey("Written", Constants.NBT.TAG_BYTE)
+                || !NbtTags.hasReasonableString(tag, "TitleId", words, true)
                 || !NbtTags.hasReasonableString(tag, "DescriptionId",
                 MissiveWords.MAX_TEMPLATE_ID_BYTES, false)
-                || !NbtTags.hasReasonableString(tag, "IssuerId",
-                MissiveWords.MAX_TEMPLATE_ID_BYTES, false)
-                || !NbtTags.hasReasonableString(tag, "FlavorId",
-                MissiveWords.MAX_TEMPLATE_ID_BYTES, false)
+                || !NbtTags.hasReasonableString(tag, "IssuerId", words, false)
+                || !NbtTags.hasReasonableString(tag, "FlavorId", words, false)
                 || !NbtTags.hasReasonableString(tag, "Target",
                 MissiveWords.MAX_TARGET_BYTES, false)
                 || tag.getLong("GenerationWorldTime") < 0L

@@ -561,7 +561,7 @@ public final class LostTalesChatVisualStyle {
      * measured with its style's formatting code, or, for an indent marker,
      * the inset recorded for the current chat state, and the padding of a
      * backdrop it opens or closes ({@link ChatRunBackdrops}). Every walk
-     * over a line — drawing, head placement, hit testing, the hover card —
+     * over a line — drawing, head placement, hit testing, the person card —
      * must advance by this, so they all ask here.
      */
     static int partWidth(FontRenderer font, IChatComponent part,
@@ -765,7 +765,7 @@ public final class LostTalesChatVisualStyle {
         // bracket, the head, the name, the title and the closing
         // bracket — so resting on any of them underlines the whole
         // span, in the name's colour. Whether the pointer is on it is
-        // the hover card's answer, measured against each part's own
+        // the person card's answer, measured against each part's own
         // pixels with the closing bracket's trailing gap left out, so
         // the rule, the card and the hand cursor agree to the pixel.
         boolean personHovered =

@@ -29,8 +29,9 @@ import java.util.Set;
  * <p>A file is left out, with a line in the log for each reason, when it
  * is too large, cannot be read, takes an id a bundled quest or an earlier
  * file already has, takes a missive's id, raises any warning
- * ({@link LostTalesQuestDefinitionValidator}, QUEST-04), or cannot be sent
- * to a player whole. The others still load, until together they would
+ * ({@link LostTalesQuestDefinitionValidator}, QUEST-04), names an item the
+ * game does not have ({@link QuestItemNames}), or cannot be sent to a
+ * player whole. The others still load, until together they would
  * pass {@link #MAX_SENT_BYTES}.</p>
  */
 public final class ServerQuestFiles {
@@ -71,9 +72,11 @@ public final class ServerQuestFiles {
     /**
      * Reads every {@code .json} file directly in {@code folder}, sorted by
      * name, the folder made if it is missing. {@code takenIds} are the
-     * bundled quests' ids, which no file may take.
+     * bundled quests' ids, which no file may take; every item a file names
+     * is one {@code items} has ({@link QuestItemNames}).
      */
-    public static Result read(File folder, Collection<String> takenIds) {
+    public static Result read(File folder, Collection<String> takenIds,
+                              QuestItemNames.Items items) {
         List<LostTalesQuestDefinition> quests =
                 new ArrayList<LostTalesQuestDefinition>();
         List<String> problems = new ArrayList<String>();
@@ -129,7 +132,7 @@ public final class ServerQuestFiles {
             if (quest == null) {
                 continue;
             }
-            List<String> refusals = refusals(quest, ids, unread);
+            List<String> refusals = refusals(quest, ids, unread, items);
             if (!refusals.isEmpty()) {
                 for (String refusal : refusals) {
                     problems.add(name + ": " + refusal);
@@ -152,11 +155,11 @@ public final class ServerQuestFiles {
     /**
      * Every reason a quest cannot load beside the ones already taken, in
      * words: its id taken, each warning its file raises ({@code unread}
-     * those the reading found), and a quest too large to send. Empty when
-     * it can load.
+     * those the reading found), each item it names that {@code items}
+     * lacks, and a quest too large to send. Empty when it can load.
      */
     static List<String> refusals(LostTalesQuestDefinition quest,
-            Set<String> taken, List<String> unread) {
+            Set<String> taken, List<String> unread, QuestItemNames.Items items) {
         List<String> refusals = new ArrayList<String>();
         String id = quest.getId();
         if (taken.contains(id)) {
@@ -170,6 +173,7 @@ public final class ServerQuestFiles {
         }
         refusals.addAll(LostTalesQuestDefinitionValidator.warningsOf(quest,
                 unread));
+        refusals.addAll(QuestItemNames.problems(quest, items));
         if (LostTalesQuestDefinitionCodec.encodedSize(quest) < 0) {
             refusals.add("it cannot be sent to a player: an id, a name or a"
                     + " text is too long, or it holds too many stages,"

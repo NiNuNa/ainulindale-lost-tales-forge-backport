@@ -64,7 +64,7 @@ public final class LostTalesQuestPlayerHistoryTest {
         String id = "losttales:again";
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
         data.startQuest(id, "first", 10L, 0L);
-        assertTrue(data.completeQuest(id, "", 20L, Collections.<String>emptySet()));
+        assertTrue(data.completeQuest(id, 20L, Collections.<String>emptySet()));
         assertEquals(1, data.getQuestHistoryEntry(id).getCompletions());
 
         data.startQuest(id, "first", 30L, 0L);
@@ -72,7 +72,7 @@ public final class LostTalesQuestPlayerHistoryTest {
                 data.getQuestHistoryEntry(id) != null);
         assertTrue(data.isQuestActive(id));
         assertTrue(data.isQuestCompleted(id));
-        assertTrue(data.completeQuest(id, "", 40L, Collections.<String>emptySet()));
+        assertTrue(data.completeQuest(id, 40L, Collections.<String>emptySet()));
         assertEquals(2, data.getQuestHistoryEntry(id).getCompletions());
         assertEquals(40L, data.getQuestHistoryEntry(id).getWorldTime());
 
@@ -116,7 +116,7 @@ public final class LostTalesQuestPlayerHistoryTest {
         assertEquals(java.util.Arrays.asList("start", "end"),
                 loaded.getActiveQuest(id).getStagePath());
 
-        loaded.completeQuest(id, "", 20L, Collections.<String>emptySet());
+        loaded.completeQuest(id, 20L, Collections.<String>emptySet());
         assertEquals(java.util.Arrays.asList("start", "end"),
                 loaded.getQuestHistoryEntry(id).getStagePath());
         NBTTagCompound again = new NBTTagCompound();
@@ -131,17 +131,20 @@ public final class LostTalesQuestPlayerHistoryTest {
                 reloaded.writeCharacterState());
     }
 
+    /**
+     * A completion's line keeps the optional objectives it achieved and no
+     * words: each reader's game words what they add (QUEST-07).
+     */
     @Test
     public void completionOutcomeUsesTheSameTerminalHistory() {
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
         data.startQuest("losttales:ending", "last", 10L, 0L);
 
-        assertTrue(data.completeQuest("losttales:ending",
-                "The scouts survived.", 60L,
+        assertTrue(data.completeQuest("losttales:ending", 60L,
                 Collections.singleton("rescue_scouts")));
 
         assertTrue(data.isQuestCompleted("losttales:ending"));
-        assertEquals("The scouts survived.", data.getQuestHistoryEntry(
+        assertEquals("", data.getQuestHistoryEntry(
                 "losttales:ending").getDetail());
         assertEquals(Collections.singleton("losttales:ending"),
                 data.getCompletedQuestIds());

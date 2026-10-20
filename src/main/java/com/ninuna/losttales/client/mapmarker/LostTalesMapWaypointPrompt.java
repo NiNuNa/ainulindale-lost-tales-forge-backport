@@ -3,6 +3,9 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
+import com.ninuna.losttales.gui.style.LostTalesUiFading;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -270,25 +273,40 @@ final class LostTalesMapWaypointPrompt {
         }
     }
 
-    /** Placeholder text for an empty field, so its purpose is visible. */
+    /**
+     * Placeholder text for an empty field, so its purpose is visible;
+     * fading into the field's end where it is too long (LOOK-37).
+     */
     private static void drawFieldHint(
-            FontRenderer font, Bounds field, String hint) {
-        String visible = LostTalesSkyrimUiStyle.trimToWidth(
-                font, hint, Math.max(0, field.width - 10));
-        font.drawString(visible, field.x + 5,
-                field.y + (field.height - font.FONT_HEIGHT) / 2 + 1,
-                LostTalesSkyrimUiStyle.TEXT_DIM);
+            final FontRenderer font, Bounds field, final String hint) {
+        final int x = field.x + 5;
+        final int y = field.y + (field.height - font.FONT_HEIGHT) / 2 + 1;
+        final int dim = LostTalesSkyrimUiStyle.TEXT_DIM;
+        final int alpha = (dim >>> 24) == 0 ? 255 : dim >>> 24;
+        LostTalesUiCutName.draw(x, font.getStringWidth(hint),
+                Math.max(0, field.width - 10), 0.0F,
+                new LostTalesUiFading.FadingPainter() {
+                    @Override
+                    public void paint(float share) {
+                        int shown = Math.round(alpha * share);
+                        if (shown >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+                            LostTalesUiInk.beginContent();
+                            font.drawString(hint, x, y,
+                                    LostTalesUiInk.argb(dim, shown));
+                        }
+                    }
+                });
     }
 
+    /** Words centred in the popup; too long for it, they fill it and fade into its end (LOOK-37). */
     private static void drawCentered(
             FontRenderer font, Layout layout, String text, int y,
             int color) {
-        String visible = LostTalesSkyrimUiStyle.trimToWidth(font, text,
-                Math.max(0, layout.width - CONTENT_PADDING * 2));
-        font.drawStringWithShadow(visible,
-                layout.x + (layout.width
-                        - font.getStringWidth(visible)) / 2,
-                y, color);
+        int room = Math.max(0, layout.width - CONTENT_PADDING * 2);
+        int shown = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(text), room);
+        LostTalesUiCutName.drawShadowed(font, text,
+                layout.x + (layout.width - shown) / 2, y, room, color);
     }
 
     /**
@@ -349,15 +367,16 @@ final class LostTalesMapWaypointPrompt {
             LostTalesSkyrimUiStyle.drawSelectionRow(
                     bounds.x, bounds.y, bounds.width, bounds.height,
                     target.isShared(), hovered);
-            String label = LostTalesSkyrimUiStyle.trimToWidth(font,
-                    target.getName(),
-                    Math.max(0, bounds.width - 24));
-            font.drawStringWithShadow(label,
+            // A name too long for its row fades into the row's end and
+            // slides along under the pointer (LOOK-37).
+            LostTalesUiCutName.drawShadowed(font, target.getName(),
                     bounds.x + 18,
                     bounds.y + (bounds.height - font.FONT_HEIGHT) / 2 + 1,
+                    Math.max(0, bounds.width - 24),
                     target.isShared()
                             ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                            : LostTalesSkyrimUiStyle.TEXT_MUTED);
+                            : LostTalesSkyrimUiStyle.TEXT_MUTED,
+                    this, Integer.valueOf(this.shareScroll + row), hovered);
         }
         if (this.shareTargets.size() > VISIBLE_FELLOWSHIPS) {
             String more = I18n.format(
@@ -534,19 +553,24 @@ final class LostTalesMapWaypointPrompt {
                     bounds.x + bounds.width, bounds.y + 1,
                     LostTalesSkyrimUiStyle.BORDER);
         }
-        String visible = LostTalesSkyrimUiStyle.trimToWidth(
-                font, label, Math.max(0, bounds.width - 6));
+        int room = Math.max(0, bounds.width - 6);
+        int shown = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(label), room);
         int color = enabled
                 ? hovered
                         ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
                         : LostTalesSkyrimUiStyle.TEXT
                 : LostTalesSkyrimUiStyle.TEXT_DIM;
-        font.drawStringWithShadow(visible,
-                bounds.x + (bounds.width
-                        - font.getStringWidth(visible)) / 2,
-                bounds.y + (bounds.height - font.FONT_HEIGHT) / 2,
-                color);
+        // A label too long for its button fades into the button's end and
+        // slides along under the pointer (LOOK-37).
+        LostTalesUiCutName.drawShadowed(font, label,
+                bounds.x + (bounds.width - shown) / 2,
+                bounds.y + (bounds.height - font.FONT_HEIGHT) / 2, room,
+                color, BUTTON_LABELS, label, hovered && enabled);
     }
+
+    /** What the popup's button labels name themselves to as cut names. */
+    private static final Object BUTTON_LABELS = new Object();
 
     static Layout calculateLayout(
             int screenWidth, int screenHeight, boolean editing) {

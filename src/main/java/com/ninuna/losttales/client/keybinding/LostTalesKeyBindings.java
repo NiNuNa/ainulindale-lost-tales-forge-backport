@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.keybinding;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
+import com.ninuna.losttales.client.progression.SkillsPage;
 import com.ninuna.losttales.client.window.ClientSettingsPage;
 import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.Views;
@@ -37,6 +38,8 @@ public class LostTalesKeyBindings {
     private static final KeyBinding FELLOWSHIP = new KeyBinding("key.losttales.fellowship", Keyboard.KEY_NONE, CATEGORY);
     /** Unbound until the player gives it a key, as the Fellowship key is. */
     private static final KeyBinding CHARACTERS = new KeyBinding("key.losttales.characters", Keyboard.KEY_NONE, CATEGORY);
+    /** The Skills page's key, unbound until the player gives it one (PROG-13). */
+    private static final KeyBinding SKILLS = new KeyBinding("key.losttales.skills", Keyboard.KEY_NONE, CATEGORY);
     private static final KeyBinding MAP = new KeyBinding(
             "key.losttales.map", Keyboard.KEY_M, CATEGORY);
     /**
@@ -73,6 +76,7 @@ public class LostTalesKeyBindings {
         ClientRegistry.registerKeyBinding(QUEST_JOURNAL);
         ClientRegistry.registerKeyBinding(FELLOWSHIP);
         ClientRegistry.registerKeyBinding(CHARACTERS);
+        ClientRegistry.registerKeyBinding(SKILLS);
         ClientRegistry.registerKeyBinding(MAP);
         ClientRegistry.registerKeyBinding(SETTINGS);
         ClientRegistry.registerKeyBinding(TOGGLE_HUD);
@@ -140,6 +144,9 @@ public class LostTalesKeyBindings {
         }
         if (CHARACTERS.isPressed()) {
             WindowScreen.openView(CharactersPage.PAGE_ID);
+        }
+        if (SKILLS.isPressed()) {
+            WindowScreen.openView(SkillsPage.PAGE_ID);
         }
         if (MAP.isPressed() && minecraft.currentScreen == null) {
             LostTalesLotrMapGui.open();
@@ -231,6 +238,10 @@ public class LostTalesKeyBindings {
 
     public static KeyBinding getCharactersKeyBinding() {
         return CHARACTERS;
+    }
+
+    public static KeyBinding getSkillsKeyBinding() {
+        return SKILLS;
     }
 
     /** The Settings view's key, pressed with Ctrl; see {@link #SETTINGS}. */

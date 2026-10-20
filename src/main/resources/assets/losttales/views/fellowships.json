@@ -1,0 +1,5 @@
+{
+  "view": "fellowships",
+  "locked": true,
+  "pages": ["fellowship", "map", "set:fellowship_chats"]
+}

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.gui.screen.waystone;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.Settings;
@@ -51,6 +52,12 @@ public final class WaystoneRowsTest {
         @Override public int sharedCharacters() { return this.sharedCharacters; }
         @Override public int sharedFellowships() { return this.sharedCharacters > 0 ? 1 : 0; }
         @Override public boolean sharesWithFellowship() { return this.fellowship; }
+        @Override public void setSharesWithFellowship(boolean fellowship) {
+            if (this.fellowship != fellowship) {
+                this.fellowship = fellowship;
+                this.target = "";
+            }
+        }
         @Override public String shareTarget() { return this.target; }
         @Override public void setShareTarget(String name) { this.target = name; }
         @Override public String nativeLore() { return this.lore; }
@@ -149,10 +156,8 @@ public final class WaystoneRowsTest {
     public void anUnnamedWaystoneReadsTheWordsItStandsFor() {
         FakeHost host = new FakeHost();
         host.draft = new WaystoneDraft(new LostTalesMapMarkerEditableSettings(
-                "", "fort", "white", "", "", true, 100, 12.0D, 64.0D, -8.0D,
-                128.0D, 8.0D, true, true, false, true,
-                "losttales:player_placed", 0,
-                LostTalesMapMarkerVisibility.PRIVATE));
+                "", "shack", "white", "", "", true, 128.0D, 8.0D, true, true,
+                false, 0, LostTalesMapMarkerVisibility.PRIVATE));
         host.defaultName = "Nils's Waystone";
         WaystoneRows rows = new WaystoneRows(host, 13);
         List<MenuWindow.Entry> built = rows.build("");
@@ -313,6 +318,72 @@ public final class WaystoneRowsTest {
         host.target = "";
         assertEquals(LANG + "why.no_target", row(new WaystoneRows(host, 13)
                 .build(""), LANG + "hand_over").unavailable);
+    }
+
+    /**
+     * Icon, Color, Relevance, Access and Share with are few-word picks:
+     * each row stands for a Settings setting whose words open in a pick,
+     * the one in force lit, none marked as a default, and a word picked
+     * lands in the draft (WIN-36).
+     */
+    @Test
+    public void theFewWordOptionsArePicks() {
+        FakeHost host = new FakeHost();
+        WaystoneRows rows = new WaystoneRows(host, 13);
+        List<MenuWindow.Entry> built = rows.build("");
+        for (String label : new String[] {"icon", "color", "relevance",
+                "visibility", "share_with"}) {
+            MenuWindow.Entry entry = row(built, LANG + label);
+            Settings.Setting pick = rows.typedFor(entry.id);
+            assertNotNull(label, pick);
+            assertFalse(label + " has words", pick.words().isEmpty());
+            assertEquals(label, -1, pick.shippedWordIndex());
+            assertTrue(label, pick.wordIndex() >= 0);
+            assertEquals(Settings.Store.NONE, pick.store());
+        }
+
+        assertEquals(WaystoneDraft.ICONS.length, rows.icon.words().size());
+        rows.icon.pickWord(0);
+        assertEquals("quest", host.draft.icon());
+        assertEquals(0, rows.icon.wordIndex());
+
+        rows.relevance.pickWord(0);
+        assertEquals(LostTalesMapMarkerRelevance.VERY_LOW,
+                host.draft.relevance());
+
+        assertEquals(Arrays.asList(LANG + "visibility.private",
+                LANG + "visibility.public"), rows.access.words());
+        rows.access.pickWord(1);
+        assertFalse("only a manager picks Public", host.draft.isPublic());
+        host.manages = true;
+        rows.access.pickWord(1);
+        assertTrue(host.draft.isPublic());
+
+        host.target = "Nils";
+        rows.shareKind.pickWord(1);
+        assertTrue(host.fellowship);
+        assertEquals("a change of kind empties the name", "", host.target);
+
+        host.stands = false;
+        assertFalse("a pick opened for a waystone the page let go closes",
+                rows.icon.stands());
+    }
+
+    /** A waystone whose icon is none of the fourteen keeps it first in the pick. */
+    @Test
+    public void anIconOffTheListStaysInThePick() {
+        FakeHost host = new FakeHost();
+        host.draft = new WaystoneDraft(WaystoneDraftTest.settings("Bree",
+                "town", "white", 0, LostTalesMapMarkerVisibility.PUBLIC,
+                true, false));
+        WaystoneRows rows = new WaystoneRows(host, 13);
+        assertEquals("town", rows.icon.words().get(0));
+        assertEquals(0, rows.icon.wordIndex());
+        rows.icon.pickWord(1);
+        assertEquals("quest", host.draft.icon());
+        rows.icon.pickWord(0);
+        assertEquals("town", host.draft.icon());
+        assertFalse(host.draft.isChanged());
     }
 
     /** A placed waystone's discovery radius stops at 1,024 blocks; a generated one keeps the marker's bound (WAY-15). */

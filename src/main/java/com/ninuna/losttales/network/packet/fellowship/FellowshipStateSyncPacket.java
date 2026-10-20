@@ -225,9 +225,8 @@ public final class FellowshipStateSyncPacket implements IMessage {
         UUID leaderIdentityId = LostTalesPacketCodec.readUuid(buffer);
         String name = LostTalesPacketCodec.readUtf8String(
                 buffer, FellowshipPacketCodec.MAX_FELLOWSHIP_NAME_BYTES);
-        long createdAt = buffer.readLong();
         long revision = buffer.readLong();
-        int dataVersion = buffer.readInt();
+        UUID lotrFellowshipId = LostTalesPacketCodec.readNullableUuid(buffer);
         FellowshipIcon icon = null;
         if (buffer.readBoolean()) {
             String itemName = LostTalesPacketCodec.readUtf8String(
@@ -246,8 +245,7 @@ public final class FellowshipStateSyncPacket implements IMessage {
             }
         }
         int memberCount = buffer.readUnsignedByte();
-        if (!Fellowship.isWellFormedName(name)
-                || createdAt < 0L || revision < 0L || dataVersion <= 0
+        if (!Fellowship.isWellFormedName(name) || revision < 0L
                 || switchBits != switchBitsOf(switchesOn)
                 || memberCount <= 0 || memberCount > Fellowship.MAX_MEMBERS) {
             throw new FellowshipPacketCodec.DecodeException("invalid fellowship header");
@@ -262,7 +260,6 @@ public final class FellowshipStateSyncPacket implements IMessage {
             String characterName = FellowshipPacketCodec.shownName(
                     LostTalesPacketCodec.readUtf8String(
                             buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
-            long joinedAt = buffer.readLong();
             FellowshipColor color = FellowshipColor.fromNetworkId(
                     buffer.readUnsignedByte());
             FellowshipMemberPresence presence = FellowshipMemberPresence.fromNetworkId(
@@ -270,13 +267,12 @@ public final class FellowshipStateSyncPacket implements IMessage {
             String elsewhereName = presence == FellowshipMemberPresence.ELSEWHERE
                     ? LostTalesPacketCodec.readUtf8String(
                     buffer, FellowshipPacketCodec.MAX_NAME_BYTES) : "";
-            if (joinedAt < 0L || color == null || presence == null
-                    || !identityIds.add(identityId)) {
+            if (color == null || presence == null || !identityIds.add(identityId)) {
                 throw new FellowshipPacketCodec.DecodeException(
                         "invalid fellowship member");
             }
             members.add(new FellowshipMemberSnapshot(identityId, ownerId,
-                    characterName, joinedAt, color, presence, elsewhereName));
+                    characterName, color, presence, elsewhereName));
         }
         if (!identityIds.contains(leaderIdentityId)) {
             throw new FellowshipPacketCodec.DecodeException("missing fellowship leader");
@@ -291,10 +287,14 @@ public final class FellowshipStateSyncPacket implements IMessage {
             }
         }
         return new FellowshipSnapshot(fellowshipId, leaderIdentityId, name, icon,
-                switchesOn, guides, createdAt, revision, dataVersion, members);
+                switchesOn, guides, revision, lotrFellowshipId, members);
     }
 
-    /** The marks the client sees, each whole; any one not well formed fails the state. */
+    /**
+     * The marks the client sees, each whole; any one not well formed fails
+     * the state. When a mark was placed is the server's alone, so each
+     * reads as placed at 0.
+     */
     private static List<FellowshipMark> readMarks(ByteBuf buffer, int count) {
         List<FellowshipMark> marks = new ArrayList<FellowshipMark>(count);
         Set<UUID> markIds = new HashSet<UUID>();
@@ -316,16 +316,15 @@ public final class FellowshipStateSyncPacket implements IMessage {
             int dimensionId = buffer.readInt();
             double x = buffer.readDouble();
             double z = buffer.readDouble();
-            long placedAt = buffer.readLong();
-            if (placedAt < 0L || !FellowshipMark.isValidPosition(x, z)
+            if (!FellowshipMark.isValidPosition(x, z)
                     || kind == FellowshipMarkKind.FELLOWSHIP
                     && !FellowshipMark.isValidName(markName)) {
                 throw new FellowshipPacketCodec.DecodeException("invalid mark");
             }
             marks.add(kind == FellowshipMarkKind.GO_HERE
-                    ? FellowshipMark.goHere(markId, placedBy, dimensionId, x, z, placedAt)
+                    ? FellowshipMark.goHere(markId, placedBy, dimensionId, x, z, 0L)
                     : FellowshipMark.ofFellowship(markId, fellowshipId, markName, placedBy,
-                            dimensionId, x, z, placedAt));
+                            dimensionId, x, z, 0L));
         }
         return marks;
     }
@@ -342,7 +341,6 @@ public final class FellowshipStateSyncPacket implements IMessage {
         buffer.writeInt(mark.getDimensionId());
         buffer.writeDouble(mark.getX());
         buffer.writeDouble(mark.getZ());
-        buffer.writeLong(mark.getPlacedAt());
     }
 
     private static void writeFellowship(ByteBuf buffer, FellowshipSnapshot fellowship) {
@@ -350,9 +348,8 @@ public final class FellowshipStateSyncPacket implements IMessage {
         LostTalesPacketCodec.writeUuid(buffer, fellowship.getLeaderIdentityId());
         LostTalesPacketCodec.writeUtf8String(buffer, fellowship.getName(),
                 FellowshipPacketCodec.MAX_FELLOWSHIP_NAME_BYTES);
-        buffer.writeLong(fellowship.getCreatedAt());
         buffer.writeLong(fellowship.getRevision());
-        buffer.writeInt(fellowship.getDataVersion());
+        LostTalesPacketCodec.writeNullableUuid(buffer, fellowship.getLotrFellowshipId());
         FellowshipIcon icon = fellowship.getIcon();
         buffer.writeBoolean(icon != null);
         if (icon != null) {
@@ -369,7 +366,6 @@ public final class FellowshipStateSyncPacket implements IMessage {
                     buffer,
                     member.getCharacterName(),
                     FellowshipPacketCodec.MAX_NAME_BYTES);
-            buffer.writeLong(member.getJoinedAt());
             buffer.writeByte(member.getColor().getNetworkId());
             buffer.writeByte(member.getPresence().getNetworkId());
             if (member.getPresence() == FellowshipMemberPresence.ELSEWHERE) {
@@ -408,15 +404,13 @@ public final class FellowshipStateSyncPacket implements IMessage {
                     LostTalesPacketCodec.readUtf8String(
                             buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
             UUID targetIdentityId = LostTalesPacketCodec.readUuid(buffer);
-            UUID targetOwnerId = LostTalesPacketCodec.readUuid(buffer);
             String targetCharacterName = FellowshipPacketCodec.shownName(
                     LostTalesPacketCodec.readUtf8String(
                             buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
-            long createdAt = buffer.readLong();
             long expiresAt = buffer.readLong();
             if (!invitationIds.add(invitationId)
                     || !Fellowship.isWellFormedName(fellowshipName)
-                    || createdAt < 0L || expiresAt <= createdAt) {
+                    || expiresAt <= 0L) {
                 throw new FellowshipPacketCodec.DecodeException(
                         "invalid invitation snapshot");
             }
@@ -428,9 +422,7 @@ public final class FellowshipStateSyncPacket implements IMessage {
                     invitingOwnerId,
                     invitingCharacterName,
                     targetIdentityId,
-                    targetOwnerId,
                     targetCharacterName,
-                    createdAt,
                     expiresAt));
         }
         return invitations;
@@ -449,12 +441,10 @@ public final class FellowshipStateSyncPacket implements IMessage {
                 invitation.getInvitingCharacterName(),
                 FellowshipPacketCodec.MAX_NAME_BYTES);
         LostTalesPacketCodec.writeUuid(buffer, invitation.getTargetIdentityId());
-        LostTalesPacketCodec.writeUuid(buffer, invitation.getTargetOwnerId());
         LostTalesPacketCodec.writeUtf8String(
                 buffer,
                 invitation.getTargetCharacterName(),
                 FellowshipPacketCodec.MAX_NAME_BYTES);
-        buffer.writeLong(invitation.getCreatedAt());
         buffer.writeLong(invitation.getExpiresAt());
     }
 

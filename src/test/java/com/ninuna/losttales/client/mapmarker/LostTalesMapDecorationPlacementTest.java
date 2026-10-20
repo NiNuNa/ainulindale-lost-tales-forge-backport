@@ -400,10 +400,13 @@ public final class LostTalesMapDecorationPlacementTest {
                 LostTalesMapDecorationSprite.WAVE;
         boolean advanced = false;
         int previous = sprite.frameAt(0L, 0);
+        double frameWidth = sprite.frameUMax(0) - sprite.frameUMin(0);
         for (long tick = 0L; tick < 400L; tick++) {
             int frame = sprite.frameAt(tick, 0);
-            assertTrue("the animation left its sheet",
-                    frame >= 0 && frame < sprite.getFrames());
+            // A frame off the sheet would be drawn as its last frame.
+            assertTrue("the animation left its sheet", frame >= 0
+                    && Math.abs(sprite.frameUMin(frame) - frame * frameWidth)
+                            < 0.0001D);
             advanced |= frame != previous;
             previous = frame;
         }
@@ -474,10 +477,8 @@ public final class LostTalesMapDecorationPlacementTest {
                     sprite.getWorldWidth() > 0.0F);
             assertTrue(sprite.name() + " has no height",
                     sprite.getWorldHeight() > 0.0F);
-            assertTrue(sprite.name() + " has no frames",
-                    sprite.getFrames() >= 1);
             assertEquals(sprite.name() + " must cover its whole sheet",
-                    1.0D, sprite.frameUMax(sprite.getFrames() - 1), 0.0001D);
+                    1.0D, sprite.frameUMax(Integer.MAX_VALUE), 0.0001D);
             assertEquals(sprite.name() + " must start at its sheet's edge",
                     0.0D, sprite.frameUMin(0), 0.0001D);
         }

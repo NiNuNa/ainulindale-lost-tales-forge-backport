@@ -5,7 +5,9 @@ import java.util.Map;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public final class LostTalesQuestParamsTest {
 
@@ -74,6 +76,35 @@ public final class LostTalesQuestParamsTest {
                 params("x", "1", "y", "high", "z", "2"), 0));
         assertNull(LostTalesQuestParams.location(
                 params("posX", "1", "targetY", "70", "posZ", "3"), 0));
+    }
+
+    /** A marker or any coordinate names a place; a radius, a dimension or a blank value does not (QUEST-40). */
+    @Test
+    public void aPlaceIsAMarkerOrACoordinate() {
+        assertTrue(LostTalesQuestParams.namesPlace(params("marker", "losttales:camp")));
+        assertTrue(LostTalesQuestParams.namesPlace(params("x", "1", "y", "2", "z", "3")));
+        assertTrue("an incomplete place is still one",
+                LostTalesQuestParams.namesPlace(params("z", "3")));
+        assertFalse(LostTalesQuestParams.namesPlace(params("radius", "16", "dimension", "-1")));
+        assertFalse(LostTalesQuestParams.namesPlace(params("x", " ", "marker", "")));
+        assertFalse(LostTalesQuestParams.namesPlace(null));
+    }
+
+    /** A point is within a place's radius only in the place's own dimension, and never for no radius. */
+    @Test
+    public void aPointIsWithinARadiusOfAPlaceInItsDimension() {
+        LostTalesQuestParams.Location camp = new LostTalesQuestParams.Location(0, 100.0D,
+                64.0D, -300.0D);
+        assertTrue(LostTalesQuestParams.isWithin(camp, 0, 110.0D, 64.0D, -300.0D, 10.0D));
+        assertTrue(LostTalesQuestParams.isWithin(camp, 0, 106.0D, 72.0D, -300.0D, 10.0D));
+        assertFalse("three dimensions", LostTalesQuestParams.isWithin(camp, 0, 106.0D,
+                73.0D, -300.0D, 10.0D));
+        assertFalse("another dimension", LostTalesQuestParams.isWithin(camp, -1, 100.0D,
+                64.0D, -300.0D, 10.0D));
+        assertFalse("no radius", LostTalesQuestParams.isWithin(camp, 0, 100.0D, 64.0D,
+                -300.0D, 0.0D));
+        assertFalse("no place", LostTalesQuestParams.isWithin(null, 0, 100.0D, 64.0D,
+                -300.0D, 10.0D));
     }
 
     private static Map<String, String> params(String... keysAndValues) {

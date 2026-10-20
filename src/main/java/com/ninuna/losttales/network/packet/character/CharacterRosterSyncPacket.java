@@ -68,7 +68,8 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 String skinId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 boolean showMinecraftCape = buffer.readBoolean();
-                int cosmeticCapeId = buffer.readUnsignedShort();
+                String cosmeticCapeId = LostTalesPacketCodec.readUtf8String(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 int age = buffer.readInt();
                 String factionId = LostTalesPacketCodec.readUtf8String(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String bodyTypeId = LostTalesPacketCodec.readUtf8String(
@@ -79,7 +80,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 if (!CharacterRoster.isValidSlotIndex(slotIndex)
                         || !ids.add(characterId)
                         || !slots.add(Integer.valueOf(slotIndex))
-                        || !CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
+                        || cosmeticCapeId.length() > CharacterCapeCatalog.MAX_ID) {
                     throw new CharacterPacketCodec.DecodeException("invalid character summary");
                 }
                 characters.add(new CharacterSummary(
@@ -167,7 +168,8 @@ public final class CharacterRosterSyncPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(
                     buffer, character.getSkinId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeBoolean(character.isMinecraftCapeVisible());
-            buffer.writeShort(character.getCosmeticCapeId());
+            LostTalesPacketCodec.writeUtf8String(buffer, character.getCosmeticCapeId(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeInt(character.getAge());
             LostTalesPacketCodec.writeUtf8String(buffer, character.getFactionId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             // The arm width and chest type chosen for the character.

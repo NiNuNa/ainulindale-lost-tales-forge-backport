@@ -13,6 +13,7 @@ public enum CharacterDeletionMaintenanceResult {
     CHARACTER_ACTIVE,
     PREVIOUS_GENERATION_UNAVAILABLE,
     RETENTION_ACTIVE,
+    RETENTION_OVER,
     NOT_COMMITTED,
     INTERNAL_ERROR
 }

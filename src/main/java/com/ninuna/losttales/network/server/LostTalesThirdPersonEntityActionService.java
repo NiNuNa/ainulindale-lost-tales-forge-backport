@@ -31,16 +31,17 @@ public final class LostTalesThirdPersonEntityActionService {
 
     private LostTalesThirdPersonEntityActionService() {}
 
+    /**
+     * Attacks or uses the entity the player aimed at, with what is in
+     * their hand now; runs on the server thread.
+     */
     public static void execute(
-            EntityPlayerMP player, int expectedDimension,
+            EntityPlayerMP player,
             LostTalesThirdPersonEntityActionPacket.Action action,
             int entityId, double hitX, double hitY, double hitZ,
-            boolean useItemIfInteractionDeclines,
-            int expectedHotbarSlot, ItemStack expectedHeldItem) {
-        if (!hasUsablePlayerContext(player, expectedDimension)
-                || action == null || !isFinitePoint(hitX, hitY, hitZ)
-                || !hasExpectedHeldItem(
-                player, expectedHotbarSlot, expectedHeldItem)) {
+            boolean useItemIfInteractionDeclines) {
+        if (!hasUsablePlayerContext(player)
+                || action == null || !isFinitePoint(hitX, hitY, hitZ)) {
             return;
         }
 
@@ -71,33 +72,21 @@ public final class LostTalesThirdPersonEntityActionService {
             return;
         }
 
-        int selectedSlotAtExecution = player.inventory.currentItem;
-        player.inventory.currentItem = expectedHotbarSlot;
-        try {
-            player.func_143004_u();
-            if (action
-                    == LostTalesThirdPersonEntityActionPacket.Action.ATTACK) {
-                player.attackTargetEntityWithCurrentItem(target);
-            } else {
-                boolean handled = player.interactWith(target);
-                if (!handled && useItemIfInteractionDeclines) {
-                    useHeldItem(player);
-                }
-            }
-        } finally {
-            if (selectedSlotAtExecution != expectedHotbarSlot
-                    && player.inventory.currentItem == expectedHotbarSlot) {
-                player.inventory.currentItem = selectedSlotAtExecution;
+        player.func_143004_u();
+        if (action == LostTalesThirdPersonEntityActionPacket.Action.ATTACK) {
+            player.attackTargetEntityWithCurrentItem(target);
+        } else {
+            boolean handled = player.interactWith(target);
+            if (!handled && useItemIfInteractionDeclines) {
+                useHeldItem(player);
             }
         }
     }
 
-    private static boolean hasUsablePlayerContext(
-            EntityPlayerMP player, int expectedDimension) {
+    private static boolean hasUsablePlayerContext(EntityPlayerMP player) {
         return player != null && player.worldObj != null
                 && !player.worldObj.isRemote
                 && player.worldObj.provider != null
-                && player.worldObj.provider.dimensionId == expectedDimension
                 && player.isEntityAlive() && !player.isDead
                 && !player.isPlayerSleeping()
                 && player.openContainer == player.inventoryContainer;
@@ -121,23 +110,6 @@ public final class LostTalesThirdPersonEntityActionService {
         return !(target instanceof EntityItem)
                 && !(target instanceof EntityXPOrb)
                 && !(target instanceof EntityArrow);
-    }
-
-    static boolean heldItemMatches(
-            ItemStack expected, ItemStack current) {
-        return ItemStack.areItemStacksEqual(expected, current);
-    }
-
-    private static boolean hasExpectedHeldItem(
-            EntityPlayerMP player, int expectedHotbarSlot,
-            ItemStack expectedHeldItem) {
-        return player != null && expectedHotbarSlot >= 0
-                && expectedHotbarSlot < 9
-                && expectedHotbarSlot
-                < player.inventory.mainInventory.length
-                && heldItemMatches(
-                expectedHeldItem,
-                player.inventory.mainInventory[expectedHotbarSlot]);
     }
 
     private static void useHeldItem(EntityPlayerMP player) {

@@ -30,6 +30,25 @@ public final class SkinImageNormalizerTest {
     }
 
     @Test
+    public void onlyAPictureOfASkinsSizeIsDecoded() throws java.io.IOException {
+        assertNotNull(SkinImageNormalizer.readSkin(new java.io.ByteArrayInputStream(
+                png(new BufferedImage(64, 32, BufferedImage.TYPE_INT_ARGB)))));
+        assertNotNull(SkinImageNormalizer.readSkin(new java.io.ByteArrayInputStream(
+                png(new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB)))));
+        assertNull(SkinImageNormalizer.readSkin(new java.io.ByteArrayInputStream(
+                png(new BufferedImage(2048, 64, BufferedImage.TYPE_INT_ARGB)))));
+        assertNull("what is no picture at all is no skin",
+                SkinImageNormalizer.readSkin(new java.io.ByteArrayInputStream(
+                        new byte[] {1, 2, 3})));
+    }
+
+    private static byte[] png(BufferedImage image) throws java.io.IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(image, "png", out);
+        return out.toByteArray();
+    }
+
+    @Test
     public void legacySkinGetsMirroredLeftLimbs() {
         BufferedImage legacy = new BufferedImage(64, 32, BufferedImage.TYPE_INT_ARGB);
         fill(legacy, 0, 16, 64, 16, GREY);

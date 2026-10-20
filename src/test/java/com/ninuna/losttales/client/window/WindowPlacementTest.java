@@ -88,7 +88,7 @@ public final class WindowPlacementTest {
     @Test
     public void aWindowFillingTheScreenTakesItAllAndGivesItBack() {
         TwoWindowLayout.reset();
-        Window console = WindowLayout.firstWindow();
+        Window console = WindowLayout.windows().get(0);
         Window conversation = WindowLayout.windows().get(1);
         WindowPlacement.Box before = WindowPlacement.windowBounds(
                 conversation, null, 1000, 600);
@@ -133,7 +133,7 @@ public final class WindowPlacementTest {
     @Test
     public void aWindowFillsTheHalfOrQuarterItIsSentTo() {
         TwoWindowLayout.reset();
-        Window window = WindowLayout.firstWindow();
+        Window window = WindowLayout.windows().get(0);
         assertTrue(WindowLayout.setFill(window.getId(),
                 Window.ScreenFill.LEFT, false));
         WindowPlacement.Box left = WindowPlacement.windowBounds(
@@ -201,7 +201,7 @@ public final class WindowPlacementTest {
     @Test
     public void theScreenHoldsOnlyAStripsWorthOfAWindow() {
         TwoWindowLayout.reset();
-        Window dragged = WindowLayout.firstWindow();
+        Window dragged = WindowLayout.windows().get(0);
         WindowLayout.setWindowHeight(dragged.getId(),
                 heightForLines(1.0D), false);
         // Above the top edge: the strip stops the frame's two pixels
@@ -269,7 +269,7 @@ public final class WindowPlacementTest {
     @Test
     public void aTallWindowOverlapsItsNeighbour() {
         TwoWindowLayout.reset();
-        Window console = WindowLayout.firstWindow();
+        Window console = WindowLayout.windows().get(0);
         Window below = WindowLayout.windows().get(1);
         WindowLayout.setPosition(console.getId(), 0.0D, 10.0D, false);
         WindowLayout.setPosition(below.getId(), 0.0D, 22.0D, false);
@@ -300,7 +300,7 @@ public final class WindowPlacementTest {
     @Test
     public void aWindowIsAsTallAsItsOwnHeightWhateverItHolds() {
         TwoWindowLayout.reset();
-        Window window = WindowLayout.firstWindow();
+        Window window = WindowLayout.windows().get(0);
         assertEquals(0.0D, window.getOwnHeight(), 0.0D);
         ChatFrame frame = ChatFrame.of(window);
         try {
@@ -332,7 +332,7 @@ public final class WindowPlacementTest {
     @Test
     public void movingAWindowLeavesEveryOtherWhereItStands() {
         TwoWindowLayout.reset();
-        Window console = WindowLayout.firstWindow();
+        Window console = WindowLayout.windows().get(0);
         Window below = WindowLayout.windows().get(1);
         WindowLayout.setWindowHeight(console.getId(),
                 heightForLines(3.0D), false);
@@ -411,7 +411,7 @@ public final class WindowPlacementTest {
         }
         // The box a resized window is drawn in carries that room, and
         // the draw shows one more line than the whole ones to clip.
-        Window window = WindowLayout.firstWindow();
+        Window window = WindowLayout.windows().get(0);
         WindowLayout.setWindowHeight(window.getId(),
                 heightForLines(12.37D), true);
         ChatFrame frame = ChatFrame.of(window);

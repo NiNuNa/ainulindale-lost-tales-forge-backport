@@ -15,9 +15,9 @@ import net.minecraft.item.ItemStack;
  * something (Abandon, Leave, Delete) stands last on the right, in red. A
  * page makes its items afresh every frame.
  *
- * <p>An action that cannot be taken now is still there, greyed, and its
- * tip says why (rule 25). Every button's tip names what it does and its
- * key.</p>
+ * <p>An action that cannot be taken now is still there, greyed, with no
+ * tip; a press says why over the bar (LOOK-15). Every button's tip names
+ * what it does and its key.</p>
  */
 public final class BarItem {
     public enum Kind {
@@ -130,7 +130,7 @@ public final class BarItem {
         return this;
     }
 
-    /** Greyed: it cannot be taken now, and {@code why} says so. */
+    /** Greyed: it cannot be taken now, and a press says {@code why}. */
     public BarItem unavailable(String why) {
         this.unavailable = why == null || why.length() == 0 ? " " : why;
         return this;
@@ -163,7 +163,7 @@ public final class BarItem {
         return this.unavailable.length() == 0;
     }
 
-    /** What the tip says: why it is greyed, else what it does. */
+    /** What the tip says: what it does; nothing while it is greyed. */
     public String tipText() {
         return isAvailable() ? this.tip : "";
     }

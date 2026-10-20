@@ -87,22 +87,39 @@ public final class ChatWelcome {
      * chat line's length, and at most {@link #MAX_LINES} of them.
      */
     static List<String> lines(String[] configured) {
+        return lines(configured, null);
+    }
+
+    /**
+     * The welcome's lines as {@link #lines(String[])} gives them; the
+     * lines past {@link #MAX_LINES} are reported to {@code warnings},
+     * once for all of them. The config reports them as it loads.
+     */
+    public static List<String> lines(String[] configured, List<String> warnings) {
         List<String> lines = new ArrayList<String>();
         if (configured == null) {
             return lines;
         }
+        int skipped = 0;
         for (String entry : configured) {
-            if (lines.size() >= MAX_LINES) {
-                break;
-            }
             String line = ChatFormattingCodes.stripSectionCodes(entry == null ? "" : entry)
                     .replaceAll("\\p{Cntrl}", " ").trim();
             if (line.length() > ChatMessageValidator.MAX_CHARACTERS) {
                 line = line.substring(0, ChatMessageValidator.MAX_CHARACTERS).trim();
             }
-            if (line.length() > 0) {
+            if (line.length() == 0) {
+                continue;
+            }
+            if (lines.size() >= MAX_LINES) {
+                skipped++;
+            } else {
                 lines.add(line);
             }
+        }
+        if (skipped > 0 && warnings != null) {
+            warnings.add("chat.welcomeLines holds " + (MAX_LINES + skipped)
+                    + " lines; a welcome sends the first " + MAX_LINES
+                    + " and skips the other " + skipped);
         }
         return lines;
     }

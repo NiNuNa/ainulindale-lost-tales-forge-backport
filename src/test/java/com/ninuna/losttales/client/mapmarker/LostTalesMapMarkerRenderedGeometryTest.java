@@ -21,8 +21,7 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
 
         assertBounds(object.getVisibleBounds(),
                 93.5F, 43.5F, 107.5F, 57.5F);
-        assertBounds(object.getInteractionBounds(),
-                92.5F, 42.5F, 108.5F, 58.5F);
+        assertHitBox(object, 92.5F, 42.5F, 108.5F, 58.5F);
     }
 
     @Test
@@ -41,8 +40,7 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
         assertEquals(3, visibleCount(object));
         assertBounds(object.getVisibleBounds(),
                 89.5F, 41.5F, 111.5F, 57.5F);
-        assertBounds(object.getInteractionBounds(),
-                88.5F, 40.5F, 112.5F, 58.5F);
+        assertHitBox(object, 88.5F, 40.5F, 112.5F, 58.5F);
         assertEquals(100.0F, object.getNameAnchorX(), 0.0F);
         assertEquals(41.5F - LostTalesMapMarkerRenderedGeometry.LABEL_GAP,
                 object.getNameAnchorY(), 0.0F);
@@ -333,6 +331,20 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
         frame.addMember(object, candidateIndex, centerX, centerY,
                 6.5F, 6.5F, 6.5F, 1.0F, visibility, alpha,
                 fanX, fanY);
+    }
+
+    /** A press answers on the box's edges and nowhere past them. */
+    private static void assertHitBox(
+            LostTalesMapMarkerRenderedGeometry.RenderedObject object,
+            float left, float top, float right, float bottom) {
+        float middleX = (left + right) * 0.5F;
+        float middleY = (top + bottom) * 0.5F;
+        assertTrue(object.containsInteractionPoint(left, top));
+        assertTrue(object.containsInteractionPoint(right, bottom));
+        assertFalse(object.containsInteractionPoint(left - 0.01F, middleY));
+        assertFalse(object.containsInteractionPoint(right + 0.01F, middleY));
+        assertFalse(object.containsInteractionPoint(middleX, top - 0.01F));
+        assertFalse(object.containsInteractionPoint(middleX, bottom + 0.01F));
     }
 
     private static void assertBounds(

@@ -80,12 +80,12 @@ public final class WorldQuestNbtCodec {
     public static ReadResult read(NBTTagCompound source) {
         NBTTagCompound safe = source == null ? new NBTTagCompound() : source;
         int version = safe.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? safe.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_DATA_VERSION || version < 0
-                || safe.hasKey(TAG_RUNS)
-                && !safe.hasKey(TAG_RUNS, Constants.NBT.TAG_LIST)
-                || safe.hasKey(TAG_REWARDS)
-                && !safe.hasKey(TAG_REWARDS, Constants.NBT.TAG_LIST)) {
+                ? safe.getInteger(TAG_DATA_VERSION) : -1;
+        // The writer always writes the version and both lists, so a save
+        // without one of them is of another shape and stays as it is.
+        if (version != CURRENT_DATA_VERSION
+                || !safe.hasKey(TAG_RUNS, Constants.NBT.TAG_LIST)
+                || !safe.hasKey(TAG_REWARDS, Constants.NBT.TAG_LIST)) {
             return ReadResult.unsupported(safe, version);
         }
         NbtQuarantine.Read quarantine = NbtQuarantine.read(safe);
@@ -93,8 +93,7 @@ public final class WorldQuestNbtCodec {
             return ReadResult.unsupported(safe,
                     quarantine.getUnsupportedVersion());
         }
-        boolean repaired = version != CURRENT_DATA_VERSION
-                || quarantine.isRepaired();
+        boolean repaired = false;
         List<NBTTagCompound> quarantined =
                 new ArrayList<NBTTagCompound>(quarantine.getEntries());
 

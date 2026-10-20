@@ -71,7 +71,8 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                 String skinId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 boolean showMinecraftCape = buffer.readBoolean();
-                int cosmeticCapeId = buffer.readUnsignedShort();
+                String cosmeticCapeId = LostTalesPacketCodec.readUtf8String(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String accountName = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_NAME_BYTES);
                 String factionId = LostTalesPacketCodec.readUtf8String(
@@ -83,7 +84,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 int kindCode = buffer.readUnsignedByte();
                 CharacterAppearanceKind kind = CharacterAppearanceKind.fromCode(kindCode);
-                if (kind == CharacterAppearanceKind.NONE && kindCode != kind.getCode()) {
+                if (kind == null) {
                     throw new CharacterPacketCodec.DecodeException(
                             "unknown appearance kind");
                 }
@@ -91,7 +92,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     throw new CharacterPacketCodec.DecodeException(
                             "duplicate appearance player UUID");
                 }
-                if (!CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
+                if (cosmeticCapeId.length() > CharacterCapeCatalog.MAX_ID) {
                     throw new CharacterPacketCodec.DecodeException(
                             "invalid cosmetic cape ID");
                 }
@@ -140,7 +141,8 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     buffer, appearance.getSkinId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeBoolean(appearance.isMinecraftCapeVisible());
-            buffer.writeShort(appearance.getCosmeticCapeId());
+            LostTalesPacketCodec.writeUtf8String(buffer, appearance.getCosmeticCapeId(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             // The account name pairs the tab list with characters for
             // mention completion.
             LostTalesPacketCodec.writeUtf8String(

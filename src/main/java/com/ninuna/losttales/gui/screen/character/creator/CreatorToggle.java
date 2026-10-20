@@ -2,6 +2,7 @@ package com.ninuna.losttales.gui.screen.character.creator;
 
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import org.lwjgl.input.Keyboard;
@@ -79,13 +80,15 @@ public final class CreatorToggle extends CreatorControl {
         font.drawStringWithShadow(state, stateX,
                 this.y + (height() - font.FONT_HEIGHT) / 2 + 1,
                 on ? LostTalesSkyrimUiStyle.GOLD : LostTalesSkyrimUiStyle.TEXT_MUTED);
-        String text = LostTalesSkyrimUiStyle.trimToWidth(font, this.label,
-                Math.max(20, stateX - this.x - 4));
-        font.drawStringWithShadow(text, this.x,
+        // A name too long for its room fades into its end and slides
+        // along under the pointer (LOOK-37).
+        LostTalesUiCutName.drawShadowed(font, this.label, this.x,
                 this.y + (height() - font.FONT_HEIGHT) / 2 + 1,
+                Math.max(20, stateX - this.x - 4),
                 hovered || isFocused()
                         ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                        : LostTalesSkyrimUiStyle.TEXT);
+                        : LostTalesSkyrimUiStyle.TEXT,
+                this, this.label, hovered);
     }
 
     /**
@@ -102,7 +105,7 @@ public final class CreatorToggle extends CreatorControl {
         int stateLeft = CreatorRows.drawValue(this.context, state, this.x,
                 this.x + this.width, this.y, hovered);
         CreatorRows.drawLabel(this.context, this.label, this.x, this.y,
-                stateLeft - MenuWindow.VALUE_GAP);
+                stateLeft - MenuWindow.VALUE_GAP, this, this.label, hovered);
     }
 
     @Override

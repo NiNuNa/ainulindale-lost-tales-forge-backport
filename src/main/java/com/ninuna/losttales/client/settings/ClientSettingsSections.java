@@ -122,7 +122,7 @@ public final class ClientSettingsSections {
     /**
      * Each panel under its name, in HUD Settings: whether it follows the
      * HUD key, where the panel has a switch of its own, and where it
-     * stands, a share of the screen. Whether the HUD and each panel show,
+     * stands, a share of the room it can move in. Whether the HUD and each panel show,
      * and the layout, are the HUD Placement page's own options.
      */
     private static Settings.Section hud() {
@@ -158,7 +158,8 @@ public final class ClientSettingsSections {
     }
 
     /**
-     * One axis of where a panel stands, a share of the screen: moving it
+     * One axis of where a panel stands, a share of the room it can move
+     * in (MAP-10): moving it
      * moves the panel as dragging its box on the HUD Placement page does,
      * and leaves the layout the panels' own.
      */
@@ -184,6 +185,13 @@ public final class ClientSettingsSections {
                 LostTalesConfig.updateHudOffset(element,
                         across ? value : other.getNumber(),
                         across ? other.getNumber() : value);
+            }
+
+            /** Its default is where the Default layout puts the panel (MAP-11); none while it did not load. */
+            @Override
+            protected double shippedNumber() {
+                double[] place = LostTalesConfig.defaultHudOffset(element);
+                return place == null ? Double.NaN : place[across ? 0 : 1];
             }
         };
     }

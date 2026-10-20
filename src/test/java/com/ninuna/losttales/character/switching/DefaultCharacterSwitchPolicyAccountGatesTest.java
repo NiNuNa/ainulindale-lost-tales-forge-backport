@@ -64,16 +64,22 @@ public final class DefaultCharacterSwitchPolicyAccountGatesTest {
     }
 
     /**
-     * A journal held for an operator refuses every further switch until
-     * it is discarded. The other three statuses describe a switch that
-     * either finished or was rolled back, and neither stands in the way.
+     * A held journal refuses every further switch: one held for an
+     * operator until it is discarded, one discarded until its source is
+     * back (CHAR-37), even with the account thawed. The other three
+     * statuses describe a switch that either finished or was rolled back,
+     * and neither stands in the way.
      */
     @Test
-    public void onlyAJournalAwaitingRecoveryRefusesASwitch() {
+    public void onlyAHeldJournalRefusesASwitch() {
         assertEquals(CharacterErrorId.SWITCH_RECOVERY_REQUIRED,
                 DefaultCharacterSwitchPolicy.accountRefusal(
                         accountHolding(CharacterSwitchTransactionStatus
                                 .RECOVERY_REQUIRED)).getErrorId());
+        assertEquals(CharacterErrorId.SWITCH_RECOVERY_REQUIRED,
+                DefaultCharacterSwitchPolicy.accountRefusal(
+                        accountHolding(CharacterSwitchTransactionStatus
+                                .RESTORE_SOURCE)).getErrorId());
         assertNull(DefaultCharacterSwitchPolicy.accountRefusal(
                 accountHolding(CharacterSwitchTransactionStatus.PREPARED)));
         assertNull(DefaultCharacterSwitchPolicy.accountRefusal(
@@ -146,7 +152,7 @@ public final class DefaultCharacterSwitchPolicyAccountGatesTest {
         CharacterSwitchAccountState account = new CharacterSwitchAccountState(OWNER);
         account.setTransaction(new CharacterSwitchTransaction(
                 UUID.fromString("50000000-0000-0000-0000-000000000005"),
-                SOURCE, TARGET, 10L, 11L, 3000L, 7L, 8,
+                SOURCE, TARGET, 3000L,
                 2, 2000L, 1000L, 1000L, 1000L,
                 3, 4000L, 3000L, 3000L, 3000L,
                 20L, 21L, status, 0L));

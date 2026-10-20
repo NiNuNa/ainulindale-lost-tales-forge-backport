@@ -11,7 +11,6 @@ import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
-import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
@@ -24,7 +23,7 @@ import com.ninuna.losttales.client.character.ClientCharacterProfileCache;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.util.LostTalesWords;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,7 +40,7 @@ import java.util.Locale;
 /**
  * The bounded player card: opened in a sub-window of its own by a
  * click on the head or name of a chat line, on a mention or on a member,
- * and shown in brief under the pointer for the identity the head button
+ * and shown in brief under the pointer for whoever the identity button
  * speaks as. It is laid out as a menu is: the head beside the name and
  * the title on two menu rows, then a row for each detail, its label at
  * the left and its value at the row's right end in the aside tone, a
@@ -121,13 +120,14 @@ final class LostTalesChatHoverCard {
         final Target target;
         String name = "";
         String suffix = "";
+        /** How wide the name stands, and the room it and the suffix keep. */
         int nameWidth;
+        int nameRoom;
+        int suffixRoom;
         int nameColor;
         /** The title on the head's second row; empty for none. */
         String title = "";
         final List<Row> rows = new ArrayList<Row>(8);
-        /** The role-play status whose mark stands after the name; null for none. */
-        ChatRoleplayStatus roleplay;
         /** The person's glances, drawn as a row of their emoji; empty for none. */
         List<CharacterProfile.Glance> glances =
                 Collections.<CharacterProfile.Glance>emptyList();
@@ -345,11 +345,6 @@ final class LostTalesChatHoverCard {
                 }
             }
         }
-        laid.roleplay = target.presence() == null ? null
-                : ChatRoleplayMark.markedFor(target.playerId,
-                        target.accountIdentity ? ChatPresenceIdentity.ACCOUNT
-                                : ChatPresenceIdentity.character(
-                                        target.characterId));
         return finish(font, laid, width, maxWidth);
     }
 
@@ -407,12 +402,11 @@ final class LostTalesChatHoverCard {
     private static Laid finish(FontRenderer font, Laid laid, int width,
                                int maxWidth) {
         int lead = headLead(laid);
-        int markWidth = markWidth(laid);
         if (width > 0) {
             laid.width = width;
         } else {
             int contentWidth = lead + Math.max(
-                    font.getStringWidth(laid.name + laid.suffix) + markWidth,
+                    font.getStringWidth(laid.name + laid.suffix),
                     font.getStringWidth(laid.title));
             for (Row row : laid.rows) {
                 contentWidth = Math.max(contentWidth, row.wants(font, laid));
@@ -422,20 +416,12 @@ final class LostTalesChatHoverCard {
         }
         laid.textWidth = Math.max(0, laid.width - MenuWindow.PADDING_X * 2);
         int room = Math.max(0, laid.textWidth - lead);
-        String name = laid.name;
-        String suffix = laid.suffix;
-        int nameWidth = font.getStringWidth(name);
-        if (nameWidth + markWidth + font.getStringWidth(suffix) > room) {
-            // The account suffix gives way before the name does.
-            suffix = LostTalesSkyrimUiStyle.trimToWidth(font, suffix,
-                    Math.max(0, room - nameWidth - markWidth));
-            name = LostTalesSkyrimUiStyle.trimToWidth(font, name,
-                    Math.max(0, room - markWidth));
-            nameWidth = font.getStringWidth(name);
-        }
-        laid.name = name;
-        laid.suffix = suffix;
-        laid.nameWidth = nameWidth;
+        // The account suffix gives way before the name does; each is cut
+        // where its room ends, fading into it (LOOK-37).
+        laid.nameRoom = room;
+        laid.nameWidth = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(laid.name), room);
+        laid.suffixRoom = Math.max(0, room - laid.nameWidth);
         int top = MenuWindow.PADDING_Y
                 + (laid.head ? HEAD_ROWS : 1) * MenuWindow.rowHeight();
         for (Row row : laid.rows) {
@@ -516,20 +502,15 @@ final class LostTalesChatHoverCard {
         }
         LostTalesUiInk.beginContent();
         int nameTop = capTop(top);
-        drawColored(font, laid.name, textX, nameTop, laid.nameColor, alpha);
-        if (laid.roleplay != null) {
-            ChatRoleplayMark.draw(laid.roleplay, textX + laid.nameWidth
-                    + ChatRoleplayMark.GAP - 1, nameTop + 1, alpha);
-        }
-        if (laid.suffix.length() > 0) {
-            drawColored(font, laid.suffix, textX + laid.nameWidth
-                    + markWidth(laid), nameTop, WindowStyle.asideRgb(),
-                    alpha);
+        drawCut(font, laid.name, textX, nameTop, laid.nameRoom,
+                laid.nameColor, alpha);
+        if (laid.suffix.length() > 0 && laid.suffixRoom > 0) {
+            drawCut(font, laid.suffix, textX + laid.nameWidth, nameTop,
+                    laid.suffixRoom, WindowStyle.asideRgb(), alpha);
         }
         if (laid.title.length() > 0) {
-            drawColored(font, LostTalesSkyrimUiStyle.trimToWidth(font,
-                    laid.title, right - textX), textX, capTop(top + rowHeight),
-                    WindowStyle.asideRgb(), alpha);
+            drawCut(font, laid.title, textX, capTop(top + rowHeight),
+                    right - textX, WindowStyle.asideRgb(), alpha);
         }
         for (Row row : laid.rows) {
             drawRow(minecraft, font, laid, row, left, right, y + row.top,
@@ -584,18 +565,30 @@ final class LostTalesChatHoverCard {
         }
         int labelTop = capTop(rowY);
         if (row.kind == Kind.ITEM) {
-            drawColored(font, LostTalesSkyrimUiStyle.trimToWidth(font,
-                    row.text, right - left), left, labelTop,
+            drawCut(font, row.text, left, labelTop, right - left,
                     row.rgb >= 0 ? row.rgb : aside, alpha);
             return;
         }
-        String value = LostTalesSkyrimUiStyle.trimToWidth(font, row.value,
-                valueRoom(font, row, right - left));
-        int valueX = right - font.getStringWidth(value);
-        drawColored(font, row.style + value, valueX, labelTop, aside, alpha);
-        drawColored(font, LostTalesSkyrimUiStyle.trimToWidth(font, row.text,
-                valueX - MenuWindow.VALUE_GAP - left), left, labelTop,
-                LostTalesUiInk.IVORY, alpha);
+        String value = row.style + row.value;
+        int valueRoom = valueRoom(font, row, right - left);
+        int valueX = right - (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(value), valueRoom);
+        drawCut(font, value, valueX, labelTop, valueRoom, aside, alpha);
+        drawCut(font, row.text, left, labelTop,
+                valueX - MenuWindow.VALUE_GAP - left, LostTalesUiInk.IVORY,
+                alpha);
+    }
+
+    /**
+     * Words without their colour codes from {@code x}, in {@code color}:
+     * whole in {@code room}, else cut there and fading into its end
+     * (LOOK-37). Nothing on a card is pointed at, so nothing slides.
+     */
+    private static void drawCut(FontRenderer font, String text, int x, int y,
+                                int room, int color, int alpha) {
+        LostTalesUiCutName.drawText(font,
+                LostTalesChatVisualStyle.removeColorCodes(text), x, y, room,
+                color, alpha);
     }
 
     /**
@@ -660,13 +653,6 @@ final class LostTalesChatHoverCard {
             rows.add(Row.detail(StatCollector.translateToLocal(labelKey),
                     text, style));
         }
-    }
-
-    /** The room the role-play mark takes after the name: the mark and a gap either side; none without one. */
-    private static int markWidth(Laid laid) {
-        return laid.roleplay == null ? 0
-                : ChatRoleplayMark.GAP + ChatRoleplayMark.SIZE
-                        + ChatRoleplayMark.GAP - 1;
     }
 
     /**

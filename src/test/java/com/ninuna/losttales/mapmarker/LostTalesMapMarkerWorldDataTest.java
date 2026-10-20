@@ -142,7 +142,7 @@ public final class LostTalesMapMarkerWorldDataTest {
                 serialized,
                 java.util.Arrays.asList(oldRecord, newRecord),
                 Collections.<NBTTagCompound>emptyList());
-        serialized.setBoolean("CatalogInitialized", true);
+        serialized.setTag("SeededMarkers", new NBTTagList());
 
         LostTalesMapMarkerWorldData restored =
                 new LostTalesMapMarkerWorldData("restored");
@@ -204,8 +204,7 @@ public final class LostTalesMapMarkerWorldDataTest {
         data.seedDefinitions(Collections.singleton(original));
         data.saveRecord(data.getRecord(original.getId())
                 .withGenerationState(
-                        LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED,
-                        "surface_not_level"));
+                        LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED));
 
         NBTTagCompound serialized = new NBTTagCompound();
         data.writeToNBT(serialized);
@@ -271,7 +270,7 @@ public final class LostTalesMapMarkerWorldDataTest {
         LostTalesMapMarkerNbtCodec.write(
                 serialized, Collections.singleton(misaligned),
                 Collections.<NBTTagCompound>emptyList());
-        serialized.setBoolean("CatalogInitialized", true);
+        serialized.setTag("SeededMarkers", new NBTTagList());
         LostTalesMapMarkerWorldData restored =
                 new LostTalesMapMarkerWorldData("restored");
         restored.readFromNBT(serialized);
@@ -299,8 +298,169 @@ public final class LostTalesMapMarkerWorldDataTest {
                 .build());
     }
 
+    /**
+     * Two records linked to one block, which no write makes, are settled
+     * once as the store loads: the higher revision keeps the block, the
+     * other is quarantined whole, and saving again adds nothing.
+     */
+    @Test
+    public void aSharedLinkIsQuarantinedOnceAsTheStoreLoads() {
+        UUID token = UUID.randomUUID();
+        LostTalesMapMarkerRecord first = LostTalesMapMarkerRecord
+                .fromDefinition(definition("losttales:first_link"))
+                .withLink(0, 200, 70, -300, token);
+        LostTalesMapMarkerRecord second = LostTalesMapMarkerRecord
+                .fromDefinition(definition("losttales:second_link"))
+                .withLink(0, 200, 70, -300, token).toBuilder()
+                .revision(9L).build();
+        NBTTagCompound serialized = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(serialized,
+                java.util.Arrays.asList(first, second),
+                Collections.<NBTTagCompound>emptyList());
+        serialized.setTag("SeededMarkers", new NBTTagList());
+
+        LostTalesMapMarkerWorldData restored =
+                new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+
+        assertEquals("losttales:second_link", restored.findByLinkedPosition(
+                0, 200, 70, -300).getId());
+        assertNull(restored.getRecord("losttales:first_link"));
+        restored.saveRecord(restored.getRecord("losttales:second_link")
+                .withGenerationState(LostTalesWaystoneGenerationState.PLACED));
+        restored.saveRecord(restored.getRecord("losttales:second_link")
+                .withGenerationState(LostTalesWaystoneGenerationState.PLACED));
+        NBTTagCompound saved = new NBTTagCompound();
+        restored.writeToNBT(saved);
+        NBTTagList quarantine = saved.getTagList(
+                "Quarantine", Constants.NBT.TAG_COMPOUND);
+        assertEquals("every save keeps the one entry", 1,
+                quarantine.tagCount());
+        assertEquals("duplicate_waystone_link",
+                quarantine.getCompoundTagAt(0).getString("Reason"));
+        assertEquals("losttales:first_link", quarantine.getCompoundTagAt(0)
+                .getCompoundTag("OriginalData").getString("Id"));
+    }
+
+    /**
+     * A marker new to the files is seeded on a later seed, as the server
+     * starts after an update or with a new server file; one seeded and
+     * removed since never comes back, after a save too (MOD-17).
+     */
+    @Test
+    public void aNewMarkerIsSeededLaterAndARemovedOneIsNot() {
+        LostTalesMapMarkerWorldData data = new LostTalesMapMarkerWorldData("test");
+        data.seedDefinitions(Collections.singleton(definition("losttales:first")));
+        assertTrue(data.removeRecord("losttales:first"));
+
+        assertTrue(data.seedDefinitions(java.util.Arrays.asList(
+                definition("losttales:first"), definition("losttales:second"))));
+        assertNull(data.getRecord("losttales:first"));
+        assertNotNull(data.getRecord("losttales:second"));
+
+        NBTTagCompound serialized = new NBTTagCompound();
+        data.writeToNBT(serialized);
+        assertEquals(2, serialized.getTagList("SeededMarkers",
+                Constants.NBT.TAG_STRING).tagCount());
+        LostTalesMapMarkerWorldData restored = new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+        assertFalse(restored.seedDefinitions(java.util.Arrays.asList(
+                definition("losttales:first"), definition("losttales:second"))));
+        assertNull(restored.getRecord("losttales:first"));
+
+        restored.noteSeeded("losttales:third");
+        assertFalse(restored.seedDefinitions(Collections.singleton(
+                definition("losttales:third"))));
+    }
+
+    /** A store that does not say which markers the files seeded is kept as it is and reads only. */
+    @Test
+    public void aStoreWithoutItsSeedingFlagReadsOnly() {
+        NBTTagCompound serialized = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(serialized,
+                Collections.singleton(LostTalesMapMarkerRecord.fromDefinition(
+                        definition("losttales:flagless"))),
+                Collections.<NBTTagCompound>emptyList());
+        LostTalesMapMarkerWorldData restored =
+                new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+        assertTrue(restored.isReadOnlyForNewerVersion());
+        assertFalse(restored.seedDefinitions(Collections.singleton(
+                definition("losttales:must-not-be-seeded"))));
+        NBTTagCompound preserved = new NBTTagCompound();
+        restored.writeToNBT(preserved);
+        assertFalse(preserved.hasKey("SeededMarkers"));
+        assertEquals(1, preserved.getTagList("Markers",
+                Constants.NBT.TAG_COMPOUND).tagCount());
+    }
+
+    /**
+     * The discovery scan finds a marker as far as its radius, up to 1,024
+     * blocks across the ground, and no further, whatever the widest radius
+     * in the world (WAY-15).
+     */
+    @Test
+    public void discoveryFindsEachMarkerWithinItsOwnReach() {
+        LostTalesMapMarkerWorldData data =
+                new LostTalesMapMarkerWorldData("test");
+        data.seedDefinitions(java.util.Arrays.asList(
+                definition("losttales:near", 64.0D, 8.0D, 0.0D),
+                definition("losttales:town", 64.0D, 200.0D, 5000.0D),
+                definition("losttales:wide", 64.0D, 1024.0D, -20000.0D),
+                definition("losttales:huge", 64.0D, 50000.0D, 40000.0D)));
+
+        assertEquals(ids("losttales:near"),
+                ids(data.getDiscoveryCandidates(0, 32.0D, 7.0D, 1.0D)));
+        assertEquals(ids(), ids(data.getDiscoveryCandidates(0, 32.0D, 9.0D, 1.0D)));
+        assertEquals("Pathfinder widens every reach (PROG-06)", ids("losttales:near"),
+                ids(data.getDiscoveryCandidates(0, 32.0D, 11.0D, 1.5D)));
+        assertEquals(ids("losttales:town"),
+                ids(data.getDiscoveryCandidates(0, 32.0D, 5000.0D + 299.0D, 1.5D)));
+        assertEquals(ids("losttales:town"),
+                ids(data.getDiscoveryCandidates(0, 32.0D, 5000.0D + 199.0D, 1.0D)));
+        assertEquals(ids(),
+                ids(data.getDiscoveryCandidates(0, 32.0D, 5000.0D + 201.0D, 1.0D)));
+        assertEquals(ids("losttales:wide"),
+                ids(data.getDiscoveryCandidates(0, 32.0D,
+                        -20000.0D - 1023.0D, 1.0D)));
+        assertEquals(ids(), ids(data.getDiscoveryCandidates(0, 32.0D,
+                -20000.0D - 1025.0D, 1.0D)));
+        assertEquals("a wider radius reaches only as far as the scan",
+                ids("losttales:huge"), ids(data.getDiscoveryCandidates(0,
+                        32.0D, 40000.0D + 1023.0D, 1.0D)));
+        assertEquals(ids(), ids(data.getDiscoveryCandidates(0, 32.0D,
+                40000.0D + 1100.0D, 1.0D)));
+        assertEquals("another world holds none of them", ids(),
+                ids(data.getDiscoveryCandidates(1, 32.0D, 7.0D, 1.0D)));
+    }
+
+    private static java.util.Set<String> ids(String... ids) {
+        return new java.util.LinkedHashSet<String>(java.util.Arrays.asList(ids));
+    }
+
+    private static java.util.Set<String> ids(
+            java.util.Collection<LostTalesMapMarkerRecord> records) {
+        java.util.Set<String> ids = new java.util.LinkedHashSet<String>();
+        for (LostTalesMapMarkerRecord record : records) {
+            ids.add(record.getId());
+        }
+        return ids;
+    }
+
     private static LostTalesMapMarkerDefinition definition(String id) {
         return definition(id, 64.0D);
+    }
+
+    /** A discoverable bundled marker at x 32, {@code z}, found from {@code radius}. */
+    private static LostTalesMapMarkerDefinition definition(
+            String id, double y, double radius, double z) {
+        return new LostTalesMapMarkerDefinition(
+                id, id, "shack", "white",
+                "Town", "", true, 0,
+                32, y, z, 128, radius,
+                false, true, false,
+                LostTalesMapMarkerSource.CUSTOM_PRESET,
+                false, "", 0);
     }
 
     private static LostTalesMapMarkerDefinition definition(

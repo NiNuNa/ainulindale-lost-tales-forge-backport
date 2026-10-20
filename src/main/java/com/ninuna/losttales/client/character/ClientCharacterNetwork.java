@@ -89,7 +89,7 @@ public final class ClientCharacterNetwork {
     public static int updateCapeSettings(final long expectedRosterRevision,
                                          final UUID characterId,
                                          final boolean showMinecraftCape,
-                                         final int cosmeticCapeId) {
+                                         final String cosmeticCapeId) {
         if (expectedRosterRevision < 0L || characterId == null) {
             throw new IllegalArgumentException("revision and characterId must be valid");
         }

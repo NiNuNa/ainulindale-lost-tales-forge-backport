@@ -625,7 +625,7 @@ public final class LostTalesMapMarkerGroupingTest {
         }
         assertEquals("the marker never arrived at its new stack",
                 -68.0F, offset[0], 0.0001F);
-        assertEquals(1.0F, state.getHandoverProgress(), 0.0001F);
+        assertEquals(1.0F, state.handoverProgress, 0.0001F);
     }
 
     /** Panning moves a stack and its members together, so it is not a change. */
@@ -689,13 +689,13 @@ public final class LostTalesMapMarkerGroupingTest {
         }
 
         assertTrue("the marker taking the slot never left the stack",
-                incoming.getCompanionSlot() < -0.0001F);
+                incoming.companionSlot < -0.0001F);
         assertTrue("the displaced marker never went back to the stack",
-                displaced.getCompanionSlot() > incoming.getCompanionSlot());
+                displaced.companionSlot > incoming.companionSlot);
         // Both are still grouped: neither of them travels to its own map
         // position during an exchange.
-        assertEquals(0.0F, incoming.getVisibility(), 0.0001F);
-        assertEquals(0.0F, displaced.getVisibility(), 0.0001F);
+        assertEquals(0.0F, incoming.visibility, 0.0001F);
+        assertEquals(0.0F, displaced.visibility, 0.0001F);
     }
 
     private static float[] companion(
@@ -1395,13 +1395,13 @@ public final class LostTalesMapMarkerGroupingTest {
         LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
                 state, true, 0.0F, 0.25F);
 
-        assertTrue(state.isLeavingStack());
-        assertEquals(-8.0F, state.getExitOffsetX(), 0.0001F);
-        assertEquals(-3.0F, state.getExitOffsetY(), 0.0001F);
+        assertTrue(state.leavingStack);
+        assertEquals(-8.0F, state.exitOffsetX, 0.0001F);
+        assertEquals(-3.0F, state.exitOffsetY, 0.0001F);
         // Opacity and size follow these two, so holding them is what keeps
         // the sprite from restarting at nothing.
-        assertEquals(-1.0F, state.getCompanionSlot(), 0.0001F);
-        assertEquals(1.0F, state.getFanStrength(), 0.0001F);
+        assertEquals(-1.0F, state.companionSlot, 0.0001F);
+        assertEquals(1.0F, state.fanStrength, 0.0001F);
     }
 
     @Test
@@ -1414,9 +1414,9 @@ public final class LostTalesMapMarkerGroupingTest {
         for (int frame = 0; frame < 12; frame++) {
             LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
                     state, true, 0.0F, 0.25F);
-            float travelled = 1.0F - state.getVisibility();
+            float travelled = 1.0F - state.visibility;
             float[] point = transition(100.0F + 9.0F, 100.0F,
-                    100.0F, 100.0F, state.getVisibility());
+                    100.0F, 100.0F, state.visibility);
             assertTrue("the marker overshot its own position",
                     point[0] >= 100.0F - 0.0001F
                             && point[0] <= 109.0F + 0.0001F);
@@ -1428,9 +1428,9 @@ public final class LostTalesMapMarkerGroupingTest {
                 break;
             }
         }
-        assertEquals(1.0F, state.getVisibility(), 0.0001F);
+        assertEquals(1.0F, state.visibility, 0.0001F);
         assertFalse("the hold must be released once it arrives",
-                state.isLeavingStack());
+                state.leavingStack);
     }
 
     @Test
@@ -1442,18 +1442,18 @@ public final class LostTalesMapMarkerGroupingTest {
         state.recordRendered(-8.0F, 0.0F);
         LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
                 state, true, 0.0F, 0.5F);
-        assertEquals(0.5F, state.getVisibility(), 0.0001F);
+        assertEquals(0.5F, state.visibility, 0.0001F);
 
         LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
                 state, false, -1.0F, 0.25F);
-        assertFalse(state.isLeavingStack());
+        assertFalse(state.leavingStack);
         state.recordRendered(-6.0F, 0.0F);
 
         LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
                 state, true, 0.0F, 0.25F);
-        assertTrue(state.isLeavingStack());
+        assertTrue(state.leavingStack);
         assertEquals("the exit restarted from the old fan position",
-                -6.0F, state.getExitOffsetX(), 0.0001F);
+                -6.0F, state.exitOffsetX, 0.0001F);
     }
 
     @Test
@@ -1509,17 +1509,17 @@ public final class LostTalesMapMarkerGroupingTest {
                     state, true, 0.0F, 0.25F);
         }
 
-        assertEquals(1.0F, state.getVisibility(), 0.0001F);
-        assertEquals(0.0F, state.getFanStrength(), 0.0001F);
-        assertEquals(0.0F, state.getCompanionSlot(), 0.0001F);
-        assertFalse(state.isLeavingStack());
+        assertEquals(1.0F, state.visibility, 0.0001F);
+        assertEquals(0.0F, state.fanStrength, 0.0001F);
+        assertEquals(0.0F, state.companionSlot, 0.0001F);
+        assertFalse(state.leavingStack);
         assertEquals("a lone marker was still dimmed", 1.0F,
                 LostTalesLotrMapMarkerIconOverlay.groupedIconAlpha(
-                        state.getVisibility(), state.getFanStrength()),
+                        state.visibility, state.fanStrength),
                 0.0001F);
         assertEquals("a lone marker was still shrunk", 1.0F,
                 LostTalesLotrMapMarkerIconOverlay.groupedIconScale(
-                        state.getVisibility(), state.getFanStrength()),
+                        state.visibility, state.fanStrength),
                 0.0001F);
     }
 
@@ -1533,7 +1533,7 @@ public final class LostTalesMapMarkerGroupingTest {
                     state, true, 0.0F, 0.25F);
             assertEquals(1.0F,
                     LostTalesLotrMapMarkerIconOverlay.groupedIconAlpha(
-                            state.getVisibility(), state.getFanStrength()),
+                            state.visibility, state.fanStrength),
                     0.0001F);
         }
     }
@@ -1547,8 +1547,8 @@ public final class LostTalesMapMarkerGroupingTest {
         LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
                 state, true, 0.0F, 0.25F);
 
-        assertEquals(0.0F, state.getExitOffsetX(), 0.0001F);
-        assertEquals(0.0F, state.getExitOffsetY(), 0.0001F);
+        assertEquals(0.0F, state.exitOffsetX, 0.0001F);
+        assertEquals(0.0F, state.exitOffsetY, 0.0001F);
     }
 
     /** A companion fully gathered on its leader, on the given fan side. */
@@ -1561,9 +1561,9 @@ public final class LostTalesMapMarkerGroupingTest {
             LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
                     state, false, side, 0.25F);
         }
-        assertEquals(0.0F, state.getVisibility(), 0.0001F);
-        assertEquals(side, state.getCompanionSlot(), 0.0001F);
-        assertEquals(1.0F, state.getFanStrength(), 0.0001F);
+        assertEquals(0.0F, state.visibility, 0.0001F);
+        assertEquals(side, state.companionSlot, 0.0001F);
+        assertEquals(1.0F, state.fanStrength, 0.0001F);
         return state;
     }
 

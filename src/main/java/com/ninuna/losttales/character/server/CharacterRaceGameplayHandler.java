@@ -56,9 +56,10 @@ public final class CharacterRaceGameplayHandler {
         }
         RoleplayCharacter character = identity.getCharacter();
 
-        // Legacy EntityPlayer code and other transformation mods can restore
-        // vanilla dimensions during ordinary ticks. apply() is idempotent and
-        // therefore runs every END tick; stable modifier UUIDs prevent stacking.
+        // Vanilla's EntityPlayer and mods that change a player's size can put
+        // the vanilla dimensions back during ordinary ticks. apply() is
+        // idempotent and so runs every END tick; stable modifier UUIDs keep
+        // the attributes from stacking.
         apply(player, character);
     }
 

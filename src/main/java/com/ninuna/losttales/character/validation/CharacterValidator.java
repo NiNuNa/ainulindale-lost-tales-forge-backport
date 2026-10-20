@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.validation;
 
-import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -309,6 +308,10 @@ public final class CharacterValidator {
         int age = appearance.getAppearance().getAge();
         CharacterRaceDefinition race = CharacterRaceRegistry.get(
                 appearance.getAppearance().getRaceId());
+        // A race gone from the server stands in for its characters only.
+        if (race.isStandIn()) {
+            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_RACE);
+        }
 
         String requestedFactionId = normalizeStableIdentifier(request.getStartingFactionId());
         if (!isValidIdentifierLength(requestedFactionId)) {
@@ -357,22 +360,6 @@ public final class CharacterValidator {
                 bodyTypeId,
                 chestTypeId
         ));
-    }
-
-    /**
-     * A switch target: one of the roster's characters, at the roster's
-     * revision. The account itself is never one.
-     */
-    public static CharacterValidationResult validateSelectionTarget(
-            CharacterRoster roster, PlayableIdentity target, long expectedRevision) {
-        CharacterValidationResult revision = validateExpectedRevision(roster, expectedRevision);
-        if (!revision.isValid()) {
-            return revision;
-        }
-        if (target == null || !roster.getOwnerId().equals(target.getOwnerId())) {
-            return CharacterValidationResult.failure(CharacterErrorId.INVALID_CHARACTER_ID);
-        }
-        return validateCharacterReference(roster, target.getCharacterId(), expectedRevision);
     }
 
     /**

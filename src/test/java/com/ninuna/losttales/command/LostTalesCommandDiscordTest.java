@@ -3,6 +3,7 @@ package com.ninuna.losttales.command;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.compat.discord.DiscordBridgeDirection;
+import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.util.EnglishWords;
 import java.util.Collections;
 import java.util.HashMap;
@@ -11,6 +12,7 @@ import org.junit.After;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
@@ -68,6 +70,24 @@ public final class LostTalesCommandDiscordTest {
         assertEquals("Linked Discord channel #general of The Shire to OOC Chat.",
                 EnglishWords.INSTANCE.format(LostTalesCommandDiscord.SAY + "linked",
                         "#general of The Shire", "OOC Chat"));
+    }
+
+    /** No code is handed out while the bot cannot take it, and the answer says why. */
+    @Test
+    public void eachReasonTheBotCannotPairHasItsOwnAnswer() {
+        assertEquals("The Discord bot is still connecting. Try again in a moment.",
+                EnglishWords.INSTANCE.format(LostTalesCommandDiscord.notConnectedKey(
+                        LostTalesDiscordBridge.Pairing.CONNECTING)));
+        java.util.Set<String> keys = new java.util.HashSet<String>();
+        for (LostTalesDiscordBridge.Pairing pairing : LostTalesDiscordBridge.Pairing.values()) {
+            if (pairing != LostTalesDiscordBridge.Pairing.READY) {
+                String key = LostTalesCommandDiscord.notConnectedKey(pairing);
+                keys.add(key);
+                assertNotNull(key, EnglishWords.INSTANCE.format(key));
+                assertFalse(key, key.equals(EnglishWords.INSTANCE.format(key)));
+            }
+        }
+        assertEquals(4, keys.size());
     }
 
     private static String direction(DiscordBridgeDirection direction) {

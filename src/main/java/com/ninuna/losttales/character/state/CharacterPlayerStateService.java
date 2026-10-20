@@ -1,10 +1,12 @@
 package com.ninuna.losttales.character.state;
 
 import com.ninuna.losttales.character.identity.PlayableIdentity;
+import com.ninuna.losttales.character.kit.StartingKits;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.state.component.LostTalesQuestStateComponent;
+import com.ninuna.losttales.character.state.component.ProgressionStateComponent;
 import com.ninuna.losttales.character.state.component.AccessoryStateComponent;
 import com.ninuna.losttales.character.state.component.LotrCharacterDetailsStateComponent;
 import com.ninuna.losttales.character.state.component.LotrCustomWaypointStateComponent;
@@ -22,6 +24,7 @@ import com.ninuna.losttales.character.state.component.VanillaLocationStateCompon
 import com.ninuna.losttales.character.switching.CharacterLocationTransitionService;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.progression.ProgressionCatalog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 
@@ -45,6 +48,7 @@ public final class CharacterPlayerStateService {
     private final CharacterLocationTransitionService locationTransitionService;
     private final LotrCustomWaypointStateComponent lotrCustomWaypointComponent;
     private final LotrProgressionStateComponent lotrProgressionComponent;
+    private final ProgressionStateComponent progressionComponent;
 
     private CharacterPlayerStateService() {
         ArrayList<CharacterStateComponent> registered =
@@ -55,6 +59,7 @@ public final class CharacterPlayerStateService {
                 new CharacterLocationTransitionService(this.locationComponent);
         this.lotrCustomWaypointComponent = new LotrCustomWaypointStateComponent();
         this.lotrProgressionComponent = new LotrProgressionStateComponent();
+        this.progressionComponent = new ProgressionStateComponent();
         // Registration order is apply order within a phase.
         registered.add(new VanillaInventoryStateComponent());
         registered.add(new AccessoryStateComponent());
@@ -64,6 +69,7 @@ public final class CharacterPlayerStateService {
         registered.add(new VanillaPotionStateComponent());
         registered.add(this.statisticsComponent);
         registered.add(new LostTalesQuestStateComponent());
+        registered.add(this.progressionComponent);
         registered.add(new LotrFastTravelRegionStateComponent());
         registered.add(new LotrWaypointUseStateComponent());
         registered.add(this.lotrCustomWaypointComponent);
@@ -90,14 +96,13 @@ public final class CharacterPlayerStateService {
     }
 
     /**
-     * Bootstrap for one account's saved identities. A roster seen for the
-     * first time gets a record for every character: the
-     * active character's is the live state the account file holds, every
-     * other character's is clean defaults. With no active character the live
-     * state is the account's own and stays where it is. Characters created
-     * later start from defaults too. The account itself has no record until
-     * the first capture that needs one: while the account is being played
-     * the vanilla player file already is its state.
+     * Bootstrap for one account's saved characters. An account's store is
+     * made as its first character is played, while it is still a ghost:
+     * every character it holds then, and every one made later, starts from
+     * a clean save of its own. A roster that plays a character with no
+     * store behind it is refused, never filled in from the live player.
+     * The ghost has a record only while its first switch is under way
+     * ({@link #forgetGhostState}).
      */
     public CharacterPlayerStateAccount ensureBootstrapped(
             EntityPlayerMP player,
@@ -121,41 +126,19 @@ public final class CharacterPlayerStateService {
         boolean changed = false;
         long now = System.currentTimeMillis();
         if (account.getBootstrapVersion() == 0) {
-            // The live state is imported into the active character's
-            // record; on the account it is imported nowhere, since it is
-            // already the account's and is captured when the account is
-            // first left.
-            UUID importTarget = roster.getActiveCharacterId();
-            Map<String, NBTTagCompound> liveState = importTarget == null
-                    ? null : captureComponents(player);
-            ArrayList<CharacterPlayerStateRecord> initialized =
-                    new ArrayList<CharacterPlayerStateRecord>();
-            for (RoleplayCharacter character : roster.getCharacters()) {
-                Map<String, NBTTagCompound> initial =
-                        character.getCharacterId().equals(importTarget)
-                                ? liveState : createDefaultComponents(character);
-                CharacterPlayerStateSnapshot snapshot = createSnapshot(
-                        character.getCharacterId(), 1L, now, initial);
-                initialized.add(new CharacterPlayerStateRecord(
-                        character.getCharacterId(), snapshot, null));
-            }
-            // Publish only after every candidate record has validated. A failed
-            // bootstrap may leave the empty account shell created by storage,
-            // but it must never leave a partially initialized character set.
-            for (CharacterPlayerStateRecord record : initialized) {
-                account.putRecord(record);
+            if (roster.getActiveCharacterId() != null) {
+                throw new CharacterStateValidationException(
+                        "The played character has no saved state");
             }
             account.markBootstrapped(now);
             changed = true;
         }
 
-        // A character created after bootstrap starts from a clean save of
-        // its own: defaults, its starting faction's progression and its
-        // starting waypoint as the place its first switch lands it.
-        for (RoleplayCharacter character : roster.getCharacters()) {
-            if (account.getRecord(character.getCharacterId()) != null) {
-                continue;
-            }
+        // Every character starts from a clean save of its own: defaults,
+        // its starting kits, its starting faction's progression and its
+        // starting waypoint as the place its first switch lands it. Each
+        // record is validated as it is made, before it is published.
+        for (RoleplayCharacter character : withoutState(roster, account)) {
             CharacterPlayerStateSnapshot snapshot = createSnapshot(
                     character.getCharacterId(), 1L, now,
                     createDefaultComponents(character));
@@ -171,9 +154,26 @@ public final class CharacterPlayerStateService {
     }
 
     /**
-     * Captures the live player as the identity's next generation. An account
-     * captured for the first time gets its record from this capture; a
-     * character always has one once the account is bootstrapped.
+     * The roster's characters with no saved state yet, which get their
+     * first, starting kits and all. A character that has one keeps it:
+     * a switch back to it or a rejoin plays what it saved, never a new start.
+     */
+    static List<RoleplayCharacter> withoutState(CharacterRoster roster,
+                                                CharacterPlayerStateAccount account) {
+        List<RoleplayCharacter> fresh = new ArrayList<RoleplayCharacter>();
+        for (RoleplayCharacter character : roster.getCharacters()) {
+            if (account.getRecord(character.getCharacterId()) == null) {
+                fresh.add(character);
+            }
+        }
+        return fresh;
+    }
+
+    /**
+     * Captures the live player as the identity's next generation. The
+     * ghost gets its record from this capture as its first switch begins,
+     * so the switch has a state to roll back to; a character always has
+     * one once the account is bootstrapped.
      */
     public CharacterPlayerStateSnapshot captureOrCreate(
             EntityPlayerMP player,
@@ -300,6 +300,51 @@ public final class CharacterPlayerStateService {
         }
     }
 
+    /**
+     * Every part of the live player a switch moves, by component id, for
+     * keeping rather than playing: what is set aside is never put on a
+     * player, so it is not held to the snapshot's size. A part that cannot
+     * be captured throws, so nothing is kept in part.
+     */
+    public NBTTagCompound captureAsIs(EntityPlayerMP player)
+            throws CharacterStateValidationException {
+        if (player == null) {
+            throw new CharacterStateValidationException("The player is unavailable");
+        }
+        NBTTagCompound captured = new NBTTagCompound();
+        for (CharacterStateComponent component : this.components) {
+            NBTTagCompound state = component.capture(player);
+            if (state == null) {
+                throw new CharacterStateValidationException(
+                        "Character-state component " + component.getId()
+                                + " captured nothing");
+            }
+            captured.setTag(component.getId(), state.copy());
+        }
+        return captured;
+    }
+
+    /**
+     * Forgets the ghost's record once its owner plays a character and no
+     * journal names it any more: it was kept only for the first switch to
+     * roll back to. Answers whether one went.
+     */
+    public boolean forgetGhostState(CharacterRoster roster,
+                                    CharacterPlayerStateWorldData data) {
+        if (roster == null || data == null
+                || roster.getActiveCharacterId() == null
+                || data.isReadOnlyForNewerVersion()
+                || data.isOwnerBlocked(roster.getOwnerId())) {
+            return false;
+        }
+        CharacterPlayerStateAccount account = data.getAccount(roster.getOwnerId());
+        if (account == null || account.removeRecord(roster.getOwnerId()) == null) {
+            return false;
+        }
+        data.saveAccount(account);
+        return true;
+    }
+
     public void clearRuntimeState(UUID ownerId) {
         this.statisticsComponent.clearRuntimeState(ownerId);
         this.lotrCustomWaypointComponent.clearRuntimeState(ownerId);
@@ -318,8 +363,11 @@ public final class CharacterPlayerStateService {
             boolean flush)
             throws CharacterStateValidationException {
         requirePlayerRoster(player, roster);
+        // A ghost has no saved life of its own: it touches nothing, and
+        // its first switch captures what it holds.
         if (!player.isEntityAlive() || player.isDead
-                || player.getHealth() <= 0.0F) {
+                || player.getHealth() <= 0.0F
+                || roster.getActiveCharacterId() == null) {
             return null;
         }
         CharacterPlayerStateAccount account = ensureBootstrapped(
@@ -415,6 +463,14 @@ public final class CharacterPlayerStateService {
                                 character.getStartingFactionId());
             } else if (component == this.locationComponent) {
                 state = createInitialLocation(character);
+            } else if (character != null && component == this.progressionComponent) {
+                // A race starts a few skills a little higher (PROG-05).
+                state = this.progressionComponent.createDefault(
+                        ProgressionCatalog.startingSkills(character.getRaceId()));
+            } else if (character != null && component instanceof VanillaInventoryStateComponent) {
+                // A new character carries the kits that fit it (CHAR-40).
+                state = StartingKits.firstInventory(
+                        (VanillaInventoryStateComponent) component, character);
             } else {
                 state = component.createDefault();
             }

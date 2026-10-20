@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -8,11 +9,12 @@ import io.netty.buffer.ByteBuf;
 
 /** Server-to-client one-shot notification for a map marker discovered by walking into its radius. */
 public class LostTalesMapMarkerDiscoveryPacket implements IMessage {
-    // Match the existing snapshot and quest-sync marker-ID wire limit. The
-    // previous 128-byte value could reject an authoritative marker only after
-    // the server had already persisted its discovery.
+    // The marker id's bound the snapshot and the quest log carry too, so an
+    // id the server saved as discovered always fits.
     static final int MAX_MARKER_ID_BYTES = 256;
-    static final int MAX_MARKER_NAME_BYTES = 512;
+    // A marker's name, every letter up to three bytes.
+    static final int MAX_MARKER_NAME_BYTES =
+            3 * LostTalesMapMarkerRecord.MAX_NAME_LENGTH;
     private static final int MAX_PACKET_BYTES =
             MAX_MARKER_ID_BYTES + MAX_MARKER_NAME_BYTES + 8;
 

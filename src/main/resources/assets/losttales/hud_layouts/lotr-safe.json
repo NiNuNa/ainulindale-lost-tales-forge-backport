@@ -1,0 +1,10 @@
+{
+  "id": "lotr-safe",
+  "panels": {
+    "compass": {"across": 50, "down": 15},
+    "fellowship": {"across": 3, "down": 43},
+    "quickloot": {"across": 100, "down": 85},
+    "quest": {"across": 4, "down": 71},
+    "notifications": {"across": 50, "down": 32}
+  }
+}

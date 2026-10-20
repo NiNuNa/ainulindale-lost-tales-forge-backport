@@ -1,6 +1,7 @@
 package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.compat.lotr.LotrFellowshipMirror;
+import com.ninuna.losttales.compat.lotr.MirrorShapes;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.model.FellowshipFixtures;
@@ -41,26 +42,26 @@ public final class FellowshipMirrorsTest {
     public void theLeadersAccountHoldsItWhilePlayingTheLeader() {
         LotrFellowshipMirror.Shape shape = FellowshipMirrors.shapeOf(fellowship(),
                 playing(LEADER, GUIDE), loggedOutAs());
-        assertEquals(LEADER_ACCOUNT, shape.owner());
-        assertEquals(Collections.singletonList(GUIDE_ACCOUNT), shape.members());
-        assertEquals(Collections.singleton(GUIDE_ACCOUNT), shape.admins());
+        assertEquals(LEADER_ACCOUNT, MirrorShapes.owner(shape));
+        assertEquals(Collections.singletonList(GUIDE_ACCOUNT), MirrorShapes.members(shape));
+        assertEquals(Collections.singleton(GUIDE_ACCOUNT), MirrorShapes.admins(shape));
     }
 
     @Test
     public void elseTheFirstAccountPlayingOneHoldsIt() {
         LotrFellowshipMirror.Shape shape = FellowshipMirrors.shapeOf(fellowship(),
                 playing(MEMBER, GUIDE), loggedOutAs());
-        assertEquals(GUIDE_ACCOUNT, shape.owner());
-        assertEquals(Collections.singletonList(MEMBER_ACCOUNT), shape.members());
-        assertTrue("an owner is no admin", shape.admins().isEmpty());
+        assertEquals(GUIDE_ACCOUNT, MirrorShapes.owner(shape));
+        assertEquals(Collections.singletonList(MEMBER_ACCOUNT), MirrorShapes.members(shape));
+        assertTrue("an owner is no admin", MirrorShapes.admins(shape).isEmpty());
     }
 
     @Test
     public void whileNobodyPlaysOneTheLeadersAccountHoldsItAlone() {
         LotrFellowshipMirror.Shape shape = FellowshipMirrors.shapeOf(fellowship(), playing(),
                 loggedOutAs());
-        assertEquals(LEADER_ACCOUNT, shape.owner());
-        assertTrue(shape.members().isEmpty());
+        assertEquals(LEADER_ACCOUNT, MirrorShapes.owner(shape));
+        assertTrue(MirrorShapes.members(shape).isEmpty());
     }
 
     /**
@@ -71,13 +72,13 @@ public final class FellowshipMirrorsTest {
     public void anAccountThatLoggedOutPlayingAMemberStays() {
         LotrFellowshipMirror.Shape shape = FellowshipMirrors.shapeOf(fellowship(),
                 playing(MEMBER), loggedOutAs(GUIDE));
-        assertEquals(MEMBER_ACCOUNT, shape.owner());
-        assertEquals(Collections.singletonList(GUIDE_ACCOUNT), shape.members());
-        assertEquals(Collections.singleton(GUIDE_ACCOUNT), shape.admins());
+        assertEquals(MEMBER_ACCOUNT, MirrorShapes.owner(shape));
+        assertEquals(Collections.singletonList(GUIDE_ACCOUNT), MirrorShapes.members(shape));
+        assertEquals(Collections.singleton(GUIDE_ACCOUNT), MirrorShapes.admins(shape));
 
         shape = FellowshipMirrors.shapeOf(fellowship(), playing(), loggedOutAs(LEADER));
-        assertEquals(LEADER_ACCOUNT, shape.owner());
-        assertTrue(shape.members().isEmpty());
+        assertEquals(LEADER_ACCOUNT, MirrorShapes.owner(shape));
+        assertTrue(MirrorShapes.members(shape).isEmpty());
     }
 
     /** The leader's account playing the leader takes part in what the fellowship shares. */
@@ -85,8 +86,8 @@ public final class FellowshipMirrorsTest {
     public void theLeadersAccountPlayingTheLeaderTakesPart() {
         LotrFellowshipMirror.Shape shape = FellowshipMirrors.shapeOf(fellowship(),
                 playing(LEADER), loggedOutAs());
-        assertEquals(LEADER_ACCOUNT, shape.owner());
-        assertTrue(shape.ownerPlays());
+        assertEquals(LEADER_ACCOUNT, MirrorShapes.owner(shape));
+        assertTrue(MirrorShapes.ownerPlays(shape));
         assertTrue(FellowshipMirrors.playsAMember(LEADER_ACCOUNT, fellowship(),
                 playing(LEADER), loggedOutAs()));
     }
@@ -101,9 +102,9 @@ public final class FellowshipMirrorsTest {
                 LEADER);
         LotrFellowshipMirror.Shape shape = FellowshipMirrors.shapeOf(fellowship(),
                 presence, loggedOutAs());
-        assertEquals(GUIDE_ACCOUNT, shape.owner());
-        assertTrue(shape.ownerPlays());
-        assertTrue(shape.members().isEmpty());
+        assertEquals(GUIDE_ACCOUNT, MirrorShapes.owner(shape));
+        assertTrue(MirrorShapes.ownerPlays(shape));
+        assertTrue(MirrorShapes.members(shape).isEmpty());
         assertFalse(FellowshipMirrors.playsAMember(LEADER_ACCOUNT, fellowship(),
                 presence, loggedOutAs()));
     }
@@ -117,12 +118,12 @@ public final class FellowshipMirrorsTest {
     public void whileNobodyPlaysOneTheLeadersAccountHoldsItForTheRecordOnly() {
         LotrFellowshipMirror.Shape shape = FellowshipMirrors.shapeOf(fellowship(),
                 playing(new FellowshipMember[0], LEADER), loggedOutAs());
-        assertEquals(LEADER_ACCOUNT, shape.owner());
-        assertFalse(shape.ownerPlays());
+        assertEquals(LEADER_ACCOUNT, MirrorShapes.owner(shape));
+        assertFalse(MirrorShapes.ownerPlays(shape));
 
         shape = FellowshipMirrors.shapeOf(fellowship(), playing(), loggedOutAs());
-        assertEquals(LEADER_ACCOUNT, shape.owner());
-        assertFalse(shape.ownerPlays());
+        assertEquals(LEADER_ACCOUNT, MirrorShapes.owner(shape));
+        assertFalse(MirrorShapes.ownerPlays(shape));
         assertFalse(FellowshipMirrors.playsAMember(LEADER_ACCOUNT, fellowship(),
                 playing(), loggedOutAs()));
     }
@@ -132,8 +133,8 @@ public final class FellowshipMirrorsTest {
     public void theLeadersAccountLoggedOutAsTheLeaderTakesPart() {
         LotrFellowshipMirror.Shape shape = FellowshipMirrors.shapeOf(fellowship(),
                 playing(), loggedOutAs(LEADER));
-        assertEquals(LEADER_ACCOUNT, shape.owner());
-        assertTrue(shape.ownerPlays());
+        assertEquals(LEADER_ACCOUNT, MirrorShapes.owner(shape));
+        assertTrue(MirrorShapes.ownerPlays(shape));
     }
 
     /** These members' accounts are offline and logged out playing them. */

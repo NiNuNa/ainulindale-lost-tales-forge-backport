@@ -49,6 +49,25 @@ public final class ChatCommandTextTest {
         assertTrue(cut.endsWith("..."));
     }
 
+    /**
+     * The game's private message is {@code /tell} with the aliases
+     * {@code /w} and {@code /msg}; a command answering to any of them
+     * keeps whom it went to, never what it said.
+     */
+    @Test
+    public void aPrivateMessageIsKnownByEveryOneOfItsNames() {
+        assertEquals("/tell Bob ...", ChatCommandText.describe("tell",
+                java.util.Arrays.asList("w", "msg"),
+                new String[] {"Bob", "the", "key"}, null));
+        assertEquals("/whisperto Bob ...", ChatCommandText.describe("whisperto",
+                java.util.Arrays.asList("W"),
+                new String[] {"Bob", "the", "key"}, null));
+        assertEquals("/w Bob ...",
+                ChatCommandText.describeTyped("/w Bob the key", null));
+        assertEquals("/tellraw Bob hello", ChatCommandText.describe("tellraw",
+                null, new String[] {"Bob", "hello"}, null));
+    }
+
     /** A typed command reads as the console would write it, so its echo holds no secret. */
     @Test
     public void aTypedCommandIsDescribedAsTheConsoleWritesIt() {

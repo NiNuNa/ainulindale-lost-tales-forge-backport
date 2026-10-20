@@ -64,20 +64,28 @@ public final class DiscordGameEventRelay {
     /**
      * A player logging in, announced unless they are still waiting for
      * their first character, who is announced as they join
-     * ({@link #announceJoin}), or come Invisible.
+     * ({@link #announceJoin}).
      */
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event == null || !(event.player instanceof EntityPlayerMP)
-                || CharacterJoin.isWaiting(event.player)
-                || ChatPresenceService.playsInvisible((EntityPlayerMP)event.player)) {
+                || CharacterJoin.isWaiting(event.player)) {
             return;
         }
         announceJoin((EntityPlayerMP)event.player);
     }
 
-    /** Tells Discord a player has joined, with the join line's id. */
+    /**
+     * Tells Discord a player has joined, with the join line's id, unless
+     * they are Invisible as the identity they play: the rule the game's
+     * own join line follows ({@link ChatPresenceService#playsInvisible}).
+     * A first visit is announced from here once the first character is
+     * played.
+     */
     public static void announceJoin(EntityPlayerMP player) {
+        if (player == null || ChatPresenceService.playsInvisible(player)) {
+            return;
+        }
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
         bridge.announce(DiscordServerNotices.playerJoined(LostTalesWords.LANG,
                 player.getCommandSenderName(),
@@ -90,7 +98,8 @@ public final class DiscordGameEventRelay {
 
     /**
      * A player leaving, unless they never joined or go Invisible: one
-     * still waiting goes unannounced, and so does one nobody sees.
+     * still waiting goes unannounced, and so does one nobody sees, by the
+     * rule the game's own leave line follows.
      */
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {

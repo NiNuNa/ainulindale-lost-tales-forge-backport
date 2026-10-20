@@ -36,8 +36,25 @@ import static org.junit.Assert.assertTrue;
 public final class MissiveWordsTest {
     private static final Charset UTF_8 = Charset.forName("UTF-8");
 
-    /** The mod's missive lines, and only those, so the rest of the suite still reads keys. */
+    /** The bundled templates, as a server loads them, every item there (QUEST-42). */
     @Before
+    public void loadTheBundledTemplates() {
+        MissiveTemplates.load(com.ninuna.losttales.progression.ProgressionFiles.CLASSPATH,
+                null, true, new com.ninuna.losttales.quest.QuestItemNames.Items() {
+                    @Override
+                    public boolean has(String itemId) {
+                        return true;
+                    }
+                });
+        readInEnglish();
+    }
+
+    @After
+    public void forgetTheTemplates() {
+        MissiveTemplates.clear();
+    }
+
+    /** The mod's missive lines, and only those, so the rest of the suite still reads keys. */
     public void readInEnglish() {
         StringBuilder english = new StringBuilder();
         for (Map.Entry<String, String> line : LostTalesLangFile.english().entrySet()) {
@@ -77,7 +94,6 @@ public final class MissiveWordsTest {
             assertTrue("its target has a noun line: " + missive.getTarget(),
                     EnglishWords.INSTANCE.has(
                             MissiveWords.targetKey(missive.getTarget())));
-            assertEquals("2", missive.getGenerationContext().get("generator"));
             for (LostTalesMissiveObjectiveData objective : missive.getObjectives()) {
                 assertEquals("an objective's count is an argument",
                         String.valueOf(Integer.parseInt(
@@ -278,6 +294,96 @@ public final class MissiveWordsTest {
                 .setString("Value", "Missive: Clear the Paths");
         assertNull(com.ninuna.losttales.quest.LostTalesQuestDefinitionNbt
                 .read(tag));
+    }
+
+    /**
+     * A letter from a server's template carries its title, issuer and
+     * flavour as written (QUEST-42): shown so in every language, kept so by
+     * its item data, its quest, the quest log and its card; its
+     * description and objectives are still the reader's lang lines.
+     */
+    @Test
+    public void aServersLetterIsShownAsWrittenEverywhere() {
+        LostTalesMissiveData letter = written("Wanted: Wolf Pelts", "Barliman Butterbur",
+                "The wolves came down from the Barrow-downs again.");
+        assertTrue(letter.isValid());
+        inject(MissiveWords.titleKey("dangerous_work") + "=Kopfgeld\n"
+                + MissiveWords.descriptionKey("kill") + "=Reisende melden %s an den Straßen.\n"
+                + MissiveWords.targetKey("Zombie") + "=Zombies\n");
+        assertEquals("Wanted: Wolf Pelts", MissiveWords.title(letter));
+        assertEquals("Barliman Butterbur", MissiveWords.issuer(letter));
+        assertEquals("The wolves came down from the Barrow-downs again.",
+                MissiveWords.flavor(letter));
+        assertEquals("Reisende melden Zombies an den Straßen.",
+                MissiveWords.description(letter));
+
+        LostTalesMissiveData kept = LostTalesMissiveNbt.readFromNBT(
+                LostTalesMissiveNbt.writeToNBT(letter));
+        assertNotNull(kept);
+        assertTrue(kept.isWritten());
+        assertEquals("Wanted: Wolf Pelts", kept.getTitleId());
+
+        LostTalesQuestDefinition quest =
+                LostTalesMissiveQuestFactory.createQuestDefinition(letter);
+        assertEquals("true", quest.getWords().get(MissiveWords.WRITTEN));
+        LostTalesQuestDefinition logged = com.ninuna.losttales.quest
+                .LostTalesQuestDefinitionNbt.read(com.ninuna.losttales.quest
+                        .LostTalesQuestDefinitionNbt.write(quest));
+        assertNotNull("the quest log keeps written words", logged);
+        assertEquals("Wanted: Wolf Pelts", LostTalesQuestWords.title(logged));
+        assertEquals("The wolves came down from the Barrow-downs again.",
+                LostTalesQuestWords.journalParagraphs(logged,
+                        Collections.<String>emptyList(), false).get(0));
+        IChatComponent title = LostTalesQuestWords.titleComponent(logged);
+        assertFalse(title instanceof ChatComponentTranslation);
+        assertEquals("Wanted: Wolf Pelts", title.getUnformattedText());
+
+        com.ninuna.losttales.chat.share.ChatQuestCard card =
+                com.ninuna.losttales.quest.LostTalesQuestShareResolver.card(logged, null);
+        assertEquals(com.ninuna.losttales.chat.share.ChatQuestCard.Source.MISSIVE_WRITTEN,
+                card.getSource());
+        assertEquals("Wanted: Wolf Pelts", com.ninuna.losttales.quest
+                .LostTalesQuestCardWords.title(logged.getId(), card));
+    }
+
+    /** Written words are held to their bounds, and an id letter never holds a sentence. */
+    @Test
+    public void writtenWordsAreBoundedAndOnlyAWrittenLetterHoldsThem() {
+        assertFalse("blank", written(" ", "", "").isValid());
+        assertFalse("a control character", written("Wan\u0007ted", "", "").isValid());
+        StringBuilder longTitle = new StringBuilder();
+        while (longTitle.length() <= MissiveWords.MAX_WRITTEN_BYTES) {
+            longTitle.append('a');
+        }
+        assertFalse("past the bound", written(longTitle.toString(), "", "").isValid());
+        assertTrue("no issuer or flavour", written("Wanted", "", "").isValid());
+
+        Map<String, String> words = MissiveWords.wordsOf(written("Wanted", "Barliman", ""));
+        assertTrue(MissiveWords.isWellFormed(words));
+        words.remove(MissiveWords.WRITTEN);
+        assertFalse("a sentence without the mark is no id", MissiveWords.isWellFormed(words));
+        words.put(MissiveWords.WRITTEN, "yes");
+        assertFalse(MissiveWords.isWellFormed(words));
+
+        NBTTagCompound unmarked = LostTalesMissiveNbt.writeToNBT(written("Wanted", "", ""));
+        unmarked.setBoolean("Written", false);
+        assertNull(LostTalesMissiveNbt.readFromNBT(unmarked));
+        NBTTagCompound unsaid = LostTalesMissiveNbt.writeToNBT(written("Wanted", "", ""));
+        unsaid.removeTag("Written");
+        assertNull("a letter that does not say how it is worded is not read",
+                LostTalesMissiveNbt.readFromNBT(unsaid));
+    }
+
+    private static LostTalesMissiveData written(String title, String issuer, String flavor) {
+        Map<String, String> params = new java.util.LinkedHashMap<String, String>();
+        params.put("entity", "Zombie");
+        params.put("count", "4");
+        return LostTalesMissiveData.builder("losttales:missive/generated/b/1_0", "kill")
+                .written(true).titleId(title).issuerId(issuer).flavorId(flavor)
+                .descriptionId("kill").target("Zombie")
+                .objective(new LostTalesMissiveObjectiveData("kill_zombie", "kill",
+                        false, params))
+                .build();
     }
 
     private static LostTalesMissiveData counted(String type, String param,

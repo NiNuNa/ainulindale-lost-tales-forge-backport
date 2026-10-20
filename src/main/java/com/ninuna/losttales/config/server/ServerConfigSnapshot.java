@@ -22,10 +22,13 @@ import java.util.TreeSet;
  */
 public final class ServerConfigSnapshot {
 
-    /** Keys whose value never leaves the server. */
+    /**
+     * Keys whose value never leaves the server, as {@code category.key} in
+     * lower case.
+     */
     public static final Set<String> SECRET_KEYS = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList(
-                    LostTalesConfig.CATEGORY_DISCORD + ".botToken")));
+                    LostTalesConfig.CATEGORY_DISCORD + ".bottoken")));
     /** Categories that belong to the client and are not the server's to offer. */
     public static final Set<String> CLIENT_CATEGORIES = LostTalesConfig.CLIENT_CATEGORIES;
     /**
@@ -40,7 +43,12 @@ public final class ServerConfigSnapshot {
             Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
                     LostTalesConfig.CATEGORY_ROLES,
                     LostTalesConfig.CATEGORY_CHANNELS)));
-    /** Every category the general settings surface leaves alone. */
+    /**
+     * Every category the general settings surface leaves alone, by its
+     * root category in lower case: a subcategory goes with its root, as
+     * {@link com.ninuna.losttales.config.LostTalesSidedConfiguration}
+     * routes it to its root's file.
+     */
     public static final Set<String> EXCLUDED_CATEGORIES = excluded();
     /**
      * Keys a command of their own writes and the general settings
@@ -68,9 +76,22 @@ public final class ServerConfigSnapshot {
     private ServerConfigSnapshot() {}
 
     /**
-     * The entries of every category not excluded, in category then key
-     * order, leaving out the {@code excludedKeys} too, each named
-     * {@code category.key} in lower case.
+     * A category's root, in lower case: {@code roles} for {@code roles}
+     * and for {@code Roles.extra}.
+     */
+    public static String rootCategory(String category) {
+        String root = category == null ? "" : category;
+        int split = root.indexOf(Configuration.CATEGORY_SPLITTER);
+        if (split >= 0) {
+            root = root.substring(0, split);
+        }
+        return root.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * The entries of every category whose root is not excluded, in
+     * category then key order, leaving out the {@code excludedKeys} too.
+     * Excluded and secret keys are named {@code category.key} in lower case.
      */
     public static List<ServerConfigEntry> fromConfiguration(Configuration config,
                                                             Set<String> excludedCategories,
@@ -82,19 +103,18 @@ public final class ServerConfigSnapshot {
         }
         for (String categoryName : new TreeSet<String>(config.getCategoryNames())) {
             if (excludedCategories != null && excludedCategories.contains(
-                    categoryName.toLowerCase(Locale.ROOT))) {
+                    rootCategory(categoryName))) {
                 continue;
             }
             ConfigCategory category = config.getCategory(categoryName);
             for (String key : new TreeSet<String>(category.getValues().keySet())) {
                 Property property = category.get(key);
+                String qualified = (categoryName + "." + key).toLowerCase(Locale.ROOT);
                 if (property == null || entries.size() >= MAX_ENTRIES
-                        || (excludedKeys != null && excludedKeys.contains(
-                                (categoryName + "." + key).toLowerCase(Locale.ROOT)))) {
+                        || (excludedKeys != null && excludedKeys.contains(qualified))) {
                     continue;
                 }
-                boolean secret = secretKeys != null
-                        && secretKeys.contains(categoryName + "." + key);
+                boolean secret = secretKeys != null && secretKeys.contains(qualified);
                 entries.add(entryOf(categoryName, key, property, secret));
             }
         }

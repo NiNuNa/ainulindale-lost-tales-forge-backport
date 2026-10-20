@@ -53,7 +53,7 @@ public final class ChatRoleMentionTest {
     @Test
     public void aRoleCandidateIsNamedInItsColourAndFoundByPrefix() {
         ChatMentionCandidate operator = ChatMentionCandidate.role(
-                "role:operator", "Operator",
+                "role:operator", "Operator", null,
                 ChatRoleFixtures.OPERATOR.getColor());
         assertTrue(operator.isRole());
         assertEquals(ChatRoleFixtures.OPERATOR.getColor(),
@@ -68,7 +68,7 @@ public final class ChatRoleMentionTest {
     @Test
     public void rolesComeBeforePlayersInTheCompletionList() {
         ChatMentionCandidate operator = ChatMentionCandidate.role(
-                "role:operator", "Operator", 0xA94B54);
+                "role:operator", "Operator", null, 0xA94B54);
         ChatMentionCandidate player = ChatMentionCandidate.player(
                 "key", "Opal", "", "", Collections.<String>emptyList());
         List<ChatMentionCandidate> matches = ChatNameSuggester.matches(

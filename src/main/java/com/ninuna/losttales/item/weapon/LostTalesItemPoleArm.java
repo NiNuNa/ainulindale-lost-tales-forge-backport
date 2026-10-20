@@ -11,10 +11,6 @@ public class LostTalesItemPoleArm extends LostTalesItemSword {
         super(material, itemType);
     }
 
-    public LostTalesItemPoleArm(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, String credits) {
-        super(material, itemType, credits);
-    }
-
     @Override
     public EnumAction getItemUseAction(ItemStack itemstack) {
         return EnumAction.none;

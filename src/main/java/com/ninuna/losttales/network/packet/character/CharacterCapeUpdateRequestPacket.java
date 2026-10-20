@@ -23,7 +23,7 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
     private long expectedRosterRevision;
     private UUID characterId;
     private boolean showMinecraftCape;
-    private int cosmeticCapeId;
+    private String cosmeticCapeId = "";
     private boolean malformed;
 
     public CharacterCapeUpdateRequestPacket() {}
@@ -32,9 +32,10 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
                                             long expectedRosterRevision,
                                             UUID characterId,
                                             boolean showMinecraftCape,
-                                            int cosmeticCapeId) {
+                                            String cosmeticCapeId) {
         if (expectedRosterRevision < 0L || characterId == null
-                || !CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
+                || cosmeticCapeId == null
+                || cosmeticCapeId.length() > CharacterCapeCatalog.MAX_ID) {
             throw new IllegalArgumentException("invalid cape update request");
         }
         this.requestId = requestId;
@@ -51,7 +52,8 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
             this.expectedRosterRevision = buffer.readLong();
             this.characterId = LostTalesPacketCodec.readUuid(buffer);
             this.showMinecraftCape = buffer.readBoolean();
-            this.cosmeticCapeId = buffer.readUnsignedShort();
+            this.cosmeticCapeId = LostTalesPacketCodec.readUtf8String(
+                    buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             if (NIL_UUID.equals(this.characterId)) {
                 throw new CharacterPacketCodec.DecodeException("nil character id");
             }
@@ -60,11 +62,9 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
                 throw new CharacterPacketCodec.DecodeException(
                         "missing roster revision");
             }
-            // Do not normalize an unknown client value. The authoritative
-            // service must reject it rather than silently accepting "none".
-            if (this.cosmeticCapeId > CharacterCapeCatalog.MAX_NETWORK_ID) {
-                throw new CharacterPacketCodec.DecodeException(
-                        "cape ID is outside the network range");
+            // An unknown cape is not made "none" here: the service refuses it.
+            if (this.cosmeticCapeId.length() > CharacterCapeCatalog.MAX_ID) {
+                throw new CharacterPacketCodec.DecodeException("cape id too long");
             }
         } catch (RuntimeException exception) {
             this.malformed = true;
@@ -77,7 +77,8 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
         buffer.writeLong(this.expectedRosterRevision);
         LostTalesPacketCodec.writeUuid(buffer, this.characterId);
         buffer.writeBoolean(this.showMinecraftCape);
-        buffer.writeShort(this.cosmeticCapeId);
+        LostTalesPacketCodec.writeUtf8String(
+                buffer, this.cosmeticCapeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
     }
 
     /** The character asked about. */
@@ -85,7 +86,7 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
         return this.characterId;
     }
 
-    public int getCosmeticCapeId() {
+    public String getCosmeticCapeId() {
         return this.cosmeticCapeId;
     }
 
@@ -106,7 +107,7 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
             final long expectedRosterRevision = message.expectedRosterRevision;
             final UUID characterId = message.characterId;
             final boolean showMinecraftCape = message.showMinecraftCape;
-            final int cosmeticCapeId = message.cosmeticCapeId;
+            final String cosmeticCapeId = message.cosmeticCapeId;
             CharacterServerPacketDispatcher.submit(
                     player,
                     requestId,

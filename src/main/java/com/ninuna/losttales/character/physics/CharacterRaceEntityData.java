@@ -15,9 +15,6 @@ public final class CharacterRaceEntityData {
     private static final String TAG_RACE = "LostTalesActiveRace";
     private static final String TAG_STANDING_EYE_HEIGHT = "LostTalesEyeHeight";
     private static final String TAG_SNEAKING_EYE_HEIGHT = "LostTalesSneakingEyeHeight";
-    private static final String TAG_WIDTH = "LostTalesWidth";
-    private static final String TAG_HEIGHT = "LostTalesHeight";
-    private static final String TAG_LOTR_DERIVED = "LostTalesLotrDerivedProfile";
 
     private CharacterRaceEntityData() {}
 
@@ -32,9 +29,6 @@ public final class CharacterRaceEntityData {
                 dimensions.getStandingEyeHeight());
         data.setFloat(TAG_SNEAKING_EYE_HEIGHT,
                 dimensions.getSneakingEyeHeight());
-        data.setFloat(TAG_WIDTH, dimensions.getWidth());
-        data.setFloat(TAG_HEIGHT, dimensions.getHeight());
-        data.setBoolean(TAG_LOTR_DERIVED, dimensions.isLotrDerived());
     }
 
     public static String getRaceId(Entity entity) {

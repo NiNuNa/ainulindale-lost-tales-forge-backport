@@ -86,7 +86,6 @@ public class LostTalesColors {
 
     // ---- Translucent surfaces (palette entries with a chosen alpha) ----
     public static final int PANEL_FILL = withAlpha(PLUM_BLACK, 0xBC);
-    public static final int PANEL_FILL_SOFT = withAlpha(PLUM_BLACK, 0x90);
     public static final int PANEL_HOVER = withAlpha(IVORY, 0x4A);
     public static final int PANEL_SELECTED = withAlpha(PLUM_DARK, 0x64);
     public static final int BORDER = withAlpha(SAND, 0x82);

@@ -51,7 +51,7 @@ public final class CharacterRaceDimensionsRegistryTest {
                     new CharacterRaceGameplayProfile(
                             race.getId(), "lotr.common.entity.npc.Incorrect",
                             0.10F, 0.10F, 0.10F, 0.10F,
-                            26.0D, 1.10D, 2.0D, true);
+                            26.0D, 1.10D, 2.0D);
 
             CharacterRaceDimensions resolved =
                     CharacterRaceDimensions.fromProfile(

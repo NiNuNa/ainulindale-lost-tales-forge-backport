@@ -6,6 +6,7 @@ import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.compat.discord.DiscordBindingEntries;
 import com.ninuna.losttales.compat.discord.DiscordBridgePolicy;
 import com.ninuna.losttales.compat.discord.DiscordBridgeDirection;
+import com.ninuna.losttales.compat.discord.DiscordChannelBinding;
 import com.ninuna.losttales.compat.discord.DiscordLinkCodes;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -34,10 +35,9 @@ import net.minecraft.util.IChatComponent;
  * shown; {@code unlink} takes a game channel's links away, or one
  * Discord channel's, and deletes their webhooks. The links are written
  * through the config service, which saves the file and restarts the
- * bridge on it; {@code /losttales config reload} reads a file edited by
- * hand. Every
- * answer is words the sender's game translates, the channels it names
- * among them; the usage lines are the command's own syntax.
+ * bridge on it. Every answer is words the sender's game translates, the
+ * channels it names among them; the usage lines are the command's own
+ * syntax.
  */
 public final class LostTalesCommandDiscord extends LostTalesCommandBase {
 
@@ -81,26 +81,22 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
         }
     }
 
-    /** Every link, as a line each: the game channel, the Discord channel, the way lines cross. */
+    /**
+     * Every link as the bridge holds it, a line each: the game channel,
+     * the Discord channel, the way lines cross. An entry the bridge
+     * refuses is not among them; the server log says why.
+     */
     private void list(ICommandSender sender) {
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
         List<IChatComponent> lines = new ArrayList<IChatComponent>();
-        for (String entry : LostTalesConfig.discordChannelBindings) {
-            String key = DiscordBindingEntries.keyOf(entry);
-            if (key.length() == 0) {
-                continue;
-            }
-            String channel = DiscordBindingEntries.optionOf(entry, "channel");
-            DiscordBridgeDirection direction = DiscordBridgeDirection.parse(
-                    entry.substring(entry.indexOf('=') + 1).split(";")[0]);
+        for (DiscordChannelBinding binding : bridge.bindingsInForce().all()) {
             // Indented under the heading, the indent outside the words.
             IChatComponent line = new ChatComponentText("  ");
             line.getChatStyle().setColor(EnumChatFormatting.WHITE);
             line.appendSibling(words(SAY + "list.entry",
-                    LostTalesDiscordBridge.gameChannelComponent(key),
-                    channel.length() > 0 ? bridge.discordChannelComponent(channel)
-                            : words(SAY + "list.no_channel"),
-                    describe(direction)));
+                    LostTalesDiscordBridge.gameChannelComponent(binding.key()),
+                    bridge.discordChannelComponent(binding.getDiscordChannelId()),
+                    describe(binding.getDirection())));
             lines.add(line);
         }
         String heading;
@@ -144,10 +140,9 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             // Nobody on Discord stands near anyone.
             direction = DiscordBridgeDirection.GAME_TO_DISCORD;
         }
-        LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
-        if (!bridge.canPair()) {
-            say(sender, EnumChatFormatting.RED, bridge.isGatewayClosedForGood()
-                    ? SAY + "not_connected.closed" : SAY + "not_connected.setup");
+        LostTalesDiscordBridge.Pairing pairing = LostTalesDiscordBridge.getInstance().pairing();
+        if (pairing != LostTalesDiscordBridge.Pairing.READY) {
+            say(sender, EnumChatFormatting.RED, notConnectedKey(pairing));
             return;
         }
         UUID issuer = sender instanceof EntityPlayerMP
@@ -216,6 +211,20 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
                         LostTalesConfig.CATEGORY_DISCORD, BINDINGS_KEY, true, after)),
                 Collections.<String>emptySet(), ServerConfigSnapshot.COMMAND_KEYS));
         LostTalesDiscordBridge.getInstance().retireWebhooks(webhooks);
+    }
+
+    /** The lang key of why no code is handed out while the bot cannot take one. */
+    static String notConnectedKey(LostTalesDiscordBridge.Pairing pairing) {
+        switch (pairing) {
+            case CLOSED:
+                return SAY + "not_connected.closed";
+            case CONNECTING:
+                return SAY + "not_connected.connecting";
+            case NO_COMMANDS:
+                return SAY + "not_connected.commands";
+            default:
+                return SAY + "not_connected.setup";
+        }
     }
 
     /** The way lines cross a link, as words the sender's game translates. */

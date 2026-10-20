@@ -80,11 +80,14 @@ public final class LostTalesQuestTextTest {
         return new LostTalesQuestDefinition("quest", "Quest", "", repeatable,
                 restartable, LostTalesQuestDefinition.START_MODE_ANY, null,
                 null, null, null, null, null, null,
-                Collections.<LostTalesQuestStageDefinition>emptyList());
+                Collections.<LostTalesQuestStageDefinition>emptyList(), false,
+                null, null);
     }
 
     private static LostTalesQuestHistoryEntry ended(
             LostTalesQuestHistoryEntry.Outcome outcome) {
-        return new LostTalesQuestHistoryEntry("quest", outcome, "", 100L);
+        return new LostTalesQuestHistoryEntry("quest", outcome, "", 100L,
+                java.util.Collections.<String>emptySet(), 0,
+                java.util.Collections.<String>emptyList());
     }
 }

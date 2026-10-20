@@ -45,7 +45,7 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.record(-8, fellowship, global, false, 4200L, 1000L, true);
         assertFalse(ClientChatChannelViews.hasUnread(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         ClientChatChannelViews.record(-9, fellowship, global, false, 4201L, 1000L, true);
-        assertEquals(1, ClientChatChannelViews.unreadCount(ChatChannel.FELLOWSHIP));
+        assertEquals(1, ClientChatChannelViews.unreadCount(ConversationPage.of(ChatChannel.FELLOWSHIP)));
     }
 
     /**
@@ -69,11 +69,11 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.record(-399, global, console, false, 700L,
                 1000L, true);
         assertFalse(ClientChatChannelViews.hasUnread(ConversationPage.of(ChatChannel.GLOBAL)));
-        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.GLOBAL));
+        assertEquals(0, ClientChatChannelViews.unreadCount(global));
         // Said after they arrived, in a tab they are not looking at.
         ClientChatChannelViews.record(-400, global, console, false, 900L,
                 1000L, false);
-        assertEquals(1, ClientChatChannelViews.unreadCount(ChatChannel.GLOBAL));
+        assertEquals(1, ClientChatChannelViews.unreadCount(global));
     }
 
     /**
@@ -94,7 +94,7 @@ public final class ClientChatChannelViewsTest {
                 1000L, true);
         ClientChatChannelViews.record(-3, global, console, false, 502L,
                 1000L, true);
-        assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.GLOBAL));
+        assertEquals(2, ClientChatChannelViews.unreadCount(global));
     }
 
     /**
@@ -122,7 +122,7 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.record(-4, global, global, false, 900L,
                 1000L, true);
         assertEquals(2,
-                ClientChatChannelViews.unreadCount(ChatChannel.PROXIMITY));
+                ClientChatChannelViews.unreadCount(ConversationPage.of(ChatChannel.PROXIMITY)));
         assertTrue((ClientChatChannelViews.unreadPingCount(
                 ConversationPage.of(ChatChannel.PROXIMITY)) > 0));
         assertEquals(Integer.valueOf(-2),
@@ -139,11 +139,11 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.record(-1, proximity, global, false, 150L,
                 1000L, false);
         assertEquals(1,
-                ClientChatChannelViews.unreadCount(ChatChannel.PROXIMITY));
+                ClientChatChannelViews.unreadCount(ConversationPage.of(ChatChannel.PROXIMITY)));
         // In the tab in front, at the newest line, it is read as it comes.
         ClientChatChannelViews.record(-2, global, global, false, 151L,
                 1000L, false);
-        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.GLOBAL));
+        assertEquals(0, ClientChatChannelViews.unreadCount(global));
     }
 
     private static ChatLine line(int chatLineId) {
@@ -256,7 +256,7 @@ public final class ClientChatChannelViewsTest {
                 ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertEquals(1, ClientChatChannelViews.unreadOtherCount(
                 ConversationPage.of(ChatChannel.FELLOWSHIP)));
-        assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.FELLOWSHIP));
+        assertEquals(2, ClientChatChannelViews.unreadCount(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         assertTrue((ClientChatChannelViews.unreadPingCount(ConversationPage.of(ChatChannel.FELLOWSHIP)) > 0));
         // Lines arriving in the selected channel are read on arrival.
         assertFalse(ClientChatChannelViews.hasUnread(ConversationPage.of(ChatChannel.GLOBAL)));
@@ -288,7 +288,7 @@ public final class ClientChatChannelViewsTest {
                 ClientChatChannelViews.unreadOtherCount(ConversationPage.of(ChatChannel.OOC)));
         // The total shares the cap rather than summing past it.
         assertEquals(ClientChatChannelViews.MAX_UNREAD + 1,
-                ClientChatChannelViews.unreadCount(ChatChannel.OOC));
+                ClientChatChannelViews.unreadCount(ConversationPage.of(ChatChannel.OOC)));
     }
 
     /**
@@ -308,17 +308,17 @@ public final class ClientChatChannelViewsTest {
             ClientChatChannelViews.record(-3, ConversationPage.of(ChatChannel.FELLOWSHIP),
                     ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
             assertEquals(3, ClientChatChannelViews.unreadCount(
-                    ChatChannel.FELLOWSHIP));
+                    ConversationPage.of(ChatChannel.FELLOWSHIP)));
             // Closing and restoring touch no counter on their own.
             assertTrue(ChatLayoutViews.reopen(ChatChannel.FELLOWSHIP));
             assertEquals(3, ClientChatChannelViews.unreadCount(
-                    ChatChannel.FELLOWSHIP));
+                    ConversationPage.of(ChatChannel.FELLOWSHIP)));
             assertTrue(ChatLayout.close(ConversationPage.of(ChatChannel.FELLOWSHIP)));
             assertEquals(3, ClientChatChannelViews.unreadCount(
-                    ChatChannel.FELLOWSHIP));
+                    ConversationPage.of(ChatChannel.FELLOWSHIP)));
             ClientChatChannelViews.markViewed(ConversationPage.of(ChatChannel.FELLOWSHIP));
             assertEquals(0, ClientChatChannelViews.unreadCount(
-                    ChatChannel.FELLOWSHIP));
+                    ConversationPage.of(ChatChannel.FELLOWSHIP)));
         } finally {
             TwoWindowLayout.reset();
         }

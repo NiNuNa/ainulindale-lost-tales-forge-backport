@@ -83,7 +83,7 @@ public abstract class ScreenPart {
 
     /**
      * The box on screen a new player's tip points at ({@link FirstTips}),
-     * by the tip's id: the chat's head button for {@code head}. Null
+     * by the tip's id: the chat's identity button for {@code head}. Null
      * while the part draws no such thing.
      */
     public LostTalesUiHitBox tipTarget(String tip) {

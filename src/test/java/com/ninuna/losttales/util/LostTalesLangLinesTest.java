@@ -4,8 +4,14 @@ import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.camera.CameraPresetId;
 import com.ninuna.losttales.item.ELostTalesItem;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import net.minecraft.item.EnumRarity;
 import org.junit.Test;
 
@@ -19,6 +25,20 @@ import static org.junit.Assert.assertTrue;
  * sends no name, and the lines content names by its id.
  */
 public final class LostTalesLangLinesTest {
+    private static final String SOURCE_ROOT = "src/main/java";
+    /** A whole key: {@code gui.losttales.…}, {@code chat.losttales.…}, {@code losttales.…}. */
+    private static final Pattern KEY = Pattern.compile(
+            "(?:[A-Za-z]+\\.losttales|losttales)\\.[A-Za-z0-9_.\\-]*[A-Za-z0-9_]");
+    /** The coremod's flags, system properties named like keys. */
+    private static final Pattern FLAG = Pattern.compile("losttales\\.[A-Za-z]+\\.active");
+    /** Literals shaped like keys that are not lines. */
+    private static final List<String> NOT_LINES = Arrays.asList(
+            // The prefix PageHelp.paragraphs numbers: .1, .2 and on.
+            "gui.losttales.help.chat",
+            // The permission node of LostTalesPermissions.
+            "losttales.permission",
+            // A system property of the map markers.
+            "losttales.mapmarker.groupingDebug");
     private static final List<String> NAMED = Arrays.asList(
             "item.losttales.tooltip.hold.lore",
             "item.losttales.tooltip.hold.details",
@@ -82,9 +102,39 @@ public final class LostTalesLangLinesTest {
         }
     }
 
-    /** English reads as it did before the words moved to the lang file. */
+    /**
+     * Every key the code spells out whole in a string literal has its
+     * English line, so a key mistyped or a line renamed fails here and not
+     * on a screen. A literal followed by {@code +} is the start of a key
+     * built as the game runs; {@link #NOT_LINES} and the coremod's flags
+     * are shaped like keys but are not lines.
+     */
     @Test
-    public void englishReadsAsItDid() {
+    public void everyKeyTheCodeSpellsOutHasAnEnglishLine() throws IOException {
+        List<String> missing = new ArrayList<String>();
+        int checked = 0;
+        for (File file : javaFiles(sourceRoot())) {
+            String source = read(file);
+            for (int[] literal : literals(source)) {
+                String key = source.substring(literal[0], literal[1]);
+                if (!KEY.matcher(key).matches() || FLAG.matcher(key).matches()
+                        || NOT_LINES.contains(key) || builtOn(source, literal[1] + 1)) {
+                    continue;
+                }
+                checked++;
+                if (!EnglishWords.INSTANCE.has(key)) {
+                    missing.add(key + " (" + file.getName() + ")");
+                }
+            }
+        }
+        assertTrue("the code's keys were found", checked > 500);
+        assertEquals("keys in the code with no line in en_US.lang",
+                new ArrayList<String>(), missing);
+    }
+
+    /** The English lines read as the screens show them. */
+    @Test
+    public void englishReadsAsTheScreensShowIt() {
         assertEquals("Heavy Armor", EnglishWords.INSTANCE.format(
                 ELostTalesItem.Type.ARMOR_HEAVY.getNameKey()));
         assertEquals("Urn (Sealed)", EnglishWords.INSTANCE.format(
@@ -95,5 +145,89 @@ public final class LostTalesLangLinesTest {
                 "gui.losttales.character.attribute.value.percent", "110"));
         assertEquals("12m", EnglishWords.INSTANCE.format(
                 "gui.losttales.compass.distance", Long.valueOf(12L)));
+    }
+
+    /** Whether the code goes on with {@code +} after {@code index}: a key built as it runs. */
+    private static boolean builtOn(String source, int index) {
+        int cursor = index;
+        while (cursor < source.length() && Character.isWhitespace(source.charAt(cursor))) {
+            cursor++;
+        }
+        return cursor < source.length() && source.charAt(cursor) == '+';
+    }
+
+    /**
+     * Where each string literal of a Java source starts and ends, its
+     * quotes left out; comments and character literals are passed over.
+     */
+    private static List<int[]> literals(String source) {
+        List<int[]> found = new ArrayList<int[]>();
+        int length = source.length();
+        int index = 0;
+        while (index < length) {
+            char c = source.charAt(index);
+            char next = index + 1 < length ? source.charAt(index + 1) : '\0';
+            if (c == '/' && next == '/') {
+                int end = source.indexOf('\n', index);
+                index = end < 0 ? length : end + 1;
+            } else if (c == '/' && next == '*') {
+                int end = source.indexOf("*/", index + 2);
+                index = end < 0 ? length : end + 2;
+            } else if (c == '\'' || c == '"') {
+                int start = index + 1;
+                index = start;
+                while (index < length && source.charAt(index) != c) {
+                    index += source.charAt(index) == '\\' ? 2 : 1;
+                }
+                if (c == '"') {
+                    found.add(new int[] {start, Math.min(index, length)});
+                }
+                index++;
+            } else {
+                index++;
+            }
+        }
+        return found;
+    }
+
+    /**
+     * {@code src/main/java} under the working directory, as Gradle runs
+     * tests, or under the nearest folder above it that has one.
+     */
+    private static File sourceRoot() throws IOException {
+        File directory = new File(System.getProperty("user.dir")).getAbsoluteFile();
+        while (directory != null) {
+            File candidate = new File(directory, SOURCE_ROOT);
+            if (new File(candidate, "com/ninuna/losttales").isDirectory()) {
+                return candidate;
+            }
+            directory = directory.getParentFile();
+        }
+        throw new IOException("No " + SOURCE_ROOT + " at or above the working "
+                + "directory; run this test from the repository");
+    }
+
+    private static List<File> javaFiles(File directory) {
+        List<File> files = new ArrayList<File>();
+        collect(directory, files);
+        return files;
+    }
+
+    private static void collect(File directory, List<File> files) {
+        File[] entries = directory.listFiles();
+        if (entries == null) {
+            return;
+        }
+        for (File entry : entries) {
+            if (entry.isDirectory()) {
+                collect(entry, files);
+            } else if (entry.getName().endsWith(".java")) {
+                files.add(entry);
+            }
+        }
+    }
+
+    private static String read(File file) throws IOException {
+        return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
     }
 }

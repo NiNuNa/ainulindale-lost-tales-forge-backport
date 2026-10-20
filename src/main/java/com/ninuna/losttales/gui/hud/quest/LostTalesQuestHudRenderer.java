@@ -10,6 +10,7 @@ import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,6 +39,8 @@ public final class LostTalesQuestHudRenderer {
     private static final int NOTIFICATION_WIDTH = 272;
     private static final int NOTIFICATION_HEIGHT = 34;
     private static final int MAX_VISIBLE_NOTIFICATIONS = 4;
+    /** The tracked quests the tracker's box holds, when as many are tracked. */
+    static final int BOX_QUESTS = 2;
 
     private LostTalesQuestHudRenderer() {}
 
@@ -45,14 +48,21 @@ public final class LostTalesQuestHudRenderer {
         return PANEL_WIDTH;
     }
 
+    /**
+     * The tracker's box, which its two numbers place: the tracker as it
+     * most often stands, two tracked quests (one when only one may be)
+     * of one objective line each. A longer tracker grows down out of it,
+     * held inside the screen.
+     */
     public static int getTrackerPlacementHeight() {
-        int entries = getConfiguredTrackedQuestCount();
-        int entryHeight = QUEST_ENTRY_BASE_HEIGHT
-                + getConfiguredObjectiveLineCount() * QUEST_ENTRY_LINE_HEIGHT
-                + QUEST_ENTRY_PROGRESS_HEIGHT;
-        return PANEL_PADDING * 2 + 12
-                + entries * entryHeight
-                + Math.max(0, entries - 1) * QUEST_ENTRY_GAP;
+        return boxHeight(getConfiguredTrackedQuestCount());
+    }
+
+    static int boxHeight(int trackedQuests) {
+        int quests = Math.max(1, Math.min(BOX_QUESTS, trackedQuests));
+        int entryHeight = QUEST_ENTRY_BASE_HEIGHT + QUEST_ENTRY_LINE_HEIGHT;
+        return PANEL_PADDING * 2 + quests * entryHeight
+                + (quests - 1) * QUEST_ENTRY_GAP;
     }
 
     public static void render(Minecraft minecraft, float partialTicks) {
@@ -88,13 +98,14 @@ public final class LostTalesQuestHudRenderer {
             }
         }
 
-        HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
-                resolution.getScaledWidth(), resolution.getScaledHeight(),
-                PANEL_WIDTH, panelHeight,
-                LostTalesConfig.questHudOffsetX,
-                LostTalesConfig.questHudOffsetY,
-                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT,
-                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT);
+        int screenWidth = resolution.getScaledWidth();
+        int screenHeight = resolution.getScaledHeight();
+        HudPlacementLayout.Bounds placement = HudPlacementLayout.drawn(
+                HudPlacementLayout.calculate(screenWidth, screenHeight,
+                        PANEL_WIDTH, getTrackerPlacementHeight(),
+                        LostTalesConfig.questHudOffsetX,
+                        LostTalesConfig.questHudOffsetY),
+                PANEL_WIDTH, panelHeight, screenWidth, screenHeight);
         int x = placement.x;
         int y = placement.y;
 
@@ -135,7 +146,12 @@ public final class LostTalesQuestHudRenderer {
         int left = x + PANEL_PADDING;
         int right = x + width - PANEL_PADDING;
         int titleY = y + 1;
-        String title = trimToWidth(font, entry.title, right - left - 28);
+        // A title or a line too long for the panel fades into its end;
+        // nothing points at the HUD, so nothing slides (LOOK-37).
+        String title = entry.title == null ? "" : entry.title;
+        int titleRoom = Math.max(0, right - left - 28);
+        int titleWidth = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(title), titleRoom);
         int titleRgb = LostTalesColors.rgb(entry.complete
                 ? LostTalesColors.GREEN : LostTalesColors.TEXT_BRIGHT);
 
@@ -143,20 +159,21 @@ public final class LostTalesQuestHudRenderer {
         // the way a section's rule does in the journal.
         int ruleColor = LostTalesColors.withAlpha(LostTalesColors.SAND, 0x88);
         Gui.drawRect(left + 17, titleY + 5,
-                Math.max(left + 17, right - font.getStringWidth(title) - 10),
+                Math.max(left + 17, right - titleWidth - 10),
                 titleY + 6, ruleColor);
         Gui.drawRect(right - 8, titleY + 5, right, titleY + 6, ruleColor);
         drawSmallDiamond(left + 5, titleY + 5, titleRgb);
         LostTalesSkyrimUiStyle.beginContent();
-        font.drawStringWithShadow(title, right - font.getStringWidth(title),
-                titleY, titleRgb);
+        LostTalesUiCutName.drawShadowed(font, title, right - titleWidth,
+                titleY, titleRoom, titleRgb);
 
         int objectiveY = y + 15;
         int maxLines = Math.max(1, Math.min(getConfiguredObjectiveLineCount(), entry.objectiveLines.size()));
         for (int i = 0; i < maxLines; i++) {
-            String line = trimToWidth(font, entry.objectiveLines.get(i), right - left - 10);
-            font.drawStringWithShadow(line, left + 4,
-                    objectiveY + i * QUEST_ENTRY_LINE_HEIGHT,
+            String line = entry.objectiveLines.get(i);
+            LostTalesUiCutName.drawShadowed(font, line == null ? "" : line,
+                    left + 4, objectiveY + i * QUEST_ENTRY_LINE_HEIGHT,
+                    Math.max(0, right - left - 10),
                     LostTalesColors.rgb(entry.complete
                             ? LostTalesColors.GREEN : LostTalesColors.TEXT));
         }
@@ -266,8 +283,13 @@ public final class LostTalesQuestHudRenderer {
             Gui.drawRect(x, y + NOTIFICATION_HEIGHT - 1, x + NOTIFICATION_WIDTH, y + NOTIFICATION_HEIGHT, accentColor);
             String title = notification.getType().getDisplayTitle();
             LostTalesSkyrimUiStyle.beginContent();
-            font.drawStringWithShadow(trimToWidth(font, title, NOTIFICATION_WIDTH - 16), x + 8, y + 4, accentColor);
-            font.drawStringWithShadow(trimToWidth(font, notification.getMessage(), NOTIFICATION_WIDTH - 16), x + 8, y + 17, textColor);
+            // Words too long for the notice fade into its end (LOOK-37).
+            String message = notification.getMessage();
+            LostTalesUiCutName.drawShadowed(font, title == null ? "" : title,
+                    x + 8, y + 4, NOTIFICATION_WIDTH - 16, accentColor);
+            LostTalesUiCutName.drawShadowed(font,
+                    message == null ? "" : message, x + 8, y + 17,
+                    NOTIFICATION_WIDTH - 16, textColor);
         }
     }
 
@@ -275,22 +297,6 @@ public final class LostTalesQuestHudRenderer {
     private static String noObjective() {
         return QuestMarks.OPEN + " " + StatCollector.translateToLocal(
                 "gui.losttales.quest.objective.none");
-    }
-
-    private static String trimToWidth(FontRenderer font, String text, int width) {
-        if (text == null || width <= 0) {
-            return "";
-        }
-        if (font.getStringWidth(text) <= width) {
-            return text;
-        }
-        String ellipsis = "...";
-        int ellipsisWidth = font.getStringWidth(ellipsis);
-        String trimmed = text;
-        while (trimmed.length() > 0 && font.getStringWidth(trimmed) + ellipsisWidth > width) {
-            trimmed = trimmed.substring(0, trimmed.length() - 1);
-        }
-        return trimmed + ellipsis;
     }
 
     private static final class TrackedQuestHudEntry {

@@ -37,7 +37,7 @@ public final class DiscordReturnCheckTest {
 
     private static List<DiscordReturnCheck.Fix> fixes(List<DiscordJson.ReactionCount> onDiscord,
                                                       Map<String, Integer> inGame) {
-        return DiscordReturnCheck.fixesFor(CHANNEL, MESSAGE, onDiscord, inGame);
+        return DiscordReturnCheck.fixesFor(CHANNEL, MESSAGE, onDiscord, inGame, 0L);
     }
 
     @Test
@@ -131,7 +131,7 @@ public final class DiscordReturnCheckTest {
         assertNull(check.nextChannel());
         assertTrue(check.isDone());
         DiscordReturnCheck.Fix fix = new DiscordReturnCheck.Fix(CHANNEL, MESSAGE,
-                "smile", "", "😄", false, true);
+                "smile", "", "😄", false, true, 0L);
         for (int index = 0; index < DiscordReturnCheck.MAX_FIXES; index++) {
             assertTrue(check.offer(fix));
         }

@@ -76,16 +76,16 @@ public final class FellowshipMarkNbtCodec {
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
-        if (safeSource.hasKey(TAG_MARKS)
-                && !safeSource.hasKey(TAG_MARKS, Constants.NBT.TAG_LIST)) {
+        // The writer always writes the list, so a save without it is of
+        // another shape and stays as it is.
+        if (!safeSource.hasKey(TAG_MARKS, Constants.NBT.TAG_LIST)) {
             return ReadResult.unsupported(safeSource, -1);
         }
-        boolean repaired = !safeSource.hasKey(TAG_MARKS, Constants.NBT.TAG_LIST);
-        NbtQuarantine.Read quarantine = NbtQuarantine.readCurrentVersionOnly(safeSource);
+        boolean repaired = false;
+        NbtQuarantine.Read quarantine = NbtQuarantine.read(safeSource);
         if (!quarantine.isSupported()) {
             return ReadResult.unsupported(safeSource, quarantine.getUnsupportedVersion());
         }
-        repaired |= quarantine.isRepaired();
         List<NBTTagCompound> quarantinedEntries =
                 new ArrayList<NBTTagCompound>(quarantine.getEntries());
         Map<UUID, FellowshipMark> marks = new LinkedHashMap<UUID, FellowshipMark>();
@@ -137,6 +137,13 @@ public final class FellowshipMarkNbtCodec {
                 perFellowship.put(mark.getFellowshipId(),
                         Integer.valueOf(held == null ? 1 : held.intValue() + 1));
             }
+        }
+        if (quarantinedEntries.size() > FellowshipNbtCodec.MAX_QUARANTINED) {
+            LostTalesLog.warning("Fellowship mark quarantine would hold %d records, past its %d; "
+                            + "data will remain read-only",
+                    Integer.valueOf(quarantinedEntries.size()),
+                    Integer.valueOf(FellowshipNbtCodec.MAX_QUARANTINED));
+            return ReadResult.unsupported(safeSource, -1);
         }
         return ReadResult.success(marks, repaired, quarantinedEntries);
     }

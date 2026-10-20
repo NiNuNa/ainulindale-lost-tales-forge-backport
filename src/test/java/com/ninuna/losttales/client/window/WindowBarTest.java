@@ -174,4 +174,15 @@ public final class WindowBarTest {
         assertEquals("", track.tipText());
         assertEquals("Pick a quest first.", track.greyedWhy());
     }
+
+    /** A greyed field keeps its own hint; only a press on it says why. */
+    @Test
+    public void aGreyedFieldKeepsItsHint() {
+        BarItem invite = BarItem.field("invite", null,
+                "Invite a character by name...")
+                .unavailable("Only the leader may invite.");
+        assertEquals("Invite a character by name...", invite.label);
+        assertEquals("", invite.tipText());
+        assertEquals("Only the leader may invite.", invite.greyedWhy());
+    }
 }

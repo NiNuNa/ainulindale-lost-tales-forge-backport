@@ -72,6 +72,13 @@ public final class LostTalesCapability {
     /** Ban an account, a character or everyone from spawning LOTR's structures (/losttales structures). */
     public static final LostTalesCapability STRUCTURES_BAN =
             register("structures.ban", OPERATOR);
+    /**
+     * Read the skill, race and deed files again, see and give skill
+     * experience (/losttales skills), and place and break the statues
+     * that reset a skill's perks (PROG-12).
+     */
+    public static final LostTalesCapability PROGRESSION_ADMIN =
+            register("progression.admin", OPERATOR);
 
     private final String id;
     private final int requiredOpLevel;

@@ -27,6 +27,9 @@ public abstract class LostTalesCommandBase extends CommandBase {
     /** The answer when a command run from the console names no player. */
     static final String PLAYER_REQUIRED = "chat.losttales.command.player_required";
 
+    /** The answer when a command names a player who is not online: {@code %s}, the name given. */
+    static final String PLAYER_UNKNOWN = "chat.losttales.command.player_unknown";
+
     private final String commandName;
 
     public LostTalesCommandBase(String commandName) {

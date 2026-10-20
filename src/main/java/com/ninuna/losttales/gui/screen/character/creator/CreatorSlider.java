@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import net.minecraft.client.gui.FontRenderer;
@@ -181,9 +182,12 @@ public final class CreatorSlider extends CreatorControl {
                         LostTalesSkyrimUiStyle.PLUM_BLACK, 0x60));
         LostTalesSkyrimUiStyle.beginContent();
         // The far end of the track reads as "and older".
-        String end = LostTalesSkyrimUiStyle.trimToWidth(font, this.endLabel, 30);
-        font.drawStringWithShadow(end, right - font.getStringWidth(end) + 2,
-                trackY + TRACK_HEIGHT + 6, LostTalesSkyrimUiStyle.TEXT_DIM);
+        // Words too long for their room fade into its end (LOOK-37).
+        int endWidth = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(this.endLabel), 30);
+        LostTalesUiCutName.drawShadowed(font, this.endLabel,
+                right - endWidth + 2, trackY + TRACK_HEIGHT + 6, 30,
+                LostTalesSkyrimUiStyle.TEXT_DIM);
 
         // The readout, or the field standing in for it.
         int readoutX = readoutX();
@@ -218,7 +222,8 @@ public final class CreatorSlider extends CreatorControl {
             CreatorRows.light(this.context, this.y, this.y + height());
         }
         CreatorRows.drawLabel(this.context, this.label, this.x, this.y,
-                this.x + this.width);
+                this.x + this.width, this, this.label,
+                contains(mouseX, mouseY));
         int textTop = CreatorRows.textTop(this.y);
         int left = trackLeft();
         int right = trackRight();

@@ -26,9 +26,9 @@ import java.util.regex.Pattern;
  * registered Unicode emoji and alias shortcodes become their canonical
  * {@code :name:}, any other Unicode emoji its Discord name between colons,
  * Discord's block markup is folded into the inline marks the chat reads
- * ({@link #normalizeMarkdown}), line breaks collapse to spaces, control
- * characters, section signs and whatever no font can draw go, and the
- * result is cut to the chat's own length. Outbound, a canonical
+ * ({@link #normalizeMarkdown}), its lines become the chat's paragraphs,
+ * eight at most, control characters, section signs and whatever no font
+ * can draw go, and the result is cut to the chat's own length. Outbound, a canonical
  * shortcode becomes the Unicode emoji Discord renders — the mod's own
  * sprites stay literal text — and what Discord would draw and the game
  * does not is broken with a zero-width space

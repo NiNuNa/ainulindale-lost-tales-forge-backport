@@ -33,12 +33,16 @@ public final class FellowshipNames {
         return FellowshipErrorId.NONE;
     }
 
-    /** Why a mark's name is refused; {@link FellowshipErrorId#NONE} for one that stands. */
+    /**
+     * Why a trimmed name may not be a mark's; {@link FellowshipErrorId#NONE}
+     * for one that may: as a fellowship's name, with no {@code @} or square
+     * brackets besides.
+     */
     public static FellowshipErrorId markNameError(String name, ChatProfanityWords words) {
         if (name == null || name.length() == 0) {
             return FellowshipErrorId.NAME_MISSING;
         }
-        if (name.length() > FellowshipMark.MAX_NAME_LENGTH) {
+        if (name.codePointCount(0, name.length()) > FellowshipMark.MAX_NAME_LENGTH) {
             return FellowshipErrorId.NAME_TOO_LONG;
         }
         if (!FellowshipMark.isValidName(name)

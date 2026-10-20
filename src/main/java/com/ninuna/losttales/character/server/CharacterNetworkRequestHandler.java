@@ -2,7 +2,6 @@ package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.deletion.CharacterDeletionService;
-import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
@@ -49,7 +48,7 @@ public final class CharacterNetworkRequestHandler {
                     return made;
                 }
                 CharacterOperationResult joined = CharacterJoin.join(player,
-                        requestId, made.getCharacter().getCharacterId());
+                        made.getCharacter().getCharacterId());
                 return joined.isSuccessful() ? joined : made;
             }
         });
@@ -65,13 +64,8 @@ public final class CharacterNetworkRequestHandler {
         execute(player, requestId, CharacterOperationType.SELECT, new Operation() {
             @Override
             public CharacterOperationResult run() {
-                if (characterId == null) {
-                    return CharacterOperationResult.failure(
-                            CharacterErrorId.INVALID_CHARACTER_ID, null);
-                }
-                return CharacterService.getInstance().selectIdentity(
-                        player, requestId, expectedRosterRevision,
-                        PlayableIdentity.character(player.getUniqueID(), characterId));
+                return CharacterService.getInstance().selectCharacter(
+                        player, requestId, expectedRosterRevision, characterId);
             }
         });
     }
@@ -96,7 +90,7 @@ public final class CharacterNetworkRequestHandler {
                                                final long expectedRosterRevision,
                                                final UUID characterId,
                                                final boolean showMinecraftCape,
-                                               final int cosmeticCapeId) {
+                                               final String cosmeticCapeId) {
         execute(player, requestId, CharacterOperationType.CAPE_UPDATE, new Operation() {
             @Override
             public CharacterOperationResult run() {

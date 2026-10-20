@@ -33,7 +33,7 @@ public final class LostTalesMapLegendRegistry {
     static {
         register(new LostTalesMapLegendCategory(
                 LOCATIONS, "gui.losttales.map.legend.locations",
-                LostTalesCompassMarkerIcon.TOWN, "white"));
+                LostTalesCompassMarkerIcon.SHACK, "white"));
         register(new LostTalesMapLegendCategory(
                 PERSONAL_WAYPOINTS,
                 "gui.losttales.map.legend.personal_waypoints",
@@ -45,7 +45,7 @@ public final class LostTalesMapLegendRegistry {
         register(new LostTalesMapLegendCategory(
                 PLAYER_WAYSTONES,
                 "gui.losttales.map.legend.player_waystones",
-                LostTalesCompassMarkerIcon.FORT, "yellow"));
+                LostTalesCompassMarkerIcon.SHACK, "yellow"));
         register(new LostTalesMapLegendCategory(
                 QUESTS, "gui.losttales.map.legend.quests",
                 LostTalesCompassMarkerIcon.QUEST, "yellow"));
@@ -54,7 +54,7 @@ public final class LostTalesMapLegendRegistry {
                 LostTalesCompassMarkerIcon.QUEST, "blue"));
         register(new LostTalesMapLegendCategory(
                 LABELS, "gui.losttales.map.legend.labels",
-                LostTalesCompassMarkerIcon.TOWN, "white"));
+                LostTalesCompassMarkerIcon.SHACK, "white"));
     }
 
     private LostTalesMapLegendRegistry() {

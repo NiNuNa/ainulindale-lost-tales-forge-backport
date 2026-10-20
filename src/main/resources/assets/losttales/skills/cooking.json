@@ -1,0 +1,62 @@
+{
+  "id": "losttales:cooking",
+  "icon": "minecraft:bread",
+  "order": 8,
+  "counts": [
+    {
+      "act": "smelt",
+      "worth": {
+        "food": 1.0
+      }
+    },
+    {
+      "act": "craft",
+      "worth": {
+        "food": 0.5
+      }
+    },
+    {
+      "act": "brew",
+      "per": 2.0
+    }
+  ],
+  "perks": [
+    {
+      "id": "hearty_meals",
+      "levels": [10, 40],
+      "effect": "hearty_meals",
+      "amount": 0.1
+    },
+    {
+      "id": "brewer",
+      "levels": [20],
+      "effect": "brewer",
+      "amount": 4
+    },
+    {
+      "id": "second_helping",
+      "levels": [30],
+      "effect": "second_helping",
+      "amount": 0.2
+    },
+    {
+      "id": "ale_wise",
+      "levels": [50],
+      "effect": "ale_wise",
+      "amount": 0.5
+    },
+    {
+      "id": "feast",
+      "levels": [60],
+      "effect": "feast",
+      "amount": 5,
+      "needs": "hearty_meals:2"
+    },
+    {
+      "id": "master_cook",
+      "levels": [100],
+      "effect": "master_cook",
+      "amount": 0.2
+    }
+  ]
+}

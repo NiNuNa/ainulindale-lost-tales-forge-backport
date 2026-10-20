@@ -1,0 +1,3 @@
+{
+  "missives": ["missives/enemies.json", "missives/zombies.json", "missives/skeletons.json", "missives/spiders.json", "missives/creepers.json", "missives/coal.json", "missives/iron_ingots.json", "missives/gold_ingots.json", "missives/wheat.json", "missives/leather.json", "missives/string.json", "missives/bones.json", "missives/logs.json"]
+}

@@ -3,6 +3,7 @@ package com.ninuna.losttales.world.map.waypoint;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
+import java.util.BitSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +37,22 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
         return true;
     }
 
+    /** LOTR's fast-travel regions the player has unlocked, by their order; none where LOTR keeps no data. */
+    public static BitSet unlockedRegions(EntityPlayer player) {
+        BitSet unlocked = new BitSet();
+        LOTRPlayerData lotrData = player == null ? null : LOTRLevelData.getData(player);
+        if (lotrData == null) {
+            return unlocked;
+        }
+        LOTRWaypoint.Region[] regions = LOTRWaypoint.Region.values();
+        for (int index = 0; index < regions.length; index++) {
+            if (lotrData.isFTRegionUnlocked(regions[index])) {
+                unlocked.set(index);
+            }
+        }
+        return unlocked;
+    }
+
     /**
      * Makes private fallback regions match both marker discovery and the
      * marker location's real LOTR region. Native regions remain untouched.
@@ -54,7 +71,7 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
         Map<LOTRWaypoint.Region, Boolean> desiredRegions =
                 new LinkedHashMap<LOTRWaypoint.Region, Boolean>();
         for (LostTalesMapMarkerDefinition marker :
-                LostTalesMapMarkerCatalog.getMarkers()) {
+                LostTalesMapMarkerCatalog.getBundledMarkers()) {
             // Never mutate native biome/faction regions. They belong to LOTR
             // and are used by non-discoverable markers exactly as-is.
             if (!LostTalesMapMarkerWaypointRegistry

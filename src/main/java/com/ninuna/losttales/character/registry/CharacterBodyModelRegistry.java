@@ -4,10 +4,10 @@ import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * Stable body model identifiers and the default model of every race.
+ * Stable body model identifiers; a race's default model is its body's
+ * ({@link CharacterBody}).
  *
  * Skins name the model that draws them, so the model a player renders with
  * follows the chosen skin rather than the race directly. The LOTR identifiers
@@ -30,9 +30,6 @@ public final class CharacterBodyModelRegistry {
     public static final String LOSTTALES_PLAYER = "losttales:player";
 
     private static final Map<String, CharacterBodyModelDefinition> DEFINITIONS;
-    private static final Map<String, String> DEFAULT_MODEL_BY_RACE;
-    /** Models a race may use besides its default. */
-    private static final Map<String, Set<String>> EXTRA_MODELS_BY_RACE;
 
     static {
         LinkedHashMap<String, CharacterBodyModelDefinition> definitions =
@@ -53,19 +50,6 @@ public final class CharacterBodyModelRegistry {
         register(definitions, new CharacterBodyModelDefinition(
                 LOSTTALES_PLAYER, CharacterSkinLayout.MINECRAFT_64X64, true, true, true));
         DEFINITIONS = Collections.unmodifiableMap(definitions);
-
-        LinkedHashMap<String, String> defaults = new LinkedHashMap<String, String>();
-        defaults.put(CharacterRaceRegistry.HUMAN, LOTR_HUMAN);
-        defaults.put(CharacterRaceRegistry.ELF, LOTR_ELF);
-        defaults.put(CharacterRaceRegistry.DWARF, LOTR_DWARF);
-        defaults.put(CharacterRaceRegistry.HOBBIT, LOTR_HOBBIT);
-        defaults.put(CharacterRaceRegistry.ORC, LOTR_ORC);
-        defaults.put(CharacterRaceRegistry.URUK, LOTR_URUK);
-        DEFAULT_MODEL_BY_RACE = Collections.unmodifiableMap(defaults);
-
-        LinkedHashMap<String, Set<String>> extras = new LinkedHashMap<String, Set<String>>();
-        extras.put(CharacterRaceRegistry.HUMAN, Collections.singleton(LOSTTALES_PLAYER));
-        EXTRA_MODELS_BY_RACE = Collections.unmodifiableMap(extras);
     }
 
     private CharacterBodyModelRegistry() {}
@@ -74,25 +58,24 @@ public final class CharacterBodyModelRegistry {
         return DEFINITIONS.get(LostTalesIdentifiers.normalize(id));
     }
 
-    /** The model a race's catalogue skins draw with; empty for an unknown race. */
+    /** The model a race's catalogue skins draw with, its body's; empty for an unknown race. */
     public static String getDefaultModelId(String raceId) {
-        String modelId = DEFAULT_MODEL_BY_RACE.get(
-                LostTalesIdentifiers.normalize(raceId));
-        return modelId == null ? "" : modelId;
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
+        return race == null ? "" : race.getBody().getModelId();
     }
 
-    /** True when the model is one a character of that race may be drawn with. */
+    /**
+     * True when the model is one a character of that race may be drawn
+     * with: its body's, or the plain player body on the human body.
+     */
     public static boolean isCompatible(String raceId, String modelId) {
         String normalized = LostTalesIdentifiers.normalize(modelId);
-        if (normalized.length() == 0) {
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
+        if (normalized.length() == 0 || race == null) {
             return false;
         }
-        if (normalized.equals(getDefaultModelId(raceId))) {
-            return true;
-        }
-        Set<String> extras = EXTRA_MODELS_BY_RACE.get(
-                LostTalesIdentifiers.normalize(raceId));
-        return extras != null && extras.contains(normalized);
+        return normalized.equals(race.getBody().getModelId())
+                || normalized.equals(race.getBody().getAccountSkinModelId());
     }
 
     private static void register(Map<String, CharacterBodyModelDefinition> definitions,

@@ -23,7 +23,12 @@ public final class LostTalesWaystoneIconTest {
         for (String icon : WaystoneDraft.ICONS) {
             assertTrue(icon, LostTalesWaystoneSettingsService.isIconName(icon));
         }
-        assertTrue(LostTalesWaystoneSettingsService.isIconName("fort"));
+        assertTrue("the icon a placed waystone wears",
+                LostTalesWaystoneSettingsService.isIconName(
+                        LostTalesMapMarkerRecord.createPlayerMarker(
+                                "losttales:player/icon", "Aldric",
+                                java.util.UUID.randomUUID(), 0, 1, 64, 1,
+                                java.util.UUID.randomUUID()).getIconName()));
         assertTrue(LostTalesWaystoneSettingsService.isIconName("big-port"));
     }
 
@@ -51,8 +56,8 @@ public final class LostTalesWaystoneIconTest {
                 128.0D, 8.0D, false, true, false,
                 LostTalesMapMarkerSource.PLAYER_CREATED, false, "", 0, "");
         ByteBuf buffer = Unpooled.buffer();
-        new LostTalesMapMarkerSnapshotPacket(Collections.singletonList(marker))
-                .toBytes(buffer);
+        new LostTalesMapMarkerSnapshotPacket(1, 0, 1,
+                Collections.singletonList(marker)).toBytes(buffer);
         LostTalesMapMarkerSnapshotPacket decoded =
                 new LostTalesMapMarkerSnapshotPacket();
         decoded.fromBytes(buffer);

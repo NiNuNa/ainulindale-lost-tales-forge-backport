@@ -237,11 +237,6 @@ final class ClientChatIdentities {
         return activeIdentityKey() + readCharacters();
     }
 
-    /** The account's own name, which is what an account channel speaks as. */
-    static synchronized String accountName() {
-        return accountIdentity().name;
-    }
-
     /**
      * Whether the copy has the Narrator's voice taken up: its lines sign
      * as the Narrator, on its identity's own routing. The server says no
@@ -305,7 +300,7 @@ final class ClientChatIdentities {
         return tab != null && ChatRolePresentation.speaksAsPlayedCharacter(tab.getChannel());
     }
 
-    /** Whether the head button chooses who the tab speaks as: Global, Faction, whispers. */
+    /** Whether the identity button chooses who the tab speaks as: Global, Faction, whispers. */
     static boolean picksIdentity(ConversationPage tab) {
         return speaksInCharacter(tab) && !speaksAsPlayed(tab);
     }
@@ -318,7 +313,7 @@ final class ClientChatIdentities {
 
     /**
      * Whether the tab's channel speaks as a character rather than the
-     * account: where the head button chooses, and where a choice shows.
+     * account: where the identity button chooses, and where a choice shows.
      */
     static boolean speaksInCharacter(ConversationPage tab) {
         return tab != null && ChatRolePresentation.isInCharacter(tab.getChannel());

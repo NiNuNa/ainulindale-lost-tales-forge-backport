@@ -8,13 +8,13 @@ import com.ninuna.losttales.gui.style.LostTalesUiCaret;
  * pixels, left to right:
  *
  * <pre>
- * head button |7| divider |7| well: |3| field + caret |3| :well |7| divider |3| counter |3| controls
+ * identity button |7| divider |7| well: |3| field + caret |3| :well |7| divider |3| counter |3| controls
  * </pre>
  *
  * <p>The field lies in a well: a stretch of the chat's darker inset
  * surface between the two dividers, {@link #WELL_GAP} clear pixels inside
  * each. Every gap is measured in ink, like every other gap the chat
- * keeps: the head button is measured from its frame's outer edge, and the
+ * keeps: the identity button is measured from its frame's outer edge, and the
  * field ends a caret's width short of its gap, so a caret after the last
  * character of a full field keeps the same clear space from the well's
  * edge that the first character keeps from the other one. The counter's
@@ -29,7 +29,7 @@ final class ChatInputLine {
     /** Clear pixels between each divider and the well: the well counts as a control. */
     static final int WELL_GAP = WindowStyle.EDGE_GAP;
 
-    /** Left edge of the divider after the head button. */
+    /** Left edge of the divider after the identity button. */
     final int leftDividerX;
     /** The well: {@link #WELL_GAP} inside each divider. */
     final int wellLeft;
@@ -75,7 +75,7 @@ final class ChatInputLine {
 
     /**
      * Where the divider after the bar's leading buttons stands: an edge's
-     * gap past {@code buttonsRight}, the head button's frame.
+     * gap past {@code buttonsRight}, the identity button's frame.
      */
     static int dividerAfter(int buttonsRight) {
         return buttonsRight + WindowStyle.EDGE_GAP;

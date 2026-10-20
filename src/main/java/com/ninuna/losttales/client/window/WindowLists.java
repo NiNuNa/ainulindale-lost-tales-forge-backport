@@ -2,8 +2,8 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -81,9 +81,9 @@ public final class WindowLists {
         int textX = left + icon.getWidth() + TabIcons.GAP;
         if (field.getText().length() == 0) {
             int promptX = textX + LostTalesUiCaret.WIDTH + 1;
-            LostTalesUiInk.drawText(font, "§o" + trimmed(font,
-                    prompt == null ? "" : prompt, promptRight - promptX),
-                    promptX, textY, WindowStyle.asideRgb(), alpha);
+            LostTalesUiCutName.drawText(font, "§o" + (prompt == null ? ""
+                    : prompt), promptX, textY, promptRight - promptX,
+                    WindowStyle.asideRgb(), alpha);
         }
         // The windows' own field, at the window's fade: it scrolls to its
         // caret as a bar's does.
@@ -106,16 +106,34 @@ public final class WindowLists {
 
     /**
      * A heading over rows, a row high from {@code rowY}: its words in sand
-     * from {@code textLeft}, ivory while {@code lit}, cut at {@code right},
-     * over a hairline from {@code left} to {@code right} on the row's foot.
+     * from {@code textLeft}, ivory while {@code lit}, cut at {@code right}
+     * and fading into it (LOOK-37), over a hairline from {@code left} to
+     * {@code right} on the row's foot.
      */
     public static void drawHeading(FontRenderer font, String text, int left,
                                    int textLeft, int right, int rowY,
                                    int rowHeight, boolean lit, int alpha) {
-        LostTalesUiInk.drawText(font, trimmed(font, text, right - textLeft),
-                textLeft, headingTextTop(rowY, rowHeight),
+        drawHeading(font, text, left, textLeft, right, right, rowY, rowHeight,
+                lit, alpha, null, null, false);
+    }
+
+    /**
+     * As {@link #drawHeading(FontRenderer, String, int, int, int, int, int, boolean, int)},
+     * its words cut at {@code textRight}, short of what stands at the
+     * heading's end, and sliding along while the pointer is
+     * {@code rested} on it: {@code owner} and {@code key} name it to the
+     * shared state of cut names.
+     */
+    public static void drawHeading(FontRenderer font, String text, int left,
+                                   int textLeft, int textRight, int right,
+                                   int rowY, int rowHeight, boolean lit,
+                                   int alpha, Object owner, Object key,
+                                   boolean rested) {
+        LostTalesUiCutName.drawText(font, text == null ? "" : text, textLeft,
+                headingTextTop(rowY, rowHeight), textRight - textLeft,
                 lit ? LostTalesUiInk.IVORY
-                        : LostTalesColors.rgb(LostTalesColors.SAND), alpha);
+                        : LostTalesColors.rgb(LostTalesColors.SAND), alpha,
+                owner, key, rested);
         Gui.drawRect(left, rowY + rowHeight - 1, right, rowY + rowHeight,
                 LostTalesUiInk.argb(LostTalesUiTheme.secondaryRgb(),
                         Math.round(HEADING_RULE_ALPHA * alpha / 255.0F)));
@@ -221,11 +239,5 @@ public final class WindowLists {
         LostTalesUiInk.fillRect(x, thumbBottom, x + 1, bottom, track);
         LostTalesUiInk.fillRect(x, thumbTop, x + 1, thumbBottom,
                 LostTalesUiInk.argb(LostTalesUiInk.IVORY, Math.min(alpha, 200)));
-    }
-
-    private static String trimmed(FontRenderer font, String text, int width) {
-        return font.getStringWidth(text) <= width ? text
-                : LostTalesSkyrimUiStyle.trimToWidth(font, text,
-                        Math.max(0, width));
     }
 }

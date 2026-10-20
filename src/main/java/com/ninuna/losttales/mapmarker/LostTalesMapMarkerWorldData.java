@@ -1,6 +1,7 @@
 package com.ninuna.losttales.mapmarker;
 
 import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTTagString;
 import net.minecraft.world.WorldSavedData;
 import net.minecraftforge.common.util.Constants;
 
@@ -22,7 +24,17 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
     private static final String LOTR_TRAVEL_IDS = "LotrTravelIds";
     private static final String TRAVEL_MARKER_ID = "MarkerId";
     private static final String TRAVEL_ID = "TravelId";
-    private static final String CATALOG_INITIALIZED = "CatalogInitialized";
+    /** Every marker id the files ever seeded, so one removed is not seeded again. */
+    private static final String SEEDED_MARKERS = "SeededMarkers";
+    /**
+     * The discovery grids, as the shift from a block to its cell: cells of
+     * 16, 64 and 256 blocks. A marker stands on the first grid whose cells
+     * are at least a quarter of its reach, so a scan walks at most 11 by 11
+     * cells of each grid, however far a marker is found from.
+     */
+    private static final int[] DISCOVERY_CELL_SHIFTS = {4, 6, 8};
+    /** How many cells of its grid a marker's reach spans at most. */
+    private static final int CELLS_PER_REACH = 4;
 
     private final Map<String, LostTalesMapMarkerRecord> records =
             new LinkedHashMap<String, LostTalesMapMarkerRecord>();
@@ -32,8 +44,15 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
             new LinkedHashMap<String, String>();
     private final Map<String, Set<String>> markerIdsByChunk =
             new LinkedHashMap<String, Set<String>>();
-    private final Map<Integer, Double> maximumDiscoveryRadiusByDimension =
-            new LinkedHashMap<Integer, Double>();
+    /**
+     * The discoverable markers by the cell of the discovery grid that
+     * suits how far each is found from ({@link #DISCOVERY_CELL_SHIFTS}).
+     */
+    private final Map<String, Set<String>> discoverableIdsByCell =
+            new LinkedHashMap<String, Set<String>>();
+    /** The widest reach on each discovery grid of each world, in blocks. */
+    private final Map<String, Double> widestReachByGrid =
+            new LinkedHashMap<String, Double>();
     private final List<NBTTagCompound> quarantinedEntries =
             new ArrayList<NBTTagCompound>();
     private final Map<String, Integer> lotrTravelIds =
@@ -41,7 +60,9 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
     private boolean readOnlyForNewerVersion;
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
-    private boolean catalogInitialized;
+    private final Set<String> seededKeys = new LinkedHashSet<String>();
+    /** The marker files' read this store last seeded from; held in memory only. */
+    private int seededRevision = -1;
 
     public LostTalesMapMarkerWorldData(String name) {
         super(name);
@@ -53,13 +74,15 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         this.markerIdByCanonicalKey.clear();
         this.markerIdByLinkedPosition.clear();
         this.markerIdsByChunk.clear();
-        this.maximumDiscoveryRadiusByDimension.clear();
+        this.discoverableIdsByCell.clear();
+        this.widestReachByGrid.clear();
         this.quarantinedEntries.clear();
         this.lotrTravelIds.clear();
         this.readOnlyForNewerVersion = false;
         this.unsupportedDataVersion = -1;
         this.preservedNewerData = null;
-        this.catalogInitialized = false;
+        this.seededKeys.clear();
+        this.seededRevision = -1;
 
         LostTalesMapMarkerNbtCodec.ReadResult result =
                 LostTalesMapMarkerNbtCodec.read(compound);
@@ -69,23 +92,20 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
             this.preservedNewerData = result.getOriginalCopy();
             return;
         }
+        Set<String> seeded = readSeededKeys(compound);
+        if (seeded == null) {
+            LostTalesLog.warning("Map marker data does not say which markers the files seeded; preserving it read-only");
+            this.readOnlyForNewerVersion = true;
+            this.preservedNewerData = (NBTTagCompound)compound.copy();
+            return;
+        }
+        this.seededKeys.addAll(seeded);
         this.records.putAll(result.getRecords());
-        boolean hadStoredRecords = !this.records.isEmpty();
         this.quarantinedEntries.addAll(result.getQuarantineCopy());
         boolean repaired = deduplicateLogicalRecords();
+        repaired |= quarantineSharedLinks();
         repaired |= alignLinkedMarkerPositions();
-        if (compound.hasKey(CATALOG_INITIALIZED,
-                Constants.NBT.TAG_BYTE)) {
-            this.catalogInitialized =
-                    compound.getBoolean(CATALOG_INITIALIZED);
-        } else {
-            // Existing saves were already initialized by the old
-            // session-based seeding logic. Persist the new flag on the
-            // next save so JSON remains initialization-only.
-            this.catalogInitialized = hadStoredRecords;
-            repaired |= hadStoredRecords;
-        }
-        repaired |= rebuildIndexes();
+        rebuildIndexes();
         repaired |= readLotrTravelIds(compound);
         if (result.wasRepaired() || repaired) {
             markDirty();
@@ -101,8 +121,11 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         }
         LostTalesMapMarkerNbtCodec.write(
                 compound, this.records.values(), this.quarantinedEntries);
-        compound.setBoolean(CATALOG_INITIALIZED,
-                this.catalogInitialized);
+        NBTTagList seeded = new NBTTagList();
+        for (String key : this.seededKeys) {
+            seeded.appendTag(new NBTTagString(key));
+        }
+        compound.setTag(SEEDED_MARKERS, seeded);
         NBTTagList travelIds = new NBTTagList();
         ArrayList<String> markerIds =
                 new ArrayList<String>(this.lotrTravelIds.keySet());
@@ -166,19 +189,74 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         return Collections.unmodifiableList(result);
     }
 
+    /**
+     * The discoverable markers a player standing at {@code x, z} is within
+     * reach of, across the ground: a marker's discovery radius, at most
+     * {@link LostTalesMapMarkerRecord#MAX_PLACED_DISCOVERY_RADIUS}, as far
+     * as the scan goes (WAY-15), times {@code reachScale}, which
+     * Pathfinder widens (PROG-06). Each discovery grid is walked only as
+     * far as the widest reach on it.
+     */
     public synchronized Collection<LostTalesMapMarkerRecord>
-    getDiscoveryCandidates(int dimensionId, double x, double z) {
-        Double maximum = this.maximumDiscoveryRadiusByDimension.get(
-                Integer.valueOf(dimensionId));
-        if (maximum == null || maximum.doubleValue() <= 0.0D) {
-            return Collections.emptyList();
+    getDiscoveryCandidates(int dimensionId, double x, double z, double reachScale) {
+        double scale = Math.max(1.0D, reachScale);
+        LinkedHashSet<String> ids = new LinkedHashSet<String>();
+        int blockX = floor(x);
+        int blockZ = floor(z);
+        for (int grid = 0; grid < DISCOVERY_CELL_SHIFTS.length; grid++) {
+            Double widest = this.widestReachByGrid.get(
+                    gridKey(dimensionId, grid));
+            if (widest == null) {
+                continue;
+            }
+            int shift = DISCOVERY_CELL_SHIFTS[grid];
+            int cells = (int)Math.ceil(widest.doubleValue() * scale / (1 << shift))
+                    + 1;
+            int cellX = blockX >> shift;
+            int cellZ = blockZ >> shift;
+            for (int walkX = cellX - cells; walkX <= cellX + cells; walkX++) {
+                for (int walkZ = cellZ - cells; walkZ <= cellZ + cells;
+                     walkZ++) {
+                    Set<String> bucket = this.discoverableIdsByCell.get(
+                            cellKey(dimensionId, grid, walkX, walkZ));
+                    if (bucket != null) {
+                        ids.addAll(bucket);
+                    }
+                }
+            }
         }
-        int radiusChunks = (int)Math.ceil(
-                Math.min(LostTalesMapMarkerRecord.MAX_PLACED_DISCOVERY_RADIUS,
-                        maximum.doubleValue()) / 16.0D) + 1;
-        return getRecordsNearChunks(
-                dimensionId, floor(x) >> 4, floor(z) >> 4,
-                Math.min(64, radiusChunks));
+        ArrayList<LostTalesMapMarkerRecord> result =
+                new ArrayList<LostTalesMapMarkerRecord>();
+        for (String id : ids) {
+            LostTalesMapMarkerRecord record = this.records.get(id);
+            if (record == null) {
+                continue;
+            }
+            double reach = discoveryReach(record) * scale;
+            double dx = x - record.getX();
+            double dz = z - record.getZ();
+            if (dx * dx + dz * dz <= reach * reach) {
+                result.add(record);
+            }
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    /** How far across the ground a marker is found from: its radius, at least a block, at most as far as the scan goes. */
+    private static double discoveryReach(LostTalesMapMarkerRecord record) {
+        return Math.max(1.0D, Math.min(
+                LostTalesMapMarkerRecord.MAX_PLACED_DISCOVERY_RADIUS,
+                record.getDiscoveryRadius()));
+    }
+
+    /** The discovery grid a reach stands on: the first whose cells are a quarter of it or more. */
+    private static int gridFor(double reach) {
+        for (int grid = 0; grid < DISCOVERY_CELL_SHIFTS.length - 1; grid++) {
+            if (reach <= CELLS_PER_REACH * (1 << DISCOVERY_CELL_SHIFTS[grid])) {
+                return grid;
+            }
+        }
+        return DISCOVERY_CELL_SHIFTS.length - 1;
     }
 
     public synchronized LostTalesMapMarkerRecord findByLinkedPosition(
@@ -249,16 +327,22 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         return true;
     }
 
+    /**
+     * Puts in each marker of the files this store never seeded: a marker
+     * new to the files, bundled or the server's own, arrives as the server
+     * starts. One seeded before stays as the store has it, and one removed
+     * since, its waystone broken, does not come back; only
+     * {@code /losttales mapmarker reseed} brings it back. Answers whether
+     * a record was added.
+     */
     public synchronized boolean seedDefinitions(
             Collection<LostTalesMapMarkerDefinition> definitions) {
         if (this.readOnlyForNewerVersion) {
             return false;
         }
         ensureWritable();
-        if (this.catalogInitialized) {
-            return false;
-        }
-        boolean changed = false;
+        boolean added = false;
+        boolean noted = false;
         LinkedHashSet<String> canonicalKeys =
                 new LinkedHashSet<String>(
                         this.markerIdByCanonicalKey.keySet());
@@ -268,21 +352,68 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
                     continue;
                 }
                 String canonicalKey = canonicalKey(definition.getId());
-                if (canonicalKey != null
-                        && canonicalKeys.add(canonicalKey)) {
+                if (canonicalKey == null
+                        || !this.seededKeys.add(canonicalKey)) {
+                    continue;
+                }
+                noted = true;
+                if (canonicalKeys.add(canonicalKey)) {
                     this.records.put(definition.getId(),
                             LostTalesMapMarkerRecord.fromDefinition(
                                     definition));
-                    changed = true;
+                    added = true;
                 }
             }
         }
-        this.catalogInitialized = true;
-        if (changed) {
+        if (added) {
             rebuildIndexes();
         }
-        markDirty();
-        return changed;
+        if (noted) {
+            markDirty();
+        }
+        return added;
+    }
+
+    /** Notes a marker as seeded, as a reseed made its record. */
+    public synchronized void noteSeeded(String markerId) {
+        String canonicalKey = canonicalKey(markerId);
+        if (!this.readOnlyForNewerVersion && canonicalKey != null
+                && this.seededKeys.add(canonicalKey)) {
+            markDirty();
+        }
+    }
+
+    /** The marker files' read the store last seeded from; -1 before any. */
+    public synchronized int getSeededRevision() {
+        return this.seededRevision;
+    }
+
+    public synchronized void setSeededRevision(int revision) {
+        this.seededRevision = revision;
+    }
+
+    /**
+     * The seeded markers' keys a store holds; null for a store without
+     * the list, or with anything but keys in it.
+     */
+    private static Set<String> readSeededKeys(NBTTagCompound compound) {
+        if (!compound.hasKey(SEEDED_MARKERS, Constants.NBT.TAG_LIST)) {
+            return null;
+        }
+        NBTTagList list = (NBTTagList)compound.getTag(SEEDED_MARKERS);
+        if (list.tagCount() > 0
+                && list.func_150303_d() != Constants.NBT.TAG_STRING) {
+            return null;
+        }
+        LinkedHashSet<String> keys = new LinkedHashSet<String>();
+        for (int index = 0; index < list.tagCount(); index++) {
+            String key = list.getStringTagAt(index);
+            if (key.length() == 0) {
+                return null;
+            }
+            keys.add(key);
+        }
+        return keys;
     }
 
     /**
@@ -441,67 +572,97 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         return repaired;
     }
 
-    private boolean rebuildIndexes() {
+    /**
+     * Two records linked to one waystone block, which no write makes: the
+     * one of the higher revision keeps the block, and the other is
+     * quarantined whole, once, as the store loads.
+     */
+    private boolean quarantineSharedLinks() {
+        LinkedHashMap<String, LostTalesMapMarkerRecord> holders =
+                new LinkedHashMap<String, LostTalesMapMarkerRecord>();
+        List<String> discarded = new ArrayList<String>();
+        for (LostTalesMapMarkerRecord candidate : this.records.values()) {
+            if (!candidate.isLinked()) {
+                continue;
+            }
+            String key = linkKey(candidate.getLinkedDimensionId(),
+                    candidate.getLinkedX(), candidate.getLinkedY(),
+                    candidate.getLinkedZ());
+            LostTalesMapMarkerRecord previous = holders.get(key);
+            if (previous == null) {
+                holders.put(key, candidate);
+                continue;
+            }
+            LostTalesMapMarkerRecord retained =
+                    previous.getRevision() >= candidate.getRevision()
+                            ? previous : candidate;
+            LostTalesMapMarkerRecord other =
+                    retained == previous ? candidate : previous;
+            holders.put(key, retained);
+            discarded.add(other.getId());
+            this.quarantinedEntries.add(quarantineRecord(
+                    "duplicate_waystone_link", other, retained.getId()));
+        }
+        for (String id : discarded) {
+            this.records.remove(id);
+        }
+        return !discarded.isEmpty();
+    }
+
+    /**
+     * Rebuilds every lookup from the records. The store holds no two
+     * records of one logical id and no two linked to one block: loading
+     * quarantines them, and {@link #saveRecord} refuses them.
+     */
+    private void rebuildIndexes() {
         this.markerIdByCanonicalKey.clear();
         this.markerIdByLinkedPosition.clear();
         this.markerIdsByChunk.clear();
-        this.maximumDiscoveryRadiusByDimension.clear();
-        boolean repaired = false;
+        this.discoverableIdsByCell.clear();
+        this.widestReachByGrid.clear();
         for (LostTalesMapMarkerRecord record : this.records.values()) {
             String canonicalKey = canonicalKey(record.getId());
-            String previousMarkerId =
-                    this.markerIdByCanonicalKey.get(canonicalKey);
-            if (previousMarkerId == null) {
-                this.markerIdByCanonicalKey.put(
-                        canonicalKey, record.getId());
-            } else if (!previousMarkerId.equals(record.getId())) {
-                this.quarantinedEntries.add(quarantineRecord(
-                        "duplicate_logical_marker_id",
-                        record, previousMarkerId));
-                repaired = true;
-                continue;
+            if (!this.markerIdByCanonicalKey.containsKey(canonicalKey)) {
+                this.markerIdByCanonicalKey.put(canonicalKey, record.getId());
             }
             if (record.isLinked()) {
-                String key = linkKey(record.getLinkedDimensionId(),
+                String linkKey = linkKey(record.getLinkedDimensionId(),
                         record.getLinkedX(), record.getLinkedY(),
                         record.getLinkedZ());
-                String previous = this.markerIdByLinkedPosition.get(key);
-                if (previous == null) {
-                    this.markerIdByLinkedPosition.put(
-                            key, record.getId());
-                } else if (!previous.equals(record.getId())) {
-                    this.quarantinedEntries.add(quarantine(
-                            "duplicate_waystone_link",
-                            record.getId(), previous));
-                    repaired = true;
+                if (!this.markerIdByLinkedPosition.containsKey(linkKey)) {
+                    this.markerIdByLinkedPosition.put(linkKey, record.getId());
                 }
             }
             int blockX = floor(record.getX());
             int blockZ = floor(record.getZ());
-            String chunkKey = chunkKey(
-                    record.getDimensionId(), blockX >> 4, blockZ >> 4);
-            Set<String> bucket = this.markerIdsByChunk.get(chunkKey);
-            if (bucket == null) {
-                bucket = new LinkedHashSet<String>();
-                this.markerIdsByChunk.put(chunkKey, bucket);
-            }
-            bucket.add(record.getId());
+            add(this.markerIdsByChunk, chunkKey(
+                    record.getDimensionId(), blockX >> 4, blockZ >> 4),
+                    record.getId());
             if (record.isDiscoverable()) {
-                Integer dimensionKey =
-                        Integer.valueOf(record.getDimensionId());
-                Double previousMaximum =
-                        this.maximumDiscoveryRadiusByDimension.get(
-                                dimensionKey);
-                if (previousMaximum == null
-                        || previousMaximum.doubleValue()
-                                < record.getDiscoveryRadius()) {
-                    this.maximumDiscoveryRadiusByDimension.put(
-                            dimensionKey,
-                            Double.valueOf(record.getDiscoveryRadius()));
+                double reach = discoveryReach(record);
+                int grid = gridFor(reach);
+                int shift = DISCOVERY_CELL_SHIFTS[grid];
+                add(this.discoverableIdsByCell, cellKey(
+                        record.getDimensionId(), grid, blockX >> shift,
+                        blockZ >> shift), record.getId());
+                String gridKey = gridKey(record.getDimensionId(), grid);
+                Double widest = this.widestReachByGrid.get(gridKey);
+                if (widest == null || widest.doubleValue() < reach) {
+                    this.widestReachByGrid.put(gridKey,
+                            Double.valueOf(reach));
                 }
             }
         }
-        return repaired;
+    }
+
+    private static void add(Map<String, Set<String>> buckets, String key,
+                            String markerId) {
+        Set<String> bucket = buckets.get(key);
+        if (bucket == null) {
+            bucket = new LinkedHashSet<String>();
+            buckets.put(key, bucket);
+        }
+        bucket.add(markerId);
     }
 
     private String resolveStoredMarkerId(String markerId) {
@@ -535,6 +696,15 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
     private static String chunkKey(
             int dimensionId, int chunkX, int chunkZ) {
         return dimensionId + ":" + chunkX + ":" + chunkZ;
+    }
+
+    private static String gridKey(int dimensionId, int grid) {
+        return dimensionId + ":" + grid;
+    }
+
+    private static String cellKey(
+            int dimensionId, int grid, int cellX, int cellZ) {
+        return dimensionId + ":" + grid + ":" + cellX + ":" + cellZ;
     }
 
     private static int floor(double value) {

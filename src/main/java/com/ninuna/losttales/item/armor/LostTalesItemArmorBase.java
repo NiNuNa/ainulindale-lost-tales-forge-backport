@@ -18,28 +18,17 @@ import net.minecraft.item.ItemStack;
 
 public class LostTalesItemArmorBase extends ItemArmor {
     private final String armorTextureName;
-    private final String credits;
     private final ELostTalesItemMaterial material;
     private final ELostTalesItem.Type itemType;
 
     private AttributeModifier knockBack;
     private AttributeModifier moveSpeed;
 
-    public LostTalesItemArmorBase(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, int slotType, String armorTextureName, String credits) {
-        super((itemType.equals(ELostTalesItem.Type.ARMOR_LIGHT)) ? material.getMaterial().getLightArmorMaterial() : material.getMaterial().getHeavyArmorMaterial(), 0, slotType);
-        this.material = material;
-        this.itemType = itemType;
-        this.armorTextureName = armorTextureName;
-        this.credits = credits;
-        this.setAttributeModifier();
-    }
-
     public LostTalesItemArmorBase(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, int slotType, String armorTextureName) {
         super((itemType.equals(ELostTalesItem.Type.ARMOR_LIGHT)) ? material.getMaterial().getLightArmorMaterial() : material.getMaterial().getHeavyArmorMaterial(), 0, slotType);
         this.material = material;
         this.itemType = itemType;
         this.armorTextureName = armorTextureName;
-        this.credits = null;
         this.setAttributeModifier();
     }
 
@@ -85,7 +74,7 @@ public class LostTalesItemArmorBase extends ItemArmor {
     @Override
     @SideOnly(Side.CLIENT)
     public void addInformation(ItemStack itemStack, EntityPlayer player, List list, boolean advancedTooltips) {
-        LostTalesClientUtil.addItemInformation(list, itemStack, this.material, this.credits, player, this.itemType);
+        LostTalesClientUtil.addItemInformation(list, itemStack, this.material, null, player, this.itemType);
     }
 
     public ELostTalesItem.Type getItemType() {

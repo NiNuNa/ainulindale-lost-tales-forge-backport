@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.window.Unlocking;
+import com.ninuna.losttales.client.window.ViewFileFixtures;
 import com.ninuna.losttales.client.window.WindowLayout;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,8 +38,12 @@ public final class TwoWindowLayout {
 
     private TwoWindowLayout() {}
 
-    /** The chat's state cleared and the two windows laid out. */
+    /**
+     * The chat's state cleared and the two windows laid out, the views
+     * opening with the mod's own view files.
+     */
     public static void reset() {
+        ViewFileFixtures.useBundled();
         ChatLayout.reset();
         WindowLayout.setDefaults(TWO_WINDOWS);
         try {

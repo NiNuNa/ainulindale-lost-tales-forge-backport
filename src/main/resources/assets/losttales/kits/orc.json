@@ -1,0 +1,9 @@
+{
+  "id": "losttales:orc",
+  "race": "losttales:orc",
+  "items": [
+    {"item": "lotr:item.daggerOrc", "count": 1},
+    {"item": "lotr:item.maggotyBread", "count": 10},
+    {"item": "lotr:item.orcTorch", "count": 4}
+  ]
+}

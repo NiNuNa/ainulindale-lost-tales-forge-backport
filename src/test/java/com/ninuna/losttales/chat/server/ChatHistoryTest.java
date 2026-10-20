@@ -1028,8 +1028,8 @@ public final class ChatHistoryTest {
                 ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true));
 
         ChatReactionSummary forBob = ChatHistory.reactionsFor(id, Collections.singleton(BOB));
-        assertTrue(forBob.find("smile").isMine(BOB));
-        assertFalse(ChatHistory.reactionsFor(id, Collections.singleton(ALICE)).find("smile").isMine(ALICE));
+        assertTrue(forBob.find("smile").mineAs.contains(BOB));
+        assertFalse(ChatHistory.reactionsFor(id, Collections.singleton(ALICE)).find("smile").mineAs.contains(ALICE));
     }
 
     @Test
@@ -1044,6 +1044,31 @@ public final class ChatHistoryTest {
         assertNull("a message not kept takes no reaction",
                 ChatHistory.react(whisper + 99, reader(BOB), BOB, "Beren",
                         "smile", true));
+    }
+
+    @Test
+    public void onePlayersIdentitiesTogetherHoldOneIdentitysReactions() {
+        long id = record(ChatChannel.GLOBAL, ALICE, "hail",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        UUID beren = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
+        UUID barahir = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
+        ChatHistory.Requester bob = new ChatHistory.Requester(BOB,
+                Collections.<String, Long>emptyMap(), null, EVERY_CHANNEL,
+                Arrays.asList(beren, barahir));
+        com.ninuna.losttales.chat.emoji.ChatEmoji[] emoji =
+                com.ninuna.losttales.chat.emoji.ChatEmoji.values();
+        String first = emoji[0].getName();
+        for (int i = 0; i < ChatReactions.MAX_PER_PLAYER; i++) {
+            assertNotNull(ChatHistory.react(id, bob, beren, "Beren",
+                    emoji[i].getName(), true));
+        }
+        assertNull("a second character of the same player adds none past the cap",
+                ChatHistory.react(id, bob, barahir, "Barahir", first, true));
+        assertNotNull("another player still may",
+                ChatHistory.react(id, reader(CAROL), CAROL, "Celeb", first, true));
+        assertNotNull("taking one back is never refused",
+                ChatHistory.react(id, bob, beren, "Beren", first, false));
+        assertNotNull(ChatHistory.react(id, bob, barahir, "Barahir", first, true));
     }
 
     @Test
@@ -1067,7 +1092,7 @@ public final class ChatHistoryTest {
         ChatReactionSummary.Reaction smile =
                 replay.get(0).getReactions().find("smile");
         assertNotNull(smile);
-        assertFalse(smile.isMine(CAROL));
+        assertFalse(smile.mineAs.contains(CAROL));
         assertEquals("Aldric", smile.names.get(0));
 
         // Carol was handed the line, so a reaction made later reaches her.
@@ -1109,7 +1134,7 @@ public final class ChatHistoryTest {
         assertTrue("the first player", change.after.players());
         assertNotNull(ChatHistory.clearDiscordReactions(id, parrot, "556", "7"));
         assertEquals(1, ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find(parrot).count);
-        assertTrue(ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find(parrot).isMine(BOB));
+        assertTrue(ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find(parrot).mineAs.contains(BOB));
     }
 
     /** The custom emoji pepe:556 renamed on Discord to pepe_happy keeps its id. */
@@ -1155,7 +1180,7 @@ public final class ChatHistoryTest {
         assertNotNull(ChatHistory.clearDiscordReactions(id, "pepe_happy:556",
                 "556", "7"));
         assertEquals(1, ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("pepe:556").count);
-        assertTrue(ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("pepe:556").isMine(BOB));
+        assertTrue(ChatHistory.reactionsFor(id, Collections.singleton(BOB)).find("pepe:556").mineAs.contains(BOB));
         assertNull("nothing of Discord's left to clear",
                 ChatHistory.clearDiscordReactions(id, null, "556", "7"));
     }

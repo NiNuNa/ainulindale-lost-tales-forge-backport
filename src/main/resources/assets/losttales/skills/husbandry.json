@@ -1,0 +1,74 @@
+{
+  "id": "losttales:husbandry",
+  "icon": "minecraft:wheat",
+  "order": 9,
+  "counts": [
+    {
+      "act": "harvest",
+      "worth": {
+        "*": 1.0,
+        "lotr:tile.athelas": 2.0,
+        "lotr:tile.dwarfHerb": 2.0,
+        "lotr:tile.simbelmyne": 2.0,
+        "lotr:tile.elanor": 2.0,
+        "lotr:tile.niphredil": 2.0,
+        "lotr:tile.asphodel": 2.0,
+        "lotr:tile.lavender": 2.0,
+        "lotr:tile.bluebell": 2.0
+      }
+    },
+    {
+      "act": "breed",
+      "worth": {
+        "*": 5.0
+      }
+    },
+    {
+      "act": "tame",
+      "worth": {
+        "Wolf": 10,
+        "Ozelot": 10
+      }
+    }
+  ],
+  "perks": [
+    {
+      "id": "harvest",
+      "levels": [10, 40],
+      "effect": "harvest_bonus",
+      "amount": 0.15
+    },
+    {
+      "id": "breeder",
+      "levels": [20],
+      "effect": "breed_cooldown",
+      "amount": 0.5
+    },
+    {
+      "id": "shepherd",
+      "levels": [30],
+      "effect": "shear_bonus",
+      "amount": 1
+    },
+    {
+      "id": "herbalist",
+      "levels": [50],
+      "effect": "herbalist",
+      "amount": 1,
+      "with": ["lotr:tile.athelas", "lotr:tile.dwarfHerb", "lotr:tile.simbelmyne", "lotr:tile.elanor", "lotr:tile.niphredil", "lotr:tile.asphodel", "lotr:tile.lavender", "lotr:tile.bluebell"]
+    },
+    {
+      "id": "butcher",
+      "levels": [60],
+      "effect": "butcher",
+      "amount": 0.5
+    },
+    {
+      "id": "master_of_beasts",
+      "levels": [100],
+      "effect": "grow_faster",
+      "amount": 0.5,
+      "needs": "breeder"
+    }
+  ]
+}

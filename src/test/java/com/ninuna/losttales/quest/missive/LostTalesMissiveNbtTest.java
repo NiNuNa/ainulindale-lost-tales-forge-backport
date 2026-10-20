@@ -49,6 +49,7 @@ public final class LostTalesMissiveNbtTest {
         NBTTagCompound missive = new NBTTagCompound();
         missive.setString("QuestId", "losttales:missive/generated/test");
         missive.setString("QuestType", "gather");
+        missive.setBoolean("Written", false);
         missive.setString("TitleId", "clear_the_paths");
         NBTTagList objectives = new NBTTagList();
         for (int i = 0; i < LostTalesMissiveNbt.MAX_OBJECTIVES + 1; i++) {
@@ -64,6 +65,7 @@ public final class LostTalesMissiveNbtTest {
         NBTTagCompound missive = new NBTTagCompound();
         missive.setString("QuestId", "losttales:missive/generated/test");
         missive.setString("QuestType", "gather");
+        missive.setBoolean("Written", false);
         missive.setString("TitleId", "clear_the_paths");
         NBTTagList objectives = new NBTTagList();
         objectives.appendTag(new NBTTagString("not-an-objective"));

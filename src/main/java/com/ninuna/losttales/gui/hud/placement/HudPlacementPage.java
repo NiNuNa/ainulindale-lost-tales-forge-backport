@@ -10,7 +10,10 @@ import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
+import com.ninuna.losttales.gui.hud.layout.HudLayout;
+import com.ninuna.losttales.gui.hud.layout.HudLayouts;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
@@ -82,12 +85,6 @@ public final class HudPlacementPage extends PageContent {
             "..#..", "..#..", "..#..", ".....", "..#..");
     private static final OptionGlyph LAYOUT_GLYPH = OptionGlyph.pattern(
             "##.##", "##.##", ".....", "##.##", "##.##");
-    /** The layouts the Panel Layout option picks from, in the order it lists them. */
-    private static final String[] LAYOUTS = {
-            LostTalesConfig.HUD_PRESET_DEFAULT,
-            LostTalesConfig.HUD_PRESET_LOTR_SAFE,
-            LostTalesConfig.HUD_PRESET_COMPACT,
-            LostTalesConfig.HUD_PRESET_MINIMAL};
 
     private boolean previewOut = true;
     /** The box picked: the one the arrows move and the bar reads; null for none. */
@@ -259,8 +256,10 @@ public final class HudPlacementPage extends PageContent {
 
     /**
      * One panel's box on the placement screen: its surface, its edge and
-     * its name, centred and cut to the box. The box picked wears the accent, the
-     * one pointed at ivory, the rest sand.
+     * its name, centred and cut to the box. The surface is the theme's
+     * primary, lit in its secondary under the pointer and while picked, as
+     * a list's rows are. The box picked wears the accent on its edge and
+     * name, the one pointed at ivory, the rest sand.
      */
     private void drawBox(Minecraft minecraft, HudPanel panel, double[] placed,
                          int[] screen, boolean pointed, int alpha) {
@@ -270,11 +269,10 @@ public final class HudPlacementPage extends PageContent {
         float right = Math.max(left + 2.0F, (float)Math.floor(box[0] + box[2]));
         float bottom = Math.max(top + 2.0F, (float)Math.floor(box[1] + box[3]));
         boolean picked = panel == this.picked;
-        int fill = picked ? LostTalesColors.PLUM_DARK
-                : pointed ? LostTalesColors.DUSK_VIOLET : LostTalesColors.PLUM_BLACK;
+        int fill = boxRgb(picked || pointed);
         int fillAlpha = picked ? 0x99 : pointed ? 0x66 : 0x40;
         LostTalesUiInk.fillRect(left, top, right, bottom, LostTalesUiInk.argb(
-                LostTalesColors.rgb(fill), Math.round(alpha * fillAlpha / 255.0F)));
+                fill, Math.round(alpha * fillAlpha / 255.0F)));
         int edge = picked ? LostTalesUiTheme.accentRgb()
                 : LostTalesColors.rgb(pointed ? LostTalesColors.IVORY
                         : LostTalesColors.SAND);
@@ -291,13 +289,22 @@ public final class HudPlacementPage extends PageContent {
         if (font == null || room < 6 || bottom - top < LostTalesUiInk.CAP_HEIGHT + 4) {
             return;
         }
-        String name = font.trimStringToWidth(panel.title(), room);
+        // A name too long for its box fills it, fades into its end and
+        // slides along while the box is pointed at (LOOK-37).
+        String name = panel.title();
         int x = (int)left + LostTalesUiInk.centredStart((int)(right - left),
-                font.getStringWidth(name));
+                (int)LostTalesUiCutName.shownWidth(font.getStringWidth(name),
+                        room));
         int y = (int)top + LostTalesUiInk.centredStart((int)(bottom - top),
                 LostTalesUiInk.CAP_HEIGHT);
-        LostTalesUiInk.drawText(font, name, x, y, picked ? edge
-                : LostTalesUiInk.IVORY, alpha);
+        LostTalesUiCutName.drawText(font, name, x, y, room, picked ? edge
+                : LostTalesUiInk.IVORY, alpha, this, panel, pointed);
+    }
+
+    /** A box's surface: the theme's primary, and its secondary while lit. */
+    static int boxRgb(boolean lit) {
+        return lit ? LostTalesUiTheme.secondaryRgb()
+                : LostTalesUiTheme.primaryRgb();
     }
 
     /** A panel's box on the page: its box on the screen, shrunk onto the placement screen. */
@@ -464,7 +471,7 @@ public final class HudPlacementPage extends PageContent {
     /* ---- The bar ---- */
 
     /**
-     * The box picked and where it stands, as shares of the screen, and
+     * The box picked and where it stands, its two numbers, and
      * Default Place, which puts it back; greyed while nothing is picked or
      * it stands there already.
      */
@@ -482,7 +489,10 @@ public final class HudPlacementPage extends PageContent {
                     LANG + "pick")));
             return items;
         }
-        items.add(this.picked.atDefaultPlace()
+        items.add(!this.picked.hasDefaultPlace()
+                ? putBack.unavailable(StatCollector.translateToLocal(
+                        LANG + "no_default"))
+                : this.picked.atDefaultPlace()
                 ? putBack.unavailable(StatCollector.translateToLocalFormatted(
                         LANG + "at_default", this.picked.title()))
                 : putBack);
@@ -537,8 +547,9 @@ public final class HudPlacementPage extends PageContent {
 
     /**
      * The page's options: the HUD as a whole, as the HUD key switches it,
-     * and a switch for each panel that has one; then Panel Layout, the
-     * layouts that put every panel in its place at once.
+     * and a switch for each panel that has one; then Panel Layout, every
+     * layout that loaded (MAP-11), each putting every panel in its place
+     * at once.
      */
     @Override
     public List<PageOption> options() {
@@ -557,12 +568,13 @@ public final class HudPlacementPage extends PageContent {
                 LostTalesConfig.showQuestHud, QUEST_GLYPH));
         String chosen = LostTalesConfig.normalizeHudPreset(
                 LostTalesConfig.hudPlacementPreset);
-        List<PageOption> words = new ArrayList<PageOption>(LAYOUTS.length);
-        for (String layout : LAYOUTS) {
-            words.add(PageOption.choice(OPTION_LAYOUT_PREFIX + layout,
-                    layoutWord(layout), layout.equals(chosen), LAYOUT_GLYPH)
-                    .explained(StatCollector.translateToLocal(
-                            LANG + "layout." + layout)));
+        List<HudLayout> layouts = HudLayouts.all();
+        List<PageOption> words = new ArrayList<PageOption>(layouts.size());
+        for (HudLayout layout : layouts) {
+            String id = layout.getId();
+            words.add(PageOption.choice(OPTION_LAYOUT_PREFIX + id,
+                    layoutWord(id), id.equals(chosen), LAYOUT_GLYPH)
+                    .explained(HudLayouts.description(id)));
         }
         options.add(PageOption.pick(OPTION_LAYOUT,
                 StatCollector.translateToLocal(LANG + "layout"),
@@ -578,8 +590,7 @@ public final class HudPlacementPage extends PageContent {
     }
 
     private static String layoutWord(String layout) {
-        return StatCollector.translateToLocal(
-                "gui.losttales.settings.hud.preset." + layout);
+        return HudLayouts.name(layout);
     }
 
     /** A panel switched on or off, or a layout picked; both stay, for another try. */

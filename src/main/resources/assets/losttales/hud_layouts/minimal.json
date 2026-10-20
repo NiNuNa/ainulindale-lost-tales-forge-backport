@@ -1,0 +1,10 @@
+{
+  "id": "minimal",
+  "panels": {
+    "compass": {"across": 50, "down": 5},
+    "fellowship": {"across": 2, "down": 28},
+    "quickloot": {"across": 100, "down": 100},
+    "quest": {"across": 2, "down": 96},
+    "notifications": {"across": 50, "down": 28}
+  }
+}

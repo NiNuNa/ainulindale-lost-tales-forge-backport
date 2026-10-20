@@ -23,44 +23,37 @@ public final class LostTalesThirdPersonAimService {
 
     private LostTalesThirdPersonAimService() {}
 
+    /**
+     * Keeps the aim the player asks for, for the item in their hand now;
+     * runs on the server thread. A shot only takes it while the same item
+     * is held in the same slot and the same world.
+     */
     public static synchronized void execute(
-            EntityPlayerMP player, int expectedDimension,
-            boolean active, double directionX,
-            double directionY, double directionZ,
-            int expectedHotbarSlot, Item expectedItem) {
+            EntityPlayerMP player, boolean active, double directionX,
+            double directionY, double directionZ) {
         if (player == null || player.getUniqueID() == null) {
             return;
         }
-        if (!active) {
-            clearPlayer(player.getUniqueID());
-            return;
-        }
-        if (!hasUsablePlayerContext(player, expectedDimension)
-                || expectedHotbarSlot < 0 || expectedHotbarSlot >= 9
-                || expectedHotbarSlot
-                >= player.inventory.mainInventory.length) {
+        if (!active || !hasUsablePlayerContext(player)) {
             clearPlayer(player.getUniqueID());
             return;
         }
 
-        ItemStack held = player.inventory
-                .mainInventory[expectedHotbarSlot];
+        ItemStack held = player.inventory.getCurrentItem();
         Vec3 requested = normalizeDirection(
                 directionX, directionY, directionZ);
-        Vec3 look = player.getLookVec();
-        if (player.inventory.currentItem != expectedHotbarSlot
-                || held == null || held.getItem() != expectedItem
+        if (held == null
                 || !ThirdPersonProjectileItemPolicy.isSupported(held)
                 || requested == null
-                || !isDirectionAllowed(requested, look)) {
+                || !isDirectionAllowed(requested, player.getLookVec())) {
             clearPlayer(player.getUniqueID());
             return;
         }
 
         AIM_STATES.put(player.getUniqueID(), new AimState(
-                expectedDimension,
+                player.worldObj.provider.dimensionId,
                 player.worldObj.getTotalWorldTime(),
-                expectedHotbarSlot, expectedItem, requested));
+                player.inventory.currentItem, held.getItem(), requested));
     }
 
     public static synchronized boolean applyAim(
@@ -122,11 +115,9 @@ public final class LostTalesThirdPersonAimService {
                 state.direction, shooter.getLookVec());
     }
 
-    private static boolean hasUsablePlayerContext(
-            EntityPlayerMP player, int expectedDimension) {
+    private static boolean hasUsablePlayerContext(EntityPlayerMP player) {
         return player.worldObj != null && !player.worldObj.isRemote
                 && player.worldObj.provider != null
-                && player.worldObj.provider.dimensionId == expectedDimension
                 && player.isEntityAlive() && !player.isDead
                 && !player.isPlayerSleeping()
                 && player.openContainer == player.inventoryContainer;

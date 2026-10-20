@@ -61,8 +61,9 @@ public final class LostTalesClientMapMarkerLookupTest {
     }
 
     /**
-     * The bundled Town at 15, 15, read from the marker files, still
-     * claims its waypoint's icon once the server has deleted the marker.
+     * The bundled Greenway Market at 180, 40, read from the marker files,
+     * still claims its waypoint's icon once the server has deleted the
+     * marker.
      */
     @Test
     public void deletedMarkerKeepsOnlyItsDecorativeSuppressionMapping() {
@@ -74,10 +75,10 @@ public final class LostTalesClientMapMarkerLookupTest {
 
             assertNull(LostTalesClientMapMarkerStore
                     .findMappedWaypointMarker(
-                            "", "", 15, 15));
+                            "", "", 180, 40));
             assertTrue(LostTalesClientMapMarkerStore
                     .hasDecorativeWaypointMapping(
-                            "", "", 15, 15));
+                            "", "", 180, 40));
         } finally {
             LostTalesClientMapMarkerStore.reloadFromResources(new BundledFiles(false));
         }

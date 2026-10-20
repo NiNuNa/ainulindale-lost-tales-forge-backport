@@ -27,8 +27,7 @@ public final class LoreCharacterSyncPacketTest {
     public void viewerOwnedCharacterRoundTripsWithoutLosingState() {
         LoreCharacterSummary gandalf = new LoreCharacterSummary(
                 "gandalf", "Gandalf", "A wandering wizard.",
-                "losttales:human", "losttales:male", "lotr:human",
-                "losttales:human_gondor_male_0", true, true, true,
+                "losttales:human", true, true, true,
                 false, "AccountName", CHARACTER_ID, 7L);
         LoreCharacterSnapshot snapshot = new LoreCharacterSnapshot(
                 Arrays.asList(gandalf), false, true);
@@ -45,6 +44,7 @@ public final class LoreCharacterSyncPacketTest {
             LoreCharacterSummary value = decoded.getSnapshot().getCharacters().get(0);
             assertEquals("gandalf", value.getId());
             assertEquals("A wandering wizard.", value.getDescription());
+            assertEquals("losttales:human", value.getRaceId());
             assertEquals("AccountName", value.getOwnerName());
             assertEquals(CHARACTER_ID, value.getOwnedCharacterId());
             assertEquals(7L, value.getOwnershipRevision());
@@ -77,7 +77,7 @@ public final class LoreCharacterSyncPacketTest {
         assertTrue(parsed.getErrors().toString(), parsed.isValid());
         LoreCharacterSummary longest = new LoreCharacterSummary(
                 parsed.getDefinition().getId(), parsed.getDefinition().getName(),
-                "", "", "", "", "", false, false, false, false, "", null, 0L);
+                "", "", false, false, false, false, "", null, 0L);
         ByteBuf buffer = Unpooled.buffer();
         try {
             new LoreCharacterSyncPacket(new LoreCharacterSnapshot(
@@ -118,7 +118,6 @@ public final class LoreCharacterSyncPacketTest {
     public void foreignCharacterIdIsNeverExposedToViewer() {
         LoreCharacterSummary frodo = new LoreCharacterSummary(
                 "frodo", "Frodo", "", "losttales:hobbit",
-                "losttales:male", "lotr:hobbit", "losttales:hobbit_0",
                 true, true, false, false, "AnotherPlayer",
                 CHARACTER_ID, 2L);
 
@@ -129,7 +128,6 @@ public final class LoreCharacterSyncPacketTest {
     public void negativeOwnershipRevisionMakesPacketMalformed() {
         LoreCharacterSummary eomer = new LoreCharacterSummary(
                 "eomer", "Eomer", "", "losttales:human",
-                "losttales:male", "lotr:human", "losttales:rohan_0",
                 true, false, false, false, "", null, 0L);
         ByteBuf buffer = Unpooled.buffer();
         try {

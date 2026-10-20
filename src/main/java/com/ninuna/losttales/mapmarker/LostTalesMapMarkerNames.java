@@ -24,8 +24,10 @@ import net.minecraft.util.StatCollector;
  * the ones it ships with are theirs and never translated; otherwise the
  * lang line wins where one exists; otherwise the words the marker file or
  * the server gives it; otherwise its id. A Lost Tales marker's English
- * words live in the lang file alone, and the marker files leave them
- * out ({@link #englishName}).</p>
+ * words live in the lang file alone, and the bundled marker files leave
+ * them out ({@link #englishName}). A server's own marker file writes its
+ * words, and they stand as written, in every language: only a bundled
+ * file's own words stand for a lang line.</p>
  */
 public final class LostTalesMapMarkerNames {
     private static final String LOST_TALES_PREFIX = LostTalesMetaData.MOD_ID + ":";
@@ -95,7 +97,7 @@ public final class LostTalesMapMarkerNames {
         if (given.length() == 0) {
             return true;
         }
-        LostTalesMapMarkerDefinition bundled = LostTalesMapMarkerCatalog.getMarker(markerId);
+        LostTalesMapMarkerDefinition bundled = LostTalesMapMarkerCatalog.getBundledMarker(markerId);
         return bundled != null && given.equals(trim(bundled.getName()));
     }
 
@@ -105,7 +107,7 @@ public final class LostTalesMapMarkerNames {
         if (given.length() == 0) {
             return true;
         }
-        LostTalesMapMarkerDefinition bundled = LostTalesMapMarkerCatalog.getMarker(markerId);
+        LostTalesMapMarkerDefinition bundled = LostTalesMapMarkerCatalog.getBundledMarker(markerId);
         return bundled != null && given.equals(trim(bundled.getDescription()));
     }
 

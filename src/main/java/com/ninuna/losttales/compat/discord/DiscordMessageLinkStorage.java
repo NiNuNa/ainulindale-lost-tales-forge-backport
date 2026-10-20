@@ -13,21 +13,23 @@ import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 
 /**
- * Resolves the Discord bridge's kept message links from dimension-zero
- * MapStorage, and moves them between the save and the bridge's live map
- * at the two ends of a server's run.
+ * Resolves the Discord bridge's memory in the save — its message links
+ * and its topic writes — from dimension-zero MapStorage, and moves it
+ * between the save and the bridge's live stores at the two ends of a
+ * server's run.
  *
- * <p>They come back only with the chat history they index into. A link
- * names a game message by id, and ids go on from the kept history, so
- * an id from the save is only known to name the same message when that
- * history was read back from the same save; and then only the links to
- * messages it still keeps come back. Everything here fails open: links
- * that cannot be read leave the bridge with the links of this run
- * alone, and the save as it was.</p>
+ * <p>The links come back only with the chat history they index into. A
+ * link names a game message by id, and ids go on from the kept history,
+ * so an id from the save is only known to name the same message when
+ * that history was read back from the same save; and then only the
+ * links to messages it still keeps come back. The topics index into
+ * nothing and always come back. Everything here fails open: what cannot
+ * be read leaves the bridge with what this run learns alone, and the
+ * save as it was.</p>
  */
 final class DiscordMessageLinkStorage {
 
-    /** The save the live links are written with, or null while they have none. */
+    /** The save the live links and topics are written with, or null while they have none. */
     private static DiscordMessageLinkWorldData attached;
 
     /** The kept chat history, asked whether a message is still in it. */
@@ -63,31 +65,24 @@ final class DiscordMessageLinkStorage {
     }
 
     /**
-     * Hands the save's links to {@code live} as the server starts, and
-     * attaches the save so every link made from here on is written with
-     * the world. Called after the chat history is restored and before
-     * the bridge starts. Without the history read back from the save —
-     * off by the config, or a history save this build cannot read — the
-     * save's links are neither read nor written this run: they wait for
-     * a run that has their history back. The bridge being off changes
-     * nothing here: its saved links are kept, and only those whose
-     * message the restored history no longer holds are dropped, which
-     * marks the save to be written again without them.
+     * Hands the save's topic writes to {@code topics} and its links to
+     * {@code live} as the server starts, and attaches the save so every
+     * topic write and every link from here on is written with the world.
+     * Called after the chat history is restored and before the bridge
+     * starts. Without the history read back from the save — off by the
+     * config, or a history save this build cannot read — the save's links
+     * are neither read nor changed this run: they wait for a run that has
+     * their history back. The bridge being off changes nothing here: its
+     * saved links and topics are kept, and only the links whose message
+     * the restored history no longer holds are dropped, which marks the
+     * save to be written again without them.
      */
     static synchronized void restore(MinecraftServer server,
-                                     DiscordMessageLinks live) {
+                                     DiscordMessageLinks live,
+                                     DiscordTopicMemory topics) {
         attached = null;
-        if (server == null || live == null
+        if (server == null || live == null || topics == null
                 || server.worldServerForDimension(0) == null) {
-            return;
-        }
-        if (!ChatHistoryStorage.isRestoredFromSave()) {
-            if (LostTalesConfig.discordEnabled) {
-                FMLLog.info("[%s] The chat history was not read from the save, so "
-                        + "the Discord bridge's message links are not either; "
-                        + "replies, reactions and edits cross only for messages "
-                        + "from this run", LostTalesMetaData.MOD_ID);
-            }
             return;
         }
         try {
@@ -95,15 +90,26 @@ final class DiscordMessageLinkStorage {
             if (data.isReadOnlyForNewerVersion()) {
                 FMLLog.severe("[%s] Discord message links in this save use unsupported "
                         + "version %d; they are left as they are and the bridge "
-                        + "keeps its links in memory only for this run",
-                        LostTalesMetaData.MOD_ID,
+                        + "keeps its links and topic writes in memory only for "
+                        + "this run", LostTalesMetaData.MOD_ID,
                         Integer.valueOf(data.getUnsupportedDataVersion()));
+                return;
+            }
+            topics.restore(data.restoredTopics(), System.currentTimeMillis());
+            data.attachTopics(topics);
+            attached = data;
+            if (!ChatHistoryStorage.isRestoredFromSave()) {
+                if (LostTalesConfig.discordEnabled) {
+                    FMLLog.info("[%s] The chat history was not read from the save, so "
+                            + "the Discord bridge's message links are not either; "
+                            + "replies, reactions and edits cross only for messages "
+                            + "from this run", LostTalesMetaData.MOD_ID);
+                }
                 return;
             }
             List<DiscordMessageLinks.SavedLink> saved = data.restoredLinks();
             int kept = live.restore(saved, HISTORY);
             data.attach(live, kept != saved.size());
-            attached = data;
             if (!saved.isEmpty() || data.getQuarantinedEntryCount() > 0) {
                 FMLLog.info("[%s] Restored %d of %d Discord message links from the "
                         + "save (%d quarantined)", LostTalesMetaData.MOD_ID,
@@ -118,9 +124,10 @@ final class DiscordMessageLinkStorage {
     }
 
     /**
-     * Leaves the live links' last state with the save as the server
-     * stops, once the bridge has stopped adding to them: the worlds are
-     * saved after this, and what they write is that snapshot.
+     * Leaves the live links' and topics' last state with the save as the
+     * server stops, once the bridge has stopped and written its offline
+     * topic: the worlds are saved after this, and what they write is that
+     * snapshot.
      */
     static synchronized void release() {
         DiscordMessageLinkWorldData data = attached;

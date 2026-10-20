@@ -1,0 +1,8 @@
+{
+  "id": "losttales:expert",
+  "category": "growth",
+  "icon": "minecraft:iron_pickaxe",
+  "kind": "skill_level",
+  "skill": "any",
+  "level": 75
+}

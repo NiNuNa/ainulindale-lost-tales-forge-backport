@@ -27,15 +27,6 @@ public enum LostTalesCompassMarkerIcon {
     BRIDGE(108, 36, 1, 16, 3, 14),
     SMALL_BRIDGE(126, 36, 1, 16, 7, 14),
     CAMP(144, 36, 3, 14, 2, 15),
-
-    // Compatibility aliases. Saved markers and waystones store the icon name,
-    // so retired names must keep resolving rather than falling back to the
-    // question mark.
-    TOWN(0, 36, 2, 15, 3, 15),
-    FORT(0, 36, 2, 15, 3, 15),
-    TAVERN(0, 36, 2, 15, 3, 15),
-    /** Retired from the palette; its cell now holds the mountains glyph. */
-    FOUNTAIN(54, 36, 1, 16, 2, 16),
     FELLOWSHIP_PURPLE(72, 0, 4, 13, 2, 15),
     FELLOWSHIP_YELLOW(72, 0, 4, 13, 2, 15),
     FELLOWSHIP_BLUE(72, 0, 4, 13, 2, 15),

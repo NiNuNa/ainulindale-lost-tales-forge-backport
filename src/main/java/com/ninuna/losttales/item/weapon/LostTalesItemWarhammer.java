@@ -16,11 +16,6 @@ public class LostTalesItemWarhammer extends LostTalesItemSword implements IAnima
         this.lotrWeaponDamage += 2.0F;
     }
 
-    public LostTalesItemWarhammer(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, String credits) {
-        super(material, itemType, credits);
-        this.lotrWeaponDamage += 2.0F;
-    }
-
     @Override
     public EnumAction getItemUseAction(ItemStack itemstack) {
         return EnumAction.none;

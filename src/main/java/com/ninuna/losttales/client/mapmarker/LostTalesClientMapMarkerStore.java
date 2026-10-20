@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSnapshotAssembly;
 import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,6 +28,9 @@ public final class LostTalesClientMapMarkerStore {
                             .createDecorativeSnapshot(decorativeMarkers);
     private static final LostTalesClientMapMarkerIndex INDEX =
             new LostTalesClientMapMarkerIndex();
+    /** The server's snapshot being put together from its parts (WAY-12). */
+    private static final LostTalesMapMarkerSnapshotAssembly SERVER_PARTS =
+            new LostTalesMapMarkerSnapshotAssembly();
 
     static {
         INDEX.replaceWorldMarkers(decorativeMarkers);
@@ -123,6 +127,25 @@ public final class LostTalesClientMapMarkerStore {
             }
         }
         INDEX.replaceQuestMarkers(byId.values());
+    }
+
+    /**
+     * One part of the server's snapshot. The markers shown change to the
+     * new snapshot only with its last part, all at once.
+     */
+    public static synchronized void acceptServerPart(int sequence,
+            int index, int total,
+            Collection<LostTalesMapMarkerDefinition> markers) {
+        List<LostTalesMapMarkerDefinition> whole =
+                SERVER_PARTS.accept(sequence, index, total, markers);
+        if (whole != null) {
+            setServerMarkers(whole);
+        }
+    }
+
+    /** Forgets the parts of a snapshot not finished, as the client leaves the server. */
+    public static synchronized void forgetServerParts() {
+        SERVER_PARTS.clear();
     }
 
     public static synchronized void setServerMarkers(

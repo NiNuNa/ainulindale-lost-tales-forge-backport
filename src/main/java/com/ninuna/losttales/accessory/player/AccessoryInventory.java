@@ -141,8 +141,8 @@ public final class AccessoryInventory implements IInventory {
     public boolean isItemValidForSlot(int slot, ItemStack stack) {
         return slot == RING_SLOT
                 && isLifecycleOperational()
-                && AccessoryCompatibilityRegistry.getInstance().canEquip(
-                this.owner, AccessorySlotType.RING, stack);
+                && AccessoryCompatibilityRegistry.getInstance().isCompatible(
+                AccessorySlotType.RING, stack);
     }
 
     /** Refuse server-authoritative insertion if the loss-safe death hook failed. */

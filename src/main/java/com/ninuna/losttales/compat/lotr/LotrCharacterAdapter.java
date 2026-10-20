@@ -704,9 +704,6 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
     private static Set<CharacterFactionCategory> mapCategories(LOTRFaction faction) {
         EnumSet<CharacterFactionCategory> categories =
                 EnumSet.noneOf(CharacterFactionCategory.class);
-        if (faction.isOfType(LOTRFaction.FactionType.TYPE_FREE)) {
-            categories.add(CharacterFactionCategory.FREE);
-        }
         if (faction.isOfType(LOTRFaction.FactionType.TYPE_MAN)) {
             categories.add(CharacterFactionCategory.HUMAN);
         }
@@ -718,9 +715,6 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         }
         if (faction.isOfType(LOTRFaction.FactionType.TYPE_ORC)) {
             categories.add(CharacterFactionCategory.ORC);
-        }
-        if (faction.isOfType(LOTRFaction.FactionType.TYPE_TREE)) {
-            categories.add(CharacterFactionCategory.TREE);
         }
         return categories;
     }

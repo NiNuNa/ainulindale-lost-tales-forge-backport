@@ -32,6 +32,7 @@ import com.ninuna.losttales.client.window.ClientSettingsPage;
 import com.ninuna.losttales.client.window.NewPage;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageCategory;
+import com.ninuna.losttales.client.window.ViewFiles;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
@@ -155,6 +156,14 @@ import lotr.client.render.entity.LOTRRenderBreeMan;
 import net.minecraftforge.common.MinecraftForge;
 import software.bernie.geckolib3.renderers.geo.GeoArmorRenderer;
 import com.ninuna.losttales.client.chat.ChatFellowshipInvitationAnswers;
+import com.ninuna.losttales.client.progression.ClientProgression;
+import com.ninuna.losttales.network.packet.ProgressionCatalogPacket;
+import com.ninuna.losttales.network.packet.ProgressionStatePacket;
+import com.ninuna.losttales.network.packet.ProgressionStatuePacket;
+import com.ninuna.losttales.progression.perk.PerkIndex;
+import com.ninuna.losttales.client.progression.PerkClientEvents;
+import com.ninuna.losttales.client.progression.ResetStatuePage;
+import com.ninuna.losttales.client.progression.SkillsPage;
 
 public class LostTalesClientProxy extends LostTalesCommonProxy {
 
@@ -169,6 +178,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         File clientFolder = LostTalesConfigFiles.clientDirectory(
                 event.getModConfigurationDirectory());
         CameraPresetFileStore.initialize(clientFolder);
+        com.ninuna.losttales.gui.hud.layout.HudLayouts.initialize(clientFolder);
         ChatEmojiUsageStore.initialize(clientFolder);
         ClientChatIgnores.initialize(clientFolder);
         ClientChatProfanity.initialize(clientFolder);
@@ -186,6 +196,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         LostTalesClientMapMarkerUsageStore.initialize(clientFolder);
         // The Motion Lab's tuning, read over the mod's own motion files.
         Motions.initialize(clientFolder);
+        // The player's own view files, read with the mod's (WIN-49).
+        ViewFiles.initialize(clientFolder);
         LostTalesThirdPersonConfig.load(
                 event.getModConfigurationDirectory());
         ThirdPersonCameraRuntime.resetSession();
@@ -206,6 +218,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(new FirstCharacterCreator());
         FMLCommonHandler.instance().bus().register(guiAnimationHandler);
         MinecraftForge.EVENT_BUS.register(new LostTalesMainMenuHandler());
+        MinecraftForge.EVENT_BUS.register(new PerkClientEvents());
         ELostTalesMapLabels.initAndRegisterMapLabels();
 
         GeoArmorRenderer.registerArmorRenderer(LostTalesItemArmor3D.class, new LostTalesItemRendererArmor3D());
@@ -215,13 +228,14 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     /**
      * The New Page, every page's way in; the quest journal, the
-     * fellowship, the map and the characters, each a page a window can
-     * hold, with the key that opens it from another page; the Characters
-     * page's own kinds of sub-window; the Motion Lab,
+     * fellowship, the map, the characters and the skills, each a page a
+     * window can hold, with the key that opens it from another page; the
+     * Characters page's own kinds of sub-window; the Motion Lab,
      * the Client Settings, the HUD Placement and the Server Settings, pages
      * with no key of their own;
      * and the pages that open only from a thing in the world: a
-     * waystone's, a missive board's and a missive letter's.
+     * waystone's, a missive board's, a missive letter's and a reset
+     * statue's.
      */
     private static void registerPages() {
         WindowPages.register(NewPage.PAGE_ID, "gui.losttales.page.new_page",
@@ -269,6 +283,14 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     }
                 });
         CharacterSubWindows.install();
+        WindowPages.register(SkillsPage.PAGE_ID, "gui.losttales.page.skills",
+                SkillsPage.ICON, LostTalesKeyBindings.getSkillsKeyBinding(),
+                PageCategory.PROFILE, new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new SkillsPage();
+                    }
+                });
         WindowPages.register(ClientSettingsPage.PAGE_ID,
                 "gui.losttales.page.client_settings", ClientSettingsPage.ICON,
                 null, PageCategory.SETTINGS, new WindowPages.Factory() {
@@ -331,6 +353,16 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                         return new MissiveLetterPage();
                     }
                 });
+        // A reset statue's page opens only from the statue and stands
+        // with the character's skills.
+        WindowPages.registerWorldPage(ResetStatuePage.PAGE_ID,
+                "gui.losttales.page.reset_statue", ResetStatuePage.ICON,
+                PageCategory.PROFILE, new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new ResetStatuePage();
+                    }
+                });
         MissiveBoardPage.install();
         // A world page closes by itself once its thing is out of reach,
         // behind another tab as well as in front.
@@ -344,6 +376,12 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(guiAnimationHandler);
         // Every motion is read again with the resources, F3+T included.
         ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(Motions.RELOADER);
+        // The HUD layouts too, a resource pack's and the player's own (MAP-11).
+        ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(
+                com.ninuna.losttales.gui.hud.layout.HudLayouts.RELOADER);
+        // The windows the views open with, read again with the resources,
+        // after every page and set they may name is registered.
+        ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(ViewFiles.RELOADER);
 
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityUrn.class, new LostTalesTileEntityRendererUrn());
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityStatue.class, new LostTalesTileEntityRendererStatue());
@@ -455,7 +493,10 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         if (packet != null) {
             LostTalesClientMapMarkerStore.setDynamicMarkers(packet.getDynamicMapMarkers());
             LostTalesClientQuestDefinitionStore.setDynamicQuestDefinitions(packet.getDynamicQuestDefinitions());
-            LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getQuestHistory());
+            // Another character's log, after a switch, is no news.
+            if (!packet.isReplacement()) {
+                LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getQuestHistory());
+            }
             LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getQuestHistory(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
             LostTalesClientQuestProgressStore.setHeardRumours(packet.getHeardRumours());
         }
@@ -472,6 +513,46 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         LostTalesClientQuestNotificationStore.notifyForIncomingSync(active,
                 LostTalesClientQuestProgressStore.getQuestHistory());
         LostTalesClientQuestProgressStore.replaceActiveQuests(active);
+    }
+
+    /** The server's skills, in place of what the client held (PROG-01). */
+    @Override
+    public void handleProgressionCatalog(ProgressionCatalogPacket packet) {
+        if (packet != null) {
+            ClientProgression.setSkills(packet.getSkills());
+            ClientProgression.setDeeds(packet.getDeeds());
+        }
+    }
+
+    @Override
+    public void handleRaceCatalog(
+            com.ninuna.losttales.network.packet.character.CharacterRaceCatalogPacket packet) {
+        if (packet != null) {
+            com.ninuna.losttales.character.registry.CharacterRaceRegistry.set(packet.getRaces());
+            com.ninuna.losttales.character.cape.CharacterCapeCatalog.set(packet.getCapes());
+            // Every look is worked out again against the server's races.
+            com.ninuna.losttales.client.render.player.PlayerAppearanceResolver.clear();
+        }
+    }
+
+    @Override
+    public PerkIndex clientPerkIndex(EntityPlayer player) {
+        return player != null && player == Minecraft.getMinecraft().thePlayer
+                ? ClientProgression.perkIndex() : PerkIndex.EMPTY;
+    }
+
+    /** The played character's growth (PROG-13). */
+    @Override
+    public void handleProgressionState(ProgressionStatePacket packet) {
+        if (packet != null && packet.getSnapshot() != null) {
+            ClientProgression.setSnapshot(packet.getSnapshot());
+        }
+    }
+
+    /** A reset statue the player used: its page opens (PROG-12). */
+    @Override
+    public void handleProgressionStatue(ProgressionStatuePacket packet) {
+        ResetStatuePage.accept(packet);
     }
 
     /** How the fellowships' members stand in the quests this player runs too (QUEST-25). */
@@ -494,8 +575,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     public void handleMapMarkerSnapshot(
             LostTalesMapMarkerSnapshotPacket packet) {
         if (packet != null && !packet.isMalformed()) {
-            LostTalesClientMapMarkerStore.setServerMarkers(
-                    packet.getMarkers());
+            LostTalesClientMapMarkerStore.acceptServerPart(
+                    packet.getSequence(), packet.getIndex(),
+                    packet.getTotal(), packet.getMarkers());
         }
     }
 

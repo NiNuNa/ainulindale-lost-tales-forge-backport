@@ -2,8 +2,9 @@ package com.ninuna.losttales.quest;
 
 /**
  * An answer to a quest giver clicked in the chat, where the quest
- * conversation is switched off (QUEST-37): *Accept* or *Decline* on an
- * offer, or the item taken from a hand-in's pick. The answer rides in the
+ * conversation is switched off or an offer arrived while another screen
+ * was open (QUEST-37, QUEST-41): *Accept* or *Decline* on an offer, or the item
+ * taken from a hand-in's pick. The answer rides in the
  * click of the word that says it; the client reads it back and asks the
  * server as the conversation's replies do, and the server checks it all
  * again, so a forged answer does nothing.

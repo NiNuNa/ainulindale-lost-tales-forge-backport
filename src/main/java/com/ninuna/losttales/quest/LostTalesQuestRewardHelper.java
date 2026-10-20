@@ -2,6 +2,7 @@ package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.compat.lotr.LotrQuestRewards;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import com.ninuna.losttales.progression.ProgressionService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -113,6 +114,12 @@ public final class LostTalesQuestRewardHelper {
 
         granted |= LotrQuestRewards.giveCoins(player,
                 LostTalesQuestRewards.coins(rewards));
+
+        for (LostTalesQuestRewards.SkillReward skill
+                : LostTalesQuestRewards.skills(rewards)) {
+            granted |= ProgressionService.questReward(player,
+                    skill.getSkillId(), skill.getAmount()) > 0.0D;
+        }
 
         return granted;
     }

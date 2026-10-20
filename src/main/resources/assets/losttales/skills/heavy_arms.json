@@ -1,0 +1,66 @@
+{
+  "id": "losttales:heavy_arms",
+  "icon": "lotr:item.battleaxeIron",
+  "order": 3,
+  "counts": [
+    {
+      "act": "hit",
+      "weapons": ["battleaxe", "axe", "hammer", "throwing_axe"],
+      "per": 1.0
+    },
+    {
+      "act": "kill",
+      "weapons": ["battleaxe", "axe", "hammer", "throwing_axe"],
+      "per": 0.5
+    }
+  ],
+  "perks": [
+    {
+      "id": "weight",
+      "levels": [10, 30, 50],
+      "effect": "weapon_damage",
+      "amount": 0.05
+    },
+    {
+      "id": "woodcutters_arm",
+      "levels": [20],
+      "effect": "chop_speed",
+      "amount": 0.25,
+      "with": ["axe", "battleaxe"]
+    },
+    {
+      "id": "sunder",
+      "levels": [30],
+      "effect": "sunder",
+      "amount": 0.25
+    },
+    {
+      "id": "stagger",
+      "levels": [50],
+      "effect": "stagger",
+      "amount": 0.5
+    },
+    {
+      "id": "unbreakable_grip",
+      "levels": [60],
+      "effect": "wear",
+      "amount": 0.25
+    },
+    {
+      "id": "cleave",
+      "levels": [70],
+      "effect": "cleave",
+      "amount": 0.3,
+      "needs": "stagger",
+      "params": {
+        "radius": 1.5
+      }
+    },
+    {
+      "id": "warlord",
+      "levels": [100],
+      "effect": "kill_heal",
+      "amount": 2
+    }
+  ]
+}

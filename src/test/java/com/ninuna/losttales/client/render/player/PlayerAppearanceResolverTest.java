@@ -186,4 +186,21 @@ public final class PlayerAppearanceResolverTest {
         assertEquals(first.getTexture().toString(), second.getTexture().toString());
         assertTrue(first.getTexture().toString().startsWith("lotr:mob/elf/"));
     }
+
+    /** A character falls back by its own id, whoever plays it. */
+    @Test
+    public void aCharacterFallsBackByItsOwnId() {
+        UUID character = UUID.fromString("c2000000-0000-0000-0000-00000000002c");
+        CharacterAppearance appearance = new CharacterAppearance(
+                com.ninuna.losttales.character.sync.CharacterAppearanceKind.CHARACTER,
+                PLAYER, character, "Steve", "Aldric", CharacterRaceRegistry.ELF,
+                CharacterGenderRegistry.MALE, "losttales:human_bree_male_0",
+                false, "", "", 30, "", "");
+        ResolvedPlayerAppearance resolved =
+                PlayerAppearanceResolver.resolve(PLAYER, appearance);
+        assertNotNull(resolved);
+        assertEquals(CharacterSkinRegistry.get(CharacterSkinRegistry.getDefaultSkinId(
+                CharacterRaceRegistry.ELF, CharacterGenderRegistry.MALE, character))
+                .getTextureLocation(), resolved.getTexture().toString());
+    }
 }

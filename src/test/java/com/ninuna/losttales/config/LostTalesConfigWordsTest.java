@@ -93,22 +93,30 @@ public final class LostTalesConfigWordsTest {
                 new ArrayList<String>(), missing);
     }
 
+    /**
+     * Every category has its name line, which heads its section on the
+     * settings pages, and no tip line: a section heading carries no tip.
+     */
     @Test
-    public void everyCategoryHasANameAndATipLine() {
+    public void everyCategoryHasANameLineAndNoTipLine() {
         List<String> missing = new ArrayList<String>();
+        List<String> unread = new ArrayList<String>();
         for (Configuration config : definitions()) {
             for (String name : config.getCategoryNames()) {
                 ConfigCategory category = config.getCategory(name);
                 String langKey = category.getLanguagekey();
-                for (String line : new String[] {langKey, langKey + ".tooltip"}) {
-                    if (!EnglishWords.INSTANCE.has(line)) {
-                        missing.add(line);
-                    }
+                if (!EnglishWords.INSTANCE.has(langKey)) {
+                    missing.add(langKey);
+                }
+                if (EnglishWords.INSTANCE.has(langKey + ".tooltip")) {
+                    unread.add(langKey + ".tooltip");
                 }
             }
         }
         assertEquals("category lines missing from en_US.lang",
                 new ArrayList<String>(), missing);
+        assertEquals("category tips no screen reads",
+                new ArrayList<String>(), unread);
     }
 
     /**

@@ -6,6 +6,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -713,7 +714,7 @@ public final class WindowBar {
         BarLead lead = lead(frame);
         lead.advanceTab(placed.lead, pointed);
         lead.drawTab(minecraft, font, placed.lead, buttonTop(top), textTop(top),
-                fraction(frame), surfaceAlpha(minecraft, share), alpha);
+                surfaceAlpha(minecraft, share), alpha);
     }
 
     /**
@@ -796,7 +797,8 @@ public final class WindowBar {
     /**
      * The field in its well, a gap inside each side and a caret short at
      * the end, its words where a message row puts them; the hint in the
-     * aside tone and italics while it is empty.
+     * aside tone and italics while it is empty. A greyed field shows its
+     * hint and its words at half strength (LOOK-15).
      */
     private static void drawField(FontRenderer font, Placed placed, int top,
                                   int alpha) {
@@ -809,13 +811,18 @@ public final class WindowBar {
         item.field.xPosition = fieldLeft;
         item.field.yPosition = textTop(top);
         item.field.width = fieldRight - fieldLeft;
+        int ink = item.isAvailable() ? alpha
+                : Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY);
         if (item.field.getText().length() == 0) {
             int x = fieldLeft + LostTalesUiCaret.WIDTH + 1;
-            LostTalesUiInk.drawText(font, "§o" + font.trimStringToWidth(
-                    item.label, Math.max(0, fieldRight - x)), x,
-                    textTop(top), WindowStyle.asideRgb(), alpha);
+            LostTalesUiCutName.drawText(font, "§o" + item.label, x,
+                    textTop(top), fieldRight - x, WindowStyle.asideRgb(), ink);
         }
-        item.field.drawTextBox();
+        if (item.isAvailable()) {
+            item.field.drawTextBox();
+        } else {
+            WindowFields.draw(item.field, ink);
+        }
     }
 
     /**
@@ -866,22 +873,26 @@ public final class WindowBar {
             return;
         }
         int first = firstOffer(field.item);
-        int pointed = hit != null && hit.offer >= 0 && hit.item != null
-                && hit.item.id.equals(field.item.id)
-                ? hit.offer : field.item.offered;
+        boolean onList = hit != null && hit.offer >= 0 && hit.item != null
+                && hit.item.id.equals(field.item.id);
+        int pointed = onList ? hit.offer : field.item.offered;
         int rowsTop = list[1] + WindowStyle.POPUP_INSET;
         WindowStyle.drawPopupList(list[0], list[1], list[2], list[3], rowsTop,
                 MenuWindow.ROW_HEIGHT, pointed - first);
         int rows = Math.min(MAX_OFFERS, field.item.offers.size());
         for (int row = 0; row < rows; row++) {
+            // A name too long for the list fades into its end and slides
+            // along under the pointer (LOOK-37).
             String name = field.item.offers.get(first + row);
-            LostTalesUiInk.drawText(font, font.trimStringToWidth(name,
-                    list[2] - list[0] - 2 * WindowStyle.POPUP_INSET),
+            LostTalesUiCutName.drawText(font, name,
                     list[0] + WindowStyle.POPUP_INSET,
                     rowsTop + row * MenuWindow.ROW_HEIGHT
                             + LostTalesUiInk.centredStart(MenuWindow.ROW_HEIGHT,
                                     LostTalesUiInk.CAP_HEIGHT),
-                    LostTalesUiInk.IVORY, Math.round(255.0F * share));
+                    list[2] - list[0] - 2 * WindowStyle.POPUP_INSET,
+                    LostTalesUiInk.IVORY, Math.round(255.0F * share),
+                    field.item, Integer.valueOf(first + row),
+                    onList && hit.offer == first + row);
         }
         regions.add(list[0], list[1], list[2], list[3]);
     }

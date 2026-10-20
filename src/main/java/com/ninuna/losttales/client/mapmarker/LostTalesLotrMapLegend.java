@@ -9,8 +9,8 @@ import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.WindowDrawing;
 import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
@@ -112,7 +112,7 @@ final class LostTalesLotrMapLegend {
         try {
             GL11.glDisable(GL11.GL_DEPTH_TEST);
             drawSurface(minecraft, layout, scroll, categories, hovered);
-            drawRows(minecraft, font, layout, scroll, categories);
+            drawRows(minecraft, font, layout, scroll, categories, hovered);
             // The fades hang from the frame on both edges.
             WindowLists.drawScroll(layout.boxLeft(), layout.boxTop(),
                     layout.boxRight(), layout.boxBottom(), layout.rowsTop(),
@@ -177,11 +177,14 @@ final class LostTalesLotrMapLegend {
     /**
      * The heading and the kinds' rows the band shows, cut to it where they
      * glide past its edges: each kind's glyph in the icon column, struck
-     * through while the map leaves the kind out, then its name in ivory.
+     * through while the map leaves the kind out, then its name in ivory,
+     * fading into the row's end where it is cut and sliding along while
+     * the row is {@code hovered} (LOOK-37).
      */
     private static void drawRows(Minecraft minecraft, FontRenderer font,
                                  Layout layout, Scroll scroll,
-                                 List<LostTalesMapLegendCategory> categories) {
+                                 List<LostTalesMapLegendCategory> categories,
+                                 int hovered) {
         boolean clipped = LostTalesUiClip.beginLocal(minecraft,
                 layout.boxLeft(), layout.rowsTop(), layout.boxRight(),
                 layout.rowsBottom());
@@ -215,10 +218,11 @@ final class LostTalesLotrMapLegend {
                         labelTop + LostTalesUiInk.centredStart(
                                 LostTalesUiInk.CAP_HEIGHT, glyph.height()),
                         0.0F, 255);
-                LostTalesUiInk.drawText(font, trimmed(font,
-                                I18n.format(category.getTranslationKey()),
-                                right - labelLeft), labelLeft, labelTop,
-                        LostTalesUiInk.IVORY, 255);
+                LostTalesUiCutName.drawText(font,
+                        I18n.format(category.getTranslationKey()), labelLeft,
+                        labelTop, right - labelLeft, LostTalesUiInk.IVORY,
+                        255, scroll, Integer.valueOf(index),
+                        index == hovered);
             }
         } finally {
             LostTalesUiClip.end(clipped);
@@ -370,13 +374,6 @@ final class LostTalesLotrMapLegend {
         int index = Math.floorDiv(pointY - listTop(layout, shown),
                 layout.rowHeight) - 1;
         return index >= 0 && index < categoryCount ? index : -1;
-    }
-
-    /** {@code text} cut to {@code width}, whole when it fits. */
-    private static String trimmed(FontRenderer font, String text, int width) {
-        return font.getStringWidth(text) <= width ? text
-                : LostTalesSkyrimUiStyle.trimToWidth(font, text,
-                        Math.max(0, width));
     }
 
     /**

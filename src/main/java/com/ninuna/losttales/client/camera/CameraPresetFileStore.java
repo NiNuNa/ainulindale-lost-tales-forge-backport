@@ -24,7 +24,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import net.minecraft.util.StatCollector;
 
-/** Loads editable client camera presets from config/losttales. */
+/** Loads editable client camera presets from config/losttales/client/camera_presets. */
 public final class CameraPresetFileStore {
     public static final int MAX_PRESET_FILES = 128;
     public static final long MAX_JSON_BYTES = 128L * 1024L;
@@ -37,9 +37,6 @@ public final class CameraPresetFileStore {
     private static final String[] BUNDLED_FILE_NAMES = {
             "modern_action_rpg.json"
     };
-    private static final Set<String> RETIRED_BUILT_IN_IDS =
-            Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
-                    "wide_exploration", "vanilla_plus")));
     /** What the lang keys of the built-in presets' names begin with. */
     static final String NAME_KEY_PREFIX =
             "losttales.config.third_person_camera.cameraPreset.";
@@ -256,9 +253,6 @@ public final class CameraPresetFileStore {
             acceptedFiles++;
             CameraPresetDefinition definition = loadDefinition(candidate);
             if (definition == null) {
-                continue;
-            }
-            if (RETIRED_BUILT_IN_IDS.contains(definition.getId())) {
                 continue;
             }
             if (!loadedIds.add(definition.getId())) {

@@ -56,6 +56,7 @@
   ],
   "rewards": {
     "experience": "35",
-    "items": "minecraft:iron_ingot*2,minecraft:string*2"
+    "items": "minecraft:iron_ingot*2,minecraft:string*2",
+    "skills": "losttales:smithing*40,losttales:mining*20"
   }
 }

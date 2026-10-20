@@ -65,6 +65,16 @@ public final class DiscordBridgeWordsTest {
                 EnglishWords.INSTANCE, "", "The Shire", "123"));
     }
 
+    /** The webhook a link makes is named by the lang file, held to what Discord takes. */
+    @Test
+    public void aLinksWebhookIsNamedByTheLangFile() {
+        assertEquals("Lost Tales", EnglishWords.INSTANCE.format(
+                LostTalesDiscordBridge.WEBHOOK_NAME_KEY));
+        assertEquals("{\"name\":\"Lost Tales\"}", DiscordJson.createWebhookBody(
+                EnglishWords.INSTANCE.format(LostTalesDiscordBridge.WEBHOOK_NAME_KEY)));
+        assertFalse(DiscordJson.createWebhookBody("Discord Bridge").contains("Discord"));
+    }
+
     /** In a player's line the words are translations, the names plain. */
     @Test
     public void aPlayersLineNamesThemAsWordsToTranslate() {

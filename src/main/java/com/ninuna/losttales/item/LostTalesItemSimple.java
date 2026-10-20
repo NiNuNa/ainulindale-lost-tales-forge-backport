@@ -12,21 +12,15 @@ import net.minecraft.item.ItemStack;
 public class LostTalesItemSimple extends Item {
     private final ELostTalesItemMaterial material;
     private final ELostTalesItem.Type itemType;
-    private final String credits;
 
     public LostTalesItemSimple(ELostTalesItemMaterial material, ELostTalesItem.Type itemType) {
-        this(material, itemType, null);
-    }
-
-    public LostTalesItemSimple(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, String credits) {
         this.material = material;
         this.itemType = itemType;
-        this.credits = credits;
     }
 
     @Override
     @SideOnly(Side.CLIENT)
     public void addInformation(ItemStack itemStack, EntityPlayer player, List list, boolean advancedTooltips) {
-        LostTalesClientUtil.addItemInformation(list, itemStack, this.material, this.credits, player, this.itemType);
+        LostTalesClientUtil.addItemInformation(list, itemStack, this.material, null, player, this.itemType);
     }
 }

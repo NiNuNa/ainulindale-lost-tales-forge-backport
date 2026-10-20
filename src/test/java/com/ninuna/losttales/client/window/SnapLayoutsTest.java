@@ -1,7 +1,9 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -20,13 +22,11 @@ import static org.junit.Assert.assertTrue;
 /**
  * The snap layouts: the parts of the screen a window fills, the layouts
  * a screen has room for, how a panel of them is laid out and answers
- * the pointer, where the panel under a fullscreen control opens,
- * and the suggested layouts holding the other windows. Without a
- * Minecraft instance the narrowest window is 166 wide and 88 tall, and a
- * window keeps two pixels inside the part of the screen it fills. A panel
- * wears a chat window's two-pixel frame inside its box, four clear pixels
- * inside that. Motion is off, so every transition and follower lands at
- * once.
+ * the pointer, the colours its zones wear, and the suggested layouts
+ * holding the other windows. Without a Minecraft instance the narrowest
+ * window is 166 wide and 88 tall, and a window keeps two pixels inside
+ * the part of the screen it fills. A panel keeps four clear pixels inside
+ * its box. Motion is off, so every transition and follower lands at once.
  */
 public final class SnapLayoutsTest {
     private static final double EPSILON = 1.0E-9D;
@@ -146,7 +146,7 @@ public final class SnapLayoutsTest {
      * A panel answers with the zone under the pointer, counted through
      * the panel: a part of the screen two layouts offer is two zones,
      * and only the one under the pointer lights. Between zones and on
-     * the padding nothing answers, though the panel is still there.
+     * the padding nothing answers.
      */
     @Test
     public void aPanelAnswersWithTheZoneUnderThePointer() {
@@ -155,23 +155,50 @@ public final class SnapLayoutsTest {
         SnapLayouts.Panel panel = SnapLayouts.lay(
                 Collections.<SnapLayouts.Suggestion>emptyList(), layouts,
                 6, 100.0D, 2.0D, 960, 540);
-        assertEquals(320.0D, panel.box.width, EPSILON);
-        assertEquals(39.0D, panel.box.height, EPSILON);
-        // The first layout's small screen starts inside the frame and
-        // the padding, at (106, 8); the fourth, the quarters, three
-        // layouts on, after seven zones.
-        assertEquals(0, panel.zoneAt(110.0D, 12.0D));
-        assertEquals(7, panel.zoneAt(265.0D, 12.0D));
+        assertEquals(316, SnapLayouts.panelWidth(layouts.size(), 6));
+        assertEquals(35, SnapLayouts.panelHeight(layouts.size(), 6,
+                SnapLayouts.thumbHeight(960, 540)));
+        // The first layout's small screen starts inside the padding, at
+        // (104, 6); the fourth, the quarters, three layouts on, after
+        // seven zones.
+        assertEquals(0, panel.zoneAt(108.0D, 10.0D));
+        assertEquals(7, panel.zoneAt(263.0D, 10.0D));
         assertEquals(Window.ScreenFill.LEFT, panel.fillOf(0));
         assertEquals(Window.ScreenFill.TOP_LEFT, panel.fillOf(7));
-        assertEquals(-1, panel.zoneAt(129.0D, 12.0D));
-        assertEquals(-1, panel.zoneAt(102.0D, 12.0D));
-        assertTrue(panel.contains(102.0D, 12.0D));
+        assertEquals(-1, panel.zoneAt(127.0D, 10.0D));
+        assertEquals(-1, panel.zoneAt(102.0D, 10.0D));
         assertEquals(Window.ScreenFill.NONE, panel.fillOf(-1));
         assertTrue(panel.companionsOf(0).isEmpty());
         // In rows of three the panel is two rows tall.
-        assertEquals(164, SnapLayouts.panelWidth(6, 3));
-        assertEquals(56, SnapLayouts.panelHeight(6, 3, 20));
+        assertEquals(160, SnapLayouts.panelWidth(6, 3));
+        assertEquals(52, SnapLayouts.panelHeight(6, 3, 20));
+    }
+
+    /**
+     * A zone wears the theme's secondary colour, as a strip does, and the
+     * zone lit two thirds of the way from the primary to the accent: the
+     * colours the player picks, never a colour of its own.
+     */
+    @Test
+    public void theZonesWearTheThemesColours() {
+        String primary = LostTalesConfig.windowPrimaryColor;
+        String secondary = LostTalesConfig.windowSecondaryColor;
+        String accent = LostTalesConfig.windowAccentColor;
+        try {
+            LostTalesConfig.windowPrimaryColor = "plum_black";
+            LostTalesConfig.windowSecondaryColor = "slate_blue";
+            LostTalesConfig.windowAccentColor = "coral";
+            assertEquals(LostTalesColors.rgb(LostTalesColors.SLATE_BLUE),
+                    SnapLayouts.zoneRgb(false));
+            assertEquals(LostTalesUiInk.blend(
+                    LostTalesColors.rgb(LostTalesColors.PLUM_BLACK),
+                    LostTalesColors.rgb(LostTalesColors.CORAL), 2.0F / 3.0F),
+                    SnapLayouts.zoneRgb(true));
+        } finally {
+            LostTalesConfig.windowPrimaryColor = primary;
+            LostTalesConfig.windowSecondaryColor = secondary;
+            LostTalesConfig.windowAccentColor = accent;
+        }
     }
 
     /**
@@ -338,25 +365,25 @@ public final class SnapLayoutsTest {
                 SnapLayouts.suggested(layouts, "hand",
                         Arrays.asList("front", "behind")),
                 layouts, 8, 100.0D, 2.0D, 960, 540);
-        assertEquals(424.0D, panel.box.width, EPSILON);
-        // The first suggestion's small screen at (106, 8): the left half
+        assertEquals(420, SnapLayouts.panelWidth(2 + layouts.size(), 8));
+        // The first suggestion's small screen at (104, 6): the left half
         // is the window in hand's, the right half the window in front's.
-        assertEquals(0, panel.zoneAt(110.0D, 12.0D));
-        assertEquals(0, panel.zoneAt(140.0D, 12.0D));
+        assertEquals(0, panel.zoneAt(108.0D, 10.0D));
+        assertEquals(0, panel.zoneAt(138.0D, 10.0D));
         assertEquals(Window.ScreenFill.LEFT, panel.fillOf(0));
         Map<String, Window.ScreenFill> halves =
                 new HashMap<String, Window.ScreenFill>();
         halves.put("front", Window.ScreenFill.RIGHT);
         assertEquals(halves, panel.companionsOf(0));
-        // The second, one small screen on at (158, 8): zones 2 to 4.
-        assertEquals(2, panel.zoneAt(190.0D, 25.0D));
+        // The second, one small screen on at (156, 6): zones 2 to 4.
+        assertEquals(2, panel.zoneAt(188.0D, 23.0D));
         Map<String, Window.ScreenFill> stacked =
                 new HashMap<String, Window.ScreenFill>();
         stacked.put("front", Window.ScreenFill.TOP_RIGHT);
         stacked.put("behind", Window.ScreenFill.BOTTOM_RIGHT);
         assertEquals(stacked, panel.companionsOf(2));
         // The plain layouts follow, and take the window alone.
-        assertEquals(6, panel.zoneAt(245.0D, 12.0D));
+        assertEquals(6, panel.zoneAt(243.0D, 10.0D));
         assertTrue(panel.companionsOf(6).isEmpty());
         assertEquals(2, panel.step(0, SnapKeys.Direction.RIGHT));
     }

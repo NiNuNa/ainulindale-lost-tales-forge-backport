@@ -49,14 +49,21 @@ public class LostTalesCompassHudRenderer {
 
     /** Bar rows plus the centre tick beneath them; row 24 is the blank separator. */
     public static final int COMPASS_HEIGHT = 24;
-    private static final int PLACEMENT_HEIGHT = 42;
+    public static final int MAP_MARKER_DISTANCE_LABEL_OFFSET_Y = 4;
+    /**
+     * The distance label's line over the bar, the game font's nine pixels,
+     * and its gap: the compass's box starts there, so the label stays on
+     * the screen with the bar.
+     */
+    static final int LABEL_ROOM_ABOVE = 9 + MAP_MARKER_DISTANCE_LABEL_OFFSET_Y;
+    /** The box: the label's line, then the bar and the name label under it. */
+    private static final int PLACEMENT_HEIGHT = LABEL_ROOM_ABOVE + 42;
     // Short indicator = one chevron pair (rows 25-27); the tall one adds the
     // second pair after a blank row, so h=7 spans rows 25-31 to the atlas floor.
     static final int VERTICAL_ARROW_TEXTURE_V = 25;
 
     public static final int MAP_MARKER_OFFSET_Y = 8;
     public static final int MAP_MARKER_NAME_LABEL_OFFSET_Y = 3;
-    public static final int MAP_MARKER_DISTANCE_LABEL_OFFSET_Y = 4;
     public static final float MAP_MARKER_SCALE_MODIFIER = 0.18F;
     /** Minimum opacity for positioned markers that are still inside their configured distance threshold. */
     public static final float MAP_MARKER_DISTANCE_FADE_IN_FLOOR_ALPHA = 0.4F;
@@ -122,14 +129,9 @@ public class LostTalesCompassHudRenderer {
         HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
                 width, height, COMPASS_WIDTH, PLACEMENT_HEIGHT,
                 LostTalesConfig.compassHudOffsetX,
-                LostTalesConfig.compassHudOffsetY,
-                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT,
-                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT,
-                0,
-                minecraft.fontRenderer.FONT_HEIGHT
-                        + MAP_MARKER_DISTANCE_LABEL_OFFSET_Y);
+                LostTalesConfig.compassHudOffsetY);
         int compassX = placement.x;
-        int compassY = placement.y;
+        int compassY = placement.y + LABEL_ROOM_ABOVE;
         // Float: COMPASS_WIDTH is odd, so integer halving would anchor every
         // marker half a pixel left of the bar's actual centre.
         float centerX = compassX + COMPASS_WIDTH / 2.0F;

@@ -16,7 +16,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -112,6 +112,8 @@ abstract class ChatPickerPanel extends SubWindowContent {
     private ChatInputField searchField;
     private int buttonIndex;
     private Entry hoveredEntry;
+    /** Which cell is being drawn: what its cut name names itself by. */
+    private int drawnCell;
     /**
      * Pixels the body is asked to be scrolled up by — the wheel's
      * target; clamped on every layout.
@@ -506,16 +508,19 @@ abstract class ChatPickerPanel extends SubWindowContent {
                 }
                 String glyph = label.collapsible
                         ? (isCollapsed(label.key) ? "+ " : "- ") : "";
+                boolean litHeading = label.collapsible
+                        && label.key.equals(litLabel);
+                int right = layout.left + layout.width - PADDING_X;
                 WindowLists.drawHeading(font, glyph + label.text, label.x,
-                        label.x, layout.left + layout.width - PADDING_X,
-                        label.y, labelHeight(),
-                        label.collapsible && label.key.equals(litLabel),
-                        alpha);
+                        label.x, right, right, label.y, labelHeight(),
+                        litHeading, alpha, this, label.key, litHeading);
             }
-            for (Cell cell : layout.cells) {
+            for (int index = 0; index < layout.cells.size(); index++) {
+                Cell cell = layout.cells.get(index);
                 if (!layout.showsRow(cell.y, cellHeight())) {
                     continue;
                 }
+                this.drawnCell = index;
                 drawEntry(minecraft, cell.entry, cell.x, cell.y,
                         layout.cellWidth, alpha, cell == lit);
             }
@@ -551,14 +556,11 @@ abstract class ChatPickerPanel extends SubWindowContent {
         if (this.searchField.getText().length() == 0) {
             int x = this.searchField.xPosition + LostTalesUiCaret.WIDTH
                     + 1;
-            String prompt = LostTalesSkyrimUiStyle.trimToWidth(font,
-                    StatCollector.translateToLocal(
-                            "gui.losttales.chat.share.search"),
-                    this.searchField.xPosition + this.searchField.getWidth()
-                            - x);
-            LostTalesUiInk.drawText(font, "§o" + prompt, x,
-                    layout.searchY, LostTalesChatVisualStyle.asideRgb(),
-                    alpha);
+            LostTalesUiCutName.drawText(font, "§o" + StatCollector
+                            .translateToLocal("gui.losttales.chat.share.search"),
+                    x, layout.searchY, this.searchField.xPosition
+                            + this.searchField.getWidth() - x,
+                    LostTalesChatVisualStyle.asideRgb(), alpha);
         }
         this.searchField.drawTextBox();
     }
@@ -578,18 +580,6 @@ abstract class ChatPickerPanel extends SubWindowContent {
             this.searchField.setEnableBackgroundDrawing(false);
             this.searchField.setTextColor(LostTalesUiInk.IVORY);
         }
-    }
-
-    /**
-     * The box a press lands on the search field in, read from the numbers
-     * {@link #positionSearchField} gives the field: what the field's own
-     * press test asks, so the magnifier lights on the pixels a press
-     * would put the caret from.
-     */
-    private LostTalesUiHitBox searchFieldBox() {
-        return new LostTalesUiHitBox(this.searchField.xPosition,
-                this.searchField.yPosition, this.searchField.width,
-                this.searchField.height);
     }
 
     /**
@@ -732,6 +722,18 @@ abstract class ChatPickerPanel extends SubWindowContent {
     /** Draws one cell {@code width} wide at {@code x}, {@code y}. */
     abstract void drawEntry(Minecraft minecraft, Entry entry, int x, int y,
                             int width, int alpha, boolean hovered);
+
+    /**
+     * The name of the cell being drawn, in ivory from {@code x}: whole in
+     * {@code room}, else cut there, fading into its end and sliding along
+     * while the cell is {@code hovered} (LOOK-37).
+     */
+    void drawName(FontRenderer font, String name, int x, int y, int room,
+                  int alpha, boolean hovered) {
+        LostTalesUiCutName.drawText(font, name, x, y, room,
+                LostTalesUiInk.IVORY, alpha, this,
+                Integer.valueOf(this.drawnCell), hovered);
+    }
 
     /** Hover label for a cell, or null for none. */
     abstract String tooltip(Entry entry);

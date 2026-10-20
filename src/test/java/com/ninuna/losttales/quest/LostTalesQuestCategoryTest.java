@@ -33,13 +33,10 @@ public final class LostTalesQuestCategoryTest {
             stages[index] = new LostTalesQuestStageDefinition(stageIds[index],
                     Collections.<LostTalesQuestObjectiveDefinition>emptyList());
         }
-        return new LostTalesQuestDefinition(id, "Q", "", false,
+        return new LostTalesQuestDefinition(id, "Q", "", false, false,
                 LostTalesQuestDefinition.START_MODE_LOCKED,
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(), journal,
-                Arrays.asList(stages));
+                null, null, null, null, journal, null, null,
+                Arrays.asList(stages), false, null, null);
     }
 
     private static String category(String id) {

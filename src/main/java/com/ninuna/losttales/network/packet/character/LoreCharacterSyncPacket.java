@@ -40,9 +40,6 @@ public final class LoreCharacterSyncPacket implements IMessage {
                 String name = string(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
                 String description = string(buffer, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
                 String race = string(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String gender = string(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String model = string(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String skin = string(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 boolean configured = buffer.readBoolean();
                 boolean claimed = buffer.readBoolean();
                 boolean owned = buffer.readBoolean();
@@ -53,7 +50,7 @@ public final class LoreCharacterSyncPacket implements IMessage {
                 long revision = buffer.readLong();
                 if (revision < 0L) throw new CharacterPacketCodec.DecodeException("negative revision");
                 summaries.add(new LoreCharacterSummary(
-                        id, name, description, race, gender, model, skin,
+                        id, name, description, race,
                         configured, claimed, owned, transferring,
                         owner, ownedCharacterId, revision));
             }
@@ -79,9 +76,6 @@ public final class LoreCharacterSyncPacket implements IMessage {
             write(buffer, summary.getName(), CharacterPacketCodec.MAX_NAME_BYTES);
             write(buffer, summary.getDescription(), CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
             write(buffer, summary.getRaceId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            write(buffer, summary.getGenderId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            write(buffer, summary.getModelId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            write(buffer, summary.getSkinId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeBoolean(summary.isConfigured());
             buffer.writeBoolean(summary.isClaimed());
             buffer.writeBoolean(summary.isOwnedByViewer());

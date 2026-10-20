@@ -5,6 +5,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.fellowship.server.FellowshipService;
+import com.ninuna.losttales.quest.LostTalesQuestManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,8 +19,8 @@ import net.minecraft.world.World;
  * Shares kills and arrivals inside one company (FEL-28): one counts for a
  * member only when its maker and the member both travel with that
  * fellowship ({@link #sharingCredit}). Every member is checked again
- * against the live server, and each quest adapter checks whether that
- * player has a matching objective.
+ * against the live server, and the quest manager checks whether that
+ * player has a matching objective; completion and rewards stay its own.
  */
 public final class FellowshipQuestProgressCoordinator {
 
@@ -32,14 +33,10 @@ public final class FellowshipQuestProgressCoordinator {
             new FellowshipQuestProgressCoordinator();
     private static final long DEDUPLICATION_WINDOW_TICKS = 5L;
 
-    private final List<FellowshipQuestCompatibilityAdapter> adapters =
-            new ArrayList<FellowshipQuestCompatibilityAdapter>();
     private final Map<KillEventKey, Long> recentKillEvents =
             new HashMap<KillEventKey, Long>();
 
-    private FellowshipQuestProgressCoordinator() {
-        this.adapters.add(new LostTalesFellowshipQuestCompatibilityAdapter());
-    }
+    private FellowshipQuestProgressCoordinator() {}
 
     public static FellowshipQuestProgressCoordinator getInstance() {
         return INSTANCE;
@@ -68,7 +65,7 @@ public final class FellowshipQuestProgressCoordinator {
         }
         this.recentKillEvents.put(eventKey, Long.valueOf(worldTime));
 
-        applyKillAdapters(creditedPlayer, victim, false);
+        LostTalesQuestManager.handleEntityKilled(creditedPlayer, victim, false);
         if (!LostTalesConfig.enableSharedQuestProgress) {
             return;
         }
@@ -100,7 +97,7 @@ public final class FellowshipQuestProgressCoordinator {
                     creditedPlayer, participant, member, radiusSq)) {
                 continue;
             }
-            applyKillAdapters(participant, victim, true);
+            LostTalesQuestManager.handleEntityKilled(participant, victim, true);
         }
     }
 
@@ -110,7 +107,8 @@ public final class FellowshipQuestProgressCoordinator {
                 || source.worldObj.isRemote || !source.isEntityAlive()) {
             return;
         }
-        boolean sourceChanged = applyTravelAdapters(source, source, false);
+        boolean sourceChanged = LostTalesQuestManager.handleTravelProgress(
+                source, source, false);
         if (!sourceChanged
                 || !LostTalesConfig.enableSharedQuestProgress) {
             return;
@@ -138,7 +136,7 @@ public final class FellowshipQuestProgressCoordinator {
                     onlinePlayers, member.getOwnerId());
             if (isEligibleParticipant(source, participant, member,
                     radiusSq)) {
-                applyTravelAdapters(participant, source, true);
+                LostTalesQuestManager.handleTravelProgress(participant, source, true);
             }
         }
     }
@@ -178,27 +176,6 @@ public final class FellowshipQuestProgressCoordinator {
                         .getTravellingFellowshipId(world, identityId);
             }
         };
-    }
-
-    private void applyKillAdapters(EntityPlayerMP participant, Entity victim,
-            boolean shared) {
-        for (FellowshipQuestCompatibilityAdapter adapter : this.adapters) {
-            if (adapter != null && adapter.isAvailable()) {
-                adapter.applyKillProgress(participant, victim, shared);
-            }
-        }
-    }
-
-    private boolean applyTravelAdapters(EntityPlayerMP participant,
-            Entity source, boolean shared) {
-        boolean changed = false;
-        for (FellowshipQuestCompatibilityAdapter adapter : this.adapters) {
-            if (adapter != null && adapter.isAvailable()) {
-                changed |= adapter.applyTravelProgress(
-                        participant, source, shared);
-            }
-        }
-        return changed;
     }
 
     private boolean isEligibleParticipant(EntityPlayerMP source,

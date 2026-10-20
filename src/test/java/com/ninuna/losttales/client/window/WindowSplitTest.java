@@ -146,6 +146,25 @@ public final class WindowSplitTest {
         assertFalse("a page stands in one split at most", WindowLayout.split(this.a, this.c));
     }
 
+    /**
+     * The split view button acts while its sub-window has rows: a page in
+     * a split, a page beside another, and a page alone while the New Page
+     * offers a page to open beside it. A page no window holds has none.
+     */
+    @Test
+    public void theSplitViewActsWhileAPageCanStandBeside() {
+        assertFalse("in no window", TabMenus.canSplit(this.a));
+        Window window = Unlocking.of(WindowLayout.addWindow(row(this.a, this.b), this.a));
+        assertTrue("another page in its window", TabMenus.canSplit(this.a));
+        WindowLayout.split(this.a, this.b);
+        assertTrue("its split's own rows", TabMenus.canSplit(this.a));
+        WindowLayout.separate(this.a);
+        WindowLayout.close(this.b);
+        assertEquals(row(this.a), window.getTabs());
+        assertTrue("the New Page offers a page", TabMenus.offersAnyPage(null));
+        assertTrue("alone, a page opens beside it", TabMenus.canSplit(this.a));
+    }
+
     @Test
     public void aPageFromAnotherWindowComesOverForTheSplit() {
         Window window = Unlocking.of(WindowLayout.addWindow(row(this.a), this.a));

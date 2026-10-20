@@ -18,9 +18,7 @@ public final class FellowshipInvitationSnapshot {
     private final UUID invitingOwnerId;
     private final String invitingCharacterName;
     private final UUID targetIdentityId;
-    private final UUID targetOwnerId;
     private final String targetCharacterName;
-    private final long createdAt;
     private final long expiresAt;
 
     public FellowshipInvitationSnapshot(UUID invitationId,
@@ -30,17 +28,14 @@ public final class FellowshipInvitationSnapshot {
                                         UUID invitingOwnerId,
                                         String invitingCharacterName,
                                         UUID targetIdentityId,
-                                        UUID targetOwnerId,
                                         String targetCharacterName,
-                                        long createdAt,
                                         long expiresAt) {
         if (invitationId == null || fellowshipId == null
                 || invitingIdentityId == null || invitingOwnerId == null
-                || targetIdentityId == null || targetOwnerId == null) {
+                || targetIdentityId == null) {
             throw new IllegalArgumentException("invitation identities must not be null");
         }
-        if (invitingIdentityId.equals(targetIdentityId)
-                || createdAt < 0L || expiresAt <= createdAt
+        if (invitingIdentityId.equals(targetIdentityId) || expiresAt <= 0L
                 || !Fellowship.isWellFormedName(fellowshipName)) {
             throw new IllegalArgumentException("invitation snapshot is invalid");
         }
@@ -51,9 +46,7 @@ public final class FellowshipInvitationSnapshot {
         this.invitingOwnerId = invitingOwnerId;
         this.invitingCharacterName = normalizeName(invitingCharacterName);
         this.targetIdentityId = targetIdentityId;
-        this.targetOwnerId = targetOwnerId;
         this.targetCharacterName = normalizeName(targetCharacterName);
-        this.createdAt = createdAt;
         this.expiresAt = expiresAt;
     }
 
@@ -70,9 +63,7 @@ public final class FellowshipInvitationSnapshot {
                 invitation.getInvitingOwnerId(),
                 invitation.getInvitingCharacterName(),
                 invitation.getTargetIdentityId(),
-                invitation.getTargetOwnerId(),
                 invitation.getTargetCharacterName(),
-                invitation.getCreatedAt(),
                 invitation.getExpiresAt());
     }
 
@@ -104,16 +95,8 @@ public final class FellowshipInvitationSnapshot {
         return this.targetIdentityId;
     }
 
-    public UUID getTargetOwnerId() {
-        return this.targetOwnerId;
-    }
-
     public String getTargetCharacterName() {
         return this.targetCharacterName;
-    }
-
-    public long getCreatedAt() {
-        return this.createdAt;
     }
 
     public long getExpiresAt() {

@@ -66,28 +66,27 @@ public final class LostTalesQuestSyncPacketTest {
                         "collect", "item", "Collect supplies.", false,
                         Collections.singletonMap("count", "3"));
         LostTalesQuestDefinition quest = new LostTalesQuestDefinition(
-                "runtime:test", "Test", "A runtime quest.", false,
+                "runtime:test", "Test", "A runtime quest.", false, false,
                 LostTalesQuestDefinition.START_MODE_INTERACTION,
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
+                null, null, null, null, null, null, null,
                 Collections.singletonList(
                         new LostTalesQuestStageDefinition(
-                                "start", Collections.singletonList(objective))));
+                                "start", Collections.singletonList(objective))),
+                false, null, null);
 
         LostTalesQuestSyncPacket original = new LostTalesQuestSyncPacket(
                 Collections.singletonList(progress),
                 Arrays.asList(new LostTalesQuestHistoryEntry(
                         "losttales:completed",
                         LostTalesQuestHistoryEntry.Outcome.COMPLETED,
-                        "The scouts survived.", 47000L,
-                        Collections.singleton("rescue_scouts")),
+                        "", 47000L, Collections.singleton("rescue_scouts"), 1,
+                        Collections.<String>emptyList()),
                         new LostTalesQuestHistoryEntry(
                         "losttales:failed",
                         LostTalesQuestHistoryEntry.Outcome.FAILED,
-                        "Time limit expired.", 48000L)),
+                        "gui.losttales.quest.reason.expired", 48000L,
+                        Collections.<String>emptySet(), 0,
+                        Collections.<String>emptyList())),
                 Collections.singleton("losttales:test_quest"),
                 Collections.singleton("runtime:camp"),
                 "runtime:camp", Collections.singletonList(marker),
@@ -107,12 +106,10 @@ public final class LostTalesQuestSyncPacketTest {
                 decoded.getQuestHistory().get(0).getQuestId());
         assertTrue(decoded.getQuestHistory().get(0).isCompleted());
         assertTrue(decoded.getQuestHistory().get(1).isFailed());
-        assertEquals("Time limit expired.",
+        assertEquals("gui.losttales.quest.reason.expired",
                 decoded.getQuestHistory().get(1).getDetail());
         assertEquals(48000L,
                 decoded.getQuestHistory().get(1).getWorldTime());
-        assertEquals("The scouts survived.",
-                decoded.getQuestHistory().get(0).getDetail());
         assertTrue(decoded.getQuestHistory().get(0)
                 .isOptionalObjectiveCompleted("rescue_scouts"));
         assertEquals(Collections.singleton("losttales:test_quest"),

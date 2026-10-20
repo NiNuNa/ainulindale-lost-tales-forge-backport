@@ -68,12 +68,12 @@ public final class CharacterGhostAndCapePacketTest {
         UUID character = UUID.fromString("b1000000-0000-0000-0000-00000000001b");
         ByteBuf named = Unpooled.buffer();
         new CharacterCapeUpdateRequestPacket(6, 2L, character, false,
-                CharacterCapeCatalog.PELARGIR).toBytes(named);
+                "losttales:pelargir").toBytes(named);
         CharacterCapeUpdateRequestPacket forCharacter = new CharacterCapeUpdateRequestPacket();
         forCharacter.fromBytes(named.copy());
         assertFalse(forCharacter.isMalformed());
         assertEquals(character, forCharacter.getCharacterId());
-        assertEquals(CharacterCapeCatalog.PELARGIR, forCharacter.getCosmeticCapeId());
+        assertEquals("losttales:pelargir", forCharacter.getCosmeticCapeId());
 
         // A request cut short is malformed.
         CharacterCapeUpdateRequestPacket cut = new CharacterCapeUpdateRequestPacket();
@@ -82,7 +82,7 @@ public final class CharacterGhostAndCapePacketTest {
 
         // The nil id names no character.
         ByteBuf nil = Unpooled.buffer();
-        new CharacterCapeUpdateRequestPacket(7, 2L, new UUID(0L, 0L), true, 0)
+        new CharacterCapeUpdateRequestPacket(7, 2L, new UUID(0L, 0L), true, "")
                 .toBytes(nil);
         CharacterCapeUpdateRequestPacket refused = new CharacterCapeUpdateRequestPacket();
         refused.fromBytes(nil);
@@ -91,6 +91,6 @@ public final class CharacterGhostAndCapePacketTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void aCapeRequestWithoutACharacterIsNotMade() {
-        new CharacterCapeUpdateRequestPacket(5, 2L, null, true, 0);
+        new CharacterCapeUpdateRequestPacket(5, 2L, null, true, "");
     }
 }

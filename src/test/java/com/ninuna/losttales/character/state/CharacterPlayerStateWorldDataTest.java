@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.state;
 
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 import org.junit.Test;
 
@@ -112,6 +113,95 @@ public final class CharacterPlayerStateWorldDataTest {
 
         assertTrue(loaded.isReadOnlyForNewerVersion());
         assertEquals(newer, written);
+    }
+
+    /**
+     * A player's state set aside when an operator put their character back
+     * is kept as it was through a save and a load, beside the account, and
+     * blocks nobody (CHAR-37).
+     */
+    @Test
+    public void aStateSetAsideIsKeptAndBlocksNobody() {
+        CharacterPlayerStateWorldData data = new CharacterPlayerStateWorldData(
+                CharacterPlayerStateWorldData.dataName(OWNER));
+        data.readFromNBT(savedAccount());
+        NBTTagCompound held = new NBTTagCompound();
+        held.setLong("SetAsideAt", 7000L);
+        held.setTag("Components", new NBTTagCompound());
+        held.getCompoundTag("Components").setTag("vanilla_inventory", new NBTTagCompound());
+
+        assertTrue(data.hasQuarantineRoomFor(1));
+        data.setAside(CharacterPlayerStateWorldData.REASON_SWITCH_MIXED_STATE, held);
+        held.setLong("SetAsideAt", 9L);
+        NBTTagCompound written = new NBTTagCompound();
+        data.writeToNBT(written);
+        CharacterPlayerStateWorldData loaded = new CharacterPlayerStateWorldData(
+                CharacterPlayerStateWorldData.dataName(OWNER));
+        loaded.readFromNBT(written);
+
+        assertFalse(loaded.isReadOnlyForNewerVersion());
+        assertFalse(loaded.isOwnerBlocked(OWNER));
+        assertNotNull(loaded.getAccount(OWNER));
+        assertEquals(1, loaded.getQuarantinedEntryCount());
+        NBTTagCompound entry = loaded.getQuarantinedEntries().get(0);
+        assertEquals(CharacterPlayerStateWorldData.REASON_SWITCH_MIXED_STATE,
+                entry.getString("Reason"));
+        assertEquals("kept as it was set aside", 7000L,
+                entry.getCompoundTag("OriginalData").getLong("SetAsideAt"));
+        assertTrue(entry.getCompoundTag("OriginalData").getCompoundTag("Components")
+                .hasKey("vanilla_inventory"));
+    }
+
+    /**
+     * With no room left the store closes, read-only, and still writes all
+     * it holds: nothing leaves it without being kept.
+     */
+    @Test
+    public void aFullQuarantineClosesTheStoreAndKeepsEverything() {
+        CharacterPlayerStateWorldData data = new CharacterPlayerStateWorldData(
+                CharacterPlayerStateWorldData.dataName(OWNER));
+        data.readFromNBT(savedAccount());
+        for (int index = 0; index < CharacterPlayerStateWorldData.MAX_QUARANTINED; index++) {
+            assertTrue(data.hasQuarantineRoomFor(1));
+            data.setAside(CharacterPlayerStateWorldData.REASON_SWITCH_MIXED_STATE,
+                    new NBTTagCompound());
+        }
+
+        assertFalse(data.hasQuarantineRoomFor(1));
+        assertTrue(data.isReadOnlyForNewerVersion());
+        NBTTagCompound written = new NBTTagCompound();
+        data.writeToNBT(written);
+        assertEquals(CharacterPlayerStateWorldData.MAX_QUARANTINED,
+                written.getTagList("Quarantine", Constants.NBT.TAG_COMPOUND).tagCount());
+        assertEquals(1, written.getTagList("Accounts", Constants.NBT.TAG_COMPOUND)
+                .tagCount());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void aClosedStoreSetsNothingAside() {
+        CharacterPlayerStateWorldData data = new CharacterPlayerStateWorldData(
+                CharacterPlayerStateWorldData.dataName(OWNER));
+        for (int index = 0; index < CharacterPlayerStateWorldData.MAX_QUARANTINED; index++) {
+            data.setAside(CharacterPlayerStateWorldData.REASON_SWITCH_MIXED_STATE,
+                    new NBTTagCompound());
+        }
+        data.setAside(CharacterPlayerStateWorldData.REASON_SWITCH_MIXED_STATE,
+                new NBTTagCompound());
+    }
+
+    /** A file quarantining past the bound is kept as it is and read-only. */
+    @Test
+    public void aQuarantinePastItsBoundIsPreservedReadOnly() {
+        NBTTagCompound saved = savedAccount();
+        NBTTagList quarantine = new NBTTagList();
+        for (int index = 0; index <= CharacterPlayerStateWorldData.MAX_QUARANTINED; index++) {
+            NBTTagCompound entry = new NBTTagCompound();
+            entry.setString("Reason", CharacterPlayerStateWorldData.REASON_SWITCH_MIXED_STATE);
+            entry.setTag("OriginalData", new NBTTagCompound());
+            quarantine.appendTag(entry);
+        }
+        saved.setTag("Quarantine", quarantine);
+        assertPreservedReadOnly(saved);
     }
 
     /** A file holding the owner's account with one record, as this build writes it. */

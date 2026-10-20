@@ -39,6 +39,17 @@ public final class LostTalesServerTaskQueueTest {
     }
 
     @Test
+    public void manyFullSharesNeverShutAnotherPlayerOut() {
+        for (int player = 0; player < 40; player++) {
+            UUID greedy = UUID.randomUUID();
+            for (int task = 0; task < LostTalesServerTaskQueue.MAX_QUEUED_PER_PLAYER; task++) {
+                assertTrue(LostTalesServerTaskQueue.enqueue(greedy, "request", NOTHING));
+            }
+        }
+        assertTrue(LostTalesServerTaskQueue.enqueue(UUID.randomUUID(), "request", NOTHING));
+    }
+
+    @Test
     public void aClearedQueueGivesEveryShareBack() {
         UUID player = UUID.randomUUID();
         for (int task = 0; task < LostTalesServerTaskQueue.MAX_QUEUED_PER_PLAYER; task++) {

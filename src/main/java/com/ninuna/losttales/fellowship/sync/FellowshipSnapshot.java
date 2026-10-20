@@ -37,16 +37,17 @@ public final class FellowshipSnapshot {
     private final FellowshipIcon icon;
     private final Set<FellowshipSwitch> switchesOn;
     private final Set<UUID> guides;
-    private final long createdAt;
     private final long revision;
-    private final int dataVersion;
+    /** LOTR's fellowship behind it; null while it has none yet. */
+    private final UUID lotrFellowshipId;
     private final List<FellowshipMemberSnapshot> members;
     private final Map<UUID, FellowshipMemberSnapshot> membersByIdentityId;
 
     public FellowshipSnapshot(UUID fellowshipId, UUID leaderIdentityId, String name,
                               FellowshipIcon icon, Set<FellowshipSwitch> switchesOn,
-                              Collection<UUID> guides, long createdAt, long revision,
-                              int dataVersion, List<FellowshipMemberSnapshot> members) {
+                              Collection<UUID> guides, long revision,
+                              UUID lotrFellowshipId,
+                              List<FellowshipMemberSnapshot> members) {
         if (fellowshipId == null || leaderIdentityId == null) {
             throw new IllegalArgumentException("fellowship and leader identifiers must not be null");
         }
@@ -58,9 +59,8 @@ public final class FellowshipSnapshot {
         this.icon = icon;
         this.switchesOn = switchesOn == null || switchesOn.isEmpty()
                 ? EnumSet.noneOf(FellowshipSwitch.class) : EnumSet.copyOf(switchesOn);
-        this.createdAt = Math.max(0L, createdAt);
         this.revision = Math.max(0L, revision);
-        this.dataVersion = Math.max(1, dataVersion);
+        this.lotrFellowshipId = lotrFellowshipId;
         ArrayList<FellowshipMemberSnapshot> accepted = new ArrayList<FellowshipMemberSnapshot>();
         HashMap<UUID, FellowshipMemberSnapshot> byId = new HashMap<UUID, FellowshipMemberSnapshot>();
         if (members != null) {
@@ -90,7 +90,9 @@ public final class FellowshipSnapshot {
         this.membersByIdentityId = Collections.unmodifiableMap(byId);
     }
 
-    public static FellowshipSnapshot fromFellowship(Fellowship fellowship, Presence presence) {
+    /** The fellowship as its members see it, with LOTR's fellowship behind it; null for none yet. */
+    public static FellowshipSnapshot fromFellowship(Fellowship fellowship, Presence presence,
+                                                    UUID lotrFellowshipId) {
         if (fellowship == null || presence == null) {
             throw new IllegalArgumentException("fellowship and presence must not be null");
         }
@@ -102,8 +104,7 @@ public final class FellowshipSnapshot {
         return new FellowshipSnapshot(fellowship.getFellowshipId(),
                 fellowship.getLeaderIdentityId(), fellowship.getName(),
                 fellowship.getIcon(), fellowship.getSwitchesOn(), fellowship.getGuides(),
-                fellowship.getCreatedAt(), fellowship.getRevision(),
-                fellowship.getDataVersion(), members);
+                fellowship.getRevision(), lotrFellowshipId, members);
     }
 
     public UUID getFellowshipId() {
@@ -137,16 +138,16 @@ public final class FellowshipSnapshot {
         return this.guides;
     }
 
-    public long getCreatedAt() {
-        return this.createdAt;
-    }
-
     public long getRevision() {
         return this.revision;
     }
 
-    public int getDataVersion() {
-        return this.dataVersion;
+    /**
+     * LOTR's fellowship behind it, the one its members share waypoints
+     * into; null while it has none yet.
+     */
+    public UUID getLotrFellowshipId() {
+        return this.lotrFellowshipId;
     }
 
     public List<FellowshipMemberSnapshot> getMembers() {

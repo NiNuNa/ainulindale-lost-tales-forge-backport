@@ -9,7 +9,6 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.item.ItemStack;
 
 /**
  * Requests one camera-intent entity action. The server re-resolves reach,
@@ -121,14 +120,12 @@ public final class LostTalesThirdPersonEntityActionPacket
                 MessageContext context) {
             EntityPlayerMP player =
                     LostTalesServerPacketDispatcher.getPlayer(context);
-            if (player == null || player.worldObj == null
-                    || player.worldObj.provider == null
-                    || message == null) {
+            if (player == null || message == null) {
                 return null;
             }
 
-            final int expectedDimension =
-                    player.worldObj.provider.dimensionId;
+            // The player's world and hand are read on the server thread,
+            // in the task, never here.
             final Action action = message.action;
             final int entityId = message.entityId;
             final double hitX = message.hitX;
@@ -136,10 +133,6 @@ public final class LostTalesThirdPersonEntityActionPacket
             final double hitZ = message.hitZ;
             final boolean useItemIfInteractionDeclines =
                     message.useItemIfInteractionDeclines;
-            final int expectedHotbarSlot =
-                    player.inventory.currentItem;
-            final ItemStack expectedHeldItem = ItemStack.copyItemStack(
-                    player.inventory.getCurrentItem());
             LostTalesServerPacketDispatcher.submit(
                     player,
                     LostTalesRequestRateLimiter.RequestType
@@ -150,12 +143,9 @@ public final class LostTalesThirdPersonEntityActionPacket
                         @Override
                         public void run(EntityPlayerMP livePlayer) {
                             LostTalesThirdPersonEntityActionService.execute(
-                                    livePlayer, expectedDimension,
-                                    action, entityId,
+                                    livePlayer, action, entityId,
                                     hitX, hitY, hitZ,
-                                    useItemIfInteractionDeclines,
-                                    expectedHotbarSlot,
-                                    expectedHeldItem);
+                                    useItemIfInteractionDeclines);
                         }
                     });
             return null;

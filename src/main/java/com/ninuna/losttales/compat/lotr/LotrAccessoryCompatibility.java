@@ -1,7 +1,6 @@
 package com.ninuna.losttales.compat.lotr;
 
 import com.ninuna.losttales.accessory.AccessoryCompatibilityRegistry;
-import com.ninuna.losttales.accessory.AccessoryEligibility;
 import com.ninuna.losttales.accessory.AccessorySlotType;
 import lotr.common.LOTRMod;
 import net.minecraft.item.Item;
@@ -24,7 +23,6 @@ public final class LotrAccessoryCompatibility {
                                  Item item) {
         registry.registerExactItem(
                 id, AccessorySlotType.RING, item,
-                AccessoryEligibility.ALLOW_ALL,
                 "", "", "");
     }
 }

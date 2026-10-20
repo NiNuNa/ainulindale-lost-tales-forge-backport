@@ -1,0 +1,9 @@
+{
+  "id": "losttales:elf",
+  "race": "losttales:elf",
+  "items": [
+    {"item": "lotr:item.daggerElven", "count": 1},
+    {"item": "lotr:item.lembas", "count": 2},
+    {"item": "minecraft:torch", "count": 8}
+  ]
+}

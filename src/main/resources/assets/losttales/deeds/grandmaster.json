@@ -1,0 +1,9 @@
+{
+  "id": "losttales:grandmaster",
+  "category": "growth",
+  "icon": "minecraft:diamond_pickaxe",
+  "kind": "skill_level",
+  "skill": "any",
+  "level": 100,
+  "title": true
+}

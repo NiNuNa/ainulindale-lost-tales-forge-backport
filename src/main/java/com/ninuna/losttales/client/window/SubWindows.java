@@ -605,9 +605,14 @@ public final class SubWindows {
         GL11.glPushMatrix();
         GL11.glTranslatef(window.fractionX, window.fractionY, 0.0F);
         try {
-            window.strip = SubWindowStrip.layOut(font, wholeLeft,
+            window.strip = SubWindowStrip.layOut(wholeLeft,
                     wholeLeft + window.width, wholeTop, window.title(),
                     window.content.stripIcon() != null);
+            // A cut name slides along while the pointer rests on the
+            // strip clear of its cross and grip, as a tab's does.
+            window.nameSlide.advance(mine
+                            && hover.is(WindowHover.Kind.SUB_WINDOW_STRIP),
+                    window.strip.nameOverflow(font), now);
             // The strip's surface and the content's side by side, never
             // one over the other, with the frame's ring round them; the
             // frame's edges lie over the ring.

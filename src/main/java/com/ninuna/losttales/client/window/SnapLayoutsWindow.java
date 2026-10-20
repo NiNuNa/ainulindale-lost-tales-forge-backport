@@ -15,8 +15,7 @@ import net.minecraft.client.Minecraft;
  * whose arrows then walk the zones and Return takes the one they stand on,
  * and as the pointer rests on the window's fullscreen control. Opened by
  * the pointer, it goes again once the pointer has left both the control
- * and the sub-window, unless something held it first: a press on it, or
- * its padlock.</p>
+ * and the sub-window, unless a press on it held it first.</p>
  */
 final class SnapLayoutsWindow extends SubWindowContent {
     static final SubWindowKind KIND = SubWindowKind.register("snap_layouts",
@@ -27,8 +26,6 @@ final class SnapLayoutsWindow extends SubWindowContent {
     static final long OPEN_NANOS = 400L * 1000000L;
     /** How long the pointer may be away before one it opened goes. */
     static final long CLOSE_NANOS = 200L * 1000000L;
-    /** The panel's own frame, which the sub-window's frame stands in for. */
-    private static final int FRAME = WindowPlacement.FRAME_WIDTH;
 
     /** The window it sends to a zone; null before it first opens. */
     private String windowId;
@@ -79,7 +76,7 @@ final class SnapLayoutsWindow extends SubWindowContent {
         return this.byKeys;
     }
 
-    /** Something held it, a press on it or its padlock: it stays until it is closed. */
+    /** A press on it held it: it stays until it is closed. */
     void hold() {
         this.byPointer = false;
     }
@@ -129,7 +126,7 @@ final class SnapLayoutsWindow extends SubWindowContent {
             return null;
         }
         return SnapLayouts.lay(SnapLayouts.suggestedFor(layouts,
-                this.windowId), layouts, COLUMNS, left - FRAME, top - FRAME,
+                this.windowId), layouts, COLUMNS, left, top,
                 this.screenWidth, this.screenHeight);
     }
 
@@ -140,14 +137,13 @@ final class SnapLayoutsWindow extends SubWindowContent {
 
     @Override
     public int naturalWidth() {
-        return SnapLayouts.panelWidth(count(), COLUMNS) - 2 * FRAME;
+        return SnapLayouts.panelWidth(count(), COLUMNS);
     }
 
     @Override
     public int naturalHeight(int width) {
         return SnapLayouts.panelHeight(count(), COLUMNS,
-                SnapLayouts.thumbHeight(this.screenWidth, this.screenHeight))
-                - 2 * FRAME;
+                SnapLayouts.thumbHeight(this.screenWidth, this.screenHeight));
     }
 
     @Override

@@ -3,9 +3,9 @@ package com.ninuna.losttales.client.window;
 /**
  * The four tips a new player's first opening of the chat shows, one
  * after another: the padlock, which holds a window as it is until it is
- * unlocked; the {@code +}, where closed channels, whispers and
- * other pages wait; the head button, which picks who speaks; and Ctrl+K,
- * the quick switcher. A click anywhere takes the tip showing away and
+ * unlocked; the {@code +}, which opens a New Page of every page there is;
+ * the identity button, which picks who speaks; and Ctrl+K, the quick
+ * switcher. A click anywhere takes the tip showing away and
  * brings the next; once the last has gone none shows again, which the
  * account's window layout file remembers ({@code tips seen=4}). A tip
  * left showing as the screen closes comes back with the next opening of
@@ -18,7 +18,7 @@ public final class FirstTips {
         LOCK("lock"),
         /** The {@code +} at the end of the tab row. */
         PLUS("plus"),
-        /** The head button on the input bar. */
+        /** The identity button on the input bar. */
         HEAD("head"),
         /** Ctrl+K, the quick switcher, in the middle of the window. */
         SWITCHER("switcher");

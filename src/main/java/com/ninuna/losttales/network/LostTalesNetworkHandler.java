@@ -71,6 +71,7 @@ import com.ninuna.losttales.network.packet.character.LoreCharacterReleaseRequest
 import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfileRequestPacket;
+import com.ninuna.losttales.network.packet.character.CharacterRaceCatalogPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipActionRequestPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipOperationResultPacket;
@@ -78,6 +79,10 @@ import com.ninuna.losttales.network.packet.fellowship.FellowshipStateSyncPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipTrackingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresencePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
+import com.ninuna.losttales.network.packet.ProgressionCatalogPacket;
+import com.ninuna.losttales.network.packet.ProgressionRequestPacket;
+import com.ninuna.losttales.network.packet.ProgressionStatePacket;
+import com.ninuna.losttales.network.packet.ProgressionStatuePacket;
 import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import cpw.mods.fml.relauncher.Side;
@@ -88,67 +93,62 @@ public final class LostTalesNetworkHandler {
     private LostTalesNetworkHandler() {}
 
     public static void registerCommonPackets() {
-        // Client -> server requests. These handlers are common/server-safe and validate
-        // every request on the logical server before touching world state.
+        // Every packet by its discriminator, from 0 without a gap: a new one
+        // takes the next number, and one taken out closes its gap until the
+        // first release (MOD-11). The common proxy registers them, so a
+        // dedicated server knows them all. Server-bound handlers check each
+        // request on the server thread before touching the world; client-bound
+        // handlers go through the sided proxy and load no client class here.
         CHANNEL.registerMessage(LostTalesQuickLootRequestPacket.Handler.class, LostTalesQuickLootRequestPacket.class, 0, Side.SERVER);
         CHANNEL.registerMessage(LostTalesQuickLootDropItemPacket.Handler.class, LostTalesQuickLootDropItemPacket.class, 1, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesQuickLootContainerSyncPacket.Handler.class, LostTalesQuickLootContainerSyncPacket.class, 2, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesQuestSyncPacket.Handler.class, LostTalesQuestSyncPacket.class, 3, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesQuestActionPacket.Handler.class, LostTalesQuestActionPacket.class, 4, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesMobAggroSyncPacket.Handler.class, LostTalesMobAggroSyncPacket.class, 5, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesMapMarkerDiscoveryPacket.Handler.class, LostTalesMapMarkerDiscoveryPacket.class, 6, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesMissiveAcceptPacket.Handler.class, LostTalesMissiveAcceptPacket.class, 7, Side.SERVER);
         CHANNEL.registerMessage(CharacterRosterRequestPacket.Handler.class, CharacterRosterRequestPacket.class, 8, Side.SERVER);
         CHANNEL.registerMessage(CharacterCreateRequestPacket.Handler.class, CharacterCreateRequestPacket.class, 9, Side.SERVER);
         CHANNEL.registerMessage(CharacterSelectRequestPacket.Handler.class, CharacterSelectRequestPacket.class, 10, Side.SERVER);
         CHANNEL.registerMessage(CharacterDeleteRequestPacket.Handler.class, CharacterDeleteRequestPacket.class, 11, Side.SERVER);
-        CHANNEL.registerMessage(CharacterCapeUpdateRequestPacket.Handler.class, CharacterCapeUpdateRequestPacket.class, 16, Side.SERVER);
-        CHANNEL.registerMessage(FellowshipActionRequestPacket.Handler.class, FellowshipActionRequestPacket.class, 17, Side.SERVER);
-        CHANNEL.registerMessage(LoreCharacterClaimRequestPacket.Handler.class, LoreCharacterClaimRequestPacket.class, 22, Side.SERVER);
-        CHANNEL.registerMessage(LoreCharacterReleaseRequestPacket.Handler.class, LoreCharacterReleaseRequestPacket.class, 23, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesThirdPersonEntityActionPacket.Handler.class, LostTalesThirdPersonEntityActionPacket.class, 25, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesThirdPersonBlockActionPacket.Handler.class, LostTalesThirdPersonBlockActionPacket.class, 26, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesThirdPersonAimPacket.Handler.class, LostTalesThirdPersonAimPacket.class, 27, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesWaystoneSettingsRequestPacket.Handler.class, LostTalesWaystoneSettingsRequestPacket.class, 32, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesWaystoneTravelRequestPacket.Handler.class, LostTalesWaystoneTravelRequestPacket.class, 34, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesChatSendPacket.Handler.class, LostTalesChatSendPacket.class, 35, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesChatTypingPacket.Handler.class, LostTalesChatTypingPacket.class, 39, Side.SERVER);
-
-        // Server -> client snapshots. These are registered from the common proxy so a
-        // dedicated server also knows the packet discriminators when it sends them.
-        // The handlers route through the sided proxy instead of importing client-only
-        // cache/renderer classes here, keeping dedicated-server class loading safe.
-        CHANNEL.registerMessage(LostTalesQuickLootContainerSyncPacket.Handler.class, LostTalesQuickLootContainerSyncPacket.class, 2, Side.CLIENT);
-        CHANNEL.registerMessage(LostTalesQuestSyncPacket.Handler.class, LostTalesQuestSyncPacket.class, 3, Side.CLIENT);
-        CHANNEL.registerMessage(LostTalesMobAggroSyncPacket.Handler.class, LostTalesMobAggroSyncPacket.class, 5, Side.CLIENT);
-        CHANNEL.registerMessage(LostTalesMapMarkerDiscoveryPacket.Handler.class, LostTalesMapMarkerDiscoveryPacket.class, 6, Side.CLIENT);
         CHANNEL.registerMessage(CharacterRosterSyncPacket.Handler.class, CharacterRosterSyncPacket.class, 12, Side.CLIENT);
         CHANNEL.registerMessage(CharacterOperationResultPacket.Handler.class, CharacterOperationResultPacket.class, 13, Side.CLIENT);
         CHANNEL.registerMessage(CharacterAppearanceSyncPacket.Handler.class, CharacterAppearanceSyncPacket.class, 14, Side.CLIENT);
         CHANNEL.registerMessage(CharacterCreationCatalogSyncPacket.Handler.class, CharacterCreationCatalogSyncPacket.class, 15, Side.CLIENT);
+        CHANNEL.registerMessage(CharacterCapeUpdateRequestPacket.Handler.class, CharacterCapeUpdateRequestPacket.class, 16, Side.SERVER);
+        CHANNEL.registerMessage(FellowshipActionRequestPacket.Handler.class, FellowshipActionRequestPacket.class, 17, Side.SERVER);
         CHANNEL.registerMessage(FellowshipStateSyncPacket.Handler.class, FellowshipStateSyncPacket.class, 18, Side.CLIENT);
         CHANNEL.registerMessage(FellowshipOperationResultPacket.Handler.class, FellowshipOperationResultPacket.class, 19, Side.CLIENT);
         CHANNEL.registerMessage(FellowshipMemberStatusSyncPacket.Handler.class, FellowshipMemberStatusSyncPacket.class, 20, Side.CLIENT);
         CHANNEL.registerMessage(FellowshipTrackingSyncPacket.Handler.class, FellowshipTrackingSyncPacket.class, 21, Side.CLIENT);
+        CHANNEL.registerMessage(LoreCharacterClaimRequestPacket.Handler.class, LoreCharacterClaimRequestPacket.class, 22, Side.SERVER);
+        CHANNEL.registerMessage(LoreCharacterReleaseRequestPacket.Handler.class, LoreCharacterReleaseRequestPacket.class, 23, Side.SERVER);
         CHANNEL.registerMessage(LoreCharacterSyncPacket.Handler.class, LoreCharacterSyncPacket.class, 24, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesThirdPersonEntityActionPacket.Handler.class, LostTalesThirdPersonEntityActionPacket.class, 25, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesThirdPersonBlockActionPacket.Handler.class, LostTalesThirdPersonBlockActionPacket.class, 26, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesThirdPersonAimPacket.Handler.class, LostTalesThirdPersonAimPacket.class, 27, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChargeTierSyncPacket.Handler.class, LostTalesChargeTierSyncPacket.class, 28, Side.CLIENT);
         CHANNEL.registerMessage(AccessoryInventorySyncPacket.Handler.class, AccessoryInventorySyncPacket.class, 29, Side.CLIENT);
         CHANNEL.registerMessage(AccessoryEffectSyncPacket.Handler.class, AccessoryEffectSyncPacket.class, 30, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesMapMarkerSnapshotPacket.Handler.class, LostTalesMapMarkerSnapshotPacket.class, 31, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesWaystoneSettingsRequestPacket.Handler.class, LostTalesWaystoneSettingsRequestPacket.class, 32, Side.SERVER);
         CHANNEL.registerMessage(LostTalesWaystoneStatePacket.Handler.class, LostTalesWaystoneStatePacket.class, 33, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesWaystoneTravelRequestPacket.Handler.class, LostTalesWaystoneTravelRequestPacket.class, 34, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatSendPacket.Handler.class, LostTalesChatSendPacket.class, 35, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatMessagePacket.Handler.class, LostTalesChatMessagePacket.class, 36, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChatAccessPacket.Handler.class, LostTalesChatAccessPacket.class, 37, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesFastTravelArrivalPacket.Handler.class, LostTalesFastTravelArrivalPacket.class, 38, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatTypingPacket.Handler.class, LostTalesChatTypingPacket.class, 39, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatTypingSyncPacket.Handler.class, LostTalesChatTypingSyncPacket.class, 40, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatEditPacket.Handler.class, LostTalesChatEditPacket.class, 41, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatDeletePacket.Handler.class, LostTalesChatDeletePacket.class, 42, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatUpdatePacket.Handler.class, LostTalesChatUpdatePacket.class, 43, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesServerConfigRequestPacket.Handler.class, LostTalesServerConfigRequestPacket.class, 44, Side.SERVER);
         CHANNEL.registerMessage(LostTalesServerConfigSyncPacket.Handler.class, LostTalesServerConfigSyncPacket.class, 45, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesServerConfigApplyPacket.Handler.class, LostTalesServerConfigApplyPacket.class, 46, Side.SERVER);
         CHANNEL.registerMessage(LostTalesServerConfigResultPacket.Handler.class, LostTalesServerConfigResultPacket.class, 47, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChatHistorySyncPacket.Handler.class, LostTalesChatHistorySyncPacket.class, 48, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChatConsoleSyncPacket.Handler.class, LostTalesChatConsoleSyncPacket.class, 49, Side.CLIENT);
-
-        // Client -> server requests registered after the snapshots they answer
-        // with. Ids are allocated in order of addition and are never reused, so
-        // a later request keeps its higher id.
-        CHANNEL.registerMessage(LostTalesChatEditPacket.Handler.class, LostTalesChatEditPacket.class, 41, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesChatDeletePacket.Handler.class, LostTalesChatDeletePacket.class, 42, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesServerConfigRequestPacket.Handler.class, LostTalesServerConfigRequestPacket.class, 44, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesServerConfigApplyPacket.Handler.class, LostTalesServerConfigApplyPacket.class, 46, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatContextHistoryPacket.Handler.class, LostTalesChatContextHistoryPacket.class, 50, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatCommandContextPacket.Handler.class, LostTalesChatCommandContextPacket.class, 51, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatOlderHistoryPacket.Handler.class, LostTalesChatOlderHistoryPacket.class, 52, Side.SERVER);
@@ -176,5 +176,10 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesQuestOfferPacket.Handler.class, LostTalesQuestOfferPacket.class, 74, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesQuestProgressPacket.Handler.class, LostTalesQuestProgressPacket.class, 75, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesQuestFellowsPacket.Handler.class, LostTalesQuestFellowsPacket.class, 76, Side.CLIENT);
+        CHANNEL.registerMessage(ProgressionCatalogPacket.Handler.class, ProgressionCatalogPacket.class, 77, Side.CLIENT);
+        CHANNEL.registerMessage(ProgressionStatePacket.Handler.class, ProgressionStatePacket.class, 78, Side.CLIENT);
+        CHANNEL.registerMessage(ProgressionRequestPacket.Handler.class, ProgressionRequestPacket.class, 79, Side.SERVER);
+        CHANNEL.registerMessage(ProgressionStatuePacket.Handler.class, ProgressionStatuePacket.class, 80, Side.CLIENT);
+        CHANNEL.registerMessage(CharacterRaceCatalogPacket.Handler.class, CharacterRaceCatalogPacket.class, 81, Side.CLIENT);
     }
 }

@@ -2,6 +2,7 @@ package com.ninuna.losttales.fellowship.storage;
 
 import com.ninuna.losttales.fellowship.model.FellowshipInvitation;
 import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
 
@@ -65,6 +66,19 @@ public final class FellowshipInvitationWorldData extends WorldSavedData {
         this.quarantinedEntries.addAll(
                 result.getQuarantineEntriesCopy());
         boolean repaired = rebuildIndexesAndRepairDuplicates();
+        if (this.quarantinedEntries.size() > FellowshipNbtCodec.MAX_QUARANTINED) {
+            LostTalesLog.warning("Fellowship invitation quarantine would hold %d records, past "
+                            + "its %d; data will remain read-only",
+                    Integer.valueOf(this.quarantinedEntries.size()),
+                    Integer.valueOf(FellowshipNbtCodec.MAX_QUARANTINED));
+            this.invitations.clear();
+            this.invitationIdsByFellowship.clear();
+            this.invitationIdsByTargetCharacter.clear();
+            this.quarantinedEntries.clear();
+            this.readOnlyForNewerVersion = true;
+            this.preservedNewerData = (NBTTagCompound) compound.copy();
+            return;
+        }
         if (result.wasRepaired() || repaired) {
             markDirty();
         }
@@ -255,9 +269,33 @@ public final class FellowshipInvitationWorldData extends WorldSavedData {
         return removeByIds(toRemove);
     }
 
+    /**
+     * Whether the quarantine has room for {@code records} more. When it has
+     * not, the store closes, read-only as a save it could not read, so that
+     * no invitation leaves it without being kept.
+     */
+    public synchronized boolean hasQuarantineRoomFor(int records) {
+        if (this.readOnlyForNewerVersion) {
+            return false;
+        }
+        if (this.quarantinedEntries.size() + Math.max(0, records)
+                <= FellowshipNbtCodec.MAX_QUARANTINED) {
+            return true;
+        }
+        this.readOnlyForNewerVersion = true;
+        LostTalesLog.warning("The fellowship invitation quarantine holds its %d records; "
+                        + "the invitations stay read-only until it is emptied",
+                Integer.valueOf(FellowshipNbtCodec.MAX_QUARANTINED));
+        return false;
+    }
+
+    /** Sets an invitation's record aside; the caller asked {@link #hasQuarantineRoomFor} first. */
     public synchronized void quarantine(String reason,
                                         FellowshipInvitation invitation) {
         ensureWritable();
+        if (this.quarantinedEntries.size() >= FellowshipNbtCodec.MAX_QUARANTINED) {
+            throw new IllegalStateException("The fellowship invitation quarantine is full");
+        }
         this.quarantinedEntries.add(
                 FellowshipInvitationNbtCodec.createQuarantineEntry(
                         reason,

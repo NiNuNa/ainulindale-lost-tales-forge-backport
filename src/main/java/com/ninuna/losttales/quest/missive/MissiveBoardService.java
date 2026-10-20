@@ -19,8 +19,8 @@ import net.minecraft.world.World;
  * board sends its notices as an opening; every request the page sends —
  * accept, take, pin — is checked against the world as it stands (the
  * player's world, the player's reach and sight, the board at the place
- * named, LOTR's banners, the slot's range and the letter in it, as the
- * page read it) and answered
+ * named, LOTR's banners and every other mod's protection, the slot's
+ * range and the letter in it, as the page read it) and answered
  * with the board's notices and why. Whoever else watches the board is
  * sent the change by {@link MissiveBoardWatches}.
  */
@@ -241,6 +241,12 @@ public final class MissiveBoardService {
             public boolean bannerAllows() {
                 return LotrContainerProtection.mayOpen(player, world, x, y, z);
             }
+
+            @Override
+            public boolean othersAllow() {
+                return LostTalesQuickLootInventoryHelper.mayUseAsRightClick(
+                        player, x, y, z, true);
+            }
         });
         if (refusal != null) {
             say(player, refusal);
@@ -273,6 +279,13 @@ public final class MissiveBoardService {
 
         /** LOTR's banners let this player at the board, as at a chest. */
         boolean bannerAllows();
+
+        /**
+         * Every other mod lets this player at the board, asked as a
+         * right-click on it would ask, quietly: the question starts no
+         * quest of this mod's.
+         */
+        boolean othersAllow();
     }
 
     /**
@@ -280,7 +293,7 @@ public final class MissiveBoardService {
      * words it, or null where they may: as a chest is opened by quick
      * loot, the board must be in their world, within reach, in sight,
      * standing and usable, and open to them under LOTR's banner
-     * protection.
+     * protection and every other mod's.
      */
     static String refusal(BoardSite site) {
         if (!site.inPlayersWorld()) {
@@ -298,7 +311,7 @@ public final class MissiveBoardService {
         if (!site.usable()) {
             return "chat.losttales.missive.too_far";
         }
-        if (!site.bannerAllows()) {
+        if (!site.bannerAllows() || !site.othersAllow()) {
             return "chat.losttales.missive.protected";
         }
         return null;

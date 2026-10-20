@@ -20,7 +20,7 @@ public final class CharacterCreationRequest {
     private final String startingWaypointId;
     private final boolean unconventionalSettings;
     private final boolean showMinecraftCape;
-    private final int cosmeticCapeId;
+    private final String cosmeticCapeId;
 
     /** Empty body and chest types let validation pick the defaults for the sex. */
     public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
@@ -31,10 +31,10 @@ public final class CharacterCreationRequest {
                                     boolean unconventionalSettings,
                                     String history, String bodyTypeId,
                                     String chestTypeId, boolean showMinecraftCape,
-                                    int cosmeticCapeId) {
+                                    String cosmeticCapeId) {
         this.expectedRosterRevision = expectedRosterRevision;
         this.showMinecraftCape = showMinecraftCape;
-        this.cosmeticCapeId = cosmeticCapeId;
+        this.cosmeticCapeId = cosmeticCapeId == null ? "" : cosmeticCapeId;
         this.slotIndex = slotIndex;
         this.name = name;
         this.raceId = raceId;
@@ -109,7 +109,7 @@ public final class CharacterCreationRequest {
     }
 
     /** The cosmetic cape's catalogue id; zero for none. The server checks it. */
-    public int getCosmeticCapeId() {
+    public String getCosmeticCapeId() {
         return this.cosmeticCapeId;
     }
 }

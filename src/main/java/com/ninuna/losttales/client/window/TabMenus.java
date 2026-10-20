@@ -157,11 +157,28 @@ final class TabMenus {
     }
 
     /**
-     * Whether the split view does anything for {@code tab}: it is open, and
-     * a copy of any page can always come to stand beside it.
+     * Whether the split view has rows for {@code tab}, as its sub-window
+     * shows them: its split's own while it stands in one; else a page shown
+     * that can come beside it, or a page the New Page offers, which *Open
+     * Beside* opens as a new copy beside it. False for a tab no window
+     * holds.
      */
     static boolean canSplit(WindowPage tab) {
-        return WindowLayout.windowOf(tab) != null;
+        Window window = WindowLayout.windowOf(tab);
+        if (window == null) {
+            return false;
+        }
+        if (window.splitOf(tab) != null) {
+            return true;
+        }
+        for (Window from : WindowLayout.windows()) {
+            for (WindowPage other : from.getTabs()) {
+                if (canSplitWith(window, tab, from, other)) {
+                    return true;
+                }
+            }
+        }
+        return offersAnyPage(WindowScreen.current());
     }
 
     /**
@@ -616,15 +633,34 @@ final class TabMenus {
             }
         }
         for (WindowPages.Page page : WindowPages.all()) {
-            OtherPage tab = page.tab();
-            if (WindowPages.isOffered(page)
-                    && page.category() != PageCategory.NEW_PAGE
-                    && WindowMenus.matchesFilter(page.title(), filter)) {
+            if (offers(page, filter)) {
+                OtherPage tab = page.tab();
                 rows.add(new MenuWindow.Entry(tab.id(), page.title(), false,
                         -1, tab));
             }
         }
         return rows;
+    }
+
+    /** Whether the New Page offers a registered page, its name holding {@code filter}. */
+    private static boolean offers(WindowPages.Page page, String filter) {
+        return WindowPages.isOffered(page)
+                && page.category() != PageCategory.NEW_PAGE
+                && WindowMenus.matchesFilter(page.title(), filter);
+    }
+
+    /**
+     * Whether the New Page offers any page at all ({@link #everyPage}):
+     * the registered pages are asked first, so the systems' rows are only
+     * built when none is offered.
+     */
+    static boolean offersAnyPage(WindowScreen screen) {
+        for (WindowPages.Page page : WindowPages.all()) {
+            if (offers(page, "")) {
+                return true;
+            }
+        }
+        return !everyPage(screen, "").isEmpty();
     }
 
     /**

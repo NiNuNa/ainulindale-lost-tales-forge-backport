@@ -33,12 +33,13 @@ import net.minecraft.util.StatCollector;
  * starting, finishing and resetting a player's quests, starter items and
  * markers, reading the server's own quest files again, and starting and
  * stopping world quests. Every answer is a line of the lang file,
- * {@code chat.losttales.quest.command.*} and the quest lines it shares
- * with the game ({@code chat.losttales.quest.*}), in the chat's own white.
+ * {@code chat.losttales.command.quest.*} and the quest lines it shares
+ * with the game ({@code chat.losttales.quest.*}), in the chat's own white;
+ * a player missing or not online is refused in red, as every command does.
  */
 public class LostTalesCommandQuest extends LostTalesCommandBase {
     /** What the lang key of each of the command's own answers begins with. */
-    static final String SAY = "chat.losttales.quest.command.";
+    static final String SAY = "chat.losttales.command.quest.";
     /** The colour every answer is in. */
     private static final EnumChatFormatting WHITE = EnumChatFormatting.WHITE;
     private static final EnumChatFormatting GRAY = EnumChatFormatting.GRAY;
@@ -289,10 +290,11 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             if (sender instanceof EntityPlayerMP) {
                 return (EntityPlayerMP) sender;
             }
-            say(sender, WHITE, SAY + "player.console");
+            say(sender, EnumChatFormatting.RED, PLAYER_REQUIRED);
             return null;
         } catch (Exception e) {
-            say(sender, WHITE, SAY + "player.unknown", args[playerArgIndex]);
+            String playerName = args.length > playerArgIndex ? args[playerArgIndex] : "";
+            say(sender, EnumChatFormatting.RED, PLAYER_UNKNOWN, playerName);
             return null;
         }
     }

@@ -30,7 +30,6 @@ public final class AccessoryBootstrap {
                 ONE_RING_DEFINITION_ID,
                 AccessorySlotType.RING,
                 ELostTalesItem.THE_ONE_RING.getItem(),
-                AccessoryEligibility.ALLOW_ALL,
                 ONE_RING_SERVER_EFFECT_ID,
                 WRAITH_WORLD_VISUAL_EFFECT_ID,
                 CONCEALED_PUBLIC_EFFECT_ID);

@@ -43,6 +43,8 @@ public final class FellowshipStateSyncPacketTest {
             UUID.fromString("20000000-0000-0000-0000-000000000004");
     private static final UUID FELLOWSHIP =
             UUID.fromString("30000000-0000-0000-0000-000000000008");
+    private static final UUID LOTR_FELLOWSHIP =
+            UUID.fromString("40000000-0000-0000-0000-00000000000a");
     private static final UUID MARK = new UUID(9L, 9L);
     private static final UUID GO_HERE = new UUID(10L, 10L);
 
@@ -62,6 +64,8 @@ public final class FellowshipStateSyncPacketTest {
         assertEquals(FellowshipMemberPresence.ELSEWHERE, friend.getPresence());
         assertEquals("Hurin", friend.getElsewhereName());
         assertFalse(decoded.isFull(fellowship));
+        assertEquals("LOTR's fellowship behind it, to share waypoints into",
+                LOTR_FELLOWSHIP, fellowship.getLotrFellowshipId());
     }
 
     @Test
@@ -161,20 +165,46 @@ public final class FellowshipStateSyncPacketTest {
         assertEquals(100, mark.getDimensionId());
         assertEquals(1200.25D, mark.getX(), 0.0D);
         assertEquals(-340.5D, mark.getZ(), 0.0D);
-        assertEquals(9L, mark.getPlacedAt());
+    }
+
+    /** An invitation travels with what the page shows of it: who sent it, to whom, and until when. */
+    @Test
+    public void anInvitationTravelsWithWhatThePageShows() {
+        List<FellowshipInvitationSnapshot> sent = new ArrayList<FellowshipInvitationSnapshot>();
+        UUID invitationId = new UUID(11L, 11L);
+        UUID target = UUID.fromString("20000000-0000-0000-0000-000000000009");
+        sent.add(new FellowshipInvitationSnapshot(invitationId, FELLOWSHIP, "The Grey Company",
+                LEADER, OWNER, "Aldric", target, "Hurin", 86400000L));
+        FellowshipStateSnapshot decoded = roundTrip(state(10,
+                Collections.<FellowshipInviteTargetSnapshot>emptyList(), sent));
+        assertEquals(1, decoded.getOutgoingInvitations().size());
+        FellowshipInvitationSnapshot invitation = decoded.getOutgoingInvitations().get(0);
+        assertEquals(invitationId, invitation.getInvitationId());
+        assertEquals(OWNER, invitation.getInvitingOwnerId());
+        assertEquals("Aldric", invitation.getInvitingCharacterName());
+        assertEquals(target, invitation.getTargetIdentityId());
+        assertEquals("Hurin", invitation.getTargetCharacterName());
+        assertEquals(86400000L, invitation.getExpiresAt());
     }
 
     private static FellowshipStateSnapshot state(int limit,
                                                  List<FellowshipInviteTargetSnapshot> targets) {
+        return state(limit, targets,
+                Collections.<FellowshipInvitationSnapshot>emptyList());
+    }
+
+    private static FellowshipStateSnapshot state(int limit,
+                                                 List<FellowshipInviteTargetSnapshot> targets,
+                                                 List<FellowshipInvitationSnapshot> sent) {
         List<FellowshipMemberSnapshot> members = new ArrayList<FellowshipMemberSnapshot>();
-        members.add(new FellowshipMemberSnapshot(LEADER, OWNER, "Aldric", 1L,
+        members.add(new FellowshipMemberSnapshot(LEADER, OWNER, "Aldric",
                 FellowshipColor.GREEN, FellowshipMemberPresence.HERE, ""));
-        members.add(new FellowshipMemberSnapshot(FRIEND, FRIEND_OWNER, "Beleg", 2L,
+        members.add(new FellowshipMemberSnapshot(FRIEND, FRIEND_OWNER, "Beleg",
                 FellowshipColor.ORANGE, FellowshipMemberPresence.ELSEWHERE, "Hurin"));
         FellowshipSnapshot fellowship = new FellowshipSnapshot(FELLOWSHIP, LEADER,
                 "The Grey Company", new FellowshipIcon("minecraft:compass", 0),
                 EnumSet.of(FellowshipSwitch.NO_FIGHTING, FellowshipSwitch.NO_HIRED_HARM),
-                Collections.singletonList(FRIEND), 1L, 4L, 2, members);
+                Collections.singletonList(FRIEND), 4L, LOTR_FELLOWSHIP, members);
         List<FellowshipMark> marks = new ArrayList<FellowshipMark>();
         marks.add(FellowshipMark.ofFellowship(MARK, FELLOWSHIP,
                 "Weathertop", FRIEND, 100, 1200.25D, -340.5D, 9L));
@@ -182,8 +212,7 @@ public final class FellowshipStateSyncPacketTest {
         return new FellowshipStateSnapshot(OWNER, 2L, FellowshipErrorId.NONE, limit,
                 LEADER, Collections.singletonList(fellowship), FELLOWSHIP, marks,
                 FellowshipErrorId.NONE,
-                Collections.<FellowshipInvitationSnapshot>emptyList(),
-                Collections.<FellowshipInvitationSnapshot>emptyList(),
+                Collections.<FellowshipInvitationSnapshot>emptyList(), sent,
                 false, false, targets, false);
     }
 

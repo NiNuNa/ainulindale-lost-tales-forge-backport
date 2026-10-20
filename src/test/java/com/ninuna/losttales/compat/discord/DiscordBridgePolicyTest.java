@@ -2,7 +2,6 @@ package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelGates;
-import com.ninuna.losttales.chat.ChatMessageOrigin;
 import org.junit.After;
 import org.junit.Test;
 
@@ -28,14 +27,8 @@ public final class DiscordBridgePolicyTest {
     }
 
     @Test
-    public void aLineFromDiscordNeverGoesBackOut() {
-        for (ChatChannel channel : ChatChannel.values()) {
-            assertFalse("a line from Discord never goes back out: " + channel,
-                    DiscordBridgePolicy.relaysOutbound(
-                            ChatMessageOrigin.DISCORD, channel));
-        }
-        assertFalse(DiscordBridgePolicy.relaysOutbound(
-                ChatMessageOrigin.PLAYER, null));
+    public void noChannelCrossesNothing() {
+        assertFalse(DiscordBridgePolicy.relaysOutbound(null));
         assertFalse(DiscordBridgePolicy.acceptsInbound(null));
     }
 
@@ -43,8 +36,7 @@ public final class DiscordBridgePolicyTest {
     public void aChannelOnlySomeMayReadMayBeLinkedAndSaysSo() {
         for (ChatChannel channel : ChatChannel.values()) {
             assertEquals(channel.getId(), channel.isBridgeable(),
-                    DiscordBridgePolicy.relaysOutbound(
-                            ChatMessageOrigin.PLAYER, channel));
+                    DiscordBridgePolicy.relaysOutbound(channel));
             assertEquals(channel.getId(), channel.isBridgeable(),
                     DiscordBridgePolicy.acceptsInbound(channel));
         }

@@ -60,16 +60,23 @@ public final class LostTalesQuestShareResolver {
      * The card for a quest at {@code progress}: where it comes from, its
      * category's word, the current stage's objectives with their counts,
      * and its reward as written. A bundled quest and a missive carry no
-     * words; a server quest carries the words its operator wrote.
+     * words but a missive's title id; a server quest carries the words its
+     * operator wrote, and a missive from a server's template its title as
+     * written (QUEST-42).
      */
     public static ChatQuestCard card(LostTalesQuestDefinition quest,
                                      LostTalesQuestProgress progress) {
         ChatQuestCard.Source source = quest.isBundled()
                 ? ChatQuestCard.Source.BUNDLED
-                : MissiveWords.isMissive(quest.getWords())
-                ? ChatQuestCard.Source.MISSIVE : ChatQuestCard.Source.SERVER;
+                : !MissiveWords.isMissive(quest.getWords())
+                ? ChatQuestCard.Source.SERVER
+                : MissiveWords.isWritten(quest.getWords())
+                ? ChatQuestCard.Source.MISSIVE_WRITTEN : ChatQuestCard.Source.MISSIVE;
         String title = source == ChatQuestCard.Source.SERVER
                 ? fitBytes(LostTalesQuestWords.title(quest),
+                        ChatQuestCard.MAX_TITLE_BYTES)
+                : source == ChatQuestCard.Source.MISSIVE_WRITTEN
+                ? fitBytes(quest.getWords().get(MissiveWords.TITLE),
                         ChatQuestCard.MAX_TITLE_BYTES)
                 : source == ChatQuestCard.Source.MISSIVE
                 ? quest.getWords().get(MissiveWords.TITLE) : "";

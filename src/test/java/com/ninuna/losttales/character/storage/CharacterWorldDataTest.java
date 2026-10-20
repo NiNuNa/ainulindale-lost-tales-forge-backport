@@ -25,9 +25,9 @@ import static org.junit.Assert.fail;
 
 /**
  * The world store for character rosters fails closed. Data it cannot read
- * is handed back exactly as it was found, an entry it must reject is kept
- * in the quarantine with its original tag, and a field it can repair is
- * repaired to a deterministic value rather than costing the character.
+ * is handed back exactly as it was found, and a roster or a character not
+ * as this build writes it is kept in the quarantine with its original
+ * tag; nothing is filled in or put right.
  */
 public final class CharacterWorldDataTest {
 
@@ -281,71 +281,89 @@ public final class CharacterWorldDataTest {
         assertEquals(2, reloaded.getRosters().size());
     }
 
+    /**
+     * A race no file has any more keeps its characters, as they were saved,
+     * with the skin they wear: races are data a server may change, and such
+     * a character plays as the body it stood on (CHAR-38).
+     */
     @Test
-    public void anUnknownRaceIsRepairedRatherThanRejected() {
+    public void aRaceNoFileHasKeepsItsCharacterAsSaved() {
         NBTTagCompound saved = savedRosters();
         NBTTagCompound characterTag = firstCharacterOf(saved);
-        String storedSkinId = characterTag.getString("SkinId");
-        characterTag.setString("RaceId", "losttales:balrog");
+        characterTag.setString("RaceId", "myserver:beorning");
+        characterTag.setString("SkinId", CharacterSkinRegistry.getDefaultSkinId(
+                CharacterRaceRegistry.ELF, CharacterGenderRegistry.MALE, CHARACTER_A));
 
         CharacterWorldData loaded = load(saved);
 
-        RoleplayCharacter repaired = loaded.findCharacter(CHARACTER_A);
-        assertNotNull(repaired);
-        assertEquals(CharacterRaceRegistry.HUMAN, repaired.getRaceId());
-        assertEquals(storedSkinId, repaired.getSkinId());
+        assertFalse(loaded.isReadOnlyForNewerVersion());
         assertEquals(0, quarantinedOf(loaded).size());
-        assertTrue(loaded.isDirty());
+        assertEquals("myserver:beorning", loaded.findCharacter(CHARACTER_A).getRaceId());
     }
 
+    /** A race id not written as this build writes ids is not guessed at. */
     @Test
-    public void anIncompatibleSkinIsRepairedToTheDeterministicDefault() {
-        String elfSkinId = CharacterSkinRegistry.getDefaultSkinId(
-                CharacterRaceRegistry.ELF, CharacterGenderRegistry.MALE, CHARACTER_A);
+    public void aRaceIdOutOfShapeIsQuarantined() {
         NBTTagCompound saved = savedRosters();
-        firstCharacterOf(saved).setString("SkinId", elfSkinId);
+        firstCharacterOf(saved).setString("RaceId", "LostTales:Human ");
 
-        CharacterWorldData loaded = load(saved);
-
-        RoleplayCharacter repaired = loaded.findCharacter(CHARACTER_A);
-        assertNotNull(repaired);
-        assertFalse(elfSkinId.equals(repaired.getSkinId()));
-        assertTrue(CharacterSkinRegistry.isCompatible(repaired.getSkinId(),
-                CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE));
-        assertEquals(CharacterSkinRegistry.getDefaultSkinId(
-                        CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE,
-                        CHARACTER_A),
-                repaired.getSkinId());
-        assertEquals(0, quarantinedOf(loaded).size());
+        assertQuarantined(saved, "malformed_race");
     }
 
-    /** A record written before the body and chest keys existed takes the sex's defaults. */
+    /** A record without its arm width or its chest is not one this build writes. */
     @Test
-    public void aMissingBodyAndChestTypeFollowTheSex() {
-        CharacterWorldData data = new CharacterWorldData(CharacterWorldData.DATA_NAME);
-        CharacterRoster roster = data.getOrCreateRoster(OWNER_A);
-        roster.addCharacter(character(OWNER_A, CHARACTER_A, 0, "Bregil",
-                CharacterBodyTypeRegistry.SLIM,
-                CharacterChestTypeRegistry.ROUNDED_MEDIUM));
-        data.saveRoster(roster);
-        NBTTagCompound saved = new NBTTagCompound();
-        data.writeToNBT(saved);
-        NBTTagCompound characterTag = firstCharacterOf(saved);
-        assertEquals(CharacterBodyTypeRegistry.SLIM,
-                characterTag.getString("BodyTypeId"));
-        assertEquals(CharacterChestTypeRegistry.ROUNDED_MEDIUM,
-                characterTag.getString("ChestTypeId"));
-        characterTag.removeTag("BodyTypeId");
-        characterTag.removeTag("ChestTypeId");
+    public void aMissingBodyOrChestTypeIsQuarantined() {
+        NBTTagCompound withoutBody = savedRosters();
+        assertEquals(CharacterBodyTypeRegistry.WIDE,
+                firstCharacterOf(withoutBody).getString("BodyTypeId"));
+        firstCharacterOf(withoutBody).removeTag("BodyTypeId");
+        assertQuarantined(withoutBody, "missing_body_type");
+
+        NBTTagCompound unknownChest = savedRosters();
+        firstCharacterOf(unknownChest).setString("ChestTypeId", "losttales:huge");
+        assertQuarantined(unknownChest, "unknown_chest_type");
+    }
+
+    /** A character stands only in a slot its roster has open. */
+    @Test
+    public void aCharacterInASlotNotOpenIsQuarantined() {
+        NBTTagCompound saved = savedRosters();
+        firstCharacterOf(saved).setInteger("SlotIndex", 3);
+
+        assertQuarantined(saved, "slot_not_open");
+    }
+
+    /** A roster without its open slot count is not filled in either. */
+    @Test
+    public void aRosterWithoutItsOpenSlotCountIsQuarantined() {
+        NBTTagCompound saved = savedRosters();
+        rostersOf(saved).getCompoundTagAt(0).removeTag("UnlockedSlotCount");
 
         CharacterWorldData loaded = load(saved);
 
-        RoleplayCharacter repaired = loaded.findCharacter(CHARACTER_A);
-        assertNotNull(repaired);
-        assertEquals(CharacterBodyTypeRegistry.WIDE, repaired.getBodyTypeId());
-        assertEquals(CharacterChestTypeRegistry.NONE, repaired.getChestTypeId());
-        assertEquals(0, quarantinedOf(loaded).size());
+        assertNull(loaded.getRoster(OWNER_A));
+        assertNotNull(loaded.getRoster(OWNER_B));
+        assertEquals(1, quarantinedOf(loaded).size());
+        NBTTagCompound entry = quarantinedOf(loaded).get(0);
+        assertEquals("roster", entry.getString("EntryType"));
+        assertEquals("invalid_unlocked_slot_count", entry.getString("Reason"));
+    }
+
+    /** Owner A's first character, quarantined with its original tag and the reason. */
+    private static void assertQuarantined(NBTTagCompound saved, String reason) {
+        NBTTagCompound original = (NBTTagCompound) firstCharacterOf(saved).copy();
+
+        CharacterWorldData loaded = load(saved);
+
+        assertFalse(loaded.isReadOnlyForNewerVersion());
+        assertNull(loaded.findCharacter(CHARACTER_A));
+        assertNotNull(loaded.findCharacter(CHARACTER_B));
         assertTrue(loaded.isDirty());
+        assertEquals(1, quarantinedOf(loaded).size());
+        NBTTagCompound entry = quarantinedOf(loaded).get(0);
+        assertEquals("character", entry.getString("EntryType"));
+        assertEquals(reason, entry.getString("Reason"));
+        assertEquals(original, entry.getCompoundTag("OriginalData"));
     }
 
     @Test

@@ -10,26 +10,27 @@ public final class LostTalesQuestObjectiveSelection {
     private LostTalesQuestObjectiveSelection() {}
 
     /**
-     * Where the quest stands: the stage its progress names by id. Only
-     * when the quest's file no longer has that id does the saved position
-     * stand in, so a quest whose file changed keeps going. -1 for none.
+     * Where the quest stands: the stage its progress names by id, or -1
+     * where the quest's file has no stage of that id. A quest whose stage
+     * is gone from its file stands nowhere and counts nothing until the
+     * file has the stage again (MOD-10).
      */
     public static int getCurrentStageIndex(LostTalesQuestDefinition quest,
             LostTalesQuestProgress progress) {
-        if (quest == null || progress == null || quest.getStages().isEmpty()) {
+        if (quest == null || progress == null) {
             return -1;
         }
         List<LostTalesQuestStageDefinition> stages = quest.getStages();
         String stageId = progress.getStageId();
-        if (stageId != null && stageId.length() > 0) {
-            for (int index = 0; index < stages.size(); index++) {
-                if (stageId.equals(stages.get(index).getId())) {
-                    return index;
-                }
+        if (stageId == null || stageId.length() == 0) {
+            return -1;
+        }
+        for (int index = 0; index < stages.size(); index++) {
+            if (stageId.equals(stages.get(index).getId())) {
+                return index;
             }
         }
-        return Math.max(0, Math.min(progress.getStageIndex(),
-                stages.size() - 1));
+        return -1;
     }
 
     public static LostTalesQuestStageDefinition getCurrentStage(

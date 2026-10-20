@@ -3,6 +3,7 @@ package com.ninuna.losttales.gui.screen.character.creator;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import net.minecraft.client.gui.FontRenderer;
 import org.lwjgl.input.Mouse;
 import net.minecraft.client.gui.Gui;
@@ -22,13 +23,20 @@ public final class CreatorWidgets {
     static final int ARROW_BOX = 14;
     /** A text field's box. */
     static final int FIELD_HEIGHT = 16;
+    /** What the buttons' labels name themselves to as cut names. */
+    private static final Object BUTTON_LABELS = new Object();
 
     private CreatorWidgets() {}
 
-    /** A muted label, the way every row names itself. */
-    static void drawLabel(FontRenderer font, String label, int x, int y) {
+    /**
+     * A muted label, the way every row names itself, cut at {@code room}
+     * and fading into it where it is longer (LOOK-37).
+     */
+    static void drawLabel(FontRenderer font, String label, int x, int y,
+                          int room) {
         LostTalesSkyrimUiStyle.beginContent();
-        font.drawStringWithShadow(label, x, y, LostTalesSkyrimUiStyle.TEXT_MUTED);
+        LostTalesUiCutName.drawShadowed(font, label == null ? "" : label, x, y,
+                room, LostTalesSkyrimUiStyle.TEXT_MUTED);
     }
 
     /**
@@ -124,7 +132,10 @@ public final class CreatorWidgets {
                     4, LostTalesSkyrimUiStyle.GOLD);
         }
         LostTalesSkyrimUiStyle.beginContent();
-        String text = LostTalesSkyrimUiStyle.trimToWidth(font, label, width - 8);
+        String text = label == null ? "" : label;
+        int room = width - 8;
+        int shown = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(text), room);
         int color = !enabled ? LostTalesSkyrimUiStyle.TEXT_DIM
                 : hovered ? LostTalesSkyrimUiStyle.GOLD
                 : LostTalesSkyrimUiStyle.TEXT_BRIGHT;
@@ -132,9 +143,12 @@ public final class CreatorWidgets {
             LostTalesUiButton.beginPose(motion, x, y, width, height);
         }
         try {
-            font.drawStringWithShadow(text,
-                    x + (width - font.getStringWidth(text)) / 2,
-                    y + (height - font.FONT_HEIGHT) / 2 + 1, color);
+            // A label too long for its button fades into the button's end
+            // and slides along under the pointer (LOOK-37).
+            LostTalesUiCutName.drawShadowed(font, text,
+                    x + (width - shown) / 2,
+                    y + (height - font.FONT_HEIGHT) / 2 + 1, room, color,
+                    BUTTON_LABELS, text, enabled && hovered);
         } finally {
             if (motion != null) {
                 LostTalesUiButton.endPose();

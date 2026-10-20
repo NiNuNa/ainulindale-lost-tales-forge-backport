@@ -5,6 +5,8 @@ import com.google.gson.JsonObject;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
+import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.chat.server.ChatPresenceService;
 import com.ninuna.losttales.chat.server.ChatServerStatus;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
@@ -159,6 +161,15 @@ public final class DiscordSlashCommands {
     /** This channel is linked to the very game channel asked for. */
     public static String linkAlready(LostTalesWords words, String gameChannel) {
         return bound(words.format("chat.losttales.discord.link.already",
+                escape(gameChannel)));
+    }
+
+    /**
+     * The game channel the code names may not be linked now: the game
+     * server's channel settings keep it from Discord.
+     */
+    public static String linkClosed(LostTalesWords words, String gameChannel) {
+        return bound(words.format("chat.losttales.discord.link.closed",
                 escape(gameChannel)));
     }
 
@@ -345,10 +356,15 @@ public final class DiscordSlashCommands {
 
     /**
      * A race by the name the game gives it: {@code losttales:uruk} reads
-     * as {@code Uruk}. One the lang file does not name reads as its id,
+     * as {@code Uruk}, a server's own race as its file writes it (CHAR-38).
+     * One the lang file does not name reads as its id,
      * {@code losttales:black_uruk} as {@code Black uruk}.
      */
     static String raceName(LostTalesWords words, String raceId) {
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
+        if (race != null && race.getName().length() > 0) {
+            return race.getName();
+        }
         String path = raceId == null ? ""
                 : raceId.substring(raceId.indexOf(':') + 1);
         if (path.length() == 0) {

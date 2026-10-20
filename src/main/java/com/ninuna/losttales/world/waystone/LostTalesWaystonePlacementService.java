@@ -36,8 +36,7 @@ public final class LostTalesWaystonePlacementService {
         if (placer == null) {
             LostTalesMapMarkerRecord failed =
                     record.withGenerationState(
-                            LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED,
-                            "unknown_structure_type");
+                            LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED);
             data.saveRecord(failed);
             LostTalesLog.warning("Marker %s references unknown waystone structure %s",
                     record.getId(), record.getWaystoneStructureType());
@@ -53,8 +52,7 @@ public final class LostTalesWaystonePlacementService {
             if (current != null && current.getGenerationState()
                             != LostTalesWaystoneGenerationState.PLACED) {
                 data.saveRecord(current.withGenerationState(
-                        LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED,
-                        result.getReason()));
+                        LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED));
             }
             LostTalesLog.warning("Waystone generation blocked for marker %s: %s",
                     record.getId(), result.getReason());

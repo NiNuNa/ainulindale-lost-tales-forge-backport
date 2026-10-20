@@ -22,6 +22,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.WorldServer;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -52,16 +53,20 @@ public final class FellowshipMemberStatusSyncManager {
         synchronizeOnlinePlayers(false);
     }
 
-    /** Sends a fresh snapshot after login, character, or fellowship-state changes. */
-    public static synchronized boolean sendNow(EntityPlayerMP recipient) {
-        if (!LostTalesServerPlayers.isServerPlayer(recipient)) {
-            return false;
-        }
+    /**
+     * Sends each recipient a fresh snapshot after login, character, or
+     * fellowship-state changes, all read from one view of the server.
+     */
+    public static synchronized void sendNow(Collection<EntityPlayerMP> recipients) {
         ServerView view = collectServerView();
         if (view == null) {
-            return false;
+            return;
         }
-        return sendForPlayer(recipient, view, true);
+        for (EntityPlayerMP recipient : recipients) {
+            if (LostTalesServerPlayers.isServerPlayer(recipient)) {
+                sendForPlayer(recipient, view, true);
+            }
+        }
     }
 
     public static synchronized void clearPlayer(UUID ownerId) {

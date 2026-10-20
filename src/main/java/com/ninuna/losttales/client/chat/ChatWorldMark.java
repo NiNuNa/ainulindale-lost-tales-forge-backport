@@ -10,7 +10,7 @@ import net.minecraft.util.IChatComponent;
  * The quiet mark of a character spoken as in a copy while its player
  * plays another: here, but not in the world (CHAT-05). A hollow square in
  * the aside tone, casting the one shadow, after the name on a line's name
- * row and at the end of a member row's name, before its role-play mark.
+ * row and at the end of a member row's name.
  * Drawn from its own pixels, standing in until its artwork is painted;
  * no other mark is square, so it never reads as a status.
  *

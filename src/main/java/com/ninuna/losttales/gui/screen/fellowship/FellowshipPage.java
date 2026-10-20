@@ -23,7 +23,7 @@ import com.ninuna.losttales.client.window.NamingWindow;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -555,12 +555,13 @@ public final class FellowshipPage extends PageContent {
                 (float)box.width, bandBottom);
         try {
             y = listTop();
-            for (Row row : rows) {
+            for (int index = 0; index < rows.size(); index++) {
+                Row row = rows.get(index);
                 if (y >= bandBottom) {
                     break;
                 }
                 if (y + row.height > bandTop) {
-                    drawRow(snapshot, row, y, row == picked,
+                    drawRow(snapshot, row, index, y, row == picked,
                             row == this.hovered, alpha);
                 }
                 y += row.height;
@@ -611,10 +612,12 @@ public final class FellowshipPage extends PageContent {
      * pointer; a note's lines, each centred in a row of its own; any other
      * row's words in the list's one label column, a member's colour in the
      * icon box before them, and what stands at the row's right ending at
-     * the padding, the words giving way before it.
+     * the padding, the words giving way before it: cut there, fading into
+     * that end and sliding along under the pointer (LOOK-37).
      */
-    private void drawRow(FellowshipStateSnapshot snapshot, Row row, int y,
-                         boolean picked, boolean hovered, int alpha) {
+    private void drawRow(FellowshipStateSnapshot snapshot, Row row, int index,
+                         int y, boolean picked, boolean hovered, int alpha) {
+        Integer key = Integer.valueOf(index);
         int rowHeight = MenuWindow.rowHeight();
         int left = MenuWindow.PADDING_X;
         int right = this.width - MenuWindow.PADDING_X;
@@ -634,10 +637,9 @@ public final class FellowshipPage extends PageContent {
                 : right - asideWidth - MenuWindow.VALUE_GAP;
         if (row.kind == Kind.HEADING || row.kind == Kind.FELLOWSHIP) {
             boolean lit = picked || hovered;
-            WindowLists.drawHeading(this.font,
-                    LostTalesSkyrimUiStyle.trimToWidth(this.font, row.text,
-                            wordsRight - left),
-                    left, left, right, y, rowHeight, lit, alpha);
+            WindowLists.drawHeading(this.font, row.text, left, left,
+                    wordsRight, right, y, rowHeight, lit, alpha, this, key,
+                    hovered);
             if (aside.length() > 0) {
                 // The aside on the heading's own line, in the aside tone.
                 LostTalesUiInk.drawText(this.font, aside, right - asideWidth,
@@ -655,10 +657,10 @@ public final class FellowshipPage extends PageContent {
         int labelLeft = left + TabIcons.SLOT + TabIcons.GAP;
         boolean away = row.member != null
                 && row.member.getPresence() != FellowshipMemberPresence.HERE;
-        LostTalesUiInk.drawText(this.font, LostTalesSkyrimUiStyle.trimToWidth(
-                        this.font, row.text, wordsRight - labelLeft),
-                labelLeft, textTop, away || row.kind == Kind.OUTGOING
-                        ? WindowStyle.asideRgb() : LostTalesUiInk.IVORY, alpha);
+        LostTalesUiCutName.drawText(this.font, row.text, labelLeft, textTop,
+                wordsRight - labelLeft, away || row.kind == Kind.OUTGOING
+                        ? WindowStyle.asideRgb() : LostTalesUiInk.IVORY, alpha,
+                this, key, hovered);
         if (aside.length() > 0) {
             boolean expired = row.invitation != null
                     && row.invitation.isExpired(System.currentTimeMillis());
@@ -1313,8 +1315,8 @@ public final class FellowshipPage extends PageContent {
      * The invite field: any character is invited by its name, played or
      * not; while it is typed in its list offers the players online who can
      * be invited into the picked fellowship, narrowed by what is typed.
-     * Greyed, its hint saying why, for anyone but its leader and guides, and
-     * while it is full.
+     * Greyed for anyone but its leader and guides, and while it is full; a
+     * press says why (LOOK-15).
      */
     private BarItem inviteItem(FellowshipStateSnapshot snapshot, FellowshipSnapshot fellowship,
                                boolean manages) {
@@ -1334,9 +1336,8 @@ public final class FellowshipPage extends PageContent {
                         Integer.valueOf(snapshot.getMemberLimit()))
                 : "";
         BarItem field = BarItem.field(INVITE, this.inviteField,
-                why.length() > 0 ? why
-                        : I18n.format("gui.losttales.fellowship.invite.hint",
-                                fellowship.getName()));
+                I18n.format("gui.losttales.fellowship.invite.hint",
+                        fellowship.getName()));
         if (why.length() > 0) {
             releaseField();
             return field.unavailable(why);

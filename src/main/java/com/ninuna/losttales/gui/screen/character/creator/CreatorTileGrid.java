@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -113,12 +114,11 @@ public final class CreatorTileGrid extends CreatorControl {
         int count = this.choice.count();
         int selected = this.choice.index();
         if (this.label != null) {
-            drawLabel(LostTalesSkyrimUiStyle.trimToWidth(font, title(),
-                    this.width));
+            drawLabel(title());
         }
         if (count == 0) {
-            font.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(font,
-                    this.choice.emptyLabel(), this.width), this.x, gridTop(),
+            LostTalesUiCutName.drawShadowed(font, this.choice.emptyLabel(),
+                    this.x, gridTop(), this.width,
                     LostTalesSkyrimUiStyle.TEXT_MUTED);
             return;
         }
@@ -167,10 +167,9 @@ public final class CreatorTileGrid extends CreatorControl {
                     alpha);
         }
         if (count == 0) {
-            LostTalesUiInk.drawText(font, CreatorRows.trimmed(font,
-                    this.choice.emptyLabel(), this.width), this.x,
-                    CreatorRows.textTop(gridTop()), WindowStyle.asideRgb(),
-                    alpha);
+            CreatorRows.drawLine(this.context, this.choice.emptyLabel(),
+                    this.x, gridTop(), this.x + this.width,
+                    WindowStyle.asideRgb());
             return;
         }
         int selected = this.choice.index();

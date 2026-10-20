@@ -55,6 +55,7 @@ public final class CharacterPlayerStateServiceRegistryTest {
                     "vanilla_vitals",
                     "losttales_accessory",
                     "losttales_quests",
+                    "losttales_progression",
                     "lotr_fast_travel_regions",
                     "lotr_waypoint_uses",
                     "lotr_custom_waypoints",

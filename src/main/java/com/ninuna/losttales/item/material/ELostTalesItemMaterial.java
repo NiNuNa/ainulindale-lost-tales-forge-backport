@@ -13,10 +13,7 @@ public enum ELostTalesItemMaterial {
     OROCARNI(new LostTalesItemMaterialBase("OROCARNI", 675, 3, 6.5F, 3.0F, 9, new int[]{2, 4, 3, 2}, new ItemStack(LOTRMod.bronze))),
     LOTHLORIEN(new LostTalesItemMaterialBase("LOTHLORIEN", 675, 3, 6.5F, 3.0F, 9, new int[]{2, 4, 3, 2}, new ItemStack(LOTRMod.elfSteel))),
     NEUTRAL(new LostTalesItemMaterialBase("NEUTRAL", 675, 3, 6.5F, 3.0F, 9, new int[]{2, 4, 3, 2}, new ItemStack(LOTRMod.bronze))),
-    THARBAD(new LostTalesItemMaterialBase("THARBAD", 675, 3, 6.5F, 3.0F, 9, new int[]{2, 4, 3, 2}, new ItemStack(LOTRMod.bronze))),
-    MOON_ELVES(new LostTalesItemMaterialBase("MOON_ELVES", 675, 3, 6.5F, 3.0F, 9, new int[]{2, 4, 3, 2}, new ItemStack(LOTRMod.elfSteel))),
-    SUN_ELVES(new LostTalesItemMaterialBase("SUN_ELVES", 675, 3, 6.5F, 3.0F, 9, new int[]{2, 4, 3, 2}, new ItemStack(LOTRMod.elfSteel))),
-    BLUE_GOBLINS(new LostTalesItemMaterialBase("BLUE_GOBLINS", 350, 2, 5.5F, 2.5F, 6, new int[]{2, 4, 2, 2}, new ItemStack(LOTRMod.orcSteel)));
+    MOON_ELVES(new LostTalesItemMaterialBase("MOON_ELVES", 675, 3, 6.5F, 3.0F, 9, new int[]{2, 4, 3, 2}, new ItemStack(LOTRMod.elfSteel)));
 
     private final LostTalesItemMaterialBase material;
     private final LOTRFaction faction;

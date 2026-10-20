@@ -11,20 +11,11 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 
 public class LostTalesItemDagger extends LOTRItemDagger {
-    private final String credits;
     private final ELostTalesItemMaterial material;
     private final ELostTalesItem.Type itemType;
 
     public LostTalesItemDagger(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, DaggerEffect effect) {
         super(material.getMaterial().getToolMaterial(), effect);
-        this.credits = null;
-        this.material = material;
-        this.itemType = itemType;
-    }
-
-    public LostTalesItemDagger(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, DaggerEffect effect, String credits) {
-        super(material.getMaterial().getToolMaterial(), effect);
-        this.credits = credits;
         this.material = material;
         this.itemType = itemType;
     }
@@ -32,6 +23,6 @@ public class LostTalesItemDagger extends LOTRItemDagger {
     @Override
     @SideOnly(Side.CLIENT)
     public void addInformation(ItemStack itemStack, EntityPlayer player, List list, boolean advancedTooltips) {
-        LostTalesClientUtil.addItemInformation(list, itemStack, this.material, this.credits, player, this.itemType);
+        LostTalesClientUtil.addItemInformation(list, itemStack, this.material, null, player, this.itemType);
     }
 }

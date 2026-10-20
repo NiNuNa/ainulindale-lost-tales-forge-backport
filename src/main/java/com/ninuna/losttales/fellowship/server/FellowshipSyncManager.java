@@ -23,9 +23,10 @@ import net.minecraft.world.World;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,6 +54,32 @@ public final class FellowshipSyncManager {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return false;
         }
+        sendStatePacket(player, requestId, onlineView(player.worldObj));
+        List<EntityPlayerMP> recipient = Collections.singletonList(player);
+        FellowshipMemberStatusSyncManager.sendNow(recipient);
+        FellowshipTrackingSyncManager.sendNow(recipient);
+        return true;
+    }
+
+    /**
+     * Sends each player their state, unasked. Who is online, and the
+     * members' health and places, are read once for all of them.
+     */
+    private static void sendStateTo(List<EntityPlayerMP> players) {
+        if (players.isEmpty()) {
+            return;
+        }
+        FellowshipOnlineView online = onlineView(players.get(0).worldObj);
+        for (EntityPlayerMP player : players) {
+            sendStatePacket(player, UNSOLICITED_REQUEST_ID, online);
+        }
+        FellowshipMemberStatusSyncManager.sendNow(players);
+        FellowshipTrackingSyncManager.sendNow(players);
+    }
+
+    /** The fellowship state alone, built for the player from {@code online}. */
+    private static void sendStatePacket(EntityPlayerMP player, int requestId,
+                                        FellowshipOnlineView online) {
         UUID ownerId = player.getUniqueID();
         long sequence = nextSequence(ownerId);
         FellowshipInvitationState state;
@@ -69,14 +96,11 @@ public final class FellowshipSyncManager {
                 player, state);
         FellowshipStateSnapshot snapshot = FellowshipStateSnapshot.fromState(
                 ownerId, sequence, FellowshipService.memberLimit(), state,
-                onlineView(player.worldObj),
+                online, lotrFellowshipIds(player.worldObj, state),
                 FellowshipService.getInstance().marksSeenBy(player.worldObj, state),
                 inviteTargets.targets, inviteTargets.truncated);
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new FellowshipStateSyncPacket(requestId, snapshot), player);
-        FellowshipMemberStatusSyncManager.sendNow(player);
-        FellowshipTrackingSyncManager.sendNow(player);
-        return true;
     }
 
     public static void sendResultAndState(EntityPlayerMP player,
@@ -277,15 +301,17 @@ public final class FellowshipSyncManager {
         if (audience == null || audience.isEmpty()) {
             return;
         }
+        List<EntityPlayerMP> players = new ArrayList<EntityPlayerMP>();
         for (UUID ownerId : audience.getOwnerIds()) {
             if (ownerId == null || ownerId.equals(excludedOwnerId)) {
                 continue;
             }
             EntityPlayerMP player = LostTalesServerPlayers.findOnline(ownerId);
-            if (player != null) {
-                sendState(player, UNSOLICITED_REQUEST_ID);
+            if (LostTalesServerPlayers.isServerPlayer(player)) {
+                players.add(player);
             }
         }
+        sendStateTo(players);
     }
 
     /**
@@ -334,6 +360,31 @@ public final class FellowshipSyncManager {
         return result;
     }
 
+    /**
+     * LOTR's fellowship behind each fellowship of the state, by ours: the
+     * ones its player may share waypoints into. None while the store
+     * cannot be read.
+     */
+    private static Map<UUID, UUID> lotrFellowshipIds(World world,
+                                                     FellowshipInvitationState state) {
+        Map<UUID, UUID> ids = new HashMap<UUID, UUID>();
+        if (state == null || !state.isSuccessful()) {
+            return ids;
+        }
+        try {
+            FellowshipWorldData data = FellowshipStorage.get(world);
+            for (Fellowship fellowship : state.getFellowships()) {
+                UUID mirrorId = data.getMirrorId(fellowship.getFellowshipId());
+                if (mirrorId != null) {
+                    ids.put(fellowship.getFellowshipId(), mirrorId);
+                }
+            }
+        } catch (RuntimeException unreadable) {
+            ids.clear();
+        }
+        return ids;
+    }
+
     /** Who is online and as whom; nobody while the character store cannot be read. */
     private static FellowshipOnlineView onlineView(World world) {
         try {
@@ -349,12 +400,15 @@ public final class FellowshipSyncManager {
         if (server == null || server.getConfigurationManager() == null) {
             return;
         }
+        List<EntityPlayerMP> players = new ArrayList<EntityPlayerMP>();
         for (Object value : new ArrayList<Object>(
                 server.getConfigurationManager().playerEntityList)) {
-            if (value instanceof EntityPlayerMP) {
-                sendState((EntityPlayerMP) value, UNSOLICITED_REQUEST_ID);
+            if (value instanceof EntityPlayerMP
+                    && LostTalesServerPlayers.isServerPlayer((EntityPlayerMP) value)) {
+                players.add((EntityPlayerMP) value);
             }
         }
+        sendStateTo(players);
     }
 
     public static void clearPlayer(UUID ownerId) {

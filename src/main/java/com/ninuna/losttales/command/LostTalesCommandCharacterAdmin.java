@@ -22,6 +22,7 @@ import com.ninuna.losttales.character.server.CharacterSyncManager;
 import com.ninuna.losttales.character.server.KnownAccounts;
 import com.ninuna.losttales.character.server.SeenAccountNames;
 import com.ninuna.losttales.character.server.CharacterOperationResult;
+import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.state.CharacterPlayerStateAccount;
 import com.ninuna.losttales.character.state.CharacterPlayerStateRecord;
 import com.ninuna.losttales.character.state.CharacterPlayerStateStorage;
@@ -31,12 +32,18 @@ import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchAccountState;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
+import com.ninuna.losttales.character.switching.CharacterSwitchSourceRestore;
 import com.ninuna.losttales.character.switching.CharacterSwitchStorage;
 import com.ninuna.losttales.character.switching.CharacterSwitchTransaction;
+import com.ninuna.losttales.character.switching.CharacterSwitchTransactionStatus;
 import com.ninuna.losttales.character.switching.CharacterSwitchWorldData;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.chat.server.LostTalesChatService;
+import com.ninuna.losttales.fellowship.server.FellowshipSyncManager;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.util.LostTalesDuration;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.command.ICommandSender;
@@ -112,6 +119,9 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         } else if ("recover".equalsIgnoreCase(action)) {
             CharacterSwitchCoordinator coordinator =
                     CharacterSwitchCoordinator.getInstance();
+            // A journal an operator discarded is restored by the recovery
+            // (CHAR-37), which moves the roster as a switch does.
+            boolean restoring = awaitsRestore(target);
             CharacterErrorId result = coordinator.recover(target);
             if (result == CharacterErrorId.SWITCH_DEATH_PENDING
                     && target.isEntityAlive() && !target.isDead
@@ -123,6 +133,9 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             }
             if (result == CharacterErrorId.NONE) {
                 CharacterLifecycleStateTracker.markReady(target);
+                if (restoring) {
+                    followPlayed(target);
+                }
                 say(sender, EnumChatFormatting.GREEN, SAY + "recover.done");
             } else {
                 say(sender, EnumChatFormatting.RED, SAY + "recover.failed", result.getId());
@@ -177,10 +190,13 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
     }
 
     /**
-     * Discards one account's switch journal and thaws the account, naming
-     * the account by an online player's name or by its UUID — the id the
-     * server log prints beside every switch failure — so an account that
-     * is disconnected or refused at login can be repaired while offline.
+     * Discards one account's switch journal (CHAR-37), naming the account
+     * by an online player's name or by its UUID — the id the server log
+     * prints beside every switch failure — so an account that is
+     * disconnected or refused at login can be settled while offline. The
+     * character the switch was leaving comes back as the server saved it,
+     * at once for a player here and alive, else at their next join; what
+     * the player holds then is set aside in their player-state quarantine.
      */
     private void processDiscardJournal(ICommandSender sender, String[] args) {
         World world = overworld(sender);
@@ -192,25 +208,124 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             return;
         }
         EntityPlayerMP online = resolveTarget(sender, args[1]);
+        if (online != null && !ownerId.equals(online.getUniqueID())) {
+            online = null;
+        }
 
-        CharacterSwitchCoordinator.JournalDiscard outcome =
-                CharacterSwitchCoordinator.getInstance().discardJournal(world, ownerId);
-        if (outcome == CharacterSwitchCoordinator.JournalDiscard.NONE) {
-            say(sender, EnumChatFormatting.YELLOW, SAY + "journal.none");
-            return;
+        CharacterSwitchCoordinator.JournalDiscard result =
+                CharacterSwitchCoordinator.getInstance().discardJournal(
+                        world, ownerId, online);
+        Object account = accountWords(ownerId, online);
+        Object source = sourceWords(result);
+        switch (result.getOutcome()) {
+            case NONE:
+                say(sender, EnumChatFormatting.YELLOW, SAY + "journal.none");
+                return;
+            case UNAVAILABLE:
+                say(sender, EnumChatFormatting.RED, SAY + "journal.refused");
+                return;
+            case RESTORED:
+                say(sender, EnumChatFormatting.GREEN, SAY + "journal.restored",
+                        account, source);
+                // Switching is open again without a reconnect, and everyone
+                // is told whom the player plays, as after a switch.
+                CharacterLifecycleStateTracker.markReady(online);
+                followPlayed(online);
+                reportStatus(sender, online);
+                return;
+            case AT_NEXT_JOIN:
+                say(sender, EnumChatFormatting.GREEN, SAY + "journal.next_join",
+                        account, source);
+                if (online != null) {
+                    say(sender, EnumChatFormatting.GRAY, SAY + "journal.when_alive");
+                }
+                return;
+            case WAITING:
+                say(sender, EnumChatFormatting.YELLOW, SAY + "journal.waiting",
+                        account, source, refusalWords(result.getRefusal()));
+                return;
+            default:
+                say(sender, EnumChatFormatting.RED, SAY + "journal.failed",
+                        account, source);
         }
-        if (outcome == CharacterSwitchCoordinator.JournalDiscard.UNAVAILABLE) {
-            say(sender, EnumChatFormatting.RED, SAY + "journal.refused");
-            return;
+    }
+
+    /** The account's own name where the server knows it, else its UUID. */
+    private static Object accountWords(UUID ownerId, EntityPlayerMP online) {
+        String name = accountNameOf(ownerId, online);
+        return name == null || name.length() == 0 ? ownerId.toString() : name;
+    }
+
+    /** The character a discard brings back: its name, its id once gone, or the ghost. */
+    private static Object sourceWords(CharacterSwitchCoordinator.JournalDiscard result) {
+        if (result.getSourceName() != null) {
+            return result.getSourceName();
         }
-        say(sender, EnumChatFormatting.GREEN, SAY + "journal.discarded", ownerId);
-        if (online != null) {
-            // Already connected: switching becomes available again without
-            // making them reconnect.
-            CharacterLifecycleStateTracker.markReady(online);
-            reportStatus(sender, online);
-        } else {
-            say(sender, EnumChatFormatting.GRAY, SAY + "journal.next_join");
+        if (result.getSourceId() != null) {
+            return result.getSourceId().toString();
+        }
+        return words(SAY + "journal.ghost");
+    }
+
+    /** Why a discard's restore waits, in the reader's words. */
+    private static IChatComponent refusalWords(CharacterSwitchSourceRestore.Refusal refusal) {
+        if (refusal == null) {
+            return words(SAY + "failure.internal");
+        }
+        switch (refusal) {
+            case SOURCE_GONE:
+                return words(SAY + "journal.reason.source_gone");
+            case STATE_GONE:
+                return words(SAY + "journal.reason.state_gone");
+            case STORE_UNAVAILABLE:
+                return words(SAY + "journal.reason.store_unavailable");
+            case QUARANTINE_FULL:
+                return words(SAY + "journal.reason.quarantine_full");
+            default:
+                return words(SAY + "journal.reason.state_unreadable");
+        }
+    }
+
+    /**
+     * Tells an online player and everyone else whom they play once an
+     * operator has put a character back: what follows a switch, the
+     * roster, the look, the fellowships, the waystones and the chat.
+     */
+    private static void followPlayed(EntityPlayerMP player) {
+        try {
+            CharacterRoster roster = CharacterStorage.get(player.worldObj)
+                    .getRoster(player.getUniqueID());
+            CharacterRaceGameplayHandler.apply(player);
+            CharacterAppearanceSyncManager.broadcastPlayer(player, roster);
+            FellowshipSyncManager.sendState(
+                    player, FellowshipSyncManager.UNSOLICITED_REQUEST_ID);
+            FellowshipSyncManager.presenceChanged(player.getUniqueID());
+            LostTalesMapMarkerSyncManager.sync(player);
+            LostTalesChatService.sendAccess(player);
+            if (roster != null) {
+                CharacterSyncManager.sendRoster(player,
+                        CharacterSyncManager.UNSOLICITED_REQUEST_ID, roster);
+            }
+        } catch (RuntimeException exception) {
+            // The stores hold the restored character; the next roster
+            // request or join brings the clients up to date.
+            LostTalesLog.warning("Could not tell everyone whom %s plays after a "
+                    + "character was put back: %s", player.getUniqueID(),
+                    exception.toString());
+        }
+    }
+
+    /** Whether the account's journal waits for an operator's restore. */
+    private static boolean awaitsRestore(EntityPlayerMP player) {
+        try {
+            CharacterSwitchAccountState state = CharacterSwitchStorage
+                    .get(player.worldObj).getAccount(player.getUniqueID());
+            CharacterSwitchTransaction transaction =
+                    state == null ? null : state.getTransaction();
+            return transaction != null && transaction.getStatus()
+                    == CharacterSwitchTransactionStatus.RESTORE_SOURCE;
+        } catch (RuntimeException exception) {
+            return false;
         }
     }
 
@@ -620,6 +735,9 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                         ? words(SAY + "failure.retention")
                         : words(SAY + "failure.retention.for", formatDuration(
                                 tombstone.getPurgeAfter() - System.currentTimeMillis()));
+                break;
+            case RETENTION_OVER:
+                detail = words(SAY + "failure.retention_over");
                 break;
             case NOT_COMMITTED:
                 detail = words(SAY + "failure.not_committed");

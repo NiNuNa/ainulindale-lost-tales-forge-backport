@@ -166,7 +166,8 @@ public final class ChatPagesTest {
     public void aConversationCoveredByAPageStaysTheLastUsed() {
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         ConversationPage friend = ConversationPage.whisper("friend", "");
-        WindowLayout.openInNewWindow(friend, null);
+        // The chat's window is locked: the whisper opens in a window of its own.
+        WindowLayout.openByHand(friend, null);
         Window window = WindowLayout.windowOf(global);
         ClientChatChannelState.select(global);
         OtherPage page = WindowPages.tab(PAGE);
@@ -191,7 +192,8 @@ public final class ChatPagesTest {
     @Test
     public void beforeAnyPickTheChatKeyBringsTheTopWindowsConversation() {
         ConversationPage friend = ConversationPage.whisper("friend", "");
-        WindowLayout.openInNewWindow(friend, null);
+        // The chat's window is locked: the whisper opens in a window of its own.
+        WindowLayout.openByHand(friend, null);
         ClientChatChannelState.clear();
         assertEquals("the top window's, as the layout left it", friend,
                 ClientChatChannelState.lastUsed());
@@ -208,9 +210,14 @@ public final class ChatPagesTest {
 
     @Test
     public void aPageOpensAWindowHoweverManyStand() {
+        int before = WindowLayout.windows().size();
         for (int index = 0; index < 12; index++) {
-            WindowLayout.openInNewWindow(ConversationPage.whisper("friend" + index, ""), null);
+            // Each window locked, the next whisper opens a window of its own.
+            WindowPage friend = WindowLayout.openByHand(
+                    ConversationPage.whisper("friend" + index, ""), null);
+            WindowLayout.setLocked(WindowLayout.windowOf(friend).getId(), true);
         }
+        assertEquals(before + 12, WindowLayout.windows().size());
         assertNotNull(WindowLayout.showPage(WindowPages.tab(PAGE)));
     }
 

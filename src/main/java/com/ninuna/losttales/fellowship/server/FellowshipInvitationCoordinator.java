@@ -203,6 +203,10 @@ final class FellowshipInvitationCoordinator {
         String corruptionReason = getInvitationCorruptionReason(
                 invitation, acceptanceIndex);
         if (corruptionReason != null) {
+            if (!invitationData.hasQuarantineRoomFor(1)) {
+                return FellowshipInvitationOperationResult.failure(
+                        FellowshipErrorId.INVITATION_STORAGE_READ_ONLY, null, null);
+            }
             invitationData.quarantine(corruptionReason, invitation);
             invitationData.removeInvitation(invitationId);
             return FellowshipInvitationOperationResult.failure(
@@ -387,14 +391,30 @@ final class FellowshipInvitationCoordinator {
                 names);
     }
 
+    /**
+     * Removes the invitations that ran out or no longer stand, those that
+     * name a character wrongly into the quarantine. Answers how many went:
+     * none where the quarantine has no room for them all, which leaves the
+     * store closed.
+     */
     int pruneInvalidInvitations(
             FellowshipWorldData fellowshipData,
             FellowshipInvitationWorldData invitationData,
             CharacterWorldData characterData,
             long now) {
-        int removed = invitationData.removeExpired(now);
         CharacterIndex index =
                 characterData.characterIndex();
+        int corrupt = 0;
+        for (FellowshipInvitation invitation : invitationData.getInvitations()) {
+            if (!invitation.isExpired(now)
+                    && getInvitationCorruptionReason(invitation, index) != null) {
+                corrupt++;
+            }
+        }
+        if (!invitationData.hasQuarantineRoomFor(corrupt)) {
+            return 0;
+        }
+        int removed = invitationData.removeExpired(now);
         List<FellowshipInvitation> invitations =
                 new ArrayList<FellowshipInvitation>(invitationData.getInvitations());
         for (FellowshipInvitation invitation : invitations) {

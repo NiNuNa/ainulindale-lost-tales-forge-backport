@@ -35,8 +35,16 @@ public final class CharacterServerPacketDispatcher {
     /** The budget every character request draws on. */
     private static final LostTalesRequestRateLimiter.RequestType REQUESTS =
             LostTalesRequestRateLimiter.RequestType.CHARACTER_REQUEST;
+    /** The budget a lore claim or release draws on besides. */
+    private static final LostTalesRequestRateLimiter.RequestType LORE_TRANSFERS =
+            LostTalesRequestRateLimiter.RequestType.LORE_TRANSFER;
 
     private CharacterServerPacketDispatcher() {}
+
+    private static boolean isLoreTransfer(CharacterOperationType operationType) {
+        return operationType == CharacterOperationType.LORE_CLAIM
+                || operationType == CharacterOperationType.LORE_RELEASE;
+    }
 
     public static EntityPlayerMP getPlayer(MessageContext context) {
         return LostTalesServerPacketDispatcher.getPlayer(context);
@@ -51,9 +59,14 @@ public final class CharacterServerPacketDispatcher {
         if (player == null || operationType == null || task == null) {
             return;
         }
-        if (!LostTalesRequestRateLimiter.allow(player, REQUESTS)) {
-            LostTalesRequestRateLimiter.logRateLimited(player, REQUESTS, packetName);
-            if (LostTalesRequestRateLimiter.allowReply(player, REQUESTS,
+        LostTalesRequestRateLimiter.RequestType spent =
+                !LostTalesRequestRateLimiter.allow(player, REQUESTS) ? REQUESTS
+                : isLoreTransfer(operationType)
+                        && !LostTalesRequestRateLimiter.allow(player, LORE_TRANSFERS)
+                        ? LORE_TRANSFERS : null;
+        if (spent != null) {
+            LostTalesRequestRateLimiter.logRateLimited(player, spent, packetName);
+            if (LostTalesRequestRateLimiter.allowReply(player, spent,
                     RATE_LIMIT_REPLY_INTERVAL_MILLIS)) {
                 CharacterSyncManager.sendFailure(
                         player, requestId, operationType,

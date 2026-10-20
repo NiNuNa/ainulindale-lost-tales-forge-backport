@@ -29,6 +29,12 @@ import lotr.common.world.map.LOTRWaypoint;
  * <p>A registered waypoint is named in the lang file under its code
  * ({@code lotr.waypoint.LOSTTALES_MOSSY_CAVE} and its {@code .info}), the
  * line every map marker screen reads too ({@link LostTalesMapMarkerNames}).</p>
+ *
+ * <p>Only the bundled markers register, as the game starts on every side:
+ * a client would lack a waypoint a server's own marker file made. A
+ * server's own marker is reached as a placed waystone is, from a
+ * waystone's Destinations; one in a bundled marker's place keeps that
+ * marker's waypoint (MOD-17).</p>
  */
 public final class LostTalesMapMarkerWaypointRegistry {
     private static final String LOTR_WAYPOINT_MARKER_PREFIX = "lotr:waypoint:";
@@ -46,7 +52,7 @@ public final class LostTalesMapMarkerWaypointRegistry {
         }
 
         LostTalesMapMarkerCatalog.ensureLoaded();
-        for (LostTalesMapMarkerDefinition marker : LostTalesMapMarkerCatalog.getMarkers()) {
+        for (LostTalesMapMarkerDefinition marker : LostTalesMapMarkerCatalog.getBundledMarkers()) {
             registerMarkerWaypoint(marker);
         }
         registered = true;
@@ -67,13 +73,13 @@ public final class LostTalesMapMarkerWaypointRegistry {
         for (Map.Entry<String, LOTRWaypoint> entry
                 : WAYPOINTS_BY_MARKER_ID.entrySet()) {
             if (entry.getValue() == waypoint) {
-                return LostTalesMapMarkerCatalog.getMarker(entry.getKey());
+                return LostTalesMapMarkerCatalog.getBundledMarker(entry.getKey());
             }
         }
 
         String code = normalizeWaypointKey(waypoint.getCodeName());
         for (LostTalesMapMarkerDefinition marker
-                : LostTalesMapMarkerCatalog.getMarkers()) {
+                : LostTalesMapMarkerCatalog.getBundledMarkers()) {
             if (matchesWaypoint(marker, waypoint, code)) {
                 return marker;
             }

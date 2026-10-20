@@ -1,8 +1,9 @@
 package com.ninuna.losttales.client.mapmarker;
 
 /**
- * Short-lived client navigation context. It is only a convenience for packet
- * construction; the server independently resolves and validates the source.
+ * The waystone the next place picked on the map travels from, for two
+ * minutes after its Destinations: what the travel request names. The
+ * server holds the same window and checks the source again.
  */
 public final class LostTalesClientWaystoneTravelContext {
     private static final long MAX_AGE_MILLIS = 120000L;

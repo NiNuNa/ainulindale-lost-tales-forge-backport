@@ -30,10 +30,6 @@ final class VanillaSkinCacheAccess {
                 hash.substring(0, 2)), hash);
     }
 
-    static boolean isAvailable() {
-        return ASSETS_DIRECTORY_FIELD != null;
-    }
-
     private static File assetsDirectory(Minecraft minecraft) {
         if (minecraft == null || ASSETS_DIRECTORY_FIELD == null) {
             return null;

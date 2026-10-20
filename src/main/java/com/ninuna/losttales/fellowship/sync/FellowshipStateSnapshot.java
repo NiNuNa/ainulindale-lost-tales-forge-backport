@@ -129,11 +129,16 @@ public final class FellowshipStateSnapshot {
         this.inviteTargetsTruncated = inviteTargetsTruncated;
     }
 
+    /**
+     * The state of {@code state}, each fellowship with LOTR's fellowship
+     * behind it from {@code lotrFellowshipIds}, by our fellowship's id.
+     */
     public static FellowshipStateSnapshot fromState(UUID ownerId,
                                                     long synchronizationSequence,
                                                     int memberLimit,
                                                     FellowshipInvitationState state,
                                                     FellowshipSnapshot.Presence presence,
+                                                    Map<UUID, UUID> lotrFellowshipIds,
                                                     List<FellowshipMark> marks,
                                                     List<FellowshipInviteTargetSnapshot> inviteTargets,
                                                     boolean inviteTargetsTruncated) {
@@ -144,7 +149,9 @@ public final class FellowshipStateSnapshot {
         }
         ArrayList<FellowshipSnapshot> fellowships = new ArrayList<FellowshipSnapshot>();
         for (Fellowship fellowship : state.getFellowships()) {
-            fellowships.add(FellowshipSnapshot.fromFellowship(fellowship, presence));
+            fellowships.add(FellowshipSnapshot.fromFellowship(fellowship, presence,
+                    lotrFellowshipIds == null ? null
+                            : lotrFellowshipIds.get(fellowship.getFellowshipId())));
         }
         ArrayList<FellowshipInvitationSnapshot> incoming = convert(
                 state, state.getIncomingInvitations(), MAX_INCOMING_INVITATIONS);
@@ -241,6 +248,24 @@ public final class FellowshipStateSnapshot {
     /** One of the identity's fellowships; null for one it is not in. */
     public FellowshipSnapshot getFellowship(UUID fellowshipId) {
         return findIn(this.fellowships, fellowshipId);
+    }
+
+    /**
+     * Whether the identity may share a waypoint into LOTR's fellowship
+     * {@code lotrFellowshipId}: the one behind one of its fellowships. The
+     * account's LOTR list may also hold one it holds for the record only,
+     * while nobody plays a member, which it may not (FEL-02).
+     */
+    public boolean mayShareInto(UUID lotrFellowshipId) {
+        if (lotrFellowshipId == null) {
+            return false;
+        }
+        for (FellowshipSnapshot fellowship : this.fellowships) {
+            if (lotrFellowshipId.equals(fellowship.getLotrFellowshipId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The fellowship the identity travels with; null while it is in none. */

@@ -242,10 +242,6 @@ final class LostTalesMapMarkerRenderedGeometry {
             return this.visibleBounds;
         }
 
-        Bounds getInteractionBounds() {
-            return this.interactionBounds;
-        }
-
         Member getRepresentativeMember() {
             return this.representativeMember;
         }

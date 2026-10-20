@@ -39,6 +39,12 @@ import java.util.UUID;
 public final class FellowshipNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 2;
+    /**
+     * The most records each fellowship store keeps in its quarantine. A
+     * save holding more is kept as it is, read-only, and a store whose
+     * quarantine is full closes before it sets another record aside.
+     */
+    public static final int MAX_QUARANTINED = 4096;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_FELLOWSHIPS = "Fellowships";
@@ -107,24 +113,20 @@ public final class FellowshipNbtCodec {
             return ReadResult.unsupported(safeSource, version);
         }
 
-        NbtQuarantine.Read quarantineResult = NbtQuarantine.readCurrentVersionOnly(safeSource);
+        NbtQuarantine.Read quarantineResult = NbtQuarantine.read(safeSource);
         if (!quarantineResult.isSupported()) {
             LostTalesLog.warning("Fellowship quarantine data is malformed or uses unsupported "
                             + "version %d; data will remain read-only",
                     Integer.valueOf(quarantineResult.getUnsupportedVersion()));
             return ReadResult.unsupported(safeSource, quarantineResult.getUnsupportedVersion());
         }
-        boolean repaired = quarantineResult.isRepaired();
+        boolean repaired = false;
         ArrayList<NBTTagCompound> quarantine =
                 new ArrayList<NBTTagCompound>(quarantineResult.getEntries());
 
-        if (safeSource.hasKey(TAG_FELLOWSHIPS)
-                && !safeSource.hasKey(TAG_FELLOWSHIPS, Constants.NBT.TAG_LIST)) {
-            LostTalesLog.warning("Fellowship data root has a malformed fellowship list; preserving data read-only");
-            return ReadResult.unsupported(safeSource, -1);
-        }
         if (!safeSource.hasKey(TAG_FELLOWSHIPS, Constants.NBT.TAG_LIST)) {
-            repaired = true;
+            LostTalesLog.warning("Fellowship data root has no fellowship list; preserving data read-only");
+            return ReadResult.unsupported(safeSource, -1);
         }
 
         LinkedHashMap<UUID, Fellowship> fellowships = new LinkedHashMap<UUID, Fellowship>();
@@ -153,6 +155,12 @@ public final class FellowshipNbtCodec {
                 continue;
             }
             fellowships.put(fellowship.getFellowshipId(), fellowship);
+        }
+        if (quarantine.size() > MAX_QUARANTINED) {
+            LostTalesLog.warning("Fellowship quarantine would hold %d records, past its %d; "
+                            + "data will remain read-only",
+                    Integer.valueOf(quarantine.size()), Integer.valueOf(MAX_QUARANTINED));
+            return ReadResult.unsupported(safeSource, -1);
         }
         Map<UUID, UUID> travelling = readPairs(safeSource, TAG_TRAVELLING,
                 TAG_CHARACTER_UUID, TAG_FELLOWSHIP_UUID);

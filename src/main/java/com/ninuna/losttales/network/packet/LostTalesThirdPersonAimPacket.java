@@ -9,8 +9,6 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
 
 /** Updates or clears a short-lived server-validated projectile aim vector. */
 public final class LostTalesThirdPersonAimPacket implements IMessage {
@@ -81,21 +79,15 @@ public final class LostTalesThirdPersonAimPacket implements IMessage {
                 MessageContext context) {
             EntityPlayerMP player =
                     LostTalesServerPacketDispatcher.getPlayer(context);
-            if (player == null || player.worldObj == null
-                    || player.worldObj.provider == null
-                    || message == null) {
+            if (player == null || message == null) {
                 return null;
             }
-            final int expectedDimension =
-                    player.worldObj.provider.dimensionId;
+            // The player's world and hand are read on the server thread,
+            // in the task, never here.
             final boolean active = message.active;
             final double directionX = message.directionX;
             final double directionY = message.directionY;
             final double directionZ = message.directionZ;
-            final int expectedHotbarSlot = player.inventory.currentItem;
-            ItemStack held = player.inventory.getCurrentItem();
-            final Item expectedItem = held == null
-                    ? null : held.getItem();
             LostTalesServerPacketDispatcher.submit(
                     player,
                     LostTalesRequestRateLimiter.RequestType
@@ -106,10 +98,8 @@ public final class LostTalesThirdPersonAimPacket implements IMessage {
                         @Override
                         public void run(EntityPlayerMP livePlayer) {
                             LostTalesThirdPersonAimService.execute(
-                                    livePlayer, expectedDimension,
-                                    active, directionX, directionY,
-                                    directionZ, expectedHotbarSlot,
-                                    expectedItem);
+                                    livePlayer, active, directionX,
+                                    directionY, directionZ);
                         }
                     });
             return null;

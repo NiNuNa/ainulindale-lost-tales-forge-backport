@@ -160,20 +160,7 @@ public final class LostTalesChatSendPacket implements IMessage {
         return packet;
     }
 
-    public LostTalesChatSendPacket(ChatChannel channel, String message,
-                                   List<ChatShareReference> references,
-                                   String target, int identityKind,
-                                   UUID identityCharacterId,
-                                   long replyToMessageId,
-                                   String targetIdentity, long echoNonce,
-                                   UUID targetCharacterId,
-                                   boolean quotesUnkept) {
-        this(channel, message, references, target, identityKind,
-                identityCharacterId, replyToMessageId, targetIdentity,
-                echoNonce, targetCharacterId, quotesUnkept, false);
-    }
-
-    /** As above; {@code action} sends the words as an action. */
+    /** A line typed into a conversation; {@code action} sends the words as an action. */
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
                                    String target, int identityKind,

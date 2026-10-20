@@ -11,5 +11,5 @@ public interface CharacterCapeEligibilityPolicy {
 
     CharacterValidationResult validate(EntityPlayerMP player,
                                        RoleplayCharacter character,
-                                       int cosmeticCapeId);
+                                       String cosmeticCapeId);
 }

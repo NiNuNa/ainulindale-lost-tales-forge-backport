@@ -1,11 +1,15 @@
 package com.ninuna.losttales.gui.hud.compass.marker;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
+import java.util.Locale;
 import javax.imageio.ImageIO;
 import org.junit.Test;
 
@@ -73,7 +77,30 @@ public final class LostTalesCompassMarkerIconTest {
     }
 
     @Test
-    public void iconNamesResolveNewIconsAndLegacyAliases() {
+    public void everyBundledMarkerNamesAnIconOfItsOwn() {
+        LostTalesMapMarkerCatalog.reloadFromClasspath();
+        assertFalse(LostTalesMapMarkerCatalog.getMarkers().isEmpty());
+        for (LostTalesMapMarkerDefinition marker
+                : LostTalesMapMarkerCatalog.getMarkers()) {
+            assertEquals(marker.getId(),
+                    marker.getIconName().toUpperCase(Locale.ROOT),
+                    LostTalesCompassMarkerIcon.fromName(
+                            marker.getIconName()).name());
+        }
+    }
+
+    @Test
+    public void aNameNoIconGoesByShowsTheQuestionMark() {
+        for (String name : new String[] {"town", "fort", "tavern",
+                "fountain", "", null}) {
+            assertEquals(String.valueOf(name),
+                    LostTalesCompassMarkerIcon.UNDISCOVERED,
+                    LostTalesCompassMarkerIcon.fromName(name));
+        }
+    }
+
+    @Test
+    public void iconNamesResolveIconsAndTheirOtherWords() {
         assertEquals(LostTalesCompassMarkerIcon.SHACK,
                 LostTalesCompassMarkerIcon.fromName("shack"));
         assertEquals(LostTalesCompassMarkerIcon.MOUNTAINS,
@@ -88,21 +115,12 @@ public final class LostTalesCompassMarkerIconTest {
                 LostTalesCompassMarkerIcon.fromName("point_of_interest"));
         assertEquals(LostTalesCompassMarkerIcon.PERSONAL,
                 LostTalesCompassMarkerIcon.fromName("personal"));
-        // Saved markers still store the retired names.
-        assertEquals(LostTalesCompassMarkerIcon.TOWN,
-                LostTalesCompassMarkerIcon.fromName("town"));
         assertEquals(LostTalesCompassMarkerIcon.GRAVEYARD,
                 LostTalesCompassMarkerIcon.fromName("cemetery"));
         assertEquals(LostTalesCompassMarkerIcon.FOREST,
                 LostTalesCompassMarkerIcon.fromName("woods"));
-        assertEquals(LostTalesCompassMarkerIcon.FOUNTAIN,
-                LostTalesCompassMarkerIcon.fromName("fountain"));
         assertEquals(LostTalesCompassMarkerIcon.PORT,
                 LostTalesCompassMarkerIcon.fromName("harbour"));
-        assertEquals(LostTalesCompassMarkerIcon.FORT,
-                LostTalesCompassMarkerIcon.fromName("fort"));
-        assertEquals(LostTalesCompassMarkerIcon.TAVERN,
-                LostTalesCompassMarkerIcon.fromName("tavern"));
     }
 
     private static boolean hasVisiblePixel(BufferedImage atlas,

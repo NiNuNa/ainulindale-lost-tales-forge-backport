@@ -15,9 +15,9 @@ import java.util.UUID;
 
 /**
  * A client asking what a character says about itself, by the character's
- * id alone. The server decides whether this player may read it — one of
- * their own characters, or one another online player is using — and
- * answers with {@link CharacterProfilePacket} either way.
+ * id alone. Every profile is readable, its owner online or not; the
+ * server answers with {@link CharacterProfilePacket}: the profile, or that
+ * it holds no such character.
  */
 public final class CharacterProfileRequestPacket implements IMessage {
 

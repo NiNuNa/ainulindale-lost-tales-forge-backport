@@ -18,8 +18,11 @@ public enum ELostTalesBiome {
         this.biome = biome;
     }
 
+    /**
+     * Builds every biome: calling this loads the enum, and LOTR's biome
+     * constructor registers each biome under its id.
+     */
     public static void initAndRegisterBiomes() {
-        for (ELostTalesBiome b : ELostTalesBiome.values()) {}
     }
 
     public LOTRBiome getBiome() {

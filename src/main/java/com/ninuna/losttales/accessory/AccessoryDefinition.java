@@ -1,6 +1,5 @@
 package com.ninuna.losttales.accessory;
 
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 
 import java.util.Locale;
@@ -11,7 +10,6 @@ public final class AccessoryDefinition {
     private final String id;
     private final AccessorySlotType slotType;
     private final AccessoryStackMatcher matcher;
-    private final AccessoryEligibility eligibility;
     private final String serverEffectId;
     private final String ownerVisualEffectId;
     private final String publicEffectId;
@@ -19,7 +17,6 @@ public final class AccessoryDefinition {
     public AccessoryDefinition(String id,
                                AccessorySlotType slotType,
                                AccessoryStackMatcher matcher,
-                               AccessoryEligibility eligibility,
                                String serverEffectId,
                                String ownerVisualEffectId,
                                String publicEffectId) {
@@ -32,8 +29,6 @@ public final class AccessoryDefinition {
         }
         this.slotType = slotType;
         this.matcher = matcher;
-        this.eligibility = eligibility == null
-                ? AccessoryEligibility.ALLOW_ALL : eligibility;
         this.serverEffectId = normalizeOptionalId(serverEffectId);
         this.ownerVisualEffectId = normalizeOptionalId(ownerVisualEffectId);
         this.publicEffectId = normalizeOptionalId(publicEffectId);
@@ -62,10 +57,6 @@ public final class AccessoryDefinition {
     public boolean matches(ItemStack stack) {
         return stack != null && stack.getItem() != null
                 && this.matcher.matches(stack);
-    }
-
-    public boolean canEquip(EntityPlayer player, ItemStack stack) {
-        return matches(stack) && this.eligibility.canEquip(player, stack);
     }
 
     private static String requireId(String value) {

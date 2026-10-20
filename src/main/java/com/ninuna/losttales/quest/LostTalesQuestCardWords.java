@@ -13,7 +13,8 @@ import net.minecraft.util.StatCollector;
  * lang lines its id names, a missive's from its template ids, every
  * objective without words of its own from its kind and targets, and the
  * reward from what the quest pays. Words a server's operator or LOTR
- * gave the quest are shown as they came.
+ * gave the quest, a server's missive title among them, are shown as they
+ * came.
  */
 public final class LostTalesQuestCardWords {
     private LostTalesQuestCardWords() {}
@@ -103,6 +104,7 @@ public final class LostTalesQuestCardWords {
                                 ? LostTalesQuestWords.objectiveKey(reference,
                                         objective.getId())
                                 : source == ChatQuestCard.Source.MISSIVE
+                                        || source == ChatQuestCard.Source.MISSIVE_WRITTEN
                                 ? MissiveWords.objectiveKey(objective.getType())
                                 : "");
         String line = LostTalesQuestObjectiveTextHelper.describe(definition)

@@ -87,10 +87,6 @@ enum LostTalesMapDecorationSprite {
         return this.texture;
     }
 
-    int getFrames() {
-        return this.frames;
-    }
-
     boolean isAnimated() {
         return this.animated;
     }

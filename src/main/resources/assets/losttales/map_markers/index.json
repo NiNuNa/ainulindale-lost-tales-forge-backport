@@ -1,0 +1,11 @@
+{
+  "files": [
+    "map_markers/towns.json",
+    "map_markers/settlements.json",
+    "map_markers/cities.json",
+    "map_markers/forts.json",
+    "map_markers/camps.json",
+    "map_markers/caves.json",
+    "map_markers/lotr_waypoints.json"
+  ]
+}

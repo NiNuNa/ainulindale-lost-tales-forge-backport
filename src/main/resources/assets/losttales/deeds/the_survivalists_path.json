@@ -1,0 +1,8 @@
+{
+  "id": "losttales:the_survivalists_path",
+  "category": "tales",
+  "icon": "minecraft:torch",
+  "kind": "quests",
+  "quests": ["losttales:path/survivalist/first_sparks", "losttales:path/survivalist/stone_and_shelter", "losttales:path/survivalist/food_for_the_road", "losttales:path/survivalist/tools_of_the_trail", "losttales:path/survivalist/under_open_sky", "losttales:path/survivalist/night_watch", "losttales:path/survivalist/keeper_of_the_trail"],
+  "title": true
+}

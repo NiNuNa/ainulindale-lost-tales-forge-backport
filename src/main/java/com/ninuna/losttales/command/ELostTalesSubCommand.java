@@ -42,7 +42,10 @@ public enum ELostTalesSubCommand {
             "role", "roles"),
     STRUCTURES(new LostTalesCommandStructures(),
             "structures <ban|allow|list> [player|character]",
-            "structures", "structure");
+            "structures", "structure"),
+    SKILLS(new LostTalesCommandSkills(),
+            "skills <reload|show|give> ...",
+            "skills", "skill", "progression");
 
     private final CommandBase command;
     private final String usage;

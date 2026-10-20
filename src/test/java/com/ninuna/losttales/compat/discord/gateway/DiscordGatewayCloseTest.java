@@ -34,6 +34,23 @@ public final class DiscordGatewayCloseTest {
                 DiscordGatewayClient.closesForGood(4014, false));
     }
 
+    /**
+     * Discord does not say which privileged intent a 4014 refused: the
+     * member intents are dropped first, so a 4014 that keeps the gateway
+     * down is the Message Content intent's, and the line names the member
+     * intents as well only when they were dropped untried.
+     */
+    @Test
+    public void aClosedGatewayNamesTheIntentItWasRefusedFor() {
+        String alone = DiscordGatewayClient.closedForGoodReason(4014, false);
+        assertTrue(alone, alone.contains("Message Content"));
+        assertFalse(alone, alone.contains("Server Members"));
+        String both = DiscordGatewayClient.closedForGoodReason(4014, true);
+        assertTrue(both, both.contains("Message Content"));
+        assertTrue(both, both.contains("Server Members and Presence"));
+        assertTrue(DiscordGatewayClient.closedForGoodReason(4004, false).contains("token"));
+    }
+
     @Test
     public void anyOtherCloseIsFollowedByAReconnect() {
         int[] others = {1000, 1006, 4000, 4001, 4007, 4008, 4009};

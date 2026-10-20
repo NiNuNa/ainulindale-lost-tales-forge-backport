@@ -14,8 +14,11 @@ public enum ELostTalesAchievement {
         this.achievement = achievement;
     }
 
+    /**
+     * Builds every achievement: calling this loads the enum, and LOTR's
+     * achievement constructor adds each to its category.
+     */
     public static void initAndRegisterAchievements() {
-        for (ELostTalesAchievement a : ELostTalesAchievement.values()) {}
     }
 
     public LOTRAchievement getAchievement() {

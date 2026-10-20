@@ -1,0 +1,7 @@
+{
+  "id": "losttales:a_foe_of_note",
+  "category": "foes",
+  "icon": "minecraft:name_tag",
+  "kind": "kill",
+  "named": true
+}

@@ -1,0 +1,10 @@
+{
+  "id": "losttales:skeletons",
+  "kind": "kill",
+  "entity": "Skeleton",
+  "count": [3, 6],
+  "experience": 12,
+  "titles": ["trouble_on_the_road", "dangerous_work", "clear_the_paths"],
+  "issuers": ["local_watch", "road_warden", "village_reeve", "caravan_master", "quartermaster"],
+  "flavours": ["shapes_beyond_firelight", "roads_open", "steady_blade"]
+}

@@ -54,15 +54,25 @@ public final class LostTalesQuestObjectiveSelectionTest {
                 .getProgressibleObjectives(quest, skipped)));
     }
 
+    /**
+     * The stage is the one its id names, wherever the saved position
+     * points; a stage gone from the file stands nowhere and nothing counts
+     * (MOD-10).
+     */
     @Test
-    public void stageIdWinsAndAnUnknownStageFallsBackWithinBounds() {
+    public void stageIdWinsAndAnUnknownStageStandsNowhere() {
         LostTalesQuestDefinition quest = quest(objective("a", false),
                 objective("b", true), objective("c", false),
                 objective("d", true));
         assertEquals(0, LostTalesQuestObjectiveSelection
                 .getCurrentStageIndex(quest, progressAt(quest, 1, "first")));
-        assertEquals(1, LostTalesQuestObjectiveSelection
-                .getCurrentStageIndex(quest, progressAt(quest, 99, "unknown")));
+        LostTalesQuestProgress gone = progressAt(quest, 1, "unknown");
+        assertEquals(-1, LostTalesQuestObjectiveSelection
+                .getCurrentStageIndex(quest, gone));
+        assertEquals(null, LostTalesQuestObjectiveSelection
+                .getCurrentStage(quest, gone));
+        assertTrue(LostTalesQuestObjectiveSelection
+                .getProgressibleObjectives(quest, gone).isEmpty());
     }
 
     /** The quest at that stage, with no objective progress, no start and no deadline. */
@@ -78,19 +88,16 @@ public final class LostTalesQuestObjectiveSelectionTest {
             LostTalesQuestObjectiveDefinition secondRequired,
             LostTalesQuestObjectiveDefinition secondOptional) {
         return new LostTalesQuestDefinition("losttales:selection", "Quest",
-                "Description", false,
+                "Description", false, false,
                 LostTalesQuestDefinition.START_MODE_LOCKED,
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
+                null, null, null, null, null, null, null,
                 Arrays.asList(
                         new LostTalesQuestStageDefinition("first",
                                 Arrays.asList(firstRequired, firstOptional)),
                         new LostTalesQuestStageDefinition("second",
                                 Arrays.asList(secondRequired,
-                                        secondOptional))));
+                                        secondOptional))),
+                false, null, null);
     }
 
     private static LostTalesQuestObjectiveDefinition objective(String id,

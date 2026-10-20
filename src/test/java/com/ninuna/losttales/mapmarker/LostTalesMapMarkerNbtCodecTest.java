@@ -177,31 +177,175 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 reread.getRecords().get(marker.getId()).getId()));
     }
 
+    /** Data of an older version is never repaired: it is kept as it is, and the store reads only. */
     @Test
-    public void versionThreeRecordDefaultsPriorityToZero() {
-        LostTalesMapMarkerRecord marker = LostTalesMapMarkerRecord.builder(
-                "losttales:legacy", LostTalesMapMarkerSource.CUSTOM_PRESET)
-                .name("Legacy")
-                .position(100, 1.0D, 64.0D, 2.0D)
-                .visibility(LostTalesMapMarkerVisibility.PUBLIC)
-                .build();
+    public void olderRootVersionIsPreservedReadOnly() {
         NBTTagCompound encoded = new NBTTagCompound();
         LostTalesMapMarkerNbtCodec.write(encoded,
-                Collections.singleton(marker),
+                Collections.singleton(preset("losttales:older")),
                 Collections.<NBTTagCompound>emptyList());
-        encoded.setInteger("DataVersion", 3);
-        NBTTagCompound stored = encoded.getTagList(
-                "Markers", Constants.NBT.TAG_COMPOUND)
-                .getCompoundTagAt(0);
-        stored.setInteger("DataVersion", 3);
-        stored.removeTag("Priority");
+        encoded.setInteger("DataVersion",
+                LostTalesMapMarkerNbtCodec.CURRENT_DATA_VERSION - 1);
 
         LostTalesMapMarkerNbtCodec.ReadResult result =
                 LostTalesMapMarkerNbtCodec.read(encoded);
 
-        assertTrue(result.wasRepaired());
-        assertEquals(0, result.getRecords().get(marker.getId())
-                .getPriority());
+        assertTrue(result.isReadOnly());
+        assertEquals(LostTalesMapMarkerNbtCodec.CURRENT_DATA_VERSION - 1,
+                result.getUnsupportedVersion());
+        assertTrue(result.getRecords().isEmpty());
+        assertNotNull(result.getOriginalCopy());
+
+        NBTTagCompound unversioned = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(unversioned,
+                Collections.singleton(preset("losttales:unversioned")),
+                Collections.<NBTTagCompound>emptyList());
+        unversioned.removeTag("DataVersion");
+        assertTrue(LostTalesMapMarkerNbtCodec.read(unversioned).isReadOnly());
+
+        NBTTagCompound listless = new NBTTagCompound();
+        listless.setInteger("DataVersion",
+                LostTalesMapMarkerNbtCodec.CURRENT_DATA_VERSION);
+        assertTrue("a store without its lists reads only",
+                LostTalesMapMarkerNbtCodec.read(listless).isReadOnly());
+    }
+
+    /**
+     * A record of another version, one missing a key the writer writes,
+     * one naming a value no record holds, or one with a broken share is
+     * quarantined whole; the others load.
+     */
+    @Test
+    public void aRecordOfAnotherShapeIsQuarantinedWhole() {
+        String[] breakages = {"version", "priority", "source", "share",
+                "saved_missing", "saved_unknown", "saved_twice",
+                "saved_not_names"};
+        for (String breakage : breakages) {
+            NBTTagCompound encoded = new NBTTagCompound();
+            LostTalesMapMarkerNbtCodec.write(encoded, java.util.Arrays.asList(
+                    preset("losttales:broken"), preset("losttales:whole")),
+                    Collections.<NBTTagCompound>emptyList());
+            NBTTagCompound broken = encoded.getTagList(
+                    "Markers", Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
+            if ("version".equals(breakage)) {
+                broken.setInteger("DataVersion",
+                        LostTalesMapMarkerNbtCodec.CURRENT_DATA_VERSION - 1);
+            } else if ("priority".equals(breakage)) {
+                broken.removeTag("Priority");
+            } else if ("source".equals(breakage)) {
+                broken.setString("Source", "account_placed");
+            } else if ("saved_missing".equals(breakage)) {
+                broken.removeTag(LostTalesMapMarkerNbtCodec.SAVED_SETTINGS);
+            } else if ("saved_unknown".equals(breakage)) {
+                broken.setTag(LostTalesMapMarkerNbtCodec.SAVED_SETTINGS,
+                        names("name", "nickname"));
+            } else if ("saved_twice".equals(breakage)) {
+                broken.setTag(LostTalesMapMarkerNbtCodec.SAVED_SETTINGS,
+                        names("icon", "icon"));
+            } else if ("saved_not_names".equals(breakage)) {
+                NBTTagList compounds = new NBTTagList();
+                compounds.appendTag(new NBTTagCompound());
+                broken.setTag(LostTalesMapMarkerNbtCodec.SAVED_SETTINGS,
+                        compounds);
+            } else {
+                NBTTagList shares = new NBTTagList();
+                shares.appendTag(new NBTTagCompound());
+                broken.setTag("SharedCharacters", shares);
+            }
+
+            LostTalesMapMarkerNbtCodec.ReadResult result =
+                    LostTalesMapMarkerNbtCodec.read(encoded);
+
+            assertFalse(breakage, result.isReadOnly());
+            assertTrue(breakage, result.wasRepaired());
+            assertEquals(breakage, java.util.Collections.singleton(
+                    "losttales:whole"), result.getRecords().keySet());
+            assertEquals(breakage, 1, result.getQuarantineCopy().size());
+            assertTrue(breakage, result.getQuarantineCopy().get(0).hasKey(
+                    "OriginalData", Constants.NBT.TAG_COMPOUND));
+        }
+    }
+
+    /** The generation state is saved; no message travels with it. */
+    @Test
+    public void noGenerationMessageIsSaved() {
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(encoded,
+                Collections.singleton(preset("losttales:state")),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagCompound stored = encoded.getTagList(
+                "Markers", Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
+        assertTrue(stored.hasKey("GenerationState"));
+        assertFalse(stored.hasKey("GenerationMessage"));
+    }
+
+    /** The store reads every record, however many there are (WAY-12). */
+    @Test
+    public void everyRecordIsReadWithNoCap() {
+        java.util.List<LostTalesMapMarkerRecord> many =
+                new java.util.ArrayList<LostTalesMapMarkerRecord>();
+        for (int index = 0; index < 20000; index++) {
+            many.add(preset("losttales:many/" + index));
+        }
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(encoded, many,
+                Collections.<NBTTagCompound>emptyList());
+
+        LostTalesMapMarkerNbtCodec.ReadResult result =
+                LostTalesMapMarkerNbtCodec.read(encoded);
+
+        assertFalse(result.isReadOnly());
+        assertFalse(result.wasRepaired());
+        assertEquals(20000, result.getRecords().size());
+        assertTrue(result.getRecords().containsKey("losttales:many/19999"));
+        assertTrue(result.getQuarantineCopy().isEmpty());
+    }
+
+    /** The settings saved on a marker's page are kept by name (WAY-16). */
+    @Test
+    public void savedSettingsRoundTrip() {
+        LostTalesMapMarkerRecord marker = preset("losttales:saved").toBuilder()
+                .savedSettings(java.util.EnumSet.of(
+                        LostTalesMapMarkerSetting.NAME,
+                        LostTalesMapMarkerSetting.ACCESS))
+                .build();
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(encoded,
+                java.util.Arrays.asList(marker, preset("losttales:plain")),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagList names = encoded.getTagList("Markers",
+                Constants.NBT.TAG_COMPOUND).getCompoundTagAt(1)
+                .getTagList(LostTalesMapMarkerNbtCodec.SAVED_SETTINGS,
+                        Constants.NBT.TAG_STRING);
+        assertEquals("name", names.getStringTagAt(0));
+        assertEquals("access", names.getStringTagAt(1));
+
+        LostTalesMapMarkerNbtCodec.ReadResult result =
+                LostTalesMapMarkerNbtCodec.read(encoded);
+
+        assertEquals(java.util.EnumSet.of(LostTalesMapMarkerSetting.NAME,
+                        LostTalesMapMarkerSetting.ACCESS),
+                result.getRecords().get("losttales:saved").getSavedSettings());
+        assertTrue(result.getRecords().get("losttales:plain")
+                .getSavedSettings().isEmpty());
+        assertFalse(result.wasRepaired());
+    }
+
+    private static NBTTagList names(String... names) {
+        NBTTagList list = new NBTTagList();
+        for (String name : names) {
+            list.appendTag(new net.minecraft.nbt.NBTTagString(name));
+        }
+        return list;
+    }
+
+    private static LostTalesMapMarkerRecord preset(String id) {
+        return LostTalesMapMarkerRecord.builder(
+                id, LostTalesMapMarkerSource.CUSTOM_PRESET)
+                .name("Preset")
+                .position(100, 1.0D, 64.0D, 2.0D)
+                .visibility(LostTalesMapMarkerVisibility.PUBLIC)
+                .build();
     }
 
     @Test

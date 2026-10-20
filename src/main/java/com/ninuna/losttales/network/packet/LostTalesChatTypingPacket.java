@@ -1,7 +1,6 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
@@ -162,10 +161,6 @@ public final class LostTalesChatTypingPacket implements IMessage {
     }
     /** The whisper's account name, or a fellowship line's fellowship id; empty otherwise. */
     public String getTarget() { return this.target; }
-    /** The fellowship a fellowship line is typed for; null for every other line. */
-    public UUID getFellowshipId() {
-        return getChannel() == ChatChannel.FELLOWSHIP ? ChatFellowship.idOf(this.target) : null;
-    }
     public String getTargetIdentity() { return this.targetIdentity; }
     public UUID getTargetCharacterId() { return this.targetCharacterId; }
     public boolean isTyping() { return this.typing; }

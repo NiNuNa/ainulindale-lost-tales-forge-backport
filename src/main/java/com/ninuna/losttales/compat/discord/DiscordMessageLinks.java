@@ -1,6 +1,7 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.server.ChatHistory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -33,14 +34,14 @@ import java.util.Map;
  *
  * <p>Only lines of bridgeable channels are ever linked, so a Discord id
  * can never lead to a line from a private one. Bounded to the newest
- * {@link #MAX_LINKS} messages — the same order of reach the chat's own
- * {@link com.ninuna.losttales.chat.server.ChatHistory} has. The links
+ * {@link #MAX_LINKS} messages, as many as the chat's own
+ * {@link ChatHistory} keeps. The links
  * belong to the world, like the history they index into: a bridge that
  * stops or reloads keeps them, and the world save keeps them across a
  * restart through {@link DiscordMessageLinkWorldData}, without their
- * webhooks — a copy brought back names the binding it went through, and
- * the bridge finds its webhook again among the bindings of its
- * message's channel. What may be done with a copy at all is
+ * webhooks — a copy brought back names its Discord channel and the
+ * binding it went through, and the bridge finds its webhook again among
+ * the bindings of its message's channel. What may be done with a copy at all is
  * {@link DiscordCopyLiveness}'s to say; a link is never dropped because
  * its pair is unbound. Written from the server thread
  * (inbound) and the bridge's worker (outbound), so every touch is
@@ -49,7 +50,7 @@ import java.util.Map;
  */
 final class DiscordMessageLinks {
     /** Messages remembered, as many as the history keeps in all; past it the oldest message's copies go first. */
-    static final int MAX_LINKS = 2000;
+    static final int MAX_LINKS = ChatHistory.MAX_TOTAL;
 
     private final LinkedHashMap<Long, List<Copy>> copiesByMessage =
             new LinkedHashMap<Long, List<Copy>>();
@@ -62,10 +63,9 @@ final class DiscordMessageLinks {
     static final class Copy {
         final String discordId;
         /**
-         * The Discord channel the copy is in ({@code channel:<id>}). For
-         * a post whose channel Discord never named: the webhook it went
-         * through, or, brought back from the save, the binding it went
-         * through ({@code binding:<id>}).
+         * The Discord channel the copy is in ({@code channel:<id>}); for a
+         * post made through no binding the bridge holds, the webhook it
+         * went through, which the save leaves out.
          */
         final String destination;
         /**
@@ -250,19 +250,16 @@ final class DiscordMessageLinks {
 
     /**
      * Every message held, oldest first, as the save writes it, with the
-     * revision it is as of. A copy is written with its channel. A post
-     * whose channel Discord never named has no other name than its
-     * webhook's URL, so it is written under its binding instead, and one
-     * with no binding either is left out. No webhook URL is part of it.
+     * revision it is as of. A copy is written with its channel; one known
+     * by its webhook alone is left out. No webhook URL is part of it.
      */
     synchronized Snapshot snapshot() {
         List<SavedLink> saved = new ArrayList<SavedLink>(this.copiesByMessage.size());
         for (Map.Entry<Long, List<Copy>> entry : this.copiesByMessage.entrySet()) {
             List<SavedCopy> copies = new ArrayList<SavedCopy>(entry.getValue().size());
             for (Copy copy : entry.getValue()) {
-                String destination = savedDestinationOf(copy);
-                if (destination.length() > 0) {
-                    copies.add(new SavedCopy(copy.discordId, destination,
+                if (copy.destination.startsWith(DiscordMessageLinkNbtCodec.CHANNEL_PREFIX)) {
+                    copies.add(new SavedCopy(copy.discordId, copy.destination,
                             copy.bindingId, copy.header));
                 }
             }
@@ -271,16 +268,6 @@ final class DiscordMessageLinks {
             }
         }
         return new Snapshot(saved, this.revision);
-    }
-
-    /** How a copy's destination is saved; empty for one that cannot be. */
-    private static String savedDestinationOf(Copy copy) {
-        if (copy.destination.startsWith(DiscordMessageLinkNbtCodec.CHANNEL_PREFIX)
-                || copy.destination.startsWith(DiscordMessageLinkNbtCodec.BINDING_PREFIX)) {
-            return copy.destination;
-        }
-        return copy.bindingId.length() == 0 ? ""
-                : DiscordMessageLinkNbtCodec.BINDING_PREFIX + copy.bindingId;
     }
 
     /**

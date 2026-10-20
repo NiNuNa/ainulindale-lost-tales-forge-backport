@@ -55,9 +55,13 @@ public final class FellowshipMirrors {
 
     private FellowshipMirrors() {}
 
-    /** Forgets that the mirrors were set right, as the server starts or stops. */
+    /**
+     * Forgets that the mirrors were set right, and which are held for the
+     * record only, as the server starts or stops.
+     */
     public static synchronized void clear() {
         settled = false;
+        LotrFellowshipMirror.clear();
     }
 
     /** Sets every mirror right once LOTR has read its data after the server starts. */

@@ -34,7 +34,6 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_RECORDS = "Records";
-    private static final String TAG_QUARANTINE = "Quarantine";
     private static final String TAG_LORE_CHARACTER_ID = "LoreCharacterId";
     private static final String TAG_CHARACTER_UUID = "CharacterUUID";
     private static final String TAG_OWNER_UUID = "OwnerUUID";
@@ -47,8 +46,6 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             new LinkedHashMap<String, LoreCharacterOwnershipRecord>();
     private final Map<UUID, LoreCharacterOwnershipRecord> recordsByCharacterId =
             new LinkedHashMap<UUID, LoreCharacterOwnershipRecord>();
-    private final List<NBTTagCompound> quarantinedEntries =
-            new ArrayList<NBTTagCompound>();
     private boolean readOnly;
     private String readOnlyReason = "";
     private NBTTagCompound preservedData;
@@ -65,36 +62,23 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             return;
         }
         if (!compound.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)) {
-            failReadOnly(compound, "missing_data_version", compound);
+            failReadOnly(compound, "missing_data_version");
             return;
         }
         int version = compound.getInteger(TAG_DATA_VERSION);
         if (version != CURRENT_DATA_VERSION) {
-            failReadOnly(compound, "unsupported_data_version", compound);
+            failReadOnly(compound, "unsupported_data_version");
             return;
         }
         if (!compound.hasKey(TAG_RECORDS, Constants.NBT.TAG_LIST)) {
-            failReadOnly(compound, "missing_or_invalid_records", compound);
+            failReadOnly(compound, "missing_or_invalid_records");
             return;
-        }
-        if (compound.hasKey(TAG_QUARANTINE)
-                && !compound.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_LIST)) {
-            failReadOnly(compound, "invalid_quarantine", compound);
-            return;
-        }
-        if (compound.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_LIST)) {
-            NBTTagList quarantine = compound.getTagList(
-                    TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND);
-            for (int index = 0; index < quarantine.tagCount(); index++) {
-                this.quarantinedEntries.add((NBTTagCompound)
-                        quarantine.getCompoundTagAt(index).copy());
-            }
         }
 
         NBTTagList records = compound.getTagList(
                 TAG_RECORDS, Constants.NBT.TAG_COMPOUND);
         if (records.tagCount() > MAX_RECORDS) {
-            failReadOnly(compound, "record_limit_exceeded", compound);
+            failReadOnly(compound, "record_limit_exceeded");
             return;
         }
         for (int index = 0; index < records.tagCount(); index++) {
@@ -103,17 +87,17 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             try {
                 record = readRecord(raw);
             } catch (RuntimeException exception) {
-                failReadOnly(compound, "malformed_record_" + index, raw);
+                failReadOnly(compound, "malformed_record_" + index);
                 LostTalesLog.warning("Lore-character ownership record %d is malformed; storage is read-only: %s",
                         Integer.valueOf(index), exception.toString());
                 return;
             }
             if (this.recordsByLoreId.containsKey(record.getLoreCharacterId())) {
-                failReadOnly(compound, "duplicate_lore_character_id", raw);
+                failReadOnly(compound, "duplicate_lore_character_id");
                 return;
             }
             if (this.recordsByCharacterId.containsKey(record.getCharacterId())) {
-                failReadOnly(compound, "duplicate_character_uuid", raw);
+                failReadOnly(compound, "duplicate_character_uuid");
                 return;
             }
             this.recordsByLoreId.put(record.getLoreCharacterId(), record);
@@ -145,12 +129,6 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             recordList.appendTag(writeRecord(record));
         }
         compound.setTag(TAG_RECORDS, recordList);
-
-        NBTTagList quarantine = new NBTTagList();
-        for (NBTTagCompound entry : this.quarantinedEntries) {
-            quarantine.appendTag(entry.copy());
-        }
-        compound.setTag(TAG_QUARANTINE, quarantine);
     }
 
     public synchronized boolean isReadOnly() {
@@ -343,25 +321,19 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
     private void reset() {
         this.recordsByLoreId.clear();
         this.recordsByCharacterId.clear();
-        this.quarantinedEntries.clear();
         this.readOnly = false;
         this.readOnlyReason = "";
         this.preservedData = null;
     }
 
-    private void failReadOnly(NBTTagCompound source, String reason,
-                              NBTTagCompound malformedEntry) {
+    /** The whole store as it was read is kept and written back unchanged; nothing in it is used. */
+    private void failReadOnly(NBTTagCompound source, String reason) {
         this.recordsByLoreId.clear();
         this.recordsByCharacterId.clear();
         this.readOnly = true;
         this.readOnlyReason = reason == null ? "unknown" : reason;
         this.preservedData = source == null
                 ? new NBTTagCompound() : (NBTTagCompound) source.copy();
-        NBTTagCompound quarantine = new NBTTagCompound();
-        quarantine.setString("Reason", this.readOnlyReason);
-        quarantine.setTag("OriginalData", malformedEntry == null
-                ? new NBTTagCompound() : malformedEntry.copy());
-        this.quarantinedEntries.add(quarantine);
         LostTalesLog.warning("Lore-character ownership storage is read-only: %s",
                 this.readOnlyReason);
     }

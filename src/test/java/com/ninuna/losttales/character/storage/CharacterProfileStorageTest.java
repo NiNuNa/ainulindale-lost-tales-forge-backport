@@ -15,13 +15,14 @@ import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * A character's profile is kept with its record: every part round-trips,
- * a record without one reads as saying nothing, and a part that is no
- * longer valid as stored is read as empty — a glance that no longer is
- * one, or one past the fifth, is left out. Each About text is held to its
- * own length.
+ * each About text held to its own length. A record without a profile, or
+ * with a part not as it is written (a text past its length, a glance that
+ * is none, one past the fifth), is refused whole, never emptied.
  */
 public final class CharacterProfileStorageTest {
 
@@ -54,26 +55,39 @@ public final class CharacterProfileStorageTest {
     }
 
     @Test
-    public void aRecordWithoutAProfileSaysNothing() {
+    public void aRecordWithoutAProfileIsRefused() {
         NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
                 character(profile()));
         record.removeTag("Profile");
-        RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(
-                record, OWNER);
-        assertNotNull(loaded);
-        assertEquals(CharacterProfile.EMPTY, loaded.getProfile());
+        assertRefused(record, "missing_profile");
+    }
+
+    /** About text past its length is not emptied and saved over: the record is refused whole. */
+    @Test
+    public void anAboutTextPastItsLengthIsRefused() {
+        NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
+                character(profile()));
+        record.getCompoundTag("Profile").setString("Personality", repeat(
+                CharacterProfile.Section.PERSONALITY.getMaxLength() + 1));
+        assertRefused(record, "invalid_profile");
     }
 
     @Test
-    public void aPartNoLongerValidIsReadAsEmpty() {
+    public void aGlanceThatIsNoneIsRefused() {
         NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
                 character(profile()));
-        NBTTagCompound stored = record.getCompoundTag("Profile");
-        stored.setString("Personality", repeat(
-                CharacterProfile.Section.PERSONALITY.getMaxLength() + 1));
-        NBTTagList glances = stored.getTagList("Glances",
-                Constants.NBT.TAG_COMPOUND);
-        glances.getCompoundTagAt(0).setString("Emoji", "not_an_emoji");
+        record.getCompoundTag("Profile").getTagList("Glances",
+                Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0)
+                .setString("Emoji", "not_an_emoji");
+        assertRefused(record, "invalid_profile");
+    }
+
+    @Test
+    public void aGlancePastTheFifthIsRefused() {
+        NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
+                character(profile()));
+        NBTTagList glances = record.getCompoundTag("Profile").getTagList(
+                "Glances", Constants.NBT.TAG_COMPOUND);
         for (int index = 0; index < CharacterProfile.MAX_GLANCES; index++) {
             NBTTagCompound extra = new NBTTagCompound();
             extra.setString("Emoji", "smiley");
@@ -81,16 +95,7 @@ public final class CharacterProfileStorageTest {
             extra.setString("Line", "");
             glances.appendTag(extra);
         }
-
-        RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(
-                record, OWNER);
-        assertNotNull(loaded);
-        CharacterProfile read = loaded.getProfile();
-        assertEquals("", read.section(CharacterProfile.Section.PERSONALITY));
-        assertEquals("Tall, grey.",
-                read.section(CharacterProfile.Section.APPEARANCE));
-        assertEquals(CharacterProfile.MAX_GLANCES, read.glances().size());
-        assertEquals("Scarred", read.glances().get(0).getTitle());
+        assertRefused(record, "invalid_profile");
     }
 
     @Test
@@ -106,17 +111,19 @@ public final class CharacterProfileStorageTest {
 
         NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
                 character(profile()));
-        NBTTagCompound stored = record.getCompoundTag("Profile");
-        stored.setString("History", history + "a");
-        stored.setString("Appearance", repeat(
+        record.getCompoundTag("Profile").setString("Appearance", repeat(
                 CharacterProfile.Section.APPEARANCE.getMaxLength() + 1));
-        CharacterProfile read = CharacterNbtCodec.readCharacterRecord(
-                record, OWNER).getProfile();
-        assertEquals("", read.section(CharacterProfile.Section.HISTORY));
-        assertEquals("an Appearance is not as long as a History", "",
-                read.section(CharacterProfile.Section.APPEARANCE));
-        assertEquals("Patient.",
-                read.section(CharacterProfile.Section.PERSONALITY));
+        assertRefused(record, "invalid_profile");
+    }
+
+    private static void assertRefused(NBTTagCompound record, String reason) {
+        try {
+            CharacterNbtCodec.readCharacterRecord(record, OWNER);
+            fail("a record not as written is refused");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(),
+                    expected.getMessage().contains(reason));
+        }
     }
 
     private static String repeat(int count) {

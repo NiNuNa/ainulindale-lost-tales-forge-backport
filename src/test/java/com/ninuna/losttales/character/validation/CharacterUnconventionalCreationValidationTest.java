@@ -138,7 +138,7 @@ public final class CharacterUnconventionalCreationValidationTest {
                 "",
                 "",
                 true,
-                0);
+                "");
     }
 
     private static String humanSkin() {

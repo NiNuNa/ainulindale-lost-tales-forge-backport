@@ -5,167 +5,91 @@ import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.LostTalesItemMissiveLetter;
 import com.ninuna.losttales.quest.LostTalesQuestParams;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 
 /**
- * Writes a missive board's notices: kill-or-gather tasks built from the
+ * Writes a missive board's notices from the templates the server loaded
+ * ({@link MissiveTemplates}, QUEST-42): a kill or a gather built from the
  * objective types and selectors the quest runtime already handles. A
- * notice is written as template ids and a target, never as sentences
- * ({@link MissiveWords}), so each player reads it in their own language.
+ * bundled template's notice is written as template ids and a target, never
+ * as sentences ({@link MissiveWords}), so each player reads it in their
+ * own language; a server's template's notice carries its title, issuer and
+ * flavour as written.
  */
 public final class LostTalesMissiveGenerator {
-    /** Which generator wrote a letter, kept in its context. */
-    private static final String GENERATOR_VERSION = "2";
     private static final long ONE_INGAME_DAY_TICKS = 24000L;
-
-    /** Who writes the notices, as template ids ({@code missive.losttales.issuer.*}). */
-    private static final String[] ISSUERS = new String[] {
-            "local_watch", "road_warden", "village_reeve", "caravan_master",
-            "quartermaster"
-    };
-    private static final String[] KILL_TITLES = new String[] {
-            "trouble_on_the_road", "dangerous_work", "clear_the_paths"
-    };
-    private static final String[] KILL_FLAVORS = new String[] {
-            "shapes_beyond_firelight", "roads_open", "steady_blade"
-    };
-    private static final String[] GATHER_TITLES = new String[] {
-            "materials_wanted", "gatherers_pay", "stores_run_low"
-    };
-    private static final String[] GATHER_FLAVORS = new String[] {
-            "small_stores", "plain_notice", "useful_materials"
-    };
-
-    private static final KillTemplate[] KILL_TEMPLATES = new KillTemplate[] {
-            new KillTemplate("enemy", true, 4, 8, 12),
-            new KillTemplate("Zombie", false, 3, 7, 10),
-            new KillTemplate("Skeleton", false, 3, 6, 12),
-            new KillTemplate("Spider", false, 3, 6, 12),
-            new KillTemplate("Creeper", false, 2, 4, 18)
-    };
-
-    private static final GatherTemplate[] GATHER_TEMPLATES = new GatherTemplate[] {
-            new GatherTemplate("minecraft:coal", 8, 18, 3),
-            new GatherTemplate("minecraft:iron_ingot", 4, 10, 6),
-            new GatherTemplate("minecraft:gold_ingot", 2, 6, 10),
-            new GatherTemplate("minecraft:wheat", 8, 18, 3),
-            new GatherTemplate("minecraft:leather", 3, 8, 6),
-            new GatherTemplate("minecraft:string", 4, 10, 5),
-            new GatherTemplate("minecraft:bone", 4, 10, 5),
-            new GatherTemplate("minecraft:log", 8, 20, 2)
-    };
 
     private LostTalesMissiveGenerator() {}
 
-    /** A new notice for a board, sealed by the world. */
+    /** A new notice for a board, sealed by the world; null where no template is loaded or the missive is not valid. */
     public static ItemStack createRandomMissiveLetter(World world, String boardKey, long worldTime, int sequence, Random random) {
         LostTalesMissiveData missive = createRandomMissive(world, boardKey, worldTime, sequence, random);
-        ItemStack letter = createMissiveLetter(missive);
-        if (letter != null) {
-            MissiveSeals.seal(world, letter);
-        }
-        return letter;
-    }
-
-    public static ItemStack createMissiveLetter(LostTalesMissiveData missive) {
         if (missive == null || !missive.isValid()) {
             return null;
         }
-
-        Item item = ELostTalesItem.MISSIVE_LETTER.getItem();
-        if (item instanceof LostTalesItemMissiveLetter) {
-            return ((LostTalesItemMissiveLetter) item).createStack(missive);
-        }
-
-        ItemStack stack = new ItemStack(item);
-        LostTalesMissiveNbt.writeToItemStack(stack, missive);
-        return stack;
+        ItemStack letter = ((LostTalesItemMissiveLetter) ELostTalesItem.MISSIVE_LETTER
+                .getItem()).createStack(missive);
+        MissiveSeals.seal(world, letter);
+        return letter;
     }
 
+    /** A notice from a template the server loaded, picked by chance; null where there is none. */
     public static LostTalesMissiveData createRandomMissive(World world, String boardKey, long worldTime, int sequence, Random random) {
         Random safeRandom = random == null ? new Random() : random;
-        int choice = safeRandom.nextInt(2);
-        if (choice == 0) {
-            return createKillMissive(world, boardKey, worldTime, sequence, safeRandom);
-        }
-        return createGatherMissive(world, boardKey, worldTime, sequence, safeRandom);
+        MissiveTemplate template = MissiveTemplates.pick(safeRandom);
+        return template == null ? null
+                : createMissive(template, world, boardKey, worldTime, sequence, safeRandom);
     }
 
-    private static LostTalesMissiveData createKillMissive(World world, String boardKey, long worldTime, int sequence, Random random) {
-        KillTemplate template = KILL_TEMPLATES[random.nextInt(KILL_TEMPLATES.length)];
-        int count = randomBetween(random, template.minCount, template.maxCount);
-        int xp = count * template.xpPerTarget + randomBetween(random, 8, 24);
-        String issuer = randomIssuer(random);
+    /**
+     * A notice from {@code template}: a count between its least and its
+     * most, the experience it pays for each and a little more by chance,
+     * LOTR coins, a title, an issuer and a flavour line of its words, and
+     * maybe a time limit.
+     */
+    public static LostTalesMissiveData createMissive(MissiveTemplate template, World world,
+                                                     String boardKey, long worldTime,
+                                                     int sequence, Random random) {
+        boolean kill = template.isKill();
+        int count = randomBetween(random, template.getLeastCount(), template.getMostCount());
+        int xp = count * template.getExperience()
+                + (kill ? randomBetween(random, 8, 24) : randomBetween(random, 6, 18));
+        String issuer = randomWord(random, template.getIssuers());
         String questId = LostTalesMissiveData.createQuestId(boardKey, worldTime, sequence);
 
         Map<String, String> params = new LinkedHashMap<String, String>();
-        if (template.groupSelector) {
-            params.put("group", template.selector);
-        } else {
-            params.put("entity", template.selector);
-        }
+        params.put(template.getTargetParam(), template.getTarget());
         params.put("count", String.valueOf(count));
+        if (!kill) {
+            // A notice's gathering is handed over, so one stack pays one notice.
+            params.put(LostTalesQuestParams.TAKE, "true");
+        }
 
         LostTalesMissiveObjectiveData objective = new LostTalesMissiveObjectiveData(
-                "kill_" + normalizeId(template.selector),
-                LostTalesMissiveObjectiveData.TYPE_KILL,
+                template.getKind() + "_" + normalizeId(template.getTarget()),
+                template.getKind(),
                 false,
                 params
         );
 
-        return LostTalesMissiveData.builder(questId, LostTalesMissiveObjectiveData.TYPE_KILL)
-                .titleId(randomChoice(random, KILL_TITLES))
-                .descriptionId(LostTalesMissiveObjectiveData.TYPE_KILL)
+        return LostTalesMissiveData.builder(questId, template.getKind())
+                .written(template.isWritten())
+                .titleId(randomWord(random, template.getTitles()))
+                .descriptionId(template.getKind())
                 .issuerId(issuer)
-                .flavorId(randomChoice(random, KILL_FLAVORS))
-                .target(template.selector)
+                .flavorId(randomWord(random, template.getFlavours()))
+                .target(template.getTarget())
                 .generationWorldTime(worldTime)
                 .timeLimitTicks(randomTimeLimitTicks(random))
-                .context("generator", GENERATOR_VERSION)
                 .context("board", safeBoardKey(boardKey))
                 .context("dimension", String.valueOf(getDimensionId(world)))
                 .objective(objective)
-                .rewardData(LostTalesMissiveRewardData.experienceAndCoins(xp, coinsForDifficulty(random, count)))
-                .build();
-    }
-
-    private static LostTalesMissiveData createGatherMissive(World world, String boardKey, long worldTime, int sequence, Random random) {
-        GatherTemplate template = GATHER_TEMPLATES[random.nextInt(GATHER_TEMPLATES.length)];
-        int count = randomBetween(random, template.minCount, template.maxCount);
-        int xp = count * template.xpPerItem + randomBetween(random, 6, 18);
-        String issuer = randomIssuer(random);
-        String questId = LostTalesMissiveData.createQuestId(boardKey, worldTime, sequence);
-
-        Map<String, String> params = new LinkedHashMap<String, String>();
-        params.put("item", template.itemId);
-        params.put("count", String.valueOf(count));
-        // A notice's gathering is handed over, so one stack pays one notice.
-        params.put(LostTalesQuestParams.TAKE, "true");
-
-        LostTalesMissiveObjectiveData objective = new LostTalesMissiveObjectiveData(
-                "gather_" + normalizeId(template.itemId),
-                LostTalesMissiveObjectiveData.TYPE_GATHER,
-                false,
-                params
-        );
-
-        return LostTalesMissiveData.builder(questId, LostTalesMissiveObjectiveData.TYPE_GATHER)
-                .titleId(randomChoice(random, GATHER_TITLES))
-                .descriptionId(LostTalesMissiveObjectiveData.TYPE_GATHER)
-                .issuerId(issuer)
-                .flavorId(randomChoice(random, GATHER_FLAVORS))
-                .target(template.itemId)
-                .generationWorldTime(worldTime)
-                .timeLimitTicks(randomTimeLimitTicks(random))
-                .context("generator", GENERATOR_VERSION)
-                .context("board", safeBoardKey(boardKey))
-                .context("dimension", String.valueOf(getDimensionId(world)))
-                .objective(objective)
-                .rewardData(LostTalesMissiveRewardData.experienceAndCoins(xp, coinsForDifficulty(random, Math.max(1, count / 2))))
+                .rewardData(LostTalesMissiveRewardData.experienceAndCoins(xp,
+                        coinsForDifficulty(random, kill ? count : Math.max(1, count / 2))))
                 .build();
     }
 
@@ -193,12 +117,9 @@ public final class LostTalesMissiveGenerator {
         return Math.max(1, difficulty) * 4 + randomBetween(random, 5, 15);
     }
 
-    private static String randomIssuer(Random random) {
-        return ISSUERS[random.nextInt(ISSUERS.length)];
-    }
-
-    private static String randomChoice(Random random, String[] choices) {
-        return choices[random.nextInt(choices.length)];
+    /** One of the words, by chance; empty where there are none. */
+    private static String randomWord(Random random, List<String> words) {
+        return words.isEmpty() ? "" : words.get(random.nextInt(words.size()));
     }
 
     private static int randomBetween(Random random, int min, int max) {
@@ -231,35 +152,5 @@ public final class LostTalesMissiveGenerator {
             builder.deleteCharAt(builder.length() - 1);
         }
         return builder.length() == 0 ? "objective" : builder.toString();
-    }
-
-    private static final class KillTemplate {
-        private final String selector;
-        private final boolean groupSelector;
-        private final int minCount;
-        private final int maxCount;
-        private final int xpPerTarget;
-
-        private KillTemplate(String selector, boolean groupSelector, int minCount, int maxCount, int xpPerTarget) {
-            this.selector = selector;
-            this.groupSelector = groupSelector;
-            this.minCount = minCount;
-            this.maxCount = maxCount;
-            this.xpPerTarget = xpPerTarget;
-        }
-    }
-
-    private static final class GatherTemplate {
-        private final String itemId;
-        private final int minCount;
-        private final int maxCount;
-        private final int xpPerItem;
-
-        private GatherTemplate(String itemId, int minCount, int maxCount, int xpPerItem) {
-            this.itemId = itemId;
-            this.minCount = minCount;
-            this.maxCount = maxCount;
-            this.xpPerItem = xpPerItem;
-        }
     }
 }

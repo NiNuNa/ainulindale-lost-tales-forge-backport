@@ -1,7 +1,10 @@
 package com.ninuna.losttales.gui.style;
 
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -147,6 +150,137 @@ public final class LostTalesUiFading {
                     boundRight, clipTop, clipBottom);
         }
     }
+
+    /**
+     * Whatever {@code painter} draws, cut to {@code clipLeft} to
+     * {@code clipRight} in the space the caller draws in — the matrix in
+     * force only scales and translates — and inside whatever cut already
+     * stands, thinning out into either edge over {@code depth} of that
+     * space as far as {@code leftStrength} and {@code rightStrength} say:
+     * each stretch at a fading edge one display pixel wide at falling
+     * opacity, as {@link #drawFading} cuts them. The cut in force is
+     * narrowed, never replaced, so a window's, a list's or a row's own cut
+     * still holds.
+     */
+    public static void drawFadingLocal(Minecraft minecraft, float clipLeft,
+                                       float clipRight, float depth,
+                                       float leftStrength, float rightStrength,
+                                       FadingPainter painter) {
+        if (minecraft == null || painter == null || !(clipRight > clipLeft)) {
+            return;
+        }
+        LOCAL_MATRIX.clear();
+        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, LOCAL_MATRIX);
+        float scaleX = LOCAL_MATRIX.get(0);
+        float shiftX = LOCAL_MATRIX.get(12);
+        if (!(scaleX > 0.0F)) {
+            return;
+        }
+        int factor = LostTalesDisplayPixels.scaleFactor();
+        int[] columns = fadeColumns(shiftX * (double)factor,
+                scaleX * (double)factor,
+                clipLeft, clipRight, depth, leftStrength > 0.0F,
+                rightStrength > 0.0F);
+        if (columns == null) {
+            return;
+        }
+        int boxLeft = 0;
+        int boxBottom = 0;
+        int boxRight = minecraft.displayWidth;
+        int boxTop = minecraft.displayHeight;
+        if (GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)) {
+            LOCAL_BOX.clear();
+            GL11.glGetInteger(GL11.GL_SCISSOR_BOX, LOCAL_BOX);
+            boxLeft = LOCAL_BOX.get(0);
+            boxBottom = LOCAL_BOX.get(1);
+            boxRight = boxLeft + LOCAL_BOX.get(2);
+            boxTop = boxBottom + LOCAL_BOX.get(3);
+        }
+        if (boxTop <= boxBottom || boxRight <= boxLeft) {
+            return;
+        }
+        int first = columns[0];
+        int end = columns[1];
+        int leftSlices = columns[2];
+        int rightSlices = columns[3];
+        GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
+        try {
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            paintColumns(painter, 1.0F, first + leftSlices, end - rightSlices,
+                    boxLeft, boxRight, boxBottom, boxTop);
+            for (int slice = 0; slice < leftSlices; slice++) {
+                paintColumns(painter, sliceShare(leftStrength, slice,
+                                leftSlices), first + slice, first + slice + 1,
+                        boxLeft, boxRight, boxBottom, boxTop);
+            }
+            for (int slice = 0; slice < rightSlices; slice++) {
+                int column = end - 1 - slice;
+                paintColumns(painter, sliceShare(rightStrength, slice,
+                                rightSlices), column, column + 1, boxLeft,
+                        boxRight, boxBottom, boxTop);
+            }
+        } finally {
+            GL11.glPopAttrib();
+        }
+    }
+
+    /**
+     * The display columns a local cut takes: its first, the one past its
+     * last, and how many of them fade at its left and at its right — each
+     * one display pixel, never more than the cut holds between them. The
+     * cut's edges round inward, so not a pixel of the words lands past
+     * its room. {@code shift} is the matrix's offset in display pixels and
+     * {@code perUnit} the display pixels to one unit of the caller's
+     * space; null when the cut takes no whole column.
+     */
+    static int[] fadeColumns(double shift, double perUnit, double clipLeft,
+                             double clipRight, float depth, boolean fadeLeft,
+                             boolean fadeRight) {
+        if (!(perUnit > 0.0D) || !(clipRight > clipLeft)) {
+            return null;
+        }
+        int first = (int)Math.ceil(shift + clipLeft * perUnit
+                - LostTalesDisplayPixels.TOLERANCE);
+        int end = (int)Math.floor(shift + clipRight * perUnit
+                + LostTalesDisplayPixels.TOLERANCE);
+        int whole = end - first;
+        if (whole <= 0) {
+            return null;
+        }
+        double zone = Math.max(0.0D, Math.min(depth,
+                (clipRight - clipLeft) / 2.0D)) * perUnit;
+        int leftSlices = fadeLeft ? (int)Math.round(zone) : 0;
+        int rightSlices = fadeRight ? (int)Math.round(zone) : 0;
+        leftSlices = Math.min(leftSlices, whole / 2);
+        rightSlices = Math.min(rightSlices, whole - leftSlices);
+        return new int[] {first, end, leftSlices, rightSlices};
+    }
+
+    /**
+     * A slice's opacity, read at its middle: {@code slice} 0 the one at
+     * the very edge, none there for what has fully gone past it, the
+     * whole at the zone's inner end.
+     */
+    static float sliceShare(float strength, int slice, int slices) {
+        return 1.0F - strength * (1.0F - (slice + 0.5F) / slices);
+    }
+
+    /** What the painter draws, cut to display columns {@code from} to {@code to} inside the box in force. */
+    private static void paintColumns(FadingPainter painter, float share,
+                                     int from, int to, int boxLeft,
+                                     int boxRight, int boxBottom, int boxTop) {
+        int left = Math.max(from, boxLeft);
+        int right = Math.min(to, boxRight);
+        if (right <= left || share <= 0.0F) {
+            return;
+        }
+        GL11.glScissor(left, boxBottom, right - left, boxTop - boxBottom);
+        painter.paint(share);
+    }
+
+    private static final FloatBuffer LOCAL_MATRIX =
+            BufferUtils.createFloatBuffer(16);
+    private static final IntBuffer LOCAL_BOX = BufferUtils.createIntBuffer(16);
 
     /**
      * What the painter draws, once, cut to one stretch of screen and at

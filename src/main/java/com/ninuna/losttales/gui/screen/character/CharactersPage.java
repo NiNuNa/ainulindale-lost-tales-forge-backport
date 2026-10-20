@@ -38,6 +38,7 @@ import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -224,16 +225,19 @@ public final class CharactersPage extends PageContent {
 
     /**
      * Opens another person's character on the Characters page, read only,
-     * in the roster's place, and brings the page forward; one of this
-     * player's own is picked in the roster instead.
+     * in the roster's place; one of this player's own is picked in the
+     * roster instead. The page comes forward first, and the copy it
+     * brings forward is the one that shows the visit.
      */
     public static void visit(Visit visit) {
-        CharactersPage page = current();
-        if (page == null || visit == null || visit.characterId == null) {
+        if (visit == null || visit.characterId == null) {
             return;
         }
-        page.startVisit(visit);
         WindowScreen.openPage(PAGE_ID);
+        CharactersPage page = current();
+        if (page != null) {
+            page.startVisit(visit);
+        }
     }
 
     private void startVisit(Visit visit) {
@@ -515,12 +519,13 @@ public final class CharactersPage extends PageContent {
                 GL11.glTranslatef(0.0F,
                         (float)(scrolled - this.shownRosterScroll), 0.0F);
                 int y = (int)list.top - scrolled;
-                for (CharacterRosterRows.Row row : rows) {
+                for (int index = 0; index < rows.size(); index++) {
+                    CharacterRosterRows.Row row = rows.get(index);
                     if (y > list.bottom()) {
                         break;
                     }
                     if (y + rowHeight > list.top) {
-                        drawRow(snapshot, row, list, y, row == picked,
+                        drawRow(snapshot, row, index, list, y, row == picked,
                                 row == this.hovered, alpha);
                     }
                     y += rowHeight;
@@ -540,11 +545,15 @@ public final class CharactersPage extends PageContent {
      * the padding over its hairline; any other row's head or glyph in the
      * icon's box at the padding, centred on the capitals of its words,
      * which start after the icon's room, and what stands at its right
-     * ending at the padding.
+     * ending at the padding. Words too long for their room fade into its
+     * end, a name sliding along while the row is {@code hovered}
+     * (LOOK-37).
      */
     private void drawRow(CharacterRosterSnapshot snapshot,
-                         CharacterRosterRows.Row row, LostTalesUiHitBox list,
-                         int y, boolean picked, boolean hovered, int alpha) {
+                         CharacterRosterRows.Row row, int index,
+                         LostTalesUiHitBox list, int y, boolean picked,
+                         boolean hovered, int alpha) {
+        Integer key = Integer.valueOf(index);
         int rowHeight = MenuWindow.rowHeight();
         int left = (int)list.left + MenuWindow.PADDING_X;
         int right = (int)list.right() - MenuWindow.PADDING_X;
@@ -577,9 +586,8 @@ public final class CharactersPage extends PageContent {
             String words = I18n.format(row.kind == CharacterRosterRows.Kind.EMPTY
                     ? "gui.losttales.character.create"
                     : "gui.losttales.lore.open");
-            LostTalesUiInk.drawText(this.font, "§o" + this.font
-                            .trimStringToWidth(words, Math.max(0, right - nameX)),
-                    nameX, textTop, WindowStyle.asideRgb(), alpha);
+            LostTalesUiCutName.drawText(this.font, "§o" + words, nameX,
+                    textTop, right - nameX, WindowStyle.asideRgb(), alpha);
             return;
         }
         drawHead(row, left + LostTalesUiInk.centredStart(TabIcons.SIZE, HEAD),
@@ -590,11 +598,11 @@ public final class CharactersPage extends PageContent {
             // the days left to restore it at the right.
             String daysLeft = daysText(row.deleted.getDaysLeft());
             int daysWidth = this.font.getStringWidth(daysLeft) + MenuWindow.VALUE_GAP;
-            LostTalesUiInk.drawText(this.font, "\u00a7o" + this.font
-                            .trimStringToWidth(row.deleted.getName(),
-                                    Math.max(0, right - nameX - daysWidth)),
-                    nameX, textTop, picked ? LostTalesUiInk.IVORY
-                            : WindowStyle.asideRgb(), alpha);
+            LostTalesUiCutName.drawText(this.font,
+                    "\u00a7o" + row.deleted.getName(), nameX, textTop,
+                    right - nameX - daysWidth, picked ? LostTalesUiInk.IVORY
+                            : WindowStyle.asideRgb(), alpha, this, key,
+                    hovered);
             LostTalesUiInk.drawText(this.font, daysLeft,
                     right - this.font.getStringWidth(daysLeft), textTop,
                     WindowStyle.asideRgb(), alpha);
@@ -606,11 +614,11 @@ public final class CharactersPage extends PageContent {
         String aside = asideOf(row, played);
         int asideWidth = aside.length() == 0 ? 0
                 : this.font.getStringWidth(aside) + MenuWindow.VALUE_GAP;
-        LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(name,
-                        Math.max(0, right - nameX - asideWidth)), nameX,
-                textTop, played ? LostTalesUiTheme.accentRgb()
+        LostTalesUiCutName.drawText(this.font, name, nameX, textTop,
+                right - nameX - asideWidth, played ? LostTalesUiTheme.accentRgb()
                         : picked ? LostTalesUiInk.IVORY
-                        : LostTalesColors.rgb(LostTalesColors.TEXT), alpha);
+                        : LostTalesColors.rgb(LostTalesColors.TEXT), alpha,
+                this, key, hovered);
         if (aside.length() > 0) {
             LostTalesUiInk.drawText(this.font, aside,
                     right - this.font.getStringWidth(aside), textTop,
@@ -737,16 +745,16 @@ public final class CharactersPage extends PageContent {
     private void drawDeleted(LostTalesUiHitBox box,
                              DeletedCharacterSummary deleted, int alpha) {
         int y = (int)box.top;
-        LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(
-                deleted.getName(), (int)box.width), (int)box.left, y,
-                LostTalesUiInk.IVORY, alpha);
+        // The name and the facts fade into the column's end where they are
+        // too long for it (LOOK-37).
+        LostTalesUiCutName.drawText(this.font, deleted.getName(),
+                (int)box.left, y, (int)box.width, LostTalesUiInk.IVORY, alpha);
         y += NOTE_LINE + 2;
-        LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(
-                        I18n.format("gui.losttales.character.deleted.facts",
-                                ClientCharacterDisplayNames.race(
-                                        deleted.getRaceId())),
-                        (int)box.width), (int)box.left, y,
-                WindowStyle.asideRgb(), alpha);
+        LostTalesUiCutName.drawText(this.font,
+                I18n.format("gui.losttales.character.deleted.facts",
+                        ClientCharacterDisplayNames.race(deleted.getRaceId())),
+                (int)box.left, y, (int)box.width, WindowStyle.asideRgb(),
+                alpha);
         y += NOTE_LINE + 6;
         for (Object line : this.font.listFormattedStringToWidth(I18n.format(
                         "gui.losttales.character.deleted.detail",
@@ -775,8 +783,8 @@ public final class CharactersPage extends PageContent {
         CharacterProfileColumn column = new CharacterProfileColumn(this.mc,
                 this.font, (int)layout.words().width, known
                         ? ProfileSubject.of(look)
-                        : ProfileSubject.named(this.visit.characterId,
-                                this.visit.name, this.visit.skinId),
+                        : ProfileSubject.named(this.visit.name,
+                                this.visit.skinId),
                 profile, ClientCharacterProfileCache.isUnavailable(
                         this.visit.characterId), "", false, false,
                 this.openHistories.contains(this.visit.characterId));
@@ -1360,7 +1368,7 @@ public final class CharactersPage extends PageContent {
         WindowScreen screen = WindowScreen.current();
         if (screen != null) {
             screen.menus().show(CharacterSubWindows.CAPES,
-                    CharacterMenus.capesAbout(character),
+                    CharacterMenus.capesAbout(this, character),
                     WindowMenus.centredIn(windowId()), true);
         }
     }
@@ -1375,7 +1383,7 @@ public final class CharactersPage extends PageContent {
         LoreCharactersWindow lore = open != null
                 && open.content instanceof LoreCharactersWindow
                 ? (LoreCharactersWindow)open.content : new LoreCharactersWindow();
-        lore.restart();
+        lore.restart(this);
         screen.openOverPage(tab, CharacterSubWindows.LORE, "", lore);
     }
 

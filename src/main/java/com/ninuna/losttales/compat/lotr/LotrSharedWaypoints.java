@@ -122,9 +122,9 @@ public final class LotrSharedWaypoints {
     /**
      * Brings the copies of LOTR's fellowship {@code mirrorId} up to date:
      * the shares of characters played again are made again, the accounts
-     * online with the fellowship on their own list are handed the copies of
-     * every character in {@code away}, and copies handed out before that no
-     * longer stand are taken back.
+     * online in it are handed the copies of every character in
+     * {@code away}, none while its owner holds it for the record only, and
+     * copies handed out before that no longer stand are taken back.
      */
     public static synchronized void update(UUID mirrorId, List<Away> away) {
         if (mirrorId == null) {
@@ -137,13 +137,13 @@ public final class LotrSharedWaypoints {
                 return;
             }
             Set<UUID> recipients = new LinkedHashSet<UUID>();
-            for (UUID account : fellowship.getAllPlayerUUIDs()) {
-                // The leader's account holding the fellowship for the record
-                // only is off its own list and takes no part (FEL-02).
-                if (LostTalesServerPlayers.findOnline(account) != null
-                        && LOTRLevelData.getData(account).getFellowshipIDs()
-                                .contains(mirrorId)) {
-                    recipients.add(account);
+            // The leader's account holding the fellowship for the record
+            // only is the one account in it, and takes no part (FEL-02).
+            if (!LotrFellowshipMirror.heldForTheRecordIds().contains(mirrorId)) {
+                for (UUID account : fellowship.getAllPlayerUUIDs()) {
+                    if (LostTalesServerPlayers.findOnline(account) != null) {
+                        recipients.add(account);
+                    }
                 }
             }
             for (UUID account : recipients) {

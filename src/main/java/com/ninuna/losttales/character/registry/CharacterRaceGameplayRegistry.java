@@ -13,8 +13,7 @@ public final class CharacterRaceGameplayRegistry {
                     1.54F,
                     20.0D,
                     1.0D,
-                    2.0D,
-                    false
+                    2.0D
             );
 
     private CharacterRaceGameplayRegistry() {}

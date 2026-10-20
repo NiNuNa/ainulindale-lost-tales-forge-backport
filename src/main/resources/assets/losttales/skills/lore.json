@@ -1,0 +1,64 @@
+{
+  "id": "losttales:lore",
+  "icon": "minecraft:book",
+  "order": 11,
+  "counts": [
+    {
+      "act": "quest",
+      "per": 10.0
+    },
+    {
+      "act": "discover",
+      "worth": {
+        "region": 25,
+        "waypoint": 15,
+        "marker": 10
+      }
+    }
+  ],
+  "perks": [
+    {
+      "id": "wayfarer",
+      "levels": [10, 40],
+      "effect": "travel_wait",
+      "amount": 0.1
+    },
+    {
+      "id": "pathfinder",
+      "levels": [20],
+      "effect": "discovery_range",
+      "amount": 0.5
+    },
+    {
+      "id": "rumour_hound",
+      "levels": [30],
+      "effect": "rumours",
+      "amount": 2
+    },
+    {
+      "id": "fair_dealer",
+      "levels": [50],
+      "effect": "fair_dealer",
+      "amount": 0.1
+    },
+    {
+      "id": "friend_of_the_wise",
+      "levels": [60],
+      "effect": "alignment_gain",
+      "amount": 0.05
+    },
+    {
+      "id": "storyteller",
+      "levels": [80],
+      "effect": "quest_skill_bonus",
+      "amount": 0.25,
+      "needs": "rumour_hound"
+    },
+    {
+      "id": "sage",
+      "levels": [100],
+      "effect": "perk_point",
+      "amount": 1
+    }
+  ]
+}

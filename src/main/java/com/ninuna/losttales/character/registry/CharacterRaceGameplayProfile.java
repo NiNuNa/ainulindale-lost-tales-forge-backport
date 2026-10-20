@@ -18,7 +18,6 @@ public final class CharacterRaceGameplayProfile {
     private final double maxHealth;
     private final double movementSpeedMultiplier;
     private final double attackDamage;
-    private final boolean lotrDerived;
 
     public CharacterRaceGameplayProfile(
             String raceId,
@@ -29,8 +28,7 @@ public final class CharacterRaceGameplayProfile {
             float sneakingEyeHeight,
             double maxHealth,
             double movementSpeedMultiplier,
-            double attackDamage,
-            boolean lotrDerived) {
+            double attackDamage) {
         this.raceId = raceId == null ? "" : raceId;
         this.representativeEntityClassName = representativeEntityClassName == null
                 ? "" : representativeEntityClassName;
@@ -41,7 +39,6 @@ public final class CharacterRaceGameplayProfile {
         this.maxHealth = maxHealth;
         this.movementSpeedMultiplier = movementSpeedMultiplier;
         this.attackDamage = attackDamage;
-        this.lotrDerived = lotrDerived;
     }
 
     public String getRaceId() {
@@ -78,9 +75,5 @@ public final class CharacterRaceGameplayProfile {
 
     public double getAttackDamage() {
         return this.attackDamage;
-    }
-
-    public boolean isLotrDerived() {
-        return this.lotrDerived;
     }
 }

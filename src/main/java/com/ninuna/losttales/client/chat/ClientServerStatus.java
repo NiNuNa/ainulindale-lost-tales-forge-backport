@@ -40,20 +40,9 @@ public final class ClientServerStatus {
         receivedMillis = System.currentTimeMillis();
     }
 
-    /** Whether the server has said how it stands. */
-    public static synchronized boolean isKnown() {
-        return known;
-    }
-
     /** The address the server names; empty for none. */
     public static synchronized String address() {
         return address;
-    }
-
-    /** The players shown against the cap: {@code 3/20 players}; empty before the server has said. */
-    public static synchronized String players() {
-        return !known ? "" : ChatServerStatus.playersPart(LostTalesWords.LANG,
-                players, maxPlayers);
     }
 
     /** The players shown against the cap as figures: {@code 3/20}; empty before the server has said. */

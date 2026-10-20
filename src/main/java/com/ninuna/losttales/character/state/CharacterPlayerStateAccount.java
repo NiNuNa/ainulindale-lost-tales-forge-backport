@@ -6,7 +6,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Persistent snapshot manifest for every playable identity of one account, the account itself included. */
+/**
+ * Persistent snapshot manifest for every character of one account, and for
+ * the ghost while its first switch is under way.
+ */
 public final class CharacterPlayerStateAccount {
 
     public static final int CURRENT_DATA_VERSION = 13;

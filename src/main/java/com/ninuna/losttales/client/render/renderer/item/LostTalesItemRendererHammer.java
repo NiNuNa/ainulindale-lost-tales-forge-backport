@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.render.renderer.item;
 
-import com.ninuna.losttales.client.render.model.item.LostTalesItemModelTestHammer;
+import com.ninuna.losttales.client.render.model.item.LostTalesItemModelDainsHammer;
 import com.ninuna.losttales.item.weapon.LostTalesItemWarhammer;
 import net.minecraft.item.ItemStack;
 import org.lwjgl.opengl.GL11;
@@ -9,7 +9,7 @@ import software.bernie.geckolib3.renderers.geo.GeoItemRenderer;
 public class LostTalesItemRendererHammer extends GeoItemRenderer<LostTalesItemWarhammer> {
 
     public LostTalesItemRendererHammer() {
-        super(new LostTalesItemModelTestHammer());
+        super(new LostTalesItemModelDainsHammer());
     }
 
     @Override

@@ -8,15 +8,18 @@ import java.io.IOException;
  * One worker's writer of a channel's topic. The server thread states the
  * wanted topic; the worker writes it when its {@link DiscordTopicPacing}
  * gives it a turn: only when the words differ from those Discord last
- * took, at most once every interval, and never more often than Discord's
- * two topic edits per channel in ten minutes, so a burst of joins and
- * leaves folds into one write, the newest words winning. The pacing
- * belongs to the bridge for the whole server run and outlives this
- * writer, so a restart of the bridge neither writes the same words again
- * nor spends an edit Discord has not given back.
+ * took, at most once every interval and once in ten minutes, keeping the
+ * second of Discord's two topic edits per channel in ten minutes for the
+ * stop, so a burst of joins and leaves folds into one write, the newest
+ * words winning. The pacing belongs to the bridge's
+ * {@link DiscordTopicMemory}, which outlives this writer and the world
+ * save keeps, so neither a restart of the bridge nor one of the server
+ * writes the same words again or spends an edit Discord has not given
+ * back.
  *
  * <p>A last write as the bridge stops (the offline topic) skips the
- * interval but not Discord's allowance or a pause it asked for. A
+ * interval and takes the edit kept in hand, never more than Discord's
+ * allowance, and waits out a pause Discord asked for. A
  * refused write (no Manage Channels, a bad token, a JVM that cannot
  * PATCH) switches this writer off until the bridge is reloaded, with one
  * log line; any other failure backs off on its own clock and never
@@ -30,7 +33,7 @@ final class DiscordChannelStatus {
 
     /** The Discord channel this topic belongs to, for its log lines. */
     private final String channelId;
-    /** When and what the topic is written, kept by the bridge for the server run. */
+    /** When and what the topic is written, kept by the bridge and the world save. */
     private final DiscordTopicPacing pacing;
     /** Until when a failure holds the next write back. */
     private long failedUntilMillis;

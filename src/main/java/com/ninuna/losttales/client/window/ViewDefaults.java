@@ -2,42 +2,26 @@ package com.ninuna.losttales.client.window;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * The window each view opens with: as a new player first sees it, once
- * every window of it has been closed, and after Reset View. Every view
- * opens one window at the default place, its pages as tabs, the first in
- * front: a category's view locked, a custom view's New Page unlocked, so
- * the page picked there takes its tab.
- *
- * <ul>
- * <li>Chat: Global and OOC, and the conversations waiting for a window.</li>
- * <li>Consoles: every console the player may read.</li>
- * <li>Map: the map.</li>
- * <li>Quest Journal: the journal, then the map.</li>
- * <li>Fellowships: the Fellowships page, the map, then the conversation
- * of every fellowship of the character played.</li>
- * <li>Profile: the Characters page.</li>
- * <li>Settings: every settings page.</li>
- * </ul>
- *
- * <p>A page another view holds already opens here as a copy of its own.
- * The chat's pages come from the sets it gives ({@link #addPages}).</p>
+ * every window of it has been closed, and after Reset View. What each
+ * window holds and whether it opens locked are the view files'
+ * ({@link ViewFiles}, WIN-49); the rules are the code's. Every view opens
+ * one window at the default place, its pages as tabs, the first in front.
+ * A page another view holds already opens here as a copy of its own, and
+ * a page the player cannot open now is left out as the window opens. The
+ * chat's pages come from the sets it gives ({@link #addPages}).
  */
 public final class ViewDefaults {
     /** The chat's set: Global and OOC, and the conversations waiting for a window. */
     public static final String CHAT = "chat";
     /** The chat's set: the conversation of every fellowship of the character played. */
     public static final String FELLOWSHIP_CHATS = "fellowship_chats";
-    /** The pages the views open with, by their systems' ids. */
-    private static final String MAP = "map";
-    private static final String JOURNAL = "journal";
-    private static final String FELLOWSHIPS = "fellowship";
-    private static final String CHARACTERS = "characters";
 
     /** Some pages a window opens with, read as the view opens. */
     public interface Pages {
@@ -55,24 +39,13 @@ public final class ViewDefaults {
         }
     }
 
-    private static final Map<PageCategory, Defaults> OWN =
-            new EnumMap<PageCategory, Defaults>(PageCategory.class);
     /** The sets the systems give by name: the chat's. */
     private static final Map<String, Pages> NAMED = new HashMap<String, Pages>();
-    /** A custom view's window. */
-    private static final Defaults CUSTOM = new Defaults(page(NewPage.PAGE_ID),
-            false);
-
-    static {
-        declare(PageCategory.CHANNELS, named(CHAT));
-        declare(PageCategory.CONSOLES, category(PageCategory.CONSOLES));
-        declare(PageCategory.MAP, page(MAP));
-        declare(PageCategory.QUEST_JOURNAL, page(JOURNAL), page(MAP));
-        declare(PageCategory.FELLOWSHIPS, page(FELLOWSHIPS), page(MAP),
-                named(FELLOWSHIP_CHATS));
-        declare(PageCategory.PROFILE, page(CHARACTERS));
-        declare(PageCategory.SETTINGS, category(PageCategory.SETTINGS));
-    }
+    /**
+     * The view files in force, by the view each is: a category's id, or
+     * custom. Null until first asked for or read.
+     */
+    private static Map<String, ViewFile> files;
 
     private ViewDefaults() {}
 
@@ -83,17 +56,61 @@ public final class ViewDefaults {
         }
     }
 
+    /** Whether a system gives a set of pages under {@code name}. */
+    static synchronized boolean isSet(String name) {
+        return name != null && NAMED.containsKey(name);
+    }
+
+    /** Takes the view files the windows open with from now on; a view no file names opens with none. */
+    static synchronized void use(List<ViewFile> found) {
+        Map<String, ViewFile> byView = new LinkedHashMap<String, ViewFile>();
+        if (found != null) {
+            for (ViewFile file : found) {
+                byView.put(file.view, file);
+            }
+        }
+        files = Collections.unmodifiableMap(byView);
+    }
+
+    /** Lets the files in force go: the mod's own are read from its jar when next asked for. */
+    static synchronized void forget() {
+        files = null;
+    }
+
+    /** The file {@code view} opens with: a category's id, or custom; null for none. */
+    static synchronized ViewFile fileOf(String view) {
+        return files().get(view);
+    }
+
     /** The window {@code view} opens with; null for none. */
     static synchronized Defaults of(View view) {
         if (view == null) {
             return null;
         }
-        return view.isCustom() ? CUSTOM : OWN.get(view.category());
+        ViewFile file = files().get(view.isCustom() ? ViewFile.CUSTOM
+                : view.category() == null ? "" : view.category().id());
+        return file == null ? null : defaultsOf(file);
     }
 
-    /** A category's view's window, locked, holding {@code sets} one after the other. */
-    private static void declare(PageCategory category, final Pages... sets) {
-        OWN.put(category, new Defaults(new Pages() {
+    /**
+     * The files in force. Until the resources are first read, which checks
+     * every file against the game ({@link ViewFiles#reload}), the mod's own
+     * as its jar holds them, checked for their shape.
+     */
+    private static Map<String, ViewFile> files() {
+        if (files == null) {
+            use(ViewFiles.classpathFiles());
+        }
+        return files;
+    }
+
+    /** A file's window: its entries' pages one after the other, locked as it says. */
+    private static Defaults defaultsOf(ViewFile file) {
+        final List<Pages> sets = new ArrayList<Pages>();
+        for (ViewFile.Entry entry : file.pages) {
+            sets.add(pagesOf(entry, file.category()));
+        }
+        return new Defaults(new Pages() {
             @Override
             public List<? extends WindowPage> pages() {
                 List<WindowPage> pages = new ArrayList<WindowPage>();
@@ -102,7 +119,18 @@ public final class ViewDefaults {
                 }
                 return pages;
             }
-        }, true));
+        }, file.locked);
+    }
+
+    private static Pages pagesOf(ViewFile.Entry entry, PageCategory category) {
+        switch (entry.kind) {
+            case SET:
+                return named(entry.name);
+            case CATEGORY:
+                return category(category);
+            default:
+                return page(entry.name);
+        }
     }
 
     /** A page by the id it was registered under. */
@@ -122,7 +150,8 @@ public final class ViewDefaults {
         return new Pages() {
             @Override
             public List<? extends WindowPage> pages() {
-                return WindowLayout.pagesOf(category);
+                return category == null ? Collections.<WindowPage>emptyList()
+                        : WindowLayout.pagesOf(category);
             }
         };
     }

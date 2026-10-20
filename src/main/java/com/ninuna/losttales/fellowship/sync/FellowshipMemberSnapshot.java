@@ -7,8 +7,9 @@ import java.util.UUID;
 
 /**
  * One member of a fellowship as its members' clients see it: who, whose,
- * when they joined, the colour they wear, and where they stand now, with
- * the name of the other character they play while that is elsewhere.
+ * the colour they wear, and where they stand now, with the name of the
+ * other character they play while that is elsewhere. Members come first
+ * joined first.
  */
 public final class FellowshipMemberSnapshot {
 
@@ -18,14 +19,13 @@ public final class FellowshipMemberSnapshot {
     private final UUID identityId;
     private final UUID ownerId;
     private final String characterName;
-    private final long joinedAt;
     private final FellowshipColor color;
     private final FellowshipMemberPresence presence;
     /** The character the member's account plays now, while it is another; empty otherwise. */
     private final String elsewhereName;
 
     public FellowshipMemberSnapshot(UUID identityId, UUID ownerId, String characterName,
-                                    long joinedAt, FellowshipColor color,
+                                    FellowshipColor color,
                                     FellowshipMemberPresence presence,
                                     String elsewhereName) {
         if (identityId == null || ownerId == null || color == null || presence == null) {
@@ -35,7 +35,6 @@ public final class FellowshipMemberSnapshot {
         this.ownerId = ownerId;
         // Empty where the member has no name; the client words it.
         this.characterName = normalizeName(characterName);
-        this.joinedAt = Math.max(0L, joinedAt);
         this.color = color;
         this.presence = presence;
         this.elsewhereName = presence == FellowshipMemberPresence.ELSEWHERE
@@ -50,8 +49,7 @@ public final class FellowshipMemberSnapshot {
             throw new IllegalArgumentException("member must not be null");
         }
         return new FellowshipMemberSnapshot(member.getIdentityId(), member.getOwnerId(),
-                member.getCharacterName(), member.getJoinedAt(), member.getColor(),
-                presence, elsewhereName);
+                member.getCharacterName(), member.getColor(), presence, elsewhereName);
     }
 
     public UUID getIdentityId() {
@@ -64,10 +62,6 @@ public final class FellowshipMemberSnapshot {
 
     public String getCharacterName() {
         return this.characterName;
-    }
-
-    public long getJoinedAt() {
-        return this.joinedAt;
     }
 
     public FellowshipColor getColor() {

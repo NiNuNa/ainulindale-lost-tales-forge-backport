@@ -16,7 +16,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Versioned NBT codec for the persistent chat mute list. */
+/**
+ * Versioned NBT codec for the persistent chat mute list. A save or a
+ * mute at another version than this codec writes, or a save without its
+ * version or its list, is left alone and the store goes read-only; a
+ * mute missing a field, a second mute of one account, or one past
+ * {@link #MAX_MUTES} is quarantined.
+ */
 public final class ChatMuteNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
@@ -56,25 +62,26 @@ public final class ChatMuteNbtCodec {
 
     public static ReadResult read(NBTTagCompound source) {
         NBTTagCompound safeSource = source == null ? new NBTTagCompound() : source;
-        int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
+        if (!safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)) {
+            LostTalesLog.warning("Chat mute data carries no version; data will remain read-only");
+            return ReadResult.unsupported(safeSource, -1);
+        }
+        int version = safeSource.getInteger(TAG_DATA_VERSION);
+        if (version != CURRENT_ROOT_DATA_VERSION) {
             LostTalesLog.warning("Chat mute data uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
-        if (safeSource.hasKey(TAG_MUTES)
-                && !safeSource.hasKey(TAG_MUTES, Constants.NBT.TAG_LIST)) {
+        if (!safeSource.hasKey(TAG_MUTES, Constants.NBT.TAG_LIST)) {
+            LostTalesLog.warning("Chat mute data lacks its list of mutes; data will remain read-only");
             return ReadResult.unsupported(safeSource, -1);
         }
 
-        boolean repaired = version != CURRENT_ROOT_DATA_VERSION
-                || !safeSource.hasKey(TAG_MUTES, Constants.NBT.TAG_LIST);
+        boolean repaired = false;
         NbtQuarantine.Read quarantine = NbtQuarantine.read(safeSource);
         if (!quarantine.isSupported()) {
             return ReadResult.unsupported(safeSource, quarantine.getUnsupportedVersion());
         }
-        repaired |= quarantine.isRepaired();
         ArrayList<NBTTagCompound> quarantinedEntries =
                 new ArrayList<NBTTagCompound>(quarantine.getEntries());
         LinkedHashMap<UUID, ChatMuteEntry> mutes =
@@ -114,7 +121,6 @@ public final class ChatMuteNbtCodec {
             } else {
                 mutes.put(accountId, muteResult.mute);
             }
-            repaired |= muteResult.repaired;
         }
         return ReadResult.success(mutes, repaired, quarantinedEntries);
     }
@@ -136,32 +142,35 @@ public final class ChatMuteNbtCodec {
             return MuteReadResult.failed("missing_mute");
         }
         int version = source.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? source.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > ChatMuteEntry.CURRENT_DATA_VERSION || version < 0) {
+                ? source.getInteger(TAG_DATA_VERSION) : -1;
+        if (version != ChatMuteEntry.CURRENT_DATA_VERSION) {
             return MuteReadResult.unsupported(version);
         }
         UUID accountId = NbtTags.readUuid(source, TAG_ACCOUNT_UUID);
         if (accountId == null) {
             return MuteReadResult.failed("missing_account");
         }
-        long expiresAt = source.hasKey(TAG_EXPIRES_AT, Constants.NBT.TAG_LONG)
-                ? source.getLong(TAG_EXPIRES_AT) : ChatMuteEntry.EXPIRES_NEVER;
+        // The writer writes every field: a mute without one is quarantined,
+        // never read with a stand-in.
+        if (!source.hasKey(TAG_ACCOUNT_NAME, Constants.NBT.TAG_STRING)
+                || !source.hasKey(TAG_MUTED_BY, Constants.NBT.TAG_STRING)
+                || !source.hasKey(TAG_MUTE_REASON, Constants.NBT.TAG_STRING)
+                || !source.hasKey(TAG_ISSUED_AT, Constants.NBT.TAG_LONG)
+                || !source.hasKey(TAG_EXPIRES_AT, Constants.NBT.TAG_LONG)) {
+            return MuteReadResult.failed("missing_mute_field");
+        }
+        long expiresAt = source.getLong(TAG_EXPIRES_AT);
         if (expiresAt < 0L) {
             return MuteReadResult.failed("invalid_expiry");
         }
-        long issuedAt = source.hasKey(TAG_ISSUED_AT, Constants.NBT.TAG_LONG)
-                ? source.getLong(TAG_ISSUED_AT) : 0L;
         try {
             return MuteReadResult.success(new ChatMuteEntry(
                     accountId,
                     source.getString(TAG_ACCOUNT_NAME),
                     source.getString(TAG_MUTED_BY),
                     source.getString(TAG_MUTE_REASON),
-                    issuedAt,
-                    expiresAt),
-                    version != ChatMuteEntry.CURRENT_DATA_VERSION
-                            || !source.hasKey(TAG_ISSUED_AT,
-                            Constants.NBT.TAG_LONG));
+                    source.getLong(TAG_ISSUED_AT),
+                    expiresAt));
         } catch (IllegalArgumentException exception) {
             return MuteReadResult.failed("invalid_mute_data");
         }
@@ -251,29 +260,26 @@ public final class ChatMuteNbtCodec {
 
     private static final class MuteReadResult {
         private final ChatMuteEntry mute;
-        private final boolean repaired;
         private final String failureReason;
         private final int unsupportedVersion;
 
-        private MuteReadResult(ChatMuteEntry mute, boolean repaired,
-                               String failureReason, int unsupportedVersion) {
+        private MuteReadResult(ChatMuteEntry mute, String failureReason,
+                               int unsupportedVersion) {
             this.mute = mute;
-            this.repaired = repaired;
             this.failureReason = failureReason;
             this.unsupportedVersion = unsupportedVersion;
         }
 
-        private static MuteReadResult success(ChatMuteEntry mute,
-                                              boolean repaired) {
-            return new MuteReadResult(mute, repaired, null, Integer.MIN_VALUE);
+        private static MuteReadResult success(ChatMuteEntry mute) {
+            return new MuteReadResult(mute, null, Integer.MIN_VALUE);
         }
 
         private static MuteReadResult failed(String reason) {
-            return new MuteReadResult(null, false, reason, Integer.MIN_VALUE);
+            return new MuteReadResult(null, reason, Integer.MIN_VALUE);
         }
 
         private static MuteReadResult unsupported(int version) {
-            return new MuteReadResult(null, false, null, version);
+            return new MuteReadResult(null, null, version);
         }
     }
 }

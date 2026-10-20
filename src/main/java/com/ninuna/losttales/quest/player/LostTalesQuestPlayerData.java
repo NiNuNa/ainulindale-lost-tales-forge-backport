@@ -77,7 +77,21 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
      * the player's next tick. Never saved: a stage still full asks again.
      */
     private final Set<String> handOversDue = new LinkedHashSet<String>();
-    private boolean readOnlyForNewerVersion;
+    /** Counts every change to the discovered markers; never saved. */
+    private int markerChanges;
+    /** What the LOTR waypoint check saw when it last ran; never saved. */
+    private Object waypointCheckSeen;
+    /**
+     * Whether a character switch put this log in place since the client
+     * was last sent it; never saved.
+     */
+    private boolean replaced;
+    /**
+     * Whether the log is kept whole as it was read and changes nothing:
+     * saved under any version but {@link #CURRENT_DATA_VERSION}, malformed
+     * or past its bounds.
+     */
+    private boolean readOnly;
     private NBTBase preservedReadOnlyData;
 
     public static LostTalesQuestPlayerData get(EntityPlayer player) {
@@ -100,7 +114,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (compound == null) {
             return;
         }
-        if (this.readOnlyForNewerVersion && this.preservedReadOnlyData != null) {
+        if (this.readOnly && this.preservedReadOnlyData != null) {
             compound.setTag(PROPERTY_ID, this.preservedReadOnlyData.copy());
             return;
         }
@@ -215,6 +229,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private void loadNBTData(NBTTagCompound compound,
                              boolean registerRuntimeDefinitions,
                              boolean logWarnings) {
+        this.markerChanges++;
         this.activeQuests.clear();
         this.questHistory.clear();
         this.discoveredMarkerIds.clear();
@@ -226,7 +241,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.pinnedMapMarkerId = "";
         this.startersGiven = false;
         this.heardRumours.clear();
-        this.readOnlyForNewerVersion = false;
+        this.readOnly = false;
         this.preservedReadOnlyData = null;
 
         if (compound == null || !compound.hasKey(PROPERTY_ID)) {
@@ -382,17 +397,22 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         // The data needs nothing from the player it is attached to.
     }
 
+    /**
+     * Whether the log is read-only: saved under any version but the
+     * current one, malformed or past its bounds, and kept whole. The
+     * name is the one every store of the mod answers by.
+     */
     public boolean isReadOnlyForNewerVersion() {
-        return this.readOnlyForNewerVersion;
+        return this.readOnly;
     }
 
     private boolean isWritable() {
-        return !this.readOnlyForNewerVersion;
+        return !this.readOnly;
     }
 
     private void enterReadOnlyMode(NBTBase preservedData,
                                    String message, boolean logWarning) {
-        this.readOnlyForNewerVersion = true;
+        this.readOnly = true;
         this.preservedReadOnlyData = preservedData == null ? null : preservedData.copy();
         if (logWarning) {
             FMLLog.warning("[%s] %s", LostTalesMetaData.MOD_ID, message);
@@ -437,7 +457,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return (NBTTagCompound) canonical.copy();
     }
 
-    /** Replaces the live player's quest state from an already detached payload. */
+    /**
+     * Replaces the live player's quest state from an already detached
+     * payload, as a character switch does: the client's next log takes the
+     * place of the one it holds, without news.
+     */
     public void replaceCharacterState(NBTTagCompound characterState) {
         NBTTagCompound validated = validateCharacterState(characterState);
         this.handOversDue.clear();
@@ -446,6 +470,17 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             throw new IllegalArgumentException(
                     "Quest character state became unavailable while applying");
         }
+        this.replaced = true;
+    }
+
+    /**
+     * Whether a character switch put this log in place since this was
+     * last asked; asking forgets it.
+     */
+    public boolean takeReplaced() {
+        boolean was = this.replaced;
+        this.replaced = false;
+        return was;
     }
 
     private void loadCharacterState(NBTTagCompound characterState,
@@ -692,7 +727,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         LostTalesMapMarkerDefinition old =
                 this.dynamicMapMarkers.put(storedId, normalized);
         boolean discoveredChanged = addDiscoveredMarkerId(storedId);
-        return discoveredChanged || !sameMarker(old, normalized);
+        if (discoveredChanged || !sameMarker(old, normalized)) {
+            this.markerChanges++;
+            return true;
+        }
+        return false;
     }
 
     public boolean isMarkerDiscovered(String markerId) {
@@ -716,6 +755,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (dynamicId != null
                 && this.dynamicMapMarkers.remove(dynamicId) != null) {
             changed = true;
+        }
+        if (changed) {
+            this.markerChanges++;
         }
         if (sameMarkerIdentity(markerId, this.pinnedMapMarkerId)) {
             this.pinnedMapMarkerId = "";
@@ -795,8 +837,13 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return changed;
     }
 
-    public boolean completeQuest(String questId, String outcome,
-            long worldTime,
+    /**
+     * Ends a running quest as completed. Its History line keeps the
+     * optional objectives it achieved and no words: what they add is
+     * worded by each reader's game. A failure's or an abandon's line keeps
+     * its reason as a lang key instead.
+     */
+    public boolean completeQuest(String questId, long worldTime,
             Collection<String> completedOptionalObjectiveIds) {
         if (!isWritable()) {
             return false;
@@ -810,7 +857,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         LostTalesQuestHistoryEntry old = this.questHistory.put(questId,
                 new LostTalesQuestHistoryEntry(questId,
                         LostTalesQuestHistoryEntry.Outcome.COMPLETED,
-                        boundedDetail(outcome), worldTime,
+                        "", worldTime,
                         completedOptionalObjectiveIds,
                         completionsBefore(before) + (progress != null
                                 || before == null || !before.isCompleted()
@@ -970,6 +1017,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public void copyFrom(LostTalesQuestPlayerData oldData) {
+        this.markerChanges++;
         this.activeQuests.clear();
         this.questHistory.clear();
         this.discoveredMarkerIds.clear();
@@ -981,13 +1029,13 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.pinnedMapMarkerId = "";
         this.startersGiven = false;
         this.heardRumours.clear();
-        this.readOnlyForNewerVersion = false;
+        this.readOnly = false;
         this.preservedReadOnlyData = null;
         if (oldData == null) {
             return;
         }
-        if (oldData.readOnlyForNewerVersion) {
-            this.readOnlyForNewerVersion = true;
+        if (oldData.readOnly) {
+            this.readOnly = true;
             this.preservedReadOnlyData = oldData.preservedReadOnlyData == null
                     ? null
                     : oldData.preservedReadOnlyData.copy();
@@ -1072,7 +1120,22 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         this.discoveredMarkerIds.add(normalized);
         this.discoveredMarkerIdByCanonicalKey.put(key, normalized);
+        this.markerChanges++;
         return true;
+    }
+
+    /** How many times the discovered markers changed since this log was made. */
+    public int getMarkerChanges() {
+        return this.markerChanges;
+    }
+
+    /** What the LOTR waypoint check saw when it last ran; null before it ran. */
+    public Object getWaypointCheckSeen() {
+        return this.waypointCheckSeen;
+    }
+
+    public void setWaypointCheckSeen(Object seen) {
+        this.waypointCheckSeen = seen;
     }
 
     private boolean addLoadedDynamicMarker(
@@ -1196,11 +1259,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 markerTag.getDouble("DiscoveryRadius"),
                 markerTag.getBoolean("HiddenUntilDiscovered"),
                 markerTag.getBoolean("IsDiscoverable"),
-                markerTag.hasKey("RequiresRegionUnlock")
-                        && markerTag.getBoolean("RequiresRegionUnlock"),
+                markerTag.getBoolean("RequiresRegionUnlock"),
                 LostTalesMapMarkerSource.QUEST_DYNAMIC,
-                false, "", markerTag.hasKey("Priority")
-                        ? markerTag.getInteger("Priority") : 0,
+                false, "", markerTag.getInteger("Priority"),
                 namedAfter
         );
     }
@@ -1371,8 +1432,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         double z = marker.getDouble("Z");
         double fadeRadius = marker.getDouble("CompassFadeInRadius");
         double discoveryRadius = marker.getDouble("DiscoveryRadius");
-        int priority = marker.hasKey("Priority", Constants.NBT.TAG_INT)
-                ? marker.getInteger("Priority") : 0;
+        int priority = marker.getInteger("Priority");
         return Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z)
                 && Double.isFinite(fadeRadius) && fadeRadius >= 0.0D
                 && Double.isFinite(discoveryRadius) && discoveryRadius >= 0.0D

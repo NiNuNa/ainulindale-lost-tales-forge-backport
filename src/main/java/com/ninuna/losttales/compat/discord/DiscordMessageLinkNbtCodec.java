@@ -15,27 +15,31 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
 /**
- * Versioned NBT codec for the Discord bridge's message links: each game
- * message the bridge carried, oldest first, with every Discord copy it
- * has — the copy's Discord id, the channel it is in, the binding it was
- * posted through and the reply header it opened with.
+ * Versioned NBT codec for the Discord bridge's memory in the world save:
+ * the message links, each game message the bridge carried, oldest first,
+ * with every Discord copy it has — the copy's Discord id, the channel it
+ * is in, the binding it was posted through and the reply header it
+ * opened with — and the topics, each kept channel's words Discord last
+ * took and when it took the last two writes.
  *
  * <p>No webhook URL is ever written, since a webhook URL is a
- * credential: the binding id stands in for it, and a copy whose channel
- * Discord never named is written under its binding
- * ({@code binding:<id>}) rather than under its webhook. A copy that can
- * be written neither way is left out, and on read a destination that is
- * neither a channel nor a binding is refused, so a URL cannot pass for
+ * credential: the binding id stands in for it. Every copy is written
+ * under the Discord channel it is in ({@code channel:<id>}), which every
+ * link names; a copy known by anything else is left out, and on read a
+ * destination that is not a channel is refused, so a URL cannot pass for
  * one. An entry the codec cannot vouch for is quarantined whole with
- * its reason; data newer than this codec is left alone and the store
- * goes read-only. Nothing read is dropped or cut. A write keeps every
- * bound a read checks: a message's copies past
- * {@link #MAX_COPIES_PER_ENTRY} are not saved, the oldest kept.</p>
+ * its reason, a message under {@code EntryIndex} and a topic under
+ * {@code TopicIndex}; data newer than this codec is left alone and the
+ * store goes read-only. Nothing read is dropped or cut. A write keeps
+ * every bound a read checks: a message's copies past
+ * {@link #MAX_COPIES_PER_ENTRY} are not saved, the oldest kept, and
+ * topics past {@link #MAX_TOPICS} are not saved.</p>
  */
 final class DiscordMessageLinkNbtCodec {
 
-    static final int CURRENT_ROOT_DATA_VERSION = 1;
+    static final int CURRENT_ROOT_DATA_VERSION = 2;
     static final int CURRENT_ENTRY_DATA_VERSION = 1;
+    static final int CURRENT_TOPIC_DATA_VERSION = 1;
     /** Safety bound on messages read back; entries past it are quarantined. */
     static final int MAX_ENTRIES = DiscordMessageLinks.MAX_LINKS;
     /** The most copies one message may name: it has one per binding of its channel. */
@@ -44,17 +48,19 @@ final class DiscordMessageLinkNbtCodec {
     static final int MAX_HEADER_LENGTH = 2000;
     /** The longest binding id kept. */
     static final int MAX_BINDING_ID_LENGTH = 128;
-    /** The longest Discord id read; a snowflake has at most twenty digits. */
-    private static final int MAX_DISCORD_ID_LENGTH = 24;
+    /** Safety bound on topics read back; topics past it are quarantined. */
+    static final int MAX_TOPICS = DiscordTopicMemory.MAX_CHANNELS;
+    /** The longest topic kept: Discord takes no longer one. */
+    static final int MAX_TOPIC_LENGTH = 1024;
 
     /** A destination naming a Discord channel by id. */
     static final String CHANNEL_PREFIX = "channel:";
-    /** A saved destination naming the binding a post went through. */
-    static final String BINDING_PREFIX = "binding:";
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_MESSAGES = "Messages";
     private static final String TAG_ENTRY_INDEX = "EntryIndex";
+    private static final String TAG_TOPICS = "Topics";
+    private static final String TAG_TOPIC_INDEX = "TopicIndex";
 
     private static final String TAG_MESSAGE_ID = "MessageId";
     private static final String TAG_COPIES = "Copies";
@@ -63,11 +69,20 @@ final class DiscordMessageLinkNbtCodec {
     private static final String TAG_BINDING = "Binding";
     private static final String TAG_HEADER = "Header";
 
+    private static final String TAG_CHANNEL_ID = "ChannelId";
+    private static final String TAG_WORDS = "Words";
+    private static final String TAG_LAST_WRITE = "LastWrite";
+    private static final String TAG_WRITE_BEFORE = "WriteBefore";
+
     private DiscordMessageLinkNbtCodec() {}
 
-    /** Writes the links in the order given, oldest first, and the quarantine as it was read. */
+    /**
+     * Writes the links in the order given, oldest first, the topics in the
+     * order given, and the quarantine as it was read.
+     */
     static void write(NBTTagCompound output,
                       Collection<DiscordMessageLinks.SavedLink> links,
+                      Collection<DiscordTopicMemory.SavedTopic> topics,
                       Collection<NBTTagCompound> quarantinedEntries) {
         output.setInteger(TAG_DATA_VERSION, CURRENT_ROOT_DATA_VERSION);
         NBTTagList list = new NBTTagList();
@@ -80,7 +95,51 @@ final class DiscordMessageLinkNbtCodec {
             }
         }
         output.setTag(TAG_MESSAGES, list);
+        NBTTagList topicList = new NBTTagList();
+        if (topics != null) {
+            Set<String> written = new HashSet<String>();
+            for (DiscordTopicMemory.SavedTopic topic : topics) {
+                if (topicList.tagCount() >= MAX_TOPICS) {
+                    break;
+                }
+                NBTTagCompound entry = topic == null ? null : writeTopic(topic);
+                if (entry != null && written.add(topic.channelId)) {
+                    topicList.appendTag(entry);
+                }
+            }
+        }
+        output.setTag(TAG_TOPICS, topicList);
         NbtQuarantine.write(output, quarantinedEntries);
+    }
+
+    /** One topic, or null for one a read would refuse. */
+    private static NBTTagCompound writeTopic(DiscordTopicMemory.SavedTopic topic) {
+        if (!isTopic(topic)) {
+            return null;
+        }
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setInteger(TAG_DATA_VERSION, CURRENT_TOPIC_DATA_VERSION);
+        tag.setString(TAG_CHANNEL_ID, topic.channelId);
+        tag.setString(TAG_WORDS, topic.words);
+        tag.setLong(TAG_LAST_WRITE, topic.lastWrite);
+        tag.setLong(TAG_WRITE_BEFORE, topic.writeBefore);
+        return tag;
+    }
+
+    /**
+     * Whether a topic may be kept: a Discord channel by id, words Discord
+     * would take, a last write in time, and no write or one no later than
+     * it before.
+     */
+    static boolean isTopic(DiscordTopicMemory.SavedTopic topic) {
+        return topic != null
+                && DiscordChannelBindings.isSnowflake(topic.channelId)
+                && topic.words.length() > 0
+                && topic.words.length() <= MAX_TOPIC_LENGTH
+                && topic.lastWrite > 0L
+                && (topic.writeBefore == DiscordTopicMemory.SavedTopic.NO_WRITE
+                        || (topic.writeBefore > 0L
+                                && topic.writeBefore <= topic.lastWrite));
     }
 
     /**
@@ -115,15 +174,12 @@ final class DiscordMessageLinkNbtCodec {
 
     /**
      * One copy, or null for one a read would refuse. Its binding is
-     * written only when it reads back as one, and a copy placed under a
-     * binding that does not is not written at all.
+     * written only when it reads back as one.
      */
     private static NBTTagCompound writeCopy(DiscordMessageLinks.SavedCopy copy) {
         String binding = isBindingId(copy.bindingId) ? copy.bindingId : "";
-        boolean placed = isChannelDestination(copy.destination)
-                || (binding.length() > 0
-                        && copy.destination.equals(BINDING_PREFIX + binding));
-        if (!isDiscordId(copy.discordId) || !placed
+        if (!DiscordChannelBindings.isSnowflake(copy.discordId)
+                || !isChannelDestination(copy.destination)
                 || copy.header.length() > MAX_HEADER_LENGTH) {
             return null;
         }
@@ -135,26 +191,38 @@ final class DiscordMessageLinkNbtCodec {
         return tag;
     }
 
+    /**
+     * Reads a save as {@link #write} writes it. One without its version
+     * or either of its lists, or at another version, is kept as it is
+     * and the store goes read-only.
+     */
     static ReadResult read(NBTTagCompound source) {
         NBTTagCompound safeSource = source == null ? new NBTTagCompound() : source;
-        int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
+        if (!safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)) {
+            LostTalesLog.warning("Discord message link data carries no version; data will remain read-only");
+            return ReadResult.unsupported(safeSource, -1);
+        }
+        int version = safeSource.getInteger(TAG_DATA_VERSION);
+        if (version != CURRENT_ROOT_DATA_VERSION) {
             LostTalesLog.warning("Discord message link data uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
-        if (safeSource.hasKey(TAG_MESSAGES)
-                && !holdsCompoundsOnly(safeSource, TAG_MESSAGES)) {
+        if (!safeSource.hasKey(TAG_MESSAGES, Constants.NBT.TAG_LIST)
+                || !holdsCompoundsOnly(safeSource, TAG_MESSAGES)) {
+            LostTalesLog.warning("Discord message link data lacks its list of messages; data will remain read-only");
             return ReadResult.unsupported(safeSource, -1);
         }
-        boolean repaired = version != CURRENT_ROOT_DATA_VERSION
-                || !safeSource.hasKey(TAG_MESSAGES, Constants.NBT.TAG_LIST);
+        if (!safeSource.hasKey(TAG_TOPICS, Constants.NBT.TAG_LIST)
+                || !holdsCompoundsOnly(safeSource, TAG_TOPICS)) {
+            LostTalesLog.warning("Discord message link data lacks its list of topics; data will remain read-only");
+            return ReadResult.unsupported(safeSource, -1);
+        }
+        boolean repaired = false;
         NbtQuarantine.Read quarantine = NbtQuarantine.read(safeSource);
         if (!quarantine.isSupported()) {
             return ReadResult.unsupported(safeSource, quarantine.getUnsupportedVersion());
         }
-        repaired |= quarantine.isRepaired();
         List<NBTTagCompound> quarantinedEntries =
                 new ArrayList<NBTTagCompound>(quarantine.getEntries());
         List<DiscordMessageLinks.SavedLink> links =
@@ -191,7 +259,64 @@ final class DiscordMessageLinkNbtCodec {
             }
             links.add(result.link);
         }
-        return ReadResult.success(links, repaired, quarantinedEntries);
+        List<DiscordTopicMemory.SavedTopic> topics =
+                new ArrayList<DiscordTopicMemory.SavedTopic>();
+        Set<String> seenChannels = new HashSet<String>();
+        NBTTagList topicList = safeSource.getTagList(TAG_TOPICS,
+                Constants.NBT.TAG_COMPOUND);
+        for (int index = 0; index < topicList.tagCount(); index++) {
+            NBTTagCompound raw = topicList.getCompoundTagAt(index);
+            int topicVersion = raw.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
+                    ? raw.getInteger(TAG_DATA_VERSION) : 0;
+            if (topicVersion > CURRENT_TOPIC_DATA_VERSION) {
+                return ReadResult.unsupported(safeSource, topicVersion);
+            }
+            String reason = topicVersion < 1 ? "invalid_topic_version"
+                    : topicFailure(raw);
+            DiscordTopicMemory.SavedTopic topic = reason != null ? null
+                    : new DiscordTopicMemory.SavedTopic(
+                            raw.getString(TAG_CHANNEL_ID), raw.getString(TAG_WORDS),
+                            raw.getLong(TAG_LAST_WRITE), raw.getLong(TAG_WRITE_BEFORE));
+            if (topic != null) {
+                if (seenChannels.contains(topic.channelId)) {
+                    reason = "duplicate_topic_channel";
+                } else if (topics.size() >= MAX_TOPICS) {
+                    reason = "topics_over_capacity";
+                }
+            }
+            if (reason != null) {
+                quarantinedEntries.add(NbtQuarantine.entry(reason, TAG_TOPIC_INDEX, index, raw));
+                repaired = true;
+                continue;
+            }
+            seenChannels.add(topic.channelId);
+            topics.add(topic);
+        }
+        return ReadResult.success(links, topics, repaired, quarantinedEntries);
+    }
+
+    /**
+     * Why a topic cannot be read as {@link #writeTopic} writes it, every
+     * field present, of its type and within its bounds; null when it can.
+     */
+    private static String topicFailure(NBTTagCompound raw) {
+        if (!raw.hasKey(TAG_CHANNEL_ID, Constants.NBT.TAG_STRING)
+                || !DiscordChannelBindings.isSnowflake(raw.getString(TAG_CHANNEL_ID))) {
+            return "invalid_topic_channel";
+        }
+        if (!raw.hasKey(TAG_WORDS, Constants.NBT.TAG_STRING)
+                || raw.getString(TAG_WORDS).length() == 0
+                || raw.getString(TAG_WORDS).length() > MAX_TOPIC_LENGTH) {
+            return "invalid_topic_words";
+        }
+        if (!raw.hasKey(TAG_LAST_WRITE, Constants.NBT.TAG_LONG)
+                || !raw.hasKey(TAG_WRITE_BEFORE, Constants.NBT.TAG_LONG)) {
+            return "invalid_topic_writes";
+        }
+        DiscordTopicMemory.SavedTopic topic = new DiscordTopicMemory.SavedTopic(
+                raw.getString(TAG_CHANNEL_ID), raw.getString(TAG_WORDS),
+                raw.getLong(TAG_LAST_WRITE), raw.getLong(TAG_WRITE_BEFORE));
+        return isTopic(topic) ? null : "invalid_topic_writes";
     }
 
     private static boolean namesAny(DiscordMessageLinks.SavedLink link,
@@ -238,7 +363,7 @@ final class DiscordMessageLinkNbtCodec {
         for (int index = 0; index < copies.tagCount(); index++) {
             NBTTagCompound copy = copies.getCompoundTagAt(index);
             if (!copy.hasKey(TAG_DISCORD_ID, Constants.NBT.TAG_STRING)
-                    || !isDiscordId(copy.getString(TAG_DISCORD_ID))) {
+                    || !DiscordChannelBindings.isSnowflake(copy.getString(TAG_DISCORD_ID))) {
                 return EntryReadResult.failure("invalid_discord_id");
             }
             String discordId = copy.getString(TAG_DISCORD_ID);
@@ -246,24 +371,19 @@ final class DiscordMessageLinkNbtCodec {
                 return EntryReadResult.failure("invalid_destination");
             }
             String destination = copy.getString(TAG_DESTINATION);
-            if (copy.hasKey(TAG_BINDING)
-                    && !copy.hasKey(TAG_BINDING, Constants.NBT.TAG_STRING)) {
+            // The writer writes every field, a Discord line's empty binding
+            // and a headerless post's empty header too.
+            if (!copy.hasKey(TAG_BINDING, Constants.NBT.TAG_STRING)) {
                 return EntryReadResult.failure("invalid_binding");
             }
             String binding = copy.getString(TAG_BINDING);
             if (binding.length() > 0 && !isBindingId(binding)) {
                 return EntryReadResult.failure("invalid_binding");
             }
-            if (isBindingDestination(destination)) {
-                // A copy kept under its binding names that very binding.
-                if (!destination.equals(BINDING_PREFIX + binding)) {
-                    return EntryReadResult.failure("invalid_binding");
-                }
-            } else if (!isChannelDestination(destination)) {
+            if (!isChannelDestination(destination)) {
                 return EntryReadResult.failure("invalid_destination");
             }
-            if (copy.hasKey(TAG_HEADER)
-                    && !copy.hasKey(TAG_HEADER, Constants.NBT.TAG_STRING)) {
+            if (!copy.hasKey(TAG_HEADER, Constants.NBT.TAG_STRING)) {
                 return EntryReadResult.failure("invalid_header");
             }
             String header = copy.getString(TAG_HEADER);
@@ -283,25 +403,10 @@ final class DiscordMessageLinkNbtCodec {
                 raw.getLong(TAG_MESSAGE_ID), read));
     }
 
-    /** Whether a value is a Discord id: a snowflake, digits only. */
-    static boolean isDiscordId(String value) {
-        if (value == null || value.length() == 0
-                || value.length() > MAX_DISCORD_ID_LENGTH) {
-            return false;
-        }
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            if (character < '0' || character > '9') {
-                return false;
-            }
-        }
-        return true;
-    }
-
     /** Whether a destination names a Discord channel by id. */
     static boolean isChannelDestination(String value) {
         return value != null && value.startsWith(CHANNEL_PREFIX)
-                && isDiscordId(value.substring(CHANNEL_PREFIX.length()));
+                && DiscordChannelBindings.isSnowflake(value.substring(CHANNEL_PREFIX.length()));
     }
 
     /**
@@ -323,12 +428,6 @@ final class DiscordMessageLinkNbtCodec {
             }
         }
         return true;
-    }
-
-    /** Whether a destination names the binding a post whose channel was never learnt went through. */
-    static boolean isBindingDestination(String value) {
-        return value != null && value.startsWith(BINDING_PREFIX)
-                && isBindingId(value.substring(BINDING_PREFIX.length()));
     }
 
     /**
@@ -373,6 +472,7 @@ final class DiscordMessageLinkNbtCodec {
 
     static final class ReadResult {
         private final List<DiscordMessageLinks.SavedLink> entries;
+        private final List<DiscordTopicMemory.SavedTopic> topics;
         private final boolean repaired;
         private final List<NBTTagCompound> quarantineEntries;
         private final boolean readOnly;
@@ -380,12 +480,15 @@ final class DiscordMessageLinkNbtCodec {
         private final NBTTagCompound originalData;
 
         private ReadResult(List<DiscordMessageLinks.SavedLink> entries,
+                           List<DiscordTopicMemory.SavedTopic> topics,
                            boolean repaired,
                            List<NBTTagCompound> quarantineEntries,
                            boolean readOnly, int unsupportedVersion,
                            NBTTagCompound originalData) {
             this.entries = Collections.unmodifiableList(
                     new ArrayList<DiscordMessageLinks.SavedLink>(entries));
+            this.topics = Collections.unmodifiableList(
+                    new ArrayList<DiscordTopicMemory.SavedTopic>(topics));
             this.repaired = repaired;
             this.quarantineEntries = Collections.unmodifiableList(
                     new ArrayList<NBTTagCompound>(quarantineEntries));
@@ -395,14 +498,16 @@ final class DiscordMessageLinkNbtCodec {
         }
 
         private static ReadResult success(List<DiscordMessageLinks.SavedLink> entries,
+                                          List<DiscordTopicMemory.SavedTopic> topics,
                                           boolean repaired,
                                           List<NBTTagCompound> quarantine) {
-            return new ReadResult(entries, repaired, quarantine, false, -1, null);
+            return new ReadResult(entries, topics, repaired, quarantine, false, -1, null);
         }
 
         private static ReadResult unsupported(NBTTagCompound original, int version) {
             return new ReadResult(
-                    Collections.<DiscordMessageLinks.SavedLink>emptyList(), false,
+                    Collections.<DiscordMessageLinks.SavedLink>emptyList(),
+                    Collections.<DiscordTopicMemory.SavedTopic>emptyList(), false,
                     Collections.<NBTTagCompound>emptyList(), true, version,
                     (NBTTagCompound) original.copy());
         }
@@ -410,6 +515,11 @@ final class DiscordMessageLinkNbtCodec {
         /** The links read, oldest first. */
         List<DiscordMessageLinks.SavedLink> getEntries() {
             return this.entries;
+        }
+
+        /** The topics read, in the order they were written. */
+        List<DiscordTopicMemory.SavedTopic> getTopics() {
+            return this.topics;
         }
 
         boolean wasRepaired() {

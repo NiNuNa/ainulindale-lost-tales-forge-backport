@@ -48,6 +48,7 @@
   ],
   "rewards": {
     "experience": "30",
-    "items": "minecraft:cooked_beef*2,minecraft:apple*2"
+    "items": "minecraft:cooked_beef*2,minecraft:apple*2",
+    "skills": "losttales:cooking*40,losttales:husbandry*20"
   }
 }

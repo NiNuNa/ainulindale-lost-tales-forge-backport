@@ -1,6 +1,7 @@
 package com.ninuna.losttales.entity.npc;
 
 import com.ninuna.losttales.faction.ELostTalesFaction;
+import com.ninuna.losttales.item.LostTalesItemSpawnEgg;
 import lotr.common.entity.npc.LOTREntityBreeMan;
 import lotr.common.entity.npc.LOTREntityNPC;
 import lotr.common.fac.LOTRFaction;
@@ -9,6 +10,7 @@ import net.minecraft.entity.IEntityLivingData;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.world.World;
 
 public class LostTalesEntityOdaneMan extends LOTREntityBreeMan {
@@ -71,6 +73,15 @@ public class LostTalesEntityOdaneMan extends LOTREntityBreeMan {
     @Override
     public LOTRFaction getFaction() {
         return ELostTalesFaction.ODANE.getFaction();
+    }
+
+    /**
+     * A creative pick gives the creature's own egg, the guard's for a guard;
+     * LOTR's lookup knows only LOTR's creatures.
+     */
+    @Override
+    public ItemStack getPickedResult(MovingObjectPosition target) {
+        return LostTalesItemSpawnEgg.eggOf(this);
     }
 
     @Override

@@ -67,6 +67,8 @@ public enum CharacterErrorId {
     SWITCH_COOLDOWN("switch_cooldown"),
     SWITCH_ACCOUNT_FROZEN("switch_account_frozen"),
     SWITCH_RECOVERY_REQUIRED("switch_recovery_required"),
+    /** A held switch journal: no character is deleted or released until it is settled. */
+    SWITCH_JOURNAL_HELD("switch_journal_held"),
     DELETE_NOT_ALLOWED("delete_not_allowed"),
     DELETE_ACTIVE_CHARACTER("delete_active_character"),
     DELETE_RECOVERY_STORAGE_READ_ONLY("delete_recovery_storage_read_only"),
@@ -87,6 +89,8 @@ public enum CharacterErrorId {
     LORE_CHARACTER_CANNOT_DELETE("lore_character_cannot_delete"),
     LORE_CHARACTER_CANNOT_EDIT("lore_character_cannot_edit"),
     LORE_CHARACTER_KEEPS_LOOK("lore_character_keeps_look"),
+    LORE_CHARACTER_KEEPS_NAME("lore_character_keeps_name"),
+    LORE_CHARACTER_NO_FACTION("lore_character_no_faction"),
     LORE_CHARACTER_STALE_OWNERSHIP("lore_character_stale_ownership"),
     LORE_CHARACTER_TRANSFER_IN_PROGRESS("lore_character_transfer_in_progress"),
     LORE_CHARACTER_TRANSFER_STORAGE_READ_ONLY("lore_character_transfer_storage_read_only"),

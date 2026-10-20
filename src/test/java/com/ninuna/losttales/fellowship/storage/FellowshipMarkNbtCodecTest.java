@@ -193,6 +193,37 @@ public final class FellowshipMarkNbtCodecTest {
         assertTrue(FellowshipMarkNbtCodec.read(newerRoot).isReadOnly());
     }
 
+    /**
+     * A save whose quarantine would hold more than its bound is kept as it
+     * is, read-only; a store whose quarantine is full closes before it
+     * takes another mark out.
+     */
+    @Test
+    public void aQuarantinePastItsBoundKeepsTheStoreReadOnly() {
+        List<NBTTagCompound> full = new ArrayList<NBTTagCompound>();
+        for (int index = 0; index < FellowshipNbtCodec.MAX_QUARANTINED; index++) {
+            full.add(FellowshipMarkNbtCodec.createQuarantineEntry("unregistered_dimension",
+                    mark(1, "Bree", index)));
+        }
+        NBTTagCompound atBound = new NBTTagCompound();
+        FellowshipMarkNbtCodec.write(atBound, Collections.singletonList(mark(2, "Bree", 1L)),
+                full);
+        assertFalse(FellowshipMarkNbtCodec.read(atBound).isReadOnly());
+
+        NBTTagCompound pastBound = (NBTTagCompound) atBound.copy();
+        markTag(pastBound, 0).setString("Name", "§cBree");
+        FellowshipMarkNbtCodec.ReadResult past = FellowshipMarkNbtCodec.read(pastBound);
+        assertTrue(past.isReadOnly());
+        assertEquals(pastBound, past.getOriginalDataCopy());
+
+        FellowshipMarkWorldData data = new FellowshipMarkWorldData(
+                FellowshipMarkWorldData.DATA_NAME);
+        data.readFromNBT(atBound);
+        assertFalse(data.hasQuarantineRoomFor(1));
+        assertTrue("closed", data.isReadOnlyForNewerVersion());
+        assertEquals(1, data.getMarkCount());
+    }
+
     private static FellowshipMark mark(int number, String name, long placedAt) {
         return FellowshipMark.ofFellowship(
                 UUID.fromString("40000000-0000-0000-0000-00000000000" + number),

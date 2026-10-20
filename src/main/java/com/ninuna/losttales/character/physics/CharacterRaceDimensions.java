@@ -22,21 +22,18 @@ public final class CharacterRaceDimensions {
     private final float height;
     private final float standingEyeHeight;
     private final float sneakingEyeHeight;
-    private final boolean lotrDerived;
 
     private CharacterRaceDimensions(
             String raceId,
             float width,
             float height,
             float standingEyeHeight,
-            float sneakingEyeHeight,
-            boolean lotrDerived) {
+            float sneakingEyeHeight) {
         this.raceId = LostTalesIdentifiers.normalize(raceId);
         this.width = width;
         this.height = height;
         this.standingEyeHeight = standingEyeHeight;
         this.sneakingEyeHeight = sneakingEyeHeight;
-        this.lotrDerived = lotrDerived;
     }
 
     /**
@@ -74,8 +71,7 @@ public final class CharacterRaceDimensions {
                 width,
                 height,
                 standingEyeHeight,
-                sneakingEyeHeight,
-                profile.isLotrDerived());
+                sneakingEyeHeight);
     }
 
     public String getRaceId() {
@@ -119,10 +115,6 @@ public final class CharacterRaceDimensions {
      */
     public float getItemDropEyeReferenceHeight(boolean sneaking) {
         return getEyeHeight(sneaking);
-    }
-
-    public boolean isLotrDerived() {
-        return this.lotrDerived;
     }
 
     private static float positiveOr(float value, float fallback) {

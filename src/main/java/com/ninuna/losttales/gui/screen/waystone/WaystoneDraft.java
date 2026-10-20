@@ -3,17 +3,19 @@ package com.ninuna.losttales.gui.screen.waystone;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 
 /**
  * What the waystone page holds between the server's state and Save: each
  * setting the page edits, as the player has set it, over the settings it
  * was read from. It says which of them changed, which is what lights
  * Save; keeps the player's edits when newer settings arrive; and makes
- * the settings Save sends. The waystone's place, structure and link are
- * the settings' own and are never edited here. Access is public or not:
- * a waystone that is not public reads as shared or private by its shares
- * alone (WAY-14), so the draft keeps only whether it is public.
+ * the settings Save sends. Access is public or not: a waystone that is
+ * not public reads as shared or private by its shares alone (WAY-14), so
+ * the draft keeps only whether it is public.
  */
 public final class WaystoneDraft {
     /** Every setting the page edits. */
@@ -23,14 +25,14 @@ public final class WaystoneDraft {
         FAST_TRAVEL, VISIBILITY
     }
 
-    /** The icons a waystone's marker is given from, in the order a step walks them. */
+    /** The icons a waystone's marker is given from, in the order its pick lists them. */
     public static final String[] ICONS = {
         "quest", "hostile", "undiscovered", "point_of_interest",
         "personal", "shack", "graveyard", "forest", "mountains",
         "port", "big_port", "bridge", "small_bridge", "camp"
     };
 
-    /** The colours a waystone's marker is given from, in the order a step walks them. */
+    /** The colours a waystone's marker is given from, in the order its pick lists them. */
     public static final String[] COLORS = {
         "white", "red", "green", "blue", "yellow", "gold",
         "orange", "purple", "violet", "gray", "dark_gray", "black"
@@ -202,16 +204,13 @@ public final class WaystoneDraft {
         return fields;
     }
 
-    /** The settings Save sends: the player's, on the waystone's own place, structure and link. */
+    /** The settings Save sends: every one as the player has set it. */
     public LostTalesMapMarkerEditableSettings toSettings() {
-        LostTalesMapMarkerEditableSettings from = this.base;
         return new LostTalesMapMarkerEditableSettings(
                 this.name, this.icon, this.color, this.category,
                 this.description, this.fastTravel,
-                from.getDimensionId(), from.getX(), from.getY(),
-                from.getZ(), this.compassRadius, this.discoveryRadius,
+                this.compassRadius, this.discoveryRadius,
                 this.hidden, this.discoverable, this.region,
-                from.hasWaystone(), from.getWaystoneStructureType(),
                 this.priority, this.publicAccess
                         ? LostTalesMapMarkerVisibility.PUBLIC
                         : LostTalesMapMarkerVisibility.PRIVATE);
@@ -277,38 +276,50 @@ public final class WaystoneDraft {
         this.fastTravel = on;
     }
 
-    /** The next icon, or with {@code back} the one before; one off the list steps onto it. */
-    public void stepIcon(boolean back) {
-        this.icon = step(ICONS, this.icon, back);
+    /**
+     * The icons the icon's pick offers: the fourteen, after the icon the
+     * waystone was read with where it is none of them, so picking another
+     * never loses it.
+     */
+    public List<String> icons() {
+        return offered(ICONS, this.base.getIconName());
     }
 
-    /** The next colour, or with {@code back} the one before. */
-    public void stepColor(boolean back) {
-        this.color = step(COLORS, this.color, back);
+    /** The colours the colour's pick offers: the twelve, after the waystone's own where it is none of them. */
+    public List<String> colors() {
+        return offered(COLORS, this.base.getColorName());
     }
 
-    /** The next relevance up, or with {@code back} down, round from either end. */
-    public void stepRelevance(boolean back) {
-        LostTalesMapMarkerRelevance[] all =
-                LostTalesMapMarkerRelevance.values();
-        this.priority = all[next(relevance().ordinal(), all.length, back)]
-                .getRank();
+    public void setIcon(String icon) {
+        this.icon = text(icon);
+    }
+
+    public void setColor(String color) {
+        this.color = text(color);
+    }
+
+    /** The level picked; picking the level the waystone reads keeps its exact rank. */
+    public void setRelevance(LostTalesMapMarkerRelevance level) {
+        if (level != null && level != relevance()) {
+            this.priority = level.getRank();
+        }
     }
 
     /**
-     * Private to public and back. Only a player who manages markers turns
-     * a waystone public; one that is public already may step back to it
-     * whoever edits it, since saving it public again needs nothing.
+     * Public or private, as picked. Only a player who manages markers
+     * makes a waystone public; one that is public already may be picked
+     * public again whoever edits it, since saving it public again needs
+     * nothing.
      */
-    public void stepVisibility(boolean managesMarkers) {
-        if (this.publicAccess) {
+    public void setPublic(boolean on, boolean managesMarkers) {
+        if (!on) {
             this.publicAccess = false;
         } else if (mayBePublic(managesMarkers)) {
             this.publicAccess = true;
         }
     }
 
-    /** Whether the draft may step to public: for a manager, or a waystone saved public already. */
+    /** Whether the draft may be public: for a manager, or a waystone saved public already. */
     public boolean mayBePublic(boolean managesMarkers) {
         return managesMarkers || isPublic(this.base);
     }
@@ -318,24 +329,26 @@ public final class WaystoneDraft {
         return settings.getVisibility() == LostTalesMapMarkerVisibility.PUBLIC;
     }
 
-    /** The word after {@code current} in {@code words}, or before it; a word off the list steps onto the first or the last. */
-    static String step(String[] words, String current, boolean back) {
-        int index = -1;
-        for (int at = 0; at < words.length; at++) {
-            if (words[at].equalsIgnoreCase(current == null ? ""
-                    : current.trim())) {
-                index = at;
-            }
+    /** {@code words}, after {@code own} where it is none of them. */
+    private static List<String> offered(String[] words, String own) {
+        List<String> offered = new ArrayList<String>(words.length + 1);
+        String value = own == null ? "" : own.trim();
+        if (value.length() > 0 && indexOf(Arrays.asList(words), value) < 0) {
+            offered.add(value);
         }
-        return words[next(index, words.length, back)];
+        offered.addAll(Arrays.asList(words));
+        return offered;
     }
 
-    /** The index a step lands on among {@code count}, round from either end; from none, the first or the last. */
-    private static int next(int index, int count, boolean back) {
-        if (index < 0) {
-            return back ? count - 1 : 0;
+    /** Where {@code word} stands among {@code words}, whatever its case; -1 for nowhere. */
+    static int indexOf(List<String> words, String word) {
+        String wanted = word == null ? "" : word.trim();
+        for (int at = 0; at < words.size(); at++) {
+            if (words.get(at).equalsIgnoreCase(wanted)) {
+                return at;
+            }
         }
-        return ((back ? index - 1 : index + 1) % count + count) % count;
+        return -1;
     }
 
     private static String text(String value) {

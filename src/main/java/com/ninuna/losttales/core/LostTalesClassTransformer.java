@@ -155,6 +155,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrFellowshipRequestsTransformer.active";
     public static final String LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY =
             "losttales.lotrFellowshipCreateTransformer.active";
+    public static final String LOTR_FELLOWSHIP_SHARE_ACTIVE_PROPERTY =
+            "losttales.lotrFellowshipShareTransformer.active";
+    public static final String LOTR_FELLOWSHIP_SHARE_ROW_ACTIVE_PROPERTY =
+            "losttales.lotrFellowshipShareRowTransformer.active";
     public static final String LOTR_TRADER_NOTICE_ACTIVE_PROPERTY =
             "losttales.lotrTraderNoticeTransformer.active";
     public static final String LOTR_ACHIEVEMENT_HOVER_ACTIVE_PROPERTY =
@@ -171,6 +175,30 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     /** Set once the game's chat log writes every line on one line of the log. */
     public static final String CHAT_LOG_ACTIVE_PROPERTY =
             "losttales.chatLogTransformer.active";
+    /** Friend of the Wise's larger alignment gains (PROG-06). */
+    public static final String PERK_ALIGNMENT_ACTIVE_PROPERTY =
+            "losttales.perkAlignmentTransformer.active";
+    /** Daggerwork's sooner strikes on LOTR's server. */
+    public static final String PERK_ATTACK_SERVER_ACTIVE_PROPERTY =
+            "losttales.perkAttackServerTransformer.active";
+    /** Daggerwork's sooner strikes in LOTR's client timer. */
+    public static final String PERK_ATTACK_CLIENT_ACTIVE_PROPERTY =
+            "losttales.perkAttackClientTransformer.active";
+    /** Fair Dealer's prices where LOTR checks and takes coins. */
+    public static final String PERK_TRADE_ACTIVE_PROPERTY =
+            "losttales.perkTradeTransformer.active";
+    /** Fair Dealer's prices on LOTR's trade screen. */
+    public static final String PERK_TRADE_SCREEN_ACTIVE_PROPERTY =
+            "losttales.perkTradeScreenTransformer.active";
+    /** Fair Dealer's sales as LOTR pays them. */
+    public static final String PERK_SELL_ACTIVE_PROPERTY =
+            "losttales.perkSellTransformer.active";
+    /** Repair and Master Smith at LOTR's anvil. */
+    public static final String PERK_ANVIL_ACTIVE_PROPERTY =
+            "losttales.perkAnvilTransformer.active";
+    /** Repairs taken from LOTR's anvil counting toward Smithing. */
+    public static final String PERK_ANVIL_TAKE_ACTIVE_PROPERTY =
+            "losttales.perkAnvilTakeTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -398,6 +426,26 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final int VANILLA_MENU_FRAMERATE = 30;
     private static final String LOTR_PLAYER_DATA =
             "lotr.common.LOTRPlayerData";
+    private static final String LOTR_ADD_ALIGNMENT_DESC =
+            "(Lnet/minecraft/entity/player/EntityPlayer;"
+                    + "Llotr/common/fac/LOTRAlignmentValues$AlignmentBonus;"
+                    + "Llotr/common/fac/LOTRFaction;Ljava/util/List;DDD)"
+                    + "Llotr/common/fac/LOTRAlignmentBonusMap;";
+    private static final String LOTR_NET_HANDLER_PLAY_SERVER =
+            "lotr.common.LOTRNetHandlerPlayServer";
+    private static final String LOTR_ATTACK_TIMING = "lotr.client.LOTRAttackTiming";
+    private static final String LOTR_SLOT_TRADE = "lotr.common.inventory.LOTRSlotTrade";
+    private static final String LOTR_GUI_TRADE = "lotr.client.gui.LOTRGuiTrade";
+    private static final String LOTR_PACKET_SELL_HANDLER =
+            "lotr.common.network.LOTRPacketSell$Handler";
+    private static final String LOTR_CONTAINER_ANVIL =
+            "lotr.common.inventory.LOTRContainerAnvil";
+    private static final String LOTR_SLOT_ANVIL_OUTPUT =
+            "lotr.common.inventory.LOTRSlotAnvilOutput";
+    private static final String PERK_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LostTalesLotrPerkPatchHooks";
+    private static final String CLIENT_PERK_HOOK_OWNER =
+            "com/ninuna/losttales/client/progression/ClientPerkHooks";
     private static final String LOTR_HIRED_NPC_INFO =
             "lotr.common.entity.npc.LOTRHiredNPCInfo";
     private static final String LOTR_CUSTOM_WAYPOINT =
@@ -416,6 +464,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "(Llotr/common/network/LOTRPacketFellowshipCreate;"
                     + "Lcpw/mods/fml/common/network/simpleimpl/MessageContext;)"
                     + "Lcpw/mods/fml/common/network/simpleimpl/IMessage;";
+    private static final String LOTR_SHARE_CWP_HANDLER =
+            "lotr.common.network.LOTRPacketShareCWP$Handler";
+    private static final String LOTR_SHARE_CWP_DESC =
+            "(Llotr/common/network/LOTRPacketShareCWP;"
+                    + "Lcpw/mods/fml/common/network/simpleimpl/MessageContext;)"
+                    + "Lcpw/mods/fml/common/network/simpleimpl/IMessage;";
+    private static final String LOTR_FELLOWSHIP_SHARE_ROW_HOOK_OWNER =
+            "com/ninuna/losttales/client/fellowship/LostTalesLotrFellowshipShareRows";
     private static final String LOTR_TRAVELLING_TRADER_INFO =
             "lotr.common.entity.npc.LOTRTravellingTraderInfo";
     private static final String LOTR_TRADER_NOTICE_HOOK_OWNER =
@@ -470,7 +526,29 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             transformGuiNewChatHitTest(basicClass)))));
         }
         if (LOTR_PLAYER_DATA.equals(transformedName)) {
-            return transformLotrFastTravelArrival(basicClass);
+            return transformLotrAlignmentGain(
+                    transformLotrFastTravelArrival(basicClass));
+        }
+        if (LOTR_NET_HANDLER_PLAY_SERVER.equals(transformedName)) {
+            return transformLotrServerAttackTime(basicClass);
+        }
+        if (LOTR_ATTACK_TIMING.equals(transformedName)) {
+            return transformLotrClientAttackTime(basicClass);
+        }
+        if (LOTR_SLOT_TRADE.equals(transformedName)) {
+            return transformLotrSlotTrade(basicClass);
+        }
+        if (LOTR_GUI_TRADE.equals(transformedName)) {
+            return transformLotrGuiTrade(basicClass);
+        }
+        if (LOTR_PACKET_SELL_HANDLER.equals(transformedName)) {
+            return transformLotrPacketSell(basicClass);
+        }
+        if (LOTR_CONTAINER_ANVIL.equals(transformedName)) {
+            return transformLotrContainerAnvil(basicClass);
+        }
+        if (LOTR_SLOT_ANVIL_OUTPUT.equals(transformedName)) {
+            return transformLotrSlotAnvilOutput(basicClass);
         }
         if (LOTR_HIRED_NPC_INFO.equals(transformedName)) {
             return transformLotrHiredUnit(basicClass);
@@ -483,6 +561,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_FELLOWSHIP_CREATE_HANDLER.equals(transformedName)) {
             return transformLotrFellowshipCreate(basicClass);
+        }
+        if (LOTR_SHARE_CWP_HANDLER.equals(transformedName)) {
+            return transformLotrFellowshipShare(basicClass);
         }
         if (GUI_CONTAINER.equals(transformedName)) {
             return transformGuiContainer(basicClass);
@@ -547,7 +628,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformLotrAlignmentLift(basicClass);
         }
         if (LOTR_GUI_MAP.equals(transformedName)) {
-            return transformLotrMapScene(transformLotrGuiMap(basicClass), false);
+            return transformLotrFellowshipShareRow(
+                    transformLotrMapScene(transformLotrGuiMap(basicClass), false));
         }
         if (LOTR_GUI_MINIQUEST_TRACKER.equals(transformedName)) {
             return transformLotrQuestTracker(basicClass);
@@ -3722,7 +3804,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
      * Refuses LOTR's own request to make a fellowship: before its handler
      * does anything, {@code LostTalesLotrFellowshipRequestHook.refusesCreation}
      * is asked, and a yes returns at once. Fellowships are made on the
-     * mod's page; LOTR's operator command still makes LOTR's own.
+     * mod's page; LOTR's {@code /fellowship} is removed at server start.
      */
     private static byte[] transformLotrFellowshipCreate(byte[] basicClass) {
         try {
@@ -3758,6 +3840,113 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Failed to patch LOTR's request to make a fellowship: " + throwable);
             return basicClass;
         }
+    }
+
+    /**
+     * LOTR's request to share a waypoint finds the fellowship it names
+     * through {@code LOTRPlayerData.getFellowshipByName}; that call is
+     * handed to {@code LostTalesLotrFellowshipRequestHook.shareInto}, which
+     * passes over a fellowship the account holds for the record only
+     * (FEL-02). The call takes and gives the same, so nothing else moves.
+     */
+    private static byte[] transformLotrFellowshipShare(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"onMessage".equals(method.name) || !LOTR_SHARE_CWP_DESC.equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, LOTR_FELLOWSHIP_HOOK_OWNER, "shareInto")) {
+                    activate(LOTR_FELLOWSHIP_SHARE_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                if (!redirectPlayerDataCall(method, "getFellowshipByName",
+                        "(Ljava/lang/String;)" + LOTR_FELLOWSHIP_DESC,
+                        LOTR_FELLOWSHIP_HOOK_OWNER, "shareInto")) {
+                    break;
+                }
+                activate(LOTR_FELLOWSHIP_SHARE_ACTIVE_PROPERTY);
+                info("Patched LOTR's waypoint share to pass over a fellowship held for the record");
+                return write(owner);
+            }
+            warn("Could not locate the fellowship lookup of LOTRPacketShareCWP.Handler#onMessage; "
+                    + "a fellowship held for the record takes shared waypoints");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR's waypoint share: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * LOTR's map finds the fellowship a waypoint is shared into, by the name
+     * typed, in its private {@code getFellowshipByName} through
+     * {@code LOTRPlayerData.getClientFellowshipByName}; that call is handed
+     * to {@code LostTalesLotrFellowshipShareRows.fellowshipByName}, which
+     * offers only the fellowships behind the character played (FEL-02).
+     */
+    private static byte[] transformLotrFellowshipShareRow(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"getFellowshipByName".equals(method.name)
+                        || !"(Ljava/lang/String;)Llotr/common/fellowship/LOTRFellowshipClient;"
+                                .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, LOTR_FELLOWSHIP_SHARE_ROW_HOOK_OWNER,
+                        "fellowshipByName")) {
+                    activate(LOTR_FELLOWSHIP_SHARE_ROW_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                if (!redirectPlayerDataCall(method, "getClientFellowshipByName",
+                        "(Ljava/lang/String;)Llotr/common/fellowship/LOTRFellowshipClient;",
+                        LOTR_FELLOWSHIP_SHARE_ROW_HOOK_OWNER, "fellowshipByName")) {
+                    break;
+                }
+                activate(LOTR_FELLOWSHIP_SHARE_ROW_ACTIVE_PROPERTY);
+                info("Patched LOTR's map to offer only the fellowships behind the character played");
+                return write(owner);
+            }
+            warn("Could not locate LOTRGuiMap#getFellowshipByName's lookup; LOTR's map "
+                    + "offers a fellowship held for the record as one to share into");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR's map share rows: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Hands every call of {@code LOTRPlayerData.name(desc)} in the method to
+     * the static {@code hookOwner.hookName}, which takes the player data
+     * first and the call's arguments after it. Whether there was one.
+     */
+    private static boolean redirectPlayerDataCall(MethodNode method, String name,
+                                                  String desc, String hookOwner,
+                                                  String hookName) {
+        boolean redirected = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
+                    && "lotr/common/LOTRPlayerData".equals(call.owner)
+                    && name.equals(call.name) && desc.equals(call.desc)) {
+                MethodInsnNode hook = new MethodInsnNode(Opcodes.INVOKESTATIC, hookOwner,
+                        hookName, "(Llotr/common/LOTRPlayerData;" + desc.substring(1), false);
+                method.instructions.set(call, hook);
+                instruction = hook;
+                redirected = true;
+            }
+        }
+        return redirected;
     }
 
     /**
@@ -4324,6 +4513,419 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Failed to patch RenderManager F3+B origin: " + throwable);
             return basicClass;
         }
+    }
+
+    /**
+     * Friend of the Wise (Nils, 2026-10-19): every gain LOTR's alignment
+     * core adds passes {@code checkBonusForPledgeEnemyLimit}, the kill
+     * path's and the direct path's alike, so the gain is made larger right
+     * after it and LOTR's map, popup and conquest all read the larger
+     * number. Penalties never pass there.
+     */
+    private static byte[] transformLotrAlignmentGain(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"addAlignment".equals(method.name)
+                        || !LOTR_ADD_ALIGNMENT_DESC.equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, PERK_HOOK_OWNER, "alignmentGain")) {
+                    activate(PERK_ALIGNMENT_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                List<AbstractInsnNode> limits = calls(method, Opcodes.INVOKESPECIAL,
+                        "lotr/common/LOTRPlayerData", "checkBonusForPledgeEnemyLimit",
+                        "(Llotr/common/fac/LOTRFaction;F)F");
+                if (limits.size() < 2) {
+                    warn("Could not locate both of LOTR's alignment gains; Friend"
+                            + " of the Wise will not make them larger");
+                    return basicClass;
+                }
+                for (AbstractInsnNode limit : limits) {
+                    InsnList hook = new InsnList();
+                    hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
+                            "alignmentGain", "(FLnet/minecraft/entity/player/EntityPlayer;)F"));
+                    method.instructions.insert(limit, hook);
+                }
+                activate(PERK_ALIGNMENT_ACTIVE_PROPERTY);
+                info("Patched LOTR alignment gains for Friend of the Wise");
+                return write(owner);
+            }
+            warn("Could not locate LOTRPlayerData#addAlignment; Friend of the Wise"
+                    + " will not make alignment gains larger");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR alignment gains: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Daggerwork (Nils, 2026-10-19): the ticks LOTR's server blocks a
+     * player's next strike for, as {@code processUseEntity} reads them
+     * from {@code LOTRWeaponStats.getAttackTimePlayer}.
+     */
+    private static byte[] transformLotrServerAttackTime(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("processUseEntity".equals(method.name)
+                        || "func_147340_a".equals(method.name))
+                        || !"(Lnet/minecraft/network/play/client/C02PacketUseEntity;)V"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, PERK_HOOK_OWNER, "attackTime")) {
+                    activate(PERK_ATTACK_SERVER_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                List<AbstractInsnNode> times = calls(method, Opcodes.INVOKESTATIC,
+                        "lotr/common/item/LOTRWeaponStats", "getAttackTimePlayer",
+                        "(Lnet/minecraft/item/ItemStack;)I");
+                if (times.isEmpty()) {
+                    warn("Could not locate LOTR's attack time in processUseEntity;"
+                            + " Daggerwork will not strike sooner");
+                    return basicClass;
+                }
+                for (AbstractInsnNode time : times) {
+                    InsnList hook = new InsnList();
+                    hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
+                            "attackTime", "(ILnet/minecraft/network/NetHandlerPlayServer;)I"));
+                    method.instructions.insert(time, hook);
+                }
+                activate(PERK_ATTACK_SERVER_ACTIVE_PROPERTY);
+                info("Patched LOTR's server attack timer for Daggerwork");
+                return write(owner);
+            }
+            warn("Could not locate LOTRNetHandlerPlayServer#processUseEntity;"
+                    + " Daggerwork will not strike sooner");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR's server attack timer: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Daggerwork on LOTR's client: the wait its attack timer starts after a swing. */
+    private static byte[] transformLotrClientAttackTime(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"doAttackTiming".equals(method.name) || !"()V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, CLIENT_PERK_HOOK_OWNER, "attackTime")) {
+                    activate(PERK_ATTACK_CLIENT_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                List<AbstractInsnNode> times = calls(method, Opcodes.INVOKESTATIC,
+                        "lotr/common/item/LOTRWeaponStats", "getAttackTimePlayer",
+                        "(Lnet/minecraft/item/ItemStack;)I");
+                if (times.isEmpty()) {
+                    warn("Could not locate LOTR's attack time in its client timer;"
+                            + " Daggerwork's sooner strikes will not show");
+                    return basicClass;
+                }
+                for (AbstractInsnNode time : times) {
+                    method.instructions.insert(time, new MethodInsnNode(Opcodes.INVOKESTATIC,
+                            CLIENT_PERK_HOOK_OWNER, "attackTime", "(I)I"));
+                }
+                activate(PERK_ATTACK_CLIENT_ACTIVE_PROPERTY);
+                info("Patched LOTR's client attack timer for Daggerwork");
+                return write(owner);
+            }
+            warn("Could not locate LOTRAttackTiming#doAttackTiming; Daggerwork's"
+                    + " sooner strikes will not show");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR's client attack timer: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Fair Dealer (Nils, 2026-10-19): a trade slot's price where LOTR
+     * checks the player's coins and where it takes them.
+     */
+    private static byte[] transformLotrSlotTrade(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            int patched = 0;
+            int found = 0;
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                boolean check = ("canTakeStack".equals(method.name)
+                        || "func_82869_a".equals(method.name))
+                        && "(Lnet/minecraft/entity/player/EntityPlayer;)Z".equals(method.desc);
+                boolean take = ("onPickupFromSlot".equals(method.name)
+                        || "func_82870_a".equals(method.name))
+                        && "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/ItemStack;)V"
+                        .equals(method.desc);
+                if (!check && !take) {
+                    continue;
+                }
+                found++;
+                if (containsHook(method, PERK_HOOK_OWNER, "tradeCost")) {
+                    patched++;
+                    continue;
+                }
+                List<AbstractInsnNode> costs = calls(method, Opcodes.INVOKEVIRTUAL,
+                        "lotr/common/inventory/LOTRSlotTrade", "cost", "()I");
+                for (AbstractInsnNode cost : costs) {
+                    InsnList hook = new InsnList();
+                    hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                    hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
+                            "tradeCost", "(ILnet/minecraft/entity/player/EntityPlayer;"
+                                    + "Lnet/minecraft/inventory/Slot;)I"));
+                    method.instructions.insert(cost, hook);
+                }
+                if (!costs.isEmpty()) {
+                    patched++;
+                }
+            }
+            if (found < 2 || patched < found) {
+                rollBack();
+                warn("Could not locate LOTR's trade price checks; Fair Dealer will"
+                        + " not change prices");
+                return basicClass;
+            }
+            activate(PERK_TRADE_ACTIVE_PROPERTY);
+            info("Patched LOTR trade prices for Fair Dealer");
+            return write(owner);
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR trade prices: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Fair Dealer on LOTR's trade screen: the price it draws under each
+     * trade and the total it adds up for what is offered for sale.
+     */
+    private static byte[] transformLotrGuiTrade(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            boolean prices = false;
+            boolean sales = false;
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (containsHook(method, CLIENT_PERK_HOOK_OWNER, "shownTradeCost")) {
+                    prices = true;
+                }
+                if (containsHook(method, CLIENT_PERK_HOOK_OWNER, "shownSellValue")) {
+                    sales = true;
+                }
+            }
+            if (prices && sales) {
+                activate(PERK_TRADE_SCREEN_ACTIVE_PROPERTY);
+                return basicClass;
+            }
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if ("renderTradeSlot".equals(method.name)
+                        && "(Llotr/common/inventory/LOTRSlotTrade;)V".equals(method.desc)) {
+                    for (AbstractInsnNode cost : calls(method, Opcodes.INVOKEVIRTUAL,
+                            "lotr/common/inventory/LOTRSlotTrade", "cost", "()I")) {
+                        InsnList hook = new InsnList();
+                        hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                        hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, CLIENT_PERK_HOOK_OWNER,
+                                "shownTradeCost", "(ILnet/minecraft/inventory/Slot;)I"));
+                        method.instructions.insert(cost, hook);
+                        prices = true;
+                    }
+                }
+                for (AbstractInsnNode read : fieldReads(method,
+                        "lotr/common/entity/npc/LOTRTradeSellResult", "totalSellValue")) {
+                    method.instructions.insert(read, new MethodInsnNode(Opcodes.INVOKESTATIC,
+                            CLIENT_PERK_HOOK_OWNER, "shownSellValue", "(I)I"));
+                    sales = true;
+                }
+            }
+            if (!prices || !sales) {
+                warn("Could not locate the prices LOTR's trade screen draws; Fair"
+                        + " Dealer's prices will not show there");
+                return basicClass;
+            }
+            activate(PERK_TRADE_SCREEN_ACTIVE_PROPERTY);
+            info("Patched LOTR's trade screen for Fair Dealer");
+            return write(owner);
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR's trade screen: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Fair Dealer when the player sells what they offered: each stack's value as LOTR pays it. */
+    private static byte[] transformLotrPacketSell(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"onMessage".equals(method.name) || !("(Llotr/common/network/LOTRPacketSell;"
+                        + "Lcpw/mods/fml/common/network/simpleimpl/MessageContext;)"
+                        + "Lcpw/mods/fml/common/network/simpleimpl/IMessage;").equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, PERK_HOOK_OWNER, "sellValue")) {
+                    activate(PERK_SELL_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                int player = findLotrHandlerPlayerLocal(method);
+                List<AbstractInsnNode> reads = fieldReads(method,
+                        "lotr/common/entity/npc/LOTRTradeSellResult", "totalSellValue");
+                if (player < 0 || reads.isEmpty()) {
+                    warn("Could not locate what LOTR pays for a sale; Fair Dealer"
+                            + " will not raise it");
+                    return basicClass;
+                }
+                for (AbstractInsnNode read : reads) {
+                    InsnList hook = new InsnList();
+                    hook.add(new VarInsnNode(Opcodes.ALOAD, player));
+                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
+                            "sellValue", "(ILnet/minecraft/entity/player/EntityPlayer;)I"));
+                    method.instructions.insert(read, hook);
+                }
+                activate(PERK_SELL_ACTIVE_PROPERTY);
+                info("Patched LOTR sales for Fair Dealer");
+                return write(owner);
+            }
+            warn("Could not locate LOTRPacketSell's handler; Fair Dealer will not"
+                    + " raise what sales pay");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR sales: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Repair and Master Smith (Nils, 2026-10-19): each time LOTR's anvil
+     * has worked out its output and price, on both sides.
+     */
+    private static byte[] transformLotrContainerAnvil(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"updateRepairOutput".equals(method.name) || !"()V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, PERK_HOOK_OWNER, "anvilOutput")) {
+                    activate(PERK_ANVIL_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                List<AbstractInsnNode> returns = new ArrayList<AbstractInsnNode>();
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() == Opcodes.RETURN) {
+                        returns.add(instruction);
+                    }
+                }
+                if (returns.isEmpty()) {
+                    warn("Could not locate the ends of LOTR's anvil output; Repair"
+                            + " and Master Smith will not change it");
+                    return basicClass;
+                }
+                for (AbstractInsnNode end : returns) {
+                    InsnList hook = new InsnList();
+                    hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
+                            "anvilOutput", "(Llotr/common/inventory/LOTRContainerAnvil;)V"));
+                    method.instructions.insertBefore(end, hook);
+                }
+                activate(PERK_ANVIL_ACTIVE_PROPERTY);
+                info("Patched LOTR's anvil output for Repair and Master Smith");
+                return write(owner);
+            }
+            warn("Could not locate LOTRContainerAnvil#updateRepairOutput; Repair and"
+                    + " Master Smith will not change it");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR's anvil output: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /** A repair taken from LOTR's anvil counts toward Smithing. */
+    private static byte[] transformLotrSlotAnvilOutput(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("onPickupFromSlot".equals(method.name)
+                        || "func_82870_a".equals(method.name))
+                        || !"(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/ItemStack;)V"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, PERK_HOOK_OWNER, "anvilTaken")) {
+                    activate(PERK_ANVIL_TAKE_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 2));
+                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
+                        "anvilTaken", "(Lnet/minecraft/entity/player/EntityPlayer;"
+                                + "Lnet/minecraft/item/ItemStack;)V"));
+                method.instructions.insert(hook);
+                activate(PERK_ANVIL_TAKE_ACTIVE_PROPERTY);
+                info("Patched LOTR's anvil output slot to count repairs");
+                return write(owner);
+            }
+            warn("Could not locate LOTRSlotAnvilOutput#onPickupFromSlot; repairs at"
+                    + " LOTR's anvil will not count toward Smithing");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch LOTR's anvil output slot: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Every call in the method to one owner's method by name and descriptor, in order. */
+    private static List<AbstractInsnNode> calls(MethodNode method, int opcode,
+                                                String owner, String name, String desc) {
+        List<AbstractInsnNode> found = new ArrayList<AbstractInsnNode>();
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode && instruction.getOpcode() == opcode) {
+                MethodInsnNode call = (MethodInsnNode)instruction;
+                if (owner.equals(call.owner) && name.equals(call.name) && desc.equals(call.desc)) {
+                    found.add(call);
+                }
+            }
+        }
+        return found;
+    }
+
+    /** Every read of one owner's field in the method, in order. */
+    private static List<AbstractInsnNode> fieldReads(MethodNode method, String owner, String name) {
+        List<AbstractInsnNode> found = new ArrayList<AbstractInsnNode>();
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof FieldInsnNode
+                    && instruction.getOpcode() == Opcodes.GETFIELD
+                    && owner.equals(((FieldInsnNode)instruction).owner)
+                    && name.equals(((FieldInsnNode)instruction).name)) {
+                found.add(instruction);
+            }
+        }
+        return found;
     }
 
     /**

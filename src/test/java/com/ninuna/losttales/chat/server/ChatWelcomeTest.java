@@ -51,6 +51,23 @@ public final class ChatWelcomeTest {
         assertEquals(ChatWelcome.MAX_LINES, ChatWelcome.lines(many).size());
     }
 
+    /** The lines a welcome skips are reported once, blank ones not counted. */
+    @Test
+    public void linesPastTheEighthAreReportedOnce() {
+        String[] many = new String[12];
+        Arrays.fill(many, "line");
+        many[3] = " ";
+        List<String> warnings = new java.util.ArrayList<String>();
+        assertEquals(ChatWelcome.MAX_LINES, ChatWelcome.lines(many, warnings).size());
+        assertEquals(1, warnings.size());
+        assertTrue(warnings.get(0).contains("skips the other 3"));
+        warnings.clear();
+        String[] eight = new String[ChatWelcome.MAX_LINES];
+        Arrays.fill(eight, "line");
+        ChatWelcome.lines(eight, warnings);
+        assertTrue(warnings.isEmpty());
+    }
+
     @Test
     public void aJoinIsWelcomedAMomentLaterOnce() {
         UUID player = UUID.randomUUID();

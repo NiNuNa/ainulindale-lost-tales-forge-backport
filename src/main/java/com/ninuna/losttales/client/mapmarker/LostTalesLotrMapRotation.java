@@ -76,8 +76,8 @@ public final class LostTalesLotrMapRotation {
     /**
      * How quickly the drawn angle catches up with the one being dragged, as a
      * time constant in seconds. Mouse movement arrives in steps of whatever
-     * the pointer did between two events; following it exactly is what made
-     * the map look like it was shivering rather than turning.
+     * the pointer did between two events; followed exactly, the map would
+     * shiver rather than turn.
      */
     static final float SMOOTHING_SECONDS = 0.045F;
     /** Below this, in degrees, the drawn angle simply becomes the target. */
@@ -85,11 +85,10 @@ public final class LostTalesLotrMapRotation {
     /**
      * How far the eye may drop below straight down, in degrees.
      *
-     * <p>The lean's half of {@link #MAX_ORIENTATION_DEGREES}. It was once
-     * further out than the turn on the grounds that a low eye is just a low
-     * eye, but a map that can be tipped a third further than it can be turned
-     * reads as two separate controls; sharing the limit is what makes the
-     * gesture one movement.</p>
+     * <p>The lean's half of {@link #MAX_ORIENTATION_DEGREES}. A map that
+     * could be tipped further than it can be turned would read as two
+     * separate controls; sharing the limit makes the gesture one
+     * movement.</p>
      */
     static final float MAX_PITCH_DEGREES = MAX_ORIENTATION_DEGREES;
     /** Smallest safe orthographic scale when inverting the map pitch. */
@@ -656,8 +655,8 @@ public final class LostTalesLotrMapRotation {
      * The largest the sheet is ever cut, whatever it is doing.
      *
      * <p>Used by conservative screen-space culling for sheet-attached labels.
-     * Procedural noise uses the map texture's own coordinates and no longer
-     * needs an independent coverage quad.</p>
+     * Procedural noise uses the map texture's own coordinates and needs no
+     * coverage quad of its own.</p>
      */
     static float maxCoverage(float width, float height) {
         return (float)Math.sqrt(width * width + height * height)

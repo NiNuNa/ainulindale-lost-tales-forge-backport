@@ -7,10 +7,12 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData;
+import com.ninuna.losttales.mapmarker.LostTalesWaystoneVisits;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerRegionResolver;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
+import com.ninuna.losttales.world.waystone.LostTalesWaystoneStructureRegistry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -32,8 +34,6 @@ import net.minecraft.world.World;
  * cooldown, safety, and teleport implementation.
  */
 public final class LostTalesLotrWaystoneTravelAdapter {
-    private static final String GLOWSTONE_HOUSE =
-            "losttales:glowstone_house";
     private static final int[][] ADJACENT_OFFSETS = {
             {0, 1}, {1, 0}, {0, -1}, {-1, 0},
             {0, 2}, {2, 0}, {0, -2}, {-2, 0},
@@ -47,10 +47,33 @@ public final class LostTalesLotrWaystoneTravelAdapter {
 
     private LostTalesLotrWaystoneTravelAdapter() {}
 
+    /**
+     * Whether the player may travel from {@code source}, as Destinations
+     * asks: they stand in Middle-earth, and its fast travel is on.
+     */
+    public static boolean canTravelFrom(EntityPlayerMP player,
+                                        LostTalesMapMarkerRecord source) {
+        return player != null && source != null
+                && player.dimension == LOTRDimension.MIDDLE_EARTH.dimensionID
+                && source.hasFastTravel();
+    }
+
+    /**
+     * A place picked on the map after Destinations, travelled to from the
+     * waystone. Only the one pick within the window Destinations opened
+     * on the server counts ({@link LostTalesWaystoneVisits}); the window
+     * closes with it, whatever comes of it.
+     */
     public static void beginTravel(
             EntityPlayerMP player,
             int sourceX, int sourceY, int sourceZ,
             String sourceMarkerId, String destinationMarkerId) {
+        if (player == null || !LostTalesWaystoneVisits.takeTravel(
+                player.getUniqueID(), sourceMarkerId, player.dimension,
+                sourceX, sourceY, sourceZ, System.currentTimeMillis())) {
+            deny(player, "chat.losttales.fast_travel.window_closed");
+            return;
+        }
         ResolvedTravel resolved = resolve(
                 player, sourceX, sourceY, sourceZ,
                 sourceMarkerId, destinationMarkerId, true);
@@ -166,10 +189,12 @@ public final class LostTalesLotrWaystoneTravelAdapter {
         NATIVE_PENDING.clear();
     }
 
+    /** Forgets the player's travel and the waystone they used last; called as they leave. */
     public static void clearPending(EntityPlayerMP player) {
         if (player != null && player.getUniqueID() != null) {
             PENDING.remove(player.getUniqueID());
             NATIVE_PENDING.remove(player.getUniqueID());
+            LostTalesWaystoneVisits.forget(player.getUniqueID());
         }
     }
 
@@ -287,8 +312,9 @@ public final class LostTalesLotrWaystoneTravelAdapter {
                 data.getRecord(sourceMarkerId);
         LostTalesMapMarkerRecord destination =
                 data.getRecord(destinationMarkerId);
-        if (!isLiveLink(source, tile, world,
-                sourceX, sourceY, sourceZ)
+        if (source == null || !source.isLinkedTo(
+                world.provider.dimensionId, sourceX, sourceY, sourceZ,
+                tile.getLinkToken())
                 || !source.hasFastTravel()
                 || !LostTalesMapMarkerVisibilityPolicy.canView(
                         source, player)
@@ -332,21 +358,6 @@ public final class LostTalesLotrWaystoneTravelAdapter {
         return new ResolvedTravel(data, destination);
     }
 
-    private static boolean isLiveLink(
-            LostTalesMapMarkerRecord record,
-            LostTalesTileEntityWaystone tile,
-            World world, int x, int y, int z) {
-        return record != null
-                && record.isLinked() && record.hasWaystone()
-                && record.getLinkToken() != null
-                && record.getLinkToken().equals(tile.getLinkToken())
-                && record.getLinkedDimensionId()
-                        == world.provider.dimensionId
-                && record.getLinkedX() == x
-                && record.getLinkedY() == y
-                && record.getLinkedZ() == z;
-    }
-
     private static LOTRCustomWaypoint createWaypoint(
             World world, LostTalesMapMarkerRecord destination,
             int travelId) {
@@ -359,13 +370,17 @@ public final class LostTalesLotrWaystoneTravelAdapter {
                     markerX, markerY, markerZ);
         }
 
-        if (GLOWSTONE_HOUSE.equals(
-                destination.getWaystoneStructureType())) {
+        // A generated waystone's house says where a traveller arrives
+        // (WAY-17); the spots beside the waystone stand in where it is
+        // not safe, or for a waystone with no house.
+        int[] arrival = LostTalesWaystoneStructureRegistry.arrival(
+                destination.getWaystoneStructureType());
+        if (arrival != null) {
             LOTRCustomWaypoint outsideHouse = createWaypointAt(
                     destination, travelId,
-                    destination.getLinkedX(),
-                    destination.getLinkedY(),
-                    destination.getLinkedZ() + 3);
+                    destination.getLinkedX() + arrival[0],
+                    destination.getLinkedY() + arrival[1],
+                    destination.getLinkedZ() + arrival[2]);
             if (prepareSafeDestination(
                     world, destination, outsideHouse)) {
                 return outsideHouse;

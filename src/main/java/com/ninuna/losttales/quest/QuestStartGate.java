@@ -12,6 +12,8 @@ import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
+import com.ninuna.losttales.progression.perk.Perks;
+import com.ninuna.losttales.progression.skill.PerkEffect;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -194,16 +196,19 @@ public final class QuestStartGate {
     /**
      * The touched creature tells a rumour it knows (QUEST-20): of a quest
      * whose rumour names its kind, that the player could take now and has
-     * not heard of yet, one at a time. The log keeps it, the rumour's
-     * marker is revealed, and the player's game says it in the creature's
-     * voice. Answers whether one was told.
+     * not heard of yet, one at a time, or as many as Rumour-hound lets
+     * the player hear at once (PROG-06). The log keeps each, its marker is
+     * revealed, and the player's game says it in the creature's voice.
+     * Answers whether one was told.
      */
     static boolean tellRumour(EntityPlayerMP player, Entity teller) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         if (data == null || data.isReadOnlyForNewerVersion()) {
             return false;
         }
-        for (LostTalesQuestDefinition quest : LostTalesQuestRegistry.getQuests()) {
+        int most = Math.max(1, (int) Math.round(Perks.of(player).total(PerkEffect.RUMOURS)));
+        int told = 0;
+        for (LostTalesQuestDefinition quest : LostTalesQuestRegistry.getRumouredQuests()) {
             Map<String, String> rumour = LostTalesQuestRules.rumour(quest);
             String id = quest.getId();
             if (rumour.isEmpty() || quest.isWorldQuest()
@@ -222,10 +227,15 @@ public final class QuestStartGate {
             ServerQuestSync.reveal(player, Collections.singleton(id));
             LostTalesNetworkHandler.CHANNEL.sendTo(new LostTalesQuestOfferPacket(
                     teller.getEntityId(), id, true), player);
-            LostTalesQuestManager.syncToClient(player);
-            return true;
+            told++;
+            if (told >= most) {
+                break;
+            }
         }
-        return false;
+        if (told > 0) {
+            LostTalesQuestManager.syncToClient(player);
+        }
+        return told > 0;
     }
 
     /**
@@ -241,7 +251,7 @@ public final class QuestStartGate {
                 || !LostTalesConfig.allowQuestInteractionStarts) {
             return false;
         }
-        for (LostTalesQuestDefinition quest : LostTalesQuestRegistry.getQuests()) {
+        for (LostTalesQuestDefinition quest : LostTalesQuestRegistry.getBlockGivenQuests()) {
             if (!quest.canStartFromInteraction() || quest.isWorldQuest()
                     || LostTalesQuestParams.value(quest.getInteraction(),
                             "block").length() == 0
@@ -388,7 +398,7 @@ public final class QuestStartGate {
                 || result == StartResult.ALREADY_COMPLETED;
     }
 
-    /** The quest a creature's data names first, then every quest the server knows. */
+    /** The quest a creature's data names first, then every quest a creature's kind may start. */
     private static List<LostTalesQuestDefinition> questsOf(Entity target) {
         List<LostTalesQuestDefinition> quests =
                 new ArrayList<LostTalesQuestDefinition>();
@@ -398,7 +408,7 @@ public final class QuestStartGate {
         if (own != null) {
             quests.add(own);
         }
-        for (LostTalesQuestDefinition quest : LostTalesQuestRegistry.getQuests()) {
+        for (LostTalesQuestDefinition quest : LostTalesQuestRegistry.getCreatureGivenQuests()) {
             if (quest != own) {
                 quests.add(quest);
             }
@@ -432,7 +442,7 @@ public final class QuestStartGate {
                 ItemStack held = player.inventory == null ? null
                         : player.inventory.getCurrentItem();
                 return held != null && held == proof.getStack()
-                        && quest.getId().equals(questIdOf(held))
+                        && quest.getId().equals(QuestStarters.questIdOf(held))
                         && QuestStarters.isGenuine(player.worldObj, held);
             case TOUCH:
                 return proof.isBlock()
@@ -572,12 +582,7 @@ public final class QuestStartGate {
                 && questId.equals(missive.getQuestId()) ? missive : null;
     }
 
-    /** The quest an item's or a creature's data names; empty for none or one past the id bound. */
-    private static String questIdOf(ItemStack stack) {
-        NBTTagCompound tag = stack == null ? null : stack.getTagCompound();
-        return named(tag);
-    }
-
+    /** The quest a creature's data names; empty for none or one past the id bound. */
     private static String questIdOf(Entity entity) {
         return named(entity == null ? null : entity.getEntityData());
     }

@@ -58,8 +58,10 @@ import net.minecraft.util.IChatComponent;
  * they may read it and in the Console otherwise
  * ({@link #onPlayerLine}), so the answer comes back with the rest of the
  * tab's history. It is charged to that account's own share of the
- * history, never to the conversation's. A line is never delayed or
- * refused: whatever fails,
+ * history, never to the conversation's. A line is held back only where
+ * {@link #onBroadcast} and {@link #onPlayerLine} say so: a player's
+ * first visit, an Invisible player's join or leave, and the operators'
+ * notice of a command the Server Log already holds. Whatever fails,
  * the component goes out as it came.
  *
  * <p>A join line's id is also kept for the login replay of the player
@@ -155,20 +157,27 @@ public final class LostTalesServerBroadcastHook {
 
     /**
      * Whether a line is the join or the leave of a player who is
-     * Invisible as the identity they play: nobody is told they came or
-     * went, in the game or on Discord, and the line is never said later.
+     * Invisible as the identity they play ({@link ChatPresenceService#playsInvisible},
+     * the one rule the Discord relay follows too): nobody is told they
+     * came or went, in the game or on Discord, and the line is never said
+     * later. The game announces a join before it lists the player, so
+     * until then the status their saved data keeps stands in
+     * ({@link ChatArrivals#arrivesInvisible}); a first visit's join, said
+     * once the first character is played, finds them listed.
      */
     private static boolean aboutInvisiblePlayer(IChatComponent line) {
         ChatSystemLineClassifier.Kind kind = ChatSystemLineClassifier.kindOf(line);
-        if (kind == ChatSystemLineClassifier.Kind.JOIN) {
-            return ChatArrivals.arrivesInvisible(announcedAccount(line));
+        if (kind != ChatSystemLineClassifier.Kind.JOIN
+                && kind != ChatSystemLineClassifier.Kind.LEAVE) {
+            return false;
         }
-        if (kind == ChatSystemLineClassifier.Kind.LEAVE) {
-            EntityPlayerMP leaving = LostTalesServerPlayers.findOnline(
-                    announcedAccount(line));
-            return leaving != null && ChatPresenceService.playsInvisible(leaving);
+        String account = announcedAccount(line);
+        EntityPlayerMP player = LostTalesServerPlayers.findOnline(account);
+        if (player != null) {
+            return ChatPresenceService.playsInvisible(player);
         }
-        return false;
+        return kind == ChatSystemLineClassifier.Kind.JOIN
+                && ChatArrivals.arrivesInvisible(account);
     }
 
     /**

@@ -45,38 +45,33 @@ public final class NbtQuarantineTest {
         NbtQuarantine.Read read = NbtQuarantine.read(root);
 
         assertTrue(read.isSupported());
-        assertFalse(read.isRepaired());
         assertEquals(2, read.getEntries().size());
         assertEquals("b", read.getEntries().get(1).getString("Reason"));
         NBTTagCompound again = new NBTTagCompound();
         NbtQuarantine.write(again, read.getEntries());
         assertArrayEquals(NbtTagsTest.bytes(root), NbtTagsTest.bytes(again));
-        assertTrue(NbtQuarantine.readCurrentVersionOnly(root).isSupported());
     }
 
     @Test
-    public void aMissingQuarantineReadsEmptyAndIsWrittenAgain() {
+    public void aMissingQuarantineIsUnsupported() {
         NbtQuarantine.Read read = NbtQuarantine.read(new NBTTagCompound());
 
-        assertTrue(read.isSupported());
-        assertTrue(read.isRepaired());
-        assertTrue(read.getEntries().isEmpty());
+        assertFalse("every store writes one, so a root without it is another shape",
+                read.isSupported());
+        assertEquals(-1, read.getUnsupportedVersion());
     }
 
     @Test
-    public void anOlderQuarantineIsReadAndWrittenAgainUnlessOnlyTheCurrentIsRead() {
+    public void aQuarantineWithoutItsVersionOrAtAnOlderOneIsUnsupported() {
         NBTTagCompound root = new NBTTagCompound();
         NbtQuarantine.write(root, Collections.singletonList(record("a", 0)));
         root.getCompoundTag("Quarantine").removeTag("DataVersion");
+        assertFalse(NbtQuarantine.read(root).isSupported());
 
-        NbtQuarantine.Read read = NbtQuarantine.read(root);
-        assertTrue(read.isSupported());
-        assertTrue(read.isRepaired());
-        assertEquals(1, read.getEntries().size());
-
-        NbtQuarantine.Read strict = NbtQuarantine.readCurrentVersionOnly(root);
-        assertFalse(strict.isSupported());
-        assertEquals(0, strict.getUnsupportedVersion());
+        root.getCompoundTag("Quarantine").setInteger("DataVersion", 0);
+        NbtQuarantine.Read older = NbtQuarantine.read(root);
+        assertFalse(older.isSupported());
+        assertEquals(0, older.getUnsupportedVersion());
     }
 
     @Test
@@ -115,16 +110,12 @@ public final class NbtQuarantineTest {
     }
 
     @Test
-    public void aQuarantineWithoutItsListReadsEmptyAndIsWrittenAgain() {
+    public void aQuarantineWithoutItsListIsUnsupported() {
         NBTTagCompound root = new NBTTagCompound();
         NbtQuarantine.write(root, Collections.<NBTTagCompound>emptyList());
         root.getCompoundTag("Quarantine").removeTag("Entries");
 
-        NbtQuarantine.Read read = NbtQuarantine.read(root);
-
-        assertTrue(read.isSupported());
-        assertTrue(read.isRepaired());
-        assertTrue(read.getEntries().isEmpty());
+        assertFalse(NbtQuarantine.read(root).isSupported());
     }
 
     @Test

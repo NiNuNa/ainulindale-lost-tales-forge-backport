@@ -69,6 +69,11 @@ public final class CharacterSwitchAccountState {
         return Math.max(supplied, this.lastObservedWallClock);
     }
 
+    /**
+     * Steps the cooldown stage back for the time gone without a switch:
+     * stage n steps back after {@code decayDurationsMillis[n - 1]}, a stage
+     * past the list's end after its last value.
+     */
     public boolean applyDecay(long safeNow, long[] decayDurationsMillis, int maximumStage) {
         int maxStage = Math.max(0, maximumStage);
         boolean changed = false;
@@ -87,7 +92,7 @@ public final class CharacterSwitchAccountState {
         }
 
         while (this.cooldownStage > 0) {
-            int index = Math.min(this.cooldownStage, decayDurationsMillis.length - 1);
+            int index = Math.min(this.cooldownStage - 1, decayDurationsMillis.length - 1);
             long required = Math.max(1L, decayDurationsMillis[index]);
             if (safeNow < this.decayAnchorAt
                     || safeNow - this.decayAnchorAt < required) {

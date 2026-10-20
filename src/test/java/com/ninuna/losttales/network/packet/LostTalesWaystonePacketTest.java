@@ -1,7 +1,6 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerHeightResolver;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
@@ -40,12 +39,50 @@ public final class LostTalesWaystonePacketTest {
         assertEquals(4L, decoded.getExpectedRevision());
         assertEquals(LostTalesMapMarkerVisibility.SHARED,
                 decoded.getSettings().getVisibility());
-        assertEquals(LostTalesMapMarkerHeightResolver.AUTOMATIC_Y,
-                decoded.getSettings().getY(), 0.0D);
-        assertEquals("losttales:glowstone_house",
-                decoded.getSettings().getWaystoneStructureType());
+        assertEquals(220.0D,
+                decoded.getSettings().getCompassFadeInRadius(), 0.0D);
+        assertEquals(32.0D, decoded.getSettings().getDiscoveryRadius(), 0.0D);
         assertEquals(LostTalesMapMarkerRelevance.HIGH.getRank(),
                 decoded.getSettings().getPriority());
+    }
+
+    /** Destinations carries only the waystone it is taken at, and nothing runs on past it. */
+    @Test
+    public void destinationsRoundTripsWithNothingMore() {
+        LostTalesWaystoneSettingsRequestPacket original =
+                LostTalesWaystoneSettingsRequestPacket.destinations(
+                        12, 70, -8, "losttales:player/test", 4L);
+        ByteBuf buffer = Unpooled.buffer();
+        original.toBytes(buffer);
+        LostTalesWaystoneSettingsRequestPacket decoded =
+                new LostTalesWaystoneSettingsRequestPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(com.ninuna.losttales.mapmarker
+                        .LostTalesWaystoneSettingsOperation.DESTINATIONS,
+                decoded.getOperation());
+        assertEquals("losttales:player/test", decoded.getMarkerId());
+        assertEquals("", decoded.getTargetName());
+
+        ByteBuf longer = Unpooled.buffer();
+        original.toBytes(longer);
+        longer.writeByte(0);
+        LostTalesWaystoneSettingsRequestPacket trailing =
+                new LostTalesWaystoneSettingsRequestPacket();
+        trailing.fromBytes(longer);
+        assertTrue(trailing.isMalformed());
+    }
+
+    /** One settings check for both packets: a radius past what a marker keeps is refused before it is sent. */
+    @Test(expected = IllegalArgumentException.class)
+    public void aSaveWithARadiusPastTheBoundIsNeverSent() {
+        LostTalesWaystoneSettingsRequestPacket.save(12, 70, -8,
+                "losttales:player/test", 4L,
+                new LostTalesMapMarkerEditableSettings(
+                        "Bree Gate", "camp", "white", "", "", true,
+                        LostTalesMapMarkerRecord.MAX_RADIUS + 1.0D, 8.0D,
+                        false, true, false, 0,
+                        LostTalesMapMarkerVisibility.PRIVATE));
     }
 
     @Test
@@ -108,12 +145,31 @@ public final class LostTalesWaystonePacketTest {
                 decoded.getOwnerName());
         assertEquals(record.getDescription(),
                 decoded.getSettings().getDescription());
-        assertEquals(record.getDimensionId(),
-                decoded.getSettings().getDimensionId());
+        assertEquals(0, decoded.getDimensionId());
         assertEquals(1, decoded.getSharedCharacterCount());
         assertEquals(1, decoded.getSharedFellowshipCount());
         assertEquals(73, decoded.getSettings().getPriority());
         assertTrue("using the waystone opens its page", decoded.isOpening());
+    }
+
+    /** A waystone called after a lore figure of 64 three-byte letters still reaches its page. */
+    @Test
+    public void aLongNameInManyByteLettersIsCalledAfter() {
+        StringBuilder placer = new StringBuilder();
+        for (int index = 0; index < 64; index++) {
+            placer.append('მ');
+        }
+        LostTalesMapMarkerRecord record =
+                LostTalesMapMarkerRecord.createPlayerMarker(
+                        "losttales:player/lore", placer.toString(),
+                        UUID.randomUUID(), 0, 4, 65, 9, UUID.randomUUID());
+
+        LostTalesWaystoneStatePacket decoded = roundTrip(
+                new LostTalesWaystoneStatePacket(0, 4, 65, 9, record, "",
+                        true, false, LostTalesWaystoneStateReason.OPENED));
+
+        assertFalse(decoded.isMalformed());
+        assertEquals("player:" + placer, decoded.getNamedAfter());
     }
 
     @Test
@@ -279,12 +335,9 @@ public final class LostTalesWaystonePacketTest {
         return new LostTalesMapMarkerEditableSettings(
                 "Bree Gate", "tavern", "#aabbcc",
                 "Town", "The west gate of Bree.",
-                true, 100, 12.5D,
-                LostTalesMapMarkerHeightResolver.AUTOMATIC_Y,
-                -8.5D, 220.0D, 32.0D,
+                true, 220.0D, 32.0D,
                 true, true, true,
-                true, "losttales:glowstone_house",
-                LostTalesMapMarkerRelevance.HIGH,
+                LostTalesMapMarkerRelevance.HIGH.getRank(),
                 LostTalesMapMarkerVisibility.SHARED);
     }
 }

@@ -2,11 +2,13 @@ package com.ninuna.losttales.entity.npc;
 
 import com.ninuna.losttales.faction.ELostTalesFaction;
 import com.ninuna.losttales.item.ELostTalesItem;
+import com.ninuna.losttales.item.LostTalesItemSpawnEgg;
 import lotr.common.LOTRMod;
 import lotr.common.entity.npc.LOTREntityUtumnoOrc;
 import lotr.common.fac.LOTRFaction;
 import net.minecraft.entity.IEntityLivingData;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.world.World;
 
 public class LostTalesEntityNia extends LOTREntityUtumnoOrc {
@@ -38,5 +40,11 @@ public class LostTalesEntityNia extends LOTREntityUtumnoOrc {
 
     public LOTRFaction getFaction() {
         return ELostTalesFaction.BLUE_GOBLINS.getFaction();
+    }
+
+    /** A creative pick gives the creature's own egg; LOTR's lookup knows only LOTR's creatures. */
+    @Override
+    public ItemStack getPickedResult(MovingObjectPosition target) {
+        return LostTalesItemSpawnEgg.eggOf(this);
     }
 }

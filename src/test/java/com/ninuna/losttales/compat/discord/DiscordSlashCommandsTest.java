@@ -105,6 +105,9 @@ public final class DiscordSlashCommandsTest {
                 DiscordSlashCommands.linkTaken(ENGLISH, "OOC Chat"));
         assertEquals("This channel is already linked to **OOC Chat**.",
                 DiscordSlashCommands.linkAlready(ENGLISH, "OOC Chat"));
+        assertEquals("**Operator Chat** cannot be linked now: the game server's"
+                        + " channel settings keep it in the game.",
+                DiscordSlashCommands.linkClosed(ENGLISH, "Operator Chat"));
         assertEquals("Discord did not make the webhook (HTTP 500). Ask for a new code.",
                 DiscordSlashCommands.linkFailed(ENGLISH, 500));
         assertEquals("Discord could not be reached. Ask for a new code.",
@@ -196,7 +199,7 @@ public final class DiscordSlashCommandsTest {
         JsonObject ping = new JsonParser().parse("{\"id\":\"i2\",\"token\":\"t\",\"type\":1}")
                 .getAsJsonObject();
         assertNull(DiscordJson.parseInteraction(ping));
-        assertEquals("{\"type\":5,\"data\":{\"flags\":64}}", DiscordJson.deferredReplyBody(true));
+        assertEquals("{\"type\":5,\"data\":{\"flags\":64}}", DiscordJson.deferredReplyBody());
         assertEquals("{\"content\":\"hi\",\"allowed_mentions\":{\"parse\":[]}}",
                 DiscordJson.followUpBody("hi"));
         assertEquals("wss://gateway.discord.gg",

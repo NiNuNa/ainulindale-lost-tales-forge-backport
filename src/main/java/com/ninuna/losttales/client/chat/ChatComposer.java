@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatMessageIds;
@@ -232,15 +233,17 @@ final class ChatComposer {
         int x = strip.x;
         int y = strip.y;
         int room = strip.room;
-        String label = font.trimStringToWidth(
-                isEditing()
-                        ? StatCollector.translateToLocal(
-                                "gui.losttales.chat.editing")
-                        : StatCollector.translateToLocalFormatted(
-                                "gui.losttales.chat.message.replying",
-                                shownReplyName()),
-                Math.max(20, room - LostTalesUiSheet.CLOSE.getWidth() - 6));
-        int width = font.getStringWidth(label);
+        // Too long for the strip, the words fade into its end before the
+        // cross (LOOK-37).
+        String label = isEditing()
+                ? StatCollector.translateToLocal("gui.losttales.chat.editing")
+                : StatCollector.translateToLocalFormatted(
+                        "gui.losttales.chat.message.replying",
+                        shownReplyName());
+        int labelRoom = Math.max(20, room - LostTalesUiSheet.CLOSE.getWidth()
+                - 6);
+        int width = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(label), labelRoom);
         // The cross is the control, so its own box is what answers to
         // the pointer — a little wider than the sprite, so a five-pixel
         // glyph is not a five-pixel target.
@@ -255,8 +258,9 @@ final class ChatComposer {
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(strip.fractionX, strip.fractionY, 0.0F);
-            LostTalesUiInk.drawText(font, label, x, y,
+            LostTalesUiCutName.drawText(font, label, x, y, labelRoom,
                     LostTalesChatVisualStyle.asideRgb(), alpha);
+            LostTalesUiInk.beginContent();
             cross.drawWithShadow(crossX, crossY, alpha);
         } finally {
             GL11.glPopMatrix();

@@ -10,7 +10,7 @@ import net.minecraft.util.IChatComponent;
 /**
  * Style marker on the {@code , the Gondor Farmer} component that follows
  * a titled sender's name. Carries the exact RGB the title is drawn in and
- * the bare epithet ({@code Gondor Farmer}) so the hover card can name the
+ * the bare epithet ({@code Gondor Farmer}) so the person card can name the
  * title without parsing the displayed text. Same mechanism as
  * {@link ChatColorMarker}: it survives vanilla's wrapped-line copies and
  * is never a user-facing action.

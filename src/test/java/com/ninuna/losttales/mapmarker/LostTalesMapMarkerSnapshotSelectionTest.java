@@ -74,6 +74,47 @@ public final class LostTalesMapMarkerSnapshotSelectionTest {
                         discovered("losttales:player/bree")).size());
     }
 
+    /**
+     * A waystone handed over counts as found by its new owner: the next
+     * snapshot the owner's character is sent, played then or later, finds
+     * it first, so a hidden one reaches its map at once (WAY-08).
+     */
+    @Test
+    public void aWaystoneHandedOverIsFoundByItsNewOwner() {
+        UUID faramir = UUID.randomUUID();
+        LostTalesMapMarkerRecord handed =
+                LostTalesMapMarkerRecord.createPlayerMarker(
+                        "losttales:player/bree", "Aragorn", OWNER,
+                        0, 1.0D, 64.0D, 1.0D, UUID.randomUUID())
+                        .withOwner(faramir);
+        LostTalesMapMarkerRecord notOwned = publicMarker("losttales:open", true);
+        List<LostTalesMapMarkerRecord> records = Arrays.asList(handed, notOwned);
+        LostTalesMapMarkerVisibilityPolicy.Viewer newOwner =
+                LostTalesMapMarkerVisibilityPolicy.Viewer.of(faramir, false, null);
+
+        assertEquals(Collections.singletonList("losttales:player/bree"),
+                LostTalesMapMarkerSyncManager.ownedNotFound(records, newOwner,
+                        discovered()));
+        assertEquals("found once, it is not found again",
+                Collections.<String>emptyList(),
+                LostTalesMapMarkerSyncManager.ownedNotFound(records, newOwner,
+                        discovered("losttales:player/bree")));
+        assertEquals("the old owner finds nothing it no longer owns",
+                Collections.<String>emptyList(),
+                LostTalesMapMarkerSyncManager.ownedNotFound(records,
+                        LostTalesMapMarkerVisibilityPolicy.Viewer.of(
+                                OWNER, false, null), discovered()));
+        assertEquals("nobody played finds nothing",
+                Collections.<String>emptyList(),
+                LostTalesMapMarkerSyncManager.ownedNotFound(records,
+                        LostTalesMapMarkerVisibilityPolicy.Viewer.of(
+                                null, true, null), discovered()));
+        assertEquals("once found, the hidden waystone is sent", 1,
+                LostTalesMapMarkerSyncManager.select(
+                        Collections.singletonList(handed), newOwner,
+                        discovered("losttales:player/bree")).size());
+    }
+
     private static LostTalesMapMarkerRecord publicMarker(String id,
                                                          boolean hidden) {
         return LostTalesMapMarkerRecord.builder(id,

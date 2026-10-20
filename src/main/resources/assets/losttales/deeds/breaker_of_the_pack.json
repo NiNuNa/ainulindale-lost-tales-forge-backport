@@ -1,0 +1,9 @@
+{
+  "id": "losttales:breaker_of_the_pack",
+  "category": "foes",
+  "icon": "minecraft:leather",
+  "kind": "kill",
+  "creatures": ["lotr.MordorWarg", "lotr.MordorWargBombardier", "lotr.GundabadWarg", "lotr.AngmarWarg", "lotr.AngmarWargBombardier", "lotr.UrukWarg", "lotr.UrukWargBombardier", "lotr.UtumnoWarg", "lotr.UtumnoIceWarg", "lotr.UtumnoObsidianWarg", "lotr.UtumnoFireWarg"],
+  "count": 10,
+  "title": true
+}

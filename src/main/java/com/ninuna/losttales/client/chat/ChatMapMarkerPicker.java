@@ -1,14 +1,12 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
-import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerUsageStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -206,11 +204,9 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
             heart.drawWithShadow(heartX, labelTop + Math.floorDiv(
                     LostTalesUiInk.CAP_HEIGHT - heart.getHeight(), 2), alpha);
         }
-        String label = LostTalesSkyrimUiStyle.trimToWidth(
-                minecraft.fontRenderer, marker.label(),
-                heartX - TabIcons.GAP - (x + LABEL_LEFT));
-        LostTalesChatVisualStyle.drawPlain(minecraft.fontRenderer, label,
-                x + LABEL_LEFT, labelTop, alpha);
+        drawName(minecraft.fontRenderer, marker.label(), x + LABEL_LEFT,
+                labelTop, heartX - TabIcons.GAP - (x + LABEL_LEFT), alpha,
+                hovered);
     }
 
     @Override

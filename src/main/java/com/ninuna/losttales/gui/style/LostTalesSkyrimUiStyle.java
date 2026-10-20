@@ -7,12 +7,15 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.GL11;
+
 /**
- * Small primitive-drawn UI style used by the quest journal/HUD.
- *
- * The goal is an old-Forge friendly, Skyrim-inspired flat dark interface:
- * translucent charcoal panels, thin ivory rules, muted gold accents, and
- * diamond objective indicators. No external Skyrim assets are copied here.
+ * Drawing primitives the screens, the HUD panels, the windows' lists and
+ * the chat share, drawn from flat quads: the blend state content needs
+ * after a panel ({@link #beginContent}), runs of untextured quads, the
+ * screens' shade, a panel with its edge and corner brackets, headings, a
+ * list row's light and the objective diamond. A name cut to a width is
+ * {@link LostTalesUiCutName}'s. Their colours are the palette's
+ * ({@link LostTalesColors}).
  */
 public final class LostTalesSkyrimUiStyle extends LostTalesColors {
 
@@ -85,10 +88,6 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
 
     public static void drawPanel(int x, int y, int width, int height) {
         drawPanel(x, y, width, height, PANEL_FILL);
-    }
-
-    public static void drawPanelSoft(int x, int y, int width, int height) {
-        drawPanel(x, y, width, height, PANEL_FILL_SOFT);
     }
 
     public static void drawPanel(int x, int y, int width, int height, int fillColor) {
@@ -197,22 +196,6 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
         Gui.drawRect(centerX, centerY - 3, centerX + 1, centerY + 4, color);
         Gui.drawRect(centerX - 2, centerY - 1, centerX + 3, centerY + 2, color);
         Gui.drawRect(centerX - 1, centerY - 2, centerX + 2, centerY + 3, color);
-    }
-
-    public static String trimToWidth(FontRenderer font, String text, int width) {
-        if (text == null || width <= 0) {
-            return "";
-        }
-        if (font.getStringWidth(text) <= width) {
-            return text;
-        }
-        String ellipsis = "...";
-        int ellipsisWidth = font.getStringWidth(ellipsis);
-        String trimmed = text;
-        while (trimmed.length() > 0 && font.getStringWidth(trimmed) + ellipsisWidth > width) {
-            trimmed = trimmed.substring(0, trimmed.length() - 1);
-        }
-        return trimmed + ellipsis;
     }
 
     public static String uppercase(String text) {

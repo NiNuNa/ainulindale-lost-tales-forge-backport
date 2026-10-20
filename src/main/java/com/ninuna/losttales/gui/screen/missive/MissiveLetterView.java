@@ -15,6 +15,7 @@ import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.item.LostTalesItemMissiveLetter;
@@ -390,12 +391,15 @@ final class MissiveLetterView {
         }
     }
 
-    /** A heading: its words in capitals, and a rule filling what they leave, as the Motion Lab's. */
+    /**
+     * A heading: its words in capitals, fading into the letter's edge
+     * where they are too long for it (LOOK-37), and a rule filling what
+     * they leave, as the Motion Lab's.
+     */
     private static void drawHeading(FontRenderer font, String words, int left,
                                     int right, int textTop, int alpha) {
         String name = LostTalesSkyrimUiStyle.uppercase(words);
-        LostTalesUiInk.drawText(font, LostTalesSkyrimUiStyle.trimToWidth(font,
-                        name, Math.max(0, right - left)), left, textTop,
+        LostTalesUiCutName.drawText(font, name, left, textTop, right - left,
                 LostTalesColors.rgb(LostTalesColors.TEXT), alpha);
         int ruleLeft = left + font.getStringWidth(name) + 5;
         if (ruleLeft < right) {

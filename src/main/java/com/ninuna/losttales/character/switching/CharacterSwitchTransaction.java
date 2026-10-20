@@ -4,7 +4,8 @@ import java.util.UUID;
 
 /**
  * Persistent intent/commit record used to reconcile an interrupted switch.
- * A null source or target character id is the Minecraft account itself.
+ * A null source is the ghost a player is until their first character is
+ * played; the target is always a character.
  */
 public final class CharacterSwitchTransaction {
 
@@ -13,11 +14,7 @@ public final class CharacterSwitchTransaction {
     private final UUID transactionId;
     private final UUID sourceCharacterId;
     private final UUID targetCharacterId;
-    private final long sourceRosterRevision;
-    private final long targetRosterRevision;
     private final long preparedAt;
-    private final long requestEpoch;
-    private final int requestId;
 
     private final int previousCooldownStage;
     private final long previousNextAllowedAt;
@@ -41,11 +38,7 @@ public final class CharacterSwitchTransaction {
     public CharacterSwitchTransaction(UUID transactionId,
                                       UUID sourceCharacterId,
                                       UUID targetCharacterId,
-                                      long sourceRosterRevision,
-                                      long targetRosterRevision,
                                       long preparedAt,
-                                      long requestEpoch,
-                                      int requestId,
                                       int previousCooldownStage,
                                       long previousNextAllowedAt,
                                       long previousLastSuccessfulSwitchAt,
@@ -70,12 +63,7 @@ public final class CharacterSwitchTransaction {
         this.transactionId = transactionId;
         this.sourceCharacterId = sourceCharacterId;
         this.targetCharacterId = targetCharacterId;
-        this.sourceRosterRevision = Math.max(0L, sourceRosterRevision);
-        this.targetRosterRevision = Math.max(this.sourceRosterRevision,
-                targetRosterRevision);
         this.preparedAt = Math.max(0L, preparedAt);
-        this.requestEpoch = requestEpoch;
-        this.requestId = requestId;
         this.previousCooldownStage = Math.max(0, previousCooldownStage);
         this.previousNextAllowedAt = Math.max(0L, previousNextAllowedAt);
         this.previousLastSuccessfulSwitchAt = Math.max(0L,
@@ -100,11 +88,7 @@ public final class CharacterSwitchTransaction {
     public UUID getTransactionId() { return this.transactionId; }
     public UUID getSourceCharacterId() { return this.sourceCharacterId; }
     public UUID getTargetCharacterId() { return this.targetCharacterId; }
-    public long getSourceRosterRevision() { return this.sourceRosterRevision; }
-    public long getTargetRosterRevision() { return this.targetRosterRevision; }
     public long getPreparedAt() { return this.preparedAt; }
-    public long getRequestEpoch() { return this.requestEpoch; }
-    public int getRequestId() { return this.requestId; }
     public int getPreviousCooldownStage() { return this.previousCooldownStage; }
     public long getPreviousNextAllowedAt() { return this.previousNextAllowedAt; }
     public long getPreviousLastSuccessfulSwitchAt() { return this.previousLastSuccessfulSwitchAt; }
@@ -145,5 +129,21 @@ public final class CharacterSwitchTransaction {
     public void markRecoveryRequired(long timestamp) {
         this.status = CharacterSwitchTransactionStatus.RECOVERY_REQUIRED;
         this.completedAt = Math.max(0L, timestamp);
+    }
+
+    public void markRestoreSource(long timestamp) {
+        this.status = CharacterSwitchTransactionStatus.RESTORE_SOURCE;
+        this.completedAt = Math.max(0L, timestamp);
+    }
+
+    /**
+     * Whether the journal is held: one waiting on an operator, or on the
+     * restore an operator asked for. Nothing settles a held journal by
+     * itself, no checkpoint writes over the state it names, and switching
+     * stays off while it stands.
+     */
+    public boolean isHeld() {
+        return this.status == CharacterSwitchTransactionStatus.RECOVERY_REQUIRED
+                || this.status == CharacterSwitchTransactionStatus.RESTORE_SOURCE;
     }
 }

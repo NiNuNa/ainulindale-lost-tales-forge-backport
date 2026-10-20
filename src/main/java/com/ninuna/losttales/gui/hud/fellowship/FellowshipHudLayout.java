@@ -17,21 +17,30 @@ public final class FellowshipHudLayout {
     public static final int PANEL_PADDING = 4;
     /** The most rows the panel stacks: the members nearest the player. */
     public static final int MAX_ROWS = 7;
+    /** The rows the panel's box holds, a fellowship of four, when a fellowship may hold as many. */
+    public static final int BOX_ROWS = 3;
 
     private FellowshipHudLayout() {}
 
+    /**
+     * The panel with {@code rowCount} rows, in its box of {@code boxRows}
+     * rows placed at {@code across} and {@code down}
+     * ({@link HudPlacementLayout}): from the box's top, more rows growing
+     * down out of it, held inside the screen.
+     */
     public static Bounds calculate(int screenWidth,
                                    int screenHeight,
-                                   double offsetX,
-                                   double offsetY,
-                                   int rowCount) {
+                                   double across,
+                                   double down,
+                                   int rowCount,
+                                   int boxRows) {
         int rows = Math.max(1, Math.min(MAX_ROWS, rowCount));
-        int height = height(rows);
-        HudPlacementLayout.Bounds bounds = HudPlacementLayout.calculate(
-                screenWidth, screenHeight, PANEL_WIDTH, height,
-                offsetX, offsetY,
-                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT,
-                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT);
+        HudPlacementLayout.Bounds box = HudPlacementLayout.calculate(
+                screenWidth, screenHeight, PANEL_WIDTH,
+                height(Math.max(1, Math.min(MAX_ROWS, boxRows))),
+                across, down);
+        HudPlacementLayout.Bounds bounds = HudPlacementLayout.drawn(box,
+                PANEL_WIDTH, height(rows), screenWidth, screenHeight);
         return new Bounds(bounds.x, bounds.y,
                 bounds.width, bounds.height, rows);
     }

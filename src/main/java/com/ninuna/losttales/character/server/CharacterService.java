@@ -4,7 +4,6 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.deletion.CharacterDeletionService;
-import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
 import com.ninuna.losttales.character.model.CharacterRoster;
@@ -146,20 +145,12 @@ public final class CharacterService {
         return CharacterOperationResult.success(true, roster, character);
     }
 
-    /**
-     * Plays as one of the roster's characters. Once a player has made
-     * their first character there is no going back to playing without
-     * one, so the account itself is refused.
-     */
-    public CharacterOperationResult selectIdentity(
+    /** Plays as one of the roster's characters. */
+    public CharacterOperationResult selectCharacter(
             EntityPlayerMP player, int requestId,
-            long expectedRosterRevision, PlayableIdentity target) {
-        if (target == null || target.isAccount()) {
-            return CharacterOperationResult.failure(
-                    CharacterErrorId.INVALID_CHARACTER_ID, null);
-        }
-        return CharacterSwitchCoordinator.getInstance().selectIdentity(
-                player, requestId, expectedRosterRevision, target);
+            long expectedRosterRevision, UUID characterId) {
+        return CharacterSwitchCoordinator.getInstance().selectCharacter(
+                player, requestId, expectedRosterRevision, characterId);
     }
 
     /**
@@ -186,7 +177,7 @@ public final class CharacterService {
             return CharacterOperationResult.failure(CharacterErrorId.CHARACTER_NOT_FOUND, roster);
         }
         CharacterErrorId lore = refuseLoreCharacter(world, characterId,
-                CharacterErrorId.LORE_CHARACTER_CANNOT_EDIT);
+                CharacterErrorId.LORE_CHARACTER_KEEPS_NAME);
         if (lore != CharacterErrorId.NONE) {
             return CharacterOperationResult.failure(lore, roster);
         }
@@ -256,7 +247,7 @@ public final class CharacterService {
 
     public synchronized CharacterOperationResult updateCapeSettings(
             EntityPlayerMP player, long expectedRosterRevision, UUID characterId,
-            boolean showMinecraftCape, int cosmeticCapeId) {
+            boolean showMinecraftCape, String cosmeticCapeId) {
         CharacterValidationResult playerValidation = validateServerPlayer(player);
         if (!playerValidation.isValid()) {
             return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
@@ -287,13 +278,16 @@ public final class CharacterService {
             return CharacterOperationResult.failure(
                     referenceValidation.getErrorId(), roster);
         }
-        if (!CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
+        RoleplayCharacter character = roster.getCharacter(characterId);
+        // The cape a character wears stays its own when its file changes
+        // or goes; only a new choice is asked of the list (CHAR-39).
+        boolean kept = character.getCosmeticCapeId().equals(cosmeticCapeId);
+        if (!kept && !CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
             return CharacterOperationResult.failure(CharacterErrorId.INVALID_CAPE, roster);
         }
-
-        RoleplayCharacter character = roster.getCharacter(characterId);
-        CharacterValidationResult eligibility = this.capeEligibilityPolicy.validate(
-                player, character, cosmeticCapeId);
+        CharacterValidationResult eligibility = kept
+                ? CharacterValidationResult.success()
+                : this.capeEligibilityPolicy.validate(player, character, cosmeticCapeId);
         if (!eligibility.isValid()) {
             CharacterErrorId error = eligibility.getErrorId();
             if (error == CharacterErrorId.NONE) {

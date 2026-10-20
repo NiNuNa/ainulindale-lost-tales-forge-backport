@@ -91,6 +91,38 @@ public final class LostTalesAccountSkins {
         return skin;
     }
 
+    /**
+     * The skin of the account {@code playerId}, as its player is drawn in
+     * the world: this client's own player or another one loaded near it.
+     * The client knows an account's skin only from a loaded player's
+     * profile, so an account with no player here wears the default skin.
+     */
+    public static AccountSkin forAccount(Minecraft minecraft, UUID playerId) {
+        AbstractClientPlayer player = loadedPlayer(minecraft, playerId);
+        return player == null ? defaultSkin(false) : resolve(player);
+    }
+
+    private static AbstractClientPlayer loadedPlayer(Minecraft minecraft,
+                                                     UUID playerId) {
+        if (minecraft == null || playerId == null) {
+            return null;
+        }
+        if (minecraft.thePlayer != null
+                && playerId.equals(minecraft.thePlayer.getUniqueID())) {
+            return minecraft.thePlayer;
+        }
+        if (minecraft.theWorld == null || minecraft.theWorld.playerEntities == null) {
+            return null;
+        }
+        for (Object value : minecraft.theWorld.playerEntities) {
+            if (value instanceof AbstractClientPlayer
+                    && playerId.equals(((AbstractClientPlayer)value).getUniqueID())) {
+                return (AbstractClientPlayer)value;
+            }
+        }
+        return null;
+    }
+
     private static boolean hasTextures(GameProfile profile) {
         return profile != null && profile.getProperties() != null
                 && profile.getProperties().containsKey(
@@ -123,7 +155,7 @@ public final class LostTalesAccountSkins {
      * the URL fetches it, and the model says which arm width it was
      * painted for.
      */
-    public static AccountSkin resolveProfile(GameProfile gameProfile) {
+    private static AccountSkin resolveProfile(GameProfile gameProfile) {
         Minecraft minecraft = Minecraft.getMinecraft();
         AccountSkinProfile profile = ProfileTexturesDecoder.decode(gameProfile);
         BufferedImage placeholder = defaultImage(minecraft);
@@ -184,7 +216,7 @@ public final class LostTalesAccountSkins {
 
     private static BufferedImage readOverride(File file) {
         try {
-            BufferedImage image = file.isFile() ? ImageIO.read(file) : null;
+            BufferedImage image = file.isFile() ? SkinImageNormalizer.readSkin(file) : null;
             BufferedImage normalized = SkinImageNormalizer.normalize(image);
             if (normalized == null) {
                 FMLLog.warning("[%s] Developer skin override %s is not a 64x32 or 64x64 PNG",

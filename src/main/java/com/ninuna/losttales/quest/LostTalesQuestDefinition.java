@@ -37,60 +37,14 @@ public final class LostTalesQuestDefinition {
     private final Map<String, String> words;
     private final Map<String, String> rules;
 
-    public LostTalesQuestDefinition(String id, String title, String description, boolean repeatable, String startMode, Map<String, String> prerequisites, Map<String, String> rewards, Map<String, String> interaction, Map<String, String> markers, Map<String, String> journalLog, List<LostTalesQuestStageDefinition> stages) {
-        this(id, title, description, repeatable, repeatable, startMode,
-                prerequisites, rewards, interaction, markers, journalLog,
-                Collections.<String, String>emptyMap(), stages);
-    }
-
-    public LostTalesQuestDefinition(String id, String title,
-            String description, boolean repeatable, boolean restartable,
-            String startMode, Map<String, String> prerequisites,
-            Map<String, String> rewards, Map<String, String> interaction,
-            Map<String, String> markers, Map<String, String> journalLog,
-            Map<String, String> dialogue,
-            List<LostTalesQuestStageDefinition> stages) {
-        this(id, title, description, repeatable, restartable, startMode,
-                prerequisites, rewards, interaction, markers, journalLog,
-                dialogue, Collections.<String, String>emptyMap(), stages);
-    }
-
-    public LostTalesQuestDefinition(String id, String title,
-            String description, boolean repeatable, boolean restartable,
-            String startMode, Map<String, String> prerequisites,
-            Map<String, String> rewards, Map<String, String> interaction,
-            Map<String, String> markers, Map<String, String> journalLog,
-            Map<String, String> dialogue, Map<String, String> world,
-            List<LostTalesQuestStageDefinition> stages) {
-        this(id, title, description, repeatable, restartable, startMode,
-                prerequisites, rewards, interaction, markers, journalLog,
-                dialogue, world, stages, false,
-                Collections.<String, String>emptyMap());
-    }
-
     /**
-     * A quest whose words are found as {@code bundled} and {@code words}
-     * say ({@link LostTalesQuestWords}): a bundled quest's by lang lines
-     * under its id, a missive's by its template ids in {@code words}.
-     */
-    public LostTalesQuestDefinition(String id, String title,
-            String description, boolean repeatable, boolean restartable,
-            String startMode, Map<String, String> prerequisites,
-            Map<String, String> rewards, Map<String, String> interaction,
-            Map<String, String> markers, Map<String, String> journalLog,
-            Map<String, String> dialogue, Map<String, String> world,
-            List<LostTalesQuestStageDefinition> stages, boolean bundled,
-            Map<String, String> words) {
-        this(id, title, description, repeatable, restartable, startMode,
-                prerequisites, rewards, interaction, markers, journalLog,
-                dialogue, world, stages, bundled, words,
-                Collections.<String, String>emptyMap());
-    }
-
-    /**
-     * A quest with {@code rules}: the keys its file writes at the top level
-     * beside its blocks, how it ends and how long it may take among them
-     * ({@link LostTalesQuestRules}).
+     * A quest as its file, its packet or its missive writes it. Its words
+     * are found as {@code bundled} and {@code words} say
+     * ({@link LostTalesQuestWords}): a bundled quest's by lang lines under
+     * its id, a missive's by its template ids in {@code words}.
+     * {@code rules} are the keys its file writes at the top level beside
+     * its blocks, how it ends and how long it may take among them
+     * ({@link LostTalesQuestRules}). A null block stands for an empty one.
      */
     public LostTalesQuestDefinition(String id, String title,
             String description, boolean repeatable, boolean restartable,

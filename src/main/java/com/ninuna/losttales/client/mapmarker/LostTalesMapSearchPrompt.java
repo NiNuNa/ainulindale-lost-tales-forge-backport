@@ -8,9 +8,9 @@ import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.WindowFields;
 import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -222,14 +222,13 @@ final class LostTalesMapSearchPrompt {
                     I18n.format("gui.losttales.map.search.hint"), left,
                     layout.fieldTop, right, right, 255);
             if (this.results.isEmpty()) {
-                LostTalesUiInk.drawText(font, trimmed(font,
-                                I18n.format("gui.losttales.map.search.empty"),
-                                right - left), left,
+                LostTalesUiCutName.drawText(font,
+                        I18n.format("gui.losttales.map.search.empty"), left,
                         labelTop(layout.rowsTop, layout.rowHeight),
-                        WindowStyle.asideRgb(), 255);
+                        right - left, WindowStyle.asideRgb(), 255);
                 return;
             }
-            drawRows(minecraft, font, layout);
+            drawRows(minecraft, font, layout, hovered);
             // The fades hang from the field's hairline the rows pass
             // under, and from the frame.
             WindowLists.drawScroll(layout.boxLeft, layout.rowsTop,
@@ -245,10 +244,12 @@ final class LostTalesMapSearchPrompt {
     /**
      * The places found that the band shows, cut to it where they glide
      * past its edges, each its marker's icon centred in the icon box and
-     * on the name's capitals, then its name in ivory.
+     * on the name's capitals, then its name in ivory, fading into the
+     * row's end where it is cut and sliding along while the row is
+     * {@code hovered} (LOOK-37).
      */
     private void drawRows(Minecraft minecraft, FontRenderer font,
-                          Layout layout) {
+                          Layout layout, int hovered) {
         boolean clipped = LostTalesUiClip.beginLocal(minecraft,
                 layout.boxLeft, layout.rowsTop, layout.boxRight,
                 layout.rowsBottom);
@@ -276,9 +277,9 @@ final class LostTalesMapSearchPrompt {
                         labelTop + LostTalesUiInk.centredStart(
                                 LostTalesUiInk.CAP_HEIGHT, icon) + half,
                         1.0F);
-                LostTalesUiInk.drawText(font, trimmed(font, entry.name,
-                                labelRight - labelLeft), labelLeft, labelTop,
-                        LostTalesUiInk.IVORY, 255);
+                LostTalesUiCutName.drawText(font, entry.name, labelLeft,
+                        labelTop, labelRight - labelLeft, LostTalesUiInk.IVORY,
+                        255, this, Integer.valueOf(index), index == hovered);
             }
         } finally {
             LostTalesUiClip.end(clipped);
@@ -454,13 +455,6 @@ final class LostTalesMapSearchPrompt {
     private static int labelTop(int rowY, int rowHeight) {
         return rowY + LostTalesUiInk.centredStart(rowHeight,
                 LostTalesUiInk.CAP_HEIGHT);
-    }
-
-    /** {@code text} cut to {@code width}, whole when it fits. */
-    private static String trimmed(FontRenderer font, String text, int width) {
-        return font.getStringWidth(text) <= width ? text
-                : LostTalesSkyrimUiStyle.trimToWidth(font, text,
-                        Math.max(0, width));
     }
 
     /**

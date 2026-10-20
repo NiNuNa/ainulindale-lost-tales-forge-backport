@@ -47,7 +47,7 @@ public final class LoreCharacterRebindTest {
         assertEquals(2, claimed.getSlotIndex());
         assertEquals(500L, claimed.getCreationTimestamp());
         assertEquals("lotr:dale", claimed.getPledgedFactionId());
-        assertEquals(CharacterCapeCatalog.RANGER, claimed.getCosmeticCapeId());
+        assertEquals("losttales:ranger", claimed.getCosmeticCapeId());
         assertEquals("losttales:hobbit_shire_male_0", claimed.getSkinId());
     }
 
@@ -74,7 +74,7 @@ public final class LoreCharacterRebindTest {
                 .gender(CharacterGenderRegistry.MALE)
                 .skin("losttales:hobbit_shire_male_0").age(33)
                 .startingFaction("lotr:hobbit").pledgedFaction("lotr:dale")
-                .cosmeticCape(CharacterCapeCatalog.RANGER)
+                .cosmeticCape("losttales:ranger")
                 .profile(CharacterProfile.EMPTY.withSection(
                         CharacterProfile.Section.HISTORY,
                         "Written by the last holder."))

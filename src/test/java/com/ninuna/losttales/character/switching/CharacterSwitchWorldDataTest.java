@@ -14,11 +14,11 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The switch journal names its two identities by character id, and the
- * account is the absence of one on either side. It always names the
- * player-state generation of each side; one without them is malformed
- * and quarantined. A file, an account or a journal at any other version
- * than this build writes is kept as it is and the store goes read-only.
+ * The switch journal names its two sides by character id; a first switch,
+ * from the ghost, has no source id. It always names the player-state
+ * generation of each side; one without them is malformed and
+ * quarantined. A file, an account or a journal at any other version than
+ * this build writes is kept as it is and the store goes read-only.
  */
 public final class CharacterSwitchWorldDataTest {
 
@@ -30,12 +30,12 @@ public final class CharacterSwitchWorldDataTest {
             UUID.fromString("30000000-0000-0000-0000-000000000003");
 
     @Test
-    public void aJournalWhoseTargetIsTheAccountRoundTrips() {
+    public void aJournalBetweenTwoCharactersRoundTrips() {
         CharacterSwitchWorldData data = new CharacterSwitchWorldData(
                 CharacterSwitchWorldData.DATA_NAME);
         CharacterSwitchAccountState state = data.getOrCreateAccount(OWNER);
         state.setTransaction(CharacterSwitchRecoveryReconcilerTest.transaction(
-                SOURCE, null, 20L, CharacterSwitchTransactionStatus.PREPARED));
+                SOURCE, TARGET, 20L, CharacterSwitchTransactionStatus.PREPARED));
         data.saveAccount(state);
 
         CharacterSwitchWorldData loaded = reload(data);
@@ -46,7 +46,8 @@ public final class CharacterSwitchWorldDataTest {
                 loaded.getAccount(OWNER).getTransaction();
         assertNotNull(transaction);
         assertEquals(SOURCE, transaction.getSourceCharacterId());
-        assertNull(transaction.getTargetCharacterId());
+        assertEquals(TARGET, transaction.getTargetCharacterId());
+        assertEquals(3000L, transaction.getPreparedAt());
         assertEquals(20L, transaction.getSourceStateGeneration());
         assertEquals(21L, transaction.getTargetStateGeneration());
         assertEquals(CharacterSwitchTransactionStatus.PREPARED,
@@ -54,7 +55,7 @@ public final class CharacterSwitchWorldDataTest {
     }
 
     @Test
-    public void aJournalWhoseSourceIsTheAccountRoundTrips() {
+    public void aFirstSwitchsJournalWithoutASourceRoundTrips() {
         CharacterSwitchWorldData data = new CharacterSwitchWorldData(
                 CharacterSwitchWorldData.DATA_NAME);
         CharacterSwitchAccountState state = data.getOrCreateAccount(OWNER);
@@ -69,6 +70,27 @@ public final class CharacterSwitchWorldDataTest {
         assertEquals(TARGET, transaction.getTargetCharacterId());
         assertEquals(20L, transaction.getSourceStateGeneration());
         assertEquals(21L, transaction.getTargetStateGeneration());
+    }
+
+    /** A discarded journal waits through a restart for its source to come back (CHAR-37). */
+    @Test
+    public void aDiscardedJournalRoundTripsHeldAndFrozen() {
+        CharacterSwitchWorldData data = new CharacterSwitchWorldData(
+                CharacterSwitchWorldData.DATA_NAME);
+        CharacterSwitchAccountState state = data.getOrCreateAccount(OWNER);
+        state.setTransaction(CharacterSwitchRecoveryReconcilerTest.transaction(
+                SOURCE, TARGET, 20L, CharacterSwitchTransactionStatus.RECOVERY_REQUIRED));
+        CharacterSwitchSourceRestore.markForRestore(state, 6000L);
+        data.saveAccount(state);
+
+        CharacterSwitchAccountState loaded = reload(data).getAccount(OWNER);
+
+        assertTrue(loaded.isFrozen());
+        assertEquals(CharacterSwitchTransactionStatus.RESTORE_SOURCE,
+                loaded.getTransaction().getStatus());
+        assertTrue(loaded.getTransaction().isHeld());
+        assertEquals(20L, loaded.getTransaction().getSourceStateGeneration());
+        assertEquals(6000L, loaded.getTransaction().getCompletedAt());
     }
 
     @Test

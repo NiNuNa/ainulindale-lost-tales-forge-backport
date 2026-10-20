@@ -66,7 +66,7 @@ public final class ChatInputCompletionTest {
         Map<String, CharacterAppearance> byAccount =
                 new HashMap<String, CharacterAppearance>();
         byAccount.put("beren", new CharacterAppearance(beren, "Beren",
-                "Beren Erchamion", "losttales:human", "male", "", true, 0,
+                "Beren Erchamion", "losttales:human", "male", "", true, "",
                 "", 0, "", ""));
         List<ChatMentionCandidate> candidates =
                 ChatInputCompletion.mentionCandidatesFor(SELF, "Nils",
@@ -110,7 +110,7 @@ public final class ChatInputCompletionTest {
         byAccount.put("beren", new CharacterAppearance(
                 com.ninuna.losttales.character.sync.CharacterAppearanceKind.CHARACTER,
                 beren, erchamion, "Beren", "Beren Erchamion", "losttales:human",
-                "male", "", true, 0, "lotr:gondor", 30, "", ""));
+                "male", "", true, "", "lotr:gondor", 30, "", ""));
         List<ChatMentionCandidate> candidates =
                 ChatInputCompletion.mentionCandidatesFor(SELF, "Nils",
                         "Aldric", aldric, NO_MEMBERS, Arrays.asList("Beren"),

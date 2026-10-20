@@ -16,7 +16,7 @@ import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.client.camera.InspectionCameraMath;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraInspection;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
-import com.ninuna.losttales.character.cape.CharacterCapeDefinition;
+import com.ninuna.losttales.client.character.CharacterGuiPreviewLayout;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.CreatorCharacterLight;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
@@ -53,6 +53,7 @@ import com.ninuna.losttales.gui.screen.character.creator.CreatorToggle;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorWidgets;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiChat;
@@ -151,8 +152,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private boolean unconventionalSettings;
     private boolean showMinecraftCape = true;
     /** None first, then the catalogue in its own order. */
-    private List<Integer> capeIds = Collections.emptyList();
-    private int capeIndex;
+    /** The cape chosen; it stands while the race and faction chosen may wear it (CHAR-39). */
+    private String capeId = CharacterCapeCatalog.NONE_ID;
 
     private CharacterCreatorCategory category = CharacterCreatorCategory.RACE;
     private CharacterCreatorLayout layout;
@@ -333,7 +334,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         this.raceIndex = clampIndex(this.raceIndex, this.raceIds.size());
         rebuildGenderOptions();
         rebuildAppearanceOptions();
-        rebuildCapeOptions();
         this.worldCamera = this.mc != null && this.mc.theWorld != null
                 && this.mc.thePlayer != null
                 && ThirdPersonCameraInspection.isAvailable();
@@ -345,20 +345,15 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         rebuildControls();
     }
 
-    private void rebuildCapeOptions() {
-        List<Integer> ids = new ArrayList<Integer>();
-        ids.add(Integer.valueOf(CharacterCapeCatalog.NONE_ID));
-        for (CharacterCapeDefinition definition : CharacterCapeCatalog.getDefinitions()) {
-            ids.add(Integer.valueOf(definition.getNetworkId()));
-        }
-        this.capeIds = Collections.unmodifiableList(ids);
-        this.capeIndex = clampIndex(this.capeIndex, this.capeIds.size());
+    /** The capes the race and the starting faction chosen may wear, none first. */
+    private List<String> capeChoices() {
+        return CharacterCapeCatalog.choicesFor(selected(this.raceIds, this.raceIndex),
+                selected(this.factionIds, this.factionIndex), CharacterCapeCatalog.NONE_ID);
     }
 
-    private int selectedCapeId() {
-        return this.capeIds.isEmpty()
-                ? CharacterCapeCatalog.NONE_ID
-                : this.capeIds.get(clampIndex(this.capeIndex, this.capeIds.size())).intValue();
+    /** The cape chosen, or none once the race or faction chosen may not wear it. */
+    private String selectedCapeId() {
+        return capeChoices().contains(this.capeId) ? this.capeId : CharacterCapeCatalog.NONE_ID;
     }
 
     /**
@@ -664,16 +659,17 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         this.controls.add(new CreatorStepper(this.context,
                 I18n.format("gui.losttales.character.creator.cape.cosmetic"),
                 new PlainChoice() {
-            @Override public int count() { return capeIds.size(); }
-            @Override public int index() { return capeIndex; }
+            @Override public int count() { return capeChoices().size(); }
+            @Override public int index() { return capeChoices().indexOf(selectedCapeId()); }
             @Override public String id(int index) {
-                return String.valueOf(capeIds.get(index));
+                return capeChoices().get(index);
             }
             @Override public String label(int index) {
-                return ClientCharacterDisplayNames.cape(capeIds.get(index).intValue());
+                return ClientCharacterDisplayNames.cape(capeChoices().get(index));
             }
             @Override public void choose(int index) {
-                capeIndex = clampIndex(index, capeIds.size());
+                List<String> choices = capeChoices();
+                capeId = choices.get(clampIndex(index, choices.size()));
             }
             @Override public String emptyLabel() {
                 return I18n.format("gui.losttales.character.cape.none");
@@ -915,13 +911,17 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         for (int index = 0; index < all.length; index++) {
             boolean current = all[index] == this.category;
             boolean hovered = !current && all[index] == hoveredTab;
-            String label = LostTalesSkyrimUiStyle.trimToWidth(font,
-                    I18n.format(all[index].getLabelKey()), bounds[index][1]);
-            font.drawStringWithShadow(label,
-                    bounds[index][0] + (bounds[index][1] - font.getStringWidth(label)) / 2,
-                    textY, current ? LostTalesSkyrimUiStyle.GOLD
+            // A page name too long for its tab fills it, fades into its
+            // end and slides along under the pointer (LOOK-37).
+            String label = I18n.format(all[index].getLabelKey());
+            int shown = (int)LostTalesUiCutName.shownWidth(
+                    font.getStringWidth(label), bounds[index][1]);
+            LostTalesUiCutName.drawShadowed(font, label,
+                    bounds[index][0] + (bounds[index][1] - shown) / 2,
+                    textY, bounds[index][1], current ? LostTalesSkyrimUiStyle.GOLD
                             : hovered ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                            : LostTalesSkyrimUiStyle.TEXT_MUTED);
+                            : LostTalesSkyrimUiStyle.TEXT_MUTED,
+                    this, all[index], all[index] == hoveredTab);
         }
     }
 
@@ -1078,11 +1078,14 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         int color = this.statusError
                 ? LostTalesSkyrimUiStyle.RED : LostTalesSkyrimUiStyle.GREEN;
         if (isStatusInHeader()) {
-            String line = LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
-                    this.statusMessage, this.width - 16);
-            this.fontRendererObj.drawStringWithShadow(line,
-                    this.width / 2 - this.fontRendererObj.getStringWidth(line) / 2,
-                    HEADER_TEXT_Y + HEADER_SUBTITLE_OFFSET, color);
+            // Too long for the line, it fills it and fades into its end
+            // (LOOK-37).
+            int room = this.width - 16;
+            int shown = (int)LostTalesUiCutName.shownWidth(
+                    this.fontRendererObj.getStringWidth(this.statusMessage), room);
+            LostTalesUiCutName.drawShadowed(this.fontRendererObj,
+                    this.statusMessage, this.width / 2 - shown / 2,
+                    HEADER_TEXT_Y + HEADER_SUBTITLE_OFFSET, room, color);
             return;
         }
         int width = this.layout.getStageWidth() - 16;
@@ -1134,8 +1137,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             drawNameplate();
             return;
         }
+        // The race's preview scale, as the Characters page's figure takes it.
         float scale = this.layout.getFigureFitHeight() / FIGURE_HEIGHT_BLOCKS
-                * this.pose.getShownZoom();
+                * this.pose.getShownZoom() * CharacterGuiPreviewLayout.scaleOf(
+                        selected(this.raceIds, this.raceIndex));
         // The same framing the borrowed camera uses: the page's point on
         // the body at the middle of the stage, slid by the pan.
         float centerX = this.layout.getFigureCenterX() + this.pose.getShownPanX();
@@ -1266,15 +1271,19 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         int nameLabelWidth = font.getStringWidth(nameLabel);
         int factsWidth = font.getStringWidth(facts);
         int nameRoom = Math.max(30, right - left - nameLabelWidth - factsWidth - 24);
-        String shownName = LostTalesSkyrimUiStyle.trimToWidth(font, name, nameRoom);
+        int shownName = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(name), nameRoom);
+        int factsRoom = Math.max(20, right - left - nameLabelWidth - 6 - shownName - 12);
         Gui.drawRect(left, y - 4, right, y - 3, LostTalesSkyrimUiStyle.BORDER_DIM);
         LostTalesSkyrimUiStyle.beginContent();
         font.drawStringWithShadow(nameLabel, left, y, LostTalesSkyrimUiStyle.TEXT_MUTED);
-        font.drawStringWithShadow(shownName, left + nameLabelWidth + 6, y,
-                LostTalesSkyrimUiStyle.GOLD);
-        font.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(font, facts,
-                Math.max(20, right - left - nameLabelWidth - 6 - font.getStringWidth(shownName) - 12)),
-                right - factsWidth, y, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
+        // The name and the facts fade into their ends where they are too
+        // long for the stage's foot (LOOK-37).
+        LostTalesUiCutName.drawShadowed(font, name, left + nameLabelWidth + 6, y,
+                nameRoom, LostTalesSkyrimUiStyle.GOLD);
+        LostTalesUiCutName.drawShadowed(font, facts,
+                right - (int)LostTalesUiCutName.shownWidth(factsWidth, factsRoom), y,
+                factsRoom, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
     }
 
     /** The name typed, or the account's name shown as the example while nothing is. */

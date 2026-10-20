@@ -1,6 +1,7 @@
 package com.ninuna.losttales.mapmarker;
 
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -21,6 +22,10 @@ import net.minecraft.world.World;
  * access is public or not; a waystone that is not public reads as shared
  * while it has any share and private without one ({@link #access}), so
  * sharing and unsharing keep no access of their own (WAY-14).</p>
+ *
+ * <p>A record keeps which settings were saved on its page with another
+ * value than it had ({@link #getSavedSettings}); a reseed keeps those and
+ * takes every other from the marker's file (WAY-16).</p>
  */
 public final class LostTalesMapMarkerRecord {
     public static final int MAX_ID_LENGTH = 256;
@@ -64,7 +69,6 @@ public final class LostTalesMapMarkerRecord {
     private final Set<UUID> sharedCharacterIds;
     private final Set<UUID> sharedFellowshipIds;
     private final LostTalesWaystoneGenerationState generationState;
-    private final String generationMessage;
     private final boolean linked;
     private final int linkedDimensionId;
     private final int linkedX;
@@ -72,6 +76,7 @@ public final class LostTalesMapMarkerRecord {
     private final int linkedZ;
     private final UUID linkToken;
     private final long revision;
+    private final Set<LostTalesMapMarkerSetting> savedSettings;
 
     private LostTalesMapMarkerRecord(Builder builder) {
         this.id = requireText(builder.id, "marker id", MAX_ID_LENGTH);
@@ -156,8 +161,6 @@ public final class LostTalesMapMarkerRecord {
                     ? LostTalesWaystoneGenerationState.NOT_ATTEMPTED
                     : LostTalesWaystoneGenerationState.DISABLED)
                 : builder.generationState;
-        this.generationMessage = bounded(
-                builder.generationMessage, MAX_NAME_LENGTH, "");
         this.linked = builder.linked;
         this.linkedDimensionId = builder.linkedDimensionId;
         this.linkedX = builder.linkedX;
@@ -173,6 +176,16 @@ public final class LostTalesMapMarkerRecord {
                     "marker without waystone intent cannot have a live link");
         }
         this.revision = Math.max(1L, builder.revision);
+        EnumSet<LostTalesMapMarkerSetting> saved =
+                EnumSet.noneOf(LostTalesMapMarkerSetting.class);
+        if (builder.savedSettings != null) {
+            for (LostTalesMapMarkerSetting setting : builder.savedSettings) {
+                if (setting != null) {
+                    saved.add(setting);
+                }
+            }
+        }
+        this.savedSettings = Collections.unmodifiableSet(saved);
     }
 
     public static LostTalesMapMarkerRecord fromDefinition(
@@ -213,7 +226,8 @@ public final class LostTalesMapMarkerRecord {
      * A waystone a character just placed: unnamed, called after
      * {@code placerName} ({@code Nils's Waystone}), owned by that character
      * ({@code ownerCharacterId}), with no category or description of its
-     * own, until its owner gives it some.
+     * own, until its owner gives it some. Its icon is the shack, one of the
+     * icons its page offers.
      */
     public static LostTalesMapMarkerRecord createPlayerMarker(
             String id, String placerName, UUID ownerCharacterId,
@@ -226,7 +240,7 @@ public final class LostTalesMapMarkerRecord {
         return builder(id, LostTalesMapMarkerSource.PLAYER_CREATED)
                 .name("")
                 .namedAfter(LostTalesMapMarkerNamedAfter.player(placerName))
-                .iconName("fort")
+                .iconName("shack")
                 .colorName("white")
                 .categoryName("")
                 .description("")
@@ -237,7 +251,7 @@ public final class LostTalesMapMarkerRecord {
                 .waystone(true, "losttales:player_placed")
                 .ownerCharacterId(ownerCharacterId)
                 .visibility(LostTalesMapMarkerVisibility.PRIVATE)
-                .generationState(LostTalesWaystoneGenerationState.PLACED, "")
+                .generationState(LostTalesWaystoneGenerationState.PLACED)
                 .link(dimensionId, (int)Math.floor(x), (int)Math.floor(y),
                         (int)Math.floor(z), linkToken)
                 .build();
@@ -252,17 +266,31 @@ public final class LostTalesMapMarkerRecord {
         return toBuilder()
                 .position(dimensionId, x, y, z)
                 .link(dimensionId, x, y, z, token)
-                .generationState(LostTalesWaystoneGenerationState.PLACED, "")
+                .generationState(LostTalesWaystoneGenerationState.PLACED)
                 .revision(this.revision + 1L)
                 .build();
     }
 
     public LostTalesMapMarkerRecord withGenerationState(
-            LostTalesWaystoneGenerationState state, String message) {
+            LostTalesWaystoneGenerationState state) {
         return toBuilder()
-                .generationState(state, message)
+                .generationState(state)
                 .revision(this.revision + 1L)
                 .build();
+    }
+
+    /**
+     * Whether the record is linked to the waystone block at that place in
+     * that world, by the same token the block holds: the one check every
+     * use of the block passes.
+     */
+    public boolean isLinkedTo(int dimensionId, int x, int y, int z,
+                              UUID token) {
+        return this.linked && this.hasWaystone && token != null
+                && token.equals(this.linkToken)
+                && this.linkedDimensionId == dimensionId
+                && this.linkedX == x && this.linkedY == y
+                && this.linkedZ == z;
     }
 
     public LostTalesMapMarkerDefinition toDefinition() {
@@ -278,33 +306,38 @@ public final class LostTalesMapMarkerRecord {
                 this.priority, this.namedAfter);
     }
 
+    /**
+     * The record with the settings its page saved. Each setting that comes
+     * out with another value than it had joins the saved settings, which a
+     * reseed keeps (WAY-16).
+     */
     public LostTalesMapMarkerRecord withEditableSettings(
             LostTalesMapMarkerEditableSettings settings) {
         if (settings == null) {
             throw new IllegalArgumentException(
                     "editable marker settings must not be null");
         }
-        return toBuilder()
+        LostTalesMapMarkerRecord edited = toBuilder()
                 .name(settings.getName())
                 .iconName(settings.getIconName())
                 .colorName(settings.getColorName())
                 .categoryName(settings.getCategoryName())
                 .description(settings.getDescription())
                 .fastTravel(settings.hasFastTravel())
-                .position(settings.getDimensionId(),
-                        settings.getX(), settings.getY(),
-                        settings.getZ())
                 .radii(settings.getCompassFadeInRadius(),
                         settings.getDiscoveryRadius())
                 .discovery(settings.isHiddenUntilDiscovered(),
                         settings.isDiscoverable(),
                         settings.requiresRegionUnlock())
-                .waystone(settings.hasWaystone(),
-                        settings.getWaystoneStructureType())
                 .priority(settings.getPriority())
                 .visibility(settings.getVisibility())
                 .revision(this.revision + 1L)
                 .build();
+        EnumSet<LostTalesMapMarkerSetting> saved =
+                EnumSet.noneOf(LostTalesMapMarkerSetting.class);
+        saved.addAll(this.savedSettings);
+        saved.addAll(LostTalesMapMarkerSetting.changed(this, edited));
+        return edited.toBuilder().savedSettings(saved).build();
     }
 
     /** The record shared with these characters; its access follows ({@link #access}). */
@@ -404,7 +437,6 @@ public final class LostTalesMapMarkerRecord {
         return this.sharedFellowshipIds;
     }
     public LostTalesWaystoneGenerationState getGenerationState() { return this.generationState; }
-    public String getGenerationMessage() { return this.generationMessage; }
     public boolean isLinked() { return this.linked; }
     public int getLinkedDimensionId() { return this.linkedDimensionId; }
     public int getLinkedX() { return this.linkedX; }
@@ -412,6 +444,8 @@ public final class LostTalesMapMarkerRecord {
     public int getLinkedZ() { return this.linkedZ; }
     public UUID getLinkToken() { return this.linkToken; }
     public long getRevision() { return this.revision; }
+    /** The settings saved on its page with another value than they had; none for a marker nobody edited. */
+    public Set<LostTalesMapMarkerSetting> getSavedSettings() { return this.savedSettings; }
 
     public static Builder builder(String id, LostTalesMapMarkerSource source) {
         return new Builder(id, source);
@@ -498,7 +532,6 @@ public final class LostTalesMapMarkerRecord {
         private Set<UUID> sharedFellowshipIds =
                 Collections.emptySet();
         private LostTalesWaystoneGenerationState generationState;
-        private String generationMessage = "";
         private boolean linked;
         private int linkedDimensionId;
         private int linkedX;
@@ -506,6 +539,8 @@ public final class LostTalesMapMarkerRecord {
         private int linkedZ;
         private UUID linkToken;
         private long revision = 1L;
+        private Set<LostTalesMapMarkerSetting> savedSettings =
+                Collections.emptySet();
 
         private Builder(String id, LostTalesMapMarkerSource source) {
             this.id = id;
@@ -540,7 +575,6 @@ public final class LostTalesMapMarkerRecord {
             this.sharedFellowshipIds =
                     record.sharedFellowshipIds;
             this.generationState = record.generationState;
-            this.generationMessage = record.generationMessage;
             this.linked = record.linked;
             this.linkedDimensionId = record.linkedDimensionId;
             this.linkedX = record.linkedX;
@@ -548,6 +582,7 @@ public final class LostTalesMapMarkerRecord {
             this.linkedZ = record.linkedZ;
             this.linkToken = record.linkToken;
             this.revision = record.revision;
+            this.savedSettings = record.savedSettings;
         }
 
         public Builder name(String value) { this.name = value; return this; }
@@ -600,9 +635,8 @@ public final class LostTalesMapMarkerRecord {
             return this;
         }
         public Builder generationState(
-                LostTalesWaystoneGenerationState value, String message) {
+                LostTalesWaystoneGenerationState value) {
             this.generationState = value;
-            this.generationMessage = message;
             return this;
         }
         public Builder link(int dimensionId, int x, int y, int z, UUID token) {
@@ -615,6 +649,11 @@ public final class LostTalesMapMarkerRecord {
             return this;
         }
         public Builder revision(long value) { this.revision = value; return this; }
+        /** The settings saved on its page with another value than they had (WAY-16). */
+        public Builder savedSettings(Set<LostTalesMapMarkerSetting> value) {
+            this.savedSettings = value;
+            return this;
+        }
         public LostTalesMapMarkerRecord build() {
             return new LostTalesMapMarkerRecord(this);
         }

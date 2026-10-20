@@ -134,8 +134,7 @@ public final class CharacterJoin {
             return;
         }
         if (roster != null && !roster.getCharacters().isEmpty()
-                && join(player, CharacterSyncManager.UNSOLICITED_REQUEST_ID,
-                        roster.getCharacters().get(0).getCharacterId())
+                && join(player, roster.getCharacters().get(0).getCharacterId())
                         .isSuccessful()) {
             return;
         }
@@ -147,13 +146,13 @@ public final class CharacterJoin {
     /**
      * Plays a waiting player as their first character, just made, and lets
      * the world announce them: the join line held for them goes out, then
-     * Discord's notice, and everyone's channels follow. Answers the
-     * switch's result; a refused one leaves them waiting.
+     * Discord's notice, both unless they are Invisible as that character,
+     * and everyone's channels follow. Answers the switch's result; a
+     * refused one leaves them waiting.
      */
-    static CharacterOperationResult join(EntityPlayerMP player, int requestId,
-                                         UUID characterId) {
+    static CharacterOperationResult join(EntityPlayerMP player, UUID characterId) {
         CharacterOperationResult result = CharacterSwitchCoordinator
-                .getInstance().joinAs(player, requestId, characterId);
+                .getInstance().joinAs(player, characterId);
         if (!result.isSuccessful()) {
             FMLLog.warning("[%s] %s could not be played as their first character: %s",
                     LostTalesMetaData.MOD_ID, player.getUniqueID(),

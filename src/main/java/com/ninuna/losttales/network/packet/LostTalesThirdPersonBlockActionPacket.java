@@ -9,7 +9,6 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.item.ItemStack;
 
 /** Requests one server-validated offset-camera block interaction. */
 public final class LostTalesThirdPersonBlockActionPacket
@@ -150,14 +149,12 @@ public final class LostTalesThirdPersonBlockActionPacket
                 MessageContext context) {
             EntityPlayerMP player =
                     LostTalesServerPacketDispatcher.getPlayer(context);
-            if (player == null || player.worldObj == null
-                    || player.worldObj.provider == null
-                    || message == null) {
+            if (player == null || message == null) {
                 return null;
             }
 
-            final int expectedDimension =
-                    player.worldObj.provider.dimensionId;
+            // The player's world and hand are read on the server thread,
+            // in the task, never here.
             final int x = message.x;
             final int y = message.y;
             final int z = message.z;
@@ -168,10 +165,6 @@ public final class LostTalesThirdPersonBlockActionPacket
                     (float)message.hitOffsetY / (float)OFFSET_UNITS;
             final float hitOffsetZ =
                     (float)message.hitOffsetZ / (float)OFFSET_UNITS;
-            final int expectedHotbarSlot =
-                    player.inventory.currentItem;
-            final ItemStack expectedHeldItem = ItemStack.copyItemStack(
-                    player.inventory.getCurrentItem());
             LostTalesServerPacketDispatcher.submit(
                     player,
                     LostTalesRequestRateLimiter.RequestType
@@ -182,11 +175,8 @@ public final class LostTalesThirdPersonBlockActionPacket
                         @Override
                         public void run(EntityPlayerMP livePlayer) {
                             LostTalesThirdPersonBlockActionService.execute(
-                                    livePlayer, expectedDimension,
-                                    x, y, z, side,
-                                    hitOffsetX, hitOffsetY, hitOffsetZ,
-                                    expectedHotbarSlot,
-                                    expectedHeldItem);
+                                    livePlayer, x, y, z, side,
+                                    hitOffsetX, hitOffsetY, hitOffsetZ);
                         }
                     });
             return null;

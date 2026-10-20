@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.List;
 import net.minecraft.client.gui.FontRenderer;
@@ -45,18 +46,18 @@ final class ChatTypingLine {
     }
 
     /**
-     * Draws the words, cut to leave the dots room inside {@code room},
-     * with their top at {@code y}, and the dots after them. Answers the
-     * width drawn.
+     * Draws the words, cut to leave the dots room inside {@code room} and
+     * fading into that end where they are longer (LOOK-37), with their top
+     * at {@code y}, and the dots after them. Answers the width drawn.
      */
     static int draw(FontRenderer font, String words, int x, int y, int room,
                     int alpha, long nowNanos) {
         int rgb = LostTalesChatVisualStyle.asideRgb();
-        String shown = font.trimStringToWidth(words,
-                Math.max(0, room - dotsWidth(font)));
-        LostTalesUiInk.drawText(font, "§o" + shown, x, y, rgb,
-                alpha);
-        int dotX = x + font.getStringWidth(shown);
+        String text = "§o" + words;
+        int wordsRoom = Math.max(0, room - dotsWidth(font));
+        LostTalesUiCutName.drawText(font, text, x, y, wordsRoom, rgb, alpha);
+        int dotX = x + (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(text), wordsRoom);
         for (int index = 0; index < ChatTypingDots.COUNT; index++) {
             LostTalesUiInk.drawText(font, "§o" + DOT, dotX, y,
                     rgb, Math.round(alpha

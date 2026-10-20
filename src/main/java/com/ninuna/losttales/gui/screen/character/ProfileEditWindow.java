@@ -37,7 +37,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -57,8 +56,10 @@ import org.lwjgl.input.Keyboard;
  * do, one row a control, and scroll by whole rows where the window is too
  * short for them. Save sends all of it, and the window closes once the
  * server has kept it; Cancel, the cross and Escape leave it as it was.
- * The window opens as tall as its tallest section, so it stands still as
- * the sections change.
+ * Until the profile has arrived the rows stand empty and take no click,
+ * key or wheel, so nothing typed is lost to it and nothing empty is saved
+ * over it. The window opens as tall as its tallest section, so it stands
+ * still as the sections change.
  */
 final class ProfileEditWindow extends SubWindowContent {
     /** The window's sections. */
@@ -118,8 +119,6 @@ final class ProfileEditWindow extends SubWindowContent {
     private int age = CharacterValidator.MIN_AGE;
     /** Whether the rows hold the profile the server sent, rather than an empty one waiting for it. */
     private boolean loaded;
-    /** Whether anything was changed by hand, after which an arriving profile no longer replaces the rows. */
-    private boolean touched;
     private int pendingRequestId;
     private String status = "";
     private boolean statusError;
@@ -153,7 +152,6 @@ final class ProfileEditWindow extends SubWindowContent {
                 this.characterId);
         build(profile == null ? CharacterProfile.EMPTY : profile);
         this.loaded = profile != null;
-        this.touched = false;
         this.page = Page.ABOUT;
         this.status = "";
         this.statusError = false;
@@ -198,7 +196,6 @@ final class ProfileEditWindow extends SubWindowContent {
                     @Override
                     public void set(int value) {
                         age = Math.max(CharacterValidator.MIN_AGE, value);
-                        touched = true;
                         clearError();
                     }
 
@@ -228,7 +225,11 @@ final class ProfileEditWindow extends SubWindowContent {
         this.hovered = null;
     }
 
-    /** The profile arrives: it fills the rows, unless they were already changed by hand. */
+    /**
+     * The profile arrives: it fills the rows, which took nothing while
+     * they waited, and the section's first row takes the keys where the
+     * window held them.
+     */
     private void followProfile() {
         if (this.loaded) {
             return;
@@ -238,9 +239,11 @@ final class ProfileEditWindow extends SubWindowContent {
         if (profile == null) {
             return;
         }
+        boolean heldKeys = this.focused != null;
         this.loaded = true;
-        if (!this.touched) {
-            build(profile);
+        build(profile);
+        if (heldKeys) {
+            focusNext(1);
         }
     }
 
@@ -516,9 +519,8 @@ final class ProfileEditWindow extends SubWindowContent {
                 this.renderedScroll, maxScroll, alpha);
         String said = statusText();
         if (said.length() > 0) {
-            CreatorRows.drawNote(this.context, Collections.singletonList(
-                    font.trimStringToWidth(said, inner(box))), left,
-                    statusTop(box), this.statusError
+            CreatorRows.drawNoteLine(this.context, said, left, statusTop(box),
+                    inner(box), this.statusError
                             ? LostTalesColors.rgb(LostTalesColors.RED)
                             : WindowStyle.asideRgb());
         }
@@ -658,8 +660,8 @@ final class ProfileEditWindow extends SubWindowContent {
         WindowHover hover = new WindowHover(WindowHover.Kind.SUB_WINDOW);
         hover.part = part;
         hover.acts = SAVE.equals(part) ? canSave() : !CONTROL.equals(part)
-                || this.hovered.isPointerOverAction((int)Math.floor(x),
-                        (int)Math.floor(y));
+                || this.loaded && this.hovered.isPointerOverAction(
+                        (int)Math.floor(x), (int)Math.floor(y));
         return hover;
     }
 
@@ -679,12 +681,14 @@ final class ProfileEditWindow extends SubWindowContent {
             show(Page.valueOf(hover.part.substring(SECTION_PREFIX.length())));
             return true;
         }
+        if (!this.loaded) {
+            return true;
+        }
         CreatorControl control = controlAt(x, y);
         focus(control);
         if (control != null && control.mouseClicked((int)Math.floor(x),
                 (int)Math.floor(y), button)) {
             this.held = control;
-            this.touched = true;
             clearError();
         }
         return true;
@@ -725,7 +729,8 @@ final class ProfileEditWindow extends SubWindowContent {
      */
     @Override
     public void scrollBy(int lines) {
-        if (this.hovered != null && this.hovered.mouseWheel(lines < 0 ? 1 : -1)) {
+        if (this.loaded && this.hovered != null
+                && this.hovered.mouseWheel(lines < 0 ? 1 : -1)) {
             clearError();
             return;
         }
@@ -799,8 +804,8 @@ final class ProfileEditWindow extends SubWindowContent {
             show(all[(this.page.ordinal() + step + all.length) % all.length]);
             return true;
         }
-        if (this.focused != null && this.focused.keyTyped(typedChar, keyCode)) {
-            this.touched = true;
+        if (this.loaded && this.focused != null
+                && this.focused.keyTyped(typedChar, keyCode)) {
             clearError();
             return true;
         }

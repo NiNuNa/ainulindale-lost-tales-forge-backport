@@ -25,6 +25,10 @@ public final class FellowshipInvitationNbtCodecTest {
             "c1000000-0000-0000-0000-00000000001c");
 
     private static NBTTagCompound written() {
+        return writtenWith(Collections.<NBTTagCompound>emptyList());
+    }
+
+    private static NBTTagCompound writtenWith(List<NBTTagCompound> quarantine) {
         FellowshipInvitation invitation = new FellowshipInvitation(INVITATION,
                 UUID.fromString("c2000000-0000-0000-0000-00000000002c"),
                 UUID.fromString("c3000000-0000-0000-0000-00000000003c"),
@@ -35,8 +39,7 @@ public final class FellowshipInvitationNbtCodecTest {
                 "Beren", 1000L, 2000L);
         NBTTagCompound root = new NBTTagCompound();
         FellowshipInvitationNbtCodec.write(root,
-                Collections.singletonList(invitation),
-                Collections.<NBTTagCompound>emptyList());
+                Collections.singletonList(invitation), quarantine);
         return root;
     }
 
@@ -107,6 +110,36 @@ public final class FellowshipInvitationNbtCodecTest {
         FellowshipInvitationNbtCodec.write(root, invitations,
                 Collections.<NBTTagCompound>emptyList());
         return root;
+    }
+
+    /**
+     * A save whose quarantine would hold more than its bound is kept as it
+     * is, read-only; a store whose quarantine is full closes before it
+     * takes another invitation out.
+     */
+    @Test
+    public void aQuarantinePastItsBoundKeepsTheStoreReadOnly() {
+        List<NBTTagCompound> full = new ArrayList<NBTTagCompound>();
+        for (int index = 0; index < FellowshipNbtCodec.MAX_QUARANTINED; index++) {
+            full.add(FellowshipInvitationNbtCodec.createQuarantineEntry(
+                    "missing_target_character", new UUID(800L, index), null, null));
+        }
+        NBTTagCompound atBound = writtenWith(full);
+        assertFalse(FellowshipInvitationNbtCodec.read(atBound).isReadOnly());
+
+        NBTTagCompound pastBound = (NBTTagCompound) atBound.copy();
+        pastBound.getTagList("Invitations", 10).getCompoundTagAt(0)
+                .removeTag("TargetCharacterName");
+        FellowshipInvitationNbtCodec.ReadResult past =
+                FellowshipInvitationNbtCodec.read(pastBound);
+        assertTrue(past.isReadOnly());
+
+        FellowshipInvitationWorldData data = new FellowshipInvitationWorldData(
+                FellowshipInvitationWorldData.DATA_NAME);
+        data.readFromNBT(atBound);
+        assertFalse(data.hasQuarantineRoomFor(1));
+        assertTrue("closed", data.isReadOnlyForNewerVersion());
+        assertEquals(1, data.getInvitationCount());
     }
 
     @Test

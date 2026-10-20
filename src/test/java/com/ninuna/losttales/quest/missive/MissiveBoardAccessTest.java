@@ -11,7 +11,8 @@ import static org.junit.Assert.assertNull;
 /**
  * A missive board's page reaches the board only as quick loot reaches a
  * chest: in the player's world, within reach, in sight, standing, usable,
- * and open to them under LOTR's banners, each asked only once the one
+ * and open to them under LOTR's banners and other mods' protection, each
+ * asked only once the one
  * before it holds.
  */
 public final class MissiveBoardAccessTest {
@@ -25,6 +26,7 @@ public final class MissiveBoardAccessTest {
         boolean stands = true;
         boolean usable = true;
         boolean banner = true;
+        boolean others = true;
 
         @Override
         public boolean inPlayersWorld() {
@@ -61,6 +63,12 @@ public final class MissiveBoardAccessTest {
             asked.add("banner");
             return banner;
         }
+
+        @Override
+        public boolean othersAllow() {
+            asked.add("others");
+            return others;
+        }
     }
 
     @Test
@@ -68,7 +76,7 @@ public final class MissiveBoardAccessTest {
         Site site = new Site();
         assertNull(MissiveBoardService.refusal(site));
         assertEquals(Arrays.asList("world", "reach", "sight", "stands",
-                "usable", "banner"), site.asked);
+                "usable", "banner", "others"), site.asked);
     }
 
     @Test
@@ -84,6 +92,14 @@ public final class MissiveBoardAccessTest {
     public void aBoardUnderABannerIsRefused() {
         Site site = new Site();
         site.banner = false;
+        assertEquals("chat.losttales.missive.protected",
+                MissiveBoardService.refusal(site));
+    }
+
+    @Test
+    public void aBoardAnotherModProtectsIsRefused() {
+        Site site = new Site();
+        site.others = false;
         assertEquals("chat.losttales.missive.protected",
                 MissiveBoardService.refusal(site));
     }

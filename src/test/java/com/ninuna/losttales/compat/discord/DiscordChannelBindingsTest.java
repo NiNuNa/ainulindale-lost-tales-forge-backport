@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -59,7 +58,7 @@ public final class DiscordChannelBindingsTest {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "ooc=BIDIRECTIONAL;channel=123456789;webhook=" + WEBHOOK,
-                "global=GAME_TO_DISCORD;webhook=" + WEBHOOK + "-global",
+                "global=GAME_TO_DISCORD;channel=222;webhook=" + WEBHOOK + "-global",
         }, true, warnings);
         assertTrue(bindings.forGame(ChatChannel.OOC, "").isEmpty());
         assertEquals(1, bindings.forGame(ChatChannel.GLOBAL, "").size());
@@ -94,8 +93,8 @@ public final class DiscordChannelBindingsTest {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "ooc=BIDIRECTIONAL;channel=123456789;webhook=" + WEBHOOK,
-                "global=game_to_discord;webhook=" + WEBHOOK + "-global",
-                "gondor=Discord-To-Game;channel=987654321",
+                "global=GAME_TO_DISCORD;channel=222;webhook=" + WEBHOOK + "-global",
+                "gondor=DISCORD_TO_GAME;channel=987654321;webhook=" + WEBHOOK + "-gondor",
         }, true, warnings);
         assertTrue(warnings.messages.toString(), warnings.messages.isEmpty());
         assertTrue(warnings.refusals.isEmpty());
@@ -120,12 +119,42 @@ public final class DiscordChannelBindingsTest {
         assertFalse(gondor.sendsToDiscord());
         assertEquals(Arrays.asList(ooc, gondor), bindings.reading());
         assertEquals(Arrays.asList(ooc, global), bindings.destinations());
-        assertEquals(Arrays.asList("123456789", "987654321"), bindings.channels());
+        assertEquals(Arrays.asList("123456789", "222", "987654321"), bindings.channels());
         assertEquals("ooc", bindings.ownerOfChannel("123456789"));
         assertEquals("", bindings.ownerOfChannel("555"));
         assertEquals("", bindings.ownerOfChannel(null));
         assertTrue(bindings.readsAnything());
         assertTrue(bindings.sendsAnything());
+    }
+
+    /**
+     * The list is written by the link commands alone, so an entry of any
+     * other form is refused with a warning and nothing of it is read.
+     */
+    @Test
+    public void formsTheLinkCommandsNeverWriteAreRefused() {
+        Collected warnings = new Collected();
+        DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
+                "ooc=DISABLED;channel=1;webhook=" + WEBHOOK,
+                "ooc=game_to_discord;channel=2;webhook=" + WEBHOOK,
+                "ooc=Discord-To-Game;channel=3;webhook=" + WEBHOOK,
+                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK,
+                "ooc=DISCORD_TO_GAME;channel=4",
+                "ooc=BIDIRECTIONAL",
+                "ooc=DISABLED;channel=;webhook=",
+                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK + ";channel=5",
+                "ooc=GAME_TO_DISCORD; channel=6;webhook=" + WEBHOOK,
+                " ooc=GAME_TO_DISCORD;channel=7;webhook=" + WEBHOOK,
+                "OOC=GAME_TO_DISCORD;channel=8;webhook=" + WEBHOOK,
+                "ooc=GAME_TO_DISCORD;channel=9;webhook="
+                        + "https://discordapp.com/api/webhooks/1/abc",
+                "# ooc=GAME_TO_DISCORD;channel=10;webhook=" + WEBHOOK,
+                "",
+                null,
+        }, true, warnings);
+        assertTrue(bindings.all().isEmpty());
+        assertEquals(15, warnings.messages.size());
+        assertTrue(warnings.refusals.isEmpty());
     }
 
     /**
@@ -139,9 +168,9 @@ public final class DiscordChannelBindingsTest {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + WEBHOOK,
-                "global=GAME_TO_DISCORD;webhook=" + WEBHOOK,
-                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK,
-                "proximity=GAME_TO_DISCORD;webhook=" + WEBHOOK + "-own",
+                "global=GAME_TO_DISCORD;channel=222;webhook=" + WEBHOOK,
+                "ooc=GAME_TO_DISCORD;channel=333;webhook=" + WEBHOOK,
+                "proximity=GAME_TO_DISCORD;channel=444;webhook=" + WEBHOOK + "-own",
         }, true, warnings);
         assertEquals(1, warnings.refusals.size());
         assertTrue(warnings.refusals.get(0), warnings.refusals.get(0).contains(
@@ -166,8 +195,8 @@ public final class DiscordChannelBindingsTest {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + WEBHOOK + "-main",
-                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK + "-mirror",
-                "global=GAME_TO_DISCORD;webhook=" + WEBHOOK + "-global",
+                "ooc=GAME_TO_DISCORD;channel=222;webhook=" + WEBHOOK + "-mirror",
+                "global=GAME_TO_DISCORD;channel=444;webhook=" + WEBHOOK + "-global",
                 "ooc=GAME_TO_DISCORD;channel=333;webhook=" + WEBHOOK + "-other-guild",
         }, true, warnings);
         assertTrue(warnings.messages.toString(), warnings.messages.isEmpty());
@@ -184,7 +213,7 @@ public final class DiscordChannelBindingsTest {
         // Every webhook once, the first binding through each.
         assertEquals(Arrays.asList("ooc", "ooc#2", "global", "ooc#3"),
                 idsOf(bindings.destinations()));
-        assertEquals(Arrays.asList("111", "333"), bindings.channels());
+        assertEquals(Arrays.asList("111", "222", "444", "333"), bindings.channels());
         assertEquals(Arrays.asList(bindings.byId("global")),
                 bindings.forGame(ChatChannel.GLOBAL, ""));
         assertTrue(bindings.forGame(ChatChannel.OPERATOR, "").isEmpty());
@@ -203,7 +232,7 @@ public final class DiscordChannelBindingsTest {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + WEBHOOK,
-                "global=DISCORD_TO_GAME;channel=111",
+                "global=DISCORD_TO_GAME;channel=111;webhook=" + WEBHOOK + "-global",
                 "operator=BIDIRECTIONAL;channel=111;webhook=" + WEBHOOK + "-staff",
         }, true, warnings);
         assertTrue(warnings.messages.toString(), warnings.messages.isEmpty());
@@ -229,7 +258,7 @@ public final class DiscordChannelBindingsTest {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "ooc=GAME_TO_DISCORD;channel=222;webhook=" + WEBHOOK,
-                "global=DISCORD_TO_GAME;channel=222",
+                "global=DISCORD_TO_GAME;channel=222;webhook=" + WEBHOOK + "-global",
         }, true, warnings);
         assertEquals(1, warnings.refusals.size());
         assertEquals(DiscordBridgeDirection.DISABLED,
@@ -240,16 +269,17 @@ public final class DiscordChannelBindingsTest {
 
     /**
      * The bridge sends the game's lines wherever a webhook points, so a
-     * webhook must be a Discord webhook's address; any other is dropped
-     * with a warning that does not repeat it.
+     * webhook must be a Discord webhook's address; an entry with any
+     * other is refused with a warning that does not repeat it.
      */
     @Test
     public void aWebhookMustBeADiscordWebhook() {
         assertTrue(DiscordChannelBindings.isDiscordWebhook(WEBHOOK));
         assertTrue(DiscordChannelBindings.isDiscordWebhook(
-                "https://discordapp.com/api/webhooks/123/a_B-c"));
-        assertTrue(DiscordChannelBindings.isDiscordWebhook(
                 "https://canary.discord.com/api/v10/webhooks/123/abc"));
+        assertFalse("Discord's old host is no webhook the bot makes",
+                DiscordChannelBindings.isDiscordWebhook(
+                        "https://discordapp.com/api/webhooks/123/a_B-c"));
         assertFalse(DiscordChannelBindings.isDiscordWebhook(
                 "http://discord.com/api/webhooks/123/abc"));
         assertFalse(DiscordChannelBindings.isDiscordWebhook(
@@ -260,21 +290,30 @@ public final class DiscordChannelBindingsTest {
                 "https://discord.com/api/webhooks/123/abc?wait=true"));
         assertFalse(DiscordChannelBindings.isDiscordWebhook(
                 "https://discord.com/api/webhooks/123"));
+        assertFalse("an id longer than any Discord id",
+                DiscordChannelBindings.isDiscordWebhook(
+                        "https://discord.com/api/webhooks/123456789012345678901/abc"));
         assertFalse(DiscordChannelBindings.isDiscordWebhook(null));
 
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "ooc=BIDIRECTIONAL;channel=111;webhook=https://example.org/hook/secret",
         }, true, warnings);
-        assertEquals(DiscordBridgeDirection.DISCORD_TO_GAME,
-                bindings.byId("ooc").getDirection());
-        assertEquals("", bindings.byId("ooc").getWebhookUrl());
-        // The address dropped, and then posting with nowhere to post: two
-        // faults, two warnings, neither repeating the address.
-        assertEquals(2, warnings.messages.size());
-        for (String message : warnings.messages) {
-            assertFalse(message, message.contains("secret"));
-        }
+        assertNull(bindings.byId("ooc"));
+        assertEquals(1, warnings.messages.size());
+        assertFalse(warnings.messages.get(0), warnings.messages.get(0).contains("secret"));
+    }
+
+    /** A Discord id is digits alone, as many as a 64-bit number has at most. */
+    @Test
+    public void aDiscordIdIsTwentyDigitsAtMost() {
+        assertTrue(DiscordChannelBindings.isSnowflake("1"));
+        assertTrue(DiscordChannelBindings.isSnowflake("18446744073709551615"));
+        assertFalse(DiscordChannelBindings.isSnowflake("123456789012345678901"));
+        assertFalse(DiscordChannelBindings.isSnowflake("12a"));
+        assertFalse(DiscordChannelBindings.isSnowflake("-1"));
+        assertFalse(DiscordChannelBindings.isSnowflake(""));
+        assertFalse(DiscordChannelBindings.isSnowflake(null));
     }
 
     @Test
@@ -282,12 +321,11 @@ public final class DiscordChannelBindingsTest {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + WEBHOOK,
-                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK + ";channel=111",
-                "ooc=DISCORD_TO_GAME;channel=111",
-                "global=DISABLED;webhook=",
-                "global=DISABLED;channel=;webhook=",
+                "ooc=GAME_TO_DISCORD;channel=111;webhook=" + WEBHOOK,
+                "ooc=DISCORD_TO_GAME;channel=111;webhook=" + WEBHOOK + "-other",
+                "ooc=DISCORD_TO_GAME;channel=222;webhook=" + WEBHOOK,
         }, true, warnings);
-        assertEquals(2, bindings.all().size());
+        assertEquals(1, bindings.all().size());
         assertEquals(3, warnings.messages.size());
         for (String message : warnings.messages) {
             assertTrue(message, message.contains("the first stands"));
@@ -304,9 +342,9 @@ public final class DiscordChannelBindingsTest {
     public void aFactionLineFindsOnlyItsOwnFactionsBindings() {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
-                "faction=GAME_TO_DISCORD;webhook=" + WEBHOOK,
-                "gondor=GAME_TO_DISCORD;webhook=" + WEBHOOK + "2",
-                "gondor=GAME_TO_DISCORD;webhook=" + WEBHOOK + "3",
+                "faction=GAME_TO_DISCORD;channel=1;webhook=" + WEBHOOK,
+                "gondor=GAME_TO_DISCORD;channel=2;webhook=" + WEBHOOK + "2",
+                "gondor=GAME_TO_DISCORD;channel=3;webhook=" + WEBHOOK + "3",
         }, false, warnings);
         assertEquals(1, warnings.messages.size());
         assertTrue(warnings.messages.get(0), warnings.messages.get(0).contains(
@@ -325,8 +363,8 @@ public final class DiscordChannelBindingsTest {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "whisper=BIDIRECTIONAL;channel=123;webhook=" + WEBHOOK,
-                "fellowship=GAME_TO_DISCORD;webhook=" + WEBHOOK,
-                "client_console=DISCORD_TO_GAME;channel=123",
+                "fellowship=GAME_TO_DISCORD;channel=124;webhook=" + WEBHOOK,
+                "client_console=DISCORD_TO_GAME;channel=125;webhook=" + WEBHOOK,
         }, true, warnings);
         assertTrue(bindings.all().isEmpty());
         assertEquals(3, warnings.messages.size());
@@ -341,24 +379,20 @@ public final class DiscordChannelBindingsTest {
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "nonsense",
                 "trade=BIDIRECTIONAL;channel=1;webhook=" + WEBHOOK,
-                "ooc:scope=GAME_TO_DISCORD;webhook=" + WEBHOOK,
-                "global=SIDEWAYS;webhook=" + WEBHOOK,
-                "global=GAME_TO_DISCORD;webhook=" + WEBHOOK + ";colour=red",
-                "global=GAME_TO_DISCORD;webhook=" + WEBHOOK,
+                "ooc:scope=GAME_TO_DISCORD;channel=2;webhook=" + WEBHOOK,
+                "global=SIDEWAYS;channel=3;webhook=" + WEBHOOK,
+                "global=GAME_TO_DISCORD;channel=4;webhook=" + WEBHOOK + ";colour=red",
+                "global=GAME_TO_DISCORD;channel=5;webhook=" + WEBHOOK,
                 "ooc=BIDIRECTIONAL;channel=not-a-number;webhook=" + WEBHOOK + "-ooc",
                 "",
                 "# a comment",
                 null,
         }, true, warnings);
-        assertEquals(2, bindings.all().size());
+        assertEquals(1, bindings.all().size());
         assertEquals(DiscordBridgeDirection.GAME_TO_DISCORD,
                 bindings.byId("global").getDirection());
-        // OOC asked to read a channel whose id is no number: the id is
-        // dropped, and then reading has no channel — two faults, two
-        // warnings.
-        assertEquals(DiscordBridgeDirection.GAME_TO_DISCORD,
-                bindings.byId("ooc").getDirection());
-        assertEquals(8, warnings.messages.size());
+        assertNull(bindings.byId("ooc"));
+        assertEquals(9, warnings.messages.size());
         assertTrue(warnings.refusals.isEmpty());
     }
 
@@ -371,11 +405,11 @@ public final class DiscordChannelBindingsTest {
     public void anEntryThatCannotBeReadIsNamedByItsPlaceAlone() {
         Collected warnings = new Collected();
         DiscordChannelBindings.parse(new String[] {
-                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK,
+                "ooc=GAME_TO_DISCORD;channel=1;webhook=" + WEBHOOK,
                 "https://discord.com/api/webhooks/1/sEcReT-token",
                 "MTIzNDU2Nzg5.sEcReT.bot-token=",
                 "https://discord.com/api/webhooks/2/sEcReT?wait=true",
-                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK
+                "ooc=GAME_TO_DISCORD;channel=2;webhook=" + WEBHOOK
                         + "-b;https://discord.com/api/webhooks/3/sEcReT?x=1",
         }, true, warnings);
         assertEquals(4, warnings.messages.size());
@@ -386,23 +420,17 @@ public final class DiscordChannelBindingsTest {
         assertTrue(warnings.messages.get(0), warnings.messages.get(0).contains("entry 2"));
         assertTrue(warnings.messages.get(1), warnings.messages.get(1).contains("entry 3"));
         assertTrue(warnings.messages.get(2), warnings.messages.get(2).contains("entry 4"));
-        assertTrue(warnings.messages.get(3), warnings.messages.get(3).contains("part 3"));
+        assertTrue(warnings.messages.get(3), warnings.messages.get(3).contains("entry 5"));
     }
 
     @Test
     public void whatABindingCannotDoIsTrimmedWithAWarning() {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
-                "global=BIDIRECTIONAL;channel=111",
-                "ooc=BIDIRECTIONAL;webhook=" + WEBHOOK,
                 "proximity=BIDIRECTIONAL;channel=222;webhook=" + WEBHOOK + "-p",
                 "faction=BIDIRECTIONAL;channel=333;webhook=" + WEBHOOK + "-f",
-                "operator=DISCORD_TO_GAME;channel=333",
+                "operator=DISCORD_TO_GAME;channel=333;webhook=" + WEBHOOK + "-o",
         }, true, warnings);
-        assertEquals(DiscordBridgeDirection.DISCORD_TO_GAME,
-                bindings.byId("global").getDirection());
-        assertEquals(DiscordBridgeDirection.GAME_TO_DISCORD,
-                bindings.byId("ooc").getDirection());
         assertEquals("proximity has nowhere on Discord to read from",
                 DiscordBridgeDirection.GAME_TO_DISCORD,
                 bindings.byId("proximity").getDirection());
@@ -411,7 +439,7 @@ public final class DiscordChannelBindingsTest {
         assertEquals("the refused faction entry owns nothing, so Operator may read 333",
                 DiscordBridgeDirection.DISCORD_TO_GAME,
                 bindings.byId("operator").getDirection());
-        assertEquals(4, warnings.messages.size());
+        assertEquals(2, warnings.messages.size());
         assertTrue(warnings.refusals.isEmpty());
     }
 
@@ -436,15 +464,16 @@ public final class DiscordChannelBindingsTest {
     @Test
     public void aSwitchedOffEntryOwnsNoDiscordChannel() {
         DiscordChannelBindings kept = DiscordChannelBindings.parse(new String[] {
-                "global=DISABLED;channel=111;webhook=" + WEBHOOK + "-kept",
-                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK + "-ooc",
+                "ooc=BIDIRECTIONAL;channel=111;webhook=" + WEBHOOK,
+                "global=GAME_TO_DISCORD;channel=222;webhook=" + WEBHOOK,
         }, true, null);
-        assertEquals("", kept.ownerOfChannel("111"));
+        assertEquals(DiscordBridgeDirection.DISABLED, kept.byId("global").getDirection());
+        assertEquals("", kept.ownerOfChannel("222"));
 
         Collected warnings = new Collected();
         DiscordChannelBindings refused = DiscordChannelBindings.parse(new String[] {
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + WEBHOOK,
-                "global=DISCORD_TO_GAME;channel=111",
+                "global=DISCORD_TO_GAME;channel=111;webhook=" + WEBHOOK + "-global",
         }, true, warnings);
         assertEquals(1, warnings.refusals.size());
         assertEquals(DiscordBridgeDirection.DISABLED,
@@ -455,17 +484,17 @@ public final class DiscordChannelBindingsTest {
     @Test
     public void destinationsArePostingWebhooksOnceEach() {
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
-                "global=GAME_TO_DISCORD;webhook=" + WEBHOOK + "-a",
+                "global=GAME_TO_DISCORD;channel=4;webhook=" + WEBHOOK + "-a",
                 "ooc=BIDIRECTIONAL;channel=1;webhook=" + WEBHOOK + "-b",
-                "proximity=GAME_TO_DISCORD;webhook=" + WEBHOOK + "-p",
-                "gondor=DISCORD_TO_GAME;channel=2",
-                "operator=DISABLED;channel=3;webhook=" + WEBHOOK + "-c",
+                "proximity=GAME_TO_DISCORD;channel=5;webhook=" + WEBHOOK + "-p",
+                "gondor=DISCORD_TO_GAME;channel=2;webhook=" + WEBHOOK + "-g",
+                "operator=BIDIRECTIONAL;channel=1;webhook=" + WEBHOOK + "-c",
         }, true, null);
         assertEquals(Arrays.asList("global", "ooc", "proximity"),
                 idsOf(bindings.destinations()));
         assertEquals("every channel a binding reads or posts, once each; "
                         + "a switched-off entry binds nothing",
-                Arrays.asList("1", "2"), bindings.channels());
+                Arrays.asList("4", "1", "5", "2"), bindings.channels());
         assertTrue(DiscordChannelBindings.EMPTY.destinations().isEmpty());
         assertTrue(DiscordChannelBindings.EMPTY.channels().isEmpty());
         assertFalse(DiscordChannelBindings.EMPTY.sendsAnything());

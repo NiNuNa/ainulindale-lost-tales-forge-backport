@@ -1,0 +1,3 @@
+{
+  "races": ["races/human.json", "races/elf.json", "races/dwarf.json", "races/hobbit.json", "races/orc.json", "races/uruk.json"]
+}

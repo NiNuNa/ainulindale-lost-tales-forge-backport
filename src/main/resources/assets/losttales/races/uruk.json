@@ -1,0 +1,22 @@
+{
+  "id": "losttales:uruk",
+  "body": "uruk",
+  "values_from": "lotr:uruk_hai",
+  "sexes": ["losttales:non_binary"],
+  "size": {"width": 0.6, "height": 1.8},
+  "health": 24,
+  "speed": 1.05,
+  "attack": 4,
+  "faction_categories": ["orc"],
+  "factions": [],
+  "skins": [
+    {"group": "uruk_hai", "texture": "lotr:mob/orc/urukHai", "count": 3},
+    {"group": "black_uruk", "texture": "lotr:mob/orc/blackUruk", "count": 3}
+  ],
+  "skills": {
+    "losttales:heavy_arms": 10,
+    "losttales:defence": 5,
+    "losttales:polearms": 5,
+    "losttales:archery": 5
+  }
+}

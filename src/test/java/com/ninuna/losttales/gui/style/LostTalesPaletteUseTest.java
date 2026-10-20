@@ -38,12 +38,16 @@ public final class LostTalesPaletteUseTest {
     private static final int FEWEST_EXPECTED = 200;
 
     private static final Allowed[] ALLOWED = {
-            new Allowed("ELostTalesEntity.java",
-                    "spawn-egg colours, which vanilla draws on the eggs",
-                    "0x8A5A38", "0xB45A32", "0x4F5A33", "0xC89B5A"),
             new Allowed("ELostTalesStructure.java",
                     "a structure spawner's colours, which LOTR draws on its item",
                     "0x8A5A38", "0xE3B04B"),
+            new Allowed("ELostTalesEntity.java",
+                    "each creature's spawn-egg shell and spots, drawn on its egg as LOTR's are",
+                    "0xCE50FF", "0x05B153", "0x0D0A4E", "0x5D0A4E", "0x8A5A38",
+                    "0xB45A32", "0x4F5A33", "0xC89B5A"),
+            new Allowed("LostTalesItemSpawnEgg.java",
+                    "white as an egg's tint, which leaves vanilla's egg as painted",
+                    "0xFFFFFF"),
             new Allowed("LostTalesEntityOdaneMan.java",
                     "leather dyes the Odane wear in the world",
                     "0x6B3F2A", "0x8A5A38", "0x9A6B3F", "0x4F5A33"),

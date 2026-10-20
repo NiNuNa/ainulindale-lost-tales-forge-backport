@@ -86,6 +86,84 @@ public final class DiscordMessageLinkStorageTest {
         assertEquals(2, DiscordMessageLinkNbtCodec.read(last).getEntries().size());
     }
 
+    /**
+     * The save follows the topic writes the worker records, and the
+     * stopping server leaves it the offline topic the bridge wrote as it
+     * stopped, whatever the memory does afterwards.
+     */
+    @Test
+    public void theSaveFollowsTheTopicWritesAndKeepsTheStopsOfflineTopic() {
+        DiscordTopicMemory memory = new DiscordTopicMemory();
+        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData(DiscordMessageLinkWorldData.DATA_NAME);
+        data.attachTopics(memory);
+        assertFalse(data.isDirty());
+        DiscordTopicPacing pacing = memory.pacingOf("111");
+        pacing.want("Server online • 0/20 players");
+        assertFalse("wanted is not written", data.isDirty());
+        pacing.posted("Server online • 0/20 players", 1000000L);
+        assertTrue(data.isDirty());
+        data.writeToNBT(new NBTTagCompound());
+        data.setDirty(false);
+        assertFalse(data.isDirty());
+
+        // The offline topic the bridge writes as it stops.
+        pacing.want("Server offline");
+        pacing.posted("Server offline", 2000000L);
+        data.detach();
+        assertTrue(data.isDirty());
+        memory.pacingOf("111").posted("Server online • 1/20 players", 3000000L);
+        NBTTagCompound last = new NBTTagCompound();
+        data.writeToNBT(last);
+        DiscordMessageLinkNbtCodec.ReadResult read = DiscordMessageLinkNbtCodec.read(last);
+        assertEquals(1, read.getTopics().size());
+        assertEquals("Server offline", read.getTopics().get(0).words);
+        assertEquals(2000000L, read.getTopics().get(0).lastWrite);
+        assertEquals(1000000L, read.getTopics().get(0).writeBefore);
+    }
+
+    /**
+     * Without their history the save's links are not taken, yet its
+     * topics are: a topic write rewrites the save with the links as they
+     * were read.
+     */
+    @Test
+    public void linksWaitingForTheirHistoryAreWrittenBackWithTheTopics() {
+        DiscordMessageLinks links = new DiscordMessageLinks();
+        links.link(1000L, "111", "", "channel:5", "");
+        NBTTagCompound saved = new NBTTagCompound();
+        DiscordMessageLinkNbtCodec.write(saved, links.snapshot().links,
+                Arrays.asList(new DiscordTopicMemory.SavedTopic("222", "Server offline",
+                        1000000L, DiscordTopicMemory.SavedTopic.NO_WRITE)),
+                java.util.Collections.<NBTTagCompound>emptyList());
+        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData(DiscordMessageLinkWorldData.DATA_NAME);
+        data.readFromNBT(saved);
+
+        DiscordTopicMemory memory = new DiscordTopicMemory();
+        assertEquals(1, memory.restore(data.restoredTopics(), 2000000L));
+        data.attachTopics(memory);
+        assertFalse("nothing new yet", data.isDirty());
+        assertEquals("Server offline", memory.pacingOf("222").posted());
+        memory.pacingOf("222").posted("Server online • 0/20 players", 3000000L);
+        assertTrue(data.isDirty());
+        NBTTagCompound written = new NBTTagCompound();
+        data.writeToNBT(written);
+        DiscordMessageLinkNbtCodec.ReadResult read = DiscordMessageLinkNbtCodec.read(written);
+        assertEquals(1, read.getEntries().size());
+        assertEquals(1000L, read.getEntries().get(0).messageId);
+        assertEquals("Server online • 0/20 players", read.getTopics().get(0).words);
+        assertEquals(1000000L, read.getTopics().get(0).writeBefore);
+    }
+
+    /** A save from a newer build takes no topic memory either. */
+    @Test(expected = IllegalStateException.class)
+    public void aReadOnlySaveTakesNoTopicMemory() {
+        NBTTagCompound newer = new NBTTagCompound();
+        newer.setInteger("DataVersion", DiscordMessageLinkNbtCodec.CURRENT_ROOT_DATA_VERSION + 1);
+        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData(DiscordMessageLinkWorldData.DATA_NAME);
+        data.readFromNBT(newer);
+        data.attachTopics(new DiscordTopicMemory());
+    }
+
     @Test
     public void aRestoreThatLeftSomethingOutIsWrittenBack() {
         DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData(DiscordMessageLinkWorldData.DATA_NAME);

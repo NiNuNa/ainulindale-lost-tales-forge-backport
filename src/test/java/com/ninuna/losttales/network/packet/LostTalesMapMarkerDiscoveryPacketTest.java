@@ -60,6 +60,22 @@ public final class LostTalesMapMarkerDiscoveryPacketTest {
         assertEquals(markerName, decoded.getMarkerName());
     }
 
+    @Test
+    public void theLongestNameInThreeByteLettersRoundTrips() {
+        String markerName = repeat('ᚠ',
+                com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord.MAX_NAME_LENGTH);
+        ByteBuf buffer = Unpooled.buffer();
+        new LostTalesMapMarkerDiscoveryPacket("losttales:greenway_market", markerName)
+                .toBytes(buffer);
+
+        LostTalesMapMarkerDiscoveryPacket decoded =
+                new LostTalesMapMarkerDiscoveryPacket();
+        decoded.fromBytes(buffer);
+
+        assertFalse(decoded.isMalformed());
+        assertEquals(markerName, decoded.getMarkerName());
+    }
+
     private static String repeat(char value, int count) {
         StringBuilder builder = new StringBuilder(count);
         for (int i = 0; i < count; i++) {

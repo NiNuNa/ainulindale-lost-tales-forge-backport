@@ -21,6 +21,7 @@ import com.ninuna.losttales.character.state.CharacterPlayerStateWorldData;
 import com.ninuna.losttales.character.state.CharacterStateValidationException;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
+import com.ninuna.losttales.character.switching.CharacterSwitchSourceRestore;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import com.ninuna.losttales.character.validation.CharacterValidator;
@@ -135,7 +136,7 @@ public final class LoreCharacterTransferCoordinator {
                         definition, characterId, player.getUniqueID(), slotIndex);
                 if (character == null) {
                     return failure(
-                            CharacterErrorId.LORE_CHARACTER_DEFINITION_INCOMPLETE,
+                            CharacterErrorId.LORE_CHARACTER_NO_FACTION,
                             roster);
                 }
                 state = CharacterPlayerStateService.getInstance()
@@ -199,6 +200,12 @@ public final class LoreCharacterTransferCoordinator {
                     player.getUniqueID());
             if (storageError != CharacterErrorId.NONE) {
                 return failure(storageError, roster);
+            }
+            // A held switch journal names the character it puts back (CHAR-37).
+            CharacterErrorId journal = CharacterSwitchSourceRestore
+                    .characterRemovalRefusal(player.worldObj, player.getUniqueID());
+            if (journal != CharacterErrorId.NONE) {
+                return failure(journal, roster);
             }
             if (roster.getRevision() != expectedRosterRevision) {
                 return failure(CharacterErrorId.STALE_ROSTER, roster);
@@ -497,6 +504,7 @@ public final class LoreCharacterTransferCoordinator {
         return CharacterErrorId.NONE;
     }
 
+    /** The figure as first claimed; null when no starting faction the server allows fits it. */
     private static RoleplayCharacter createInitialCharacter(
             LoreCharacterDefinition definition,
             UUID characterId,

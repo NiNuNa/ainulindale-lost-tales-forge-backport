@@ -2,14 +2,13 @@ package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.PacketDigest;
 import com.ninuna.losttales.network.packet.LostTalesQuestProgressPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.common.FMLLog;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -29,6 +28,10 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * a craft so costs one quest's counts, never the log with every missive
  * it keeps.
  *
+ * <p>A log a character switch put in place goes whole, marked as
+ * replacing the one the client holds, so the client takes it without
+ * news; one that cannot be sent then is still owed as a replacement.</p>
+ *
  * <p>What each client was last sent is kept by account until its player
  * leaves: the log's shape, a digest of everything but the counts, and
  * each running quest's counts. Static state, cleared with the server's
@@ -38,6 +41,8 @@ public final class QuestLogSync {
     private static final Map<UUID, Sent> SENT = new HashMap<UUID, Sent>();
     /** The players already told of in the log for a log that cannot be sent. */
     private static final Set<UUID> WARNED = new HashSet<UUID>();
+    /** The players whose next whole log replaces the one their client holds. */
+    private static final Set<UUID> REPLACING = new HashSet<UUID>();
 
     private QuestLogSync() {}
 
@@ -67,19 +72,25 @@ public final class QuestLogSync {
     }
 
     /**
-     * Brings the player's client up to {@code log}. A log that does not
-     * fit one packet is not sent; the client keeps the log it has, and
-     * the server's log says so once for each player.
+     * Brings the player's client up to {@code log}; {@code replaces} where
+     * a character switch put it in place of the log the client holds. A
+     * log that does not fit one packet is not sent; the client keeps the
+     * log it has, and the server's log says so once for each player.
      */
-    public static void send(EntityPlayerMP player, LostTalesQuestSyncPacket log) {
+    public static void send(EntityPlayerMP player, LostTalesQuestSyncPacket log,
+                            boolean replaces) {
         if (player == null || player.getUniqueID() == null || log == null) {
             return;
         }
         UUID account = player.getUniqueID();
+        boolean replacing = replaces || REPLACING.contains(account);
         Step step;
         try {
-            step = step(SENT.get(account), log);
+            step = step(SENT.get(account), log, replacing);
         } catch (IllegalStateException unsendable) {
+            if (replacing) {
+                REPLACING.add(account);
+            }
             if (WARNED.add(account)) {
                 FMLLog.warning("[%s] The quest log of player %s cannot be sent "
                                 + "(%s); their client keeps the log it has.",
@@ -92,16 +103,24 @@ public final class QuestLogSync {
         } else if (step.counts != null) {
             LostTalesNetworkHandler.CHANNEL.sendTo(step.counts, player);
         }
+        REPLACING.remove(account);
         SENT.put(account, step.sent);
     }
 
     /**
      * What brings a client that was sent {@code previous}, or nothing for
-     * null, up to {@code log}. Throws {@link IllegalStateException} for a
-     * log that cannot be written into one packet.
+     * null, up to {@code log}: always the whole log, marked as replacing
+     * the client's, where {@code replaces}. Throws
+     * {@link IllegalStateException} for a log that cannot be written into
+     * one packet.
      */
-    static Step step(Sent previous, LostTalesQuestSyncPacket log) {
-        Sent sent = new Sent(digest(log.withoutObjectiveCounts()), countsOf(log));
+    static Step step(Sent previous, LostTalesQuestSyncPacket log, boolean replaces) {
+        Sent sent = new Sent(PacketDigest.of(log.withoutObjectiveCounts()), countsOf(log));
+        if (replaces) {
+            LostTalesQuestSyncPacket whole = log.replacing();
+            fits(whole);
+            return new Step(whole, null, sent);
+        }
         if (previous == null || !Arrays.equals(previous.shape, sent.shape)) {
             fits(log);
             return new Step(log, null, sent);
@@ -122,6 +141,7 @@ public final class QuestLogSync {
         if (account != null) {
             SENT.remove(account);
             WARNED.remove(account);
+            REPLACING.remove(account);
         }
     }
 
@@ -129,6 +149,7 @@ public final class QuestLogSync {
     public static void clear() {
         SENT.clear();
         WARNED.clear();
+        REPLACING.clear();
     }
 
     private static Map<String, Map<String, Integer>> countsOf(
@@ -147,22 +168,6 @@ public final class QuestLogSync {
         ByteBuf buffer = Unpooled.buffer();
         try {
             log.toBytes(buffer);
-        } finally {
-            buffer.release();
-        }
-    }
-
-    /** A SHA-256 digest of the packet's bytes. */
-    private static byte[] digest(LostTalesQuestSyncPacket packet) {
-        ByteBuf buffer = Unpooled.buffer();
-        try {
-            packet.toBytes(buffer);
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = new byte[buffer.readableBytes()];
-            buffer.readBytes(bytes);
-            return digest.digest(bytes);
-        } catch (NoSuchAlgorithmException missing) {
-            throw new IllegalStateException("SHA-256 is not available", missing);
         } finally {
             buffer.release();
         }

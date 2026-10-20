@@ -213,6 +213,41 @@ public final class LostTalesQuestDefinitionValidatorTest {
                         "many")) + "]}", "'experience' many");
     }
 
+    /**
+     * A kill may name a place (QUEST-40): a marker, or x, y and z, with a
+     * radius above 0 to count within; incomplete coordinates, no radius
+     * and a world quest's kill naming one are warnings.
+     */
+    @Test
+    public void aKillsPlaceNeedsARadiusAndAllThreeCoordinates() {
+        String kill = "{\"id\":\"a\",\"type\":\"kill\",\"params\":{\"group\":"
+                + "\"hostile\",\"count\":\"5\",%s}}";
+        assertEquals(Collections.<String>emptyList(), warnings(HEAD + "\"stages\":["
+                + stage("10", String.format(kill, "\"x\":\"100\",\"y\":\"64\","
+                        + "\"z\":\"-300\",\"dimension\":\"0\",\"radius\":\"24\"")) + "]}"));
+        assertEquals(Collections.<String>emptyList(), warnings(HEAD + "\"stages\":["
+                + stage("10", String.format(kill, "\"marker\":\"losttales:camp\","
+                        + "\"radius\":\"24\"")) + "]}"));
+        assertEquals("without a place the radius is the killer's",
+                Collections.<String>emptyList(), warnings(HEAD + "\"stages\":["
+                + stage("10", String.format(kill, "\"radius\":\"24\"")) + "]}"));
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10", String.format(kill,
+                "\"x\":\"100\",\"y\":\"64\",\"z\":\"-300\"")) + "]}",
+                "names a place but no 'radius'");
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10", String.format(kill,
+                "\"marker\":\"losttales:camp\",\"radius\":\"0\"")) + "]}",
+                "names a place but no 'radius'");
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10", String.format(kill,
+                "\"x\":\"100\",\"z\":\"-300\",\"radius\":\"24\"")) + "]}",
+                "incomplete coordinates for type 'kill'");
+        assertOneWarning(HEAD + "\"stages\":[" + stage("10", String.format(kill,
+                "\"x\":\"east\",\"y\":\"64\",\"z\":\"-300\",\"radius\":\"24\"")) + "]}",
+                "non-numeric 'x'");
+        assertOneWarning(HEAD + "\"world\":{\"days\":\"7\"},\"stages\":["
+                + stage("hold", String.format(kill, "\"marker\":\"losttales:camp\""))
+                + "]}", "a world quest counts its kills anywhere");
+    }
+
     @Test
     public void aKillThatNamesNobodyIsRefused() {
         assertOneWarning(HEAD + "\"stages\":[" + stage("10",

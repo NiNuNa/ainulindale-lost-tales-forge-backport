@@ -6,7 +6,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
  * The active server-side character, or null when there is none to apply:
- * the player is on the account, or the store could not be read. Callers
+ * the player is a ghost on a first visit, or the store could not be read. Callers
  * that need to tell those two apart ask {@link PlayableIdentityResolver}.
  */
 public final class CharacterActiveResolver {

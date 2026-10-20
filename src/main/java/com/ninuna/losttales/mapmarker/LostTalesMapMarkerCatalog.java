@@ -1,19 +1,11 @@
 package com.ninuna.losttales.mapmarker;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.data.DataFiles;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
-import com.ninuna.losttales.util.LostTalesCloseables;
-import com.ninuna.losttales.util.LostTalesDimensionHelper;
-import cpw.mods.fml.common.FMLLog;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
+import com.ninuna.losttales.util.LostTalesLog;
+import com.ninuna.losttales.world.waystone.LostTalesWaystoneHouseFiles;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -23,31 +15,44 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import lotr.common.LOTRDimension;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IChatComponent;
+
 /**
- * Server-safe catalog of bundled map marker JSON.
- *
- * The client HUD still uses IResourceManager so resource packs can override marker files.
- * This catalog deliberately reads the mod classpath only; it is used for validation,
- * commands, and logging on both integrated and dedicated servers.
+ * The markers the map marker files hold (MOD-17): the bundled ones, read
+ * off the mod's own classpath, and while a server runs its own from
+ * {@code config/losttales/map_markers/}, each in place of a bundled one of
+ * its id or beside them. The server checks quests, commands and waystones
+ * against them and seeds its store with them. Each client reads the
+ * bundled files through its resource packs with the same reader
+ * ({@link #readBundled}), and gets a server's own markers only in their
+ * snapshots. The bundled markers alone register LOTR waypoints and stand
+ * on the main menu ({@link #getBundledMarkers}).
  */
 public final class LostTalesMapMarkerCatalog {
-    private static final String[] SHARED_MARKER_FILES = new String[] {
-            "towns",
-            "settlements",
-            "cities",
-            "forts",
-            "camps",
-            "caves",
-            "lotr_waypoints"
-    };
+    private static final Comparator<LostTalesMapMarkerDefinition> BY_NAME =
+            new Comparator<LostTalesMapMarkerDefinition>() {
+                @Override
+                public int compare(LostTalesMapMarkerDefinition left,
+                                   LostTalesMapMarkerDefinition right) {
+                    return left.getName().compareToIgnoreCase(right.getName());
+                }
+            };
 
-    private static final Map<String, LostTalesMapMarkerDefinition> MARKERS_BY_ID = new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
-    private static List<LostTalesMapMarkerDefinition> sortedMarkers = Collections.emptyList();
+    private static Map<String, LostTalesMapMarkerDefinition> bundledById =
+            Collections.<String, LostTalesMapMarkerDefinition>emptyMap();
+    private static List<LostTalesMapMarkerDefinition> bundledSorted =
+            Collections.<LostTalesMapMarkerDefinition>emptyList();
+    private static Map<String, LostTalesMapMarkerDefinition> serverById =
+            Collections.<String, LostTalesMapMarkerDefinition>emptyMap();
+    private static Map<String, LostTalesMapMarkerDefinition> mergedById =
+            Collections.<String, LostTalesMapMarkerDefinition>emptyMap();
+    private static List<LostTalesMapMarkerDefinition> mergedSorted =
+            Collections.<LostTalesMapMarkerDefinition>emptyList();
     private static boolean loaded;
+    private static boolean serverRead;
+    private static int revision;
 
     private LostTalesMapMarkerCatalog() {}
 
@@ -57,48 +62,120 @@ public final class LostTalesMapMarkerCatalog {
         }
     }
 
-    public static synchronized void reloadFromClasspath() {
-        Map<String, LostTalesMapMarkerDefinition> loadedMarkers = new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
-        for (String fileName : SHARED_MARKER_FILES) {
-            loadFileFromClasspath(fileName, loadedMarkers);
+    /** Reads the bundled files again; answers why each file left out was left out. */
+    public static synchronized List<String> reloadFromClasspath() {
+        List<String> problems = new ArrayList<String>();
+        List<LostTalesMapMarkerDefinition> bundled =
+                readBundled(LostTalesMapMarkerFiles.CLASSPATH, problems);
+        for (String problem : problems) {
+            LostTalesLog.warning("Bundled map marker file left out: %s", problem);
         }
-
-        ArrayList<LostTalesMapMarkerDefinition> sorted = new ArrayList<LostTalesMapMarkerDefinition>(loadedMarkers.values());
-        Collections.sort(sorted, new Comparator<LostTalesMapMarkerDefinition>() {
-            @Override
-            public int compare(LostTalesMapMarkerDefinition left, LostTalesMapMarkerDefinition right) {
-                return left.getName().compareToIgnoreCase(right.getName());
-            }
-        });
-
-        MARKERS_BY_ID.clear();
-        MARKERS_BY_ID.putAll(loadedMarkers);
-        sortedMarkers = Collections.unmodifiableList(sorted);
+        Map<String, LostTalesMapMarkerDefinition> byId =
+                new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
+        for (LostTalesMapMarkerDefinition marker : bundled) {
+            byId.put(marker.getId(), marker);
+        }
+        bundledById = Collections.unmodifiableMap(byId);
+        bundledSorted = sorted(byId.values());
         loaded = true;
+        merge();
+        return problems;
     }
 
+    /**
+     * The bundled markers {@code source} holds, checked against the houses
+     * its structure index lists; why each file was left out goes to
+     * {@code problems}.
+     */
+    public static List<LostTalesMapMarkerDefinition> readBundled(DataFiles.Source source,
+                                                                 List<String> problems) {
+        Set<String> houses = LostTalesWaystoneHouseFiles.bundledIds(source);
+        DataFiles.Result<LostTalesMapMarkerFiles.MarkerFile> files = DataFiles.readBundled(
+                source, LostTalesMapMarkerFiles.INDEX, LostTalesMapMarkerFiles.LIST_KEY,
+                LostTalesMapMarkerFiles.bundled(houses));
+        problems.addAll(files.problems);
+        return new ArrayList<LostTalesMapMarkerDefinition>(
+                LostTalesMapMarkerFiles.join(files.values, problems).values());
+    }
+
+    /**
+     * Reads a server's own files from {@code folder}, each marker checked
+     * against {@code houses}, the houses that loaded; answers why each file
+     * left out was left out. Called as the server starts and on
+     * {@code /losttales mapmarker reseed}.
+     */
+    public static synchronized List<String> loadServerFiles(File folder, Set<String> houses) {
+        ensureLoaded();
+        List<String> problems = new ArrayList<String>();
+        DataFiles.Result<LostTalesMapMarkerFiles.MarkerFile> files = DataFiles.readFolder(
+                folder, LostTalesMapMarkerFiles.server(
+                        houses == null ? Collections.<String>emptySet() : houses,
+                        bundledById.keySet()));
+        List<String> said = new ArrayList<String>(files.problems);
+        Map<String, LostTalesMapMarkerDefinition> own =
+                LostTalesMapMarkerFiles.join(files.values, said);
+        for (String problem : said) {
+            LostTalesLog.warning("Server map marker file left out: %s", problem);
+            problems.add("Server map marker file: " + problem);
+        }
+        serverById = Collections.unmodifiableMap(own);
+        serverRead = true;
+        merge();
+        return problems;
+    }
+
+    /** Forgets a server's own markers as it stops; the bundled ones stay. */
+    public static synchronized void clearServerFiles() {
+        serverById = Collections.<String, LostTalesMapMarkerDefinition>emptyMap();
+        serverRead = false;
+        merge();
+    }
+
+    /** Whether the server's own files were read since it started: the store seeds itself only then. */
+    public static synchronized boolean isServerRead() {
+        return serverRead;
+    }
+
+    /** Counts up with every read, so the store seeds itself again after one. */
+    public static synchronized int revision() {
+        return revision;
+    }
+
+    /** Every marker, bundled and the server's own, by name. */
     public static synchronized Collection<LostTalesMapMarkerDefinition> getMarkers() {
         ensureLoaded();
-        return sortedMarkers;
+        return mergedSorted;
     }
 
     public static synchronized Set<String> getMarkerIds() {
         ensureLoaded();
-        return Collections.unmodifiableSet(new LinkedHashSet<String>(MARKERS_BY_ID.keySet()));
+        return Collections.unmodifiableSet(new LinkedHashSet<String>(mergedById.keySet()));
     }
 
     public static synchronized LostTalesMapMarkerDefinition getMarker(String markerId) {
         ensureLoaded();
-        return MARKERS_BY_ID.get(LostTalesQuestMarkerHelper.normalizeMarkerId(markerId));
+        return mergedById.get(LostTalesQuestMarkerHelper.normalizeMarkerId(markerId));
     }
 
     public static synchronized boolean containsMarker(String markerId) {
         ensureLoaded();
-        return MARKERS_BY_ID.containsKey(LostTalesQuestMarkerHelper.normalizeMarkerId(markerId));
+        return mergedById.containsKey(LostTalesQuestMarkerHelper.normalizeMarkerId(markerId));
+    }
+
+    /** The bundled markers alone, by name: the ones LOTR waypoints and the main menu know. */
+    public static synchronized Collection<LostTalesMapMarkerDefinition> getBundledMarkers() {
+        ensureLoaded();
+        return bundledSorted;
+    }
+
+    /** A bundled marker as its file has it; null for any other. */
+    public static synchronized LostTalesMapMarkerDefinition getBundledMarker(String markerId) {
+        ensureLoaded();
+        return bundledById.get(LostTalesQuestMarkerHelper.normalizeMarkerId(markerId));
     }
 
     /**
-     * A bundled marker by its id and its name, {@code losttales:mossy_cave
+     * A marker by its id and its name, {@code losttales:mossy_cave
      * (Mossy Cave)}, the name in each reader's language; any other id alone.
      */
     public static IChatComponent getDisplayName(String markerId) {
@@ -124,7 +201,6 @@ public final class LostTalesMapMarkerCatalog {
         if (quests == null || quests.isEmpty()) {
             return;
         }
-
         ensureLoaded();
         for (LostTalesQuestDefinition quest : quests) {
             if (quest == null) {
@@ -132,185 +208,27 @@ public final class LostTalesMapMarkerCatalog {
             }
             for (String markerId : LostTalesQuestMarkerHelper.collectStaticQuestMarkerIds(quest)) {
                 if (!containsMarker(markerId)) {
-                    FMLLog.warning("[%s] Quest %s references missing map marker id: %s", LostTalesMetaData.MOD_ID, quest.getId(), markerId);
+                    LostTalesLog.warning("Quest %s references missing map marker id: %s",
+                            quest.getId(), markerId);
                 }
             }
         }
     }
 
-    private static void loadFileFromClasspath(String fileName, Map<String, LostTalesMapMarkerDefinition> markers) {
-        Reader reader = null;
-        try {
-            String path = "assets/" + LostTalesMetaData.MOD_ID + "/map_markers/" + fileName + ".json";
-            InputStream stream = LostTalesMapMarkerCatalog.class.getClassLoader().getResourceAsStream(path);
-            if (stream == null) {
-                return;
-            }
-            reader = new InputStreamReader(stream, StandardCharsets.UTF_8);
-            JsonElement rootElement = new JsonParser().parse(reader);
-            if (rootElement == null || !rootElement.isJsonObject()) {
-                return;
-            }
-
-            JsonElement markersElement = rootElement.getAsJsonObject().get("map_markers");
-            if (markersElement == null || !markersElement.isJsonArray()) {
-                return;
-            }
-
-            JsonArray array = markersElement.getAsJsonArray();
-            LostTalesMapMarkerSource source = "lotr_waypoints".equals(fileName)
-                    ? LostTalesMapMarkerSource.LOTR_ADAPTER
-                    : LostTalesMapMarkerSource.CUSTOM_PRESET;
-            for (JsonElement entryElement : array) {
-                if (entryElement == null || !entryElement.isJsonObject()) {
-                    continue;
-                }
-                try {
-                    LostTalesMapMarkerDefinition marker = parseMarker(
-                            entryElement.getAsJsonObject(), source);
-                    if (marker == null) {
-                        continue;
-                    }
-                    if (markers.containsKey(marker.getId())) {
-                        FMLLog.warning(
-                                "[%s] Ignoring duplicate map marker id %s in %s.json",
-                                LostTalesMetaData.MOD_ID, marker.getId(), fileName);
-                        continue;
-                    }
-                    markers.put(marker.getId(), marker);
-                } catch (RuntimeException e) {
-                    FMLLog.warning(
-                            "[%s] Ignoring malformed map marker entry in %s.json: %s",
-                            LostTalesMetaData.MOD_ID, fileName, e.getMessage());
-                }
-            }
-        } catch (RuntimeException e) {
-            FMLLog.warning("[%s] Failed to parse map marker file %s.json: %s", LostTalesMetaData.MOD_ID, fileName, e.getMessage());
-        } finally {
-            LostTalesCloseables.closeQuietly(reader);
-        }
+    private static void merge() {
+        Map<String, LostTalesMapMarkerDefinition> byId =
+                new LinkedHashMap<String, LostTalesMapMarkerDefinition>(bundledById);
+        byId.putAll(serverById);
+        mergedById = Collections.unmodifiableMap(byId);
+        mergedSorted = sorted(byId.values());
+        revision++;
     }
 
-    static LostTalesMapMarkerDefinition parseMarker(
-            JsonObject object, LostTalesMapMarkerSource source) {
-        if (source == null) {
-            source = LostTalesMapMarkerSource.CUSTOM_PRESET;
-        }
-        if (!hasNumber(object, "x") || !hasNumber(object, "z")) {
-            return null;
-        }
-        // A Lost Tales marker's words live in the lang file; a file may
-        // still write its own.
-        String name = getString(object, "name", null);
-        String id = LostTalesQuestMarkerHelper.normalizeMarkerId(getString(object, "id", name));
-        if (id.length() == 0) {
-            return null;
-        }
-        if (name == null || name.trim().length() == 0) {
-            name = LostTalesMapMarkerNames.englishName(id);
-        }
-        if (name.length() == 0) {
-            return null;
-        }
-        boolean hasFastTravel = getBoolean(object, "hasFastTravel", false);
-        String icon = getString(object, "icon", hasFastTravel ? "fort" : "undiscovered");
-        String color = getString(object, "color", "white");
-        String category = getString(object, "category", "");
-        String description = getString(object, "description",
-                LostTalesMapMarkerNames.englishDescription(id));
-        int dimensionId = LostTalesDimensionHelper.parseDimensionId(getString(object, "dimension", "lotr:middle_earth"), LOTRDimension.MIDDLE_EARTH.dimensionID);
-        double x = object.get("x").getAsDouble();
-        double y = hasNumber(object, "y")
-                ? object.get("y").getAsDouble()
-                : LostTalesMapMarkerDefinition.AUTOMATIC_Y;
-        double z = object.get("z").getAsDouble();
-        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
-            return null;
-        }
-        double compassFadeInRadius = getDouble(object, "compassFadeInRadius", 128.0D);
-        double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", 8.0D));
-        if (!Double.isFinite(compassFadeInRadius)
-                || !Double.isFinite(discoveryRadius)) {
-            return null;
-        }
-        boolean hidden = getBoolean(object, "hiddenUntilDiscovered", false);
-        boolean discoverable = getBoolean(object, "isDiscoverable", true);
-        boolean requiresRegionUnlock = getBoolean(
-                object, "requiresRegionUnlock", true);
-        boolean hasWaystone = getBoolean(object, "hasWaystone", false);
-        Integer relevanceRank =
-                LostTalesMapMarkerRelevance.parseJsonRank(object);
-        if (relevanceRank == null) {
-            return null;
-        }
-        String structureType = getString(
-                object, "waystoneStructureType", "");
-        structureType = normalizeStructureType(structureType, hasWaystone);
-        if (structureType == null) {
-            return null;
-        }
-        return new LostTalesMapMarkerDefinition(id, name, icon, color,
-                category, description, hasFastTravel,
-                dimensionId, x, y, z,
-                compassFadeInRadius, discoveryRadius, hidden,
-                discoverable, requiresRegionUnlock, source,
-                hasWaystone, structureType, relevanceRank.intValue());
-    }
-
-    private static String normalizeStructureType(String value,
-                                                 boolean hasWaystone) {
-        String normalized = value == null ? "" : value.trim().toLowerCase();
-        if (normalized.length() == 0 && hasWaystone) {
-            return null;
-        }
-        if (normalized.length() == 0) {
-            return "";
-        }
-        if (normalized.length() > 128
-                || !normalized.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
-            return null;
-        }
-        return normalized;
-    }
-
-    private static boolean hasNumber(JsonObject object, String key) {
-        JsonElement element = object.get(key);
-        return element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber();
-    }
-
-    private static String getString(JsonObject object, String key, String fallback) {
-        JsonElement element = object.get(key);
-        if (element == null || element.isJsonNull()) {
-            return fallback;
-        }
-        try {
-            return element.getAsString();
-        } catch (RuntimeException ignored) {
-            return fallback;
-        }
-    }
-
-    private static double getDouble(JsonObject object, String key, double fallback) {
-        JsonElement element = object.get(key);
-        if (element == null || element.isJsonNull()) {
-            return fallback;
-        }
-        try {
-            return element.getAsDouble();
-        } catch (RuntimeException ignored) {
-            return fallback;
-        }
-    }
-
-    private static boolean getBoolean(JsonObject object, String key, boolean fallback) {
-        JsonElement element = object.get(key);
-        if (element == null || element.isJsonNull()) {
-            return fallback;
-        }
-        try {
-            return element.getAsBoolean();
-        } catch (RuntimeException ignored) {
-            return fallback;
-        }
+    private static List<LostTalesMapMarkerDefinition> sorted(
+            Collection<LostTalesMapMarkerDefinition> markers) {
+        List<LostTalesMapMarkerDefinition> sorted =
+                new ArrayList<LostTalesMapMarkerDefinition>(markers);
+        Collections.sort(sorted, BY_NAME);
+        return Collections.unmodifiableList(sorted);
     }
 }

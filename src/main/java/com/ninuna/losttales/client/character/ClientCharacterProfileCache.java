@@ -14,14 +14,16 @@ import java.util.UUID;
  * The profiles this client has been sent, by character: its own
  * characters', and those of the people whose card or profile it opened.
  * The server sends one only when asked for, so whatever shows a profile
- * asks for it as it shows it ({@link #want}); an answer stands for a while
- * before the next look asks again. Cleared when the connection ends.
+ * asks for it as it shows it ({@link #want}), and a profile kept is not
+ * asked for again; a view opening asks afresh ({@link #refresh}). The
+ * server sends the owner a profile again once it is saved. Cleared when
+ * the connection ends.
  */
 public final class ClientCharacterProfileCache {
     /** The most profiles kept; the one looked at longest ago goes first. */
     private static final int MAX_KEPT = 128;
-    /** How long an answer stands before a look asks again. */
-    private static final long FRESH_NANOS = 30L * 1000L * 1000L * 1000L;
+    /** How long a question waits for its answer before a look asks again. */
+    private static final long ANSWER_NANOS = 5L * 1000L * 1000L * 1000L;
 
     private static final LinkedHashMap<UUID, CharacterProfile> PROFILES =
             new LinkedHashMap<UUID, CharacterProfile>(16, 0.75F, true) {
@@ -52,8 +54,9 @@ public final class ClientCharacterProfileCache {
     }
 
     /**
-     * Asks for the character's profile unless it was asked for a moment
-     * ago: what shows a profile calls this each time it draws one.
+     * Asks for the character's profile while none is kept and no question
+     * is waiting for its answer: what shows a profile calls this each time
+     * it draws one.
      */
     public static void want(UUID characterId) {
         if (characterId == null || !markAsked(characterId, false)) {
@@ -72,11 +75,15 @@ public final class ClientCharacterProfileCache {
                 new CharacterProfileRequestPacket(characterId));
     }
 
-    private static synchronized boolean markAsked(UUID characterId,
-                                                  boolean force) {
+    /** Whether to ask now, noting the question when so; {@code force} asks whatever is kept. */
+    static synchronized boolean markAsked(UUID characterId, boolean force) {
         long now = System.nanoTime();
+        if (!force && (PROFILES.containsKey(characterId)
+                || UNAVAILABLE.containsKey(characterId))) {
+            return false;
+        }
         Long asked = ASKED.get(characterId);
-        if (!force && asked != null && now - asked.longValue() < FRESH_NANOS) {
+        if (!force && asked != null && now - asked.longValue() < ANSWER_NANOS) {
             return false;
         }
         if (ASKED.size() >= MAX_KEPT * 4) {

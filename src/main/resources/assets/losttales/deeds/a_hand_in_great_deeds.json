@@ -1,0 +1,8 @@
+{
+  "id": "losttales:a_hand_in_great_deeds",
+  "category": "tales",
+  "icon": "minecraft:golden_sword",
+  "kind": "world_quest",
+  "count": 5,
+  "title": true
+}

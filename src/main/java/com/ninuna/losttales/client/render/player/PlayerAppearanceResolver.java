@@ -22,10 +22,10 @@ import java.util.UUID;
 
 /**
  * Turns a player's synchronized appearance into the model, texture, and
- * scale the renderer draws with. The account is an identity of its own: a
- * plain human on the Lost Tales player body, wearing the account skin with
- * the arm width the server read off the profile; a player with no entry
- * yet is drawn the same way from the local skin alone.
+ * scale the renderer draws with. A ghost is a plain human on the Lost
+ * Tales player body, wearing the account skin with the arm width the
+ * server read off the profile; a player with no entry yet is drawn the
+ * same way from their own skin alone.
  *
  * The answer is cached per player and recomputed only when the appearance
  * cache hands out a different {@link CharacterAppearance} instance, which is
@@ -155,8 +155,10 @@ public final class PlayerAppearanceResolver {
     }
 
     /**
-     * The selected skin when it is still valid for the character, otherwise
-     * the race's deterministic fallback so an old record keeps one look.
+     * The selected skin when it fits the race and sex, else one of the
+     * race's own picked by the character's id, so the same character
+     * always falls back to the same skin; the player's id stands in for a
+     * preview, which has no character yet.
      */
     private static CharacterSkinDefinition resolveSkin(
             UUID playerId, CharacterAppearance appearance) {
@@ -165,8 +167,10 @@ public final class PlayerAppearanceResolver {
                 appearance.getRaceId(), appearance.getGenderId())) {
             return selected;
         }
+        UUID seed = appearance.getCharacterId() != null
+                ? appearance.getCharacterId() : playerId;
         String fallbackId = CharacterSkinRegistry.getDefaultSkinId(
-                appearance.getRaceId(), appearance.getGenderId(), playerId);
+                appearance.getRaceId(), appearance.getGenderId(), seed);
         return CharacterSkinRegistry.get(fallbackId);
     }
 

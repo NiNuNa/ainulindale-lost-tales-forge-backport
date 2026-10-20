@@ -11,7 +11,6 @@ import com.ninuna.losttales.util.LostTalesWords;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatReportReason;
-import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.client.window.MenuWindow;
@@ -26,7 +25,6 @@ import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
-import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
@@ -88,8 +86,6 @@ final class ChatMenus {
     /** The start of a status's row id in the character menu. */
     private static final String ENTRY_STATUS_PREFIX = "characters:status:";
     private static final String ENTRY_STATUS_LINE = "characters:status_line";
-    /** The start of a role-play status's row id in the character menu. */
-    private static final String ENTRY_ROLEPLAY_PREFIX = "characters:roleplay:";
     /** The start of a character's row id in the character menu. */
     private static final String ENTRY_CHARACTER_PREFIX = "characters:char:";
     private static final String ENTRY_STATUS_LINE_KEEP = "status_line:keep";
@@ -1198,9 +1194,9 @@ final class ChatMenus {
         }
 
         /**
-         * A character, a status or a role-play status picked is done with
-         * the menu; the Narrator's switch stays, and the status line's row
-         * opens its field beside the menu.
+         * A character or a status picked is done with the menu; the
+         * Narrator's switch stays, and the status line's row opens its
+         * field beside the menu.
          */
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
@@ -1243,9 +1239,6 @@ final class ChatMenus {
             WindowMenus.addSection(entries, StatCollector.translateToLocal(
                     "gui.losttales.chat.character_selection.status"),
                     statusRows(subject));
-            WindowMenus.addSection(entries, StatCollector.translateToLocal(
-                    "gui.losttales.chat.character_selection.roleplay"),
-                    roleplayRows(subject));
             return entries;
         }
         entries.add(MenuWindow.Entry.passive(ClientChatIdentities.isNarrating(copy)
@@ -1279,39 +1272,7 @@ final class ChatMenus {
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
                 "gui.losttales.chat.character_selection.status"),
                 statusRows(subject));
-        WindowMenus.addSection(entries, StatCollector.translateToLocal(
-                "gui.losttales.chat.character_selection.roleplay"),
-                roleplayRows(subject));
         return entries;
-    }
-
-    /**
-     * The role-play statuses to choose from for the identity {@code tab}
-     * shows, each with its mark, the one it has marked.
-     */
-    private static List<MenuWindow.Entry> roleplayRows(WindowPage tab) {
-        ChatPresenceIdentity speaker = ClientChatPresence.speakerOf(tab);
-        ChatRoleplayStatus chosen = ClientChatPresence.chosenRoleplay(speaker);
-        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
-        for (final ChatRoleplayStatus status : ChatRoleplayStatus.values()) {
-            rows.add(new MenuWindow.Entry(ENTRY_ROLEPLAY_PREFIX + status.name(),
-                    StatCollector.translateToLocal(status.labelKey()), false,
-                    -1, null).chosen(chosen == status)
-                    .withPicture(new MenuWindow.Picture() {
-                        @Override
-                        public void draw(Minecraft minecraft, float iconX,
-                                         float labelTop, int alpha) {
-                            ChatRoleplayMark.draw(status, iconX
-                                    + LostTalesUiInk.centredStart(
-                                            LostTalesUiInk.ICON_SIZE,
-                                            ChatRoleplayMark.SIZE),
-                                    labelTop + LostTalesUiInk.centredStart(
-                                            LostTalesUiInk.CAP_HEIGHT,
-                                            ChatRoleplayMark.SIZE), alpha);
-                        }
-                    }));
-        }
-        return rows;
     }
 
     /**
@@ -1383,17 +1344,6 @@ final class ChatMenus {
         if (ENTRY_NARRATOR.equals(entry.id)) {
             ClientChatIdentities.setNarrating(copy,
                     !ClientChatIdentities.isNarrating(copy));
-            return;
-        }
-        if (entry.id.startsWith(ENTRY_ROLEPLAY_PREFIX)) {
-            try {
-                ClientChatPresence.chooseRoleplay(
-                        ClientChatPresence.speakerOf(subject),
-                        ChatRoleplayStatus.valueOf(entry.id.substring(
-                                ENTRY_ROLEPLAY_PREFIX.length())));
-            } catch (IllegalArgumentException ignored) {
-                // A row this build never made names no status.
-            }
             return;
         }
         if (entry.id.startsWith(ENTRY_STATUS_PREFIX)) {

@@ -9,16 +9,21 @@ import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
 
 /**
- * A missive's words in each player's language. A letter keeps no
- * sentences: the generator picks template ids (its title, issuer,
- * description and flavour line) and a target, and each game words them
- * from the lang file ({@code missive.losttales.*}). The target is a kind
- * of creature, a group or an item id; the description and each objective
+ * A missive's words in each player's language. A letter from a bundled
+ * template keeps no sentences: the generator picks template ids (its
+ * title, issuer, description and flavour line) and a target, and each game
+ * words them from the lang file ({@code missive.losttales.*}). A letter
+ * from a server's own template carries its title, issuer and flavour line
+ * as its operator wrote them, shown as written in every language
+ * ({@link LostTalesMissiveData#isWritten}, QUEST-42); its description and
+ * objectives are still the lang file's. The target is a kind of creature,
+ * a group or an item id; the description and each objective
  * ({@code Defeat 5 zombies.}) name it by the mod's own noun line where one
  * exists ({@code zombies}, {@code iron ingots}), else by the game's name
  * for it, else by its id.
@@ -30,6 +35,8 @@ public final class MissiveWords {
     public static final int MAX_TEMPLATE_ID_BYTES = 64;
     /** The longest target: a creature kind, a group or an item id. */
     public static final int MAX_TARGET_BYTES = 128;
+    /** The longest written title, issuer or flavour line, in UTF-8 bytes. */
+    public static final int MAX_WRITTEN_BYTES = 256;
 
     /** The entries of a missive's quest definition that word it ({@link #wordsOf}). */
     public static final String TITLE = "missive.title";
@@ -37,8 +44,28 @@ public final class MissiveWords {
     public static final String DESCRIPTION = "missive.description";
     public static final String FLAVOR = "missive.flavor";
     public static final String TARGET = "missive.target";
+    /** Present, {@code true}, where the title, issuer and flavour are written words, not ids. */
+    public static final String WRITTEN = "missive.written";
 
     private MissiveWords() {}
+
+    /**
+     * Whether {@code words} are words a server's template may write: not
+     * blank, no control characters, at most {@link #MAX_WRITTEN_BYTES}.
+     */
+    public static boolean isWrittenWords(String words) {
+        if (words == null || words.trim().length() == 0
+                || com.ninuna.losttales.quest.LostTalesQuestIds.utf8Bytes(words)
+                > MAX_WRITTEN_BYTES) {
+            return false;
+        }
+        for (int index = 0; index < words.length(); index++) {
+            if (Character.isISOControl(words.charAt(index))) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /** Whether {@code id} is a template id: lower-case letters, digits and underscores. */
     public static boolean isTemplateId(String id) {
@@ -60,14 +87,16 @@ public final class MissiveWords {
 
     /**
      * Whether a quest definition's words are none, or a missive's as
-     * {@link #wordsOf} writes them: a title id, and each other entry
-     * empty or well formed. What a saved quest log and a quest sent over
-     * the wire are held to.
+     * {@link #wordsOf} writes them: a title, and each other entry empty or
+     * well formed; the title, issuer and flavour template ids, or written
+     * words where {@link #WRITTEN} says so. What a saved quest log and a
+     * quest sent over the wire are held to.
      */
     public static boolean isWellFormed(Map<String, String> words) {
         if (words == null || words.isEmpty()) {
             return true;
         }
+        boolean written = words.containsKey(WRITTEN);
         for (Map.Entry<String, String> entry : words.entrySet()) {
             String name = entry.getKey();
             String value = entry.getValue() == null ? "" : entry.getValue();
@@ -75,12 +104,19 @@ public final class MissiveWords {
                 if (value.length() > 0 && !isTarget(value)) {
                     return false;
                 }
-            } else if (TITLE.equals(name)) {
-                if (!isTemplateId(value)) {
+            } else if (WRITTEN.equals(name)) {
+                if (!"true".equals(value)) {
                     return false;
                 }
-            } else if (ISSUER.equals(name) || DESCRIPTION.equals(name)
-                    || FLAVOR.equals(name)) {
+            } else if (TITLE.equals(name)) {
+                if (!isWord(value, written)) {
+                    return false;
+                }
+            } else if (ISSUER.equals(name) || FLAVOR.equals(name)) {
+                if (value.length() > 0 && !isWord(value, written)) {
+                    return false;
+                }
+            } else if (DESCRIPTION.equals(name)) {
                 if (value.length() > 0 && !isTemplateId(value)) {
                     return false;
                 }
@@ -91,9 +127,19 @@ public final class MissiveWords {
         return words.containsKey(TITLE);
     }
 
+    /** A title, issuer or flavour: written words for a letter written so, else a template id. */
+    static boolean isWord(String value, boolean written) {
+        return written ? isWrittenWords(value) : isTemplateId(value);
+    }
+
     /** Whether a quest definition's words are a missive's. */
     public static boolean isMissive(Map<String, String> words) {
         return words != null && words.containsKey(TITLE);
+    }
+
+    /** Whether a missive quest's title, issuer and flavour are written words (QUEST-42). */
+    public static boolean isWritten(Map<String, String> words) {
+        return "true".equals(entry(words, WRITTEN));
     }
 
     /** The entries a missive's quest is worded by. */
@@ -104,6 +150,9 @@ public final class MissiveWords {
         words.put(DESCRIPTION, missive.getDescriptionId());
         words.put(FLAVOR, missive.getFlavorId());
         words.put(TARGET, missive.getTarget());
+        if (missive.isWritten()) {
+            words.put(WRITTEN, "true");
+        }
         return words;
     }
 
@@ -198,18 +247,20 @@ public final class MissiveWords {
                 : target.toLowerCase(Locale.ROOT).replace(':', '.'));
     }
 
-    /** A letter's title; {@code Missive} for a title id the game has no line for. */
+    /** A letter's title: as written, or {@code Missive} for a title id the game has no line for. */
     public static String title(LostTalesMissiveData missive) {
-        return missive == null ? "" : title(missive.getTitleId());
+        return missive == null ? "" : missive.isWritten() ? missive.getTitleId()
+                : title(missive.getTitleId());
     }
 
     public static String title(String titleId) {
         return line(titleKey(titleId), KEY_PREFIX + "title");
     }
 
-    /** Who wrote the letter; empty for an issuer id the game has no line for. */
+    /** Who wrote the letter, as written; empty for none or an issuer id the game has no line for. */
     public static String issuer(LostTalesMissiveData missive) {
-        return missive == null ? "" : optional(issuerKey(missive.getIssuerId()));
+        return missive == null ? "" : missive.isWritten() ? missive.getIssuerId()
+                : optional(issuerKey(missive.getIssuerId()));
     }
 
     /** What the letter asks and why, its target named in the game's words. */
@@ -225,9 +276,10 @@ public final class MissiveWords {
                 : "";
     }
 
-    /** The letter's flavour line; empty for one the game has no line for. */
+    /** The letter's flavour line, as written; empty for none or one the game has no line for. */
     public static String flavor(LostTalesMissiveData missive) {
-        return missive == null ? "" : optional(flavorKey(missive.getFlavorId()));
+        return missive == null ? "" : missive.isWritten() ? missive.getFlavorId()
+                : optional(flavorKey(missive.getFlavorId()));
     }
 
     /** The words a letter is read by in the journal: its flavour line, else its description. */
@@ -251,7 +303,7 @@ public final class MissiveWords {
 
     /** A missive quest's title, from the entries its definition keeps. */
     public static String title(Map<String, String> words) {
-        return title(entry(words, TITLE));
+        return isWritten(words) ? entry(words, TITLE) : title(entry(words, TITLE));
     }
 
     public static String description(Map<String, String> words) {
@@ -259,12 +311,19 @@ public final class MissiveWords {
     }
 
     public static String journalLine(Map<String, String> words) {
-        String flavor = optional(flavorKey(entry(words, FLAVOR)));
+        String flavor = isWritten(words) ? entry(words, FLAVOR)
+                : optional(flavorKey(entry(words, FLAVOR)));
         return flavor.length() > 0 ? flavor : description(words);
     }
 
-    /** A missive quest's title as an argument of a line the server sends, which each reader's game words. */
+    /**
+     * A missive quest's title as an argument of a line the server sends:
+     * a translation each reader's game words, or the words as written.
+     */
     public static IChatComponent titleComponent(Map<String, String> words) {
+        if (isWritten(words)) {
+            return new ChatComponentText(entry(words, TITLE));
+        }
         String key = titleKey(entry(words, TITLE));
         return StatCollector.canTranslate(key) ? new ChatComponentTranslation(key)
                 : new ChatComponentTranslation(KEY_PREFIX + "title");

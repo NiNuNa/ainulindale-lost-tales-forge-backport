@@ -18,6 +18,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
@@ -76,7 +77,7 @@ import org.lwjgl.opengl.GL14;
  * {@link WindowPlacement} gives it, with the opening motion every
  * other Lost Tales screen uses, and records the screen band of every
  * line it draws in its
- * {@link WindowFrame}; all mouse-to-line mapping (hover card,
+ * {@link WindowFrame}; all mouse-to-line mapping (person card,
  * clipboard, component hits, the vanilla hit-test hook) resolves against
  * those recorded bands, so it always matches what is on screen.
  */
@@ -1837,20 +1838,18 @@ public final class LostTalesChatOverlayRenderer {
 
             if (open && totalLineCount <= 0) {
                 // The invitation, where the newest line would be, in the
-                // chat's aside tone and in italics, trimmed to the message
-                // area so a narrow window never lets it run out under its
-                // edge.
+                // chat's aside tone and in italics, cut at the message
+                // area and fading into its end (LOOK-37), so a narrow
+                // window never lets it run out under its edge.
                 int inviteAlpha = Math.round(255.0F * opacity
                         * opening.getOpacity());
                 GL11.glEnable(GL11.GL_BLEND);
-                LostTalesUiInk.drawText(font,
-                        "§o" + font.trimStringToWidth(
-                                StatCollector.translateToLocal(
+                LostTalesUiCutName.drawText(font, "§o"
+                                + StatCollector.translateToLocal(
                                         "gui.losttales.chat.empty"),
-                                Math.max(20, Math.round(panelRight) - 4)),
                         0, -TEXT_OFFSET,
-                        LostTalesChatVisualStyle.asideRgb(),
-                        inviteAlpha);
+                        Math.max(20, Math.round(panelRight) - 4),
+                        LostTalesChatVisualStyle.asideRgb(), inviteAlpha);
             }
             if (open) {
                 if (columns.shows() && columns.separatorX() >= 0.0F) {
@@ -3777,22 +3776,13 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * Palette backdrop band with a smooth transparent right edge. Edges
-     * are fractional: a band has to meet its neighbour and the window's
-     * rules exactly, and a stack moved by a scroll lands between whole
-     * units of the window's own space.
-     */
-    private static void drawChatBackdrop(
-            float left, float top, float right, float bottom, int alpha,
-            int backdropRgb) {
-        drawChatBackdrop(left, left, top, right, bottom, alpha,
-                backdropRgb);
-    }
-
-    /**
-     * As above with the band's own opacity profile, sampled evenly from
-     * its left edge to its right: the closed feed's lines thin out away
-     * from whichever edge they stand against ({@link ChatFeedAlignment}).
+     * Palette backdrop band with the band's own opacity profile, sampled
+     * evenly from its left edge to its right: the closed feed's lines
+     * thin out away from whichever edge they stand against
+     * ({@link ChatFeedAlignment}). Edges are fractional: a band has to
+     * meet its neighbour and the window's rules exactly, and a stack
+     * moved by a scroll lands between whole units of the window's own
+     * space.
      */
     private static void drawChatBackdrop(
             float left, float top, float right, float bottom, int alpha,

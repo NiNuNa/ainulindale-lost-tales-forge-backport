@@ -11,6 +11,7 @@ import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
@@ -824,6 +825,8 @@ public final class WindowScreen extends GuiChat
         WindowSearch.close();
         ContentView.leaveAll();
         FirstTips.screenClosed();
+        // Cut names slid along under the pointer start home next time.
+        LostTalesUiCutName.forgetAll();
         leavePage();
         this.pressedPage = null;
         this.pressedSubWindow = null;
@@ -2304,7 +2307,7 @@ public final class WindowScreen extends GuiChat
         return true;
     }
 
-    /** What a tip points at on screen: the row's padlock or its {@code +}, the head button a part draws; null for the Ctrl+K tip, or a thing not drawn. */
+    /** What a tip points at on screen: the row's padlock or its {@code +}, the identity button a part draws; null for the Ctrl+K tip, or a thing not drawn. */
     private LostTalesUiHitBox firstTipTarget(FirstTips.Tip tip,
                                              WindowFrame frame) {
         if (tip == FirstTips.Tip.LOCK || tip == FirstTips.Tip.PLUS) {
@@ -3029,15 +3032,6 @@ public final class WindowScreen extends GuiChat
         LostTalesUiHitBox box = SubWindowAnchor.contentBoxBeside(sibling.box(), width,
                 naming.naturalHeight(width), this.subWindows.roomOf(sibling.parentId));
         openNaming(key, naming, sibling.parentId, box);
-    }
-
-    /** Opens {@code naming} hanging from {@code control} in the window {@code windowId}, and gives it the keys. */
-    public void nameFrom(SubWindowAnchor control, String windowId, String key,
-                         NamingWindow naming) {
-        int width = naming.naturalWidth();
-        LostTalesUiHitBox box = control.contentBoxFor(width, naming.naturalHeight(width),
-                this.subWindows.roomOf(windowId));
-        openNaming(key, naming, windowId, box);
     }
 
     /** Opens {@code naming} over a page's middle and gives it the keys; false while the page's window is not drawn. */

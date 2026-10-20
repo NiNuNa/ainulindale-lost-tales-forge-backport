@@ -1,0 +1,72 @@
+{
+  "id": "losttales:archery",
+  "icon": "minecraft:bow",
+  "order": 1,
+  "counts": [
+    {
+      "act": "hit",
+      "weapons": ["bow", "crossbow"],
+      "per": 1.0
+    },
+    {
+      "act": "kill",
+      "weapons": ["bow", "crossbow"],
+      "per": 0.5
+    }
+  ],
+  "perks": [
+    {
+      "id": "steady_draw",
+      "levels": [10, 30, 50],
+      "effect": "draw_speed",
+      "amount": 0.1,
+      "with": ["bow"]
+    },
+    {
+      "id": "eagle_eye",
+      "levels": [30],
+      "effect": "bow_zoom",
+      "amount": 0.15,
+      "with": ["bow"]
+    },
+    {
+      "id": "recovery",
+      "levels": [40],
+      "effect": "arrow_recovery",
+      "amount": 0.33
+    },
+    {
+      "id": "crossbow_hand",
+      "levels": [50],
+      "effect": "reload_speed",
+      "amount": 0.2,
+      "with": ["crossbow"]
+    },
+    {
+      "id": "quick_nock",
+      "levels": [60],
+      "effect": "quick_nock",
+      "amount": 0.5,
+      "needs": "steady_draw:2",
+      "params": {
+        "seconds": 3
+      },
+      "with": ["bow"]
+    },
+    {
+      "id": "pinning_shot",
+      "levels": [80],
+      "effect": "pinning_shot",
+      "amount": 2,
+      "params": {
+        "level": 1
+      }
+    },
+    {
+      "id": "longbowman",
+      "levels": [100],
+      "effect": "arrow_flight",
+      "amount": 0.2
+    }
+  ]
+}

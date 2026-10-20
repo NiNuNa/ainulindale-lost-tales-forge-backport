@@ -21,10 +21,10 @@ import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -497,8 +497,9 @@ public final class MotionLabPage extends PageContent {
 
     /**
      * A motion's line: the name after its family, in honey while the
-     * Lab's saved version plays, and the draft pen ending at the right
-     * while it is tuned and not saved.
+     * Lab's saved version plays, fading into its end where it is cut and
+     * sliding along under the pointer (LOOK-37), and the draft pen ending
+     * at the right while it is tuned and not saved.
      */
     private void drawMotionLine(String id, int left, int right, int y,
                                 int rowHeight, int alpha) {
@@ -509,10 +510,9 @@ public final class MotionLabPage extends PageContent {
         int markRoom = unsaved ? mark.getWidth() + TabIcons.GAP : 0;
         int rgb = Motions.isSaved(id) ? LostTalesUiTheme.accentRgb()
                 : LostTalesUiInk.IVORY;
-        LostTalesUiInk.drawText(this.font, LostTalesSkyrimUiStyle.trimToWidth(
-                        this.font, MotionLabList.shortName(id),
-                        Math.max(0, right - left - markRoom)), left, textTop,
-                rgb, alpha);
+        LostTalesUiCutName.drawText(this.font, MotionLabList.shortName(id),
+                left, textTop, right - left - markRoom, rgb, alpha, this, id,
+                this.hovered != null && this.hovered.isLine(id));
         if (unsaved) {
             LostTalesUiInk.beginContent();
             mark.drawWithShadow(right - mark.getWidth(), textTop
@@ -550,17 +550,20 @@ public final class MotionLabPage extends PageContent {
         }
         Motion motion = Motions.get(this.picked);
         LostTalesUiHitBox name = layout.name();
-        LostTalesUiInk.drawText(this.font, LostTalesSkyrimUiStyle.trimToWidth(
-                        this.font, this.picked, (int)name.width),
-                (int)name.left, (int)name.top + LostTalesUiInk.centredStart(
+        LostTalesUiCutName.drawText(this.font, this.picked, (int)name.left,
+                (int)name.top + LostTalesUiInk.centredStart(
                         (int)name.height, LostTalesUiInk.CAP_HEIGHT),
-                LostTalesUiInk.IVORY, alpha);
+                (int)name.width, LostTalesUiInk.IVORY, alpha);
         drawAbout(layout, about, alpha);
         drawSample(layout, motion, alpha, now);
         drawRows(layout, alpha, surfaceAlpha, now);
     }
 
-    /** What the motion is for, as many lines as the column gives it, the last cut short where more is left. */
+    /**
+     * What the motion is for, as many lines as the column gives it; where
+     * more is left, the last runs on into the next and fades out where
+     * the column ends, as a cut name does (LOOK-37).
+     */
     private void drawAbout(MotionLabLayout layout, List<String> about,
                            int alpha) {
         LostTalesUiHitBox box = layout.about();
@@ -568,12 +571,11 @@ public final class MotionLabPage extends PageContent {
         for (int index = 0; index < shown && index < about.size(); index++) {
             String line = about.get(index);
             if (index == shown - 1 && about.size() > shown) {
-                line = LostTalesSkyrimUiStyle.trimToWidth(this.font,
-                        line + "...", (int)box.width);
+                line = line + " " + about.get(index + 1);
             }
-            LostTalesUiInk.drawText(this.font, line, (int)box.left,
+            LostTalesUiCutName.drawText(this.font, line, (int)box.left,
                     (int)box.top + index * MotionLabLayout.ABOUT_LINE,
-                    WindowStyle.asideRgb(), alpha);
+                    (int)box.width, WindowStyle.asideRgb(), alpha);
         }
     }
 
@@ -664,17 +666,15 @@ public final class MotionLabPage extends PageContent {
                 WindowLists.drawHeading(this.font, row.label, left, left,
                         right, y, rowHeight, false, alpha);
             } else {
-                LostTalesUiInk.drawText(this.font,
-                        LostTalesSkyrimUiStyle.trimToWidth(this.font,
-                                row.label, right - left), left, textTop,
-                        WindowStyle.asideRgb(), alpha);
+                LostTalesUiCutName.drawText(this.font, row.label, left,
+                        textTop, right - left, WindowStyle.asideRgb(), alpha);
             }
             return;
         }
-        LostTalesUiInk.drawText(this.font, LostTalesSkyrimUiStyle.trimToWidth(
-                        this.font, row.label, layout.labelWidth()), left,
-                textTop, LostTalesUiInk.IVORY, alpha);
         boolean onRow = this.hovered != null && this.hovered.isStepper(index);
+        LostTalesUiCutName.drawText(this.font, row.label, left, textTop,
+                layout.labelWidth(), LostTalesUiInk.IVORY, alpha, this,
+                Integer.valueOf(index), onRow);
         LostTalesUiHitBox value = layout.value(y);
         int chevronTop = textTop + Math.floorDiv(LostTalesUiInk.CAP_HEIGHT
                 - LESS_GLYPH.getHeight(), 2);
@@ -684,12 +684,14 @@ public final class MotionLabPage extends PageContent {
         drawChevron(MORE_GLYPH, MORE_GLYPH_LIT, index + ":more",
                 (int)layout.more(y).left, chevronTop,
                 onRow && this.hovered.part == Part.MORE, alpha, now);
-        String text = LostTalesSkyrimUiStyle.trimToWidth(this.font,
-                row.value(), (int)value.width);
-        LostTalesUiInk.drawText(this.font, text, (int)value.left
+        String text = row.value();
+        int shownWidth = (int)LostTalesUiCutName.shownWidth(
+                this.font.getStringWidth(text), (int)value.width);
+        LostTalesUiCutName.drawText(this.font, text, (int)value.left
                         + LostTalesUiInk.centredStart((int)value.width,
-                                this.font.getStringWidth(text)),
-                textTop, onRow && this.hovered.part == Part.VALUE
+                                shownWidth),
+                textTop, (int)value.width,
+                onRow && this.hovered.part == Part.VALUE
                         ? LostTalesUiInk.IVORY : WindowStyle.asideRgb(),
                 alpha);
     }

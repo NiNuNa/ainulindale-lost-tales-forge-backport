@@ -151,15 +151,15 @@ public final class LostTalesMapMarkerNamedAfterTest {
     public void theSnapshotCarriesWhatAMarkerIsCalledAfter() {
         LostTalesMapMarkerDefinition marker = definition("player:Nils");
         LostTalesMapMarkerSnapshotPacket decoded = roundTrip(
-                new LostTalesMapMarkerSnapshotPacket(
+                new LostTalesMapMarkerSnapshotPacket(1, 0, 1,
                         Collections.singletonList(marker)));
         assertFalse(decoded.isMalformed());
         assertEquals("", decoded.getMarkers().get(0).getName());
         assertEquals("player:Nils", decoded.getMarkers().get(0).getNamedAfter());
 
         ByteBuf corrupt = Unpooled.buffer();
-        new LostTalesMapMarkerSnapshotPacket(Collections.singletonList(marker))
-                .toBytes(corrupt);
+        new LostTalesMapMarkerSnapshotPacket(1, 0, 1,
+                Collections.singletonList(marker)).toBytes(corrupt);
         byte[] bytes = new byte[corrupt.readableBytes()];
         corrupt.readBytes(bytes);
         String text = new String(bytes, UTF_8);

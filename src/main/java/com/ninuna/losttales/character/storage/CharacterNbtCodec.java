@@ -4,10 +4,10 @@ import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.registry.CharacterBody;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
-import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
+import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.storage.NbtQuarantine;
@@ -28,7 +28,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Versioned NBT serialization for all roleplaying character data.
+ * Versioned NBT serialization for all roleplaying character data. A store,
+ * a roster and a character are read only at the version this build writes,
+ * and only as it writes them: a roster or a character of any other shape
+ * is kept whole in the quarantine and left out, never filled in or put
+ * right; data of another version keeps the whole store read-only.
  */
 public final class CharacterNbtCodec {
 
@@ -72,7 +76,8 @@ public final class CharacterNbtCodec {
     private static final String TAG_GLANCE_TITLE = "Title";
     private static final String TAG_GLANCE_LINE = "Line";
     private static final String TAG_SHOW_MINECRAFT_CAPE = "ShowMinecraftCape";
-    private static final String TAG_COSMETIC_CAPE_ID = "CosmeticCapeId";
+    private static final String TAG_COSMETIC_CAPE = "CosmeticCape";
+    private static final String TAG_BODY = "Body";
     private static final String TAG_AGE = "Age";
     private static final String TAG_STARTING_FACTION_ID = "StartingFactionId";
     private static final String TAG_STARTING_WAYPOINT_ID = "StartingWaypointId";
@@ -82,7 +87,6 @@ public final class CharacterNbtCodec {
     private static final String TAG_FACTION_SINCE = "FactionSince";
     private static final String TAG_LOTR_TITLE = "LotrTitle";
 
-    private static final int MAX_REASONABLE_AGE = 100000;
     private static final int MAX_STABLE_IDENTIFIER_LENGTH = 64;
 
     private CharacterNbtCodec() {}
@@ -173,7 +177,7 @@ public final class CharacterNbtCodec {
         }
 
         NBTTagCompound root = (NBTTagCompound) source.copy();
-        NbtQuarantine.Read quarantineResult = NbtQuarantine.readCurrentVersionOnly(root);
+        NbtQuarantine.Read quarantineResult = NbtQuarantine.read(root);
         if (!quarantineResult.isSupported()) {
             LostTalesLog.warning("Character quarantine data is malformed or uses unsupported version %d; "
                             + "the whole store will remain read-only",
@@ -181,13 +185,14 @@ public final class CharacterNbtCodec {
             return ReadResult.unsupported(source, quarantineResult.getUnsupportedVersion());
         }
 
-        boolean repaired = quarantineResult.isRepaired();
+        if (!root.hasKey(TAG_ROSTERS, Constants.NBT.TAG_LIST)) {
+            LostTalesLog.warning("Character data root is missing the roster list; "
+                    + "the whole store will remain read-only");
+            return ReadResult.unsupported(source, -1);
+        }
+        boolean repaired = false;
         ArrayList<NBTTagCompound> quarantinedEntries =
                 new ArrayList<NBTTagCompound>(quarantineResult.getEntries());
-        if (!root.hasKey(TAG_ROSTERS, Constants.NBT.TAG_LIST)) {
-            repaired = true;
-            LostTalesLog.warning("Character data root is missing the roster list; repairing it as empty");
-        }
         LinkedHashMap<UUID, CharacterRoster> rosters = new LinkedHashMap<UUID, CharacterRoster>();
         NBTTagList rosterList = root.getTagList(TAG_ROSTERS, Constants.NBT.TAG_COMPOUND);
 
@@ -254,13 +259,14 @@ public final class CharacterNbtCodec {
         tag.setInteger(TAG_SLOT_INDEX, character.getSlotIndex());
         tag.setString(TAG_NAME, character.getName());
         tag.setString(TAG_RACE_ID, character.getRaceId());
+        tag.setString(TAG_BODY, character.getBody().getWord());
         tag.setString(TAG_GENDER_ID, character.getGenderId());
         tag.setString(TAG_SKIN_ID, character.getSkinId());
         tag.setString(TAG_BODY_TYPE_ID, character.getBodyTypeId());
         tag.setString(TAG_CHEST_TYPE_ID, character.getChestTypeId());
         tag.setTag(TAG_PROFILE, writeProfile(character.getProfile()));
         tag.setBoolean(TAG_SHOW_MINECRAFT_CAPE, character.isMinecraftCapeVisible());
-        tag.setInteger(TAG_COSMETIC_CAPE_ID, character.getCosmeticCapeId());
+        tag.setString(TAG_COSMETIC_CAPE, character.getCosmeticCapeId());
         tag.setInteger(TAG_AGE, character.getAge());
         tag.setString(TAG_STARTING_FACTION_ID, character.getStartingFactionId());
         tag.setString(TAG_STARTING_WAYPOINT_ID, character.getStartingWaypointId());
@@ -324,118 +330,121 @@ public final class CharacterNbtCodec {
         }
     }
 
-    /** A profile read back, and whether any part of it had to be repaired. */
-    private static final class ProfileReadResult {
-        final CharacterProfile profile;
-        final boolean repaired;
-
-        ProfileReadResult(CharacterProfile profile, boolean repaired) {
-            this.profile = profile;
-            this.repaired = repaired;
-        }
-    }
-
     /**
-     * The profile a character record holds. A part that is missing, or no
-     * longer valid as stored, is read as empty, a glance that no longer is
-     * one is left out, and so is one past the fifth; the record is then
-     * repaired, so it is written back as read. The profanity list is not
-     * asked here: it may change after the words were accepted.
+     * The profile a character record holds, every part as it is written:
+     * each text in the form it is kept in and within its bounds, at most
+     * five glances. Anything else leaves the whole record malformed, kept
+     * in the quarantine as it was. The profanity list is not asked here:
+     * it may change after the words were accepted.
      */
-    private static ProfileReadResult readProfile(NBTTagCompound tag,
-                                                 UUID characterId,
-                                                 UUID ownerId) {
+    private static CharacterProfile readProfile(NBTTagCompound tag)
+            throws MalformedRecord {
         if (!tag.hasKey(TAG_PROFILE, Constants.NBT.TAG_COMPOUND)) {
-            LostTalesLog.warning("Assigning an empty profile to character %s owned by %s",
-                    characterId, ownerId);
-            return new ProfileReadResult(CharacterProfile.EMPTY, true);
+            throw new MalformedRecord("missing_profile");
         }
         NBTTagCompound stored = tag.getCompoundTag(TAG_PROFILE);
-        boolean repaired = false;
         CharacterProfile profile = CharacterProfile.EMPTY;
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
-            String key = sectionKey(section);
-            String text = readBoundedString(stored, key,
-                    section.getMaxLength());
-            String kept = CharacterValidator.normalizeSection(text);
-            if (!CharacterValidator.isValidSection(section, kept)) {
-                kept = "";
+            String text = requireString(stored, sectionKey(section),
+                    "invalid_profile");
+            if (!text.equals(CharacterValidator.normalizeSection(text))
+                    || !CharacterValidator.isValidSection(section, text)) {
+                throw new MalformedRecord("invalid_profile");
             }
-            if (!stored.hasKey(key, Constants.NBT.TAG_STRING)
-                    || !kept.equals(text)) {
-                repaired = true;
-            }
-            profile = profile.withSection(section, kept);
+            profile = profile.withSection(section, text);
+        }
+        if (!stored.hasKey(TAG_PROFILE_FACTS, Constants.NBT.TAG_COMPOUND)) {
+            throw new MalformedRecord("invalid_profile");
         }
         NBTTagCompound facts = stored.getCompoundTag(TAG_PROFILE_FACTS);
-        if (!stored.hasKey(TAG_PROFILE_FACTS, Constants.NBT.TAG_COMPOUND)) {
-            repaired = true;
-        }
         for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
-            String key = factKey(fact);
-            String value = readBoundedString(facts, key,
-                    CharacterProfile.MAX_FACT_LENGTH);
-            String kept = CharacterValidator.normalizeLine(value);
-            if (!CharacterValidator.isValidLine(kept,
-                    CharacterProfile.MAX_FACT_LENGTH)) {
-                kept = "";
+            String value = requireString(facts, factKey(fact),
+                    "invalid_profile");
+            if (!value.equals(CharacterValidator.normalizeLine(value))
+                    || !CharacterValidator.isValidLine(value,
+                            CharacterProfile.MAX_FACT_LENGTH)) {
+                throw new MalformedRecord("invalid_profile");
             }
-            if (!facts.hasKey(key, Constants.NBT.TAG_STRING)
-                    || !kept.equals(value)) {
-                repaired = true;
-            }
-            profile = profile.withFact(fact, kept);
+            profile = profile.withFact(fact, value);
         }
-        List<CharacterProfile.Glance> glances =
-                new ArrayList<CharacterProfile.Glance>();
         if (!stored.hasKey(TAG_PROFILE_GLANCES, Constants.NBT.TAG_LIST)) {
-            repaired = true;
+            throw new MalformedRecord("invalid_profile");
         }
         NBTTagList storedGlances = stored.getTagList(TAG_PROFILE_GLANCES,
                 Constants.NBT.TAG_COMPOUND);
+        if (storedGlances.tagCount() > CharacterProfile.MAX_GLANCES) {
+            throw new MalformedRecord("invalid_profile");
+        }
+        List<CharacterProfile.Glance> glances =
+                new ArrayList<CharacterProfile.Glance>();
         for (int index = 0; index < storedGlances.tagCount(); index++) {
             NBTTagCompound entry = storedGlances.getCompoundTagAt(index);
-            CharacterProfile.Glance read = new CharacterProfile.Glance(
-                    readBoundedString(entry, TAG_GLANCE_EMOJI,
-                            MAX_STABLE_IDENTIFIER_LENGTH),
-                    readBoundedString(entry, TAG_GLANCE_TITLE,
-                            CharacterProfile.MAX_GLANCE_TITLE_LENGTH),
-                    readBoundedString(entry, TAG_GLANCE_LINE,
-                            CharacterProfile.MAX_GLANCE_LINE_LENGTH));
-            CharacterProfile.Glance glance =
-                    CharacterValidator.normalizeGlance(read);
-            if (glances.size() >= CharacterProfile.MAX_GLANCES
+            CharacterProfile.Glance glance = new CharacterProfile.Glance(
+                    requireString(entry, TAG_GLANCE_EMOJI, "invalid_profile"),
+                    requireString(entry, TAG_GLANCE_TITLE, "invalid_profile"),
+                    requireString(entry, TAG_GLANCE_LINE, "invalid_profile"));
+            if (!glance.equals(CharacterValidator.normalizeGlance(glance))
                     || !CharacterValidator.isValidGlance(glance)) {
-                repaired = true;
-                continue;
-            }
-            if (!glance.equals(read)) {
-                repaired = true;
+                throw new MalformedRecord("invalid_profile");
             }
             glances.add(glance);
         }
-        if (repaired) {
-            LostTalesLog.warning("Repairing the profile of character %s owned by %s",
-                    characterId, ownerId);
-        }
-        return new ProfileReadResult(profile.withGlances(glances), repaired);
+        return profile.withGlances(glances);
     }
 
-    /**
-     * A string as stored, or empty for one missing or so long that no
-     * normalising could bring it within {@code limit} characters.
-     */
-    private static String readBoundedString(NBTTagCompound tag, String key,
-                                            int limit) {
-        String value = tag.hasKey(key, Constants.NBT.TAG_STRING)
-                ? tag.getString(key) : "";
-        return value.length() > limit * 2 ? "" : value;
+    /** A field this build writes and a record does not hold as written: the record is quarantined with the reason. */
+    private static final class MalformedRecord extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        final String reason;
+
+        MalformedRecord(String reason) {
+            super(reason, null, false, false);
+            this.reason = reason;
+        }
+    }
+
+    private static String requireString(NBTTagCompound tag, String key,
+                                        String reason) throws MalformedRecord {
+        if (!tag.hasKey(key, Constants.NBT.TAG_STRING)) {
+            throw new MalformedRecord(reason);
+        }
+        return tag.getString(key);
+    }
+
+    private static int requireInt(NBTTagCompound tag, String key,
+                                  String reason) throws MalformedRecord {
+        if (!tag.hasKey(key, Constants.NBT.TAG_INT)) {
+            throw new MalformedRecord(reason);
+        }
+        return tag.getInteger(key);
+    }
+
+    private static long requireLong(NBTTagCompound tag, String key,
+                                    String reason) throws MalformedRecord {
+        if (!tag.hasKey(key, Constants.NBT.TAG_LONG)) {
+            throw new MalformedRecord(reason);
+        }
+        return tag.getLong(key);
+    }
+
+    private static boolean requireBoolean(NBTTagCompound tag, String key,
+                                          String reason) throws MalformedRecord {
+        if (!tag.hasKey(key, Constants.NBT.TAG_BYTE)) {
+            throw new MalformedRecord(reason);
+        }
+        return tag.getBoolean(key);
+    }
+
+    /** An identifier as this build writes it: in its normalized form. */
+    private static boolean isCanonical(String identifier) {
+        return identifier.equals(LostTalesIdentifiers.normalize(identifier));
     }
 
     private static RosterReadResult readRoster(NBTTagCompound source, int rosterIndex) {
         if (source == null) {
             LostTalesLog.warning("Skipping malformed roster at index %d", Integer.valueOf(rosterIndex));
-            return RosterReadResult.failed(true, "malformed_roster");
+            return RosterReadResult.failed("malformed_roster");
         }
         int version = versionOf(source);
         if (version != CharacterRoster.CURRENT_DATA_VERSION) {
@@ -450,35 +459,30 @@ public final class CharacterNbtCodec {
         if (ownerId == null) {
             LostTalesLog.warning("Skipping roster at index %d because its owner UUID is missing or invalid",
                     Integer.valueOf(rosterIndex));
-            return RosterReadResult.failed(true, "missing_or_invalid_owner_uuid");
+            return RosterReadResult.failed("missing_or_invalid_owner_uuid");
         }
-
-        boolean hasUnlockedSlotCount = tag.hasKey(TAG_UNLOCKED_SLOT_COUNT, Constants.NBT.TAG_INT);
-        int unlockedSlotCount = hasUnlockedSlotCount
-                ? tag.getInteger(TAG_UNLOCKED_SLOT_COUNT)
-                : CharacterRoster.INITIAL_UNLOCKED_SLOTS;
-        if (!hasUnlockedSlotCount) {
-            repaired = true;
-            LostTalesLog.warning("Repairing missing unlocked slot count for owner %s", ownerId);
+        if (!tag.hasKey(TAG_UNLOCKED_SLOT_COUNT, Constants.NBT.TAG_INT)
+                || tag.getInteger(TAG_UNLOCKED_SLOT_COUNT)
+                        < CharacterRoster.INITIAL_UNLOCKED_SLOTS
+                || tag.getInteger(TAG_UNLOCKED_SLOT_COUNT)
+                        > CharacterRoster.MAX_SLOTS) {
+            LostTalesLog.warning("Skipping roster of owner %s because its open slot count "
+                    + "is missing or out of range", ownerId);
+            return RosterReadResult.failed("invalid_unlocked_slot_count");
         }
-        if (unlockedSlotCount < CharacterRoster.INITIAL_UNLOCKED_SLOTS
-                || unlockedSlotCount > CharacterRoster.MAX_SLOTS) {
-            repaired = true;
-            LostTalesLog.warning("Repairing unlocked slot count %d for owner %s",
-                    Integer.valueOf(unlockedSlotCount), ownerId);
+        int unlockedSlotCount = tag.getInteger(TAG_UNLOCKED_SLOT_COUNT);
+        if (!tag.hasKey(TAG_REVISION, Constants.NBT.TAG_LONG)
+                || tag.getLong(TAG_REVISION) < 0L) {
+            LostTalesLog.warning("Skipping roster of owner %s because its revision "
+                    + "is missing or negative", ownerId);
+            return RosterReadResult.failed("invalid_revision");
         }
-
-        boolean hasRevision = tag.hasKey(TAG_REVISION, Constants.NBT.TAG_LONG);
-        long revision = hasRevision ? tag.getLong(TAG_REVISION) : 0L;
-        if (!hasRevision) {
-            repaired = true;
-            LostTalesLog.warning("Repairing missing roster revision for owner %s", ownerId);
+        if (!tag.hasKey(TAG_CHARACTERS, Constants.NBT.TAG_LIST)) {
+            LostTalesLog.warning("Skipping roster of owner %s because its character list "
+                    + "is missing", ownerId);
+            return RosterReadResult.failed("missing_characters");
         }
-        if (revision < 0L) {
-            revision = 0L;
-            repaired = true;
-            LostTalesLog.warning("Repairing negative roster revision for owner %s", ownerId);
-        }
+        long revision = tag.getLong(TAG_REVISION);
 
         UUID activeCharacterId = NbtTags.readUuid(tag, TAG_ACTIVE_CHARACTER_UUID);
         CharacterRoster roster = new CharacterRoster(
@@ -496,13 +500,24 @@ public final class CharacterNbtCodec {
             if (characterResult.unsupportedVersion >= 0) {
                 return RosterReadResult.unsupported(characterResult.unsupportedVersion);
             }
-            repaired |= characterResult.repaired;
             RoleplayCharacter character = characterResult.character;
             if (character == null) {
                 quarantinedEntries.add(createQuarantineEntry(
                         "character", characterResult.failureReason, rosterIndex, i,
                         ownerId, null, rawCharacter));
                 repaired = true;
+                continue;
+            }
+            // A character stands only in an open slot, and alone in it.
+            if (character.getSlotIndex() >= unlockedSlotCount) {
+                repaired = true;
+                quarantinedEntries.add(createQuarantineEntry(
+                        "character", "slot_not_open",
+                        rosterIndex, i, ownerId, character.getCharacterId(), rawCharacter));
+                LostTalesLog.warning("Quarantining character %s of owner %s in slot %d, "
+                                + "which is not open",
+                        character.getCharacterId(), ownerId,
+                        Integer.valueOf(character.getSlotIndex()));
                 continue;
             }
             if (!roster.addCharacter(character)) {
@@ -516,14 +531,9 @@ public final class CharacterNbtCodec {
             }
         }
 
-        int beforeNormalizedUnlockedCount = roster.getUnlockedSlotCount();
-        roster.setUnlockedSlotCount(unlockedSlotCount);
-        if (roster.getUnlockedSlotCount() != beforeNormalizedUnlockedCount
-                || roster.getUnlockedSlotCount() != clampUnlockedSlotCount(unlockedSlotCount)) {
-            repaired = true;
-            LostTalesLog.warning("Expanded unlocked slots for owner %s to preserve occupied slots", ownerId);
-        }
-
+        // An active character the roster does not hold, one set aside
+        // above among them, is played by nobody: its owner is on a first
+        // visit until a character is played.
         if (roster.getActiveCharacterId() != null && roster.getActiveCharacter() == null) {
             repaired = true;
             LostTalesLog.warning("Clearing invalid active character %s for owner %s",
@@ -539,7 +549,7 @@ public final class CharacterNbtCodec {
         if (source == null) {
             LostTalesLog.warning("Skipping malformed character at index %d for owner %s",
                     Integer.valueOf(characterIndex), rosterOwnerId);
-            return CharacterReadResult.failed(true, "malformed_character");
+            return CharacterReadResult.failed("malformed_character");
         }
         int version = versionOf(source);
         if (version != RoleplayCharacter.CURRENT_DATA_VERSION) {
@@ -548,250 +558,141 @@ public final class CharacterNbtCodec {
                     Integer.valueOf(version));
             return CharacterReadResult.unsupported(version);
         }
+        try {
+            return CharacterReadResult.success(decodeCharacter(
+                    (NBTTagCompound) source.copy(), rosterOwnerId));
+        } catch (MalformedRecord malformed) {
+            LostTalesLog.warning("Quarantining the character at index %d for owner %s: %s",
+                    Integer.valueOf(characterIndex), rosterOwnerId,
+                    malformed.reason);
+            return CharacterReadResult.failed(malformed.reason);
+        }
+    }
 
-        NBTTagCompound tag = (NBTTagCompound) source.copy();
-        boolean repaired = false;
+    /**
+     * A character record exactly as this build writes it: every field
+     * present, of its type, and in the form the character holds it: names
+     * of the registries in their normalized form, a skin, an arm width and
+     * a chest the race and sex may have, an age within its bounds, the
+     * faction's start at or after the character's making. Nothing is
+     * filled in or put right; a record of any other shape is malformed.
+     */
+    private static RoleplayCharacter decodeCharacter(NBTTagCompound tag,
+                                                     UUID rosterOwnerId)
+            throws MalformedRecord {
         UUID characterId = NbtTags.readUuid(tag, TAG_CHARACTER_UUID);
         if (characterId == null) {
-            LostTalesLog.warning("Skipping character at index %d for owner %s because its UUID is missing or invalid",
-                    Integer.valueOf(characterIndex), rosterOwnerId);
-            return CharacterReadResult.failed(true, "missing_or_invalid_character_uuid");
+            throw new MalformedRecord("missing_or_invalid_character_uuid");
         }
-
         UUID characterOwnerId = NbtTags.readUuid(tag, TAG_OWNER_UUID);
         if (characterOwnerId == null) {
-            characterOwnerId = rosterOwnerId;
-            repaired = true;
-            LostTalesLog.warning("Repairing missing owner UUID for character %s using roster owner %s",
-                    characterId, rosterOwnerId);
-        } else if (!rosterOwnerId.equals(characterOwnerId)) {
-            LostTalesLog.warning("Skipping character %s because owner %s does not match roster owner %s",
-                    characterId, characterOwnerId, rosterOwnerId);
-            return CharacterReadResult.failed(true, "owner_uuid_mismatch");
+            throw new MalformedRecord("missing_or_invalid_owner_uuid");
         }
-
-        if (!tag.hasKey(TAG_SLOT_INDEX, Constants.NBT.TAG_INT)) {
-            LostTalesLog.warning("Skipping character %s for owner %s because its slot index is missing",
-                    characterId, rosterOwnerId);
-            return CharacterReadResult.failed(true, "missing_slot_index");
+        if (!rosterOwnerId.equals(characterOwnerId)) {
+            throw new MalformedRecord("owner_uuid_mismatch");
         }
-        int slotIndex = tag.getInteger(TAG_SLOT_INDEX);
+        int slotIndex = requireInt(tag, TAG_SLOT_INDEX, "missing_slot_index");
         if (!CharacterRoster.isValidSlotIndex(slotIndex)) {
-            LostTalesLog.warning("Skipping character %s for owner %s because slot %d is invalid",
-                    characterId, rosterOwnerId, Integer.valueOf(slotIndex));
-            return CharacterReadResult.failed(true, "invalid_slot_index");
+            throw new MalformedRecord("invalid_slot_index");
         }
 
-        String name = tag.getString(TAG_NAME);
-        String storedRaceId = tag.getString(TAG_RACE_ID);
-        String raceId = LostTalesIdentifiers.normalize(storedRaceId);
-        if (CharacterRaceRegistry.get(raceId) == null) {
-            raceId = CharacterRaceRegistry.HUMAN;
-            repaired = true;
-            LostTalesLog.warning("Repairing unknown race %s to safe fallback %s for character %s owned by %s",
-                    storedRaceId, raceId, characterId, rosterOwnerId);
+        String name = requireString(tag, TAG_NAME, "missing_name");
+        if (isBlank(name)) {
+            throw new MalformedRecord("missing_name");
         }
-        String storedGenderId = LostTalesIdentifiers.normalize(
-                tag.getString(TAG_GENDER_ID));
-        String genderId = CharacterRaceRegistry.normalizeGenderForRace(
-                raceId, storedGenderId);
-        String startingFactionId = tag.getString(TAG_STARTING_FACTION_ID);
-        if (isBlank(name) || isBlank(raceId) || isBlank(genderId)
-                || isBlank(startingFactionId)) {
-            LostTalesLog.warning("Skipping character %s for owner %s because a required "
-                            + "text field is empty or unsupported",
-                    characterId, rosterOwnerId);
-            return CharacterReadResult.failed(true, "missing_required_text_field");
+        // The race is kept as it was saved, and the sex and skin with it:
+        // races are data a server may change or take away, and a race gone
+        // plays as the body it stood on (CHAR-38). What a race offers is
+        // asked where a character is made or changed.
+        String raceId = requireString(tag, TAG_RACE_ID, "missing_race");
+        if (isBlank(raceId) || !isCanonical(raceId)
+                || raceId.length() > MAX_STABLE_IDENTIFIER_LENGTH) {
+            throw new MalformedRecord("malformed_race");
         }
-        if (!raceId.equals(storedRaceId)) {
-            repaired = true;
-            LostTalesLog.warning("Repairing race id %s to %s for character %s owned by %s",
-                    storedRaceId, raceId, characterId, rosterOwnerId);
+        CharacterBody body = CharacterBody.fromWord(
+                requireString(tag, TAG_BODY, "missing_body"));
+        if (body == null) {
+            throw new MalformedRecord("unknown_body");
         }
-        if (!genderId.equals(storedGenderId)) {
-            repaired = true;
-            LostTalesLog.warning("Repairing gender %s to %s for race %s on character %s owned by %s",
-                    storedGenderId, genderId, raceId, characterId, rosterOwnerId);
+        String genderId = requireString(tag, TAG_GENDER_ID, "missing_sex");
+        if (!isCanonical(genderId) || !CharacterGenderRegistry.contains(genderId)) {
+            throw new MalformedRecord("unknown_sex");
         }
-
-        boolean hasStartingWaypoint = tag.hasKey(
-                TAG_STARTING_WAYPOINT_ID, Constants.NBT.TAG_STRING);
-        String startingWaypointId = hasStartingWaypoint
-                ? tag.getString(TAG_STARTING_WAYPOINT_ID) : "";
-        String normalizedStartingWaypointId =
-                LotrCharacterAdapter.normalizeWaypointId(startingWaypointId);
+        String startingFactionId = requireString(tag, TAG_STARTING_FACTION_ID,
+                "missing_starting_faction");
+        if (isBlank(startingFactionId)) {
+            throw new MalformedRecord("missing_starting_faction");
+        }
+        String startingWaypointId = requireString(tag, TAG_STARTING_WAYPOINT_ID,
+                "missing_starting_waypoint");
         if (startingWaypointId.length() > 0
-                && (!startingWaypointId.equals(normalizedStartingWaypointId)
-                || normalizedStartingWaypointId.length()
-                > MAX_STABLE_IDENTIFIER_LENGTH)) {
-            startingWaypointId = "";
-            repaired = true;
-            LostTalesLog.warning("Clearing malformed starting waypoint for character %s owned by %s",
-                    characterId, rosterOwnerId);
-        } else {
-            startingWaypointId = normalizedStartingWaypointId;
+                && (!startingWaypointId.equals(LotrCharacterAdapter
+                        .normalizeWaypointId(startingWaypointId))
+                || startingWaypointId.length() > MAX_STABLE_IDENTIFIER_LENGTH)) {
+            throw new MalformedRecord("malformed_starting_waypoint");
         }
-        if (!hasStartingWaypoint) {
-            repaired = true;
-        }
-        boolean hasUnconventionalSettings = tag.hasKey(
-                TAG_UNCONVENTIONAL_SETTINGS, Constants.NBT.TAG_BYTE);
-        boolean unconventionalSettings = hasUnconventionalSettings
-                && tag.getBoolean(TAG_UNCONVENTIONAL_SETTINGS);
-        if (!hasUnconventionalSettings) {
-            repaired = true;
-        }
+        boolean unconventionalSettings = requireBoolean(tag,
+                TAG_UNCONVENTIONAL_SETTINGS, "missing_unconventional_settings");
 
-        String skinId = LostTalesIdentifiers.normalize(
-                tag.getString(TAG_SKIN_ID));
-        if (!CharacterSkinRegistry.isCompatible(skinId, raceId, genderId)) {
-            skinId = CharacterSkinRegistry.getDefaultSkinId(raceId, genderId, characterId);
-            repaired = true;
-            LostTalesLog.warning("Assigning a compatible LOTR skin to character %s owned by %s",
-                    characterId, rosterOwnerId);
+        String skinId = requireString(tag, TAG_SKIN_ID, "missing_skin");
+        if (isBlank(skinId) || !isCanonical(skinId)
+                || skinId.length() > MAX_STABLE_IDENTIFIER_LENGTH) {
+            throw new MalformedRecord("malformed_skin");
         }
+        String bodyTypeId = requireString(tag, TAG_BODY_TYPE_ID,
+                "missing_body_type");
+        if (!isCanonical(bodyTypeId)
+                || !CharacterBodyTypeRegistry.contains(bodyTypeId)) {
+            throw new MalformedRecord("unknown_body_type");
+        }
+        String chestTypeId = requireString(tag, TAG_CHEST_TYPE_ID,
+                "missing_chest_type");
+        if (!isCanonical(chestTypeId)
+                || !CharacterChestTypeRegistry.contains(chestTypeId)) {
+            throw new MalformedRecord("unknown_chest_type");
+        }
+        CharacterProfile profile = readProfile(tag);
 
-        // A record without a body type takes the sex's, which is what the
-        // creator would have pre-selected.
-        boolean hasBodyType = tag.hasKey(TAG_BODY_TYPE_ID, Constants.NBT.TAG_STRING);
-        String storedBodyTypeId = hasBodyType
-                ? LostTalesIdentifiers.normalize(tag.getString(TAG_BODY_TYPE_ID))
-                : "";
-        String bodyTypeId = CharacterBodyTypeRegistry.contains(storedBodyTypeId)
-                ? storedBodyTypeId
-                : CharacterBodyTypeRegistry.defaultFor(genderId);
-        if (!bodyTypeId.equals(storedBodyTypeId)) {
-            repaired = true;
-            if (hasBodyType) {
-                LostTalesLog.warning("Repairing unknown body type %s to %s for character %s owned by %s",
-                        storedBodyTypeId, bodyTypeId, characterId, rosterOwnerId);
-            }
+        boolean showMinecraftCape = requireBoolean(tag, TAG_SHOW_MINECRAFT_CAPE,
+                "missing_minecraft_cape");
+        // A cape is kept as it was chosen, its file there or not (CHAR-39).
+        String cosmeticCapeId = requireString(tag, TAG_COSMETIC_CAPE,
+                "missing_cosmetic_cape");
+        if (!isCanonical(cosmeticCapeId)
+                || cosmeticCapeId.length() > CharacterCapeCatalog.MAX_ID) {
+            throw new MalformedRecord("malformed_cosmetic_cape");
         }
-
-        // A record without a chest type takes the sex's, as the creator
-        // would have.
-        boolean hasChestType = tag.hasKey(TAG_CHEST_TYPE_ID, Constants.NBT.TAG_STRING);
-        String storedChestTypeId = hasChestType
-                ? LostTalesIdentifiers.normalize(tag.getString(TAG_CHEST_TYPE_ID))
-                : "";
-        String chestTypeId = CharacterChestTypeRegistry.contains(storedChestTypeId)
-                ? storedChestTypeId
-                : CharacterChestTypeRegistry.defaultFor(genderId);
-        if (!chestTypeId.equals(storedChestTypeId)) {
-            repaired = true;
-            if (hasChestType) {
-                LostTalesLog.warning("Repairing unknown chest type %s to %s for character %s owned by %s",
-                        storedChestTypeId, chestTypeId, characterId, rosterOwnerId);
-            }
+        int age = requireInt(tag, TAG_AGE, "missing_age");
+        if (age < CharacterValidator.MIN_AGE || age > CharacterValidator.MAX_AGE) {
+            throw new MalformedRecord("age_out_of_range");
         }
-
-        ProfileReadResult profileResult = readProfile(tag, characterId,
-                rosterOwnerId);
-        if (profileResult.repaired) {
-            repaired = true;
+        // The pledge LOTR last reported for the character; empty for none.
+        String pledgedFactionId = requireString(tag, TAG_PLEDGED_FACTION_ID,
+                "missing_pledged_faction");
+        if (!pledgedFactionId.equals(LotrCharacterAdapter
+                        .normalizeFactionId(pledgedFactionId))
+                || pledgedFactionId.length() > MAX_STABLE_IDENTIFIER_LENGTH) {
+            throw new MalformedRecord("malformed_pledged_faction");
         }
-
-        boolean hasShowMinecraftCape = tag.hasKey(
-                TAG_SHOW_MINECRAFT_CAPE, Constants.NBT.TAG_BYTE);
-        boolean showMinecraftCape = hasShowMinecraftCape
-                ? tag.getBoolean(TAG_SHOW_MINECRAFT_CAPE)
-                : RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE;
-        if (!hasShowMinecraftCape) {
-            repaired = true;
-            LostTalesLog.warning("Assigning the default normal-cape visibility to character %s owned by %s",
-                    characterId, rosterOwnerId);
-        }
-
-        boolean hasCosmeticCapeId = tag.hasKey(
-                TAG_COSMETIC_CAPE_ID, Constants.NBT.TAG_INT);
-        int storedCosmeticCapeId = hasCosmeticCapeId
-                ? tag.getInteger(TAG_COSMETIC_CAPE_ID)
-                : RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
-        int cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(storedCosmeticCapeId);
-        if (!hasCosmeticCapeId || cosmeticCapeId != storedCosmeticCapeId) {
-            repaired = true;
-            if (hasCosmeticCapeId) {
-                LostTalesLog.warning("Clearing invalid cosmetic cape ID %d for character %s owned by %s",
-                        Integer.valueOf(storedCosmeticCapeId), characterId, rosterOwnerId);
-            } else {
-                LostTalesLog.warning("Assigning no cosmetic cape to character %s owned by %s",
-                        characterId, rosterOwnerId);
-            }
-        }
-
-        boolean hasAge = tag.hasKey(TAG_AGE, Constants.NBT.TAG_INT);
-        int age = hasAge ? tag.getInteger(TAG_AGE) : 1;
-        if (!hasAge) {
-            repaired = true;
-            LostTalesLog.warning("Repairing missing age for character %s owned by %s", characterId, rosterOwnerId);
-        } else if (age < 1) {
-            age = 1;
-            repaired = true;
-            LostTalesLog.warning("Repairing non-positive age for character %s owned by %s", characterId, rosterOwnerId);
-        } else if (age > MAX_REASONABLE_AGE) {
-            age = MAX_REASONABLE_AGE;
-            repaired = true;
-            LostTalesLog.warning("Clamping unreasonable age for character %s owned by %s", characterId, rosterOwnerId);
-        }
-
-        // The pledge LOTR last reported for the character; a record
-        // without one, or with one that is no faction id, has none.
-        boolean hasPledgedFaction = tag.hasKey(
-                TAG_PLEDGED_FACTION_ID, Constants.NBT.TAG_STRING);
-        String storedPledgedFactionId = hasPledgedFaction
-                ? tag.getString(TAG_PLEDGED_FACTION_ID) : "";
-        String pledgedFactionId = LotrCharacterAdapter.normalizeFactionId(
-                storedPledgedFactionId);
-        if (pledgedFactionId.length() > MAX_STABLE_IDENTIFIER_LENGTH) {
-            pledgedFactionId = "";
-        }
-        if (!hasPledgedFaction
-                || !pledgedFactionId.equals(storedPledgedFactionId)) {
-            repaired = true;
-            if (storedPledgedFactionId.length() > 0) {
-                LostTalesLog.warning("Clearing malformed pledged faction for character %s owned by %s",
-                        characterId, rosterOwnerId);
-            }
-        }
-
-        boolean hasCreationTimestamp = tag.hasKey(TAG_CREATION_TIMESTAMP, Constants.NBT.TAG_LONG);
-        long creationTimestamp = hasCreationTimestamp ? tag.getLong(TAG_CREATION_TIMESTAMP) : 0L;
-        if (!hasCreationTimestamp) {
-            repaired = true;
-            LostTalesLog.warning("Repairing missing creation timestamp for character %s owned by %s",
-                    characterId, rosterOwnerId);
-        }
+        long creationTimestamp = requireLong(tag, TAG_CREATION_TIMESTAMP,
+                "missing_creation_timestamp");
         if (creationTimestamp < 0L) {
-            creationTimestamp = 0L;
-            repaired = true;
-            LostTalesLog.warning("Repairing negative creation timestamp for character %s owned by %s",
-                    characterId, rosterOwnerId);
+            throw new MalformedRecord("negative_creation_timestamp");
         }
-
-        // When the faction took effect: never before the character was
-        // made, and a record without it counts from its making.
-        long factionSince = tag.hasKey(TAG_FACTION_SINCE, Constants.NBT.TAG_LONG)
-                ? tag.getLong(TAG_FACTION_SINCE) : 0L;
+        long factionSince = requireLong(tag, TAG_FACTION_SINCE,
+                "missing_faction_since");
         if (factionSince < creationTimestamp) {
-            factionSince = creationTimestamp;
-            repaired = true;
+            throw new MalformedRecord("faction_before_making");
+        }
+        // The LOTR title the character last wore, as words alone.
+        String lotrTitle = requireString(tag, TAG_LOTR_TITLE, "missing_lotr_title");
+        if (!lotrTitle.equals(RoleplayCharacter.normalizeTitle(lotrTitle))) {
+            throw new MalformedRecord("malformed_lotr_title");
         }
 
-        // The LOTR title the character last wore; a record without one,
-        // or with one that holds colour codes or runs too long, keeps
-        // what is left of it.
-        boolean hasLotrTitle = tag.hasKey(TAG_LOTR_TITLE,
-                Constants.NBT.TAG_STRING);
-        String storedLotrTitle = hasLotrTitle
-                ? tag.getString(TAG_LOTR_TITLE) : "";
-        String lotrTitle = RoleplayCharacter.normalizeTitle(storedLotrTitle);
-        if (!hasLotrTitle || !lotrTitle.equals(storedLotrTitle)) {
-            repaired = true;
-        }
-
-        RoleplayCharacter character = RoleplayCharacter
+        return RoleplayCharacter
                 .builder(characterId, characterOwnerId)
-                .slot(slotIndex).name(name).race(raceId).gender(genderId)
+                .slot(slotIndex).name(name).race(raceId).body(body).gender(genderId)
                 .skin(skinId).age(age).startingFaction(startingFactionId)
                 .pledgedFaction(pledgedFactionId)
                 .factionSince(factionSince)
@@ -801,11 +702,10 @@ public final class CharacterNbtCodec {
                 .cosmeticCape(cosmeticCapeId)
                 .startingWaypoint(startingWaypointId)
                 .unconventionalSettings(unconventionalSettings)
-                .profile(profileResult.profile)
+                .profile(profile)
                 .bodyType(bodyTypeId)
                 .chestType(chestTypeId)
                 .build();
-        return CharacterReadResult.success(character, repaired);
     }
 
     private static NBTTagCompound createQuarantineEntry(String entryType, String reason,
@@ -835,13 +735,6 @@ public final class CharacterNbtCodec {
 
     private static boolean isBlank(String value) {
         return value == null || value.trim().length() == 0;
-    }
-
-    private static int clampUnlockedSlotCount(int count) {
-        if (count < CharacterRoster.INITIAL_UNLOCKED_SLOTS) {
-            return CharacterRoster.INITIAL_UNLOCKED_SLOTS;
-        }
-        return Math.min(CharacterRoster.MAX_SLOTS, count);
     }
 
     private static List<NBTTagCompound> copyQuarantineEntries(
@@ -940,8 +833,8 @@ public final class CharacterNbtCodec {
             return new RosterReadResult(roster, repaired, -1, null, quarantinedEntries);
         }
 
-        private static RosterReadResult failed(boolean repaired, String reason) {
-            return new RosterReadResult(null, repaired, -1, reason,
+        private static RosterReadResult failed(String reason) {
+            return new RosterReadResult(null, false, -1, reason,
                     Collections.<NBTTagCompound>emptyList());
         }
 
@@ -953,29 +846,26 @@ public final class CharacterNbtCodec {
 
     private static final class CharacterReadResult {
         private final RoleplayCharacter character;
-        private final boolean repaired;
         private final int unsupportedVersion;
         private final String failureReason;
 
-        private CharacterReadResult(RoleplayCharacter character, boolean repaired,
+        private CharacterReadResult(RoleplayCharacter character,
                                     int unsupportedVersion, String failureReason) {
             this.character = character;
-            this.repaired = repaired;
             this.unsupportedVersion = unsupportedVersion;
             this.failureReason = failureReason;
         }
 
-        private static CharacterReadResult success(RoleplayCharacter character,
-                                                   boolean repaired) {
-            return new CharacterReadResult(character, repaired, -1, null);
+        private static CharacterReadResult success(RoleplayCharacter character) {
+            return new CharacterReadResult(character, -1, null);
         }
 
-        private static CharacterReadResult failed(boolean repaired, String reason) {
-            return new CharacterReadResult(null, repaired, -1, reason);
+        private static CharacterReadResult failed(String reason) {
+            return new CharacterReadResult(null, -1, reason);
         }
 
         private static CharacterReadResult unsupported(int version) {
-            return new CharacterReadResult(null, false, version, null);
+            return new CharacterReadResult(null, version, null);
         }
     }
 }

@@ -129,7 +129,7 @@ public final class QuestStartRulesTest {
         data.startQuest(ID, "10", 0L, 0L);
         assertEquals(Verdict.ALREADY_ACTIVE, judge(once, data, Way.COMMAND));
 
-        data.completeQuest(ID, "", 10L, Collections.<String>emptySet());
+        data.completeQuest(ID, 10L, Collections.<String>emptySet());
         assertEquals(Verdict.ALREADY_COMPLETED, judge(once, data, Way.COMMAND));
 
         LostTalesQuestPlayerData gaveUp = new LostTalesQuestPlayerData();
@@ -139,7 +139,8 @@ public final class QuestStartRulesTest {
 
         LostTalesQuestDefinition again = new LostTalesQuestDefinition(ID, "Start",
                 "", true, true, LostTalesQuestDefinition.START_MODE_ANY, null,
-                null, null, null, null, null, null, stages());
+                null, null, null, null, null, null, stages(), false, null,
+                null);
         assertEquals(Verdict.ADMIT, judge(again, data, Way.COMMAND));
         assertEquals(Verdict.ADMIT, judge(again, gaveUp, Way.COMMAND));
     }
@@ -171,7 +172,7 @@ public final class QuestStartRulesTest {
         return new LostTalesQuestDefinition(ID, "Start", "", false, false,
                 startMode, null, null,
                 Collections.singletonMap("entity", "losttales.Nia"), null,
-                null, dialogue, stages());
+                null, dialogue, null, stages(), false, null, null);
     }
 
     private static LostTalesQuestDefinition missive() {
@@ -179,7 +180,8 @@ public final class QuestStartRulesTest {
                 "losttales:missive/generated/dim0_1_2_3/100_0", "", "", true,
                 true, LostTalesQuestDefinition.START_MODE_LOCKED, null, null,
                 null, null, null, null, null, stages(), false,
-                Collections.singletonMap(MissiveWords.TITLE, "materials_wanted"));
+                Collections.singletonMap(MissiveWords.TITLE, "materials_wanted"),
+                null);
     }
 
     private static java.util.List<LostTalesQuestStageDefinition> stages() {

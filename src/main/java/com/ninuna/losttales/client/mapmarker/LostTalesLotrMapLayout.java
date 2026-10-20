@@ -254,8 +254,9 @@ public final class LostTalesLotrMapLayout {
     }
 
     /**
-     * Gives LOTR's existing fullscreen subtitle renderer its former bottom
-     * margin while the actual map remains fullscreen.
+     * Runs before LOTR's fullscreen subtitles: draws the vignette and the
+     * control bar, and moves the bottom the subtitles stand on up above the
+     * bar, while the map itself stays fullscreen.
      */
     public static void beginFullscreenSubtitles(LOTRGuiMap gui) {
         if (gui instanceof LostTalesLotrMapGui) {

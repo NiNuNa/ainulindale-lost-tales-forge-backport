@@ -10,7 +10,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -97,6 +96,6 @@ public final class WindowStackTest {
         String before = order();
         WindowLayout.lower("nowhere");
         assertEquals(before, order());
-        assertNotNull(WindowLayout.firstWindow());
+        assertTrue(!WindowLayout.isEmpty());
     }
 }

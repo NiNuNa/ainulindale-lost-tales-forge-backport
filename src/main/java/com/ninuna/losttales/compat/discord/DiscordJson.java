@@ -241,7 +241,7 @@ public final class DiscordJson {
      * but Discord's own image host is ever named.
      */
     static String avatarUrl(String userId, String avatarHash) {
-        if (userId == null || !userId.matches("\\d{1,24}") || avatarHash == null
+        if (!DiscordChannelBindings.isSnowflake(userId) || avatarHash == null
                 || !avatarHash.matches("(?:a_)?[0-9a-f]{1,64}")) {
             return "";
         }
@@ -406,11 +406,9 @@ public final class DiscordJson {
     }
 
     /** "Working on it": the deferred answer to a command, only the asker to see. */
-    public static String deferredReplyBody(boolean ephemeral) {
+    public static String deferredReplyBody() {
         JsonObject data = new JsonObject();
-        if (ephemeral) {
-            data.addProperty("flags", Integer.valueOf(64));
-        }
+        data.addProperty("flags", Integer.valueOf(64));
         JsonObject body = new JsonObject();
         body.addProperty("type", Integer.valueOf(5));
         body.add("data", data);
@@ -924,7 +922,7 @@ public final class DiscordJson {
         if (pinged != null && !pinged.isEmpty()) {
             JsonArray users = new JsonArray();
             for (String userId : pinged) {
-                if (userId != null && userId.matches("\\d{1,20}")) {
+                if (DiscordChannelBindings.isSnowflake(userId)) {
                     users.add(new JsonPrimitive(userId));
                 }
             }
@@ -950,10 +948,13 @@ public final class DiscordJson {
         return object == null ? "" : string(object, key);
     }
 
-    /** The body of a webhook made for the bridge: its name, as members see it. */
+    /**
+     * The body of a webhook made for the bridge: its name, as members see
+     * it, held to the names Discord takes ({@link #webhookUsername}).
+     */
     public static String createWebhookBody(String name) {
         JsonObject body = new JsonObject();
-        body.addProperty("name", name == null ? "" : name);
+        body.addProperty("name", webhookUsername(name));
         return body.toString();
     }
 

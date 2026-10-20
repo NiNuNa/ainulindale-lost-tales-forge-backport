@@ -125,7 +125,8 @@ public final class CreatorTextControl extends CreatorControl {
         if (contains(mouseX, mouseY)) {
             CreatorRows.light(this.context, this.y, rowBottom);
         }
-        CreatorRows.drawLabel(this.context, this.label, this.x, this.y, right);
+        CreatorRows.drawLabel(this.context, this.label, this.x, this.y, right,
+                this, this.label, contains(mouseX, mouseY));
         if (showsCount()) {
             int countX = this.x + font.getStringWidth(this.label + " ");
             LostTalesUiInk.drawText(font, counter(), countX,

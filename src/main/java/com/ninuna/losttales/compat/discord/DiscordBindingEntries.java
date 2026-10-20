@@ -25,27 +25,13 @@ public final class DiscordBindingEntries {
 
     /**
      * The list with a link added: {@code key}'s game channel to the
-     * Discord channel, through the webhook. An entry of the same key that
-     * names neither a channel nor a webhook — a placeholder a fresh file
-     * may hold — is taken out, and so is any entry naming the same
-     * Discord channel, which the new link replaces. A comment line is
-     * left where it is.
+     * Discord channel, through the webhook. An entry naming the same
+     * Discord channel is taken out, since the new link replaces it.
      */
     public static List<String> link(String[] entries, String key,
                                     DiscordBridgeDirection direction,
                                     String discordChannelId, String webhookUrl) {
-        List<String> result = new ArrayList<String>();
-        for (String entry : entries == null ? new String[0] : entries) {
-            boolean comment = keyOf(entry).length() == 0;
-            boolean placeholder = !comment && key.equalsIgnoreCase(keyOf(entry))
-                    && optionOf(entry, "channel").length() == 0
-                    && optionOf(entry, "webhook").length() == 0;
-            boolean sameChannel = !comment
-                    && discordChannelId.equals(optionOf(entry, "channel"));
-            if (!placeholder && !sameChannel) {
-                result.add(entry);
-            }
-        }
+        List<String> result = removeChannel(entries, discordChannelId);
         result.add(format(key, direction, discordChannelId, webhookUrl));
         return result;
     }
@@ -65,8 +51,7 @@ public final class DiscordBindingEntries {
     public static List<String> removeChannel(String[] entries, String discordChannelId) {
         List<String> result = new ArrayList<String>();
         for (String entry : entries == null ? new String[0] : entries) {
-            if (keyOf(entry).length() == 0
-                    || !discordChannelId.equals(optionOf(entry, "channel"))) {
+            if (!discordChannelId.equals(optionOf(entry, "channel"))) {
                 result.add(entry);
             }
         }
@@ -91,7 +76,7 @@ public final class DiscordBindingEntries {
 
     /** The game channel key an entry names: everything before its first '='. */
     public static String keyOf(String entry) {
-        if (entry == null || entry.trim().startsWith("#")) {
+        if (entry == null) {
             return "";
         }
         int equals = entry.indexOf('=');

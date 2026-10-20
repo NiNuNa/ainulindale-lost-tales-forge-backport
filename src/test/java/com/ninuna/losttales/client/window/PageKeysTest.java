@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.window;
 
+import com.ninuna.losttales.util.EnglishWords;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
@@ -43,6 +45,30 @@ public final class PageKeysTest {
     @Test
     public void aSearchThatFindsNothingLeavesNoArea() {
         assertTrue(PageKeys.rows(AREAS, "nothing like it").isEmpty());
+    }
+
+    /**
+     * Every area and shortcut the window system and the New Page list
+     * has its words in the English lang file, so no help shows a key in
+     * place of its words.
+     */
+    @Test
+    public void theWindowsAndTheNewPagesKeysHaveEnglishWords() {
+        List<PageKeys.Area> areas = new ArrayList<PageKeys.Area>(
+                PageKeys.windowAreas());
+        areas.addAll(new NewPage().keyAreas());
+        List<String> missing = new ArrayList<String>();
+        for (PageKeys.Area area : areas) {
+            if (!EnglishWords.INSTANCE.has(area.labelKey)) {
+                missing.add(area.labelKey);
+            }
+            for (PageKeys.Shortcut shortcut : area.shortcuts) {
+                if (!EnglishWords.INSTANCE.has(shortcut.labelKey)) {
+                    missing.add(shortcut.labelKey);
+                }
+            }
+        }
+        assertEquals(new ArrayList<String>(), missing);
     }
 
     @Test

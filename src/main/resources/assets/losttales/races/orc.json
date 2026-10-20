@@ -1,0 +1,21 @@
+{
+  "id": "losttales:orc",
+  "body": "orc",
+  "values_from": "lotr:mordor_orc",
+  "sexes": ["losttales:non_binary"],
+  "size": {"width": 0.5, "height": 1.55},
+  "health": 20,
+  "speed": 1.0,
+  "attack": 3,
+  "faction_categories": ["orc"],
+  "factions": [],
+  "skins": [
+    {"group": "orc", "texture": "lotr:mob/orc/orc", "count": 8}
+  ],
+  "skills": {
+    "losttales:blades": 10,
+    "losttales:mining": 5,
+    "losttales:smithing": 5,
+    "losttales:archery": 5
+  }
+}

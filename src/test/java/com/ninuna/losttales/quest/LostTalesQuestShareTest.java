@@ -71,7 +71,8 @@ public final class LostTalesQuestShareTest {
                 Collections.singletonList(new LostTalesQuestStageDefinition("10",
                         Collections.singletonList(new LostTalesQuestObjectiveDefinition(
                                 "long", "goto", words.toString(), false,
-                                Collections.<String, String>emptyMap())))));
+                                Collections.<String, String>emptyMap())))),
+                false, null, null);
         ChatQuestCard card = LostTalesQuestShareResolver.card(quest,
                 new LostTalesQuestProgress("losttales:long", 0, "10",
                         Collections.<String, Integer>emptyMap(), 0L, 0L));
@@ -89,6 +90,7 @@ public final class LostTalesQuestShareTest {
     private static LostTalesQuestDefinition quest(String startMode) {
         return new LostTalesQuestDefinition("losttales:shared", "Shared", "",
                 false, false, startMode, null, null, null, null, null, null,
-                null, Collections.<LostTalesQuestStageDefinition>emptyList());
+                null, Collections.<LostTalesQuestStageDefinition>emptyList(),
+                false, null, null);
     }
 }

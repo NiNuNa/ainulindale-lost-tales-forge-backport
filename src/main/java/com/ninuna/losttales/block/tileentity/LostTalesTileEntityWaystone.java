@@ -53,12 +53,13 @@ public final class LostTalesTileEntityWaystone
         }
         LostTalesMapMarkerWorldData data =
                 LostTalesMapMarkerStorage.get(this.worldObj);
+        int dimensionId = this.worldObj.provider.dimensionId;
         LostTalesMapMarkerRecord record = data.findByLinkedPosition(
-                this.worldObj.provider.dimensionId,
-                this.xCoord, this.yCoord, this.zCoord);
+                dimensionId, this.xCoord, this.yCoord, this.zCoord);
         if (record == null
                 || !this.markerId.equals(record.getId())
-                || !this.linkToken.equals(record.getLinkToken())) {
+                || !record.isLinkedTo(dimensionId, this.xCoord, this.yCoord,
+                        this.zCoord, this.linkToken)) {
             clearLink();
         }
     }

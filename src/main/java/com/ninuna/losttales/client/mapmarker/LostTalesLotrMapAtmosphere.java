@@ -132,10 +132,9 @@ final class LostTalesLotrMapAtmosphere {
      * <p>The sky is weather over a stretch of Middle-earth, so it is measured
      * in Middle-earth: a cloud covers a fixed patch of ground, and the zoom
      * grows and shrinks it exactly as it grows and shrinks the ground beneath.
-     * Holding it at a constant number of screen pixels instead — which is what
-     * it used to do — made the sky a texture on the window rather than a layer
-     * over the world, and no amount of parallax on top of that reads as
-     * height.</p>
+     * Held at a constant number of screen pixels, the sky would be a texture
+     * on the window rather than a layer over the world, and no parallax on
+     * top of that reads as height.</p>
      */
     private static final float CLOUD_WORLD_CELL = 34.0F;
     private static final float CLOUD_WORLD_WIDTH = 22.0F;
@@ -608,10 +607,9 @@ final class LostTalesLotrMapAtmosphere {
      * <p>A cloud is not printed on the paper. Its <em>position</em> belongs to
      * the map and goes through the sheet's own projection — pan, zoom, turn,
      * lean — but the cloud itself then faces the reader, the way everything
-     * else standing over the map does. Drawing it through the sheet matrix
-     * instead, which is what it used to do, laid it flat on the ground and
-     * sheared it with the lean: weather painted onto Middle-earth rather than
-     * weather above it.</p>
+     * else standing over the map does. Drawn through the sheet matrix, it
+     * would lie flat on the ground and shear with the lean: weather painted
+     * onto Middle-earth rather than weather above it.</p>
      */
     private static void drawSky(
             LOTRGuiMap gui, long worldTime,

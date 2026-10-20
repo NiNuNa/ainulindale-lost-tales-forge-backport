@@ -1,0 +1,72 @@
+{
+  "id": "losttales:blades",
+  "icon": "minecraft:iron_sword",
+  "order": 2,
+  "counts": [
+    {
+      "act": "hit",
+      "weapons": ["sword", "dagger"],
+      "per": 1.0
+    },
+    {
+      "act": "kill",
+      "weapons": ["sword", "dagger"],
+      "per": 0.5
+    }
+  ],
+  "perks": [
+    {
+      "id": "edge",
+      "levels": [10, 30, 50],
+      "effect": "weapon_damage",
+      "amount": 0.05
+    },
+    {
+      "id": "light_feet",
+      "levels": [20],
+      "effect": "sprint_hunger",
+      "amount": 0.25
+    },
+    {
+      "id": "daggerwork",
+      "levels": [40],
+      "effect": "dagger_work",
+      "amount": 0.2,
+      "params": {
+        "poison": 0.5
+      },
+      "with": ["dagger"]
+    },
+    {
+      "id": "riposte",
+      "levels": [40],
+      "effect": "riposte",
+      "amount": 0.25,
+      "params": {
+        "seconds": 1
+      }
+    },
+    {
+      "id": "keen_edge",
+      "levels": [60],
+      "effect": "wear",
+      "amount": 0.25
+    },
+    {
+      "id": "bladesong",
+      "levels": [80],
+      "effect": "kill_speed",
+      "amount": 3,
+      "needs": "riposte",
+      "params": {
+        "level": 1
+      }
+    },
+    {
+      "id": "swordmaster",
+      "levels": [100],
+      "effect": "falling_strike",
+      "amount": 0.25
+    }
+  ]
+}

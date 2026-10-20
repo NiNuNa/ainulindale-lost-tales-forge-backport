@@ -141,7 +141,7 @@ public final class ClientChatChannelState {
             new java.util.HashSet<UUID>();
     /**
      * Server-stated online role holders, account name to mask, in the
-     * order the server listed them: what the role hover card names its
+     * order the server listed them: what the role card names its
      * members from. Replaced whole with every access packet.
      */
     private static final LinkedHashMap<String, Integer> ROLE_HOLDERS =
@@ -1223,21 +1223,14 @@ public final class ClientChatChannelState {
         return "";
     }
 
-    /** The faction of the character played: {@link #wornFactionId} for the identity played. */
+    /**
+     * The faction of the character played: the character's own, or
+     * Unaligned for the account and for a character created without one,
+     * as the server resolves it. Empty only for a character the roster no
+     * longer holds.
+     */
     public static synchronized String playedFactionId() {
         return factionOf(ClientChatIdentities.played());
-    }
-
-    /**
-     * The faction of the identity a copy speaks as: the character's own,
-     * or Unaligned for the account and for a character created without
-     * one, as the server resolves it. Empty only for a character the
-     * roster no longer holds. A Faction copy's label, colour and
-     * conversation read this, so they follow its identity as the server's
-     * routing does.
-     */
-    public static synchronized String wornFactionId(ConversationPage tab) {
-        return factionOf(ClientChatIdentities.effectiveFor(tab));
     }
 
     private static String factionOf(ClientChatIdentities.Identity worn) {

@@ -18,6 +18,7 @@ import com.ninuna.losttales.quest.LostTalesQuestRules;
 import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.ServerQuestSync;
 import com.ninuna.losttales.util.LostTalesLog;
+import com.ninuna.losttales.progression.ProgressionHooks;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.util.ArrayList;
@@ -466,6 +467,7 @@ public final class WorldQuests {
                         LostTalesQuestRules.podiumRewards(quest));
             } else {
                 LostTalesQuestRewardHelper.grantRewards(player, quest, null, -1);
+                ProgressionHooks.questCompleted(player, quest);
             }
         }
     }

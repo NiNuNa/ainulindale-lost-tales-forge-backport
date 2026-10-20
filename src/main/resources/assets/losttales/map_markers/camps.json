@@ -3,7 +3,7 @@
     {
       "id": "losttales:ranger_camp",
       "relevance": "low",
-      "icon": "town",
+      "icon": "shack",
       "color": "blue",
       "dimension": "lotr:middle_earth",
       "x": 90.0,
@@ -20,7 +20,7 @@
     {
       "id": "losttales:old_oak_camp",
       "relevance": "low",
-      "icon": "town",
+      "icon": "shack",
       "color": "green",
       "dimension": "lotr:middle_earth",
       "x": -260.0,

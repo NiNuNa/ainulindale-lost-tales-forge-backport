@@ -249,6 +249,9 @@ public enum ELostTalesItem {
     MISSIVE_LETTER(new LostTalesItemMissiveLetter()
             .setUnlocalizedName("missive_letter").setCreativeTab(ELostTalesCreativeTabs.MISC.getCreativeTab())),
 
+    QUEST_STARTER(new LostTalesItemQuestStarter()
+            .setUnlocalizedName("quest_starter").setCreativeTab(ELostTalesCreativeTabs.MISC.getCreativeTab())),
+
     // Consumables - Food and drinks.
     PLUM(new LostTalesItemFood(
             ELostTalesItemMaterial.NEUTRAL, Type.CONSUMABLE_FOOD, 1, 0.1F, false
@@ -287,13 +290,16 @@ public enum ELostTalesItem {
             ELostTalesItemMaterial.MORIA_GOBLINS, Type.WEAPON_PIKE
     ).setUnlocalizedName("community_moria_goblin_pike").setCreativeTab(ELostTalesCreativeTabs.COMMUNITY.getCreativeTab())),
 
-    TEST(new LostTalesItemSpear(
+    COMMUNITY_MORIA_GOBLIN_BANNER_SPEAR(new LostTalesItemSpear(
             ELostTalesItemMaterial.MORIA_GOBLINS, Type.WEAPON_SPEAR
-    ).setUnlocalizedName("test").setCreativeTab(ELostTalesCreativeTabs.COMMUNITY.getCreativeTab())),
+    ).setUnlocalizedName("community_moria_goblin_banner_spear").setCreativeTab(ELostTalesCreativeTabs.COMMUNITY.getCreativeTab())),
 
     COMMUNITY_MORIA_GOBLIN_SPEAR(new LostTalesItemSpear(
             ELostTalesItemMaterial.MORIA_GOBLINS, Type.WEAPON_SPEAR
-    ).setUnlocalizedName("community_moria_goblin_spear").setCreativeTab(ELostTalesCreativeTabs.COMMUNITY.getCreativeTab()));
+    ).setUnlocalizedName("community_moria_goblin_spear").setCreativeTab(ELostTalesCreativeTabs.COMMUNITY.getCreativeTab())),
+
+    // Spawn eggs: one per creature, in LOTR's spawn-egg tab (CONTENT-04).
+    SPAWN_EGG(new LostTalesItemSpawnEgg().setUnlocalizedName("spawn_egg"));
 
     private final Item item;
     private IIcon largeIcon;
@@ -323,6 +329,7 @@ public enum ELostTalesItem {
             i.getItem().setTextureName(LostTalesMetaData.MOD_ID + ":"+ folder + i.getItem().getUnlocalizedName().substring(5));
             GameRegistry.registerItem(i.getItem(), i.getItem().getUnlocalizedName().substring(5));
         }
+        LostTalesItemSpawnEgg.registerDispenseBehavior(SPAWN_EGG.getItem());
     }
 
     public Item getItem() {
@@ -352,7 +359,6 @@ public enum ELostTalesItem {
         BLOCK_BUILDING("building_block"),
         BLOCK_DECORATION("decoration_block"),
         BLOCK_PLUSHIE("plushie"),
-        CONSUMABLE_POTION("potion"),
         CONSUMABLE_FOOD("food"),
         CONSUMABLE_DRINK("drink"),
         ACCESSORY("accessory"),

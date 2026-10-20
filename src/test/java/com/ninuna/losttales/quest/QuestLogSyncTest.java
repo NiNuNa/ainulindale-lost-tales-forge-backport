@@ -26,7 +26,8 @@ import static org.junit.Assert.fail;
 
 /**
  * A client is sent its whole quest log only when anything but a running
- * quest's counts changed; counts alone travel as the quests whose counts
+ * quest's counts changed, or a character switch put the log in place;
+ * counts alone travel as the quests whose counts
  * moved, and an unchanged log sends nothing. A log too large for one
  * packet is refused before it reaches the wire.
  */
@@ -57,17 +58,45 @@ public final class QuestLogSyncTest {
     @Test
     public void aClientSentNothingYetIsSentTheWholeLog() {
         LostTalesQuestSyncPacket first = log(none(), quest("a:hunt", 0, 1));
-        QuestLogSync.Step step = QuestLogSync.step(null, first);
+        QuestLogSync.Step step = QuestLogSync.step(null, first, false);
         assertSame(first, step.whole);
+        assertFalse("an ordinary log brings news", step.whole.isReplacement());
         assertNull(step.counts);
+    }
+
+    /**
+     * The log a character switch put in place goes whole and marked, even
+     * where only counts differ from what the client was sent, so the client
+     * takes it without a banner for each quest; the mark is no part of the
+     * log's shape.
+     */
+    @Test
+    public void aSwitchedLogGoesWholeAndMarked() {
+        QuestLogSync.Sent sent = QuestLogSync.step(null,
+                log(none(), quest("a:hunt", 0, 1)), false).sent;
+        QuestLogSync.Step switched = QuestLogSync.step(sent,
+                log(none(), quest("a:hunt", 0, 3)), true);
+        assertNotNull(switched.whole);
+        assertNull(switched.counts);
+        assertTrue(switched.whole.isReplacement());
+        assertTrue(Arrays.equals(sent.shape, switched.sent.shape));
+
+        ByteBuf buffer = Unpooled.buffer();
+        switched.whole.toBytes(buffer);
+        LostTalesQuestSyncPacket decoded = new LostTalesQuestSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertTrue("the mark travels", decoded.isReplacement());
+        assertEquals(Integer.valueOf(3), decoded.getActiveQuests().get(0)
+                .getObjectiveProgress().get("wolves"));
     }
 
     @Test
     public void countsAloneTravelAsTheQuestsWhoseCountsMoved() {
         QuestLogSync.Sent sent = QuestLogSync.step(null,
-                log(none(), quest("a:hunt", 0, 1), quest("a:gather", 0, 4))).sent;
+                log(none(), quest("a:hunt", 0, 1), quest("a:gather", 0, 4)), false).sent;
         QuestLogSync.Step kill = QuestLogSync.step(sent,
-                log(none(), quest("a:hunt", 0, 2), quest("a:gather", 0, 4)));
+                log(none(), quest("a:hunt", 0, 2), quest("a:gather", 0, 4)), false);
         assertNull(kill.whole);
         assertNotNull(kill.counts);
         assertEquals(1, kill.counts.getQuests().size());
@@ -76,7 +105,7 @@ public final class QuestLogSyncTest {
                 .getObjectiveProgress().get("wolves"));
 
         QuestLogSync.Step again = QuestLogSync.step(kill.sent,
-                log(none(), quest("a:hunt", 0, 2), quest("a:gather", 0, 4)));
+                log(none(), quest("a:hunt", 0, 2), quest("a:gather", 0, 4)), false);
         assertNull("an unchanged log sends nothing", again.whole);
         assertNull(again.counts);
     }
@@ -84,15 +113,17 @@ public final class QuestLogSyncTest {
     @Test
     public void anythingButCountsSendsTheWholeLog() {
         QuestLogSync.Sent sent = QuestLogSync.step(null,
-                log(none(), quest("a:hunt", 0, 1))).sent;
+                log(none(), quest("a:hunt", 0, 1)), false).sent;
         assertNotNull("a new stage", QuestLogSync.step(sent,
-                log(none(), quest("a:hunt", 1, 1))).whole);
+                log(none(), quest("a:hunt", 1, 1)), false).whole);
         assertNotNull("a new quest", QuestLogSync.step(sent,
-                log(none(), quest("a:hunt", 0, 1), quest("a:other", 0, 0))).whole);
+                log(none(), quest("a:hunt", 0, 1), quest("a:other", 0, 0)), false).whole);
         assertNotNull("a History line", QuestLogSync.step(sent,
                 log(Collections.singletonList(new LostTalesQuestHistoryEntry(
-                        "a:old", LostTalesQuestHistoryEntry.Outcome.COMPLETED, "", 5L)),
-                        quest("a:hunt", 0, 1))).whole);
+                        "a:old", LostTalesQuestHistoryEntry.Outcome.COMPLETED, "", 5L,
+                        Collections.<String>emptySet(), 1,
+                        Collections.<String>emptyList())),
+                        quest("a:hunt", 0, 1)), false).whole);
     }
 
     @Test
@@ -105,10 +136,12 @@ public final class QuestLogSyncTest {
                 new ArrayList<LostTalesQuestHistoryEntry>();
         for (int index = 0; index < 300; index++) {
             history.add(new LostTalesQuestHistoryEntry("a:q" + index,
-                    LostTalesQuestHistoryEntry.Outcome.FAILED, detail.toString(), 5L));
+                    LostTalesQuestHistoryEntry.Outcome.FAILED, detail.toString(), 5L,
+                    Collections.<String>emptySet(), 0,
+                    Collections.<String>emptyList()));
         }
         try {
-            QuestLogSync.step(null, log(history));
+            QuestLogSync.step(null, log(history), false);
             fail("a log past the packet's bound is refused");
         } catch (IllegalStateException expected) {
             // refused

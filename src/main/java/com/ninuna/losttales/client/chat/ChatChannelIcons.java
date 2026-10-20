@@ -68,8 +68,8 @@ public final class ChatChannelIcons {
             new LinkedHashMap<ConversationPage, Speaker>();
     /**
      * Faction names remembered per NPC, captured when it spoke: what the
-     * hover card names as the NPC's faction, so an NPC's card reads like
-     * a player's without asking LOTR anything at hover time.
+     * card names as the NPC's faction, so an NPC's card reads like a
+     * player's without asking LOTR anything as it opens.
      */
     private static final Map<UUID, String> NPC_FACTIONS =
             new LinkedHashMap<UUID, String>();
@@ -191,7 +191,7 @@ public final class ChatChannelIcons {
         return speaker == null ? null : speaker.id;
     }
 
-    /** Remembers the faction an NPC spoke for, for its hover card. */
+    /** Remembers the faction an NPC spoke for, for its card. */
     static synchronized void rememberNpcFaction(UUID npcId,
                                                 String factionName) {
         if (npcId == null || factionName == null
@@ -578,7 +578,7 @@ public final class ChatChannelIcons {
     /**
      * The account the name belongs to, from the players in the world or
      * the appearance the server syncs for every online player; null when
-     * neither knows the name. Shared with the hover card, which places
+     * neither knows the name. Shared with the person card, which places
      * a mentioned account the same way.
      */
     static UUID partnerId(Minecraft minecraft, String name) {

@@ -66,7 +66,8 @@ public final class LostTalesClientQuestNotificationStore {
      * advanced, an objective moved or done, a quest finished, failed or
      * given up. The sounds are this player's alone, and play only while
      * their quest sounds are on. The first sync after joining a world is
-     * silent, so old quest state is not played as news. A quest started,
+     * silent, so old quest state is not played as news, and a log a
+     * character switch put in place never comes here. A quest started,
      * advanced or ended is kept as news for the inbox too
      * ({@link ClientQuestNews}); an objective moving is the tracker's.
      */

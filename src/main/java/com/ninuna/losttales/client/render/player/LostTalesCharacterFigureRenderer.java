@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.render.player;
 
-import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.character.registry.CharacterBodyModelDefinition;
 import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
@@ -103,21 +102,16 @@ public final class LostTalesCharacterFigureRenderer {
             if (resolved == null) {
                 return false;
             }
-            LostTalesAccountSkins.AccountSkin account =
-                    resolved.usesAccountSkin()
-                            ? LostTalesAccountSkins.resolveProfile(
-                                    profileOf(minecraft))
-                            : null;
-            ResourceLocation texture = account == null
-                    ? resolved.getTexture() : account.getTexture();
+            // An account skin is the owner's own, as the world draws it;
+            // the arm width is the character's, as it is in the world.
+            ResourceLocation texture = resolved.usesAccountSkin()
+                    ? LostTalesAccountSkins.forAccount(minecraft, ownerId)
+                            .getTexture()
+                    : resolved.getTexture();
             if (texture == null) {
                 return false;
             }
-            // An account skin says which arm width it was painted for; a
-            // catalogue skin was chosen with one.
-            String bodyTypeId = account == null
-                    ? resolved.getBodyTypeId() : account.getBodyTypeId();
-            ModelBiped model = modelFor(resolved, bodyTypeId);
+            ModelBiped model = modelFor(resolved, resolved.getBodyTypeId());
             if (model == null) {
                 return false;
             }
@@ -226,12 +220,6 @@ public final class LostTalesCharacterFigureRenderer {
                 OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
             }
         }
-    }
-
-    /** The player's profile, which names its skin. */
-    private static GameProfile profileOf(Minecraft minecraft) {
-        return minecraft.thePlayer == null ? null
-                : minecraft.thePlayer.getGameProfile();
     }
 
     /**

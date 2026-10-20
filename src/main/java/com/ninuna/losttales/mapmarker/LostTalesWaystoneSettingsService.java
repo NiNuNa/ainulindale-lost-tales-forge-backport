@@ -1,11 +1,14 @@
 package com.ninuna.losttales.mapmarker;
 
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.validation.CharacterNames;
+import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
@@ -31,20 +34,33 @@ import net.minecraft.world.World;
  * answer goes back to the player as the waystone's state, saying why.
  *
  * <p>A player who may not see the waystone is told only that it is
- * private, in one Server line, and is sent no state (WAY-10).</p>
+ * private, in one Server line, and is sent no state (WAY-10). A player
+ * whose page is open on a waystone they can no longer see is told so,
+ * once, and the page closes on that line ({@link #checkSight}).</p>
  *
  * <p>A waystone is shared with characters and with fellowships of ours.
  * A character share holds for that character alone, whoever plays it,
  * never for its account's other characters. A fellowship is named among
- * the fellowships of the sharer's played character (WAY-09). A manager
- * may hand a placed waystone to another character (WAY-08).</p>
+ * the fellowships of the sharer's played character (WAY-09). A share whose
+ * character or fellowship is gone for good counts for nothing: the page
+ * is never sent it, and the next change to the waystone lets it go
+ * ({@link #withoutLostShares}). A manager may hand a placed waystone to
+ * another character (WAY-08).</p>
+ *
+ * <p>Destinations is a request too: the server checks the waystone as it
+ * checks every other, opens the player's window to travel from it
+ * ({@link LostTalesWaystoneVisits}), and answers, and the page opens the
+ * map on that answer.</p>
  */
 public final class LostTalesWaystoneSettingsService {
     private static final double MIN_DISCOVERY_RADIUS = 1.0D;
     /** The longest icon name a waystone's owner may save. */
     static final int MAX_ICON_LENGTH = 64;
     /** The one line a player who may not see the waystone is told. */
-    static final String PRIVATE_LINE = "chat.losttales.waystone.private";
+    public static final String PRIVATE_LINE = "chat.losttales.waystone.private";
+    /** The line a player is told whose page is open on a waystone they no longer may see. */
+    public static final String OUT_OF_SIGHT_LINE =
+            "chat.losttales.waystone.out_of_sight";
 
     private LostTalesWaystoneSettingsService() {}
 
@@ -71,6 +87,9 @@ public final class LostTalesWaystoneSettingsService {
             deny(player, PRIVATE_LINE);
             return false;
         }
+        LostTalesWaystoneVisits.opened(player.getUniqueID(),
+                context.record.getId(), context.world.provider.dimensionId,
+                tile.xCoord, tile.yCoord, tile.zCoord);
         sendState(player, context.tile, context.record,
                 LostTalesWaystoneStateReason.OPENED);
         return true;
@@ -95,6 +114,11 @@ public final class LostTalesWaystoneSettingsService {
             deny(player, PRIVATE_LINE);
             return;
         }
+        if (request.getOperation()
+                == LostTalesWaystoneSettingsOperation.DESTINATIONS) {
+            destinations(player, context, System.currentTimeMillis());
+            return;
+        }
         if (context.record.getRevision() != request.getExpectedRevision()) {
             refuse(player, context, LostTalesWaystoneStateReason.STALE);
             return;
@@ -106,37 +130,40 @@ public final class LostTalesWaystoneSettingsService {
             return;
         }
 
+        // Every change starts from the shares that still stand, so one
+        // whose character or fellowship is gone goes with it.
+        LostTalesMapMarkerRecord base = withoutLostShares(context.record,
+                subjectsOf(context.world));
         Outcome outcome;
         switch (request.getOperation()) {
             case SAVE:
-                outcome = applySettings(context.record,
+                outcome = applySettings(base,
                         request.getSettings(),
                         LostTalesWaystonePermissionPolicy.canMakePublic(
                                 player));
                 break;
             case SHARE_CHARACTER:
                 outcome = applyCharacterSharing(
-                        context.world, context.record,
+                        context.world, base,
                         request.getTargetName(), false);
                 break;
             case UNSHARE_CHARACTER:
                 outcome = applyCharacterSharing(
-                        context.world, context.record,
+                        context.world, base,
                         request.getTargetName(), true);
                 break;
             case SHARE_FELLOWSHIP:
-                outcome = shareFellowship(context.record,
+                outcome = shareFellowship(base,
                         sharersFellowships(player),
                         request.getTargetName());
                 break;
             case UNSHARE_FELLOWSHIP:
-                outcome = unshareFellowship(context.record,
-                        sharedFellowshipNames(context.world,
-                                context.record),
+                outcome = unshareFellowship(base,
+                        sharedFellowshipNames(context.world, base),
                         request.getTargetName());
                 break;
             case HAND_OVER:
-                outcome = handOver(context.record,
+                outcome = handOver(base,
                         LostTalesWaystonePermissionPolicy.managesMarkers(
                                 player),
                         namedCharacter(context.world,
@@ -168,9 +195,66 @@ public final class LostTalesWaystoneSettingsService {
     }
 
     /**
-     * The waystone's state for its page, with the owning character's name;
-     * nothing to a player who may not see it, who could otherwise read a
-     * private waystone through a request.
+     * Destinations: a waystone with fast travel, from Middle-earth, opens
+     * the player's window to travel from it at {@code nowMillis}, and the
+     * answer tells the page to open the map. Anyone who may see the
+     * waystone may travel from it; the revision is not asked, since
+     * nothing on the waystone changes.
+     */
+    private static void destinations(EntityPlayerMP player, Context context,
+                                     long nowMillis) {
+        if (!LostTalesLotrWaystoneTravelAdapter.canTravelFrom(
+                player, context.record)) {
+            refuse(player, context,
+                    LostTalesWaystoneStateReason.NO_FAST_TRAVEL);
+            return;
+        }
+        LostTalesWaystoneVisits.destinations(player.getUniqueID(),
+                context.record.getId(), context.world.provider.dimensionId,
+                context.tile.xCoord, context.tile.yCoord,
+                context.tile.zCoord, nowMillis);
+        sendState(player, context.tile, context.record,
+                LostTalesWaystoneStateReason.DESTINATIONS);
+    }
+
+    /**
+     * Whether the player's page still shows a waystone they may see. One
+     * whose page is open on a waystone they no longer may see — unshared,
+     * made private, handed over, another character played, a fellowship
+     * left — is told so, once, and their page closes on that line. A
+     * player who walked away, or whose waystone is gone, is
+     * forgotten: their page has closed by itself. Asked as the player is
+     * sent their markers, which every such change brings about.
+     */
+    public static void checkSight(EntityPlayerMP player,
+                                  LostTalesMapMarkerWorldData data) {
+        if (player == null || data == null) {
+            return;
+        }
+        LostTalesWaystoneVisits.Visit visit =
+                LostTalesWaystoneVisits.get(player.getUniqueID());
+        if (visit == null) {
+            return;
+        }
+        LostTalesMapMarkerRecord record = data.getRecord(visit.getMarkerId());
+        if (record == null || player.dimension != visit.getDimensionId()
+                || player.getDistanceSq(visit.getX() + 0.5D,
+                        visit.getY() + 0.5D, visit.getZ() + 0.5D)
+                        > LostTalesTileEntityWaystone.REACH_SQ) {
+            LostTalesWaystoneVisits.forget(player.getUniqueID());
+            return;
+        }
+        if (!LostTalesMapMarkerVisibilityPolicy.canView(record, player)) {
+            LostTalesWaystoneVisits.forget(player.getUniqueID());
+            deny(player, OUT_OF_SIGHT_LINE);
+        }
+    }
+
+    /**
+     * The waystone's state for its page, with the owning character's name
+     * and only the shares that still stand; nothing to a player who may not
+     * see it, who could otherwise read a private waystone through a
+     * request.
      */
     public static void sendState(
             EntityPlayerMP player,
@@ -194,7 +278,9 @@ public final class LostTalesWaystoneSettingsService {
                 new LostTalesWaystoneStatePacket(
                         player.dimension,
                         tile.xCoord, tile.yCoord, tile.zCoord,
-                        record, ownerName(player.worldObj, record),
+                        withoutLostShares(record,
+                                subjectsOf(player.worldObj)),
+                        ownerName(player.worldObj, record),
                         canEdit, manages, reason),
                 player);
     }
@@ -243,14 +329,8 @@ public final class LostTalesWaystoneSettingsService {
         LostTalesMapMarkerWorldData data =
                 LostTalesMapMarkerStorage.get(world);
         LostTalesMapMarkerRecord record = data.getRecord(markerId);
-        if (record == null || !record.isLinked()
-                || record.getLinkedDimensionId()
-                        != world.provider.dimensionId
-                || record.getLinkedX() != x
-                || record.getLinkedY() != y
-                || record.getLinkedZ() != z
-                || record.getLinkToken() == null
-                || !record.getLinkToken().equals(tile.getLinkToken())) {
+        if (record == null || !record.isLinkedTo(
+                world.provider.dimensionId, x, y, z, tile.getLinkToken())) {
             return null;
         }
         return new Context(world, tile, data, record);
@@ -276,10 +356,6 @@ public final class LostTalesWaystoneSettingsService {
         String color = normalizeColor(requested.getColorName());
         String category = trim(requested.getCategoryName());
         String description = trim(requested.getDescription());
-        String structureType = record.getWaystoneStructureType();
-        double x = requested.getX();
-        double y = requested.getY();
-        double z = requested.getZ();
         double compassRadius = requested.getCompassFadeInRadius();
         double discoveryRadius = requested.getDiscoveryRadius();
         LostTalesMapMarkerVisibility visibility =
@@ -295,9 +371,6 @@ public final class LostTalesWaystoneSettingsService {
                         > LostTalesMapMarkerRecord.MAX_NAME_LENGTH
                 || description.length()
                         > LostTalesMapMarkerRecord.MAX_TEXT_LENGTH
-                || !validCoordinate(x)
-                || !validMarkerY(y)
-                || !validCoordinate(z)
                 || !validRadius(compassRadius, 0.0D,
                         LostTalesMapMarkerRecord.MAX_RADIUS)
                 || !validRadius(discoveryRadius, MIN_DISCOVERY_RADIUS,
@@ -318,21 +391,14 @@ public final class LostTalesWaystoneSettingsService {
             return Outcome.refused(
                     LostTalesWaystoneStateReason.PUBLIC_DENIED);
         }
-        if (changesPhysicalFields(record, requested)) {
-            return Outcome.refused(
-                    LostTalesWaystoneStateReason.INVALID_SETTINGS);
-        }
         LostTalesMapMarkerEditableSettings normalized =
                 new LostTalesMapMarkerEditableSettings(
                         name, icon, color, category, description,
                         requested.hasFastTravel(),
-                        record.getDimensionId(),
-                        record.getX(), record.getY(), record.getZ(),
                         compassRadius, discoveryRadius,
                         requested.isHiddenUntilDiscovered(),
                         requested.isDiscoverable(),
                         requested.requiresRegionUnlock(),
-                        record.hasWaystone(), structureType,
                         requested.getPriority(),
                         visibility);
         try {
@@ -341,37 +407,6 @@ public final class LostTalesWaystoneSettingsService {
             return Outcome.refused(
                     LostTalesWaystoneStateReason.INVALID_SETTINGS);
         }
-    }
-
-    private static boolean changesPhysicalFields(
-            LostTalesMapMarkerRecord record,
-            LostTalesMapMarkerEditableSettings settings) {
-        return record.getDimensionId() != settings.getDimensionId()
-                || different(record.getX(), settings.getX())
-                || different(record.getY(), settings.getY())
-                || different(record.getZ(), settings.getZ())
-                || record.hasWaystone() != settings.hasWaystone()
-                || !record.getWaystoneStructureType().equals(
-                        trim(settings.getWaystoneStructureType())
-                                .toLowerCase(Locale.ROOT));
-    }
-
-    private static boolean different(double first, double second) {
-        return Double.doubleToLongBits(first)
-                != Double.doubleToLongBits(second);
-    }
-
-    private static boolean validCoordinate(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value)
-                && Math.abs(value)
-                        <= LostTalesMapMarkerRecord
-                                .MAX_ABSOLUTE_COORDINATE;
-    }
-
-    private static boolean validMarkerY(double value) {
-        return validCoordinate(value)
-                && (LostTalesMapMarkerHeightResolver.isAutomatic(value)
-                    || (value >= 0.0D && value <= 255.0D));
     }
 
     private static boolean validRadius(
@@ -408,6 +443,95 @@ public final class LostTalesWaystoneSettingsService {
     }
 
     /* ---- Sharing and handing over ---- */
+
+    /** Which characters and fellowships still stand, as the shares are kept against. */
+    interface Subjects {
+        /** Whether a roster or a lore figure holds the character. */
+        boolean hasCharacter(UUID characterId);
+
+        /** Whether the fellowship has not ended. */
+        boolean hasFellowship(UUID fellowshipId);
+    }
+
+    /**
+     * The record without the shares whose character or fellowship is gone
+     * for good: a character no roster and no lore figure holds, purged; a
+     * fellowship that ended. Nobody could see the waystone through them,
+     * and nobody could name them to unshare them. The revision stays, so a
+     * page that read the record still matches it; the record itself is
+     * the same where every share stands.
+     */
+    static LostTalesMapMarkerRecord withoutLostShares(
+            LostTalesMapMarkerRecord record, Subjects subjects) {
+        Set<UUID> characters = new LinkedHashSet<UUID>();
+        for (UUID characterId : record.getSharedCharacterIds()) {
+            if (subjects.hasCharacter(characterId)) {
+                characters.add(characterId);
+            }
+        }
+        Set<UUID> fellowships = new LinkedHashSet<UUID>();
+        for (UUID fellowshipId : record.getSharedFellowshipIds()) {
+            if (subjects.hasFellowship(fellowshipId)) {
+                fellowships.add(fellowshipId);
+            }
+        }
+        if (characters.size() == record.getSharedCharacterIds().size()
+                && fellowships.size()
+                        == record.getSharedFellowshipIds().size()) {
+            return record;
+        }
+        return record.toBuilder()
+                .sharedCharacterIds(characters)
+                .sharedFellowshipIds(fellowships)
+                .build();
+    }
+
+    /**
+     * This world's characters, lore figures and fellowships as the shares
+     * are kept against. A store that cannot be read, or reads only
+     * another version's data, holds every subject, so no share is let go
+     * on its word.
+     */
+    private static Subjects subjectsOf(World world) {
+        CharacterWorldData characters = null;
+        LoreCharacterOwnershipWorldData loreFigures = null;
+        FellowshipWorldData fellowshipData = null;
+        try {
+            characters = CharacterStorage.get(world);
+            loreFigures = LoreCharacterOwnershipStorage.get(world);
+            if (characters.isReadOnlyForNewerVersion()
+                    || loreFigures.isReadOnly()) {
+                characters = null;
+            }
+        } catch (RuntimeException unreadable) {
+            characters = null;
+        }
+        try {
+            fellowshipData = FellowshipStorage.get(world);
+            if (fellowshipData.isReadOnlyForNewerVersion()) {
+                fellowshipData = null;
+            }
+        } catch (RuntimeException unreadable) {
+            fellowshipData = null;
+        }
+        final CharacterWorldData rosters = characters;
+        final LoreCharacterOwnershipWorldData lore = loreFigures;
+        final FellowshipWorldData fellowships = fellowshipData;
+        return new Subjects() {
+            @Override
+            public boolean hasCharacter(UUID characterId) {
+                return rosters == null
+                        || rosters.containsCharacter(characterId)
+                        || lore.getRecordByCharacterId(characterId) != null;
+            }
+
+            @Override
+            public boolean hasFellowship(UUID fellowshipId) {
+                return fellowships == null
+                        || fellowships.getFellowship(fellowshipId) != null;
+            }
+        };
+    }
 
     private static Outcome applyCharacterSharing(
             World world,

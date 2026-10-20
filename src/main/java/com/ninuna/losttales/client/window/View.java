@@ -58,7 +58,7 @@ public final class View {
         return this.name.length() > 0 ? this.name : ownTitle();
     }
 
-    /** The name a custom view wears while the player gives it none: Custom View and its number. */
+    /** The name a custom view wears while the player gives it none: View and its number. */
     public String ownTitle() {
         return StatCollector.translateToLocalFormatted(
                 "gui.losttales.window.views.made", Integer.valueOf(number()));

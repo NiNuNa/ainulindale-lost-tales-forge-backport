@@ -29,7 +29,7 @@ import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
@@ -789,10 +789,10 @@ public final class ChatInputBar {
                 ? "gui.losttales.chat.input.hint"
                 : "gui.losttales.chat.input.hint.read_only";
         int x = line.fieldLeft + LostTalesUiCaret.WIDTH + 1;
-        String hint = LostTalesSkyrimUiStyle.trimToWidth(this.font,
-                StatCollector.translateToLocal(key), line.fieldRight - x);
-        LostTalesUiInk.drawText(this.font, "§o" + hint, x,
-                barTextTop(), LostTalesChatVisualStyle.asideRgb(), faded(255));
+        LostTalesUiCutName.drawText(this.font,
+                "§o" + StatCollector.translateToLocal(key), x, barTextTop(),
+                line.fieldRight - x, LostTalesChatVisualStyle.asideRgb(),
+                faded(255));
     }
 
     /**
@@ -844,7 +844,7 @@ public final class ChatInputBar {
         BarLead.Fit fit = leadFit(barRight);
         this.lead.advanceTab(fit, fit.onTab(mouseX, mouseY, framedButtonTop()));
         this.lead.drawTab(this.mc, this.font, fit, framedButtonTop(),
-                barTextTop(), this.fractionX, surfaceAlpha(), faded(255));
+                barTextTop(), surfaceAlpha(), faded(255));
         this.regions.add(fit.frameLeft, this.top,
                 ChatInputLine.dividerAfter(fit.right),
                 this.top + WindowPlacement.BAR_STRIP_HEIGHT);

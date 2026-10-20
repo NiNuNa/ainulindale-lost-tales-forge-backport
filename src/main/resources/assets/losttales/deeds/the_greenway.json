@@ -1,0 +1,9 @@
+{
+  "id": "losttales:the_greenway",
+  "category": "journeys",
+  "icon": "minecraft:map",
+  "kind": "places",
+  "places": ["lotr:THARBAD", "lotr:SARN_FORD", "lotr:GREENWAY_CROSSROADS", "lotr:BREE", "lotr:FORNOST"],
+  "alignment": "lotr:bree*50",
+  "title": true
+}

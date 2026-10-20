@@ -2,11 +2,15 @@ package com.ninuna.losttales.client.render.player;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+import com.ninuna.losttales.character.cape.CharacterCapeDefinition;
 import cpw.mods.fml.common.FMLLog;
 import lotr.common.LOTRCapes;
 import net.minecraft.util.ResourceLocation;
 
-/** Client-only bridge from stable Lost Tales cape IDs to LOTR's public textures. */
+/**
+ * Client-only bridge from a cape file's picture (CHAR-39) to its texture:
+ * one of LOTR's public capes by its name, or one of the mod's own.
+ */
 final class LostTalesLotrCapeTextureResolver {
 
     private static boolean disabled;
@@ -14,69 +18,20 @@ final class LostTalesLotrCapeTextureResolver {
 
     private LostTalesLotrCapeTextureResolver() {}
 
-    static ResourceLocation resolve(int cosmeticCapeId) {
-        if (cosmeticCapeId == CharacterCapeCatalog.NONE_ID || disabled) {
+    static ResourceLocation resolve(String cosmeticCapeId) {
+        CharacterCapeDefinition cape = CharacterCapeCatalog.get(cosmeticCapeId);
+        if (cape == null || disabled) {
+            return null;
+        }
+        String picture = cape.getPicture();
+        if (picture.startsWith(CharacterCapeCatalog.OWN_PICTURE)) {
+            return new ResourceLocation(picture);
+        }
+        if (!picture.startsWith(CharacterCapeCatalog.LOTR_PICTURE)) {
             return null;
         }
         try {
-            switch (cosmeticCapeId) {
-                case CharacterCapeCatalog.GONDOR:
-                    return LOTRCapes.GONDOR;
-                case CharacterCapeCatalog.TOWER_GUARD:
-                    return LOTRCapes.TOWER_GUARD;
-                case CharacterCapeCatalog.RANGER:
-                    return LOTRCapes.RANGER;
-                case CharacterCapeCatalog.RANGER_ITHILIEN:
-                    return LOTRCapes.RANGER_ITHILIEN;
-                case CharacterCapeCatalog.LOSSARNACH:
-                    return LOTRCapes.LOSSARNACH;
-                case CharacterCapeCatalog.PELARGIR:
-                    return LOTRCapes.PELARGIR;
-                case CharacterCapeCatalog.BLACKROOT:
-                    return LOTRCapes.BLACKROOT;
-                case CharacterCapeCatalog.PINNATH_GELIN:
-                    return LOTRCapes.PINNATH_GELIN;
-                case CharacterCapeCatalog.LAMEDON:
-                    return LOTRCapes.LAMEDON;
-                case CharacterCapeCatalog.ROHAN:
-                    return LOTRCapes.ROHAN;
-                case CharacterCapeCatalog.DALE:
-                    return LOTRCapes.DALE;
-                case CharacterCapeCatalog.DUNLENDING_BERSERKER:
-                    return LOTRCapes.DUNLENDING_BERSERKER;
-                case CharacterCapeCatalog.GALADHRIM:
-                    return LOTRCapes.GALADHRIM;
-                case CharacterCapeCatalog.GALADHRIM_TRADER:
-                    return LOTRCapes.GALADHRIM_TRADER;
-                case CharacterCapeCatalog.WOOD_ELF:
-                    return LOTRCapes.WOOD_ELF;
-                case CharacterCapeCatalog.HIGH_ELF:
-                    return LOTRCapes.HIGH_ELF;
-                case CharacterCapeCatalog.RIVENDELL:
-                    return LOTRCapes.RIVENDELL;
-                case CharacterCapeCatalog.RIVENDELL_TRADER:
-                    return LOTRCapes.RIVENDELL_TRADER;
-                case CharacterCapeCatalog.NEAR_HARAD:
-                    return LOTRCapes.NEAR_HARAD;
-                case CharacterCapeCatalog.SOUTHRON_CHAMPION:
-                    return LOTRCapes.SOUTHRON_CHAMPION;
-                case CharacterCapeCatalog.GULF_HARAD:
-                    return LOTRCapes.GULF_HARAD;
-                case CharacterCapeCatalog.TAURETHRIM:
-                    return LOTRCapes.TAURETHRIM;
-                case CharacterCapeCatalog.GALADHRIM_SMITH:
-                    return LOTRCapes.GALADHRIM_SMITH;
-                case CharacterCapeCatalog.DORWINION_CAPTAIN:
-                    return LOTRCapes.DORWINION_CAPTAIN;
-                case CharacterCapeCatalog.DORWINION_ELF_CAPTAIN:
-                    return LOTRCapes.DORWINION_ELF_CAPTAIN;
-                case CharacterCapeCatalog.GANDALF:
-                    return LOTRCapes.GANDALF;
-                case CharacterCapeCatalog.GANDALF_SANTA:
-                    return LOTRCapes.GANDALF_SANTA;
-                default:
-                    return null;
-            }
+            return lotrCape(picture.substring(CharacterCapeCatalog.LOTR_PICTURE.length()));
         } catch (Throwable throwable) {
             disabled = true;
             if (!failureLogged) {
@@ -88,5 +43,37 @@ final class LostTalesLotrCapeTextureResolver {
             }
             return null;
         }
+    }
+
+    /** LOTR's cape of that name; null for a name LOTR gives none. */
+    private static ResourceLocation lotrCape(String name) {
+        if ("GONDOR".equals(name)) return LOTRCapes.GONDOR;
+        if ("TOWER_GUARD".equals(name)) return LOTRCapes.TOWER_GUARD;
+        if ("RANGER".equals(name)) return LOTRCapes.RANGER;
+        if ("RANGER_ITHILIEN".equals(name)) return LOTRCapes.RANGER_ITHILIEN;
+        if ("LOSSARNACH".equals(name)) return LOTRCapes.LOSSARNACH;
+        if ("PELARGIR".equals(name)) return LOTRCapes.PELARGIR;
+        if ("BLACKROOT".equals(name)) return LOTRCapes.BLACKROOT;
+        if ("PINNATH_GELIN".equals(name)) return LOTRCapes.PINNATH_GELIN;
+        if ("LAMEDON".equals(name)) return LOTRCapes.LAMEDON;
+        if ("ROHAN".equals(name)) return LOTRCapes.ROHAN;
+        if ("DALE".equals(name)) return LOTRCapes.DALE;
+        if ("DUNLENDING_BERSERKER".equals(name)) return LOTRCapes.DUNLENDING_BERSERKER;
+        if ("GALADHRIM".equals(name)) return LOTRCapes.GALADHRIM;
+        if ("GALADHRIM_TRADER".equals(name)) return LOTRCapes.GALADHRIM_TRADER;
+        if ("WOOD_ELF".equals(name)) return LOTRCapes.WOOD_ELF;
+        if ("HIGH_ELF".equals(name)) return LOTRCapes.HIGH_ELF;
+        if ("RIVENDELL".equals(name)) return LOTRCapes.RIVENDELL;
+        if ("RIVENDELL_TRADER".equals(name)) return LOTRCapes.RIVENDELL_TRADER;
+        if ("NEAR_HARAD".equals(name)) return LOTRCapes.NEAR_HARAD;
+        if ("SOUTHRON_CHAMPION".equals(name)) return LOTRCapes.SOUTHRON_CHAMPION;
+        if ("GULF_HARAD".equals(name)) return LOTRCapes.GULF_HARAD;
+        if ("TAURETHRIM".equals(name)) return LOTRCapes.TAURETHRIM;
+        if ("GALADHRIM_SMITH".equals(name)) return LOTRCapes.GALADHRIM_SMITH;
+        if ("DORWINION_CAPTAIN".equals(name)) return LOTRCapes.DORWINION_CAPTAIN;
+        if ("DORWINION_ELF_CAPTAIN".equals(name)) return LOTRCapes.DORWINION_ELF_CAPTAIN;
+        if ("GANDALF".equals(name)) return LOTRCapes.GANDALF;
+        if ("GANDALF_SANTA".equals(name)) return LOTRCapes.GANDALF_SANTA;
+        return null;
     }
 }

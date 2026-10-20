@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
@@ -367,14 +368,18 @@ public final class NewPage extends PageContent {
                 || shown < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
-        String text = LostTalesSkyrimUiStyle.trimToWidth(font,
-                this.centreName, room);
-        int ink = font.getStringWidth(text) - 1;
+        // A name too long for its room fills it from its left, fading
+        // into its end and sliding along while its page is pointed at
+        // (LOOK-37).
+        int shownWidth = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(this.centreName), room);
+        int ink = shownWidth - 1;
         int left = centreX - DIAMOND_WIDTH / 2;
-        LostTalesUiInk.drawText(font, text,
+        LostTalesUiCutName.drawText(font, this.centreName,
                 left + LostTalesUiInk.centredStart(DIAMOND_WIDTH, ink),
                 centreY + 3 + LostTalesUiInk.SHADOW_OFFSET + 1 + NAME_GAP,
-                LostTalesUiInk.IVORY, shown);
+                room, LostTalesUiInk.IVORY, shown, this, this.centreName,
+                named.length() > 0);
     }
 
     /** The centre: a diamond with the one shadow, lit in the accent while a category is pointed at. */
@@ -650,7 +655,7 @@ public final class NewPage extends PageContent {
 
     @Override
     public List<PageKeys.Area> keyAreas() {
-        return PageKeys.pageArea("gui.losttales.page.menu",
+        return PageKeys.pageArea("gui.losttales.page.new_page",
                 PageKeys.pageKey(PAGE_ID, "open", PageKeys.CLICK),
                 PageKeys.pageKey(PAGE_ID, "category", PageKeys.RIGHT_CLICK),
                 PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL),

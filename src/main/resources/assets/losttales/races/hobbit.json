@@ -1,0 +1,22 @@
+{
+  "id": "losttales:hobbit",
+  "body": "hobbit",
+  "values_from": "lotr:hobbit",
+  "sexes": ["losttales:male", "losttales:female"],
+  "size": {"width": 0.45, "height": 1.2},
+  "health": 16,
+  "speed": 1.0,
+  "attack": 2,
+  "faction_categories": [],
+  "factions": ["lotr:hobbit", "lotr:bree"],
+  "skins": [
+    {"group": "hobbit_shire", "sex": "losttales:male", "texture": "lotr:mob/hobbit/hobbit_male", "count": 13},
+    {"group": "hobbit_shire", "sex": "losttales:female", "texture": "lotr:mob/hobbit/hobbit_female", "count": 13}
+  ],
+  "skills": {
+    "losttales:cooking": 10,
+    "losttales:husbandry": 5,
+    "losttales:lore": 5,
+    "losttales:archery": 5
+  }
+}

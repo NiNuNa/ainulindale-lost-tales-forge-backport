@@ -114,7 +114,8 @@ public final class CharacterCreationCatalog {
                 waypointsByFaction.put(factionId, waypointIds);
             }
         }
-        for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
+        // The races a character may be made as; a stand-in is offered to nobody.
+        for (CharacterRaceDefinition race : CharacterRaceRegistry.getOffered()) {
             ArrayList<String> factionIds = new ArrayList<String>();
             if (available) {
                 for (String factionId : adapter.getPlayableFactionIds()) {

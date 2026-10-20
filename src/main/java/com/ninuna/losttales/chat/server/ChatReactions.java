@@ -43,6 +43,11 @@ public final class ChatReactions {
     public static final int MAX_KINDS = ChatReactionSummary.MAX_KINDS;
     /** Reactions on one message in all, every emoji together. */
     public static final int MAX_REACTORS = 100;
+    /**
+     * Reactions one player's identities hold on one message together:
+     * as many as one identity can make, one per emoji.
+     */
+    public static final int MAX_PER_PLAYER = MAX_KINDS;
 
     private final LinkedHashMap<String, LinkedHashMap<UUID, String>> byEmoji =
             new LinkedHashMap<String, LinkedHashMap<UUID, String>>();
@@ -489,6 +494,19 @@ public final class ChatReactions {
             total += reactors.size();
         }
         return total;
+    }
+
+    /** The reactions made by any of {@code reactors}, every emoji together. */
+    public int countBy(Set<UUID> reactors) {
+        int count = 0;
+        for (LinkedHashMap<UUID, String> made : this.byEmoji.values()) {
+            for (UUID reactor : made.keySet()) {
+                if (reactors.contains(reactor)) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 
     /**

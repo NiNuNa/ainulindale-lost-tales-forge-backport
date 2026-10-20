@@ -50,12 +50,61 @@ public final class ChatMuteNbtCodecTest {
     }
 
     @Test
-    public void emptyCompoundReadsAsEmptyAndRepaired() {
-        ChatMuteNbtCodec.ReadResult result =
-                ChatMuteNbtCodec.read(new NBTTagCompound());
+    public void anEmptyListReadsAsNobodyMuted() {
+        NBTTagCompound written = new NBTTagCompound();
+        ChatMuteNbtCodec.write(written, Collections.<ChatMuteEntry>emptyList(),
+                Collections.<NBTTagCompound>emptyList());
+        ChatMuteNbtCodec.ReadResult result = ChatMuteNbtCodec.read(written);
         assertFalse(result.isReadOnly());
-        assertTrue(result.wasRepaired());
+        assertFalse(result.wasRepaired());
         assertTrue(result.getMutes().isEmpty());
+    }
+
+    /**
+     * A save without its version or its list, or a mute at another
+     * version, is data of another shape: kept as it is, the store
+     * read-only, never filled in.
+     */
+    @Test
+    public void aSaveOfAnotherShapeIsKeptReadOnly() {
+        assertTrue(ChatMuteNbtCodec.read(new NBTTagCompound()).isReadOnly());
+        NBTTagCompound written = new NBTTagCompound();
+        ChatMuteNbtCodec.write(written, Arrays.asList(new ChatMuteEntry(
+                ACCOUNT_A, "Aldric", "Operator", "", 1000L,
+                ChatMuteEntry.EXPIRES_NEVER)),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagCompound unversioned = (NBTTagCompound) written.copy();
+        unversioned.removeTag("DataVersion");
+        assertTrue(ChatMuteNbtCodec.read(unversioned).isReadOnly());
+        NBTTagCompound noList = (NBTTagCompound) written.copy();
+        noList.removeTag("Mutes");
+        assertTrue(ChatMuteNbtCodec.read(noList).isReadOnly());
+        NBTTagCompound unversionedMute = (NBTTagCompound) written.copy();
+        unversionedMute.getTagList("Mutes", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).removeTag("DataVersion");
+        ChatMuteNbtCodec.ReadResult result = ChatMuteNbtCodec.read(unversionedMute);
+        assertTrue(result.isReadOnly());
+        assertTrue(result.getOriginalDataCopy().hasKey("Mutes"));
+    }
+
+    /** A mute without a field the writer always writes is quarantined, never given a stand-in. */
+    @Test
+    public void aMuteMissingAFieldIsQuarantined() {
+        String[] fields = {"AccountName", "MutedBy", "MuteReason", "IssuedAt", "ExpiresAt"};
+        for (String field : fields) {
+            NBTTagCompound written = new NBTTagCompound();
+            ChatMuteNbtCodec.write(written, Arrays.asList(new ChatMuteEntry(
+                    ACCOUNT_A, "Aldric", "Operator", "", 1000L, 5000L)),
+                    Collections.<NBTTagCompound>emptyList());
+            written.getTagList("Mutes", Constants.NBT.TAG_COMPOUND)
+                    .getCompoundTagAt(0).removeTag(field);
+            ChatMuteNbtCodec.ReadResult result = ChatMuteNbtCodec.read(written);
+            assertFalse(field, result.isReadOnly());
+            assertTrue(field, result.wasRepaired());
+            assertTrue(field, result.getMutes().isEmpty());
+            assertEquals(field, "missing_mute_field",
+                    result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+        }
     }
 
     @Test
@@ -156,7 +205,6 @@ public final class ChatMuteNbtCodecTest {
     @Test
     public void storeExpiresLazilyAndRefusesPastTheCap() {
         ChatMuteWorldData store = new ChatMuteWorldData(ChatMuteWorldData.DATA_NAME);
-        store.readFromNBT(new NBTTagCompound());
         ChatMuteEntry timed = new ChatMuteEntry(ACCOUNT_A, "Aldric",
                 "Operator", "", 0L, 5000L);
         assertTrue(store.mute(timed));
@@ -175,8 +223,9 @@ public final class ChatMuteNbtCodecTest {
         // Replacing an existing mute is never a capacity question.
         assertTrue(store.mute(new ChatMuteEntry(new UUID(1L, 1L),
                 "Player0", "", "renewed", 99L, ChatMuteEntry.EXPIRES_NEVER)));
-        // Unmuting by the stored name works after the player left.
-        ChatMuteEntry lifted = store.unmuteByName("player0");
+        // A mute is found by the stored name after the player left.
+        ChatMuteEntry found = store.findByName("player0");
+        ChatMuteEntry lifted = store.unmute(found.getAccountId());
         assertEquals("renewed", lifted.getReason());
     }
 }

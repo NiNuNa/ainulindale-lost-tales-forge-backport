@@ -126,6 +126,38 @@ public final class LostTalesMissivePacketTest {
         assertEquals(8, decoded.getNotices().get(2).getSlot());
     }
 
+    /** A letter from a server's template travels with its words as written (QUEST-42). */
+    @Test
+    public void aWrittenLetterTravelsWithItsWords() {
+        Map<String, String> params = new LinkedHashMap<String, String>();
+        params.put("entity", "lotr.Wolf");
+        params.put("count", "5");
+        LostTalesMissiveData written = LostTalesMissiveData.builder(QUEST, "kill")
+                .written(true)
+                .titleId("Wanted: Wolf Pelts")
+                .issuerId("Barliman Butterbur")
+                .descriptionId("kill")
+                .flavorId("The wolves came down from the Barrow-downs again.")
+                .target("lotr.Wolf")
+                .objective(new LostTalesMissiveObjectiveData("kill_lotr_wolf",
+                        "kill", false, params))
+                .build();
+        assertTrue(LostTalesMissiveCodec.fits(written));
+        LostTalesMissiveBoardStatePacket decoded = decodeState(bytes(state(
+                MissiveBoardStateReason.OPENED, new MissiveNotice(0, 3000L, written))));
+        assertFalse(decoded.isMalformed());
+        LostTalesMissiveData letter = decoded.getNotices().get(0).getMissive();
+        assertTrue(letter.isWritten());
+        assertEquals("Wanted: Wolf Pelts", letter.getTitleId());
+        assertEquals("Barliman Butterbur", letter.getIssuerId());
+        assertEquals("The wolves came down from the Barrow-downs again.",
+                letter.getFlavorId());
+        assertTrue("an id letter still travels as ids",
+                !decodeState(bytes(state(MissiveBoardStateReason.OPENED,
+                        new MissiveNotice(0, 3000L, missive(QUEST))))).getNotices()
+                        .get(0).getMissive().isWritten());
+    }
+
     @Test
     public void everyReasonTravelsAndOnlyAnOpeningOpens() {
         for (MissiveBoardStateReason reason : MissiveBoardStateReason.values()) {

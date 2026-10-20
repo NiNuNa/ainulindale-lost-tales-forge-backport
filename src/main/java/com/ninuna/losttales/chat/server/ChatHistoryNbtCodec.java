@@ -34,10 +34,10 @@ import net.minecraftforge.common.util.Constants;
  * or another channel than the entry says, is quarantined with the entry
  * rather than shown to anyone. The audience is written in full — a line
  * restored without it would be a private line replayed to whoever asks
- * — and an entry whose audience cannot be read is quarantined too. An
- * entry at another layout than this codec writes, or data newer than it
- * knows, is left alone and the store goes read-only; nothing is dropped
- * or cut.</p>
+ * — and an entry whose audience cannot be read is quarantined too. A
+ * save or an entry at another version than this codec writes, or a save
+ * without its version or one of its lists, is left alone and the store
+ * goes read-only; nothing is dropped, cut or filled in.</p>
  */
 public final class ChatHistoryNbtCodec {
 
@@ -294,24 +294,28 @@ public final class ChatHistoryNbtCodec {
 
     public static ReadResult read(NBTTagCompound source) {
         NBTTagCompound safeSource = source == null ? new NBTTagCompound() : source;
-        int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
+        if (!safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)) {
+            LostTalesLog.warning("Chat history data carries no version; data will remain read-only");
+            return ReadResult.unsupported(safeSource, -1);
+        }
+        int version = safeSource.getInteger(TAG_DATA_VERSION);
+        if (version != CURRENT_ROOT_DATA_VERSION) {
             LostTalesLog.warning("Chat history data uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
-        if (safeSource.hasKey(TAG_ENTRIES)
-                && !safeSource.hasKey(TAG_ENTRIES, Constants.NBT.TAG_LIST)) {
+        // The writer always writes both lists: a save without either is
+        // not this build's to read.
+        if (!safeSource.hasKey(TAG_ENTRIES, Constants.NBT.TAG_LIST)
+                || !safeSource.hasKey(TAG_CONSOLE_EVENTS, Constants.NBT.TAG_LIST)) {
+            LostTalesLog.warning("Chat history data lacks its lines or its Server Log; data will remain read-only");
             return ReadResult.unsupported(safeSource, -1);
         }
-        boolean repaired = version != CURRENT_ROOT_DATA_VERSION
-                || !safeSource.hasKey(TAG_ENTRIES, Constants.NBT.TAG_LIST);
+        boolean repaired = false;
         NbtQuarantine.Read quarantine = NbtQuarantine.read(safeSource);
         if (!quarantine.isSupported()) {
             return ReadResult.unsupported(safeSource, quarantine.getUnsupportedVersion());
         }
-        repaired |= quarantine.isRepaired();
         List<NBTTagCompound> quarantinedEntries =
                 new ArrayList<NBTTagCompound>(quarantine.getEntries());
         List<ChatHistory.Entry> entries = new ArrayList<ChatHistory.Entry>();
@@ -345,13 +349,6 @@ public final class ChatHistoryNbtCodec {
             }
         }
         Collections.sort(entries, ENTRY_ORDER);
-        if (safeSource.hasKey(TAG_CONSOLE_EVENTS)
-                && !safeSource.hasKey(TAG_CONSOLE_EVENTS, Constants.NBT.TAG_LIST)) {
-            return ReadResult.unsupported(safeSource, -1);
-        }
-        // A save without the console's events reads as an empty console
-        // and is written whole.
-        repaired |= !safeSource.hasKey(TAG_CONSOLE_EVENTS, Constants.NBT.TAG_LIST);
         List<ChatConsoleEvent> events = new ArrayList<ChatConsoleEvent>();
         Map<Long, ChatReactions> eventReactions = new HashMap<Long, ChatReactions>();
         Set<Long> seenEventIds = new HashSet<Long>();

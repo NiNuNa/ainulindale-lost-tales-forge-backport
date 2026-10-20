@@ -1,26 +1,9 @@
 {
   "map_markers": [
     {
-      "id": "losttales:cheese_fort",
-      "relevance": "high",
-      "icon": "town",
-      "color": "white",
-      "dimension": "lotr:middle_earth",
-      "x": -180.0,
-      "z": -140.0,
-      "compassFadeInRadius": 250.0,
-      "discoveryRadius": 12.0,
-      "isDiscoverable": true,
-      "hiddenUntilDiscovered": false,
-      "requiresRegionUnlock": true,
-      "hasFastTravel": true,
-      "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house"
-    },
-    {
       "id": "losttales:watchtower_ruins",
       "relevance": "medium",
-      "icon": "town",
+      "icon": "shack",
       "color": "orange",
       "dimension": "lotr:middle_earth",
       "x": 300.0,

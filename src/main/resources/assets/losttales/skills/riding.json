@@ -1,0 +1,84 @@
+{
+  "id": "losttales:riding",
+  "icon": "minecraft:saddle",
+  "order": 6,
+  "counts": [
+    {
+      "act": "ride",
+      "per": 0.1
+    },
+    {
+      "act": "tame",
+      "worth": {
+        "EntityHorse": 20,
+        "lotr.Horse": 20,
+        "lotr.ShirePony": 20,
+        "lotr.Camel": 20,
+        "lotr.Elk": 20,
+        "lotr.Zebra": 20,
+        "lotr.Giraffe": 20,
+        "lotr.Rhino": 25,
+        "lotr.Boar": 15,
+        "lotr.MordorWarg": 30,
+        "lotr.GundabadWarg": 30,
+        "lotr.AngmarWarg": 30,
+        "lotr.UrukWarg": 30
+      }
+    },
+    {
+      "act": "feed",
+      "per": 1.0
+    }
+  ],
+  "perks": [
+    {
+      "id": "horse_sense",
+      "levels": [10],
+      "effect": "horse_sense",
+      "amount": 0
+    },
+    {
+      "id": "long_road",
+      "levels": [20, 50],
+      "effect": "mount_speed",
+      "amount": 0.05
+    },
+    {
+      "id": "tamer",
+      "levels": [30],
+      "effect": "tame_ease",
+      "amount": 5
+    },
+    {
+      "id": "mounted_archer",
+      "levels": [40],
+      "effect": "mounted_aim",
+      "amount": 0.5
+    },
+    {
+      "id": "caretaker",
+      "levels": [50],
+      "effect": "feed_heal",
+      "amount": 0.5
+    },
+    {
+      "id": "steady_seat",
+      "levels": [60],
+      "effect": "mounted_fall",
+      "amount": 0.4
+    },
+    {
+      "id": "charger",
+      "levels": [80],
+      "effect": "charge",
+      "amount": 0.3,
+      "needs": "long_road:2"
+    },
+    {
+      "id": "rider_of_the_mark",
+      "levels": [100],
+      "effect": "mount_jump",
+      "amount": 0.15
+    }
+  ]
+}

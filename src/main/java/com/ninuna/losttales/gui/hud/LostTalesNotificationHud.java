@@ -13,9 +13,10 @@ import com.ninuna.losttales.config.LostTalesConfig;
  * before the HUD is drawn; a renderer that forgets to claim draws over
  * whatever else is there, which is what claiming exists to avoid.</p>
  *
- * <p>The slot's box is the footprint the editor shows and the anchor the
- * offsets place: wide enough for the widest notice, tall enough for a
- * discovery and one banner. More than that spills below it.</p>
+ * <p>The slot's box is the footprint the editor shows and what its two
+ * numbers place ({@link HudPlacementLayout}): wide enough for the widest
+ * notice, tall enough for a discovery and one banner. More than that
+ * spills below it.</p>
  */
 public final class LostTalesNotificationHud {
 
@@ -49,9 +50,7 @@ public final class LostTalesNotificationHud {
         return HudPlacementLayout.calculate(screenWidth, screenHeight,
                 WIDTH, HEIGHT,
                 LostTalesConfig.notificationHudOffsetX,
-                LostTalesConfig.notificationHudOffsetY,
-                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT,
-                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT);
+                LostTalesConfig.notificationHudOffsetY);
     }
 
     /** The column notices are centred on. */

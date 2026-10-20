@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.render.player;
 
+import com.ninuna.losttales.character.registry.CharacterBody;
+import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.util.LostTalesIdentifiers;
 
@@ -54,13 +56,13 @@ final class CharacterHeadIconLayout {
         return "losttales".equals(resourceDomain) ? minecraftSkin64() : minecraftSkin();
     }
 
+    /** The layout of a skin painted for the race's body (CHAR-38). */
     static CharacterHeadIconLayout forConfiguredRace(String raceId) {
-        String canonicalRace =
-                LostTalesIdentifiers.normalize(raceId);
-        if (CharacterRaceRegistry.HUMAN.equals(canonicalRace)
-                || CharacterRaceRegistry.ELF.equals(canonicalRace)
-                || CharacterRaceRegistry.DWARF.equals(canonicalRace)
-                || CharacterRaceRegistry.HOBBIT.equals(canonicalRace)) {
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(
+                LostTalesIdentifiers.normalize(raceId));
+        CharacterBody body = race == null ? null : race.getBody();
+        if (body == CharacterBody.HUMAN || body == CharacterBody.ELF
+                || body == CharacterBody.DWARF || body == CharacterBody.HOBBIT) {
             // Their outer cuboid starts at the head crown and continues
             // below the chin. A square portrait is the head, so it takes
             // the head's own eight rows and leaves the hanging hair and
@@ -68,8 +70,7 @@ final class CharacterHeadIconLayout {
             return new CharacterHeadIconLayout(
                     64.0F, 8.0F, 8.0F, 8.0F, OverlayKind.LOTR_EXTENDED);
         }
-        if (CharacterRaceRegistry.ORC.equals(canonicalRace)
-                || CharacterRaceRegistry.URUK.equals(canonicalRace)) {
+        if (body == CharacterBody.ORC || body == CharacterBody.URUK) {
             // Their ModelOrc nose is a separate child cuboid; the normal
             // Minecraft hat region contains unrelated body geometry.
             return new CharacterHeadIconLayout(

@@ -15,8 +15,9 @@ import java.util.concurrent.LinkedBlockingQueue;
  * resumes, keeps the heartbeat, reads events until the server closes or
  * the link fails, and connects again with backoff — or stops for the
  * session when Discord's close code says the token or the intents are
- * wrong. The member intents are the exception: refused, they are dropped
- * and the bot connects again without them. Events are handed to a
+ * wrong. The member intents are the exception: on a refused intent they
+ * are dropped first and the bot connects again without them, which tells
+ * which intent it was. Events are handed to a
  * {@link Listener} on this thread; the listener must not block. A second
  * thread runs the small HTTP jobs the listener hands back
  * ({@link #submit}), so an answer to Discord never holds the reader up.
@@ -54,6 +55,12 @@ public final class DiscordGatewayClient extends Thread {
     private volatile Thread heartbeat;
     private volatile boolean connected;
     private volatile boolean fatal;
+    /**
+     * Set when a 4014 dropped the member intents, until Discord tells which
+     * intent it refused: a READY says the member intents, a second 4014
+     * Message Content. The gateway thread's alone.
+     */
+    private boolean membersDropped;
     private long backoffMillis = MIN_BACKOFF_MILLIS;
     private String gatewayUrl = "";
 
@@ -216,6 +223,16 @@ public final class DiscordGatewayClient extends Thread {
             case READY:
                 this.backoffMillis = MIN_BACKOFF_MILLIS;
                 this.connected = true;
+                if (this.membersDropped) {
+                    // Taken without them: the member intents were the ones refused.
+                    this.membersDropped = false;
+                    FMLLog.warning("[%s] Discord refused the Server Members or "
+                            + "Presence intent (close 4014): switch both on for "
+                            + "the bot in the Discord developer portal, or turn "
+                            + "memberList off; the gateway goes on without Discord "
+                            + "members", LostTalesMetaData.MOD_ID);
+                    this.listener.onMembersRefused();
+                }
                 this.listener.onConnected();
                 this.listener.onReady(action.data);
                 return true;
@@ -236,19 +253,19 @@ public final class DiscordGatewayClient extends Thread {
     /** What a server close means: a fatal code stops the client for the session. */
     private boolean closed(int code) {
         if (closesForGood(code, followsMembers())) {
-            fatal(closedForGoodReason(code));
+            fatal(closedForGoodReason(code, this.membersDropped));
             return false;
         }
         if (code == 4014) {
-            // The member intents are the ones a server switches on for
-            // the member lists; without them the bridge still relays.
+            // Discord does not say which privileged intent it refused. The
+            // member intents, which only the member lists need, are tried
+            // without first: a READY then names them, a second 4014 the
+            // Message Content intent.
             this.protocol.dropIntents(DiscordGatewayProtocol.MEMBER_INTENTS);
-            FMLLog.warning("[%s] Discord refused the Server Members or Presence "
-                    + "intent (close 4014): switch both on for the bot in the "
-                    + "Discord developer portal, or turn memberList off; the "
-                    + "gateway goes on without Discord members",
-                    LostTalesMetaData.MOD_ID);
-            this.listener.onMembersRefused();
+            this.membersDropped = true;
+            note("Discord refused a privileged intent (close 4014): Message "
+                    + "Content, Server Members or Presence; connecting again "
+                    + "without the member intents to tell which");
             return false;
         }
         if (code == 4007 || code == 4009) {
@@ -281,8 +298,13 @@ public final class DiscordGatewayClient extends Thread {
         }
     }
 
-    /** What the log says of a close that keeps the gateway down. */
-    private static String closedForGoodReason(int code) {
+    /**
+     * What the log says of a close that keeps the gateway down. A 4014
+     * after the member intents were dropped is the Message Content
+     * intent's; whether the member intents were refused as well is not
+     * known, so the line names them too.
+     */
+    static String closedForGoodReason(int code, boolean membersDropped) {
         switch (code) {
             case 4004:
                 return "Discord refused the bot's token on the gateway (close 4004); "
@@ -292,8 +314,10 @@ public final class DiscordGatewayClient extends Thread {
                         + "is off for this run";
             case 4014:
                 return "Discord refused the bot's intents (close 4014): enable the "
-                        + "Message Content intent on the application; the gateway is "
-                        + "off until then";
+                        + "Message Content intent on the application"
+                        + (membersDropped ? ", and Server Members and Presence for "
+                                + "the member lists" : "")
+                        + "; the gateway is off until then";
             default:
                 return "Discord refused the gateway session (close " + code
                         + "); the gateway is off for this run";

@@ -65,8 +65,8 @@ public final class LostTalesQuestParams {
     }
 
     /**
-     * Where a go-to objective's coordinates point, read the same by the
-     * server that checks it and the tracker and map that mark it:
+     * Where a go-to's or a kill's coordinates point, read the same by the
+     * server that checks it and the tracker and map that mark a go-to:
      * {@code x}, {@code y} and {@code z}, all three, in the dimension
      * {@code dimension} names (a number or a name such as
      * {@code lotr:middle_earth}), else the one {@code here} is. Null when a
@@ -82,6 +82,34 @@ public final class LostTalesQuestParams {
         return new Location(LostTalesDimensionHelper.parseDimensionId(
                         value(params, "dimension"), here),
                 x.doubleValue(), y.doubleValue(), z.doubleValue());
+    }
+
+    /**
+     * Whether an objective's params name a place: a {@code marker}, or any
+     * of {@code x}, {@code y} and {@code z}. A kill that names one counts
+     * only the creatures that die within its {@code radius} of it
+     * (QUEST-40).
+     */
+    public static boolean namesPlace(Map<String, String> params) {
+        return value(params, "marker").length() > 0 || value(params, "x").length() > 0
+                || value(params, "y").length() > 0 || value(params, "z").length() > 0;
+    }
+
+    /**
+     * Whether the point at {@code x}, {@code y}, {@code z} in
+     * {@code dimension} lies within {@code radius} of the place, in three
+     * dimensions and in the place's own dimension. Never for no place or a
+     * radius of 0 or less.
+     */
+    public static boolean isWithin(Location place, int dimension, double x, double y,
+                                   double z, double radius) {
+        if (place == null || radius <= 0.0D || dimension != place.getDimensionId()) {
+            return false;
+        }
+        double dx = x - place.getX();
+        double dy = y - place.getY();
+        double dz = z - place.getZ();
+        return dx * dx + dy * dy + dz * dz <= radius * radius;
     }
 
     /** A point a quest file names, in the dimension it names. */

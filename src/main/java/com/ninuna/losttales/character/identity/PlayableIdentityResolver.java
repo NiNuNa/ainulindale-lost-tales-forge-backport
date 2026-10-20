@@ -9,8 +9,8 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
  * Reads which identity a server player is playing as, telling storage
- * trouble apart from "on the account": a player with no roster yet, or a
- * roster with no active character, is on the account; an unreadable or
+ * trouble apart from a first visit: a player with no roster yet, or a
+ * roster with no active character, is the ghost; an unreadable or
  * read-only store is an error and never mistaken for either.
  */
 public final class PlayableIdentityResolver {

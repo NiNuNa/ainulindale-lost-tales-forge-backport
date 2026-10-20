@@ -57,6 +57,28 @@ public final class VanillaInventoryStateComponent implements CharacterStateCompo
         return state;
     }
 
+    /**
+     * A new character's inventory holding {@code stacks} in the main
+     * inventory's slots from the first hotbar slot on (CHAR-40); a stack
+     * past the main inventory's 36 slots is not written.
+     */
+    public NBTTagCompound createDefault(java.util.List<ItemStack> stacks) {
+        NBTTagCompound state = createDefault();
+        NBTTagList items = new NBTTagList();
+        int slot = 0;
+        for (ItemStack stack : stacks) {
+            if (stack == null || slot >= 36) {
+                continue;
+            }
+            NBTTagCompound itemTag = new NBTTagCompound();
+            itemTag.setByte("Slot", (byte) slot++);
+            stack.writeToNBT(itemTag);
+            items.appendTag(itemTag);
+        }
+        state.setTag(TAG_ITEMS, items);
+        return state;
+    }
+
     @Override
     public void validate(NBTTagCompound state)
             throws CharacterStateValidationException {

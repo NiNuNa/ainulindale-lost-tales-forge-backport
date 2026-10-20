@@ -18,8 +18,9 @@ import net.minecraft.world.WorldSavedData;
  * server starts and written to as the world saves — from the live stores
  * while the server runs, and from the snapshots {@link #hold} took as it
  * stops, since the stores are cleared before the last save is written. A
- * store made read-only by newer-version data is preserved verbatim and
- * never written; the history then lives in memory alone for the run.
+ * store made read-only by data this build cannot read is preserved
+ * verbatim and never written; the history then lives in memory alone for
+ * the run.
  */
 public final class ChatHistoryWorldData extends WorldSavedData {
 

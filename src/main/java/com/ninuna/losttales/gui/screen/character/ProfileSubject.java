@@ -2,19 +2,16 @@ package com.ninuna.losttales.gui.screen.character;
 
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterSummary;
-import java.util.UUID;
 
 /**
  * Whose profile the Characters page shows, as far as this client knows
  * them: a character of the player's own roster, or another person's
- * character — with everything
- * their appearance tells when it is the one they play, and only its name
- * and head when it is the one they speak as in the chat. What is not
- * known is empty, or an age of 0, and the column leaves its line out.
+ * character — with everything their appearance tells when it is the one
+ * they play, and only its name and head when it is the one they speak as
+ * in the chat. What is not known is empty, or an age of 0, and the column
+ * leaves its line out.
  */
 final class ProfileSubject {
-    /** The character, or null for a player still making their first. */
-    final UUID characterId;
     final String name;
     final String raceId;
     final String genderId;
@@ -26,11 +23,10 @@ final class ProfileSubject {
     /** Whether it is one of this player's own. */
     final boolean own;
 
-    private ProfileSubject(UUID characterId, String name, String raceId,
-                           String genderId, String skinId, String bodyTypeId,
+    private ProfileSubject(String name, String raceId, String genderId,
+                           String skinId, String bodyTypeId,
                            String chestTypeId, String factionId, int age,
                            boolean own) {
-        this.characterId = characterId;
         this.name = name == null ? "" : name;
         this.raceId = raceId == null ? "" : raceId;
         this.genderId = genderId == null ? "" : genderId;
@@ -43,8 +39,7 @@ final class ProfileSubject {
     }
 
     static ProfileSubject of(CharacterSummary character) {
-        return new ProfileSubject(character.getCharacterId(),
-                character.getName(), character.getRaceId(),
+        return new ProfileSubject(character.getName(), character.getRaceId(),
                 character.getGenderId(), character.getSkinId(),
                 character.getBodyTypeId(), character.getChestTypeId(),
                 character.getFactionId(), character.getAge(), true);
@@ -52,16 +47,15 @@ final class ProfileSubject {
 
     /** Another person's character as their appearance shows it. */
     static ProfileSubject of(CharacterAppearance appearance) {
-        return new ProfileSubject(appearance.getCharacterId(),
-                appearance.getCharacterName(), appearance.getRaceId(),
-                appearance.getGenderId(), appearance.getSkinId(),
-                appearance.getBodyTypeId(), appearance.getChestTypeId(),
-                appearance.getFactionId(), appearance.getAge(), false);
+        return new ProfileSubject(appearance.getCharacterName(),
+                appearance.getRaceId(), appearance.getGenderId(),
+                appearance.getSkinId(), appearance.getBodyTypeId(),
+                appearance.getChestTypeId(), appearance.getFactionId(),
+                appearance.getAge(), false);
     }
 
     /** Another person's character known only by its name and head. */
-    static ProfileSubject named(UUID characterId, String name, String skinId) {
-        return new ProfileSubject(characterId, name, "", "", skinId, "", "",
-                "", 0, false);
+    static ProfileSubject named(String name, String skinId) {
+        return new ProfileSubject(name, "", "", skinId, "", "", "", 0, false);
     }
 }

@@ -165,12 +165,10 @@ public final class AccessoryEffectService {
         AccessoryDefinition definition = stack.stackSize == 1
                 ? AccessoryCompatibilityRegistry.getInstance().find(
                 AccessorySlotType.RING, stack) : null;
-        boolean valid = definition != null
-                && definition.canEquip(player, stack);
-        if (!valid && removeInvalid) {
+        if (definition == null && removeInvalid) {
             rejectInvalidStack(player, data, inventory);
         }
-        return valid ? definition : null;
+        return definition;
     }
 
     private static void rejectInvalidStack(

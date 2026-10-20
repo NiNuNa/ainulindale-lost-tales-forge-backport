@@ -30,9 +30,10 @@ public final class LostTalesDiscordBridgeRestartTest {
     @Test
     public void aChannelWhoseTopicIsNoLongerKeptIsLeftForTheOfflineTopic() {
         List<String> kept = Arrays.asList("111", "222", "333");
+        // Global's entry posts through OOC's webhook, so it is switched off.
         DiscordChannelBindings next = bound(
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + HOOK_A,
-                "global=DISABLED;channel=222;webhook=" + HOOK_B);
+                "global=GAME_TO_DISCORD;channel=222;webhook=" + HOOK_A);
         assertEquals(Arrays.asList("222", "333"),
                 LostTalesDiscordBridge.topicsLeft(kept, next, true));
         assertEquals("no topic kept at all", kept,
@@ -54,12 +55,13 @@ public final class LostTalesDiscordBridgeRestartTest {
         seen.put("5", "100");
         seen.put("6", "200");
         seen.put("7", "300");
+        String oocInFive = "ooc=DISCORD_TO_GAME;channel=5;webhook=" + HOOK_A;
         LostTalesDiscordBridge.keepSeenOfChannelsStillRead(seen,
-                bound("ooc=DISCORD_TO_GAME;channel=5", "global=DISCORD_TO_GAME;channel=6"),
-                bound("ooc=DISCORD_TO_GAME;channel=5", "global=DISCORD_TO_GAME;channel=7"));
+                bound(oocInFive, "global=DISCORD_TO_GAME;channel=6;webhook=" + HOOK_B),
+                bound(oocInFive, "global=DISCORD_TO_GAME;channel=7;webhook=" + HOOK_B));
         assertEquals(Collections.singletonMap("5", "100"), seen);
         LostTalesDiscordBridge.keepSeenOfChannelsStillRead(seen,
-                DiscordChannelBindings.EMPTY, bound("ooc=DISCORD_TO_GAME;channel=5"));
+                DiscordChannelBindings.EMPTY, bound(oocInFive));
         assertTrue("a start after a stop reads from the newest line", seen.isEmpty());
     }
 }

@@ -13,7 +13,7 @@ import java.util.Set;
 /**
  * The permissions in force: the names a server gives to sets of
  * capabilities, so a role is written in the server's own words rather
- * than in the mod's. {@code permissions.definitions} in
+ * than in the mod's. {@code roles.permissions} in
  * {@code server/roles.cfg} defines them, one per entry, and a role
  * {@code grant:}s them by id.
  *

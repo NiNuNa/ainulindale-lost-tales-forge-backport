@@ -113,12 +113,12 @@ public final class LostTalesQuestWordsTest {
     }
 
     /**
-     * The objectives whose words a count and a plural carry read word for
-     * word as their files once wrote them, each a line a translator words
-     * with its own count and plural.
+     * The objectives whose words a count and a plural carry read as their
+     * English lines say, each a line a translator words with its own count
+     * and plural.
      */
     @Test
-    public void theObjectivesReadWordForWordAsBefore() {
+    public void theObjectivesReadAsTheirEnglishLines() {
         String[][] lines = {
                 {"losttales:tutorial/starter_note", "craft_torches", "Craft 4 torches."},
                 {"losttales:path/survivalist/first_sparks", "gather_sticks", "Gather 8 sticks."},
@@ -172,6 +172,10 @@ public final class LostTalesQuestWordsTest {
                         .getAsJsonArray("objectives")) {
                     assertFalse(file + " words an objective",
                             objective.getAsJsonObject().has("description"));
+                    JsonObject params = objective.getAsJsonObject()
+                            .getAsJsonObject("params");
+                    assertFalse(file + " words an outcome",
+                            params != null && params.has("outcome"));
                 }
             }
         }
@@ -196,9 +200,9 @@ public final class LostTalesQuestWordsTest {
                 LostTalesQuestDialogue.of(quest).isOffered());
     }
 
-    /** In English the lines read word for word as the files once wrote them. */
+    /** In English a bundled quest reads word for word as its English lines say. */
     @Test
-    public void inEnglishABundledQuestReadsAsItAlwaysDid() {
+    public void inEnglishABundledQuestReadsItsEnglishLines() {
         LostTalesQuestDefinition quest = nia();
         assertEquals("A Conversation with Nia", LostTalesQuestWords.title(quest));
         assertEquals("Bring Nia 4 sticks.", LostTalesQuestObjectiveTextHelper
@@ -222,7 +226,8 @@ public final class LostTalesQuestWordsTest {
                 LostTalesQuestDefinition.START_MODE_ITEM, null, null, null,
                 null, Collections.singletonMap("10", "I walked."), null, null,
                 Collections.singletonList(new LostTalesQuestStageDefinition("10",
-                        Collections.<LostTalesQuestObjectiveDefinition>emptyList())));
+                        Collections.<LostTalesQuestObjectiveDefinition>emptyList())),
+                false, null, null);
         assertFalse(quest.isBundled());
         assertEquals("The Old Road", LostTalesQuestWords.title(quest));
         assertEquals("Walk it.", LostTalesQuestWords.description(quest));
@@ -231,6 +236,55 @@ public final class LostTalesQuestWordsTest {
         IChatComponent component = LostTalesQuestWords.titleComponent(quest);
         assertTrue(component instanceof ChatComponentText);
         assertEquals("The Old Road", EnglishWords.INSTANCE.read(component));
+    }
+
+    /**
+     * What an optional objective achieved adds to a History line is worded
+     * by each reader's game: a bundled quest's by its lang line, which
+     * fills the quest in English as it is read; an operator's as written,
+     * whatever lines the game has (QUEST-07).
+     */
+    @Test
+    public void anOutcomeIsWordedByEachReadersGame() {
+        String id = "losttales:test/outcome";
+        Map<String, String> scouts = new java.util.LinkedHashMap<String, String>();
+        scouts.put("entity", "losttales.Nia");
+        LostTalesQuestDefinition file = new LostTalesQuestDefinition(id, "", "",
+                false, false, LostTalesQuestDefinition.START_MODE_LOCKED, null,
+                null, null, null, null, null, null,
+                Collections.singletonList(new LostTalesQuestStageDefinition("10",
+                        Arrays.asList(new LostTalesQuestObjectiveDefinition(
+                                        "greet", "talk", "", false, scouts),
+                                new LostTalesQuestObjectiveDefinition(
+                                        "scouts", "talk", "", true, scouts)))),
+                false, null, null);
+        LostTalesQuestDefinition bundled = LostTalesQuestWords.bundled(file,
+                Collections.singletonMap(LostTalesQuestWords.outcomeKey(id, "scouts"),
+                        "The scouts lived."));
+        assertEquals("The scouts lived.", bundled.getStages().get(0)
+                .getObjectives().get(1).getParams().get("outcome"));
+        assertEquals("The scouts lived.", LostTalesQuestWords.outcomeLine(bundled,
+                Collections.singleton("scouts")));
+        assertEquals("", LostTalesQuestWords.outcomeLine(bundled,
+                Collections.<String>emptySet()));
+        assertEquals("a required objective adds nothing", "",
+                LostTalesQuestWords.outcomeLine(bundled, Collections.singleton("greet")));
+
+        inject(LostTalesQuestWords.outcomeKey(id, "scouts") + "=Die Späher lebten.\n");
+        assertEquals("Die Späher lebten.", LostTalesQuestWords.outcomeLine(bundled,
+                Collections.singleton("scouts")));
+
+        Map<String, String> written = new java.util.LinkedHashMap<String, String>(scouts);
+        written.put("outcome", "Scouts saved.");
+        LostTalesQuestDefinition operators = new LostTalesQuestDefinition(id, "Ops",
+                "", false, false, LostTalesQuestDefinition.START_MODE_LOCKED, null,
+                null, null, null, null, null, null,
+                Collections.singletonList(new LostTalesQuestStageDefinition("10",
+                        Collections.singletonList(new LostTalesQuestObjectiveDefinition(
+                                "scouts", "talk", "", true, written)))),
+                false, null, null);
+        assertEquals("Scouts saved.", LostTalesQuestWords.outcomeLine(operators,
+                Collections.singleton("scouts")));
     }
 
     /** A server's answer names a bundled quest by its line, which each reader's game words. */

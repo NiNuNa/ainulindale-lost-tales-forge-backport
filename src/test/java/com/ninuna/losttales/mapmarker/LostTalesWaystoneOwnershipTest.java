@@ -243,6 +243,65 @@ public final class LostTalesWaystoneOwnershipTest {
         placed().toBuilder().radii(128.0D, 1025.0D).build();
     }
 
+    /* ---- Shares whose subject is gone ---- */
+
+    /**
+     * A share whose character is purged or whose fellowship ended counts
+     * for nothing and goes with the next change; the revision stays, and
+     * a record whose every share stands is the same record.
+     */
+    @Test
+    public void sharesWhoseSubjectIsGoneAreLetGo() {
+        final UUID purged = UUID.randomUUID();
+        final UUID ended = UUID.randomUUID();
+        UUID fellowship = UUID.randomUUID();
+        LostTalesMapMarkerRecord shared = placed().toBuilder()
+                .sharedCharacterIds(new LinkedHashSet<UUID>(
+                        java.util.Arrays.asList(FARAMIR, purged)))
+                .sharedFellowshipIds(new LinkedHashSet<UUID>(
+                        java.util.Arrays.asList(fellowship, ended)))
+                .build();
+        LostTalesWaystoneSettingsService.Subjects gone =
+                new LostTalesWaystoneSettingsService.Subjects() {
+                    @Override
+                    public boolean hasCharacter(UUID characterId) {
+                        return !purged.equals(characterId);
+                    }
+
+                    @Override
+                    public boolean hasFellowship(UUID fellowshipId) {
+                        return !ended.equals(fellowshipId);
+                    }
+                };
+        LostTalesMapMarkerRecord live =
+                LostTalesWaystoneSettingsService.withoutLostShares(shared, gone);
+        assertEquals(Collections.singleton(FARAMIR),
+                live.getSharedCharacterIds());
+        assertEquals(Collections.singleton(fellowship),
+                live.getSharedFellowshipIds());
+        assertEquals(shared.getRevision(), live.getRevision());
+
+        LostTalesMapMarkerRecord onlyLost = placed().toBuilder()
+                .sharedCharacterIds(Collections.singleton(purged))
+                .build();
+        assertEquals("a purged character's share is no share at all",
+                LostTalesMapMarkerVisibility.PRIVATE,
+                LostTalesWaystoneSettingsService.withoutLostShares(
+                        onlyLost, gone).getVisibility());
+
+        LostTalesMapMarkerRecord standing = placed().toBuilder()
+                .sharedCharacterIds(Collections.singleton(FARAMIR))
+                .build();
+        assertTrue(standing == LostTalesWaystoneSettingsService
+                .withoutLostShares(standing, gone));
+
+        // Sharing again counts the limit without the lost shares.
+        LostTalesWaystoneSettingsService.Outcome again =
+                LostTalesWaystoneSettingsService.shareCharacter(live, ARAGORN);
+        assertNull(again.refusal());
+        assertFalse(again.updated().getSharedCharacterIds().contains(purged));
+    }
+
     private static LostTalesMapMarkerRecord placed() {
         return LostTalesMapMarkerRecord.createPlayerMarker(
                 "losttales:player/bree", "Aragorn", ARAGORN,
@@ -268,9 +327,7 @@ public final class LostTalesWaystoneOwnershipTest {
             double discoveryRadius, LostTalesMapMarkerVisibility access) {
         return new LostTalesMapMarkerEditableSettings(
                 name, "camp", "white", "", "", true,
-                record.getDimensionId(), record.getX(), record.getY(),
-                record.getZ(), 128.0D, discoveryRadius, true, true, false,
-                record.hasWaystone(), record.getWaystoneStructureType(),
+                128.0D, discoveryRadius, true, true, false,
                 record.getPriority(), access);
     }
 }

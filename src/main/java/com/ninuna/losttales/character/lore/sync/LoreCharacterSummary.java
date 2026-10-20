@@ -9,9 +9,6 @@ public final class LoreCharacterSummary {
     private final String name;
     private final String description;
     private final String raceId;
-    private final String genderId;
-    private final String modelId;
-    private final String skinId;
     private final boolean configured;
     private final boolean claimed;
     private final boolean ownedByViewer;
@@ -21,8 +18,7 @@ public final class LoreCharacterSummary {
     private final long ownershipRevision;
 
     public LoreCharacterSummary(
-            String id, String name, String description,
-            String raceId, String genderId, String modelId, String skinId,
+            String id, String name, String description, String raceId,
             boolean configured, boolean claimed, boolean ownedByViewer,
             boolean transferInProgress, String ownerName,
             UUID ownedCharacterId, long ownershipRevision) {
@@ -30,9 +26,6 @@ public final class LoreCharacterSummary {
         this.name = safe(name);
         this.description = safe(description);
         this.raceId = safe(raceId);
-        this.genderId = safe(genderId);
-        this.modelId = safe(modelId);
-        this.skinId = safe(skinId);
         this.configured = configured;
         this.claimed = claimed;
         this.ownedByViewer = claimed && ownedByViewer;
@@ -46,9 +39,6 @@ public final class LoreCharacterSummary {
     public String getName() { return this.name; }
     public String getDescription() { return this.description; }
     public String getRaceId() { return this.raceId; }
-    public String getGenderId() { return this.genderId; }
-    public String getModelId() { return this.modelId; }
-    public String getSkinId() { return this.skinId; }
     public boolean isConfigured() { return this.configured; }
     public boolean isClaimed() { return this.claimed; }
     public boolean isAvailable() {

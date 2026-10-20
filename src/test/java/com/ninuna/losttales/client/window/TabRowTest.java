@@ -150,68 +150,6 @@ public final class TabRowTest {
         assertFalse(TabRow.inStripBand(row, toolBottom));
     }
 
-    /** The marquee: still, out, rest, back, rest — on the clock alone. */
-    @Test
-    public void marqueeWaitsThenSlidesOutRestsAndSlidesBack() {
-        int overflow = 40;
-        double delay = 0.5D;
-        double speed = 20.0D;
-        double pause = 0.8D;
-        double slide = overflow / speed;
-        assertEquals(0.0D, marquee(0.0D, overflow), EPSILON);
-        assertEquals(0.0D, marquee(delay * 0.8D, overflow), EPSILON);
-        // Half a second in: half a second's worth of sliding.
-        assertEquals(0.5D * speed, marquee(delay + 0.5D, overflow), EPSILON);
-        // At the end of the slide and through the rest: the whole overflow.
-        assertEquals(overflow, marquee(delay + slide, overflow), EPSILON);
-        assertEquals(overflow, marquee(delay + slide + pause * 0.5D, overflow),
-                EPSILON);
-        // Halfway back.
-        assertEquals(overflow / 2.0D,
-                marquee(delay + slide + pause + slide / 2.0D, overflow),
-                EPSILON);
-        // Home, resting, and round again.
-        double cycle = 2.0D * (slide + pause);
-        assertEquals(0.0D, marquee(delay + cycle - pause * 0.5D, overflow),
-                EPSILON);
-        assertEquals(0.5D * speed, marquee(delay + cycle + 0.5D, overflow),
-                EPSILON);
-    }
-
-    /** Under reduced motion the slides are jumps: the end shows whole, then the start. */
-    @Test
-    public void aReducedMarqueeJumpsBetweenItsEnds() {
-        int overflow = 40;
-        double pause = 0.8D;
-        assertEquals(0.0D, TabRow.marqueeOffset(0.4D, overflow, 0.5D,
-                Double.POSITIVE_INFINITY, pause), EPSILON);
-        assertEquals(overflow, TabRow.marqueeOffset(0.6D, overflow, 0.5D,
-                Double.POSITIVE_INFINITY, pause), EPSILON);
-        assertEquals(0.0D, TabRow.marqueeOffset(0.5D + pause + 0.1D,
-                overflow, 0.5D, Double.POSITIVE_INFINITY, pause), EPSILON);
-    }
-
-    /** The marquee as the motion file ships it: half a second's wait, twenty pixels a second, a rest of 0.8 s. */
-    private static double marquee(double elapsed, int overflow) {
-        return TabRow.marqueeOffset(elapsed, overflow, 0.5D, 20.0D, 0.8D);
-    }
-
-    @Test
-    public void marqueeIsStillWhenNothingOverflows() {
-        assertEquals(0.0D, TabRow.marqueeOffset(5.0D, 0), EPSILON);
-        assertEquals(0.0D, TabRow.marqueeOffset(5.0D, -3), EPSILON);
-    }
-
-    @Test
-    public void marqueeNeverLeavesTheOverflow() {
-        int overflow = 17;
-        for (double time = 0.0D; time < 20.0D; time += 0.037D) {
-            double offset = TabRow.marqueeOffset(time, overflow);
-            assertTrue(offset >= -EPSILON);
-            assertTrue(offset <= overflow + EPSILON);
-        }
-    }
-
     /**
      * Every tab of a run is one width: the default while the row holds
      * them all at it, else the widest they can share once the seams

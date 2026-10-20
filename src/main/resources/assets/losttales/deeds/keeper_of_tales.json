@@ -1,0 +1,8 @@
+{
+  "id": "losttales:keeper_of_tales",
+  "category": "tales",
+  "icon": "minecraft:bookshelf",
+  "kind": "quests",
+  "count": 50,
+  "title": true
+}

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.state;
 
+import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
 import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
@@ -87,6 +88,7 @@ public final class CharacterLastSeenWorldDataTest {
         broken.setString("Id", "not an id");
         seen.appendTag(broken);
         stored.setTag("Seen", seen);
+        NbtQuarantine.write(stored, java.util.Collections.<NBTTagCompound>emptyList());
 
         CharacterLastSeenWorldData data = new CharacterLastSeenWorldData(CharacterLastSeenWorldData.DATA_NAME);
         data.readFromNBT(stored);

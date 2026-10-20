@@ -767,10 +767,6 @@ public final class ClientChatChannelViews {
                 unreadPingCount(tab) + unreadOtherCount(tab));
     }
 
-    public static synchronized int unreadCount(ChatChannel channel) {
-        return unreadCount(ConversationPage.of(channel));
-    }
-
     public static synchronized boolean hasUnread(ConversationPage tab) {
         return unreadPingCount(tab) + unreadOtherCount(tab) > 0;
     }

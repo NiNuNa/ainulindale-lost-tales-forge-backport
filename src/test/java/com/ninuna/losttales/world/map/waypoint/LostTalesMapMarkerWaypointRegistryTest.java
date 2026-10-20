@@ -18,21 +18,26 @@ import org.junit.Test;
 
 /** Catalog-wide coverage for generated and native waypoint-backed markers. */
 public final class LostTalesMapMarkerWaypointRegistryTest {
+    /** A town nobody discovers opens its fast travel with its region alone. */
     @Test
-    public void townHasOneCoherentPublicFastTravelState() {
+    public void anUndiscoverableTownOpensWithItsRegion() {
         LostTalesMapMarkerDefinition town =
-                LostTalesMapMarkerCatalog.getMarker(
-                        "losttales:test_town");
+                new LostTalesMapMarkerDefinition(
+                        "losttales:open_town", "Open Town",
+                        "shack", "red", "", "",
+                        true,
+                        LOTRDimension.MIDDLE_EARTH.dimensionID,
+                        15.0D, LostTalesMapMarkerDefinition.AUTOMATIC_Y,
+                        15.0D, 180.0D, 12.0D,
+                        false, false, true,
+                        LostTalesMapMarkerSource.CUSTOM_PRESET,
+                        true, "losttales:glowstone_house", 0);
 
-        assertNotNull(town);
-        assertTrue(town.hasFastTravel());
-        assertFalse(town.isDiscoverable());
         assertFalse(town.isHiddenUntilDiscovered());
-        assertTrue(town.requiresRegionUnlock());
         assertFalse(LostTalesMapMarkerWaypointUnlockHelper
-                .shouldUnlockPrivateRegion(town, true, false));
+                .shouldUnlockPrivateRegion(town, false, false));
         assertTrue(LostTalesMapMarkerWaypointUnlockHelper
-                .shouldUnlockPrivateRegion(town, true, true));
+                .shouldUnlockPrivateRegion(town, false, true));
     }
 
     @Test
@@ -139,7 +144,7 @@ public final class LostTalesMapMarkerWaypointRegistryTest {
             }
             checked++;
         }
-        assertEquals("Unexpected generated waypoint count", 8, checked);
+        assertEquals("Unexpected generated waypoint count", 3, checked);
     }
 
     @Test

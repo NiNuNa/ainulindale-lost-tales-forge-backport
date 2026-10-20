@@ -1,8 +1,10 @@
 package com.ninuna.losttales.event;
 
+import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.QuestStartGate;
 import com.ninuna.losttales.quest.QuestStartProof;
+import com.ninuna.losttales.quest.QuestStarters;
 import com.ninuna.losttales.fellowship.quest.FellowshipQuestProgressCoordinator;
 import com.ninuna.losttales.quest.world.WorldQuests;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
@@ -78,14 +80,17 @@ public final class LostTalesQuestObjectiveEventHandler {
         if (event.action != PlayerInteractEvent.Action.RIGHT_CLICK_AIR && event.action != PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK) {
             return;
         }
+        // A missive board's request asks other mods as a right-click would;
+        // it is no touch and starts nothing.
+        if (LostTalesQuickLootInventoryHelper.isAskingQuietly()) {
+            return;
+        }
 
         EntityPlayerMP player = (EntityPlayerMP) event.entityPlayer;
         ItemStack held = player.inventory == null ? null : player.inventory.getCurrentItem();
-        if (held != null && held.hasTagCompound()
-                && held.getTagCompound().hasKey(QuestStartGate.TAG_QUEST_ID)) {
-            QuestStartGate.start(player,
-                    held.getTagCompound().getString(QuestStartGate.TAG_QUEST_ID),
-                    QuestStartProof.item(held));
+        String startsQuest = QuestStarters.questIdOf(held);
+        if (startsQuest.length() > 0) {
+            QuestStartGate.start(player, startsQuest, QuestStartProof.item(held));
         }
 
         if (event.action == PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK) {

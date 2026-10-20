@@ -17,9 +17,10 @@ import net.minecraft.util.StatCollector;
  * <p>A bundled quest is worded by the lang lines its id names:
  * {@code losttales:tutorial/meet_nia} reads its title under
  * {@code quest.losttales.tutorial.meet_nia.title}, its description under
- * {@code .description}, an objective under {@code .objective.<id>}, a
- * journal line under {@code .journal.<stage id>} and a line of its
- * conversation under {@code .dialogue.<line>}. The quest files leave
+ * {@code .description}, an objective under {@code .objective.<id>}, what
+ * an optional one achieved adds under {@code .outcome.<id>}, a journal
+ * line under {@code .journal.<stage id>} and a line of its conversation
+ * under {@code .dialogue.<line>}. The quest files leave
  * those words out; the English lines fill the definition as it is read
  * ({@link #bundled}), so the server's own uses and a line the game has
  * no translation for still read in English. A missive is worded by its
@@ -60,6 +61,45 @@ public final class LostTalesQuestWords {
 
     public static String dialogueKey(String questId, String line) {
         return keyPrefix(questId) + ".dialogue." + line;
+    }
+
+    /** A bundled quest's line for what an optional objective achieved adds to its History (QUEST-15). */
+    public static String outcomeKey(String questId, String objectiveId) {
+        return keyPrefix(questId) + ".outcome." + objectiveId;
+    }
+
+    /**
+     * What a finished quest's optional objectives add to its History line,
+     * in this side's language: the {@code outcome} of each one whose id is
+     * in {@code achieved}, in the quest's order, parted by spaces. Empty
+     * where none achieved writes one.
+     */
+    public static String outcomeLine(LostTalesQuestDefinition quest,
+                                      java.util.Collection<String> achieved) {
+        StringBuilder outcome = new StringBuilder();
+        if (quest == null || achieved == null || achieved.isEmpty()) {
+            return "";
+        }
+        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
+            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+                if (!objective.isOptional() || !achieved.contains(objective.getId())) {
+                    continue;
+                }
+                String written = LostTalesQuestParams.value(objective.getParams(),
+                        "outcome");
+                String line = quest.isBundled()
+                        ? line(outcomeKey(quest.getId(), objective.getId()), written)
+                        : written;
+                if (line.trim().length() == 0) {
+                    continue;
+                }
+                if (outcome.length() > 0) {
+                    outcome.append(' ');
+                }
+                outcome.append(line.trim());
+            }
+        }
+        return outcome.toString();
     }
 
     /** A bundled quest's rumour line (QUEST-20). */
@@ -108,8 +148,8 @@ public final class LostTalesQuestWords {
 
     /**
      * A bundled quest as its file was read, worded by its lang lines: each
-     * title, description, objective, journal and conversation line the file
-     * leaves out takes the English line its key holds, and each objective
+     * title, description, objective, outcome, journal and conversation line
+     * the file leaves out takes the English line its key holds, and each objective
      * keeps the key of its line. An objective with neither words nor a
      * line is worded from its kind and target. {@code english} is the
      * mod's English lang file.
@@ -130,10 +170,13 @@ public final class LostTalesQuestWords {
             for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
                 String key = objectiveKey(id, objective.getId());
                 boolean lined = english != null && english.containsKey(key);
+                Map<String, String> params =
+                        new LinkedHashMap<String, String>(objective.getParams());
+                fill(params, "outcome", english, outcomeKey(id, objective.getId()));
                 objectives.add(new LostTalesQuestObjectiveDefinition(
                         objective.getId(), objective.getType(),
                         written(objective.getDescription(), english, key),
-                        objective.isOptional(), objective.getParams(),
+                        objective.isOptional(), params,
                         lined ? key : ""));
             }
             Map<String, String> rules = new LinkedHashMap<String, String>(stage.getRules());

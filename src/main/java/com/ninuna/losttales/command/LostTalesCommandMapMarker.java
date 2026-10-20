@@ -3,6 +3,7 @@ package com.ninuna.losttales.command;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerFiles;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
@@ -316,6 +317,11 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "repository.unopened");
             return;
         }
+        if (data.isReadOnlyForNewerVersion()) {
+            say(sender, EnumChatFormatting.RED, SAY + "repository.read_only",
+                    Integer.valueOf(data.getUnsupportedDataVersion()));
+            return;
+        }
         LostTalesMapMarkerRecord record = data.getRecord(markerId);
         if (record == null) {
             say(sender, EnumChatFormatting.RED, SAY + "unknown", markerId);
@@ -347,8 +353,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         }
         LostTalesMapMarkerRecord retry =
                 record.withGenerationState(
-                        LostTalesWaystoneGenerationState.NOT_ATTEMPTED,
-                        "operator_retry");
+                        LostTalesWaystoneGenerationState.NOT_ATTEMPTED);
         data.saveRecord(retry);
         LostTalesWaystonePlacementResult result =
                 LostTalesWaystonePlacementService.attempt(world, retry);
@@ -380,7 +385,10 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             return;
         }
 
-        LostTalesMapMarkerCatalog.reloadFromClasspath();
+        // The marker files and the waystone houses, as they are on disk
+        // now: the bundled ones and the server's own.
+        int leftOut = LostTalesMapMarkerCatalog.reloadFromClasspath().size()
+                + LostTalesMapMarkerFiles.loadServer().size();
         Collection<LostTalesMapMarkerDefinition> definitions;
         if ("all".equalsIgnoreCase(requestedId)) {
             definitions = LostTalesMapMarkerCatalog.getMarkers();
@@ -392,6 +400,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
                     LostTalesMapMarkerCatalog.getMarker(markerId);
             if (definition == null) {
                 say(sender, EnumChatFormatting.RED, SAY + "unknown_bundled", markerId);
+                sayLeftOut(sender, leftOut);
                 return;
             }
             definitions = java.util.Collections.singleton(definition);
@@ -415,6 +424,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         int placed = 0;
         int deferred = 0;
         int blocked = 0;
+        int kept = 0;
         String firstFailure = "";
         for (LostTalesMapMarkerDefinition definition : definitions) {
             try {
@@ -422,6 +432,11 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
                         LostTalesMapMarkerReseedService.reseed(
                                 data, definition);
                 reseeded++;
+                if (!record.getSavedSettings().isEmpty()
+                        || !record.getSharedCharacterIds().isEmpty()
+                        || !record.getSharedFellowshipIds().isEmpty()) {
+                    kept++;
+                }
                 if (record.isLinked()) {
                     linked++;
                     continue;
@@ -470,8 +485,21 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         if (linked > 0) {
             say(sender, EnumChatFormatting.GRAY, SAY + "reseed.linked");
         }
+        if (kept > 0) {
+            say(sender, EnumChatFormatting.GRAY, SAY + "reseed.kept",
+                    Integer.valueOf(kept));
+        }
         if (firstFailure.length() > 0) {
             say(sender, EnumChatFormatting.RED, SAY + "reseed.failure", firstFailure);
+        }
+        sayLeftOut(sender, leftOut);
+    }
+
+    /** How many reasons the read gave for leaving files out; the log names each. */
+    private static void sayLeftOut(ICommandSender sender, int leftOut) {
+        if (leftOut > 0) {
+            say(sender, EnumChatFormatting.YELLOW, SAY + "reseed.left_out",
+                    Integer.valueOf(leftOut));
         }
     }
 
@@ -487,7 +515,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             return null;
         } catch (Exception e) {
             String playerName = args.length > playerArgIndex ? args[playerArgIndex] : "";
-            say(sender, EnumChatFormatting.RED, SAY + "no_player", playerName);
+            say(sender, EnumChatFormatting.RED, PLAYER_UNKNOWN, playerName);
             return null;
         }
     }

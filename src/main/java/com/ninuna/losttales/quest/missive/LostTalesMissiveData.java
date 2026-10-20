@@ -7,17 +7,21 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A missive as the server writes it: its quest id, the template ids and
- * target it is worded by ({@link MissiveWords}), objectives, reward and
- * time limit, and when and where it was posted. Plain data, kept in a
- * letter's item data ({@link LostTalesMissiveNbt}); it holds no sentence
- * in any language, so each player reads it in their own.
+ * A missive as the server writes it: its quest id, the words it is
+ * worded by ({@link MissiveWords}), objectives, reward and time limit, and
+ * when and where it was posted. Plain data, kept in a letter's item data
+ * ({@link LostTalesMissiveNbt}). A letter from a bundled template holds
+ * template ids and a target, no sentence in any language, so each player
+ * reads it in their own; one from a server's template ({@link #isWritten},
+ * QUEST-42) holds its title, issuer and flavour as its operator wrote
+ * them.
  */
 public final class LostTalesMissiveData {
     public static final String QUEST_ID_PREFIX = "losttales:missive/generated/";
 
     private final String questId;
     private final String questType;
+    private final boolean written;
     private final String titleId;
     private final String descriptionId;
     private final String issuerId;
@@ -29,9 +33,10 @@ public final class LostTalesMissiveData {
     private final List<LostTalesMissiveObjectiveData> objectives;
     private final LostTalesMissiveRewardData rewardData;
 
-    public LostTalesMissiveData(String questId, String questType, String titleId, String descriptionId, String issuerId, String flavorId, String target, long generationWorldTime, long timeLimitTicks, Map<String, String> generationContext, List<LostTalesMissiveObjectiveData> objectives, LostTalesMissiveRewardData rewardData) {
+    public LostTalesMissiveData(String questId, String questType, boolean written, String titleId, String descriptionId, String issuerId, String flavorId, String target, long generationWorldTime, long timeLimitTicks, Map<String, String> generationContext, List<LostTalesMissiveObjectiveData> objectives, LostTalesMissiveRewardData rewardData) {
         this.questId = LostTalesMissiveObjectiveData.clean(questId);
         this.questType = LostTalesMissiveObjectiveData.clean(questType);
+        this.written = written;
         this.titleId = LostTalesMissiveObjectiveData.clean(titleId);
         this.descriptionId = LostTalesMissiveObjectiveData.clean(descriptionId);
         this.issuerId = LostTalesMissiveObjectiveData.clean(issuerId);
@@ -52,7 +57,16 @@ public final class LostTalesMissiveData {
         return this.questType;
     }
 
-    /** The title's template id: {@code trouble_on_the_road}. */
+    /**
+     * Whether the title, issuer and flavour are words a server's template
+     * wrote, shown as written in every language, rather than template ids
+     * (QUEST-42). The description is a template id either way.
+     */
+    public boolean isWritten() {
+        return this.written;
+    }
+
+    /** The title's template id, {@code trouble_on_the_road}, or the title as written. */
     public String getTitleId() {
         return this.titleId;
     }
@@ -62,12 +76,12 @@ public final class LostTalesMissiveData {
         return this.descriptionId;
     }
 
-    /** Who wrote the letter, as a template id; empty for nobody named. */
+    /** Who wrote the letter, as a template id or as written; empty for nobody named. */
     public String getIssuerId() {
         return this.issuerId;
     }
 
-    /** The flavour line's template id; empty for none. */
+    /** The flavour line's template id, or the line as written; empty for none. */
     public String getFlavorId() {
         return this.flavorId;
     }
@@ -85,7 +99,7 @@ public final class LostTalesMissiveData {
     /** The same missive, posted at {@code worldTime}: a letter pinned back on a board. */
     public LostTalesMissiveData postedAt(long worldTime) {
         return new LostTalesMissiveData(this.questId, this.questType,
-                this.titleId, this.descriptionId, this.issuerId,
+                this.written, this.titleId, this.descriptionId, this.issuerId,
                 this.flavorId, this.target, worldTime,
                 this.timeLimitTicks, this.generationContext, this.objectives,
                 this.rewardData);
@@ -112,16 +126,20 @@ public final class LostTalesMissiveData {
     }
 
     /**
-     * Whether the missive can be read: a quest id and kind, a title id,
-     * every other template id empty or well formed, a target empty or
-     * well formed, and objectives that are each readable.
+     * Whether the missive can be read: a quest id and kind, a title, the
+     * issuer and flavour empty or well formed (template ids, or written
+     * words for a letter written so), a description id empty or well
+     * formed, a target empty or well formed, and objectives that are each
+     * readable.
      */
     public boolean isValid() {
         if (this.questId.length() == 0 || this.questType.length() == 0
-                || !MissiveWords.isTemplateId(this.titleId)
+                || !MissiveWords.isWord(this.titleId, this.written)
                 || !isOptionalTemplateId(this.descriptionId)
-                || !isOptionalTemplateId(this.issuerId)
-                || !isOptionalTemplateId(this.flavorId)
+                || this.issuerId.length() > 0
+                        && !MissiveWords.isWord(this.issuerId, this.written)
+                || this.flavorId.length() > 0
+                        && !MissiveWords.isWord(this.flavorId, this.written)
                 || this.target.length() > 0 && !MissiveWords.isTarget(this.target)
                 || this.objectives.isEmpty()) {
             return false;
@@ -167,6 +185,7 @@ public final class LostTalesMissiveData {
     public static final class Builder {
         private final String questId;
         private final String questType;
+        private boolean written;
         private String titleId = "";
         private String descriptionId = "";
         private String issuerId = "";
@@ -181,6 +200,12 @@ public final class LostTalesMissiveData {
         private Builder(String questId, String questType) {
             this.questId = questId;
             this.questType = questType;
+        }
+
+        /** The title, issuer and flavour given are written words, not template ids (QUEST-42). */
+        public Builder written(boolean written) {
+            this.written = written;
+            return this;
         }
 
         public Builder titleId(String titleId) {
@@ -238,7 +263,7 @@ public final class LostTalesMissiveData {
         }
 
         public LostTalesMissiveData build() {
-            return new LostTalesMissiveData(this.questId, this.questType, this.titleId, this.descriptionId, this.issuerId, this.flavorId, this.target, this.generationWorldTime, this.timeLimitTicks, this.generationContext, this.objectives, this.rewardData);
+            return new LostTalesMissiveData(this.questId, this.questType, this.written, this.titleId, this.descriptionId, this.issuerId, this.flavorId, this.target, this.generationWorldTime, this.timeLimitTicks, this.generationContext, this.objectives, this.rewardData);
         }
     }
 }

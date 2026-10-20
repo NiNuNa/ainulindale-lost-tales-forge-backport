@@ -3,7 +3,7 @@
     {
       "id": "losttales:riverbend_farmstead",
       "relevance": "low",
-      "icon": "town",
+      "icon": "shack",
       "color": "purple",
       "dimension": "lotr:middle_earth",
       "x": 75.0,

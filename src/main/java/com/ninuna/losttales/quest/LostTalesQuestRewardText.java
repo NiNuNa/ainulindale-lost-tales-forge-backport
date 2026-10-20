@@ -1,6 +1,7 @@
 package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.compat.lotr.LotrQuestRewards;
+import com.ninuna.losttales.progression.SkillWords;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +75,14 @@ public final class LostTalesQuestRewardText {
                             "gui.losttales.quest.reward.alignment_with",
                             String.valueOf(alignment.getAmount()),
                             factionName(alignment.getFactionId())));
+                }
+            } else if (LostTalesQuestRewards.SKILLS.equals(key)) {
+                for (LostTalesQuestRewards.SkillReward skill
+                        : LostTalesQuestRewards.skills(rewards)) {
+                    result.add(StatCollector.translateToLocalFormatted(
+                            "gui.losttales.quest.reward.skill",
+                            String.valueOf(skill.getAmount()),
+                            SkillWords.localName(skill.getSkillId())));
                 }
             } else if (LostTalesQuestRewards.COINS.equals(key)) {
                 int coins = LostTalesQuestRewards.coins(rewards);

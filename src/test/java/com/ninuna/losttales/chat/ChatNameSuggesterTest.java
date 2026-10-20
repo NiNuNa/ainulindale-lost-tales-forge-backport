@@ -13,19 +13,19 @@ import static org.junit.Assert.assertTrue;
 public final class ChatNameSuggesterTest {
     /** Steve123 plays Aragorn; shaped for an OOC (account) channel. */
     private static final List<ChatMentionCandidate> OOC = Arrays.asList(
-            new ChatMentionCandidate("uuid-1", "Steve123",
+            ChatMentionCandidate.player("uuid-1", "Steve123", "", "",
                     Arrays.asList("Steve123", "Aragorn")),
-            new ChatMentionCandidate("uuid-2", "Grey_Wanderer",
+            ChatMentionCandidate.player("uuid-2", "Grey_Wanderer", "", "",
                     Arrays.asList("Grey_Wanderer", "Gandalf")),
-            new ChatMentionCandidate("account:padda", "Padda", null),
+            ChatMentionCandidate.player("account:padda", "Padda", "", "", null),
             null);
     /** The same players shaped for a role-play (character) channel. */
     private static final List<ChatMentionCandidate> ROLEPLAY = Arrays.asList(
-            new ChatMentionCandidate("uuid-1", "Aragorn",
+            ChatMentionCandidate.player("uuid-1", "Aragorn", "", "",
                     Arrays.asList("Steve123", "Aragorn")),
-            new ChatMentionCandidate("uuid-2", "Gandalf",
+            ChatMentionCandidate.player("uuid-2", "Gandalf", "", "",
                     Arrays.asList("Grey_Wanderer", "Gandalf")),
-            new ChatMentionCandidate("account:padda", "Padda", null));
+            ChatMentionCandidate.player("account:padda", "Padda", "", "", null));
 
     @Test
     public void plainTextCommandsAndAddressesProduceNoQuery() {
@@ -92,11 +92,11 @@ public final class ChatNameSuggesterTest {
     @Test
     public void matchesDeduplicateByKeyAndHonourTheLimit() {
         List<ChatMentionCandidate> duplicated = Arrays.asList(
-                new ChatMentionCandidate("uuid-1", "Aragorn",
+                ChatMentionCandidate.player("uuid-1", "Aragorn", "", "",
                         Arrays.asList("Steve123")),
-                new ChatMentionCandidate("uuid-1", "Aragorn",
+                ChatMentionCandidate.player("uuid-1", "Aragorn", "", "",
                         Arrays.asList("Steve123")),
-                new ChatMentionCandidate("uuid-9", "Aragorn",
+                ChatMentionCandidate.player("uuid-9", "Aragorn", "", "",
                         Arrays.asList("Imposter")));
         List<ChatMentionCandidate> matched =
                 ChatNameSuggester.matches("ara", duplicated, 8);
@@ -113,8 +113,8 @@ public final class ChatNameSuggesterTest {
 
     @Test
     public void candidateNormalizesAliasesAndUsability() {
-        ChatMentionCandidate candidate = new ChatMentionCandidate(
-                " key ", " Aragorn ", Arrays.asList("Steve123", "", null,
+        ChatMentionCandidate candidate = ChatMentionCandidate.player(
+                " key ", " Aragorn ", "", "", Arrays.asList("Steve123", "", null,
                         "aragorn"));
         assertEquals("key", candidate.getKey());
         assertEquals("Aragorn", candidate.getDisplayName());
@@ -122,6 +122,6 @@ public final class ChatNameSuggesterTest {
                 candidate.getAliases());
         assertTrue(candidate.matches("STE".toLowerCase()));
         assertFalse(candidate.matches("gimli"));
-        assertFalse(new ChatMentionCandidate("k", "  ", null).isUsable());
+        assertFalse(ChatMentionCandidate.player("k", "  ", "", "", null).isUsable());
     }
 }

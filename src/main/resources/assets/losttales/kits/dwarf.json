@@ -1,0 +1,9 @@
+{
+  "id": "losttales:dwarf",
+  "race": "losttales:dwarf",
+  "items": [
+    {"item": "lotr:item.pickaxeDwarven", "count": 1},
+    {"item": "lotr:item.cram", "count": 5},
+    {"item": "minecraft:torch", "count": 16}
+  ]
+}

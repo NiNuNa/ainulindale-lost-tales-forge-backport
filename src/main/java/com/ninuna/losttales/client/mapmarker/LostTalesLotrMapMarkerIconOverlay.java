@@ -963,9 +963,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      * <p>The frame a member is released is the last chance to read where it
      * was actually drawn, so the exit offset is captured before anything is
      * stepped. While a member travels back out of a fan both its side and its
-     * membership are held steady and only released once it arrives.
-     * Collapsing them on the way used to drag opacity and size down before
-     * they rose again, which read as a flicker.</p>
+     * membership are held steady and only released once it arrives:
+     * collapsing them on the way would drag opacity and size down before
+     * they rose again, which reads as a flicker.</p>
      */
     static void stepMarkerAnimation(
             MarkerAnimationState state, boolean standsAlone,
@@ -2908,12 +2908,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     /**
      * A marker's name fades exactly as the marker does.
      *
-     * <p>It used to keep LOTR's own rule — {@code (zoomExp + 1) / 4} — on the
-     * grounds that a name should go before the thing it names. Against this
-     * map's wider zoom that rule put every label out at an exponent of -1,
-     * which is barely a third of the way out, so names disappeared while the
-     * map was still being read at a perfectly ordinary zoom. A name and its
-     * icon are one thing to the player, and they now fade as one.</p>
+     * <p>LOTR's own rule, {@code (zoomExp + 1) / 4}, puts every label out at
+     * an exponent of -1 against this map's wider zoom, barely a third of the
+     * way out, while the map is still read at an ordinary zoom. A name and
+     * its icon are one thing to the player, and they fade as one.</p>
      */
     private static float getLabelAlpha(LOTRGuiMap gui, float zoomExp) {
         return LostTalesMapZoomFade.alpha(zoomExp);
@@ -3713,15 +3711,15 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             return state;
         }
 
-        private float visibility;
-        private float companionSlot;
-        private float fanStrength;
+        float visibility;
+        float companionSlot;
+        float fanStrength;
         private float renderedOffsetX;
         private float renderedOffsetY;
         private boolean hasRenderedOffset;
-        private float exitOffsetX;
-        private float exitOffsetY;
-        private boolean leavingStack;
+        float exitOffsetX;
+        float exitOffsetY;
+        boolean leavingStack;
         /** Which marker's stack this one is currently drawn against. */
         private String stackLeaderId = "";
         private boolean hasStack;
@@ -3729,7 +3727,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         private float stackOffsetY;
         private float handoverFromX;
         private float handoverFromY;
-        private float handoverProgress = 1.0F;
+        float handoverProgress = 1.0F;
 
         private void beginExit() {
             this.exitOffsetX = this.hasRenderedOffset
@@ -3744,14 +3742,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             this.renderedOffsetY = offsetY;
             this.hasRenderedOffset = true;
         }
-
-        float getVisibility() { return this.visibility; }
-        float getCompanionSlot() { return this.companionSlot; }
-        float getFanStrength() { return this.fanStrength; }
-        float getExitOffsetX() { return this.exitOffsetX; }
-        float getExitOffsetY() { return this.exitOffsetY; }
-        boolean isLeavingStack() { return this.leavingStack; }
-        float getHandoverProgress() { return this.handoverProgress; }
     }
 
     private static final class RoleplayPlayerHead {

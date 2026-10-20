@@ -19,7 +19,8 @@ final class ChatHistoryRequesters {
 
     /**
      * An account with one character, in that faction, made then; a
-     * faction id of nothing is an account with no character in any.
+     * faction id of nothing is an account with no character in any. The
+     * character is a founding member of the fellowship named, if any.
      */
     static ChatHistory.Requester oneFaction(UUID accountId, String factionId,
                                             long characterCreatedAt,
@@ -30,7 +31,8 @@ final class ChatHistoryRequesters {
                 : Collections.singletonMap(factionId,
                         Long.valueOf(characterCreatedAt));
         return new ChatHistory.Requester(accountId, owned, fellowshipId == null
-                ? Collections.<UUID>emptySet() : Collections.singleton(fellowshipId),
+                ? Collections.<UUID, Long>emptyMap()
+                : Collections.singletonMap(fellowshipId, Long.valueOf(0L)),
                 readable, null);
     }
 }

@@ -36,7 +36,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
     private String bodyTypeId = "";
     private String chestTypeId = "";
     private boolean showMinecraftCape = true;
-    private int cosmeticCapeId;
+    private String cosmeticCapeId = "";
     private boolean malformed;
 
     public CharacterCreateRequestPacket() {}
@@ -87,14 +87,14 @@ public final class CharacterCreateRequestPacket implements IMessage {
             this.chestTypeId = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.showMinecraftCape = buffer.readBoolean();
-            this.cosmeticCapeId = buffer.readInt();
+            this.cosmeticCapeId = LostTalesPacketCodec.readUtf8String(
+                    buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             LostTalesPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException("missing roster revision");
             }
-            if (this.cosmeticCapeId < CharacterCapeCatalog.NONE_ID
-                    || this.cosmeticCapeId > CharacterCapeCatalog.MAX_NETWORK_ID) {
-                throw new CharacterPacketCodec.DecodeException("cape id out of range");
+            if (this.cosmeticCapeId.length() > CharacterCapeCatalog.MAX_ID) {
+                throw new CharacterPacketCodec.DecodeException("cape id too long");
             }
             if (!CharacterRoster.isValidSlotIndex(this.slotIndex)) {
                 // A byte can carry any of 256 values.
@@ -130,7 +130,8 @@ public final class CharacterCreateRequestPacket implements IMessage {
                 buffer, this.chestTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         // The cape, as the creator's cape page chose it.
         buffer.writeBoolean(this.showMinecraftCape);
-        buffer.writeInt(this.cosmeticCapeId);
+        LostTalesPacketCodec.writeUtf8String(
+                buffer, this.cosmeticCapeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
     }
 
     private CharacterCreationRequest toRequest() {

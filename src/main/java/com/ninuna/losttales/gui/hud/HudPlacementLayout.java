@@ -1,122 +1,87 @@
 package com.ninuna.losttales.gui.hud;
 
 /**
- * Shared, resolution-independent positioning rules for movable HUD panels.
- * The margin is zero by design: a panel's travel reaches the screen edge
- * exactly, so 0% and 100% place it flush against the border.
+ * Where a HUD panel stands, by the one rule every panel follows (MAP-10):
+ * its Across and Down are each a share of the room its box can move in,
+ * the screen less the box. 0 puts the box flush with the left or top
+ * edge, 100 flush with the right or bottom, 50 centres it. So a panel
+ * stands at the same share at every screen size and never leaves the
+ * screen. A panel drawn larger than its box grows out of it to the right
+ * and down, held inside the screen ({@link #drawn}).
+ *
+ * <p>The margin is zero: a panel's travel reaches the screen's edge.</p>
  */
 public final class HudPlacementLayout {
     public static final int SCREEN_MARGIN = 0;
 
     private HudPlacementLayout() {}
 
+    /**
+     * The box {@code boxWidth} by {@code boxHeight} at {@code across} and
+     * {@code down} on a screen of that size. A box larger than the screen
+     * is cut to it.
+     */
     public static Bounds calculate(
             int screenWidth,
             int screenHeight,
-            int requestedWidth,
-            int requestedHeight,
-            double offsetX,
-            double offsetY,
-            CoordinateMode horizontalMode,
-            CoordinateMode verticalMode) {
-        return calculate(screenWidth, screenHeight, requestedWidth,
-                requestedHeight, offsetX, offsetY, horizontalMode,
-                verticalMode, 0, 0);
-    }
-
-    public static Bounds calculate(
-            int screenWidth,
-            int screenHeight,
-            int requestedWidth,
-            int requestedHeight,
-            double offsetX,
-            double offsetY,
-            CoordinateMode horizontalMode,
-            CoordinateMode verticalMode,
-            int pixelOffsetX,
-            int pixelOffsetY) {
+            int boxWidth,
+            int boxHeight,
+            double across,
+            double down) {
         int safeWidth = Math.max(1, screenWidth);
         int safeHeight = Math.max(1, screenHeight);
-        int width = Math.max(1, Math.min(requestedWidth,
-                Math.max(1, safeWidth - SCREEN_MARGIN * 2)));
-        int height = Math.max(1, Math.min(requestedHeight,
-                Math.max(1, safeHeight - SCREEN_MARGIN * 2)));
-        int x = positionForPercent(offsetX, safeWidth, width,
-                horizontalMode, pixelOffsetX);
-        int y = positionForPercent(offsetY, safeHeight, height,
-                verticalMode, pixelOffsetY);
-        return new Bounds(
-                clamp(x, SCREEN_MARGIN,
-                        Math.max(SCREEN_MARGIN,
-                                safeWidth - width - SCREEN_MARGIN)),
-                clamp(y, SCREEN_MARGIN,
-                        Math.max(SCREEN_MARGIN,
-                                safeHeight - height - SCREEN_MARGIN)),
-                width,
-                height);
-    }
-
-    public static double percentForPosition(
-            int position,
-            int screenSize,
-            int elementSize,
-            CoordinateMode mode,
-            int pixelOffset) {
-        int safeScreenSize = Math.max(1, screenSize);
-        if (mode == CoordinateMode.AVAILABLE_SPACE_PERCENT) {
-            int travel = Math.max(0, safeScreenSize
-                    - elementSize - SCREEN_MARGIN * 2);
-            if (travel == 0) {
-                return 0;
-            }
-            return clampPercent(
-                    (position - SCREEN_MARGIN) * 100.0D / travel);
-        }
-        return clampPercent(
-                (position - pixelOffset) * 100.0D / safeScreenSize);
-    }
-
-    public static DragResult constrainDrag(
-            int requestedX,
-            int requestedY,
-            int width,
-            int height,
-            int screenWidth,
-            int screenHeight,
-            int snapThreshold) {
-        int x = requestedX;
-        int y = requestedY;
-        // Centre on the same column and row the editor draws its centre guides
-        // on (screenWidth / 2, screenHeight / 2). Halving the leftover space
-        // instead truncates whenever the panel size is odd — the compass is 257
-        // wide — which parks the panel's own centre pixel one column left of
-        // the guide it was just snapped to.
-        int centeredX = screenWidth / 2 - width / 2;
-        int centeredY = screenHeight / 2 - height / 2;
-        boolean snappedX = Math.abs(
-                requestedX + width / 2 - screenWidth / 2)
-                <= Math.max(0, snapThreshold);
-        boolean snappedY = Math.abs(
-                requestedY + height / 2 - screenHeight / 2)
-                <= Math.max(0, snapThreshold);
-        if (snappedX) {
-            x = centeredX;
-        }
-        if (snappedY) {
-            y = centeredY;
-        }
-        x = clamp(x, SCREEN_MARGIN,
-                Math.max(SCREEN_MARGIN,
-                        screenWidth - width - SCREEN_MARGIN));
-        y = clamp(y, SCREEN_MARGIN,
-                Math.max(SCREEN_MARGIN,
-                        screenHeight - height - SCREEN_MARGIN));
-        return new DragResult(x, y, snappedX, snappedY);
+        int width = fitted(boxWidth, safeWidth);
+        int height = fitted(boxHeight, safeHeight);
+        return new Bounds(place(across, safeWidth, width),
+                place(down, safeHeight, height), width, height);
     }
 
     /**
-     * Fractional variant of {@link #constrainDrag} for elements that move
-     * in sub-pixel steps; same centre snap and margins.
+     * Where a box {@code boxSize} long stands at {@code share} of its room
+     * on a screen {@code screenSize} long: its left or top, on a whole
+     * pixel. A share past 0 or 100 counts as that end.
+     */
+    public static int place(double share, int screenSize, int boxSize) {
+        return SCREEN_MARGIN + (int)Math.round(
+                room(screenSize, boxSize) * clampShare(share) / 100.0D);
+    }
+
+    /**
+     * The share of its room a box {@code boxSize} long has, standing at
+     * {@code place}: the inverse of {@link #place}, held between 0 and
+     * 100. A box with no room to move in has 0.
+     */
+    public static double share(double place, int screenSize, int boxSize) {
+        int room = room(screenSize, boxSize);
+        if (room == 0 || Double.isNaN(place) || Double.isInfinite(place)) {
+            return 0.0D;
+        }
+        return clampShare((place - SCREEN_MARGIN) * 100.0D / room);
+    }
+
+    /**
+     * A panel {@code width} by {@code height} drawn in its {@code box}:
+     * from the box's top left, held inside the screen where it is larger
+     * than its box, and cut to the screen where it is larger than that.
+     */
+    public static Bounds drawn(Bounds box, int width, int height,
+                               int screenWidth, int screenHeight) {
+        int safeWidth = Math.max(1, screenWidth);
+        int safeHeight = Math.max(1, screenHeight);
+        int drawnWidth = fitted(width, safeWidth);
+        int drawnHeight = fitted(height, safeHeight);
+        return new Bounds(
+                clamp(box.x, SCREEN_MARGIN,
+                        SCREEN_MARGIN + room(safeWidth, drawnWidth)),
+                clamp(box.y, SCREEN_MARGIN,
+                        SCREEN_MARGIN + room(safeHeight, drawnHeight)),
+                drawnWidth, drawnHeight);
+    }
+
+    /**
+     * Where a panel carried to {@code requestedX, requestedY} lands: pulled
+     * to the screen's middle within {@code snapThreshold} pixels, and held
+     * inside the screen. It moves in fractions of a pixel.
      */
     public static PreciseDragResult constrainDrag(
             double requestedX,
@@ -134,6 +99,10 @@ public final class HudPlacementLayout {
         boolean snappedY = Math.abs(
                 requestedY + height / 2.0D - screenHeight / 2.0D)
                 <= Math.max(0, snapThreshold);
+        // Centred on the column and row the page draws its centre guides on
+        // (screenWidth / 2, screenHeight / 2). Halving the leftover space
+        // instead would put an odd-sized panel's centre pixel (the compass
+        // is 257 wide) one column left of the guide it snapped to.
         if (snappedX) {
             x = screenWidth / 2 - width / 2;
         }
@@ -149,24 +118,18 @@ public final class HudPlacementLayout {
         return new PreciseDragResult(x, y, snappedX, snappedY);
     }
 
-    private static int positionForPercent(
-            double percent,
-            int screenSize,
-            int elementSize,
-            CoordinateMode mode,
-            int pixelOffset) {
-        double boundedPercent = clampPercent(percent);
-        if (mode == CoordinateMode.AVAILABLE_SPACE_PERCENT) {
-            int travel = Math.max(0,
-                    screenSize - elementSize - SCREEN_MARGIN * 2);
-            return SCREEN_MARGIN + (int)Math.round(
-                    travel * boundedPercent / 100.0D);
-        }
-        return (int)Math.round(screenSize * boundedPercent / 100.0D)
-                + pixelOffset;
+    /** The room a box that long has to move in on a screen that long. */
+    private static int room(int screenSize, int boxSize) {
+        return Math.max(0, screenSize - boxSize - SCREEN_MARGIN * 2);
     }
 
-    private static double clampPercent(double value) {
+    /** A size cut to what the screen holds within its margins, at least a pixel. */
+    private static int fitted(int size, int screenSize) {
+        return Math.max(1, Math.min(size,
+                Math.max(1, screenSize - SCREEN_MARGIN * 2)));
+    }
+
+    private static double clampShare(double value) {
         if (Double.isNaN(value) || Double.isInfinite(value)) {
             return 0.0D;
         }
@@ -181,16 +144,6 @@ public final class HudPlacementLayout {
             return maximum;
         }
         return value;
-    }
-
-    public enum CoordinateMode {
-        SCREEN_PERCENT,
-        AVAILABLE_SPACE_PERCENT
-    }
-
-    /** A box computed elsewhere (a chat window) in this layout's terms. */
-    public static Bounds bounds(int x, int y, int width, int height) {
-        return new Bounds(x, y, Math.max(1, width), Math.max(1, height));
     }
 
     public static final class Bounds {
@@ -215,21 +168,6 @@ public final class HudPlacementLayout {
 
         private PreciseDragResult(double x, double y,
                                   boolean snappedX, boolean snappedY) {
-            this.x = x;
-            this.y = y;
-            this.snappedX = snappedX;
-            this.snappedY = snappedY;
-        }
-    }
-
-    public static final class DragResult {
-        public final int x;
-        public final int y;
-        public final boolean snappedX;
-        public final boolean snappedY;
-
-        private DragResult(int x, int y,
-                           boolean snappedX, boolean snappedY) {
             this.x = x;
             this.y = y;
             this.snappedX = snappedX;

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.util;
 
+import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipIcons;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
@@ -29,6 +30,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -61,12 +63,29 @@ public final class LostTalesClientUtil {
         addItemBlockDetails(list, itemStack, block, credits);
     }
 
+    /**
+     * The item's lore lines the lang file holds, line 1 then line 2; none
+     * for an item without lore.
+     */
     public static String[] getItemLore(ItemStack itemStack) {
-        return new String[]{I18n.format(itemStack.getUnlocalizedName() + ".lore.line1"),
-                I18n.format(itemStack.getUnlocalizedName() + ".lore.line2")};
+        List<String> lore = new ArrayList<String>(2);
+        for (String line : new String[] {".lore.line1", ".lore.line2"}) {
+            String key = itemStack.getUnlocalizedName() + line;
+            if (StatCollector.canTranslate(key)) {
+                lore.add(I18n.format(key));
+            }
+        }
+        return lore.toArray(new String[lore.size()]);
     }
 
+    /**
+     * The lore with Shift held, else the line naming Shift; nothing for an
+     * item without lore.
+     */
     public static void addItemLore(List list, String[] itemLore) {
+        if (itemLore.length == 0) {
+            return;
+        }
         if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)) {
             for (String lore : itemLore) {
                 list.add("§7§o" + lore);
@@ -139,7 +158,10 @@ public final class LostTalesClientUtil {
                 list.add(word("rarity", plushie.getRarity().rarityColor
                         + "§o" + rarityName(plushie.getRarity())));
             }
-            list.add(labelled("type", ELostTalesItem.Type.BLOCK_BUILDING.getName()));
+            ELostTalesItem.Type type = ELostTalesBlock.typeOf(block);
+            if (type != null) {
+                list.add(labelled("type", type.getName()));
+            }
             if (credits != ELostTalesUser.NULL) {
                 list.add("§8" + word("created_by", "§o" + credits.getName()));
             }

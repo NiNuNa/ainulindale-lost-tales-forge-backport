@@ -5,7 +5,6 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneStateReason;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -24,11 +23,11 @@ import io.netty.buffer.ByteBuf;
 public final class LostTalesWaystoneStatePacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 16384;
     private static final int MAX_MARKER_ID_BYTES = 1024;
-    private static final int MAX_TEXT_BYTES = 1024;
-    private static final int MAX_DESCRIPTION_BYTES = 4096;
-    private static final int MAX_STRUCTURE_ID_BYTES = 512;
     /** Past the longest name a character or a lore figure can have. */
     public static final int MAX_OWNER_NAME_BYTES = 256;
+    /** What a waystone is called after, at three bytes for each UTF-16 unit. */
+    private static final int MAX_NAMED_AFTER_BYTES =
+            3 * LostTalesMapMarkerNamedAfter.MAX_LENGTH;
 
     private int dimensionId;
     private int x;
@@ -96,47 +95,11 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
             this.markerId = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_MARKER_ID_BYTES);
             this.namedAfter = LostTalesPacketCodec.readUtf8String(
-                    buffer, LostTalesMapMarkerNamedAfter.MAX_LENGTH);
+                    buffer, MAX_NAMED_AFTER_BYTES);
             this.playerPlaced = buffer.readBoolean();
             this.revision = buffer.readLong();
-            String name = LostTalesPacketCodec.readUtf8String(
-                    buffer, MAX_TEXT_BYTES);
-            String icon = LostTalesPacketCodec.readUtf8String(
-                    buffer, MAX_TEXT_BYTES);
-            String color = LostTalesPacketCodec.readUtf8String(
-                    buffer, MAX_TEXT_BYTES);
-            String category = LostTalesPacketCodec.readUtf8String(
-                    buffer, MAX_TEXT_BYTES);
-            String description = LostTalesPacketCodec.readUtf8String(
-                    buffer, MAX_DESCRIPTION_BYTES);
-            boolean fastTravel = buffer.readBoolean();
-            int markerDimensionId = buffer.readInt();
-            double markerX = buffer.readDouble();
-            double markerY = buffer.readDouble();
-            double markerZ = buffer.readDouble();
-            double compassRadius = buffer.readDouble();
-            double discoveryRadius = buffer.readDouble();
-            boolean hiddenUntilDiscovered = buffer.readBoolean();
-            boolean discoverable = buffer.readBoolean();
-            boolean requiresRegionUnlock = buffer.readBoolean();
-            boolean hasWaystone = buffer.readBoolean();
-            String structureType =
-                    LostTalesPacketCodec.readUtf8String(
-                            buffer, MAX_STRUCTURE_ID_BYTES);
-            int priority = buffer.readInt();
-            int visibilityId = buffer.readUnsignedByte();
-            LostTalesMapMarkerVisibility visibility = visibilityId
-                    >= LostTalesMapMarkerVisibility.values().length
-                    ? null
-                    : LostTalesMapMarkerVisibility.values()[visibilityId];
-            this.settings = new LostTalesMapMarkerEditableSettings(
-                    name, icon, color, category, description,
-                    fastTravel, markerDimensionId,
-                    markerX, markerY, markerZ,
-                    compassRadius, discoveryRadius,
-                    hiddenUntilDiscovered, discoverable,
-                    requiresRegionUnlock, hasWaystone,
-                    structureType, priority, visibility);
+            this.settings =
+                    LostTalesWaystoneSettingsRequestPacket.readSettings(buffer);
             this.sharedCharacterCount = buffer.readInt();
             this.sharedFellowshipCount = buffer.readInt();
             this.ownerName = LostTalesPacketCodec.readUtf8String(
@@ -163,38 +126,11 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.markerId, MAX_MARKER_ID_BYTES);
         LostTalesPacketCodec.writeUtf8String(
-                buffer, this.namedAfter,
-                LostTalesMapMarkerNamedAfter.MAX_LENGTH);
+                buffer, this.namedAfter, MAX_NAMED_AFTER_BYTES);
         buffer.writeBoolean(this.playerPlaced);
         buffer.writeLong(this.revision);
-        LostTalesMapMarkerEditableSettings value = this.settings;
-        LostTalesPacketCodec.writeUtf8String(
-                buffer, value.getName(), MAX_TEXT_BYTES);
-        LostTalesPacketCodec.writeUtf8String(
-                buffer, value.getIconName(), MAX_TEXT_BYTES);
-        LostTalesPacketCodec.writeUtf8String(
-                buffer, value.getColorName(), MAX_TEXT_BYTES);
-        LostTalesPacketCodec.writeUtf8String(
-                buffer, value.getCategoryName(), MAX_TEXT_BYTES);
-        LostTalesPacketCodec.writeUtf8String(
-                buffer, value.getDescription(),
-                MAX_DESCRIPTION_BYTES);
-        buffer.writeBoolean(value.hasFastTravel());
-        buffer.writeInt(value.getDimensionId());
-        buffer.writeDouble(value.getX());
-        buffer.writeDouble(value.getY());
-        buffer.writeDouble(value.getZ());
-        buffer.writeDouble(value.getCompassFadeInRadius());
-        buffer.writeDouble(value.getDiscoveryRadius());
-        buffer.writeBoolean(value.isHiddenUntilDiscovered());
-        buffer.writeBoolean(value.isDiscoverable());
-        buffer.writeBoolean(value.requiresRegionUnlock());
-        buffer.writeBoolean(value.hasWaystone());
-        LostTalesPacketCodec.writeUtf8String(
-                buffer, value.getWaystoneStructureType(),
-                MAX_STRUCTURE_ID_BYTES);
-        buffer.writeInt(value.getPriority());
-        buffer.writeByte(value.getVisibility().ordinal());
+        LostTalesWaystoneSettingsRequestPacket.writeSettings(
+                buffer, this.settings);
         buffer.writeInt(this.sharedCharacterCount);
         buffer.writeInt(this.sharedFellowshipCount);
         LostTalesPacketCodec.writeUtf8String(
@@ -213,7 +149,8 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 || !LostTalesMapMarkerNamedAfter.isValid(this.namedAfter)
                 || this.reason == null
                 || this.revision < 1L
-                || !isValidSettings(this.settings)
+                || !LostTalesWaystoneSettingsRequestPacket.isValidSettings(
+                        this.settings)
                 || this.settings.getName().trim().length() == 0
                         && this.namedAfter.length() == 0
                 || this.sharedCharacterCount < 0
@@ -274,48 +211,6 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         return this.reason == LostTalesWaystoneStateReason.OPENED;
     }
     public boolean isMalformed() { return this.malformed; }
-
-    private static boolean isValidSettings(
-            LostTalesMapMarkerEditableSettings value) {
-        return value != null
-                && value.getVisibility() != null
-                && LostTalesPacketCodec.isUtf8WithinLimit(
-                        value.getName(), MAX_TEXT_BYTES)
-                && LostTalesPacketCodec.isUtf8WithinLimit(
-                        value.getIconName(), MAX_TEXT_BYTES)
-                && LostTalesPacketCodec.isUtf8WithinLimit(
-                        value.getColorName(), MAX_TEXT_BYTES)
-                && LostTalesPacketCodec.isUtf8WithinLimit(
-                        value.getCategoryName(), MAX_TEXT_BYTES)
-                && LostTalesPacketCodec.isUtf8WithinLimit(
-                        value.getDescription(), MAX_DESCRIPTION_BYTES)
-                && LostTalesPacketCodec.isUtf8WithinLimit(
-                        value.getWaystoneStructureType(),
-                        MAX_STRUCTURE_ID_BYTES)
-                && finiteCoordinate(value.getX())
-                && finiteCoordinate(value.getY())
-                && finiteCoordinate(value.getZ())
-                && finiteRadius(value.getCompassFadeInRadius())
-                && finiteRadius(value.getDiscoveryRadius())
-                && value.getPriority()
-                        >= com.ninuna.losttales.mapmarker
-                                .LostTalesMapMarkerDefinition.MIN_PRIORITY
-                && value.getPriority()
-                        <= com.ninuna.losttales.mapmarker
-                                .LostTalesMapMarkerDefinition.MAX_PRIORITY;
-    }
-
-    private static boolean finiteCoordinate(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value)
-                && Math.abs(value)
-                        <= LostTalesMapMarkerRecord.MAX_ABSOLUTE_COORDINATE;
-    }
-
-    private static boolean finiteRadius(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value)
-                && value >= 0.0D
-                && value <= LostTalesMapMarkerRecord.MAX_RADIUS;
-    }
 
     public static final class Handler implements IMessageHandler<
             LostTalesWaystoneStatePacket, IMessage> {

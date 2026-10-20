@@ -31,7 +31,7 @@ import net.minecraft.util.StatCollector;
  * shows its sections under a search field, in the order the systems
  * added them, and Defaults last. Each option takes effect and is saved
  * the moment it changes: a switch flips on a click, a few-word option
- * steps forward on a click and back on a right-click, a number steps with
+ * opens its words in a pick (WIN-36), a number steps with
  * the chevrons beside it and is typed into where its value is clicked, a
  * colour opens the palette beside it. The game's own options read here
  * are written to the game's options, so its own screens and these always
@@ -315,7 +315,7 @@ public final class Settings {
      * time or ten with Shift, stopping at its bounds. A click on the
      * value opens a small field beside the window where a number within
      * the bounds can be typed. A click elsewhere on the row steps it on,
-     * a right-click back, as a few-word setting steps.
+     * a right-click back.
      */
     public abstract static class Numeric extends ModSetting {
         private final double step;

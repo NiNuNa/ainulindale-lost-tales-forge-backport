@@ -21,7 +21,7 @@ public final class CharacterAppearanceSyncPacketTest {
         CharacterAppearance appearance = new CharacterAppearance(
                 playerId, "Steve123", "Aragorn", "losttales:human",
                 "losttales:male", "losttales:human_ranger_male_2",
-                true, 0, "lotr:gondor", 87,
+                true, "", "lotr:gondor", 87,
                 "", "");
         ByteBuf buffer = Unpooled.buffer();
         new CharacterAppearanceSyncPacket(
@@ -54,7 +54,7 @@ public final class CharacterAppearanceSyncPacketTest {
                 CharacterAppearanceKind.CHARACTER, playerId, characterId,
                 "Steve123", "Aragorn", "losttales:human",
                 "losttales:male", "losttales:human_ranger_male_2",
-                true, 0, "lotr:gondor", 87, "", "");
+                true, "", "lotr:gondor", 87, "", "");
         ByteBuf buffer = Unpooled.buffer();
         new CharacterAppearanceSyncPacket(false, Collections.singletonList(appearance))
                 .toBytes(buffer);
@@ -66,7 +66,7 @@ public final class CharacterAppearanceSyncPacketTest {
         CharacterAppearance account = new CharacterAppearance(
                 CharacterAppearanceKind.ACCOUNT, playerId, characterId,
                 "Steve123", "", "losttales:human", "",
-                "losttales:account_skin", true, 0, "", 0, "wide", "");
+                "losttales:account_skin", true, "", "", 0, "wide", "");
         assertNull(account.getCharacterId());
     }
 
@@ -94,7 +94,7 @@ public final class CharacterAppearanceSyncPacketTest {
         new CharacterAppearanceSyncPacket(false, Collections.singletonList(
                 new CharacterAppearance(UUID.randomUUID(), "Steve", "Amdir",
                         "losttales:elf", "losttales:male",
-                        "losttales:elf_high_male_0", true, 0,
+                        "losttales:elf_high_male_0", true, "",
                         "lotr:high_elf", 2000, "", "")))
                 .toBytes(buffer);
         ByteBuf truncated = buffer.slice(0, buffer.readableBytes() - 6);
@@ -111,7 +111,7 @@ public final class CharacterAppearanceSyncPacketTest {
     public void anAgeBelowZeroIsNotKnown() {
         CharacterAppearance appearance = new CharacterAppearance(
                 UUID.randomUUID(), "Steve", "Amdir", "losttales:elf",
-                "losttales:male", "losttales:elf_high_male_0", true, 0,
+                "losttales:male", "losttales:elf_high_male_0", true, "",
                 "lotr:high_elf", -1, "", "");
         assertEquals(0, appearance.getAge());
     }

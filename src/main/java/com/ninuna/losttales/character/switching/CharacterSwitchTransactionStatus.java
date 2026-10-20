@@ -1,11 +1,21 @@
 package com.ninuna.losttales.character.switching;
 
-/** Durable phases for one server-authoritative character switch. */
+/**
+ * Durable phases for one server-authoritative character switch. The last
+ * two hold the journal: nothing settles it by itself, and switching stays
+ * off while it stands.
+ */
 public enum CharacterSwitchTransactionStatus {
     PREPARED("prepared"),
     COMMITTED("committed"),
     ABORTED("aborted"),
-    RECOVERY_REQUIRED("recovery_required");
+    /** An attempt that failed part-way, held for an operator. */
+    RECOVERY_REQUIRED("recovery_required"),
+    /**
+     * Discarded by an operator: the character the switch was leaving comes
+     * back as the journal's source generation holds it (CHAR-37).
+     */
+    RESTORE_SOURCE("restore_source");
 
     private final String id;
 

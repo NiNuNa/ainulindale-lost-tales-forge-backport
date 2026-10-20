@@ -6,7 +6,9 @@ import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.util.LostTalesMath;
+import java.util.List;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.util.AxisAlignedBB;
 
 /** Every check a switch must pass, each refusal with its reason. */
 public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy {
@@ -99,7 +101,8 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
         if (!player.onGround || player.fallDistance > 0.0F
                 || Math.abs(player.motionY) > 0.08D
                 || lifecycle.getStableGroundTicks()
-                < Math.max(0, LostTalesConfig.characterSwitchStableGroundTicks)) {
+                < Math.max(0, LostTalesConfig.characterSwitchStableGroundTicks)
+                || !standsOnGround(player)) {
             return CharacterSwitchPolicyResult.denied(
                     CharacterErrorId.SWITCH_UNSAFE_MOVEMENT);
         }
@@ -109,6 +112,20 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
             return cooldownRefusal;
         }
         return CharacterSwitchPolicyResult.allowed();
+    }
+
+    /**
+     * Whether the world itself holds the player up: something solid lies
+     * just under their feet. The ground and the fall the player's game
+     * reports are not taken on its word alone.
+     */
+    private static boolean standsOnGround(EntityPlayerMP player) {
+        if (player.boundingBox == null) {
+            return false;
+        }
+        AxisAlignedBB underFeet = player.boundingBox.copy().offset(0.0D, -0.0625D, 0.0D);
+        List collisions = player.worldObj.getCollidingBoundingBoxes(player, underFeet);
+        return collisions != null && !collisions.isEmpty();
     }
 
     /**
@@ -157,9 +174,9 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
      * Why the account itself refuses a switch before the player is
      * looked at, or null when it does not: an account an operator froze,
      * one whose death has not been settled, and one holding a journal
-     * awaiting recovery. The three are the account's own facts, so they
-     * are decided here without a player and in the order the evaluation
-     * asks them.
+     * awaiting recovery or its restore. The three are the account's own
+     * facts, so they are decided here without a player and in the order
+     * the evaluation asks them.
      */
     static CharacterSwitchPolicyResult accountRefusal(
             CharacterSwitchAccountState accountState) {
@@ -175,9 +192,7 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
                     CharacterErrorId.SWITCH_DEATH_PENDING);
         }
         CharacterSwitchTransaction transaction = accountState.getTransaction();
-        if (transaction != null
-                && transaction.getStatus()
-                == CharacterSwitchTransactionStatus.RECOVERY_REQUIRED) {
+        if (transaction != null && transaction.isHeld()) {
             return CharacterSwitchPolicyResult.denied(
                     CharacterErrorId.SWITCH_RECOVERY_REQUIRED);
         }

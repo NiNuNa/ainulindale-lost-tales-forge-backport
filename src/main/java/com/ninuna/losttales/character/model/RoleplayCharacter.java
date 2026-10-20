@@ -1,8 +1,11 @@
 package com.ninuna.losttales.character.model;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+import com.ninuna.losttales.character.registry.CharacterBody;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
+import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 
 import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Locale;
@@ -11,9 +14,9 @@ import java.util.UUID;
 /** Persistent server-authoritative record for one roleplaying character. */
 public class RoleplayCharacter {
 
-    public static final int CURRENT_DATA_VERSION = 10;
+    public static final int CURRENT_DATA_VERSION = 11;
     public static final boolean DEFAULT_SHOW_MINECRAFT_CAPE = true;
-    public static final int DEFAULT_COSMETIC_CAPE_ID = CharacterCapeCatalog.NONE_ID;
+    public static final String DEFAULT_COSMETIC_CAPE_ID = CharacterCapeCatalog.NONE_ID;
     /** The longest LOTR title a record keeps. */
     public static final int MAX_LOTR_TITLE_LENGTH = 64;
 
@@ -34,7 +37,10 @@ public class RoleplayCharacter {
     private final long creationTimestamp;
 
     private boolean showMinecraftCape;
-    private int cosmeticCapeId;
+    /** The cape file's id; empty for none. */
+    private String cosmeticCapeId;
+    /** The body its race stood on when it was last known; it stands on it while the race is gone. */
+    private CharacterBody body;
     /** The faction LOTR says the character is pledged to; empty while it has no pledge. */
     private String pledgedFactionId;
     /** When the character's faction became its faction: its making, or its latest pledge. */
@@ -62,6 +68,7 @@ public class RoleplayCharacter {
                 .createdAt(source.creationTimestamp)
                 .minecraftCapeVisible(source.showMinecraftCape)
                 .cosmeticCape(source.cosmeticCapeId)
+                .body(source.body)
                 .startingWaypoint(source.startingWaypointId)
                 .unconventionalSettings(source.unconventionalSettings)
                 .profile(source.profile)
@@ -90,19 +97,26 @@ public class RoleplayCharacter {
         this.unconventionalSettings = builder.unconventionalSettings;
         this.pledgedFactionId = normalizeFactionId(builder.pledgedFactionId);
         this.creationTimestamp = Math.max(0L, builder.creationTimestamp);
-        this.factionSince = builder.factionSince > 0L ? builder.factionSince
-                : this.creationTimestamp;
+        // A faction is never the character's before the character is: a
+        // figure claimed again counts from its claim.
+        this.factionSince = Math.max(builder.factionSince,
+                this.creationTimestamp);
         this.lotrTitle = normalizeTitle(builder.lotrTitle);
         this.showMinecraftCape = builder.showMinecraftCape;
-        this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(
-                builder.cosmeticCapeId);
+        this.cosmeticCapeId = builder.cosmeticCapeId;
+        this.body = builder.body != null ? builder.body : bodyOf(builder.raceId);
+    }
+
+    /** The body a race stands on, Human's for a race the list does not hold. */
+    private static CharacterBody bodyOf(String raceId) {
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
+        return race == null ? CharacterBody.HUMAN : race.getBody();
     }
 
     /**
-     * Every field a character record holds, with the default a record
-     * without the field gets: the body and chest types follow the sex,
-     * the capes are the catalogue's defaults, and there is no pledge and
-     * no title.
+     * Every field a character holds, with the default a character made
+     * without it gets: the body and chest types follow the sex, the capes
+     * are the catalogue's defaults, and there is no pledge and no title.
      */
     public static final class Builder {
         private final UUID characterId;
@@ -119,7 +133,8 @@ public class RoleplayCharacter {
         private long factionSince;
         private String lotrTitle = "";
         private boolean showMinecraftCape = DEFAULT_SHOW_MINECRAFT_CAPE;
-        private int cosmeticCapeId = DEFAULT_COSMETIC_CAPE_ID;
+        private String cosmeticCapeId = DEFAULT_COSMETIC_CAPE_ID;
+        private CharacterBody body;
         private String startingWaypointId = "";
         private boolean unconventionalSettings;
         private CharacterProfile profile = CharacterProfile.EMPTY;
@@ -189,7 +204,7 @@ public class RoleplayCharacter {
             return this;
         }
 
-        /** When the faction became the character's; 0 for its making. */
+        /** When the faction became the character's; 0, or a time before its making, for its making. */
         public Builder factionSince(long factionSince) {
             this.factionSince = factionSince;
             return this;
@@ -211,8 +226,15 @@ public class RoleplayCharacter {
             return this;
         }
 
-        public Builder cosmeticCape(int cosmeticCapeId) {
-            this.cosmeticCapeId = cosmeticCapeId;
+        /** The cape file's id; null or empty for none. */
+        public Builder cosmeticCape(String cosmeticCapeId) {
+            this.cosmeticCapeId = cosmeticCapeId == null ? "" : cosmeticCapeId;
+            return this;
+        }
+
+        /** The body the race stands on; null is the race's own, Human's for a race not known. */
+        public Builder body(CharacterBody body) {
+            this.body = body;
             return this;
         }
 
@@ -339,8 +361,9 @@ public class RoleplayCharacter {
         this.pledgedFactionId = normalized;
         if (!before.equals(getFactionId())) {
             // A faction's past is its own: the character reads it from
-            // the moment it joined, never from before.
-            this.factionSince = Math.max(0L, now);
+            // the moment it joined, never from before, nor from before
+            // the character was made.
+            this.factionSince = Math.max(this.creationTimestamp, now);
         }
         return true;
     }
@@ -418,18 +441,33 @@ public class RoleplayCharacter {
         return this.showMinecraftCape;
     }
 
-    public int getCosmeticCapeId() {
+    /** The cape file's id; empty for none. */
+    public String getCosmeticCapeId() {
         return this.cosmeticCapeId;
     }
 
     /** Called only after server-side catalog and eligibility validation. */
-    public boolean setCapeSettings(boolean showMinecraftCape, int cosmeticCapeId) {
-        int normalizedCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
+    public boolean setCapeSettings(boolean showMinecraftCape, String cosmeticCapeId) {
+        String capeId = cosmeticCapeId == null ? "" : cosmeticCapeId;
         boolean changed = this.showMinecraftCape != showMinecraftCape
-                || this.cosmeticCapeId != normalizedCapeId;
+                || !this.cosmeticCapeId.equals(capeId);
         this.showMinecraftCape = showMinecraftCape;
-        this.cosmeticCapeId = normalizedCapeId;
+        this.cosmeticCapeId = capeId;
         return changed;
+    }
+
+    /** The body the character's race stood on when it was last known (CHAR-38). */
+    public CharacterBody getBody() {
+        return this.body;
+    }
+
+    /** Remembers the body its race stands on now; answers whether it changed. */
+    public boolean rememberBody(CharacterBody body) {
+        if (body == null || body == this.body) {
+            return false;
+        }
+        this.body = body;
+        return true;
     }
 
     public long getCreationTimestamp() {

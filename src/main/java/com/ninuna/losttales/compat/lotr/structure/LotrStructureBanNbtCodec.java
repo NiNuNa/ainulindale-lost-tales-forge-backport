@@ -68,11 +68,11 @@ public final class LotrStructureBanNbtCodec {
                     Integer.valueOf(version));
             return ReadResult.unsupported(root, version);
         }
-        NbtQuarantine.Read quarantine = NbtQuarantine.readCurrentVersionOnly(root);
+        NbtQuarantine.Read quarantine = NbtQuarantine.read(root);
         if (!quarantine.isSupported()) {
             return ReadResult.unsupported(root, quarantine.getUnsupportedVersion());
         }
-        boolean repaired = quarantine.isRepaired();
+        boolean repaired = false;
         List<NBTTagCompound> quarantined =
                 new ArrayList<NBTTagCompound>(quarantine.getEntries());
         Map<String, LotrStructureBan> bans = new LinkedHashMap<String, LotrStructureBan>();

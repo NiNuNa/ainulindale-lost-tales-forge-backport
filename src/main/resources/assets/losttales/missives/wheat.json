@@ -1,0 +1,10 @@
+{
+  "id": "losttales:wheat",
+  "kind": "gather",
+  "item": "minecraft:wheat",
+  "count": [8, 18],
+  "experience": 3,
+  "titles": ["materials_wanted", "gatherers_pay", "stores_run_low"],
+  "issuers": ["local_watch", "road_warden", "village_reeve", "caravan_master", "quartermaster"],
+  "flavours": ["small_stores", "plain_notice", "useful_materials"]
+}

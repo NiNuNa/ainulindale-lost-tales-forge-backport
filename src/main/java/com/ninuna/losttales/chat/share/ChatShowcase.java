@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.share;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import java.io.IOException;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompressedStreamTools;
@@ -36,10 +37,12 @@ public final class ChatShowcase {
     private static final long MAX_DECOMPRESSED_BITS = 16384L * 8L;
     public static final int MAX_MARKER_ID_BYTES =
             ChatShareReference.MAX_MARKER_ID_BYTES;
-    public static final int MAX_MARKER_NAME_BYTES = 256;
+    /** A marker's name, every letter up to three bytes. */
+    public static final int MAX_MARKER_NAME_BYTES =
+            3 * LostTalesMapMarkerRecord.MAX_NAME_LENGTH;
     public static final int MAX_MARKER_STYLE_BYTES = 64;
     public static final int MAX_MARKER_NAMED_AFTER_BYTES =
-            LostTalesMapMarkerNamedAfter.MAX_LENGTH;
+            3 * LostTalesMapMarkerNamedAfter.MAX_LENGTH;
     public static final int MAX_QUEST_REFERENCE_BYTES =
             ChatShareReference.MAX_QUEST_REFERENCE_BYTES;
     /** Matches {@code LostTalesMapMarkerRecord.MAX_ABSOLUTE_COORDINATE}. */

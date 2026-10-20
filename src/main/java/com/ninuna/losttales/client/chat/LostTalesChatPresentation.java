@@ -1644,7 +1644,7 @@ public final class LostTalesChatPresentation {
 
     /**
      * The drawn row whose sender the pointer rests on this frame, or
-     * null. Answered by the hover card's own hit test — the head, the
+     * null. Answered by the person card's own hit test — the head, the
      * brackets, the name and the title, and not the gap after the
      * closing bracket — so the underline under a name, the card and
      * the hand cursor all light on the same pixels.
@@ -3957,7 +3957,7 @@ public final class LostTalesChatPresentation {
         }
         // The tab wears the same portrait the line is drawn with, and
         // is named in the same colour the NPC's own name is; the
-        // faction is kept for the NPC's hover card.
+        // faction is kept for the NPC's card.
         ChatChannelIcons.rememberNpc(tab, npcId, texturePath);
         ChatChannelIcons.rememberNpcFaction(npcId, factionName);
         ClientChatChannelState.rememberPartnerColor(tab,

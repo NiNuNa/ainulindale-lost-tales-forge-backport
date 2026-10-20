@@ -104,7 +104,7 @@ public final class CharacterBodyTypeValidationTest {
         return new CharacterCreationRequest(
                 0L, 0, "Adventurer", CharacterRaceRegistry.HUMAN, genderId,
                 skinId, 25, FACTION, WAYPOINT, false, "", bodyTypeId,
-                chestTypeId, true, 0);
+                chestTypeId, true, "");
     }
 
     private static final class TestFactionResolver implements CharacterFactionResolver {

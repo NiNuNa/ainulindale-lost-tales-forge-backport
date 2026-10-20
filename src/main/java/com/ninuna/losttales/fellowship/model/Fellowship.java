@@ -264,6 +264,29 @@ public final class Fellowship {
         return false;
     }
 
+    /**
+     * When {@code identityId} joined each of {@code fellowships} it is a
+     * member of, by fellowship id: where each one's conversation starts
+     * for that character (FEL-29). A founder joined at the founding; a
+     * member who left and came back, at its latest joining.
+     */
+    public static Map<UUID, Long> joinings(Iterable<Fellowship> fellowships,
+                                           UUID identityId) {
+        Map<UUID, Long> joined = new LinkedHashMap<UUID, Long>();
+        if (fellowships == null || identityId == null) {
+            return joined;
+        }
+        for (Fellowship fellowship : fellowships) {
+            FellowshipMember member = fellowship == null ? null
+                    : fellowship.getMember(identityId);
+            if (member != null) {
+                joined.put(fellowship.getFellowshipId(),
+                        Long.valueOf(member.getJoinedAt()));
+            }
+        }
+        return joined;
+    }
+
     /** The members, first joined first. */
     public List<FellowshipMember> getMembers() {
         ArrayList<FellowshipMember> members = new ArrayList<FellowshipMember>(this.membersByIdentityId.values());

@@ -134,18 +134,17 @@ public final class FellowshipStateSnapshotTest {
     /** A fellowship of the character played and one other, led by {@code leader}. */
     private static FellowshipSnapshot fellowship(UUID id, UUID leader) {
         List<FellowshipMemberSnapshot> members = new ArrayList<FellowshipMemberSnapshot>();
-        members.add(new FellowshipMemberSnapshot(PLAYED, OWNER, "Aldric", 1L,
+        members.add(new FellowshipMemberSnapshot(PLAYED, OWNER, "Aldric",
                 FellowshipColor.GREEN, FellowshipMemberPresence.HERE, ""));
-        members.add(new FellowshipMemberSnapshot(OTHER, new UUID(4L, 4L), "Beleg", 2L,
+        members.add(new FellowshipMemberSnapshot(OTHER, new UUID(4L, 4L), "Beleg",
                 FellowshipColor.BLUE, FellowshipMemberPresence.AWAY, ""));
         return new FellowshipSnapshot(id, leader, "Company " + id.getLeastSignificantBits(),
                 null, EnumSet.allOf(FellowshipSwitch.class),
-                Collections.<UUID>emptyList(), 1L, 1L, 2, members);
+                Collections.<UUID>emptyList(), 1L, null, members);
     }
 
     private static FellowshipInvitationSnapshot invitation(UUID fellowshipId) {
         return new FellowshipInvitationSnapshot(UUID.randomUUID(), fellowshipId,
-                "Company", PLAYED, OWNER, "Aldric", new UUID(5L, 5L), new UUID(6L, 6L),
-                "Hurin", 1L, 2L);
+                "Company", PLAYED, OWNER, "Aldric", new UUID(5L, 5L), "Hurin", 2L);
     }
 }

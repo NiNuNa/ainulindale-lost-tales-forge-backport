@@ -38,6 +38,10 @@ public final class CharacterPlayerEventHandler {
 
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerLoggedInEvent event) {
+        // The server's races and capes go first: everything after names them.
+        if (event != null && event.player instanceof EntityPlayerMP) {
+            CharacterRaceCatalogSync.send((EntityPlayerMP) event.player);
+        }
         initializePlayer(event == null ? null : event.player, LifecycleAction.LOGIN);
     }
 
@@ -57,6 +61,7 @@ public final class CharacterPlayerEventHandler {
         CharacterLotrRecord.refresh(player);
         CharacterSwitchCoordinator.getInstance().saveActiveStateOnLogout(player);
         AccessoryInventorySyncManager.clearPlayer(player.getUniqueID());
+        CharacterSyncManager.forget(player.getUniqueID());
         CharacterAppearanceSyncManager.broadcastRemoval(player.getUniqueID());
         // The remaining players' role rosters follow the leave.
         com.ninuna.losttales.chat.server.ChatIdentitySelection.forget(player.getUniqueID());

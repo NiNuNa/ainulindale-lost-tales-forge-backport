@@ -226,7 +226,7 @@ public final class CharacterSwitchAccountStateTest {
     public void decayStepsDownOnePeriodAtATimeAndKeepsTheRemainder() {
         CharacterSwitchAccountState account = account(3, 9000L, 500L, 1000L, 1000L);
 
-        assertTrue(account.applyDecay(1600L, new long[] {0L, 100L, 200L, 400L}, 5));
+        assertTrue(account.applyDecay(1600L, new long[] {100L, 200L, 400L}, 5));
 
         assertEquals(1, account.getCooldownStage());
         assertEquals(1600L, account.getDecayAnchorAt());
@@ -237,7 +237,7 @@ public final class CharacterSwitchAccountStateTest {
     public void decayStopsAtStageZero() {
         CharacterSwitchAccountState account = account(2, 9000L, 500L, 1000L, 1000L);
 
-        assertTrue(account.applyDecay(100000L, new long[] {0L, 100L, 200L}, 5));
+        assertTrue(account.applyDecay(100000L, new long[] {100L, 200L}, 5));
 
         assertEquals(0, account.getCooldownStage());
     }
@@ -250,7 +250,7 @@ public final class CharacterSwitchAccountStateTest {
     public void aStageAboveTheMaximumIsClampedBeforeDecay() {
         CharacterSwitchAccountState account = account(5, 9000L, 500L, 1000L, 1000L);
 
-        assertTrue(account.applyDecay(1400L, new long[] {0L, 100L, 200L}, 2));
+        assertTrue(account.applyDecay(1400L, new long[] {100L, 200L}, 2));
 
         assertEquals(0, account.getCooldownStage());
         assertEquals(1300L, account.getDecayAnchorAt());
@@ -283,7 +283,7 @@ public final class CharacterSwitchAccountStateTest {
     public void stageZeroReportsNoChange() {
         CharacterSwitchAccountState account = account(0, 0L, 500L, 1000L, 1000L);
 
-        assertFalse(account.applyDecay(100000L, new long[] {0L, 100L}, 5));
+        assertFalse(account.applyDecay(100000L, new long[] {100L}, 5));
 
         assertEquals(1000L, account.getDecayAnchorAt());
     }
@@ -296,7 +296,7 @@ public final class CharacterSwitchAccountStateTest {
     public void aMissingAnchorIsSeededFromTheLastSwitch() {
         CharacterSwitchAccountState account = account(1, 9000L, 500L, 0L, 0L);
 
-        assertTrue(account.applyDecay(900L, new long[] {0L, 1000L}, 5));
+        assertTrue(account.applyDecay(900L, new long[] {1000L}, 5));
 
         assertEquals(500L, account.getDecayAnchorAt());
         assertEquals(1, account.getCooldownStage());
@@ -307,7 +307,7 @@ public final class CharacterSwitchAccountStateTest {
     public void aMissingAnchorWithoutAPriorSwitchStartsFromNow() {
         CharacterSwitchAccountState account = account(1, 9000L, 0L, 0L, 0L);
 
-        assertTrue(account.applyDecay(5000L, new long[] {0L, 1000L}, 5));
+        assertTrue(account.applyDecay(5000L, new long[] {1000L}, 5));
 
         assertEquals(5000L, account.getDecayAnchorAt());
         assertEquals(1, account.getCooldownStage());
@@ -318,7 +318,7 @@ public final class CharacterSwitchAccountStateTest {
     public void aClockBehindTheAnchorDecaysNothing() {
         CharacterSwitchAccountState account = account(2, 9000L, 4000L, 5000L, 5000L);
 
-        assertFalse(account.applyDecay(1000L, new long[] {0L, 100L, 200L}, 5));
+        assertFalse(account.applyDecay(1000L, new long[] {100L, 200L}, 5));
 
         assertEquals(2, account.getCooldownStage());
         assertEquals(5000L, account.getDecayAnchorAt());
@@ -332,7 +332,7 @@ public final class CharacterSwitchAccountStateTest {
     public void aNonPositivePeriodStillCostsAMillisecond() {
         CharacterSwitchAccountState account = account(1, 9000L, 500L, 1000L, 1000L);
 
-        assertTrue(account.applyDecay(1001L, new long[] {0L, -5L}, 5));
+        assertTrue(account.applyDecay(1001L, new long[] {-5L}, 5));
 
         assertEquals(0, account.getCooldownStage());
         assertEquals(1001L, account.getDecayAnchorAt());
@@ -425,11 +425,7 @@ public final class CharacterSwitchAccountStateTest {
                 UUID.fromString("50000000-0000-0000-0000-000000000005"),
                 SOURCE,
                 TARGET,
-                10L,
-                11L,
                 3000L,
-                7L,
-                8,
                 2,
                 2000L,
                 1000L,

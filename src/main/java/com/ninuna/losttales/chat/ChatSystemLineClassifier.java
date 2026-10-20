@@ -24,7 +24,8 @@ import net.minecraft.util.IChatComponent;
  * {@code StatisticsFile}, {@code ServerConfigurationManager},
  * {@code CommandBroadcast} and {@code CommandEmote} send vanilla's, and
  * {@code LOTRAchievement} broadcasts Middle-earth achievements with
- * {@code chat.lotr.achievement}; all are {@code ChatComponentTranslation}s,
+ * {@code chat.lotr.achievement}, and a server's own deed comes as
+ * {@code chat.losttales.deed.done}; all are {@code ChatComponentTranslation}s,
  * so the classification does not depend on the language the client runs
  * in. Adding a category means adding a key here, nowhere else. The class
  * has no client dependency: a dedicated server classifies with it too.</p>
@@ -39,6 +40,8 @@ public final class ChatSystemLineClassifier {
             "chat.type.achievement",
             "chat.type.achievement.taken",
             "chat.lotr.achievement",
+            // A server's own deed, which no LOTR achievement carries (PROG-11).
+            "chat.losttales.deed.done",
     };
     private static final String[] JOIN_KEYS = {
             "multiplayer.player.joined",

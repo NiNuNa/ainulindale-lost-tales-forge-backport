@@ -29,7 +29,9 @@ public final class ChatQuestCard {
         /** A LOTR mini-quest: the words LOTR gave it on the server. */
         LOTR(3),
         /** LOTR's welcome quest, the Grey Wanderer's: worded by the mod's lang lines. */
-        LOTR_WELCOME(4);
+        LOTR_WELCOME(4),
+        /** A missive from a server's template: its title as written, its work by kind and target (QUEST-42). */
+        MISSIVE_WRITTEN(5);
 
         private final int code;
 
@@ -83,8 +85,8 @@ public final class ChatQuestCard {
 
     /**
      * A card. {@code title} is the operator's or LOTR's words for a server
-     * quest or a mini-quest, a missive's title id, empty for a bundled
-     * quest and the welcome quest.
+     * quest or a mini-quest, a missive's title id or its title as written,
+     * empty for a bundled quest and the welcome quest.
      */
     public ChatQuestCard(Source source, String title, String category,
                          List<Objective> objectives, Map<String, String> rewards) {

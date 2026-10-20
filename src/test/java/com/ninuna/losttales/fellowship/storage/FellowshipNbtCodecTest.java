@@ -101,6 +101,24 @@ public final class FellowshipNbtCodecTest {
                 .getMember(GUIDE).getCharacterName());
     }
 
+    /** When each member joined is kept: where its conversation starts for it (FEL-29). */
+    @Test
+    public void eachMembersJoiningIsSavedAndRead() {
+        List<FellowshipMember> members = new ArrayList<FellowshipMember>();
+        members.add(new FellowshipMember(LEADER, UUID.randomUUID(), "Aldric",
+                1000L, FellowshipColor.GREEN));
+        members.add(new FellowshipMember(GUIDE, UUID.randomUUID(), "Beren",
+                4000L, FellowshipColor.BLUE));
+        Fellowship fellowship = new Fellowship(FELLOWSHIP, LEADER, members,
+                Collections.<UUID>emptyList(), "Grey Company", null,
+                EnumSet.allOf(FellowshipSwitch.class), 1000L, 2L,
+                Fellowship.CURRENT_DATA_VERSION);
+        Fellowship back = FellowshipNbtCodec.read(write(fellowship))
+                .getFellowships().get(FELLOWSHIP);
+        assertEquals(1000L, back.getMember(LEADER).getJoinedAt());
+        assertEquals(4000L, back.getMember(GUIDE).getJoinedAt());
+    }
+
     @Test
     public void fiftyMembersAreSavedAndRead() {
         List<FellowshipMember> members = new ArrayList<FellowshipMember>();
@@ -192,6 +210,39 @@ public final class FellowshipNbtCodecTest {
         }
     }
 
+    /**
+     * The quarantine holds its bound and no more: a save whose quarantine
+     * would hold more is kept as it is, read-only, and a store whose
+     * quarantine is full closes before it sets another record aside,
+     * keeping every record it holds.
+     */
+    @Test
+    public void aQuarantinePastItsBoundKeepsTheStoreReadOnly() {
+        List<NBTTagCompound> full = new ArrayList<NBTTagCompound>();
+        for (int index = 0; index < FellowshipNbtCodec.MAX_QUARANTINED; index++) {
+            full.add(FellowshipNbtCodec.createQuarantineEntry("missing_character",
+                    FELLOWSHIP, UUID.randomUUID()));
+        }
+        NBTTagCompound atBound = write(fellowship("Grey Company"), full);
+        assertFalse(FellowshipNbtCodec.read(atBound).isReadOnly());
+
+        NBTTagCompound pastBound = write(fellowship("Grey Company"), full);
+        member(pastBound, 1).removeTag("Color");
+        assertReadOnly(pastBound, -1);
+
+        FellowshipWorldData data = new FellowshipWorldData(FellowshipWorldData.DATA_NAME);
+        data.readFromNBT(atBound);
+        assertTrue(data.hasQuarantineRoomFor(0));
+        assertFalse(data.isReadOnlyForNewerVersion());
+        assertFalse(data.hasQuarantineRoomFor(1));
+        assertTrue("closed", data.isReadOnlyForNewerVersion());
+        NBTTagCompound saved = new NBTTagCompound();
+        data.writeToNBT(saved);
+        FellowshipNbtCodec.ReadResult read = FellowshipNbtCodec.read(saved);
+        assertEquals(FellowshipNbtCodec.MAX_QUARANTINED, read.getQuarantineEntriesCopy().size());
+        assertEquals(2, read.getFellowships().get(FELLOWSHIP).getMemberCount());
+    }
+
     private static void assertReadOnly(NBTTagCompound saved, int version) {
         NBTTagCompound before = (NBTTagCompound) saved.copy();
         FellowshipNbtCodec.ReadResult read = FellowshipNbtCodec.read(saved);
@@ -233,10 +284,14 @@ public final class FellowshipNbtCodecTest {
     }
 
     private static NBTTagCompound write(Fellowship fellowship) {
+        return write(fellowship, Collections.<NBTTagCompound>emptyList());
+    }
+
+    private static NBTTagCompound write(Fellowship fellowship, List<NBTTagCompound> quarantine) {
         NBTTagCompound tag = new NBTTagCompound();
         FellowshipNbtCodec.write(tag, Collections.singletonList(fellowship),
                 Collections.<UUID, UUID>emptyMap(), Collections.<UUID, UUID>emptyMap(),
-                Collections.<NBTTagCompound>emptyList());
+                quarantine);
         return tag;
     }
 }

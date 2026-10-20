@@ -264,8 +264,9 @@ public final class WindowLayoutStoreTest {
         assertTrue(folder.mkdirs());
         try {
             WindowLayoutStore.initialize(folder, alex);
-            Window window = WindowLayout.firstWindow();
-            assertNotNull("a new account has the first window", window);
+            assertFalse("a new account has the first window",
+                    WindowLayout.isEmpty());
+            Window window = WindowLayout.windows().get(0);
             assertTrue(WindowLayout.setPosition(window.getId(), 10.0D, 20.0D,
                     true));
             File own = WindowLayoutStore.fileFor(folder, alex);
@@ -435,14 +436,15 @@ public final class WindowLayoutStoreTest {
         assertTrue(lines.toString(), lines.contains("window w3 view=channels"
                 + " locked=true x=62.50 y=8.00 height=200.00 width=300"
                 + " active=faction tabs=fellowship,faction"));
-        assertTrue(lines.contains("closed operator"));
         assertTrue(lines.contains("notify\tnothing\tooc"));
         assertTrue(lines.contains("notify\teverything\tfellowship"));
         assertTrue(lines.contains("feedchoice\tnothing\tglobal"));
+        // A closed channel is one in no window; no line names it.
         for (String line : lines) {
             assertFalse(line.startsWith("muted ")
                     || line.startsWith("noping ")
-                    || line.startsWith("hidden "));
+                    || line.startsWith("hidden ")
+                    || line.startsWith("closed "));
         }
 
         TwoWindowLayout.reset();
@@ -509,15 +511,12 @@ public final class WindowLayoutStoreTest {
         assertEquals(40.0D, ChatLayout.feedOffsetY(), 0.0D);
         // A window line with no position stands at the origin; an input
         // line names nothing the layout has and is skipped.
-        Window main = WindowLayout.firstWindow();
+        Window main = WindowLayout.windows().get(0);
         assertEquals("w1", main.getId());
         assertEquals(0.0D, main.getOffsetX(), 0.0D);
         assertEquals(0.0D, main.getOffsetY(), 0.0D);
-        // Unknown ids dropped, unplaced channels appended but the
-        // consoles, which wait in the + as for a new player; Operator
-        // closed.
-        assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC,
-                ChatChannel.PROXIMITY, ChatChannel.FACTION),
+        // Unknown ids dropped; the channels placed nowhere stay closed.
+        assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC),
                 ChatLayoutViews.channelsOf(main));
         assertEquals(ChatChannel.GLOBAL, ChatLayoutViews.frontChannelOf(main));
         assertEquals(2, WindowLayout.windows().size());
@@ -527,9 +526,9 @@ public final class WindowLayoutStoreTest {
                 ChatLayoutViews.channelsOf(w2));
         assertEquals(0.0D, w2.getOffsetX(), 0.0D);
         assertEquals(12.0D, w2.getOffsetY(), 0.0D);
-        assertEquals(Arrays.asList(ChatChannel.OPERATOR,
-                ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
-                ChatLayout.closedChannels());
+        assertEquals(Arrays.asList(ChatChannel.PROXIMITY, ChatChannel.FACTION,
+                ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE,
+                ChatChannel.SERVER_CONSOLE), ChatLayout.closedChannels());
         assertEquals(ChatLineChoice.NOTHING,
                 ChatLayout.notification(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
         assertEquals(ChatLineChoice.ONLY_MENTIONS,
@@ -577,7 +576,7 @@ public final class WindowLayoutStoreTest {
 
     /**
      * A conversation whose timestamp area is driven out, or whose member
-     * list is put away or given a width, says so on a view line of its
+     * list is put away or given a width, says so on a panels line of its
      * own and keeps it across a reload; a conversation with no such line
      * shows both, and none is written for it.
      */
@@ -618,7 +617,7 @@ public final class WindowLayoutStoreTest {
      */
     @Test
     public void twoConversationsOfASplitKeepTheirOwnPanels() {
-        Window window = WindowLayout.firstWindow();
+        Window window = WindowLayout.windows().get(0);
         window.setLocked(false);
         List<WindowPage> tabs = window.getTabs();
         WindowPage first = tabs.get(0);

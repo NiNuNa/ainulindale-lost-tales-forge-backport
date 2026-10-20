@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.skin;
 
 import net.minecraft.client.Minecraft;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -37,7 +36,7 @@ final class RemoteSkinSource implements Callable<BufferedImage> {
         BufferedImage raw = null;
         if (this.cachedCopy != null && this.cachedCopy.isFile()) {
             try {
-                raw = ImageIO.read(this.cachedCopy);
+                raw = SkinImageNormalizer.readSkin(this.cachedCopy);
             } catch (IOException ignored) {
                 raw = null;
             }
@@ -62,7 +61,7 @@ final class RemoteSkinSource implements Callable<BufferedImage> {
                 throw new IOException("HTTP " + connection.getResponseCode());
             }
             byte[] bytes = readBounded(connection.getInputStream());
-            return ImageIO.read(new ByteArrayInputStream(bytes));
+            return SkinImageNormalizer.readSkin(new ByteArrayInputStream(bytes));
         } finally {
             connection.disconnect();
         }

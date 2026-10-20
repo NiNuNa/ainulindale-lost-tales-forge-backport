@@ -12,6 +12,7 @@ import com.ninuna.losttales.gui.screen.character.creator.CreatorControl;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorRows;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorTextControl;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -218,9 +219,9 @@ final class GlanceEditor extends CreatorControl {
         }
         placeFields();
         if (this.selected < 0) {
-            LostTalesUiInk.drawText(font, font.trimStringToWidth(I18n.format(
-                    "gui.losttales.character.profile.glance.none"),
-                    this.width), this.x, CreatorRows.textTop(fieldsTop()),
+            LostTalesUiCutName.drawText(font, I18n.format(
+                    "gui.losttales.character.profile.glance.none"), this.x,
+                    CreatorRows.textTop(fieldsTop()), this.width,
                     WindowStyle.asideRgb(), alpha);
             return;
         }

@@ -28,6 +28,14 @@ public final class ServerQuestFilesTest {
             + "\"one\",\"objectives\":[{\"id\":\"wood\",\"type\":\"gather\","
             + "\"params\":{\"item\":\"minecraft:log\",\"count\":\"4\"}}]}]}";
 
+    /** A game with every item there is; no game runs here to ask. */
+    private static final QuestItemNames.Items EVERY_ITEM = new QuestItemNames.Items() {
+        @Override
+        public boolean has(String itemId) {
+            return true;
+        }
+    };
+
     private File write(String name, String text) throws IOException {
         File file = new File(this.folder.getRoot(), name);
         OutputStream out = new FileOutputStream(file);
@@ -45,7 +53,7 @@ public final class ServerQuestFilesTest {
                 "The Woodcutter"));
         write("notes.txt", "not a quest");
         ServerQuestFiles.Result result = ServerQuestFiles.read(
-                this.folder.getRoot(), Collections.<String>emptySet());
+                this.folder.getRoot(), Collections.<String>emptySet(), EVERY_ITEM);
         assertEquals(1, result.quests.size());
         assertEquals("losttales:server/woodcutter",
                 result.quests.get(0).getId());
@@ -62,7 +70,7 @@ public final class ServerQuestFilesTest {
                 "server/x", "missive/x"));
         ServerQuestFiles.Result result = ServerQuestFiles.read(
                 this.folder.getRoot(),
-                Collections.singleton("losttales:server/bundled"));
+                Collections.singleton("losttales:server/bundled"), EVERY_ITEM);
         assertEquals(1, result.quests.size());
         assertEquals("First", result.quests.get(0).getTitle());
         assertEquals(3, result.problems.size());
@@ -82,7 +90,7 @@ public final class ServerQuestFilesTest {
         write("large.json", large.toString());
         write("broken.json", "{ not json");
         ServerQuestFiles.Result result = ServerQuestFiles.read(
-                this.folder.getRoot(), Collections.<String>emptySet());
+                this.folder.getRoot(), Collections.<String>emptySet(), EVERY_ITEM);
         assertTrue(result.quests.isEmpty());
         assertEquals(4, result.problems.size());
     }
@@ -94,12 +102,77 @@ public final class ServerQuestFilesTest {
                 "\"startMode\"", "\"colour\":\"red\",\"startMode\"").replace(
                 "\"count\":\"4\"", "\"count\":\"four\""));
         ServerQuestFiles.Result result = ServerQuestFiles.read(
-                this.folder.getRoot(), Collections.<String>emptySet());
+                this.folder.getRoot(), Collections.<String>emptySet(), EVERY_ITEM);
         assertTrue(result.quests.isEmpty());
         assertEquals(result.problems.toString(), 2, result.problems.size());
         assertTrue(result.problems.get(0).startsWith("two.json: "));
         assertTrue(result.problems.get(0).contains("'colour'"));
         assertTrue(result.problems.get(1).contains("non-integer 'count'"));
+    }
+
+    /**
+     * An item the game does not have leaves its file out, wherever the
+     * file names it: what an objective asks for, a reward, a pick or an
+     * optional objective's reward; each such item is a line of its own.
+     */
+    @Test
+    public void aFileNamingAnItemTheGameLacksIsLeftOut() throws IOException {
+        write("misspelt.json", String.format(GOOD, "misspelt", "Misspelt")
+                .replace("minecraft:log", "minecraft:logg")
+                .replace("\"startMode\"", "\"rewards\":{\"items\":"
+                        + "\"minecraft:bread*2,minecraft:breadd\"},\"startMode\""));
+        write("woodcutter.json", String.format(GOOD, "woodcutter", "Woodcutter"));
+        QuestItemNames.Items game = new QuestItemNames.Items() {
+            @Override
+            public boolean has(String itemId) {
+                return "minecraft:log".equals(itemId) || "minecraft:bread".equals(itemId);
+            }
+        };
+        ServerQuestFiles.Result result = ServerQuestFiles.read(
+                this.folder.getRoot(), Collections.<String>emptySet(), game);
+        assertEquals(1, result.quests.size());
+        assertEquals("Woodcutter", result.quests.get(0).getTitle());
+        assertEquals(result.problems.toString(), 2, result.problems.size());
+        assertTrue(result.problems.get(0).startsWith("misspelt.json: "));
+        assertTrue(result.problems.get(0).contains("'minecraft:breadd'"));
+        assertTrue(result.problems.get(1).contains("'minecraft:logg'"));
+    }
+
+    /** Every place a quest names an item is looked at, each id once and in the game's spelling. */
+    @Test
+    public void everyItemAQuestNamesIsLookedAt() {
+        java.util.Map<String, String> asked = new java.util.LinkedHashMap<String, String>();
+        asked.put("item", "log@1, minecraft:stick");
+        asked.put("count", "2");
+        java.util.Map<String, String> extra = new java.util.LinkedHashMap<String, String>();
+        extra.put("entity", "Wolf");
+        extra.put("reward.item", "minecraft:bone");
+        java.util.Map<String, String> rewards = new java.util.LinkedHashMap<String, String>();
+        rewards.put("item", "minecraft:apple");
+        rewards.put("items", "minecraft:log*3,minecraft:coal@1*4");
+        rewards.put("pick", "minecraft:iron_sword,minecraft:bow");
+        LostTalesQuestDefinition quest = new LostTalesQuestDefinition(
+                "losttales:server/all", "All", "", false, false,
+                LostTalesQuestDefinition.START_MODE_LOCKED, null, rewards, null,
+                null, null, null, null,
+                Collections.singletonList(new LostTalesQuestStageDefinition("one",
+                        java.util.Arrays.asList(
+                                new LostTalesQuestObjectiveDefinition("wood",
+                                        "gather", "", false, asked),
+                                new LostTalesQuestObjectiveDefinition("wolves",
+                                        "kill", "", true, extra)))),
+                false, null, null);
+        final java.util.List<String> looked = new java.util.ArrayList<String>();
+        QuestItemNames.problems(quest, new QuestItemNames.Items() {
+            @Override
+            public boolean has(String itemId) {
+                looked.add(itemId);
+                return true;
+            }
+        });
+        assertEquals(java.util.Arrays.asList("minecraft:apple", "minecraft:log",
+                "minecraft:coal", "minecraft:iron_sword", "minecraft:bow",
+                "minecraft:stick", "minecraft:bone"), looked);
     }
 
     /** A quest a player could not be sent whole is left out, so nobody is ever sent half of one. */
@@ -112,7 +185,7 @@ public final class ServerQuestFilesTest {
         write("long.json", String.format(GOOD, "long", title));
         write("short.json", String.format(GOOD, "short", "Short"));
         ServerQuestFiles.Result result = ServerQuestFiles.read(
-                this.folder.getRoot(), Collections.<String>emptySet());
+                this.folder.getRoot(), Collections.<String>emptySet(), EVERY_ITEM);
         assertEquals(1, result.quests.size());
         assertEquals("Short", result.quests.get(0).getTitle());
         assertEquals(1, result.problems.size());

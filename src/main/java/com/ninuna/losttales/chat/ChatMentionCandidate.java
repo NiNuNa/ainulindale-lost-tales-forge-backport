@@ -13,7 +13,7 @@ import java.util.Locale;
  * character name is only an alias; in role-play channels it is the other way
  * round. Which identity is displayed is presentation only — mention
  * detection on the receiving side still checks both names. The account and
- * character names are kept separately so a hover card can describe the
+ * character names are kept separately so a card can describe the
  * player the same way a chat line's name does.
  *
  * <p>A candidate is either a player or a role. A player carries the
@@ -32,23 +32,10 @@ public final class ChatMentionCandidate {
     private final int roleColor;
     private final List<String> aliases;
 
-    public ChatMentionCandidate(String key, String displayName,
-                                List<String> aliases) {
-        this(key, displayName, aliases, "", "", -1);
-    }
-
     /**
      * A role the whole server can be addressed by: named in its own
-     * colour, with no face of its own.
-     */
-    public static ChatMentionCandidate role(String key, String name,
-                                            int color) {
-        return role(key, name, null, color);
-    }
-
-    /**
-     * A role found by {@code aliases} too: the other names an {@code @}
-     * reaches it by, its id among them.
+     * colour, with no face of its own, and found by {@code aliases} too:
+     * the other names an {@code @} reaches it by, its id among them.
      */
     public static ChatMentionCandidate role(String key, String name,
                                             List<String> aliases, int color) {

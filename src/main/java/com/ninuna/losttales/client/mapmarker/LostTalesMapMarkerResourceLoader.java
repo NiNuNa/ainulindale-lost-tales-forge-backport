@@ -1,38 +1,28 @@
 package com.ninuna.losttales.client.mapmarker;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.data.DataFiles;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
-import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
-import com.ninuna.losttales.util.LostTalesDimensionHelper;
+import com.ninuna.losttales.util.LostTalesLog;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import lotr.common.LOTRDimension;
-import net.minecraft.client.resources.IResource;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.util.ResourceLocation;
 
+/**
+ * Reads the bundled marker files through the client's resource packs,
+ * with the server's own reader and checks
+ * ({@link LostTalesMapMarkerCatalog#readBundled}): a pack may change a
+ * marker, and the client keeps only what a server would keep of it. A
+ * server's own markers never come from here; its snapshots bring them.
+ */
 final class LostTalesMapMarkerResourceLoader {
-    private static final String[] SHARED_MARKER_FILES = new String[] {
-            "towns",
-            "settlements",
-            "cities",
-            "forts",
-            "camps",
-            "caves",
-            "lotr_waypoints"
-    };
-
     private LostTalesMapMarkerResourceLoader() {}
 
     static List<LostTalesMapMarkerData> loadSharedMarkers(IResourceManager resourceManager) {
@@ -40,156 +30,44 @@ final class LostTalesMapMarkerResourceLoader {
         if (resourceManager == null) {
             return markers;
         }
-
-        for (String fileName : SHARED_MARKER_FILES) {
-            ResourceLocation location = new ResourceLocation(LostTalesMetaData.MOD_ID, "map_markers/" + fileName + ".json");
-            LostTalesMapMarkerSource source = "lotr_waypoints".equals(fileName)
-                    ? LostTalesMapMarkerSource.LOTR_ADAPTER
-                    : LostTalesMapMarkerSource.CUSTOM_PRESET;
-            loadFile(resourceManager, location, markers, source);
+        List<String> problems = new ArrayList<String>();
+        for (LostTalesMapMarkerDefinition marker : LostTalesMapMarkerCatalog.readBundled(
+                source(resourceManager), problems)) {
+            markers.add(toClientMarker(marker));
+        }
+        for (String problem : problems) {
+            LostTalesLog.warning("Map marker file left out: %s", problem);
         }
         return markers;
     }
 
-    private static void loadFile(
-            IResourceManager resourceManager, ResourceLocation location,
-            List<LostTalesMapMarkerData> markers,
-            LostTalesMapMarkerSource source) {
-        Reader reader = null;
-        try {
-            IResource resource = resourceManager.getResource(location);
-            reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8);
-
-            JsonElement rootElement = new JsonParser().parse(reader);
-            if (rootElement == null || !rootElement.isJsonObject()) {
-                return;
-            }
-
-            JsonElement markersElement = rootElement.getAsJsonObject().get("map_markers");
-            if (markersElement == null || !markersElement.isJsonArray()) {
-                return;
-            }
-
-            JsonArray array = markersElement.getAsJsonArray();
-            for (JsonElement entryElement : array) {
-                if (entryElement == null || !entryElement.isJsonObject()) continue;
-
-                LostTalesMapMarkerData marker = parseMarker(
-                        entryElement.getAsJsonObject(), source);
-                if (marker != null) {
-                    markers.add(marker);
+    /** The mod's files as the resource packs give them; none for one no pack has. */
+    static DataFiles.Source source(final IResourceManager resourceManager) {
+        return new DataFiles.Source() {
+            @Override
+            public Reader open(String path) throws IOException {
+                try {
+                    return new InputStreamReader(resourceManager.getResource(
+                            new ResourceLocation(LostTalesMetaData.MOD_ID, path))
+                            .getInputStream(), StandardCharsets.UTF_8);
+                } catch (FileNotFoundException missing) {
+                    return null;
                 }
             }
-        } catch (IOException ignored) {
-            // Missing marker files are allowed; this lets resource packs override
-            // only the groups they need without breaking the HUD.
-        } catch (RuntimeException ignored) {
-            // A broken marker file should not crash resource reload or the HUD.
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException ignored) {}
-            }
-        }
+        };
     }
 
-    private static LostTalesMapMarkerData parseMarker(
-            JsonObject object, LostTalesMapMarkerSource source) {
-        if (!hasNumber(object, "x") || !hasNumber(object, "z")) {
-            return null;
-        }
-        // A Lost Tales marker's words live in the lang file; a file may
-        // still write its own, which stand in where no line names it.
-        String name = getString(object, "name", null);
-        String id = LostTalesQuestMarkerHelper.normalizeMarkerId(getString(object, "id", name));
-        if (id.length() == 0) {
-            return null;
-        }
-        if (name == null || name.trim().length() == 0) {
-            name = LostTalesMapMarkerNames.englishName(id);
-        }
-        if (name.length() == 0) {
-            return null;
-        }
-        boolean hasFastTravel = getBoolean(object, "hasFastTravel", false);
-        String icon = getString(object, "icon", hasFastTravel ? "fort" : "undiscovered");
-        String color = getString(object, "color", "white");
-        String category = getString(object, "category", "");
-        String description = getString(object, "description",
-                LostTalesMapMarkerNames.englishDescription(id));
-        int dimensionId = parseDimensionId(getString(object, "dimension", "lotr:middle_earth"));
-        double x = object.get("x").getAsDouble();
-        double y = hasNumber(object, "y")
-                ? object.get("y").getAsDouble()
-                : LostTalesMapMarkerDefinition.AUTOMATIC_Y;
-        double z = object.get("z").getAsDouble();
-        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
-            return null;
-        }
-        double compassFadeInRadius = getDouble(object, "compassFadeInRadius", 128.0D);
-        double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", 8.0D));
-        boolean hiddenUntilDiscovered = getBoolean(object, "hiddenUntilDiscovered", false);
-        boolean discoverable = getBoolean(object, "isDiscoverable", true);
-        boolean requiresRegionUnlock = getBoolean(
-                object, "requiresRegionUnlock", true);
-        boolean hasWaystone =
-                getBoolean(object, "hasWaystone", false);
-        Integer relevanceRank =
-                LostTalesMapMarkerRelevance.parseJsonRank(object);
-        if (relevanceRank == null) {
-            return null;
-        }
-        return new LostTalesMapMarkerData(id, name, icon, color, category,
-                description, hasFastTravel,
-                dimensionId, x, y, z, compassFadeInRadius,
-                discoveryRadius, hiddenUntilDiscovered, discoverable,
-                requiresRegionUnlock, hasWaystone,
-                relevanceRank.intValue(), source);
-    }
-
-    private static boolean hasNumber(JsonObject object, String key) {
-        JsonElement element = object.get(key);
-        return element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber();
-    }
-
-    private static String getString(JsonObject object, String key, String fallback) {
-        JsonElement element = object.get(key);
-        if (element == null || element.isJsonNull()) {
-            return fallback;
-        }
-        try {
-            return element.getAsString();
-        } catch (RuntimeException ignored) {
-            return fallback;
-        }
-    }
-
-    private static double getDouble(JsonObject object, String key, double fallback) {
-        JsonElement element = object.get(key);
-        if (element == null || element.isJsonNull()) {
-            return fallback;
-        }
-        try {
-            return element.getAsDouble();
-        } catch (RuntimeException ignored) {
-            return fallback;
-        }
-    }
-
-    private static boolean getBoolean(JsonObject object, String key, boolean fallback) {
-        JsonElement element = object.get(key);
-        if (element == null || element.isJsonNull()) {
-            return fallback;
-        }
-        try {
-            return element.getAsBoolean();
-        } catch (RuntimeException ignored) {
-            return fallback;
-        }
-    }
-
-    private static int parseDimensionId(String dimensionName) {
-        return LostTalesDimensionHelper.parseDimensionId(dimensionName, LOTRDimension.MIDDLE_EARTH.dimensionID);
+    /** A bundled marker as the client draws it, its words read in the game's language. */
+    private static LostTalesMapMarkerData toClientMarker(
+            LostTalesMapMarkerDefinition marker) {
+        return new LostTalesMapMarkerData(marker.getId(), marker.getName(),
+                marker.getIconName(), marker.getColorName(),
+                marker.getCategoryName(), marker.getDescription(),
+                marker.hasFastTravel(), marker.getDimensionId(),
+                marker.getX(), marker.getY(), marker.getZ(),
+                marker.getCompassFadeInRadius(), marker.getDiscoveryRadius(),
+                marker.isHiddenUntilDiscovered(), marker.isDiscoverable(),
+                marker.requiresRegionUnlock(), marker.hasWaystone(),
+                marker.getPriority(), marker.getSource());
     }
 }

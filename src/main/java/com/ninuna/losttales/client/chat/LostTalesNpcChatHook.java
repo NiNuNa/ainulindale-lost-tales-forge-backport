@@ -237,7 +237,7 @@ public final class LostTalesNpcChatHook {
 
     /**
      * The faction the NPC speaks for, as LOTR displays it, captured for
-     * the hover card while the entity is at hand; empty when it cannot
+     * its card while the entity is at hand; empty when it cannot
      * be read.
      */
     private static String factionName(LOTREntityNPC npc) {

@@ -27,7 +27,7 @@ import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WorldPageReach;
 import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -676,7 +676,7 @@ public final class MissiveBoardPage extends PageContent
                 LostTalesUiHitBox row = layout.row(index, whole);
                 if (row.bottom() >= band.top - 1 && row.top <= band.bottom() + 1) {
                     drawRow(font, layout, shown.get(index), (int)row.top, now,
-                            alpha);
+                            index == this.hoveredRow, alpha);
                 }
             }
         } finally {
@@ -691,10 +691,13 @@ public final class MissiveBoardPage extends PageContent
     /**
      * One notice from {@code top}, two lines a menu row high each, their
      * words centred in the line: its title, and under it who posted it
-     * and, at the right, how long it has left on the board.
+     * and, at the right, how long it has left on the board. A title or a
+     * name too long for its room fades into its end and slides along
+     * while the row is {@code hovered} (LOOK-37).
      */
     private void drawRow(FontRenderer font, MissiveBoardLayout layout,
-                         MissiveNotice notice, int top, long now, int alpha) {
+                         MissiveNotice notice, int top, long now,
+                         boolean hovered, int alpha) {
         int left = layout.textLeft();
         int right = layout.textRight();
         int lineHeight = layout.lineHeight();
@@ -713,8 +716,9 @@ public final class MissiveBoardPage extends PageContent
                 : isPicked ? LostTalesUiInk.IVORY
                 : LostTalesColors.rgb(LostTalesColors.TEXT);
         int width = Math.max(0, right - left);
-        LostTalesUiInk.drawText(font, LostTalesSkyrimUiStyle.trimToWidth(font,
-                        title, width), left, top + inset, titleRgb, alpha);
+        LostTalesUiCutName.drawText(font, title, left, top + inset, width,
+                titleRgb, alpha, this, Integer.valueOf(notice.getSlot()),
+                hovered);
         int second = top + lineHeight + inset;
         long remaining = MissiveNoticeList.ticksLeft(notice, this.receivedAt,
                 now);
@@ -728,10 +732,11 @@ public final class MissiveBoardPage extends PageContent
         String issuer = notice.isWorld() ? word("world.issuer")
                 : MissiveWords.issuer(missive);
         if (issuer.length() > 0) {
-            LostTalesUiInk.drawText(font, LostTalesSkyrimUiStyle.trimToWidth(
-                            font, issuer, Math.max(0, width - timeWidth
-                                    - (timeWidth > 0 ? 6 : 0))), left, second,
-                    WindowStyle.asideRgb(), alpha);
+            // The issuer's key stands apart from every title's.
+            LostTalesUiCutName.drawText(font, issuer, left, second,
+                    width - timeWidth - (timeWidth > 0 ? 6 : 0),
+                    WindowStyle.asideRgb(), alpha, this,
+                    Integer.valueOf(-1 - notice.getSlot()), hovered);
         }
     }
 

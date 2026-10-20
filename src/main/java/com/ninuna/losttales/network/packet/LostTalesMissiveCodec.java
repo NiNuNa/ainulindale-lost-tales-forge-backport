@@ -14,10 +14,12 @@ import java.util.Map;
 
 /**
  * A missive's letter on the wire, as much of it as a page shows: its
- * quest id and kind, the template ids and target it is worded by
- * ({@link MissiveWords}), objectives, reward and time limit. No sentence
- * travels; each client words the letter in its own language. Every field
- * is bounded; a letter larger than the bounds is not sent ({@link #fits})
+ * quest id and kind, whether its words are written, the words and target
+ * it is worded by ({@link MissiveWords}), objectives, reward and time
+ * limit. A letter from a bundled template sends no sentence, and each
+ * client words it in its own language; one from a server's template sends
+ * its title, issuer and flavour as written (QUEST-42). Every field is
+ * bounded; a letter larger than the bounds is not sent ({@link #fits})
  * and its page shows it as one that cannot be read. What the server keeps
  * of a letter to make its quest never travels.
  */
@@ -26,6 +28,8 @@ public final class LostTalesMissiveCodec {
     public static final int MAX_TYPE_BYTES = 64;
     public static final int MAX_TEMPLATE_ID_BYTES =
             MissiveWords.MAX_TEMPLATE_ID_BYTES;
+    /** A title, issuer or flavour, as an id or as written. */
+    public static final int MAX_WORD_BYTES = MissiveWords.MAX_WRITTEN_BYTES;
     public static final int MAX_TARGET_BYTES = MissiveWords.MAX_TARGET_BYTES;
     public static final int MAX_OBJECTIVES = 4;
     public static final int MAX_OBJECTIVE_ID_BYTES = 256;
@@ -44,8 +48,9 @@ public final class LostTalesMissiveCodec {
 
     /** A letter at its largest. */
     public static final int MAX_MISSIVE_BYTES = LENGTH_BYTES
-            + MAX_QUEST_ID_BYTES + LENGTH_BYTES + MAX_TYPE_BYTES
-            + 4 * (LENGTH_BYTES + MAX_TEMPLATE_ID_BYTES)
+            + MAX_QUEST_ID_BYTES + LENGTH_BYTES + MAX_TYPE_BYTES + 1
+            + 3 * (LENGTH_BYTES + MAX_WORD_BYTES)
+            + LENGTH_BYTES + MAX_TEMPLATE_ID_BYTES
             + LENGTH_BYTES + MAX_TARGET_BYTES + 8
             + 1 + MAX_OBJECTIVES * OBJECTIVE_BYTES
             + 1 + MAX_ENTRIES * ENTRY_BYTES;
@@ -99,14 +104,13 @@ public final class LostTalesMissiveCodec {
                 MAX_QUEST_ID_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, missive.getQuestType(),
                 MAX_TYPE_BYTES);
-        LostTalesPacketCodec.writeUtf8String(buffer, missive.getTitleId(),
-                MAX_TEMPLATE_ID_BYTES);
-        LostTalesPacketCodec.writeUtf8String(buffer, missive.getIssuerId(),
-                MAX_TEMPLATE_ID_BYTES);
+        buffer.writeBoolean(missive.isWritten());
+        int words = wordBytes(missive.isWritten());
+        LostTalesPacketCodec.writeUtf8String(buffer, missive.getTitleId(), words);
+        LostTalesPacketCodec.writeUtf8String(buffer, missive.getIssuerId(), words);
         LostTalesPacketCodec.writeUtf8String(buffer,
                 missive.getDescriptionId(), MAX_TEMPLATE_ID_BYTES);
-        LostTalesPacketCodec.writeUtf8String(buffer, missive.getFlavorId(),
-                MAX_TEMPLATE_ID_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, missive.getFlavorId(), words);
         LostTalesPacketCodec.writeUtf8String(buffer, missive.getTarget(),
                 MAX_TARGET_BYTES);
         buffer.writeLong(missive.getTimeLimitTicks());
@@ -131,14 +135,13 @@ public final class LostTalesMissiveCodec {
                 MAX_QUEST_ID_BYTES);
         String questType = LostTalesPacketCodec.readUtf8String(buffer,
                 MAX_TYPE_BYTES);
-        String titleId = LostTalesPacketCodec.readUtf8String(buffer,
-                MAX_TEMPLATE_ID_BYTES);
-        String issuerId = LostTalesPacketCodec.readUtf8String(buffer,
-                MAX_TEMPLATE_ID_BYTES);
+        boolean written = readBoolean(buffer);
+        int words = wordBytes(written);
+        String titleId = LostTalesPacketCodec.readUtf8String(buffer, words);
+        String issuerId = LostTalesPacketCodec.readUtf8String(buffer, words);
         String descriptionId = LostTalesPacketCodec.readUtf8String(buffer,
                 MAX_TEMPLATE_ID_BYTES);
-        String flavorId = LostTalesPacketCodec.readUtf8String(buffer,
-                MAX_TEMPLATE_ID_BYTES);
+        String flavorId = LostTalesPacketCodec.readUtf8String(buffer, words);
         String target = LostTalesPacketCodec.readUtf8String(buffer,
                 MAX_TARGET_BYTES);
         long timeLimitTicks = readLong(buffer);
@@ -168,7 +171,7 @@ public final class LostTalesMissiveCodec {
         }
         Map<String, String> rewards = readEntries(buffer);
         LostTalesMissiveData missive = new LostTalesMissiveData(questId,
-                questType, titleId, descriptionId, issuerId, flavorId,
+                questType, written, titleId, descriptionId, issuerId, flavorId,
                 target, 0L, timeLimitTicks,
                 Collections.<String, String>emptyMap(), objectives,
                 new LostTalesMissiveRewardData(rewards));
@@ -184,6 +187,11 @@ public final class LostTalesMissiveCodec {
                     "invalid missive letter");
         }
         return missive;
+    }
+
+    /** How long a title, issuer or flavour may be: written words, or a template id. */
+    private static int wordBytes(boolean written) {
+        return written ? MAX_WORD_BYTES : MAX_TEMPLATE_ID_BYTES;
     }
 
     private static void writeEntries(ByteBuf buffer,

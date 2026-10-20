@@ -144,6 +144,22 @@ import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
 import com.ninuna.losttales.chat.server.ChatPresenceService;
+import com.ninuna.losttales.network.packet.ProgressionCatalogPacket;
+import com.ninuna.losttales.network.packet.ProgressionStatePacket;
+import com.ninuna.losttales.progression.ProgressionCatalog;
+import com.ninuna.losttales.progression.ProgressionFiles;
+import com.ninuna.losttales.progression.ProgressionPlayerEvents;
+import com.ninuna.losttales.progression.ProgressionService;
+import com.ninuna.losttales.progression.count.CountEvents;
+import com.ninuna.losttales.progression.count.CountWatch;
+import com.ninuna.losttales.progression.perk.PerkIndex;
+import com.ninuna.losttales.progression.perk.PerkAnimalEvents;
+import com.ninuna.losttales.progression.perk.PerkCombatEvents;
+import com.ninuna.losttales.progression.perk.PerkFood;
+import com.ninuna.losttales.progression.perk.PerkRuntime;
+import com.ninuna.losttales.progression.perk.PerkWorkEvents;
+import com.ninuna.losttales.progression.deed.DeedEvents;
+import com.ninuna.losttales.network.packet.ProgressionStatuePacket;
 import software.bernie.geckolib3.GeckoLib;
 
 public class LostTalesCommonProxy {
@@ -166,6 +182,9 @@ public class LostTalesCommonProxy {
         loadConfig(event.getModConfigurationDirectory());
         LoreCharacterRegistry.load(event.getModConfigurationDirectory());
         ServerQuestFiles.configure(event.getModConfigurationDirectory());
+        ProgressionFiles.configure(event.getModConfigurationDirectory());
+        com.ninuna.losttales.mapmarker.LostTalesMapMarkerFiles.configure(
+                event.getModConfigurationDirectory());
         GeckoLib.initialize();
         LostTalesNetworkHandler.registerCommonPackets();
         LostTalesQuestRegistry.loadFromClasspath();
@@ -202,6 +221,17 @@ public class LostTalesCommonProxy {
         LostTalesChatRoleRosterWatcher chatRoleRosterWatcher =
                 new LostTalesChatRoleRosterWatcher();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
+        ProgressionPlayerEvents progressionPlayerEvents = new ProgressionPlayerEvents();
+        MinecraftForge.EVENT_BUS.register(progressionPlayerEvents);
+        FMLCommonHandler.instance().bus().register(progressionPlayerEvents);
+        CountEvents countEvents = new CountEvents();
+        MinecraftForge.EVENT_BUS.register(countEvents);
+        FMLCommonHandler.instance().bus().register(countEvents);
+        for (Object perks : new Object[] { new PerkCombatEvents(), new PerkWorkEvents(),
+                new PerkAnimalEvents(), new PerkFood(), new DeedEvents() }) {
+            MinecraftForge.EVENT_BUS.register(perks);
+            FMLCommonHandler.instance().bus().register(perks);
+        }
         MinecraftForge.EVENT_BUS.register(accessoryPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(accessoryConcealmentEventHandler);
         MinecraftForge.EVENT_BUS.register(characterLifecycleStateTracker);
@@ -267,6 +297,7 @@ public class LostTalesCommonProxy {
         LostTalesMapOverlay.applyWorldGenerationMap();
         LostTalesMapMarkerWaypointRegistry.initAndRegisterWaypoints();
         ELostTalesAchievement.initAndRegisterAchievements();
+        ProgressionCatalog.makeDeedAchievements();
 
         ELostTalesRoad.initAndRegisterRoads();
     }
@@ -302,6 +333,21 @@ public class LostTalesCommonProxy {
     public void handleQuestProgress(LostTalesQuestProgressPacket packet) {}
 
     public void handleQuestFellows(LostTalesQuestFellowsPacket packet) {}
+
+    public void handleProgressionCatalog(ProgressionCatalogPacket packet) {}
+
+    /** The server's races and capes, as a player joins (CHAR-38, CHAR-39). */
+    public void handleRaceCatalog(
+            com.ninuna.losttales.network.packet.character.CharacterRaceCatalogPacket packet) {}
+
+    public void handleProgressionState(ProgressionStatePacket packet) {}
+
+    public void handleProgressionStatue(ProgressionStatuePacket packet) {}
+
+    /** The perks the client's own player took; none on a dedicated server. */
+    public PerkIndex clientPerkIndex(EntityPlayer player) {
+        return PerkIndex.EMPTY;
+    }
 
     public void handleServerQuestSync(LostTalesServerQuestSyncPacket packet) {}
 
@@ -424,6 +470,7 @@ public class LostTalesCommonProxy {
         MissiveBoardWatches.clear();
         LostTalesMapMarkerSyncManager.clear();
         LostTalesLotrWaystoneTravelAdapter.clear();
+        com.ninuna.losttales.mapmarker.LostTalesWaystoneVisits.clear();
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
@@ -436,9 +483,10 @@ public class LostTalesCommonProxy {
         ChatHistoryStorage.restore(event.getServer());
         // Straight after the history, whose kept messages decide which of
         // the save's Discord links come back, and before the bridge
-        // starts below. Every server gets a map of its own, so nothing
-        // reaches it from the world before.
-        LostTalesDiscordBridge.getInstance().restoreLinks(event.getServer());
+        // starts below, which paces its topics by the save's topic
+        // writes. Every server gets its own, so nothing reaches it from
+        // the world before.
+        LostTalesDiscordBridge.getInstance().restoreSaved(event.getServer());
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
         ChatIdentitySelection.clear();
@@ -449,6 +497,26 @@ public class LostTalesCommonProxy {
         LostTalesQuestRegistry.clearRuntimeQuests();
         // The server's own quest files, as they are on disk now.
         LostTalesQuestRegistry.loadServerQuests();
+        // The skills and race starts, bundled and the server's own.
+        ProgressionCatalog.load();
+        // The races and capes, bundled and the server's own, after the
+        // skills their starts name (CHAR-38, CHAR-39).
+        com.ninuna.losttales.character.server.CharacterRaceCatalog.load(
+                event.getServer().worldServerForDimension(0));
+        // The server's own waystone houses and map marker files (MOD-17);
+        // the marker store seeds itself from the files only after this.
+        com.ninuna.losttales.mapmarker.LostTalesMapMarkerFiles.loadServer();
+        // The starting kits, checked against the server's races, so read
+        // once its race list is set (CHAR-40).
+        com.ninuna.losttales.character.kit.StartingKits.load();
+        // The missive templates, bundled and the server's own (QUEST-42).
+        com.ninuna.losttales.quest.missive.MissiveTemplates.load();
+        ProgressionService.clear();
+        CountWatch.clear();
+        PerkRuntime.clearServer();
+        PerkCombatEvents.clear();
+        PerkAnimalEvents.clear();
+        DeedEvents.clear();
         com.ninuna.losttales.quest.world.WorldQuestSchedules.logProblems();
         ServerQuestSync.clear();
         QuestLogSync.clear();
@@ -459,6 +527,7 @@ public class LostTalesCommonProxy {
         ChatArrivals.clear();
         ChatWelcome.clear();
         CharacterJoin.clear();
+        com.ninuna.losttales.character.server.CharacterSyncManager.clear();
         ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();
@@ -530,10 +599,11 @@ public class LostTalesCommonProxy {
         // worker a bounded moment to send it.
         LostTalesDiscordBridge.getInstance().onServerStopping();
         LostTalesDiscordBridge.getInstance().stop();
-        // Once the bridge has stopped adding to them, the links go to the
-        // save the worlds are written with after this event, and the live
-        // map is emptied for the next world.
-        LostTalesDiscordBridge.getInstance().releaseLinks();
+        // Once the bridge has stopped adding to them, the links and the
+        // topic writes, the offline one among them, go to the save the
+        // worlds are written with after this event, and the live ones are
+        // emptied for the next world.
+        LostTalesDiscordBridge.getInstance().releaseSaved();
         LostTalesServerTaskQueue.stopAcceptingAndClear();
         CharacterLifecycleStateTracker.markServerStopping();
         int checkpointed = CharacterSwitchCoordinator.getInstance()
@@ -556,6 +626,17 @@ public class LostTalesCommonProxy {
         FellowshipQuestProgressCoordinator.getInstance().clear();
         MissiveBoardWatches.clear();
         LostTalesQuestRegistry.clearServerQuests();
+        ProgressionCatalog.clear();
+        com.ninuna.losttales.character.server.CharacterRaceCatalog.clear();
+        com.ninuna.losttales.mapmarker.LostTalesMapMarkerFiles.clearServer();
+        com.ninuna.losttales.character.kit.StartingKits.clear();
+        com.ninuna.losttales.quest.missive.MissiveTemplates.clear();
+        ProgressionService.clear();
+        CountWatch.clear();
+        PerkRuntime.clearServer();
+        PerkCombatEvents.clear();
+        PerkAnimalEvents.clear();
+        DeedEvents.clear();
         ServerQuestSync.clear();
         QuestLogSync.clear();
         com.ninuna.losttales.quest.QuestFellows.clear();
@@ -563,6 +644,7 @@ public class LostTalesCommonProxy {
         WorldQuests.clear();
         LostTalesMapMarkerSyncManager.clear();
         LostTalesLotrWaystoneTravelAdapter.clear();
+        com.ninuna.losttales.mapmarker.LostTalesWaystoneVisits.clear();
         LostTalesChatRoleRosterWatcher.clear();
         ChatChannel.resetToBuiltIn();
         ChatChannelIconCatalog.resetToDefaults();
@@ -588,6 +670,7 @@ public class LostTalesCommonProxy {
         ChatArrivals.clear();
         ChatWelcome.clear();
         CharacterJoin.clear();
+        com.ninuna.losttales.character.server.CharacterSyncManager.clear();
         ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();

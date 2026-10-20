@@ -190,9 +190,9 @@ final class LostTalesLotrRoadLabelRenderer {
          *
          * <p>A road name is ink on the paper, exactly as a region name is, so
          * it goes under the same matrix and turns, leans and foreshortens with
-         * the ground. It used to be drawn in screen space with the map's turn
-         * undone by hand, which kept the letters level but let the name swim
-         * away from the road under it the moment the map was tilted.</p>
+         * the ground. Drawn in screen space with the map's turn undone by
+         * hand, the letters would stay level but the name would swim away
+         * from the road under it the moment the map tilts.</p>
          *
          * <p>Inside the pass the shared coordinate transform stands down — the
          * matrix is already moving these positions — so everything worked out
@@ -447,10 +447,9 @@ final class LostTalesLotrRoadLabelRenderer {
     /**
      * The tangent angle of a road, folded so the name reads left to right.
      *
-     * <p>Worked out on the flat sheet only. The map's own turn used to be
-     * added here so the letters could be drawn level in screen space; now the
-     * name is drawn on the sheet with everything else, the matrix carries it
-     * round, and adding the turn here as well would count it twice.</p>
+     * <p>Worked out on the flat sheet only. The name is drawn on the sheet
+     * with everything else and the matrix carries it round, so adding the
+     * map's turn here as well would count it twice.</p>
      */
     static float uprightAngle(double dx, double dz) {
         float angle = (float)Math.toDegrees(Math.atan2(dz, dx));

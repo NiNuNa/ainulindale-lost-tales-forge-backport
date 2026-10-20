@@ -9,10 +9,10 @@ import org.lwjgl.opengl.GL11;
 /**
  * The map's compass rose, moved out of the corner and made to mean something.
  *
- * <p>LOTR draws it at the bottom left, where the Lost Tales control strip now
- * lives, and draws it square whatever the map is doing. Here it sits above the
- * strip, centred, and turns with the map — so once the map can be turned, the
- * rose is the thing that says by how much and which way north now lies.</p>
+ * <p>LOTR draws it at the bottom left, where the Lost Tales control strip
+ * stands, and draws it square whatever the map is doing. Here it sits above
+ * the strip, centred, and turns with the map, so the rose says by how much
+ * the map is turned and which way north lies.</p>
  *
  * <p>The sprite is LOTR's own, drawn through LOTR's own routine; only where it
  * goes and which way it faces are decided here.</p>

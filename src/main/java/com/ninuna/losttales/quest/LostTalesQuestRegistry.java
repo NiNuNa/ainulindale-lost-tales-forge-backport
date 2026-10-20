@@ -28,6 +28,12 @@ public final class LostTalesQuestRegistry {
     private static final Map<String, LostTalesQuestDefinition> SERVER_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static final Map<String, LostTalesQuestDefinition> RUNTIME_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static List<LostTalesQuestDefinition> sortedQuests = Collections.emptyList();
+    /** Of the sorted quests, those a touched block may start. */
+    private static List<LostTalesQuestDefinition> blockGiven = Collections.emptyList();
+    /** Of the sorted quests, those a touched creature's kind may start. */
+    private static List<LostTalesQuestDefinition> creatureGiven = Collections.emptyList();
+    /** Of the sorted quests, those with a rumour to tell. */
+    private static List<LostTalesQuestDefinition> rumoured = Collections.emptyList();
     private static boolean loaded;
 
     private LostTalesQuestRegistry() {}
@@ -69,12 +75,15 @@ public final class LostTalesQuestRegistry {
     /**
      * Reads the server's own quest files again ({@link ServerQuestFiles}),
      * in place of those read before, and logs every file left out and why.
-     * Answers what the read found.
+     * The server reads them once every mod's items are registered, so each
+     * item a file names is checked against the game's own. Answers what
+     * the read found.
      */
     public static synchronized ServerQuestFiles.Result loadServerQuests() {
         ensureLoaded();
         ServerQuestFiles.Result result = ServerQuestFiles.read(
-                ServerQuestFiles.directory(), STATIC_QUESTS_BY_ID.keySet());
+                ServerQuestFiles.directory(), STATIC_QUESTS_BY_ID.keySet(),
+                QuestItemNames.GAME);
         SERVER_QUESTS_BY_ID.clear();
         for (LostTalesQuestDefinition quest : result.quests) {
             SERVER_QUESTS_BY_ID.put(quest.getId(), quest);
@@ -119,6 +128,31 @@ public final class LostTalesQuestRegistry {
     public static synchronized Collection<LostTalesQuestDefinition> getQuests() {
         ensureLoaded();
         return sortedQuests;
+    }
+
+    /**
+     * The quests a touched block may start, sorted: an interaction start
+     * whose interaction names a block, never a world quest.
+     */
+    public static synchronized List<LostTalesQuestDefinition> getBlockGivenQuests() {
+        ensureLoaded();
+        return blockGiven;
+    }
+
+    /**
+     * The quests a touched creature may start by its kind, sorted: an
+     * interaction start whose interaction names a creature, never a world
+     * quest. A quest a creature's own data names is found by its id.
+     */
+    public static synchronized List<LostTalesQuestDefinition> getCreatureGivenQuests() {
+        ensureLoaded();
+        return creatureGiven;
+    }
+
+    /** The quests with a rumour to tell (QUEST-20), sorted, never a world quest. */
+    public static synchronized List<LostTalesQuestDefinition> getRumouredQuests() {
+        ensureLoaded();
+        return rumoured;
     }
 
     /**
@@ -203,6 +237,28 @@ public final class LostTalesQuestRegistry {
             }
         });
         sortedQuests = Collections.unmodifiableList(sorted);
+        List<LostTalesQuestDefinition> blocks = new ArrayList<LostTalesQuestDefinition>();
+        List<LostTalesQuestDefinition> creatures = new ArrayList<LostTalesQuestDefinition>();
+        List<LostTalesQuestDefinition> rumours = new ArrayList<LostTalesQuestDefinition>();
+        for (LostTalesQuestDefinition quest : sorted) {
+            if (quest.isWorldQuest()) {
+                continue;
+            }
+            if (quest.canStartFromInteraction()) {
+                if (LostTalesQuestParams.value(quest.getInteraction(), "block").length() > 0) {
+                    blocks.add(quest);
+                }
+                if (LostTalesQuestParams.value(quest.getInteraction(), "entity").length() > 0) {
+                    creatures.add(quest);
+                }
+            }
+            if (!LostTalesQuestRules.rumour(quest).isEmpty()) {
+                rumours.add(quest);
+            }
+        }
+        blockGiven = Collections.unmodifiableList(blocks);
+        creatureGiven = Collections.unmodifiableList(creatures);
+        rumoured = Collections.unmodifiableList(rumours);
     }
 
     /** The bundled quest files as the server reads them: from the mod's own classpath. */

@@ -1,0 +1,5 @@
+{
+  "view": "channels",
+  "locked": true,
+  "pages": ["set:chat"]
+}

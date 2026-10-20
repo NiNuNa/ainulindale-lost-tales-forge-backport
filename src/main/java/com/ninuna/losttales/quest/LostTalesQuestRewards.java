@@ -19,6 +19,10 @@ public final class LostTalesQuestRewards {
     public static final String ALIGNMENT = "alignment";
     public static final String COINS = "coins";
     public static final String PICK = "pick";
+    /** Skill experience (PROG-04, QUEST-19): {@code skill*amount}, parted by commas. */
+    public static final String SKILLS = "skills";
+    /** The most experience one skill gains from one reward. */
+    public static final int MAX_SKILL_EXPERIENCE = 100000;
     /** The most items a pick offers. */
     public static final int MAX_PICKS = 3;
     /** The most alignment one faction gains from one reward. */
@@ -74,6 +78,49 @@ public final class LostTalesQuestRewards {
             }
         }
         return alignments;
+    }
+
+    /** One skill's experience, as a reward names it. */
+    public static final class SkillReward {
+        private final String skillId;
+        private final int amount;
+
+        SkillReward(String skillId, int amount) {
+            this.skillId = skillId;
+            this.amount = amount;
+        }
+
+        public String getSkillId() {
+            return this.skillId;
+        }
+
+        public int getAmount() {
+            return this.amount;
+        }
+    }
+
+    /**
+     * Each skill a reward block's {@code skills} names with its
+     * experience, as written: {@code skill*amount}, parted by commas
+     * ({@code losttales:smithing*50}). An entry without a whole amount of
+     * 1 to {@link #MAX_SKILL_EXPERIENCE} is left out; the checker names it.
+     */
+    public static List<SkillReward> skills(Map<String, String> rewards) {
+        List<SkillReward> skills = new ArrayList<SkillReward>();
+        String written = LostTalesQuestParams.value(rewards, SKILLS);
+        if (written.length() == 0) {
+            return skills;
+        }
+        for (String part : written.split(",")) {
+            int star = part.lastIndexOf('*');
+            String skill = (star < 0 ? part : part.substring(0, star)).trim();
+            int amount = star < 0 ? -1 : LostTalesQuestParams.parseInt(
+                    part.substring(star + 1), -1);
+            if (skill.length() > 0 && amount >= 1 && amount <= MAX_SKILL_EXPERIENCE) {
+                skills.add(new SkillReward(skill, amount));
+            }
+        }
+        return skills;
     }
 
     /** The coins a reward block pays: 0 for none, at most {@link #MAX_COINS}. */

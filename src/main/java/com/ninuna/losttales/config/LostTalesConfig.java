@@ -22,6 +22,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
+import com.ninuna.losttales.chat.server.ChatWelcome;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
@@ -45,23 +46,18 @@ public final class LostTalesConfig {
     public static final String CATEGORY_RANGED_COMBAT = "ranged_combat";
     public static final String CATEGORY_WAYSTONES = "waystones";
     public static final String CATEGORY_DISCORD = "discord";
+    public static final String CATEGORY_PROGRESSION = "progression";
     /** The chat roles and their assignments; a server file of its own. */
     public static final String CATEGORY_ROLES = "roles";
     /** The chat channels' gates and definitions; a server file of its own. */
     public static final String CATEGORY_CHANNELS = "channels";
 
+    /** The panels where the player put them, in no layout. */
     public static final String HUD_PRESET_CUSTOM = "custom";
+    /** The layout every panel starts in, and where Default Place puts one back. */
     public static final String HUD_PRESET_DEFAULT = "default";
-    public static final String HUD_PRESET_LOTR_SAFE = "lotr-safe";
-    public static final String HUD_PRESET_COMPACT = "compact";
-    public static final String HUD_PRESET_MINIMAL = "minimal";
-    public static final String[] HUD_PRESET_VALUES = new String[] {
-            HUD_PRESET_CUSTOM,
-            HUD_PRESET_DEFAULT,
-            HUD_PRESET_LOTR_SAFE,
-            HUD_PRESET_COMPACT,
-            HUD_PRESET_MINIMAL
-    };
+    /** What a HUD layout's id is made of: lower-case letters, digits, - and _, at most 64. */
+    public static final String HUD_LAYOUT_ID = "[a-z0-9_-]{1,64}";
 
     /**
      * The categories the client decides for itself; every other category
@@ -84,14 +80,32 @@ public final class LostTalesConfig {
     /** What every option is read with where Forge asks for a comment. */
     private static final String TIP = LostTalesConfigWords.TIP;
 
+    /** The HUD panels by the names the client file and the layout files keep their places under. */
+    private static final List<String> HUD_ELEMENTS = Collections.unmodifiableList(
+            Arrays.asList("compass", "fellowship", "quickloot", "quest",
+                    "notifications"));
+    /**
+     * The HUD layouts that loaded (MAP-11), by id in the order the HUD
+     * Placement page lists them: where each puts every panel, {across,
+     * down} for each panel of {@link #HUD_ELEMENTS} in turn, a share of
+     * the room the panel's box can move in (MAP-10). The client reads them
+     * from the layout files as the resources load; none before that, and
+     * none on a dedicated server.
+     */
+    private static volatile Map<String, double[][]> hudLayouts =
+            Collections.<String, double[][]>emptyMap();
+    /** Whether the layout files were read yet. */
+    private static volatile boolean hudLayoutsRead;
+    /** Where a panel stands until a layout places it: centred. */
+    private static final double HUD_PANEL_UNPLACED = 50.0D;
 
     public static boolean showLostTalesHud = true;
-    public static String hudPlacementPreset = HUD_PRESET_CUSTOM;
+    public static String hudPlacementPreset = HUD_PRESET_DEFAULT;
 
     public static boolean showCompassHud = true;
     public static boolean linkShowCompassHud = false;
-    public static double compassHudOffsetX = 50.0D;
-    public static double compassHudOffsetY = 2.0D;
+    public static double compassHudOffsetX = HUD_PANEL_UNPLACED;
+    public static double compassHudOffsetY = HUD_PANEL_UNPLACED;
     public static int compassHudDisplayRadius = 90;
     public static boolean showStaticCompassMarkers = true;
     public static boolean showLotrWaypointCompassMarkers = true;
@@ -114,8 +128,8 @@ public final class LostTalesConfig {
 
     public static boolean showFellowshipHud = true;
     public static boolean linkShowFellowshipHud = false;
-    public static double fellowshipHudOffsetX = 2.0D;
-    public static double fellowshipHudOffsetY = 18.0D;
+    public static double fellowshipHudOffsetX = HUD_PANEL_UNPLACED;
+    public static double fellowshipHudOffsetY = HUD_PANEL_UNPLACED;
     public static int fellowshipCompassMarkerFadeRadius = 100;
 
     public static int fellowshipStatusUpdateIntervalTicks = 10;
@@ -128,13 +142,13 @@ public final class LostTalesConfig {
     public static boolean showQuickLootHud = true;
     public static boolean linkShowQuickLootHud = false;
     public static int quickLootHudMaxRows = 5;
-    public static double quickLootHudOffsetX = 24.0D;
-    public static double quickLootHudOffsetY = 32.0D;
+    public static double quickLootHudOffsetX = HUD_PANEL_UNPLACED;
+    public static double quickLootHudOffsetY = HUD_PANEL_UNPLACED;
 
     public static boolean showQuestHud = true;
     public static boolean linkShowQuestHud = false;
-    public static double questHudOffsetX = 2.0D;
-    public static double questHudOffsetY = 38.0D;
+    public static double questHudOffsetX = HUD_PANEL_UNPLACED;
+    public static double questHudOffsetY = HUD_PANEL_UNPLACED;
     public static int questHudMaxTrackedQuests = 4;
     public static int questHudObjectiveLineCount = 2;
     public static boolean showQuestHudNotifications = true;
@@ -147,8 +161,8 @@ public final class LostTalesConfig {
      */
     public static boolean enableQuestDialogue = true;
     /** The one slot every passing notice shares: quest banners, discoveries, area names. */
-    public static double notificationHudOffsetX = 50.0D;
-    public static double notificationHudOffsetY = 35.0D;
+    public static double notificationHudOffsetX = HUD_PANEL_UNPLACED;
+    public static double notificationHudOffsetY = HUD_PANEL_UNPLACED;
     public static boolean showWorldQuestMarkers = true;
     public static boolean showDiscoveredWorldMapMarkers = true;
     public static int worldQuestMarkerMaxDistance = 256;
@@ -340,8 +354,8 @@ public final class LostTalesConfig {
     public static boolean discordAchievements = true;
     /** Keep the channel topic saying whether the server is up and who is on. */
     public static boolean discordChannelStatus = true;
-    /** Least seconds between two topic writes; five minutes at least, Discord's two in ten. */
-    public static int discordChannelStatusIntervalSeconds = 300;
+    /** Least seconds between two topic writes; ten minutes at least, one of Discord's two edits kept for the stop. */
+    public static int discordChannelStatusIntervalSeconds = 600;
     /** Connect the bot to Discord's gateway for instant relay and slash commands. */
     public static boolean discordGateway = true;
     public static boolean discordSlashCommands = true;
@@ -384,12 +398,43 @@ public final class LostTalesConfig {
     public static String waystoneRecipeCenterIngredient =
             "minecraft:ender_pearl";
 
+    /** Experience from skill level 1 to 2 (PROG-03). */
+    public static double skillCurveFirstLevel = 100.0D;
+    /** How much more each skill level needs than the one before, in percent (PROG-03). */
+    public static double skillCurveGrowthPercent = 5.0D;
+    /** The progress from character level 1 to 2 less one step (PROG-04). */
+    public static int characterLevelBase = 75;
+    /** How much more each character level needs than the one before (PROG-04). */
+    public static int characterLevelStep = 25;
+    /** Perk points each character level gives (PROG-06). */
+    public static int perkPointsPerLevel = 1;
+    /** Whether other players count toward the combat skills (PROG-02). */
+    public static boolean playersCountForCombat = false;
+    /** How many repeats of one act on one thing count in full (PROG-08). */
+    public static int repeatsCountedInFull = 10;
+    /** How much less each repeat past those counts, in percent (PROG-08). */
+    public static double repeatShrinkPercent = 10.0D;
+    /** The least share a repeat still counts for, in percent (PROG-08). */
+    public static double repeatFloorPercent = 10.0D;
+    /** Seconds after which one repeat is forgotten (PROG-08). */
+    public static int repeatRecoverySeconds = 60;
+    /** The most experience one skill gains in an hour; 0 for no cap (PROG-08). */
+    public static int skillHourlyCap = 0;
+    /** LOTR coins the first reset at a statue costs a character (PROG-12). */
+    public static int statueFirstPrice = 100;
+    /** What each later reset of the same character costs, times the one before (PROG-12). */
+    public static double statuePriceFactor = 2.0D;
+    /** An item a reset also takes, as an item name; empty for none (PROG-12). */
+    public static String statueItem = "";
+
     public static boolean enableMissiveBoardRecipe = true;
     public static String missiveBoardRecipeCornerIngredient = "ore:plankWood";
     public static String missiveBoardRecipeEdgeIngredient = "ore:stickWood";
     public static String missiveBoardRecipeCenterIngredient = "minecraft:paper";
 
     public static boolean enableDynamicMissiveBoards = true;
+    /** Whether boards post from the bundled missive templates beside a server's own (QUEST-42). */
+    public static boolean bundledMissiveTemplates = true;
     public static int missiveBoardMinAvailable = 5;
     public static int missiveBoardMaxAvailable = 9;
     public static int missiveBoardGenerationIntervalTicks = 36000;
@@ -410,9 +455,9 @@ public final class LostTalesConfig {
     /** Cooldown applied at each escalation stage, in seconds. */
     public static int[] characterSwitchCooldownSeconds =
             new int[] {60, 180, 300, 900, 1800, 3600};
-    /** Inactivity needed to decay each current stage, in seconds. */
+    /** Inactivity, in seconds, before each cooldown stage steps back, from the first stage up. */
     public static int[] characterSwitchDecaySeconds =
-            new int[] {0, 3600, 10800, 21600, 43200, 86400};
+            new int[] {3600, 10800, 21600, 43200, 86400};
     public static int characterSwitchCombatGraceSeconds = 20;
     public static int characterSwitchTeleportGraceSeconds = 5;
     public static int characterSwitchStableGroundTicks = 20;
@@ -640,7 +685,11 @@ public final class LostTalesConfig {
                     hudPlacementPreset,
                     TIP
             );
-            hudPresetProperty.setValidValues(HUD_PRESET_VALUES);
+            if (hudLayoutsRead) {
+                hudPresetProperty.setValidValues(hudPresetValues());
+            }
+            // Kept as written until the layout files are read: whether it
+            // names one that loads is told then (useHudLayouts).
             hudPlacementPreset = normalizeHudPreset(hudPresetProperty.getString());
 
             showCompassHud = config.getBoolean(
@@ -1138,7 +1187,7 @@ public final class LostTalesConfig {
                     "channelStatusIntervalSeconds",
                     CATEGORY_DISCORD,
                     discordChannelStatusIntervalSeconds,
-                    300,
+                    600,
                     3600,
                     TIP
             );
@@ -1493,6 +1542,40 @@ public final class LostTalesConfig {
                     TIP
             );
 
+            skillCurveFirstLevel = getBoundedDouble(config,
+                    CATEGORY_PROGRESSION, "skillCurveFirstLevel",
+                    skillCurveFirstLevel, 1.0D, 100000.0D);
+            skillCurveGrowthPercent = getBoundedDouble(config,
+                    CATEGORY_PROGRESSION, "skillCurveGrowthPercent",
+                    skillCurveGrowthPercent, 0.0D, 50.0D);
+            characterLevelBase = config.getInt("characterLevelBase",
+                    CATEGORY_PROGRESSION, characterLevelBase, 1, 100000, TIP);
+            characterLevelStep = config.getInt("characterLevelStep",
+                    CATEGORY_PROGRESSION, characterLevelStep, 0, 100000, TIP);
+            perkPointsPerLevel = config.getInt("perkPointsPerLevel",
+                    CATEGORY_PROGRESSION, perkPointsPerLevel, 0, 10, TIP);
+            playersCountForCombat = config.getBoolean("playersCountForCombat",
+                    CATEGORY_PROGRESSION, playersCountForCombat, TIP);
+            repeatsCountedInFull = config.getInt("repeatsCountedInFull",
+                    CATEGORY_PROGRESSION, repeatsCountedInFull, 0, 1000, TIP);
+            repeatShrinkPercent = getBoundedDouble(config,
+                    CATEGORY_PROGRESSION, "repeatShrinkPercent",
+                    repeatShrinkPercent, 0.0D, 100.0D);
+            repeatFloorPercent = getBoundedDouble(config,
+                    CATEGORY_PROGRESSION, "repeatFloorPercent",
+                    repeatFloorPercent, 0.0D, 100.0D);
+            repeatRecoverySeconds = config.getInt("repeatRecoverySeconds",
+                    CATEGORY_PROGRESSION, repeatRecoverySeconds, 1, 86400, TIP);
+            skillHourlyCap = config.getInt("skillHourlyCap",
+                    CATEGORY_PROGRESSION, skillHourlyCap, 0, 1000000, TIP);
+            statueFirstPrice = config.getInt("statueFirstPrice",
+                    CATEGORY_PROGRESSION, statueFirstPrice, 0, 1000000, TIP);
+            statuePriceFactor = getBoundedDouble(config,
+                    CATEGORY_PROGRESSION, "statuePriceFactor",
+                    statuePriceFactor, 1.0D, 10.0D);
+            statueItem = config.getString("statueItem",
+                    CATEGORY_PROGRESSION, statueItem, TIP);
+
             enableMissiveBoardRecipe = config.getBoolean(
                     "enableMissiveBoardRecipe",
                     CATEGORY_MISSIVES,
@@ -1522,6 +1605,12 @@ public final class LostTalesConfig {
                     "enableDynamicMissiveBoards",
                     CATEGORY_MISSIVES,
                     enableDynamicMissiveBoards,
+                    TIP
+            );
+            bundledMissiveTemplates = config.getBoolean(
+                    "bundledMissiveTemplates",
+                    CATEGORY_MISSIVES,
+                    bundledMissiveTemplates,
                     TIP
             );
             missiveBoardMinAvailable = config.getInt(
@@ -1610,9 +1699,7 @@ public final class LostTalesConfig {
             );
             clampMissiveOptions();
 
-            if (!HUD_PRESET_CUSTOM.equals(hudPlacementPreset)) {
-                applyHudPresetValues(hudPlacementPreset);
-            }
+            followHudLayout();
             syncLinkedHudOptions();
             clampHudOffsets();
             if (fromFiles) {
@@ -1716,6 +1803,12 @@ public final class LostTalesConfig {
         for (String warning : commandWarnings) {
             warnings.warn(warning);
         }
+        // The welcome lines past the most a welcome sends.
+        List<String> welcomeWarnings = new ArrayList<String>();
+        ChatWelcome.lines(chatWelcomeLines, welcomeWarnings);
+        for (String warning : welcomeWarnings) {
+            warnings.warn(warning);
+        }
         // The Operator channel's gate is put back when its line is
         // missing, before the gates are read, and the value written back
         // with the rest of the file at the end of this load.
@@ -1788,115 +1881,153 @@ public final class LostTalesConfig {
         return true;
     }
 
+    /** The HUD panels by the names the client file and the layout files keep their places under. */
+    public static List<String> hudElements() {
+        return HUD_ELEMENTS;
+    }
+
     /**
-     * Where a panel stands in the Default layout, as shares of the screen
-     * {x, y}; null for a name no panel goes by. The HUD Placement page puts
-     * one panel back there.
+     * Takes the HUD layouts the client read (MAP-11), by id in the order
+     * the page lists them, each {across, down} for every panel of
+     * {@link #hudElements} in turn; a layout of another shape is passed
+     * by. The chosen layout puts the panels in its places again; a chosen
+     * layout that did not load leaves them where they stand, as the
+     * player's own, and says so in the log.
+     */
+    public static synchronized void useHudLayouts(Map<String, double[][]> layouts) {
+        Map<String, double[][]> taken = new java.util.LinkedHashMap<String, double[][]>();
+        if (layouts != null) {
+            for (Map.Entry<String, double[][]> layout : layouts.entrySet()) {
+                double[][] places = copyHudPlaces(layout.getValue());
+                if (layout.getKey() != null && places != null) {
+                    taken.put(layout.getKey(), places);
+                }
+            }
+        }
+        hudLayouts = Collections.unmodifiableMap(taken);
+        hudLayoutsRead = true;
+        if (followHudLayout()) {
+            save();
+        }
+    }
+
+    /** Forgets the HUD layouts, as before the files are read; for tests. */
+    static synchronized void forgetHudLayouts() {
+        hudLayouts = Collections.<String, double[][]>emptyMap();
+        hudLayoutsRead = false;
+    }
+
+    /** The ids of the HUD layouts that loaded, in the order the page lists them. */
+    public static List<String> hudLayoutIds() {
+        return new ArrayList<String>(hudLayouts.keySet());
+    }
+
+    /** What the layout option takes: custom, then every layout that loaded. */
+    private static String[] hudPresetValues() {
+        List<String> values = new ArrayList<String>();
+        values.add(HUD_PRESET_CUSTOM);
+        values.addAll(hudLayouts.keySet());
+        return values.toArray(new String[values.size()]);
+    }
+
+    /**
+     * Puts the panels where the chosen layout has them. A chosen layout
+     * that did not load turns the layout custom, the panels where they
+     * stand; before the layout files are read nothing moves. Answers
+     * whether anything changed.
+     */
+    private static boolean followHudLayout() {
+        if (HUD_PRESET_CUSTOM.equals(hudPlacementPreset) || !hudLayoutsRead) {
+            return false;
+        }
+        double[][] places = hudLayouts.get(hudPlacementPreset);
+        if (places == null) {
+            com.ninuna.losttales.util.LostTalesLog.warning(
+                    "The HUD layout %s the client file chooses did not load;"
+                            + " the panels stay where they stand, as custom",
+                    hudPlacementPreset);
+            hudPlacementPreset = HUD_PRESET_CUSTOM;
+            return true;
+        }
+        boolean moved = false;
+        for (int panel = 0; panel < places.length; panel++) {
+            double[] now = hudPlace(HUD_ELEMENTS.get(panel));
+            moved |= now[0] != places[panel][0] || now[1] != places[panel][1];
+        }
+        applyHudPresetValues(hudPlacementPreset);
+        return moved;
+    }
+
+    /** A layout's places copied, or null for one that does not place every panel on both axes. */
+    private static double[][] copyHudPlaces(double[][] places) {
+        if (places == null || places.length != HUD_ELEMENTS.size()) {
+            return null;
+        }
+        double[][] copied = new double[places.length][];
+        for (int panel = 0; panel < places.length; panel++) {
+            if (places[panel] == null || places[panel].length != 2) {
+                return null;
+            }
+            copied[panel] = places[panel].clone();
+        }
+        return copied;
+    }
+
+    /**
+     * Where a panel stands in the Default layout, {across, down}, each a
+     * share of the room its box can move in; null for a name no panel
+     * goes by, or while no Default layout loaded. The HUD Placement page
+     * puts one panel back there.
      */
     public static double[] defaultHudOffset(String element) {
-        String key = normalizeHudElement(element);
-        if ("compass".equals(key)) {
-            return new double[] {50, 2};
-        }
-        if ("fellowship".equals(key)) {
-            return new double[] {2, 18};
-        }
-        if ("quickloot".equals(key)) {
-            return new double[] {62, 32};
-        }
-        if ("quest".equals(key)) {
-            return new double[] {2, 38};
-        }
-        if ("notifications".equals(key)) {
-            return new double[] {50, 35};
-        }
-        return null;
+        int panel = HUD_ELEMENTS.indexOf(normalizeHudElement(element));
+        double[][] places = hudLayouts.get(HUD_PRESET_DEFAULT);
+        return panel < 0 || places == null ? null : places[panel].clone();
+    }
+
+    /**
+     * Where a layout puts every panel, {across, down} for each panel of
+     * {@link #hudElements} in turn; null for custom or a layout that did
+     * not load.
+     */
+    public static double[][] hudLayoutPlaces(String preset) {
+        double[][] places = hudLayouts.get(normalizeHudPreset(preset));
+        return places == null ? null : copyHudPlaces(places);
     }
 
     private static void applyHudPresetValues(String preset) {
-        String key = normalizeHudPreset(preset);
-        if (HUD_PRESET_DEFAULT.equals(key)) {
-            for (String element : new String[] {"compass", "fellowship",
-                    "quickloot", "quest", "notifications"}) {
-                double[] place = defaultHudOffset(element);
-                updateHudOffset(element, place[0], place[1]);
-            }
-            hudPlacementPreset = HUD_PRESET_DEFAULT;
-        } else if (HUD_PRESET_LOTR_SAFE.equals(key)) {
-            compassHudOffsetX = 50;
-            compassHudOffsetY = 12;
-            fellowshipHudOffsetX = 2;
-            fellowshipHudOffsetY = 28;
-            quickLootHudOffsetX = 61;
-            quickLootHudOffsetY = 34;
-            questHudOffsetX = 2;
-            questHudOffsetY = 52;
-            setNotificationPresetOffsets(50, 32);
-        } else if (HUD_PRESET_COMPACT.equals(key)) {
-            compassHudOffsetX = 50;
-            compassHudOffsetY = 7;
-            fellowshipHudOffsetX = 1;
-            fellowshipHudOffsetY = 26;
-            quickLootHudOffsetX = 67;
-            quickLootHudOffsetY = 37;
-            questHudOffsetX = 1;
-            questHudOffsetY = 57;
-            setNotificationPresetOffsets(50, 30);
-        } else if (HUD_PRESET_MINIMAL.equals(key)) {
-            compassHudOffsetX = 50;
-            compassHudOffsetY = 4;
-            fellowshipHudOffsetX = 1;
-            fellowshipHudOffsetY = 18;
-            quickLootHudOffsetX = 71;
-            quickLootHudOffsetY = 42;
-            questHudOffsetX = 1;
-            questHudOffsetY = 70;
-            setNotificationPresetOffsets(50, 28);
+        double[][] places = hudLayoutPlaces(preset);
+        if (places == null) {
+            return;
+        }
+        for (int panel = 0; panel < places.length; panel++) {
+            setHudPlace(HUD_ELEMENTS.get(panel), places[panel][0],
+                    places[panel][1]);
         }
     }
 
-    private static void setNotificationPresetOffsets(int x, int y) {
-        notificationHudOffsetX = x;
-        notificationHudOffsetY = y;
-    }
-
+    /**
+     * A layout's name as the client file keeps it, trimmed and in lower
+     * case; custom for anything no layout file could take as its id.
+     */
     public static String normalizeHudPreset(String preset) {
         if (preset == null) {
             return HUD_PRESET_CUSTOM;
         }
-        String key = preset.trim().toLowerCase().replace('_', '-');
-        if ("modern".equals(key)) {
-            return HUD_PRESET_DEFAULT;
-        }
-        if ("lotr".equals(key) || "legacy".equals(key) || "lotr-safe".equals(key)) {
-            return HUD_PRESET_LOTR_SAFE;
-        }
-        if (HUD_PRESET_DEFAULT.equals(key)
-                || HUD_PRESET_LOTR_SAFE.equals(key)
-                || HUD_PRESET_COMPACT.equals(key)
-                || HUD_PRESET_MINIMAL.equals(key)) {
-            return key;
-        }
-        return HUD_PRESET_CUSTOM;
+        String key = preset.trim().toLowerCase(java.util.Locale.ROOT);
+        return key.matches(HUD_LAYOUT_ID) ? key : HUD_PRESET_CUSTOM;
     }
 
     public static boolean isCustomHudPreset(String preset) {
         if (preset == null) {
             return false;
         }
-        return HUD_PRESET_CUSTOM.equals(preset.trim().toLowerCase().replace('_', '-'));
+        return HUD_PRESET_CUSTOM.equals(preset.trim().toLowerCase(java.util.Locale.ROOT));
     }
 
+    /** Whether a layout of that name loaded. */
     public static boolean isKnownHudPreset(String preset) {
-        String key = normalizeHudPreset(preset);
-        return HUD_PRESET_DEFAULT.equals(key)
-                || HUD_PRESET_LOTR_SAFE.equals(key)
-                || HUD_PRESET_COMPACT.equals(key)
-                || HUD_PRESET_MINIMAL.equals(key);
-    }
-
-    public static boolean setHudOffset(String element, int x, int y) {
-        return setHudOffset(element, (double)x, (double)y);
+        return hudLayouts.containsKey(normalizeHudPreset(preset));
     }
 
     public static boolean setHudOffset(String element,
@@ -1908,17 +2039,25 @@ public final class LostTalesConfig {
         return updated;
     }
 
-    /** Updates the live client preview without writing the config every drag frame. */
+    /**
+     * Moves a panel and leaves the layout the panels' own, without writing
+     * the file: the live preview, every frame of a drag.
+     */
     public static boolean updateHudOffset(String element,
                                           double x, double y) {
         String key = normalizeHudElement(element);
         if (key.length() == 0) {
             return false;
         }
-
-        x = clampPercent(x);
-        y = clampPercent(y);
         hudPlacementPreset = HUD_PRESET_CUSTOM;
+        setHudPlace(key, x, y);
+        return true;
+    }
+
+    /** Puts a panel of the client file's names at {@code across}, {@code down}, each held between 0 and 100. */
+    private static void setHudPlace(String key, double across, double down) {
+        double x = clampPercent(across);
+        double y = clampPercent(down);
         if ("compass".equals(key)) {
             compassHudOffsetX = x;
             compassHudOffsetY = y;
@@ -1934,15 +2073,25 @@ public final class LostTalesConfig {
         } else if ("notifications".equals(key)) {
             notificationHudOffsetX = x;
             notificationHudOffsetY = y;
-        } else {
-            return false;
         }
-        return true;
     }
 
-    /** The HUD panels by the names the client file keeps their places under. */
-    private static final java.util.List<String> HUD_ELEMENTS = java.util.Arrays.asList(
-            "compass", "fellowship", "quickloot", "quest", "notifications");
+    /** Where a panel of the client file's names stands, {across, down}. */
+    private static double[] hudPlace(String key) {
+        if ("compass".equals(key)) {
+            return new double[] {compassHudOffsetX, compassHudOffsetY};
+        }
+        if ("fellowship".equals(key)) {
+            return new double[] {fellowshipHudOffsetX, fellowshipHudOffsetY};
+        }
+        if ("quickloot".equals(key)) {
+            return new double[] {quickLootHudOffsetX, quickLootHudOffsetY};
+        }
+        if ("quest".equals(key)) {
+            return new double[] {questHudOffsetX, questHudOffsetY};
+        }
+        return new double[] {notificationHudOffsetX, notificationHudOffsetY};
+    }
 
     /** A panel's name as the client file keeps it; empty for a name no panel goes by. */
     public static String normalizeHudElement(String element) {
@@ -2040,6 +2189,8 @@ public final class LostTalesConfig {
                 "losttales.config.category.waystones");
         config.getCategory(CATEGORY_DISCORD).setLanguageKey(
                 "losttales.config.category.discord");
+        config.getCategory(CATEGORY_PROGRESSION).setLanguageKey(
+                "losttales.config.category.progression");
         config.getCategory(CATEGORY_ROLES).setLanguageKey(
                 "losttales.config.category.roles");
         config.getCategory(CATEGORY_CHANNELS).setLanguageKey(
@@ -2255,7 +2406,9 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
         Property hudPresetProperty = config.get(CATEGORY_CLIENT, "hudPlacementPreset", hudPlacementPreset);
         hudPresetProperty.set(hudPlacementPreset);
-        hudPresetProperty.setValidValues(HUD_PRESET_VALUES);
+        if (hudLayoutsRead) {
+            hudPresetProperty.setValidValues(hudPresetValues());
+        }
         config.get(CATEGORY_CLIENT, "showCompassHud", showCompassHud).set(showCompassHud);
         config.get(CATEGORY_CLIENT, "linkShowCompassHud", linkShowCompassHud).set(linkShowCompassHud);
         config.get(CATEGORY_CLIENT, "compassHudOffsetX", compassHudOffsetX).set(compassHudOffsetX);
@@ -2346,11 +2499,26 @@ public final class LostTalesConfig {
         config.get(CATEGORY_WAYSTONES, "waystoneRecipeCornerIngredient", waystoneRecipeCornerIngredient).set(waystoneRecipeCornerIngredient);
         config.get(CATEGORY_WAYSTONES, "waystoneRecipeEdgeIngredient", waystoneRecipeEdgeIngredient).set(waystoneRecipeEdgeIngredient);
         config.get(CATEGORY_WAYSTONES, "waystoneRecipeCenterIngredient", waystoneRecipeCenterIngredient).set(waystoneRecipeCenterIngredient);
+        config.get(CATEGORY_PROGRESSION, "skillCurveFirstLevel", skillCurveFirstLevel).set(skillCurveFirstLevel);
+        config.get(CATEGORY_PROGRESSION, "skillCurveGrowthPercent", skillCurveGrowthPercent).set(skillCurveGrowthPercent);
+        config.get(CATEGORY_PROGRESSION, "characterLevelBase", characterLevelBase).set(characterLevelBase);
+        config.get(CATEGORY_PROGRESSION, "characterLevelStep", characterLevelStep).set(characterLevelStep);
+        config.get(CATEGORY_PROGRESSION, "perkPointsPerLevel", perkPointsPerLevel).set(perkPointsPerLevel);
+        config.get(CATEGORY_PROGRESSION, "playersCountForCombat", playersCountForCombat).set(playersCountForCombat);
+        config.get(CATEGORY_PROGRESSION, "repeatsCountedInFull", repeatsCountedInFull).set(repeatsCountedInFull);
+        config.get(CATEGORY_PROGRESSION, "repeatShrinkPercent", repeatShrinkPercent).set(repeatShrinkPercent);
+        config.get(CATEGORY_PROGRESSION, "repeatFloorPercent", repeatFloorPercent).set(repeatFloorPercent);
+        config.get(CATEGORY_PROGRESSION, "repeatRecoverySeconds", repeatRecoverySeconds).set(repeatRecoverySeconds);
+        config.get(CATEGORY_PROGRESSION, "skillHourlyCap", skillHourlyCap).set(skillHourlyCap);
+        config.get(CATEGORY_PROGRESSION, "statueFirstPrice", statueFirstPrice).set(statueFirstPrice);
+        config.get(CATEGORY_PROGRESSION, "statuePriceFactor", statuePriceFactor).set(statuePriceFactor);
+        config.get(CATEGORY_PROGRESSION, "statueItem", statueItem).set(statueItem);
         config.get(CATEGORY_MISSIVES, "enableMissiveBoardRecipe", enableMissiveBoardRecipe).set(enableMissiveBoardRecipe);
         config.get(CATEGORY_MISSIVES, "missiveBoardRecipeCornerIngredient", missiveBoardRecipeCornerIngredient).set(missiveBoardRecipeCornerIngredient);
         config.get(CATEGORY_MISSIVES, "missiveBoardRecipeEdgeIngredient", missiveBoardRecipeEdgeIngredient).set(missiveBoardRecipeEdgeIngredient);
         config.get(CATEGORY_MISSIVES, "missiveBoardRecipeCenterIngredient", missiveBoardRecipeCenterIngredient).set(missiveBoardRecipeCenterIngredient);
         config.get(CATEGORY_MISSIVES, "enableDynamicMissiveBoards", enableDynamicMissiveBoards).set(enableDynamicMissiveBoards);
+        config.get(CATEGORY_MISSIVES, "bundledMissiveTemplates", bundledMissiveTemplates).set(bundledMissiveTemplates);
         config.get(CATEGORY_MISSIVES, "missiveBoardMinAvailable", missiveBoardMinAvailable).set(missiveBoardMinAvailable);
         config.get(CATEGORY_MISSIVES, "missiveBoardMaxAvailable", missiveBoardMaxAvailable).set(missiveBoardMaxAvailable);
         config.get(CATEGORY_MISSIVES, "missiveBoardGenerationIntervalTicks", missiveBoardGenerationIntervalTicks).set(missiveBoardGenerationIntervalTicks);
@@ -2401,7 +2569,7 @@ public final class LostTalesConfig {
                 86400 * 30);
         characterSwitchDecaySeconds = sanitizePositiveIntArray(
                 characterSwitchDecaySeconds,
-                new int[] {0, 3600, 10800, 21600, 43200, 86400},
+                new int[] {3600, 10800, 21600, 43200, 86400},
                 0,
                 86400 * 365);
         characterSwitchCombatGraceSeconds = clampInt(
@@ -2489,32 +2657,20 @@ public final class LostTalesConfig {
 
     /**
      * The feed alignment a config value names, case and surrounding space
-     * aside: {@code LEFT}, {@code CENTRE} — {@code CENTER} is read as it —
-     * or {@code RIGHT}, and the shipped {@code CENTRE} for anything else.
+     * aside: {@code LEFT} or {@code RIGHT}, and the shipped {@code CENTRE}
+     * for anything else.
      */
     public static String normalizeFeedAlignment(String value) {
         String normalized = value == null
                 ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
-        if ("CENTER".equals(normalized)) {
-            return "CENTRE";
-        }
         return "LEFT".equals(normalized) || "RIGHT".equals(normalized)
                 ? normalized : DEFAULT_CHAT_FEED_ALIGNMENT;
     }
 
+    /** A HUD panel's offset, a client option held to its bounds. */
     static double getHudPercent(
             Configuration config, String key, double defaultValue,
             double minimum, double maximum) {
-        if (config.hasKey(CATEGORY_CLIENT, key)) {
-            Property existing = config.getCategory(CATEGORY_CLIENT).get(key);
-            if (existing != null
-                    && existing.getType() != Property.Type.DOUBLE) {
-                // An offset written as a whole number is made again as a
-                // double, so it holds the fraction a drag leaves it at.
-                defaultValue = existing.getDouble(defaultValue);
-                config.getCategory(CATEGORY_CLIENT).remove(key);
-            }
-        }
         return getBoundedDouble(config, CATEGORY_CLIENT, key, defaultValue,
                 minimum, maximum);
     }

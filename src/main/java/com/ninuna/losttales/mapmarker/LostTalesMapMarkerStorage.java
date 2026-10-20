@@ -5,7 +5,13 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 
-/** Resolves and seeds the single authoritative marker store. */
+/**
+ * Resolves and seeds the single authoritative marker store. The store
+ * seeds itself from the marker files once the server's own were read as
+ * it started, and again after each read of them (MOD-17), so a marker in
+ * a server's file takes a bundled one's place before the bundled one is
+ * ever seeded.
+ */
 public final class LostTalesMapMarkerStorage {
     private LostTalesMapMarkerStorage() {}
 
@@ -29,8 +35,14 @@ public final class LostTalesMapMarkerStorage {
             storage.setData(LostTalesMapMarkerWorldData.DATA_NAME, data);
             data.markDirty();
         }
-        LostTalesMapMarkerCatalog.ensureLoaded();
-        data.seedDefinitions(LostTalesMapMarkerCatalog.getMarkers());
+        if (LostTalesMapMarkerCatalog.isServerRead()) {
+            int revision = LostTalesMapMarkerCatalog.revision();
+            if (data.getSeededRevision() != revision
+                    && !data.isReadOnlyForNewerVersion()) {
+                data.seedDefinitions(LostTalesMapMarkerCatalog.getMarkers());
+                data.setSeededRevision(revision);
+            }
+        }
         return data;
     }
 }

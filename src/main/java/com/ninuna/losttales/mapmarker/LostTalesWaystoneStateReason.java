@@ -3,9 +3,9 @@ package com.ninuna.losttales.mapmarker;
 /**
  * Why the server sends a waystone's state: the player used the waystone,
  * or the state answers a request from the waystone's page. The page opens
- * on an opening and says every answer in its status line; the server
- * says a refusal in the chat as well. Each answer's words are its chat
- * line's.
+ * on an opening, opens the map on Destinations taken, and says every
+ * other answer in its status line; the server says a refusal in the chat
+ * as well. Each answer's words are its chat line's.
  */
 public enum LostTalesWaystoneStateReason {
     /** The player used the waystone: the page opens on it. */
@@ -27,7 +27,11 @@ public enum LostTalesWaystoneStateReason {
     /** Unshare named a character or fellowship the waystone is not shared with. */
     NOT_SHARED(11, "chat.losttales.waystone.not_shared"),
     /** Hand Over came from a player who does not manage markers, or for a waystone nobody placed. */
-    HAND_OVER_DENIED(12, "chat.losttales.waystone.hand_over_denied");
+    HAND_OVER_DENIED(12, "chat.losttales.waystone.hand_over_denied"),
+    /** Destinations was taken: the window to travel from the waystone is open, and the page opens the map. */
+    DESTINATIONS(13, ""),
+    /** Destinations on a waystone whose fast travel is off, or outside Middle-earth. */
+    NO_FAST_TRAVEL(14, "chat.losttales.waystone.no_fast_travel");
 
     private final int networkId;
     private final String messageKey;
@@ -39,12 +43,12 @@ public enum LostTalesWaystoneStateReason {
 
     public int getNetworkId() { return this.networkId; }
 
-    /** The lang key of the words that say it; empty for an opening. */
+    /** The lang key of the words that say it; empty for an opening and for Destinations. */
     public String getMessageKey() { return this.messageKey; }
 
     /** Whether the request it answers was turned down. */
     public boolean isRefusal() {
-        return this != OPENED && this != SAVED;
+        return this != OPENED && this != SAVED && this != DESTINATIONS;
     }
 
     /** The reason with this id; null for an id no reason has. */

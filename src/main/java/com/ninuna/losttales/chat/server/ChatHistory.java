@@ -44,7 +44,8 @@ import java.util.UUID;
  *
  * <p>The audience is decided when the message is sent and checked again
  * when it is replayed, and both have to agree: a whisper reaches its two
- * people, a fellowship line the members the fellowship had, a faction line every
+ * people, a fellowship line the members the fellowship had, each read by
+ * the character played from when it joined, a faction line every
  * account whose chat identity was in the faction then, a gated line
  * (Operator Chat, the consoles, a read gate) whoever may read the channel
  * when they ask.
@@ -52,7 +53,9 @@ import java.util.UUID;
  * said before. Proximity lines reach only those who were near, since
  * where a player stood then cannot be asked again. Having been shown a
  * line of a conversation one can leave — a gated channel, a faction's, a
- * fellowship's — counts only while one is still in it ({@link #canRead}).</p>
+ * fellowship's — counts only while one is still in it ({@link #canRead}),
+ * and a fellowship's only while the character played joined before the
+ * line was said.</p>
  *
  * <p>Bounded per channel — per faction and per fellowship on the channels
  * that hold several, per conversation for whispers, and per account for
@@ -688,7 +691,9 @@ public final class ChatHistory {
      * reactor who may not read it, a reaction already there or not
      * there to take back, or one past the bounds. A player may react to
      * what they may read now ({@link #canRead}), exactly what a reply may
-     * quote; {@code requester} is null for a Discord member, whose
+     * quote, and their identities together hold at most
+     * {@link ChatReactions#MAX_PER_PLAYER} reactions on one message;
+     * {@code requester} is null for a Discord member, whose
      * message crossed the bridge and whose reaction reached the game by
      * it. A player who reacts is one of the message's readers from then
      * on.
@@ -709,6 +714,10 @@ public final class ChatHistory {
             return null;
         }
         if (requester != null && !canRead(entry, requester)) {
+            return null;
+        }
+        if (add && requester != null && entry.reactions.countBy(
+                requester.identityIds) >= ChatReactions.MAX_PER_PLAYER) {
             return null;
         }
         ChatReactions.Stand before = entry.reactions.standOf(emoji);
@@ -1168,7 +1177,8 @@ public final class ChatHistory {
 
         /**
          * The accounts that owned the fellowship's members when the line was
-         * said, while they are still in that fellowship.
+         * said, each while the character it plays is in that fellowship and
+         * joined it before the line was said (FEL-29).
          */
         public static Audience fellowship(UUID fellowshipId, Collection<UUID> memberOwners) {
             return new Audience(memberOwners == null
@@ -1233,7 +1243,7 @@ public final class ChatHistory {
                     || !this.accounts.contains(requester.accountId))) {
                 return false;
             }
-            if (this.fellowshipId != null && !requester.fellowshipIds.contains(this.fellowshipId)) {
+            if (this.fellowshipId != null && !joinedBefore(requester, entry)) {
                 return false;
             }
             if (this.factionId != null) {
@@ -1250,11 +1260,13 @@ public final class ChatHistory {
          * Whether someone the line was shown to still holds what its
          * conversation asks: the channel's read gate, the fellowship, the
          * faction. A line said to the accounts that heard it — a whisper's,
-         * Proximity's, a note to oneself — asks nothing more.
+         * Proximity's, a note to oneself — asks nothing more. A fellowship
+         * line asks besides that the character played joined before it was
+         * said, so a line another character of the account was shown stays
+         * closed to a newcomer.
          */
         boolean stillReaches(Requester requester, Entry entry) {
-            if (this.fellowshipId != null
-                    && !requester.fellowshipIds.contains(this.fellowshipId)) {
+            if (this.fellowshipId != null && !joinedBefore(requester, entry)) {
                 return false;
             }
             if (this.factionId != null
@@ -1262,6 +1274,16 @@ public final class ChatHistory {
                 return false;
             }
             return !this.gated || requester.readableChannels.contains(entry.channelId);
+        }
+
+        /**
+         * Whether the character the requester plays is in the line's
+         * fellowship and joined it at or before the line was said: a
+         * newcomer reads the conversation from its own joining (FEL-29).
+         */
+        private boolean joinedBefore(Requester requester, Entry entry) {
+            Long joined = requester.joinedFellowship(this.fellowshipId);
+            return joined != null && joined.longValue() <= entry.timestampMillis;
         }
 
         /** Whether reading the line asks what a reader holds now: a gate, a fellowship, a faction. */
@@ -1293,8 +1315,12 @@ public final class ChatHistory {
          * was in that faction when it was said.
          */
         final Map<String, Long> ownedFactions;
-        /** The fellowships the played identity is in. */
-        final Set<UUID> fellowshipIds;
+        /**
+         * The fellowships of the character played, the one identity a
+         * fellowship's conversation is read as (FEL-22), each with when it
+         * joined: a fellowship line is replayed from that joining on.
+         */
+        final Map<UUID, Long> fellowships;
         /** The ids of the channels the player may read right now. */
         final Set<String> readableChannels;
         /**
@@ -1304,7 +1330,7 @@ public final class ChatHistory {
         final Set<UUID> identityIds;
 
         public Requester(UUID accountId, Map<String, Long> ownedFactions,
-                         Collection<UUID> fellowshipIds, Collection<ChatChannel> readable,
+                         Map<UUID, Long> fellowships, Collection<ChatChannel> readable,
                          Collection<UUID> identityIds) {
             this.accountId = accountId;
             Set<UUID> identities = new HashSet<UUID>();
@@ -1320,9 +1346,15 @@ public final class ChatHistory {
                     ? Collections.<String, Long>emptyMap()
                     : Collections.unmodifiableMap(
                             new HashMap<String, Long>(ownedFactions));
-            this.fellowshipIds = fellowshipIds == null
-                    ? Collections.<UUID>emptySet()
-                    : Collections.unmodifiableSet(new HashSet<UUID>(fellowshipIds));
+            Map<UUID, Long> joined = new HashMap<UUID, Long>();
+            if (fellowships != null) {
+                for (Map.Entry<UUID, Long> fellowship : fellowships.entrySet()) {
+                    if (fellowship.getKey() != null && fellowship.getValue() != null) {
+                        joined.put(fellowship.getKey(), fellowship.getValue());
+                    }
+                }
+            }
+            this.fellowships = Collections.unmodifiableMap(joined);
             Set<String> ids = new HashSet<String>();
             if (readable != null) {
                 for (ChatChannel channel : readable) {
@@ -1337,6 +1369,16 @@ public final class ChatHistory {
         /** When the earliest character in that faction was made; null for none. */
         Long earliestCharacterIn(String factionId) {
             return factionId == null ? null : this.ownedFactions.get(factionId);
+        }
+
+        /** When the character played joined that fellowship; null for one it is not in. */
+        Long joinedFellowship(UUID fellowshipId) {
+            return fellowshipId == null ? null : this.fellowships.get(fellowshipId);
+        }
+
+        /** Whether the character played is in that fellowship. */
+        boolean inFellowship(UUID fellowshipId) {
+            return joinedFellowship(fellowshipId) != null;
         }
     }
 

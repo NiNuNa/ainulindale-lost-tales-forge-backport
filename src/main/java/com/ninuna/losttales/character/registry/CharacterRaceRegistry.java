@@ -1,25 +1,29 @@
 package com.ninuna.losttales.character.registry;
 
+import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.data.DataFiles;
 import com.ninuna.losttales.util.LostTalesIdentifiers;
-import java.util.Arrays;
+import com.ninuna.losttales.util.LostTalesLog;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-/** Stable built-in race identifiers and common metadata. */
+/**
+ * The races the game plays with (CHAR-38): the bundled six, read from their
+ * files as the mod loads, until a list takes their place. On the logical
+ * server that is the server's own list, read as it starts
+ * ({@code character.server.CharacterRaceCatalog}); on a client, the list the server sent as
+ * it joined. Both go back to the bundled six as the server stops and as the
+ * client leaves.
+ */
 public final class CharacterRaceRegistry {
-
-    /**
-     * Eyes are measured from the feet and track the race's physical height.
-     * Keeping the ratio and crouch drop centralized prevents a future model
-     * size change from silently leaving the camera at another race's height.
-     */
-    private static final float STANDING_EYE_HEIGHT_RATIO = 0.85F;
-    private static final float SNEAKING_EYE_HEIGHT_DROP = 0.08F;
 
     public static final String HUMAN = "losttales:human";
     public static final String ELF = "losttales:elf";
@@ -28,151 +32,90 @@ public final class CharacterRaceRegistry {
     public static final String ORC = "losttales:orc";
     public static final String URUK = "losttales:uruk";
 
-    private static final Set<String> MALE_AND_FEMALE = identifiers(
-            CharacterGenderRegistry.MALE,
-            CharacterGenderRegistry.FEMALE);
-    private static final Set<String> NON_BINARY_ONLY = identifiers(
-            CharacterGenderRegistry.NON_BINARY);
-    private static final Set<String> NO_FACTIONS = Collections.emptySet();
+    /** The most races a list holds, the bundled six among them. */
+    public static final int MAX_RACES = 32;
+    /** The most stand-ins a list holds, for races gone that characters still name. */
+    public static final int MAX_STAND_INS = 32;
 
-    private static final Map<String, CharacterRaceDefinition> DEFINITIONS;
+    /** Where the bundled files are read from: the mod's own classpath. */
+    public static final DataFiles.Source CLASSPATH = new DataFiles.Source() {
+        @Override
+        public Reader open(String path) {
+            InputStream stream = CharacterRaceRegistry.class.getClassLoader()
+                    .getResourceAsStream("assets/" + LostTalesMetaData.MOD_ID + "/" + path);
+            return stream == null ? null
+                    : new InputStreamReader(stream, StandardCharsets.UTF_8);
+        }
+    };
 
-    static {
-        LinkedHashMap<String, CharacterRaceDefinition> definitions =
-                new LinkedHashMap<String, CharacterRaceDefinition>();
-
-        register(definitions, definition(
-                HUMAN, "lotr:bree_man",
-                EnumSet.of(CharacterFactionCategory.HUMAN),
-                NO_FACTIONS, NO_FACTIONS, MALE_AND_FEMALE,
-                0.60F, 1.80F, standingEyeHeight(1.80F), sneakingEyeHeight(1.80F),
-                20.0D, 1.0D, 2.0D,
-                1.0F, 1.0F, 0));
-        register(definitions, definition(
-                ELF, "lotr:high_elf",
-                EnumSet.of(CharacterFactionCategory.ELF),
-                NO_FACTIONS, NO_FACTIONS, MALE_AND_FEMALE,
-                0.60F, 1.80F, standingEyeHeight(1.80F), sneakingEyeHeight(1.80F),
-                20.0D, 1.0D, 2.0D,
-                1.0F, 0.96F, 0));
-        register(definitions, definition(
-                DWARF, "lotr:dwarf",
-                EnumSet.of(CharacterFactionCategory.DWARF),
-                NO_FACTIONS, NO_FACTIONS, MALE_AND_FEMALE,
-                0.50F, 1.50F, standingEyeHeight(1.50F), sneakingEyeHeight(1.50F),
-                20.0D, 0.9D, 3.0D,
-                0.8125F, 1.12F, -2));
-        register(definitions, definition(
-                HOBBIT, "lotr:hobbit",
-                Collections.<CharacterFactionCategory>emptySet(),
-                identifiers("lotr:hobbit", "lotr:bree"),
-                NO_FACTIONS, MALE_AND_FEMALE,
-                0.45F, 1.20F, standingEyeHeight(1.20F), sneakingEyeHeight(1.20F),
-                16.0D, 1.0D, 2.0D,
-                0.75F, 1.34F, -5));
-        register(definitions, definition(
-                ORC, "lotr:mordor_orc",
-                EnumSet.of(CharacterFactionCategory.ORC),
-                NO_FACTIONS, NO_FACTIONS, NON_BINARY_ONLY,
-                0.50F, 1.55F, standingEyeHeight(1.55F), sneakingEyeHeight(1.55F),
-                20.0D, 1.0D, 3.0D,
-                0.85F, 1.08F, -2));
-        register(definitions, definition(
-                URUK, "lotr:uruk_hai",
-                EnumSet.of(CharacterFactionCategory.ORC),
-                NO_FACTIONS, NO_FACTIONS, NON_BINARY_ONLY,
-                0.60F, 1.80F, standingEyeHeight(1.80F), sneakingEyeHeight(1.80F),
-                24.0D, 1.05D, 4.0D,
-                1.0F, 1.05F, -2));
-        DEFINITIONS = Collections.unmodifiableMap(definitions);
-    }
+    private static final List<CharacterRaceDefinition> BUNDLED = readBundled();
+    private static volatile Map<String, CharacterRaceDefinition> races = index(BUNDLED);
+    private static volatile int revision;
 
     private CharacterRaceRegistry() {}
 
+    /** A race by id, a stand-in included; null for one the list does not hold. */
     public static CharacterRaceDefinition get(String id) {
-        return DEFINITIONS.get(LostTalesIdentifiers.normalize(id));
+        return races.get(LostTalesIdentifiers.normalize(id));
     }
 
+    /** Every race of the list in its order, the stand-ins last. */
     public static Collection<CharacterRaceDefinition> getAll() {
-        return DEFINITIONS.values();
+        return races.values();
     }
 
-    /**
-     * Repairs an incompatible gender value deterministically. Gendered
-     * races fall back to male; unisex races always use non-binary.
-     */
-    public static String normalizeGenderForRace(String raceId, String genderId) {
-        CharacterRaceDefinition definition = get(raceId);
-        if (definition == null) {
-            return "";
+    /** The races a new character may be made as: every one but the stand-ins. */
+    public static List<CharacterRaceDefinition> getOffered() {
+        List<CharacterRaceDefinition> offered = new ArrayList<CharacterRaceDefinition>();
+        for (CharacterRaceDefinition race : races.values()) {
+            if (!race.isStandIn()) {
+                offered.add(race);
+            }
         }
-        String normalizedGender = LostTalesIdentifiers.normalize(genderId);
-        if (definition.isGenderAllowed(normalizedGender)) {
-            return normalizedGender;
+        return offered;
+    }
+
+    /** The bundled six, as their files write them. */
+    public static List<CharacterRaceDefinition> getBundled() {
+        return BUNDLED;
+    }
+
+    /** Puts a list in the bundled six's place: the server's own, or what a server sent. */
+    public static synchronized void set(List<CharacterRaceDefinition> list) {
+        races = index(list == null || list.isEmpty() ? BUNDLED : list);
+        revision++;
+    }
+
+    /** The bundled six again, as the server stops and a client leaves. */
+    public static synchronized void resetToBundled() {
+        set(BUNDLED);
+    }
+
+    /** Counts every change of the list, so what is worked out from it knows to be worked out again. */
+    public static int revision() {
+        return revision;
+    }
+
+    private static List<CharacterRaceDefinition> readBundled() {
+        DataFiles.Result<CharacterRaceDefinition> result = DataFiles.readBundled(CLASSPATH,
+                CharacterRaceFiles.INDEX, CharacterRaceFiles.LIST_KEY,
+                CharacterRaceFiles.kind(null));
+        for (String problem : result.problems) {
+            LostTalesLog.warning("Bundled race left out: %s", problem);
         }
-        return definition.hasGenderedModels()
-                ? CharacterGenderRegistry.MALE
-                : CharacterGenderRegistry.NON_BINARY;
+        return Collections.unmodifiableList(
+                new ArrayList<CharacterRaceDefinition>(result.values));
     }
 
-    private static CharacterRaceDefinition definition(
-            String id,
-            String lotrRaceAssociation,
-            Set<CharacterFactionCategory> categories,
-            Set<String> allowedFactions,
-            Set<String> deniedFactions,
-            Set<String> genders,
-            float width,
-            float height,
-            float standingEyeHeight,
-            float sneakingEyeHeight,
-            double maxHealth,
-            double movementSpeedMultiplier,
-            double attackDamage,
-            float rendererScale,
-            float previewScale,
-            int previewVerticalOffset) {
-        return new CharacterRaceDefinition(
-                id,
-                lotrRaceAssociation,
-                categories,
-                allowedFactions,
-                deniedFactions,
-                genders,
-                width,
-                height,
-                standingEyeHeight,
-                sneakingEyeHeight,
-                maxHealth,
-                movementSpeedMultiplier,
-                attackDamage,
-                rendererScale,
-                previewScale,
-                previewVerticalOffset);
-    }
-
-    private static Set<String> identifiers(String... values) {
-        return Collections.unmodifiableSet(
-                new LinkedHashSet<String>(Arrays.asList(values)));
-    }
-
-    private static float standingEyeHeight(float bodyHeight) {
-        return bodyHeight * STANDING_EYE_HEIGHT_RATIO;
-    }
-
-    private static float sneakingEyeHeight(float bodyHeight) {
-        return standingEyeHeight(bodyHeight) - SNEAKING_EYE_HEIGHT_DROP;
-    }
-
-    private static void register(Map<String, CharacterRaceDefinition> definitions,
-                                 CharacterRaceDefinition definition) {
-        String id = LostTalesIdentifiers.normalize(definition.getId());
-        if (!id.equals(definition.getId())) {
-            throw new IllegalArgumentException("Race ID is not canonical: " + definition.getId());
+    private static Map<String, CharacterRaceDefinition> index(
+            List<CharacterRaceDefinition> list) {
+        LinkedHashMap<String, CharacterRaceDefinition> byId =
+                new LinkedHashMap<String, CharacterRaceDefinition>();
+        for (CharacterRaceDefinition race : list) {
+            if (race != null && !byId.containsKey(race.getId())) {
+                byId.put(race.getId(), race);
+            }
         }
-        if (definitions.containsKey(id)) {
-            throw new IllegalStateException("Duplicate race ID: " + id);
-        }
-        definitions.put(id, definition);
+        return Collections.unmodifiableMap(byId);
     }
 }

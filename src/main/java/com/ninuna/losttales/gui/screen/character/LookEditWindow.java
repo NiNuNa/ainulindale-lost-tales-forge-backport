@@ -462,9 +462,9 @@ final class LookEditWindow extends SubWindowContent {
         this.chest.draw(mouseX, mouseY);
         String said = statusText();
         if (said.length() > 0) {
-            CreatorRows.drawNote(this.context, Collections.singletonList(
-                    font.trimStringToWidth(said, inner)), left, statusTop(box),
-                    this.statusError ? LostTalesColors.rgb(LostTalesColors.RED)
+            CreatorRows.drawNoteLine(this.context, said, left, statusTop(box),
+                    inner, this.statusError
+                            ? LostTalesColors.rgb(LostTalesColors.RED)
                             : WindowStyle.asideRgb());
         }
         WordButton.draw(font, buttonBox(font, box, CANCEL), cancelLabel(),

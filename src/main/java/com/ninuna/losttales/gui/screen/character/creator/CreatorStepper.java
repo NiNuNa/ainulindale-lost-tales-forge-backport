@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import net.minecraft.client.gui.FontRenderer;
 import org.lwjgl.input.Keyboard;
 
@@ -82,14 +83,17 @@ public final class CreatorStepper extends CreatorControl {
         }
         String value = currentLabel();
         int room = this.width - CreatorWidgets.ARROW_BOX * 2 - 8;
-        String text = LostTalesSkyrimUiStyle.trimToWidth(font, value, room);
+        int shown = (int)LostTalesUiCutName.shownWidth(
+                font.getStringWidth(value), room);
         int color = this.choice.isFixed() || this.choice.count() == 0
                 ? LostTalesSkyrimUiStyle.TEXT_MUTED
                 : LostTalesSkyrimUiStyle.TEXT_BRIGHT;
-        font.drawStringWithShadow(text,
-                this.x + (this.width - font.getStringWidth(text)) / 2,
+        // An option too long for the box fills it and fades into its end
+        // (LOOK-37).
+        LostTalesUiCutName.drawShadowed(font, value,
+                this.x + (this.width - shown) / 2,
                 top + (CreatorWidgets.ARROW_BOX - font.FONT_HEIGHT) / 2 + 1,
-                color);
+                room, color);
     }
 
     /**
@@ -107,15 +111,15 @@ public final class CreatorStepper extends CreatorControl {
         int arrow = steps ? arrowAt(mouseX, mouseY) : 0;
         int room = valueRoom(font);
         int right = this.x + this.width;
-        MenuWindow.drawStepper(font, CreatorRows.trimmed(font,
-                        currentLabel(), room), room, right,
+        MenuWindow.drawStepper(font, currentLabel(), room, right,
                 CreatorRows.textTop(this.y), arrow < 0 ? MenuWindow.PART_LESS
                         : arrow > 0 ? MenuWindow.PART_MORE : null,
                 steps ? this.leftMotion : null, steps ? this.rightMotion : null,
                 WindowStyle.asideRgb(), this.context.alpha());
         CreatorRows.drawLabel(this.context, this.label, this.x, this.y,
                 right - room - 2 * MenuWindow.STEPPER_CELL
-                        - MenuWindow.VALUE_GAP);
+                        - MenuWindow.VALUE_GAP, this, this.label,
+                contains(mouseX, mouseY));
     }
 
     /**

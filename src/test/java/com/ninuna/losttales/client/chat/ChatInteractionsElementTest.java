@@ -44,7 +44,7 @@ public final class ChatInteractionsElementTest {
         IChatComponent icon = ChatShowcaseMarker.createIcon(
                 ChatShareKind.MARKER, 3);
         IChatComponent name = ChatShowcaseMarker.createText(
-                ChatShareKind.MARKER, 3, " Northgate]",
+                ChatShareKind.MARKER, 3, " Greenway Market]",
                 EnumChatFormatting.WHITE, 0xFFFFFF);
         assertTrue(ChatInteractions.sameElement(open, icon));
         assertTrue(ChatInteractions.sameElement(icon, name));

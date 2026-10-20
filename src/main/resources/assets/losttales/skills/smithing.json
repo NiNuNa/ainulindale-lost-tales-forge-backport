@@ -1,0 +1,98 @@
+{
+  "id": "losttales:smithing",
+  "icon": "minecraft:anvil",
+  "order": 7,
+  "counts": [
+    {
+      "act": "smelt",
+      "worth": {
+        "minecraft:iron_ingot": 3,
+        "minecraft:gold_ingot": 4,
+        "lotr:item.copper": 2,
+        "lotr:item.tin": 2,
+        "lotr:item.bronze": 3,
+        "lotr:item.silver": 4,
+        "lotr:item.mithril": 15,
+        "lotr:item.orcSteel": 3,
+        "lotr:item.urukSteel": 3,
+        "lotr:item.blackUrukSteel": 4,
+        "lotr:item.dwarfSteel": 4,
+        "lotr:item.blueDwarfSteel": 4,
+        "lotr:item.elfSteel": 4,
+        "lotr:item.morgulSteel": 4,
+        "lotr:item.galvorn": 6,
+        "lotr:item.gildedIron": 4
+      }
+    },
+    {
+      "act": "craft",
+      "ingredients": {
+        "minecraft:iron_ingot": 2,
+        "minecraft:gold_ingot": 3,
+        "minecraft:diamond": 6,
+        "lotr:item.copper": 1.5,
+        "lotr:item.tin": 1.5,
+        "lotr:item.bronze": 2,
+        "lotr:item.silver": 3,
+        "lotr:item.mithril": 12,
+        "lotr:item.orcSteel": 2.5,
+        "lotr:item.urukSteel": 3,
+        "lotr:item.blackUrukSteel": 3.5,
+        "lotr:item.dwarfSteel": 3.5,
+        "lotr:item.blueDwarfSteel": 3.5,
+        "lotr:item.elfSteel": 3.5,
+        "lotr:item.morgulSteel": 3.5,
+        "lotr:item.galvorn": 5,
+        "lotr:item.gildedIron": 3,
+        "lotr:item.ironNugget": 0.2,
+        "lotr:item.silverNugget": 0.3,
+        "lotr:item.mithrilNugget": 1.2,
+        "minecraft:gold_nugget": 0.3
+      }
+    },
+    {
+      "act": "repair",
+      "per": 5.0
+    }
+  ],
+  "perks": [
+    {
+      "id": "quick_hands",
+      "levels": [10],
+      "effect": "smelt_nugget",
+      "amount": 0.25,
+      "with": ["minecraft:iron_ingot>lotr:item.ironNugget", "minecraft:gold_ingot>minecraft:gold_nugget", "lotr:item.silver>lotr:item.silverNugget", "lotr:item.mithril>lotr:item.mithrilNugget"]
+    },
+    {
+      "id": "thrifty_forge",
+      "levels": [20, 50],
+      "effect": "forge_thrift",
+      "amount": 0.1
+    },
+    {
+      "id": "repair",
+      "levels": [30],
+      "effect": "repair_cost",
+      "amount": 0.2
+    },
+    {
+      "id": "tempered",
+      "levels": [40],
+      "effect": "tempered",
+      "amount": 0
+    },
+    {
+      "id": "masterwork",
+      "levels": [80],
+      "effect": "masterwork",
+      "amount": 0.1,
+      "needs": "tempered"
+    },
+    {
+      "id": "master_smith",
+      "levels": [100],
+      "effect": "repair_more",
+      "amount": 0.25
+    }
+  ]
+}

@@ -25,6 +25,7 @@ import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -602,11 +603,11 @@ public final class QuestJournalPage extends PageContent {
         boolean loaded = !LostTalesClientQuestDefinitionStore.getQuests().isEmpty();
         int left = (int)rows.left;
         int width = (int)rows.width;
-        LostTalesUiInk.drawText(font, LostTalesSkyrimUiStyle.trimToWidth(font,
-                        translate("gui.losttales.quest.empty.title"), width),
-                left, (int)rows.top + LostTalesUiInk.centredStart(rowHeight(),
+        LostTalesUiCutName.drawText(font,
+                translate("gui.losttales.quest.empty.title"), left,
+                (int)rows.top + LostTalesUiInk.centredStart(rowHeight(),
                         LostTalesUiInk.CAP_HEIGHT),
-                WindowStyle.asideRgb(), alpha);
+                width, WindowStyle.asideRgb(), alpha);
         List<String> lines = font.listFormattedStringToWidth(translate(loaded
                         ? "gui.losttales.quest.empty.body"
                         : "gui.losttales.quest.empty.definitions"),
@@ -637,7 +638,8 @@ public final class QuestJournalPage extends PageContent {
                 ? FOLDED_SIGN : OPEN_SIGN;
         WindowLists.drawHeading(this.fontRendererObj,
                 sign + categoryName(label), (int)rows.left, (int)rows.left,
-                (int)rows.right(), y, rowHeight(), lit, alpha);
+                (int)rows.right(), (int)rows.right(), y, rowHeight(), lit,
+                alpha, this, label, lit);
     }
 
     /**
@@ -679,11 +681,15 @@ public final class QuestJournalPage extends PageContent {
                         LostTalesColors.rgb(LostTalesColors.GOLD), alpha);
                 titleRight = markX - TabIcons.GAP;
             }
-            LostTalesUiInk.drawText(font, LostTalesSkyrimUiStyle.trimToWidth(
-                            font, quest.getTitle(), titleRight - titleX),
-                    titleX, textTop, LostTalesColors.rgb(questRgb(quest,
+            // A title too long for its row fades into the row's end and
+            // slides along under the pointer (LOOK-37).
+            LostTalesUiCutName.drawText(font, quest.getTitle(), titleX,
+                    textTop, titleRight - titleX,
+                    LostTalesColors.rgb(questRgb(quest,
                             row.questIndex == this.selectedQuestIndex)),
-                    alpha);
+                    alpha, this, Integer.valueOf(row.questIndex),
+                    this.hovered == Hovered.QUEST
+                            && this.hoveredIndex == row.questIndex);
         } finally {
             if (cut) {
                 disableScissor();
@@ -998,10 +1004,10 @@ public final class QuestJournalPage extends PageContent {
         boolean abandoned = entry.isAbandoned();
         boolean pinned = entry.isTracked();
 
-        addTitleHeader(lines, quest.getTitle(), width);
+        addTitleHeader(lines, LostTalesQuestWords.title(quest), width);
         addQuestStatusLines(lines, quest, progress, completed, failed,
                 abandoned, pinned, width);
-        addHistoryLines(lines, entry.getHistoryEntry(), progress != null,
+        addHistoryLines(lines, quest, entry.getHistoryEntry(), progress != null,
                 width);
         addBlankLine(lines);
 
@@ -1214,10 +1220,12 @@ public final class QuestJournalPage extends PageContent {
         String tracking = translate(pinned
                 ? "gui.losttales.quest.status.tracked"
                 : "gui.losttales.quest.status.untracked");
-        String stageText = progress == null ? "" : " \u00b7 "
+        // A stage gone from the quest's file stands nowhere, and has no number.
+        int stageIndex = LostTalesQuestObjectiveSelection.getCurrentStageIndex(
+                quest, progress);
+        String stageText = stageIndex < 0 ? "" : " \u00b7 "
                 + translate("gui.losttales.quest.stage",
-                        String.valueOf(LostTalesQuestObjectiveSelection
-                                .getCurrentStageIndex(quest, progress) + 1),
+                        String.valueOf(stageIndex + 1),
                         String.valueOf(Math.max(1, quest.getStages().size())));
         int color = failed ? LostTalesColors.rgb(LostTalesColors.RED)
                 : abandoned ? LostTalesColors.rgb(LostTalesColors.GOLD)
@@ -1236,11 +1244,14 @@ public final class QuestJournalPage extends PageContent {
 
     /**
      * What the History line says: how the quest last ended, why and when,
-     * and how many times it was completed. While the quest is taken again
+     * and how many times it was completed. A completion's outcome is what
+     * the optional objectives it achieved add, worded here; a failure's or
+     * an abandon's reason is a lang key. While the quest is taken again
      * only the count shows (QUEST-10).
      */
     private void addHistoryLines(List<DetailLine> lines,
-            LostTalesQuestHistoryEntry history, boolean running, int width) {
+            LostTalesQuestDefinition quest, LostTalesQuestHistoryEntry history,
+            boolean running, int width) {
         if (history == null) {
             return;
         }
@@ -1256,14 +1267,16 @@ public final class QuestJournalPage extends PageContent {
             }
             return;
         }
-        if (history.getDetail().length() > 0) {
+        String said = history.isCompleted()
+                ? LostTalesQuestWords.outcomeLine(quest,
+                        history.getCompletedOptionalObjectiveIds())
+                : history.getDetail().length() == 0 ? ""
+                : translate(history.getDetail());
+        if (said.length() > 0) {
             addWrappedLines(lines,
                     translate(history.isCompleted()
                             ? "gui.losttales.quest.outcome"
-                            : "gui.losttales.quest.reason",
-                            // A reason the game wrote is a lang key; one a
-                            // quest's file wrote reads as it was written.
-                            translate(history.getDetail())),
+                            : "gui.losttales.quest.reason", said),
                     history.isFailed() ? LostTalesColors.rgb(LostTalesColors.RED)
                             : history.isCompleted()
                             ? LostTalesColors.rgb(LostTalesColors.GREEN)
@@ -1376,7 +1389,11 @@ public final class QuestJournalPage extends PageContent {
         }
     }
 
-    /** Words wrapped as a menu's note, from {@code y}, cut with dots where they run past {@code maxHeight}. */
+    /**
+     * Words wrapped as a menu's note, from {@code y}. Where they run past
+     * {@code maxHeight}, the last line that fits runs on into the next and
+     * fades out where the column ends, as a cut name does (LOOK-37).
+     */
     private int drawWrappedText(String text, int x, int y, int width, int color,
                                 int maxHeight, int alpha) {
         if (text == null || text.length() == 0 || maxHeight <= 0) {
@@ -1387,10 +1404,16 @@ public final class QuestJournalPage extends PageContent {
         int bottom = y + maxHeight;
         int rise = LostTalesUiInk.centredStart(DETAIL_LINE_HEIGHT,
                 LostTalesUiInk.CAP_HEIGHT);
-        for (String line : lines) {
+        for (int index = 0; index < lines.size(); index++) {
             if (lineY + DETAIL_LINE_HEIGHT > bottom) {
-                LostTalesUiInk.drawText(this.fontRendererObj, "...", x,
-                        lineY + rise, color, alpha);
+                return bottom;
+            }
+            String line = lines.get(index);
+            if (index + 1 < lines.size()
+                    && lineY + 2 * DETAIL_LINE_HEIGHT > bottom) {
+                LostTalesUiCutName.drawText(this.fontRendererObj,
+                        line + " " + lines.get(index + 1), x, lineY + rise,
+                        width, color, alpha);
                 return bottom;
             }
             LostTalesUiInk.drawText(this.fontRendererObj, line, x,

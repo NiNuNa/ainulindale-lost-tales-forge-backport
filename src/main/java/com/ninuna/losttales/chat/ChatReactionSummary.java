@@ -127,11 +127,6 @@ public final class ChatReactionSummary {
             this.names = Collections.unmodifiableList(kept);
         }
 
-        /** Whether the identity {@code identityId} is among those who reacted. */
-        public boolean isMine(UUID identityId) {
-            return identityId != null && this.mineAs.contains(identityId);
-        }
-
         /** How many reacted beyond the names shown. */
         public int others() {
             return Math.max(0, this.count - this.names.size());

@@ -40,7 +40,6 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
     private static final long EXPIRATION_CHECK_INTERVAL_TICKS = 1200L;
 
     private final ItemStack[] notices = new ItemStack[INVENTORY_SIZE];
-    private long lastGenerationWorldTime;
     private long nextGenerationWorldTime;
     private int generationSequence;
     private long nextExpirationCheckWorldTime;
@@ -94,7 +93,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
         int available = this.countAvailableMissives();
         int most = getMaxAvailableMissives();
         if (available >= most || this.getFirstEmptySlot() < 0) {
-            this.markGenerationAttempt(worldTime);
+            this.scheduleNextGeneration(worldTime);
             return;
         }
 
@@ -104,7 +103,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
         int maxBatch = Math.min(configuredMaxBatch, room);
         int minBatch = Math.min(configuredMinBatch, maxBatch);
         if (maxBatch <= 0) {
-            this.markGenerationAttempt(worldTime);
+            this.scheduleNextGeneration(worldTime);
             return;
         }
 
@@ -132,7 +131,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
             }
         }
 
-        this.markGenerationAttempt(worldTime);
+        this.scheduleNextGeneration(worldTime);
     }
 
     private void expireOldMissives(long worldTime) {
@@ -191,13 +190,8 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
         return -1;
     }
 
-    public void markGenerationAttempt(long worldTime) {
-        this.lastGenerationWorldTime = worldTime;
-        this.scheduleNextGeneration(worldTime);
-        this.markDirtyAndSync();
-    }
-
-    public void scheduleNextGeneration(long currentWorldTime) {
+    /** The next refill comes one interval after {@code currentWorldTime}. */
+    private void scheduleNextGeneration(long currentWorldTime) {
         this.nextGenerationWorldTime = currentWorldTime + getGenerationIntervalTicks();
         this.markDirtyAndSync();
     }
@@ -267,7 +261,6 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
     public void readFromNBT(NBTTagCompound nbt) {
         super.readFromNBT(nbt);
 
-        this.lastGenerationWorldTime = nbt.getLong("LastGenerationWorldTime");
         this.nextGenerationWorldTime = nbt.getLong("NextGenerationWorldTime");
         this.generationSequence = Math.max(0, nbt.getInteger("GenerationSequence"));
         this.nextExpirationCheckWorldTime = nbt.getLong("NextExpirationCheckWorldTime");
@@ -293,7 +286,6 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
     public void writeToNBT(NBTTagCompound nbt) {
         super.writeToNBT(nbt);
 
-        nbt.setLong("LastGenerationWorldTime", this.lastGenerationWorldTime);
         nbt.setLong("NextGenerationWorldTime", this.nextGenerationWorldTime);
         nbt.setInteger("GenerationSequence", this.generationSequence);
         nbt.setLong("NextExpirationCheckWorldTime", this.nextExpirationCheckWorldTime);

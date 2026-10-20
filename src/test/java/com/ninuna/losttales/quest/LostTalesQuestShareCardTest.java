@@ -127,7 +127,8 @@ public final class LostTalesQuestShareCardTest {
                                         Collections.<String, String>emptyMap()),
                                 new LostTalesQuestObjectiveDefinition("wheat",
                                         "gather", "", false,
-                                        Collections.singletonMap("count", "3"))))));
+                                        Collections.singletonMap("count", "3"))))),
+                false, null, null);
         ChatQuestCard card = LostTalesQuestShareResolver.card(quest,
                 new com.ninuna.losttales.quest.progress.LostTalesQuestProgress(
                         "losttales:server/road", 0, "10",

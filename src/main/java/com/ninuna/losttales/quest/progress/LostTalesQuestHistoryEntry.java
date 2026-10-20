@@ -9,7 +9,7 @@ import java.util.Set;
 
 /**
  * A quest's History line: how it last ended (completed, failed or
- * abandoned), why and when, the optional objectives it achieved, the
+ * abandoned), why (a lang key) and when, the optional objectives it achieved, the
  * stages it reached, and how many times it was ever completed. The line
  * stays while the quest is taken again, and the next end replaces it,
  * keeping the count (QUEST-10).
@@ -40,24 +40,11 @@ public final class LostTalesQuestHistoryEntry {
     private final int completions;
     private final List<String> stagePath;
 
-    public LostTalesQuestHistoryEntry(String questId, Outcome outcome,
-            String detail, long worldTime) {
-        this(questId, outcome, detail, worldTime,
-                Collections.<String>emptySet());
-    }
-
-    public LostTalesQuestHistoryEntry(String questId, Outcome outcome,
-            String detail, long worldTime,
-            Collection<String> completedOptionalObjectiveIds) {
-        this(questId, outcome, detail, worldTime,
-                completedOptionalObjectiveIds, 0,
-                Collections.<String>emptyList());
-    }
-
     /**
      * A line counting {@code completions}, at least one for a completed
      * quest, and the {@code stagePath} reached, bounded as a running
-     * quest's path is.
+     * quest's path is. {@code detail} is a failure's or an abandon's
+     * reason, a lang key; a completion keeps none.
      */
     public LostTalesQuestHistoryEntry(String questId, Outcome outcome,
             String detail, long worldTime,

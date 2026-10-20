@@ -261,6 +261,11 @@ public final class CharacterLifecycleStateTracker {
         }
     }
 
+    /**
+     * Ends a coordinator-owned transfer. Its change of dimension counts as
+     * a teleport, as a move within one dimension does: the grace starts and
+     * the steady ground is counted afresh.
+     */
     public static void endOwnedDimensionTransition(EntityPlayerMP player) {
         SessionState state = getState(player);
         if (state == null) {
@@ -268,6 +273,10 @@ public final class CharacterLifecycleStateTracker {
         }
         synchronized (state) {
             state.ownedDimensionTransition = false;
+            state.transitionUntil = Math.max(state.transitionUntil,
+                    LostTalesMath.saturatingAdd(System.currentTimeMillis(),
+                            Math.max(0L, LostTalesConfig.characterSwitchTeleportGraceMillis)));
+            state.stableGroundTicks = 0;
             updatePosition(state, player);
         }
     }

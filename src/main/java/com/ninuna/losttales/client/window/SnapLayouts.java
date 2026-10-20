@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.ArrayList;
@@ -61,18 +60,8 @@ public final class SnapLayouts {
     static final int ZONE_GAP = 2;
     /** Clear pixels between two layouts. */
     static final int LAYOUT_GAP = 4;
-    /** Clear pixels between the panel's frame and its layouts. */
+    /** Clear pixels between the panel's edge and its layouts. */
     static final int PADDING = 4;
-    /**
-     * The frame the panel wears, a window's: its ring, the surface
-     * and the edge over it, inside the panel's box.
-     */
-    private static final int FRAME = WindowPlacement.FRAME_WIDTH;
-    /**
-     * A layout's zones: the palette's rose grey at a third, lighter than
-     * the panel's primary colour around them.
-     */
-    private static final int ZONE_RGB = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
 
     private SnapLayouts() {}
 
@@ -254,7 +243,7 @@ public final class SnapLayouts {
     /** A panel's width for {@code count} layouts laid in rows of {@code columns}. */
     static int panelWidth(int count, int columns) {
         int across = Math.max(1, Math.min(count, columns));
-        return 2 * (FRAME + PADDING) + across * THUMB_WIDTH
+        return 2 * PADDING + across * THUMB_WIDTH
                 + (across - 1) * LAYOUT_GAP;
     }
 
@@ -262,7 +251,7 @@ public final class SnapLayouts {
     static int panelHeight(int count, int columns, int thumbHeight) {
         int rows = Math.max(1, (count + Math.max(1, columns) - 1)
                 / Math.max(1, columns));
-        return 2 * (FRAME + PADDING) + rows * thumbHeight
+        return 2 * PADDING + rows * thumbHeight
                 + (rows - 1) * LAYOUT_GAP;
     }
 
@@ -292,13 +281,11 @@ public final class SnapLayouts {
         }
     }
 
-    /** A panel of layouts laid out in one place: its frame, and every zone in it. */
+    /** A panel of layouts laid out in one place: every zone in it. */
     static final class Panel {
-        final LostTalesUiHitBox box;
         final List<Zone> zones;
 
-        Panel(LostTalesUiHitBox box, List<Zone> zones) {
-            this.box = box;
+        Panel(List<Zone> zones) {
             this.zones = zones;
         }
 
@@ -316,23 +303,6 @@ public final class SnapLayouts {
                 }
             }
             return -1;
-        }
-
-        /**
-         * The zone standing highest under {@code x}, or -1 where no zone
-         * is: what a pointer pressed against the screen's top edge above
-         * the panel points at.
-         */
-        int zoneInColumn(double x) {
-            int best = -1;
-            for (int index = 0; index < this.zones.size(); index++) {
-                LostTalesUiHitBox zone = this.zones.get(index).box;
-                if (x >= zone.left && x < zone.right() && (best < 0
-                        || zone.top < this.zones.get(best).box.top)) {
-                    best = index;
-                }
-            }
-            return best < 0 ? -1 : this.zones.get(best).target;
         }
 
         /** The part of the screen zone {@code index} stands for, or none for -1. */
@@ -428,17 +398,14 @@ public final class SnapLayouts {
             }
             return best;
         }
-
-        boolean contains(double x, double y) {
-            return this.box.contains(x, y);
-        }
     }
 
     /**
      * Lays {@code suggestions} and then {@code layouts} out in rows of
      * {@code columns} in a panel whose top-left corner is ({@code left},
-     * {@code top}), each a small screen of the shape of one
-     * {@code screenWidth} by {@code screenHeight}.
+     * {@code top}), {@link #PADDING} in from its edges, each a small
+     * screen of the shape of one {@code screenWidth} by
+     * {@code screenHeight}.
      */
     static Panel lay(List<Suggestion> suggestions,
                      List<Window.ScreenFill[]> layouts, int columns,
@@ -449,9 +416,9 @@ public final class SnapLayouts {
         int count = suggestions.size() + layouts.size();
         List<Zone> zones = new ArrayList<Zone>();
         for (int index = 0; index < count; index++) {
-            double thumbLeft = left + FRAME + PADDING
+            double thumbLeft = left + PADDING
                     + (index % across) * (THUMB_WIDTH + LAYOUT_GAP);
-            double thumbTop = top + FRAME + PADDING
+            double thumbTop = top + PADDING
                     + (index / across) * (thumbHeight + LAYOUT_GAP);
             Suggestion suggestion = index < suggestions.size()
                     ? suggestions.get(index) : null;
@@ -467,10 +434,7 @@ public final class SnapLayouts {
                         suggestion == null ? zones.size() : first));
             }
         }
-        return new Panel(new LostTalesUiHitBox(left, top,
-                panelWidth(count, across),
-                panelHeight(count, across, thumbHeight)),
-                Collections.unmodifiableList(zones));
+        return new Panel(Collections.unmodifiableList(zones));
     }
 
     /**
@@ -504,12 +468,22 @@ public final class SnapLayouts {
     }
 
     /**
+     * A zone's colour on the theme's primary surface: the secondary, as a
+     * strip or a lit row wears it, and the zone under the pointer or the
+     * arrows two thirds of the way to the accent.
+     */
+    static int zoneRgb(boolean lit) {
+        return lit ? LostTalesUiInk.blend(LostTalesUiTheme.primaryRgb(),
+                LostTalesUiTheme.accentRgb(), 2.0F / 3.0F)
+                : LostTalesUiTheme.secondaryRgb();
+    }
+
+    /**
      * Draws a panel's zones on the surface of the sub-window holding it,
-     * at {@code alpha}: each zone the surface recoloured in place toward
-     * rose grey, a third of the way, zone {@code lit} toward the accent,
-     * two thirds of the way (-1 for none), and on every zone of a
-     * suggestion its window's icon. The surface is recoloured rather than
-     * covered, so no zone lies over it as a second background.
+     * at {@code alpha}: each zone the surface recoloured in place
+     * ({@link #zoneRgb}), zone {@code lit} lit (-1 for none), and on every
+     * zone of a suggestion its window's icon. The surface is recoloured
+     * rather than covered, so no zone lies over it as a second background.
      */
     static void drawZones(Minecraft minecraft, Panel panel, int lit,
                           int alpha, int surfaceAlpha) {
@@ -517,9 +491,8 @@ public final class SnapLayouts {
             return;
         }
         int surface = LostTalesUiTheme.primaryRgb();
-        int resting = LostTalesUiInk.blend(surface, ZONE_RGB, 1.0F / 3.0F);
-        int landing = LostTalesUiInk.blend(surface,
-                LostTalesUiTheme.accentRgb(), 2.0F / 3.0F);
+        int resting = zoneRgb(false);
+        int landing = zoneRgb(true);
         for (int index = 0; index < panel.zones.size(); index++) {
             recolourRounded(panel.zones.get(index).box, surfaceAlpha, surface,
                     index == lit ? landing : resting);

@@ -131,7 +131,7 @@ public final class LostTalesQuestDialogueTest {
                 Collections.<String, String>emptyMap(),
                 Collections.<String, String>emptyMap(), interaction,
                 Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(), dialogue,
-                Collections.singletonList(stage));
+                Collections.<String, String>emptyMap(), dialogue, null,
+                Collections.singletonList(stage), false, null, null);
     }
 }

@@ -2,7 +2,7 @@ package com.ninuna.losttales.gui.screen.character.creator;
 
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
-import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import net.minecraft.client.gui.FontRenderer;
 import org.lwjgl.input.Keyboard;
 
@@ -50,8 +50,8 @@ public final class CreatorList extends CreatorControl {
         int count = this.choice.count();
         if (count == 0) {
             LostTalesSkyrimUiStyle.beginContent();
-            font.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(font,
-                    this.choice.emptyLabel(), this.width), this.x, this.y + 3,
+            LostTalesUiCutName.drawShadowed(font, this.choice.emptyLabel(),
+                    this.x, this.y + 3, this.width,
                     LostTalesSkyrimUiStyle.TEXT_MUTED);
             return;
         }
@@ -63,15 +63,18 @@ public final class CreatorList extends CreatorControl {
             LostTalesSkyrimUiStyle.drawSelectionRow(this.x, rowY, this.width,
                     ROW, isSelected, index == hovered);
             LostTalesSkyrimUiStyle.beginContent();
-            String text = LostTalesSkyrimUiStyle.trimToWidth(font,
-                    this.choice.label(index), this.width - TEXT_INSET - 2);
-            font.drawStringWithShadow(text, this.x + TEXT_INSET, rowY + 3,
+            // A name too long for its row fades into the row's end and
+            // slides along under the pointer (LOOK-37).
+            LostTalesUiCutName.drawShadowed(font, this.choice.label(index),
+                    this.x + TEXT_INSET, rowY + 3,
+                    this.width - TEXT_INSET - 2,
                     isSelected ? (isFocused()
                             ? LostTalesSkyrimUiStyle.GOLD
                             : LostTalesSkyrimUiStyle.TEXT_BRIGHT)
                             : index == hovered
                             ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                            : LostTalesSkyrimUiStyle.TEXT);
+                            : LostTalesSkyrimUiStyle.TEXT,
+                    this, Integer.valueOf(index), index == hovered);
         }
     }
 
@@ -83,11 +86,9 @@ public final class CreatorList extends CreatorControl {
     private void drawRows(int mouseX, int mouseY) {
         int count = this.choice.count();
         if (count == 0) {
-            LostTalesUiInk.drawText(this.context.getFont(),
-                    CreatorRows.trimmed(this.context.getFont(),
-                            this.choice.emptyLabel(), this.width), this.x,
-                    CreatorRows.textTop(this.y), WindowStyle.asideRgb(),
-                    this.context.alpha());
+            CreatorRows.drawLine(this.context, this.choice.emptyLabel(),
+                    this.x, this.y, this.x + this.width,
+                    WindowStyle.asideRgb());
             return;
         }
         int selected = this.choice.index();
@@ -98,7 +99,8 @@ public final class CreatorList extends CreatorControl {
                 CreatorRows.light(this.context, rowY, rowY + rowPitch());
             }
             CreatorRows.drawLabel(this.context, this.choice.label(index),
-                    this.x, rowY, this.x + this.width);
+                    this.x, rowY, this.x + this.width, this,
+                    Integer.valueOf(index), index == hovered);
         }
     }
 

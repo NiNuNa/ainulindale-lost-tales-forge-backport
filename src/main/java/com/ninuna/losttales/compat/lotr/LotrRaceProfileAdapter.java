@@ -20,26 +20,49 @@ import net.minecraft.entity.ai.attributes.IAttributeInstance;
 import net.minecraft.world.World;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Reads playable-race combat attributes from real LOTR NPC classes. Physical
- * player dimensions remain authoritative in {@link CharacterRaceRegistry};
- * NPC collision boxes are mob implementation details and do not necessarily
- * match their rendered model size.
+ * Reads a race's health, speed and attack from the LOTR NPC its race file
+ * names ({@code values_from}, CHAR-38), speed relative to the Bree-man's.
+ * The race's own size always stands: NPC collision boxes are mob details
+ * and need not match their drawn size. A race that names no NPC, and any
+ * race while LOTR cannot be asked, has its file's values.
  */
 public final class LotrRaceProfileAdapter {
+
+    /** The NPC whose speed every race's is measured against. */
+    private static final String SPEED_BASELINE = "lotr:bree_man";
 
     private interface RepresentativeFactory {
         LOTREntityNPC create(World world);
     }
 
+    /** What one NPC is worth, as LOTR sets it up; a value it lacks is not a number. */
+    private static final class Values {
+        private final String className;
+        private final double maxHealth;
+        private final double movementMultiplier;
+        private final double attackDamage;
+
+        private Values(String className, double maxHealth, double movementMultiplier,
+                       double attackDamage) {
+            this.className = className;
+            this.maxHealth = maxHealth;
+            this.movementMultiplier = movementMultiplier;
+            this.attackDamage = attackDamage;
+        }
+    }
+
     private static final LotrRaceProfileAdapter INSTANCE =
             new LotrRaceProfileAdapter();
 
-    private Map<String, CharacterRaceGameplayProfile> profiles =
-            Collections.emptyMap();
+    private Map<String, Values> representatives = Collections.emptyMap();
+    private final Map<String, CharacterRaceGameplayProfile> profiles =
+            new HashMap<String, CharacterRaceGameplayProfile>();
+    private int profilesRevision = -1;
     private boolean initialized;
 
     public static LotrRaceProfileAdapter getInstance() {
@@ -54,19 +77,32 @@ public final class LotrRaceProfileAdapter {
         if (canonicalRaceId.length() == 0) {
             return CharacterRaceGameplayRegistry.DEFAULT;
         }
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(canonicalRaceId);
         CharacterRaceGameplayProfile fallback =
                 CharacterRaceGameplayRegistry.getFallback(canonicalRaceId);
-        if (world == null) {
+        if (world == null || race == null) {
             return fallback;
         }
         ensureInitialized(world);
+        int revision = CharacterRaceRegistry.revision();
+        if (revision != this.profilesRevision) {
+            this.profiles.clear();
+            this.profilesRevision = revision;
+        }
         CharacterRaceGameplayProfile profile = this.profiles.get(canonicalRaceId);
-        return profile == null ? fallback : profile;
+        if (profile == null) {
+            profile = createProfile(race,
+                    this.representatives.get(race.getLotrRaceAssociation()), fallback);
+            this.profiles.put(canonicalRaceId, profile);
+        }
+        return profile;
     }
 
     public synchronized void clear() {
         this.initialized = false;
-        this.profiles = Collections.emptyMap();
+        this.representatives = Collections.emptyMap();
+        this.profiles.clear();
+        this.profilesRevision = -1;
     }
 
     private void ensureInitialized(World world) {
@@ -75,57 +111,48 @@ public final class LotrRaceProfileAdapter {
         }
         this.initialized = true;
 
-        LinkedHashMap<String, RepresentativeFactory> factories =
-                createFactories();
-        LinkedHashMap<String, LOTREntityNPC> representatives =
+        LinkedHashMap<String, LOTREntityNPC> npcs =
                 new LinkedHashMap<String, LOTREntityNPC>();
         try {
             for (Map.Entry<String, RepresentativeFactory> entry
-                    : factories.entrySet()) {
+                    : createFactories().entrySet()) {
                 LOTREntityNPC representative = entry.getValue().create(world);
                 if (representative == null) {
                     throw new IllegalStateException(
                             "null representative for " + entry.getKey());
                 }
-                representatives.put(entry.getKey(), representative);
+                npcs.put(entry.getKey(), representative);
             }
 
-            LOTREntityNPC human = representatives.get(CharacterRaceRegistry.HUMAN);
-            double humanMovementSpeed = readBaseAttribute(
-                    human, SharedMonsterAttributes.movementSpeed, 0.2D);
-            if (!isPositiveFinite(humanMovementSpeed)) {
+            double baselineSpeed = readBaseAttribute(npcs.get(SPEED_BASELINE),
+                    SharedMonsterAttributes.movementSpeed);
+            if (!isPositiveFinite(baselineSpeed)) {
                 throw new IllegalStateException(
-                        "invalid LOTR human movement speed " + humanMovementSpeed);
+                        "invalid LOTR Bree-man movement speed " + baselineSpeed);
             }
 
-            LinkedHashMap<String, CharacterRaceGameplayProfile> resolved =
-                    new LinkedHashMap<String, CharacterRaceGameplayProfile>();
-            for (Map.Entry<String, LOTREntityNPC> entry
-                    : representatives.entrySet()) {
-                CharacterRaceGameplayProfile profile = createProfile(
-                        entry.getKey(), entry.getValue(), humanMovementSpeed);
-                resolved.put(entry.getKey(), profile);
+            LinkedHashMap<String, Values> resolved = new LinkedHashMap<String, Values>();
+            for (Map.Entry<String, LOTREntityNPC> entry : npcs.entrySet()) {
+                LOTREntityNPC npc = entry.getValue();
+                Values values = new Values(npc.getClass().getName(),
+                        readBaseAttribute(npc, SharedMonsterAttributes.maxHealth),
+                        readBaseAttribute(npc, SharedMonsterAttributes.movementSpeed)
+                                / baselineSpeed,
+                        readBaseAttribute(npc, LOTREntityNPC.npcAttackDamage));
+                resolved.put(entry.getKey(), values);
                 FMLLog.info(
-                        "[%s] LOTR race profile %s <- %s: %.2fx%.2f, eye %.2f, health %.2f, speed x%.3f, damage %.2f",
-                        LostTalesMetaData.MOD_ID,
-                        profile.getRaceId(),
-                        profile.getRepresentativeEntityClassName(),
-                        profile.getWidth(),
-                        profile.getHeight(),
-                        profile.getStandingEyeHeight(),
-                        profile.getMaxHealth(),
-                        profile.getMovementSpeedMultiplier(),
-                        profile.getAttackDamage());
+                        "[%s] LOTR race values %s <- %s: health %.2f, speed x%.3f, damage %.2f",
+                        LostTalesMetaData.MOD_ID, entry.getKey(), values.className,
+                        values.maxHealth, values.movementMultiplier, values.attackDamage);
             }
-
-            this.profiles = Collections.unmodifiableMap(resolved);
+            this.representatives = Collections.unmodifiableMap(resolved);
         } catch (Throwable throwable) {
-            this.profiles = Collections.emptyMap();
+            this.representatives = Collections.emptyMap();
             FMLLog.severe(
-                    "[%s] LOTR-driven race profiles could not be initialized. Vanilla-safe values will be used: %s",
+                    "[%s] LOTR-driven race values could not be read; each race's file values stand: %s",
                     LostTalesMetaData.MOD_ID, throwable.toString());
         } finally {
-            for (LOTREntityNPC representative : representatives.values()) {
+            for (LOTREntityNPC representative : npcs.values()) {
                 try {
                     representative.setDead();
                 } catch (Throwable ignored) {
@@ -135,135 +162,89 @@ public final class LotrRaceProfileAdapter {
         }
     }
 
+    /**
+     * The race's size with the NPC's health, speed and attack; each value
+     * the NPC lacks, or one out of shape, is the file's.
+     */
     private static CharacterRaceGameplayProfile createProfile(
-            String raceId,
-            LOTREntityNPC representative,
-            double humanMovementSpeed) {
-        CharacterRaceDefinition definition = CharacterRaceRegistry.get(raceId);
-        CharacterRaceGameplayProfile fallback =
-                CharacterRaceGameplayRegistry.getFallback(raceId);
-        if (definition == null) {
-            throw new IllegalStateException(
-                    "missing physical race definition for " + raceId);
-        }
-        // The dimensions come from the race's own definition, never from the
-        // representative: LOTR gives Mordor Orc and Uruk NPCs the same
-        // collision box although their models differ, which would put both
-        // races' cameras at 1.32 blocks.
-        float width = definition.getWidth();
-        float height = definition.getHeight();
-        float eyeHeight = definition.getStandingEyeHeight();
-        float sneakingEyeHeight = definition.getSneakingEyeHeight();
-        double maxHealth = readBaseAttribute(
-                representative, SharedMonsterAttributes.maxHealth, fallback.getMaxHealth());
-        double movementSpeed = readBaseAttribute(
-                representative, SharedMonsterAttributes.movementSpeed,
-                humanMovementSpeed);
-        double movementMultiplier = movementSpeed / humanMovementSpeed;
-        double attackDamage = readBaseAttribute(
-                representative, LOTREntityNPC.npcAttackDamage,
-                fallback.getAttackDamage());
-
-        validatePhysicalValue("width", width);
-        validatePhysicalValue("height", height);
-        validatePhysicalValue("eye height", eyeHeight);
-        validatePhysicalValue("sneaking eye height", sneakingEyeHeight);
-        validatePositiveValue("max health", maxHealth);
-        validatePositiveValue("movement multiplier", movementMultiplier);
-        validateNonNegativeValue("attack damage", attackDamage);
-
-        return new CharacterRaceGameplayProfile(
-                raceId,
-                representative.getClass().getName(),
-                width,
-                height,
-                eyeHeight,
-                sneakingEyeHeight,
-                maxHealth,
-                movementMultiplier,
-                attackDamage,
-                true
-        );
-    }
-
-    private static double readBaseAttribute(
-            LOTREntityNPC entity, IAttribute attribute, double fallback) {
-        if (entity == null || attribute == null) {
+            CharacterRaceDefinition race, Values values,
+            CharacterRaceGameplayProfile fallback) {
+        if (values == null) {
             return fallback;
         }
-        IAttributeInstance instance = entity.getEntityAttribute(attribute);
-        return instance == null ? fallback : instance.getBaseValue();
+        return new CharacterRaceGameplayProfile(
+                race.getId(),
+                values.className,
+                race.getWidth(),
+                race.getHeight(),
+                race.getStandingEyeHeight(),
+                race.getSneakingEyeHeight(),
+                isPositiveFinite(values.maxHealth)
+                        ? values.maxHealth : fallback.getMaxHealth(),
+                isPositiveFinite(values.movementMultiplier)
+                        ? values.movementMultiplier : fallback.getMovementSpeedMultiplier(),
+                isNonNegativeFinite(values.attackDamage)
+                        ? values.attackDamage : fallback.getAttackDamage());
     }
 
-    private static void validatePhysicalValue(String name, float value) {
-        if (Float.isNaN(value) || Float.isInfinite(value) || value <= 0.0F) {
-            throw new IllegalStateException("invalid " + name + ": " + value);
+    private static double readBaseAttribute(LOTREntityNPC entity, IAttribute attribute) {
+        if (entity == null || attribute == null) {
+            return Double.NaN;
         }
+        IAttributeInstance instance = entity.getEntityAttribute(attribute);
+        return instance == null ? Double.NaN : instance.getBaseValue();
     }
 
+    /** The NPCs a race file may take its values from, by the name it writes. */
     private static LinkedHashMap<String, RepresentativeFactory> createFactories() {
         LinkedHashMap<String, RepresentativeFactory> factories =
                 new LinkedHashMap<String, RepresentativeFactory>();
-        factories.put(CharacterRaceRegistry.HUMAN,
-                new RepresentativeFactory() {
-                    @Override
-                    public LOTREntityNPC create(World world) {
-                        return new LOTREntityBreeMan(world);
-                    }
-                });
-        factories.put(CharacterRaceRegistry.ELF,
-                new RepresentativeFactory() {
-                    @Override
-                    public LOTREntityNPC create(World world) {
-                        return new LOTREntityHighElf(world);
-                    }
-                });
-        factories.put(CharacterRaceRegistry.DWARF,
-                new RepresentativeFactory() {
-                    @Override
-                    public LOTREntityNPC create(World world) {
-                        return new LOTREntityDwarf(world);
-                    }
-                });
-        factories.put(CharacterRaceRegistry.HOBBIT,
-                new RepresentativeFactory() {
-                    @Override
-                    public LOTREntityNPC create(World world) {
-                        return new LOTREntityHobbit(world);
-                    }
-                });
-        factories.put(CharacterRaceRegistry.ORC,
-                new RepresentativeFactory() {
-                    @Override
-                    public LOTREntityNPC create(World world) {
-                        return new LOTREntityMordorOrc(world);
-                    }
-                });
-        factories.put(CharacterRaceRegistry.URUK,
-                new RepresentativeFactory() {
-                    @Override
-                    public LOTREntityNPC create(World world) {
-                        return new LOTREntityUrukHai(world);
-                    }
-                });
+        factories.put("lotr:bree_man", new RepresentativeFactory() {
+            @Override
+            public LOTREntityNPC create(World world) {
+                return new LOTREntityBreeMan(world);
+            }
+        });
+        factories.put("lotr:high_elf", new RepresentativeFactory() {
+            @Override
+            public LOTREntityNPC create(World world) {
+                return new LOTREntityHighElf(world);
+            }
+        });
+        factories.put("lotr:dwarf", new RepresentativeFactory() {
+            @Override
+            public LOTREntityNPC create(World world) {
+                return new LOTREntityDwarf(world);
+            }
+        });
+        factories.put("lotr:hobbit", new RepresentativeFactory() {
+            @Override
+            public LOTREntityNPC create(World world) {
+                return new LOTREntityHobbit(world);
+            }
+        });
+        factories.put("lotr:mordor_orc", new RepresentativeFactory() {
+            @Override
+            public LOTREntityNPC create(World world) {
+                return new LOTREntityMordorOrc(world);
+            }
+        });
+        factories.put("lotr:uruk_hai", new RepresentativeFactory() {
+            @Override
+            public LOTREntityNPC create(World world) {
+                return new LOTREntityUrukHai(world);
+            }
+        });
         return factories;
-    }
-
-    private static void validatePositiveValue(String name, double value) {
-        if (!isPositiveFinite(value)) {
-            throw new IllegalStateException("invalid " + name + ": " + value);
-        }
-    }
-
-    private static void validateNonNegativeValue(String name, double value) {
-        if (Double.isNaN(value) || Double.isInfinite(value) || value < 0.0D) {
-            throw new IllegalStateException("invalid " + name + ": " + value);
-        }
     }
 
     private static boolean isPositiveFinite(double value) {
         return !Double.isNaN(value)
                 && !Double.isInfinite(value)
                 && value > 0.0D;
+    }
+
+    private static boolean isNonNegativeFinite(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value) && value >= 0.0D;
     }
 }

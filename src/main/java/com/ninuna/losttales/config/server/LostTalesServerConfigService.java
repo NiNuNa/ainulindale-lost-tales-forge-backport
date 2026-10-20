@@ -36,8 +36,10 @@ public final class LostTalesServerConfigService {
     /**
      * Whether this player may read and change the server's config: the
      * {@link LostTalesCapability#SERVER_CONFIG} capability, held by
-     * operators and by any role the config grants it to. A holder can
-     * edit the roles themselves, so granting it is granting everything.
+     * operators and by any role the config grants it to. The roles and the
+     * channel gates stay off its surface
+     * ({@link ServerConfigSnapshot#AUTHORIZATION_CATEGORIES}): they are the
+     * role command's.
      */
     public static boolean canEditServerConfig(EntityPlayerMP player) {
         return LostTalesPermissions.has(player, LostTalesCapability.SERVER_CONFIG);
@@ -57,8 +59,7 @@ public final class LostTalesServerConfigService {
 
     /** The refusal of a key that is not on the settings surface, saying why. */
     private static ServerConfigApplyResult.Refusal offTheSurface(ServerConfigChange change) {
-        String name = change.getCategory() == null ? ""
-                : change.getCategory().toLowerCase(Locale.ROOT);
+        String name = ServerConfigSnapshot.rootCategory(change.getCategory());
         String reason = "no_such_key";
         if (ServerConfigSnapshot.CLIENT_CATEGORIES.contains(name)) {
             reason = "client_setting";
@@ -141,7 +142,7 @@ public final class LostTalesServerConfigService {
                 property.set(change.getValue().trim());
             }
             applied.add(entry.qualifiedName());
-            touchedCategories.add(entry.getCategory().toLowerCase(Locale.ROOT));
+            touchedCategories.add(ServerConfigSnapshot.rootCategory(entry.getCategory()));
         }
         List<String> restarted = new ArrayList<String>();
         if (!applied.isEmpty()) {

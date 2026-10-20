@@ -18,6 +18,7 @@ public final class CharacterSkinDefinition {
     private final String raceId;
     private final String genderId;
     private final String displayGroupId;
+    private final String displayGroupName;
     private final int variantIndex;
     private final String textureLocation;
     private final String modelId;
@@ -25,16 +26,8 @@ public final class CharacterSkinDefinition {
     private final boolean accountSkin;
 
     CharacterSkinDefinition(String id, String raceId, String genderId,
-                            String displayGroupId, int variantIndex,
-                            String textureLocation, String modelId,
-                            CharacterSkinLayout layout) {
-        this(id, raceId, genderId, displayGroupId, variantIndex,
-                textureLocation, modelId, layout, false);
-    }
-
-    CharacterSkinDefinition(String id, String raceId, String genderId,
-                            String displayGroupId, int variantIndex,
-                            String textureLocation, String modelId,
+                            String displayGroupId, String displayGroupName,
+                            int variantIndex, String textureLocation, String modelId,
                             CharacterSkinLayout layout, boolean accountSkin) {
         if (isBlank(id) || isBlank(raceId) || isBlank(displayGroupId)
                 || isBlank(textureLocation) || isBlank(modelId)
@@ -45,6 +38,7 @@ public final class CharacterSkinDefinition {
         this.raceId = raceId;
         this.genderId = genderId == null ? "" : genderId;
         this.displayGroupId = displayGroupId;
+        this.displayGroupName = displayGroupName == null ? "" : displayGroupName;
         this.variantIndex = variantIndex;
         this.textureLocation = textureLocation;
         this.modelId = modelId;
@@ -62,6 +56,11 @@ public final class CharacterSkinDefinition {
 
     public String getDisplayGroupId() {
         return this.displayGroupId;
+    }
+
+    /** The group's words as a server's race file writes them; empty for a bundled group. */
+    public String getDisplayGroupName() {
+        return this.displayGroupName;
     }
 
     public int getVariantIndex() {

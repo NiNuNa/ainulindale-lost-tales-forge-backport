@@ -1,7 +1,6 @@
 package com.ninuna.losttales.character.sync;
 
 
-import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
@@ -21,7 +20,7 @@ public final class CharacterSummary {
     private final String bodyTypeId;
     private final String chestTypeId;
     private final boolean showMinecraftCape;
-    private final int cosmeticCapeId;
+    private final String cosmeticCapeId;
     private final int age;
     private final String factionId;
 
@@ -32,7 +31,7 @@ public final class CharacterSummary {
      */
     public CharacterSummary(UUID characterId, int slotIndex, String name,
                             String raceId, String genderId, String skinId,
-                            boolean showMinecraftCape, int cosmeticCapeId,
+                            boolean showMinecraftCape, String cosmeticCapeId,
                             int age, String factionId, String bodyTypeId,
                             String chestTypeId) {
         if (characterId == null) {
@@ -51,7 +50,7 @@ public final class CharacterSummary {
                 ? LostTalesIdentifiers.normalize(chestTypeId)
                 : CharacterChestTypeRegistry.defaultFor(genderId);
         this.showMinecraftCape = showMinecraftCape;
-        this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
+        this.cosmeticCapeId = cosmeticCapeId == null ? "" : cosmeticCapeId;
         this.age = age;
         this.factionId = factionId == null ? "" : factionId;
     }
@@ -112,7 +111,7 @@ public final class CharacterSummary {
         return this.showMinecraftCape;
     }
 
-    public int getCosmeticCapeId() {
+    public String getCosmeticCapeId() {
         return this.cosmeticCapeId;
     }
 

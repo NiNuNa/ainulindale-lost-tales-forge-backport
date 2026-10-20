@@ -1,0 +1,9 @@
+{
+  "id": "losttales:uruk",
+  "race": "losttales:uruk",
+  "items": [
+    {"item": "lotr:item.daggerUruk", "count": 1},
+    {"item": "lotr:item.saltedFlesh", "count": 7},
+    {"item": "lotr:item.orcTorch", "count": 4}
+  ]
+}

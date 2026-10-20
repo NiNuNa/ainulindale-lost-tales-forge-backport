@@ -1,0 +1,9 @@
+{
+  "id": "losttales:human",
+  "race": "losttales:human",
+  "items": [
+    {"item": "lotr:item.daggerIron", "count": 1},
+    {"item": "minecraft:bread", "count": 8},
+    {"item": "minecraft:torch", "count": 8}
+  ]
+}

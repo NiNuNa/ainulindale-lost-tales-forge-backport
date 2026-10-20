@@ -146,5 +146,10 @@ public final class LostTalesMapMarkerVisibilityPolicy {
         public boolean isManager() {
             return this.manager;
         }
+
+        /** The character the viewer plays; null for none. */
+        UUID characterId() {
+            return this.characterId;
+        }
     }
 }

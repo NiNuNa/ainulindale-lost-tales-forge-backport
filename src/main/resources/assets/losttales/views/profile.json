@@ -1,0 +1,5 @@
+{
+  "view": "profile",
+  "locked": true,
+  "pages": ["characters", "skills"]
+}

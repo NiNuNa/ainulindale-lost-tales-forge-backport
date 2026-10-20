@@ -162,6 +162,7 @@ public final class LostTalesQuestDefinitionValidator {
                 validateWhom(out, quest, stage, objective, "defeat");
                 validateInteger(out, quest, stage, objective, params.get("count"), "count");
                 validateNumber(out, quest, stage, objective, params.get("radius"), "radius");
+                validateKillPlace(out, quest, stage, objective);
                 return;
             case GOTO:
                 boolean hasMarker = hasAny(params, "marker");
@@ -268,6 +269,8 @@ public final class LostTalesQuestDefinitionValidator {
                 }
             } else if (LostTalesQuestRewards.ALIGNMENT.equals(key)) {
                 validateAlignment(value, where, out);
+            } else if (LostTalesQuestRewards.SKILLS.equals(key)) {
+                validateSkills(value, where, out);
             } else if (LostTalesQuestRewards.COINS.equals(key)
                     && (Integer.parseInt(value) < 1
                     || Integer.parseInt(value) > LostTalesQuestRewards.MAX_COINS)) {
@@ -300,6 +303,29 @@ public final class LostTalesQuestDefinitionValidator {
             } else if (!isAlignmentFaction(faction)) {
                 out.warn(where + " alignment names '" + faction + "', which is"
                         + " no faction a player holds alignment with");
+            }
+        }
+    }
+
+    /**
+     * A reward's {@code skills}: {@code skill*amount}, parted by commas,
+     * each a skill's id and a whole amount of 1 to
+     * {@link LostTalesQuestRewards#MAX_SKILL_EXPERIENCE}. Which skills a
+     * server has is read as the quest pays; one it lacks pays nothing.
+     */
+    private static void validateSkills(String value, String where, Warnings out) {
+        validateList(value, where + " skills", out);
+        for (String part : value.split(",")) {
+            int star = part.lastIndexOf('*');
+            String skill = (star < 0 ? part : part.substring(0, star)).trim();
+            String amount = star < 0 ? "" : part.substring(star + 1).trim();
+            if (!isWholeNumber(amount) || Integer.parseInt(amount) < 1
+                    || Integer.parseInt(amount) > LostTalesQuestRewards.MAX_SKILL_EXPERIENCE) {
+                out.warn(where + " skills '" + part.trim() + "' needs an amount"
+                        + " of 1 to " + LostTalesQuestRewards.MAX_SKILL_EXPERIENCE
+                        + ", written skill*amount");
+            } else if (skill.indexOf(':') <= 0 || skill.indexOf(':') == skill.length() - 1) {
+                out.warn(where + " skills names '" + skill + "', which is no skill's id");
             }
         }
     }
@@ -547,6 +573,40 @@ public final class LostTalesQuestDefinitionValidator {
         }
     }
 
+    /**
+     * A kill's place (QUEST-40): a {@code marker}, or {@code x}, {@code y}
+     * and {@code z} all three, with a {@code radius} above 0 to count the
+     * creatures that die within it. A world quest counts its kills
+     * anywhere, so its kills name no place.
+     */
+    private static void validateKillPlace(Warnings out, LostTalesQuestDefinition quest,
+            LostTalesQuestStageDefinition stage, LostTalesQuestObjectiveDefinition objective) {
+        Map<String, String> params = objective.getParams();
+        if (!LostTalesQuestParams.namesPlace(params)) {
+            return;
+        }
+        if (quest.isWorldQuest()) {
+            warn(out, quest, stage, objective,
+                    "names a place; a world quest counts its kills anywhere");
+            return;
+        }
+        if (!hasAny(params, "marker")
+                && (!hasAny(params, "x") || !hasAny(params, "y") || !hasAny(params, "z"))) {
+            warn(out, quest, stage, objective,
+                    "has incomplete coordinates for type 'kill'; expected x, y, and z or a marker id");
+        }
+        validateNumber(out, quest, stage, objective, params.get("x"), "x");
+        validateNumber(out, quest, stage, objective, params.get("y"), "y");
+        validateNumber(out, quest, stage, objective, params.get("z"), "z");
+        String radius = LostTalesQuestParams.value(params, "radius");
+        Double within = LostTalesQuestParams.parseNumber(radius);
+        if (radius.length() == 0 || within != null && within.doubleValue() <= 0.0D) {
+            warn(out, quest, stage, objective,
+                    "names a place but no 'radius' above 0; a kill counts the creatures"
+                            + " that die within its radius of the place");
+        }
+    }
+
     /** An item objective names its items by {@code item} or {@code ore}. */
     private static void validateItems(Warnings out, LostTalesQuestDefinition quest,
             LostTalesQuestStageDefinition stage, LostTalesQuestObjectiveDefinition objective,
@@ -623,7 +683,7 @@ public final class LostTalesQuestDefinitionValidator {
     static final Set<String> REWARD_KEYS = new HashSet<String>(Arrays.asList(
             "experience", "levels", "item", "count", "meta", "items",
             LostTalesQuestRewards.ALIGNMENT, LostTalesQuestRewards.COINS,
-            LostTalesQuestRewards.PICK));
+            LostTalesQuestRewards.PICK, LostTalesQuestRewards.SKILLS));
 
     /** The reward keys that are whole numbers. */
     private static final Set<String> INTEGER_REWARDS = new HashSet<String>(

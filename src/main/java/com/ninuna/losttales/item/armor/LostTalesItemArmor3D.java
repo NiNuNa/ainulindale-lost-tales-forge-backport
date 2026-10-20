@@ -21,10 +21,6 @@ public class LostTalesItemArmor3D extends LostTalesItemArmorBase implements IAni
         super(material, itemType, slotType, null);
     }
 
-    public LostTalesItemArmor3D(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, int slotType, String credits) {
-        super(material, itemType, slotType, null, credits);
-    }
-
     @Override
     public void registerControllers(AnimationData data) {
 

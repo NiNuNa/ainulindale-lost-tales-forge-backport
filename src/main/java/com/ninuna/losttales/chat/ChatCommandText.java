@@ -43,6 +43,13 @@ public final class ChatCommandText {
                     "unreg", "changepassword", "changepw", "cp", "password",
                     "passwd", "pass", "auth", "2fa", "totp", "r", "reply",
                     "pm", "m", "message", "whisper", "mail"));
+    /**
+     * The names of the game's private message: {@code /tell}, and its
+     * aliases {@code /w} and {@code /msg}. A command known by any of them
+     * keeps whom it went to and leaves out what it said.
+     */
+    public static final List<String> PRIVATE_MESSAGE_NAMES =
+            Collections.unmodifiableList(Arrays.asList("tell", "w", "msg"));
     /** The most names the server's list of private commands holds. */
     public static final int MAX_LISTED_NAMES = 64;
     /** The longest name on that list. */
@@ -157,7 +164,7 @@ public final class ChatCommandText {
             if (arguments.length > 0) {
                 kept.add(ELIDED);
             }
-        } else if (name.equals("msg") || name.equals("tell") || name.equals("w")) {
+        } else if (isKnownBy(PRIVATE_MESSAGE_NAMES, name, aliases)) {
             if (arguments.length > 0) {
                 kept.add(arguments[0]);
             }
@@ -204,6 +211,23 @@ public final class ChatCommandText {
             for (String alias : aliases) {
                 if (alias != null && isSecretName(
                         alias.trim().toLowerCase(Locale.ROOT), listed)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether a command known by {@code name} or any of {@code aliases} has a name in {@code names}. */
+    private static boolean isKnownBy(List<String> names, String name,
+                                     List<String> aliases) {
+        if (names.contains(name)) {
+            return true;
+        }
+        if (aliases != null) {
+            for (String alias : aliases) {
+                if (alias != null && names.contains(
+                        alias.trim().toLowerCase(Locale.ROOT))) {
                     return true;
                 }
             }

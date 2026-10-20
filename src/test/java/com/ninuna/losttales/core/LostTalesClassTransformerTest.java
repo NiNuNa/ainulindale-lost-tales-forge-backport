@@ -223,6 +223,8 @@ public final class LostTalesClassTransformerTest {
             "com/ninuna/losttales/compat/lotr/LostTalesLotrFastTravelArrivalHook";
     private static final String FELLOWSHIP_REQUEST_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/LostTalesLotrFellowshipRequestHook";
+    private static final String FELLOWSHIP_SHARE_ROW_HOOK_OWNER =
+            "com/ninuna/losttales/client/fellowship/LostTalesLotrFellowshipShareRows";
     private static final String HIRED_UNIT_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/hired/LostTalesLotrHiredUnitHook";
     private static final String SHARED_WAYPOINT_NAME_HOOK_OWNER =
@@ -275,6 +277,91 @@ public final class LostTalesClassTransformerTest {
     private static final String SMOOTH_INVENTORY_HOOK_OWNER =
             "com/ninuna/losttales/client/gui/inventory/"
                     + "LostTalesSmoothInventoryHooks";
+
+    private static final String PERK_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LostTalesLotrPerkPatchHooks";
+    private static final String CLIENT_PERK_HOOK_OWNER =
+            "com/ninuna/losttales/client/progression/ClientPerkHooks";
+
+    /** Friend of the Wise: both of LOTR's alignment gains, the kill path's and the direct path's. */
+    @Test
+    public void lotrAlignmentGainsPassThePerkHookOnceEach() throws Exception {
+        ClassNode transformed = transform("lotr.common.LOTRPlayerData");
+        assertEquals(2, countStaticHooks(transformed, "addAlignment",
+                PERK_HOOK_OWNER, "alignmentGain"));
+        assertTrue("the fast-travel arrival patch still lands beside it",
+                containsStaticHook(transformed, "receiveFTBouncePacket",
+                        FAST_TRAVEL_ARRIVAL_HOOK_OWNER, "onArrived"));
+        assertEquals("patching twice adds nothing", 2, countStaticHooks(
+                transformAgain("lotr.common.LOTRPlayerData"), "addAlignment",
+                PERK_HOOK_OWNER, "alignmentGain"));
+    }
+
+    /** Daggerwork: LOTR's attack timer on the server and on the client. */
+    @Test
+    public void lotrAttackTimersPassThePerkHook() throws Exception {
+        assertTrue(containsStaticHook(transform("lotr.common.LOTRNetHandlerPlayServer"),
+                "processUseEntity", PERK_HOOK_OWNER, "attackTime"));
+        assertTrue(containsStaticHook(transform("lotr.client.LOTRAttackTiming"),
+                "doAttackTiming", CLIENT_PERK_HOOK_OWNER, "attackTime"));
+        assertEquals(1, countStaticHooks(transformAgain("lotr.client.LOTRAttackTiming"),
+                "doAttackTiming", CLIENT_PERK_HOOK_OWNER, "attackTime"));
+    }
+
+    /** Fair Dealer: where LOTR checks and takes a price, draws it, and pays a sale. */
+    @Test
+    public void lotrTradePricesPassThePerkHooks() throws Exception {
+        ClassNode slot = transform("lotr.common.inventory.LOTRSlotTrade");
+        assertEquals(1, countStaticHooks(slot, "canTakeStack", PERK_HOOK_OWNER, "tradeCost"));
+        assertEquals(2, countStaticHooks(slot, "onPickupFromSlot", PERK_HOOK_OWNER, "tradeCost"));
+        ClassNode screen = transform("lotr.client.gui.LOTRGuiTrade");
+        assertTrue(containsStaticHook(screen, "renderTradeSlot",
+                CLIENT_PERK_HOOK_OWNER, "shownTradeCost"));
+        assertTrue(containsStaticHookAnywhere(screen, CLIENT_PERK_HOOK_OWNER, "shownSellValue"));
+        assertTrue(containsStaticHook(transform("lotr.common.network.LOTRPacketSell$Handler"),
+                "onMessage", PERK_HOOK_OWNER, "sellValue"));
+    }
+
+    /** Repair and Master Smith: every end of LOTR's anvil output, and its output slot. */
+    @Test
+    public void lotrAnvilPassesThePerkHooks() throws Exception {
+        ClassNode anvil = transform("lotr.common.inventory.LOTRContainerAnvil");
+        assertTrue(countStaticHooks(anvil, "updateRepairOutput",
+                PERK_HOOK_OWNER, "anvilOutput") >= 3);
+        assertTrue(containsStaticHook(transform("lotr.common.inventory.LOTRSlotAnvilOutput"),
+                "onPickupFromSlot", PERK_HOOK_OWNER, "anvilTaken"));
+    }
+
+    private static ClassNode transformAgain(String binaryName) throws IOException {
+        byte[] original = readResource(binaryName.replace('.', '/') + ".class");
+        LostTalesClassTransformer transformer = new LostTalesClassTransformer();
+        byte[] once = transformer.transform(binaryName, binaryName, original);
+        byte[] twice = transformer.transform(binaryName, binaryName, once);
+        ClassNode node = new ClassNode();
+        new ClassReader(twice).accept(node, 0);
+        return node;
+    }
+
+    private static int countStaticHooks(ClassNode owner, String methodName,
+                                        String hookOwner, String hookName) {
+        int count = 0;
+        for (Object value : owner.methods) {
+            MethodNode method = (MethodNode)value;
+            if (!methodName.equals(method.name)) {
+                continue;
+            }
+            for (AbstractInsnNode instruction = method.instructions.getFirst();
+                 instruction != null; instruction = instruction.getNext()) {
+                if (instruction instanceof MethodInsnNode
+                        && instruction.getOpcode() == Opcodes.INVOKESTATIC
+                        && hookOwner.equals(((MethodInsnNode)instruction).owner)
+                        && hookName.equals(((MethodInsnNode)instruction).name)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
 
     @Test
     public void factionBountiesUseRoleplayCharacterUuid() throws Exception {
@@ -757,6 +844,62 @@ public final class LostTalesClassTransformerTest {
                 FELLOWSHIP_REQUEST_HOOK_OWNER, "refusesCreation"));
         assertEquals("true", System.getProperty(
                 LostTalesClassTransformer.LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY));
+    }
+
+    /**
+     * A waypoint shared by name finds the fellowship through the hooks, on
+     * the server's request and on LOTR's map, so a fellowship the account
+     * holds for the record only is none to share into (FEL-02); the hooks
+     * take the player data and the name, as LOTR's lookups did.
+     */
+    @Test
+    public void lotrsWaypointShareFindsItsFellowshipThroughTheHooks() throws Exception {
+        ClassNode share = transform("lotr.common.network.LOTRPacketShareCWP$Handler");
+        assertTrue(containsStaticHook(share, "onMessage",
+                FELLOWSHIP_REQUEST_HOOK_OWNER, "shareInto"));
+        assertFalse("LOTR's own lookup is gone",
+                callsPlayerData(share, "onMessage", "getFellowshipByName"));
+        assertEquals("true", System.getProperty(
+                LostTalesClassTransformer.LOTR_FELLOWSHIP_SHARE_ACTIVE_PROPERTY));
+        com.ninuna.losttales.compat.lotr.LostTalesLotrFellowshipRequestHook.class.getMethod(
+                "shareInto", lotr.common.LOTRPlayerData.class, String.class);
+
+        ClassNode map = transform("lotr.client.gui.LOTRGuiMap");
+        assertTrue(containsStaticHook(map, "getFellowshipByName",
+                FELLOWSHIP_SHARE_ROW_HOOK_OWNER, "fellowshipByName"));
+        assertFalse(callsPlayerData(map, "getFellowshipByName", "getClientFellowshipByName"));
+        assertEquals("true", System.getProperty(
+                LostTalesClassTransformer.LOTR_FELLOWSHIP_SHARE_ROW_ACTIVE_PROPERTY));
+        com.ninuna.losttales.client.fellowship.LostTalesLotrFellowshipShareRows.class.getMethod(
+                "fellowshipByName", lotr.common.LOTRPlayerData.class, String.class);
+
+        byte[] once = new LostTalesClassTransformer().transform(
+                "lotr.common.network.LOTRPacketShareCWP$Handler",
+                "lotr.common.network.LOTRPacketShareCWP$Handler",
+                readResource("lotr/common/network/LOTRPacketShareCWP$Handler.class"));
+        byte[] twice = new LostTalesClassTransformer().transform(
+                "lotr.common.network.LOTRPacketShareCWP$Handler",
+                "lotr.common.network.LOTRPacketShareCWP$Handler", once);
+        assertArrayEquals("patched once, whatever runs it twice", once, twice);
+    }
+
+    /** Whether a method of the class calls {@code LOTRPlayerData.name}. */
+    private static boolean callsPlayerData(ClassNode owner, String methodName, String name) {
+        for (Object value : owner.methods) {
+            MethodNode method = (MethodNode)value;
+            if (!methodName.equals(method.name)) {
+                continue;
+            }
+            for (AbstractInsnNode instruction = method.instructions.getFirst();
+                 instruction != null; instruction = instruction.getNext()) {
+                if (instruction instanceof MethodInsnNode
+                        && "lotr/common/LOTRPlayerData".equals(((MethodInsnNode)instruction).owner)
+                        && name.equals(((MethodInsnNode)instruction).name)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Test

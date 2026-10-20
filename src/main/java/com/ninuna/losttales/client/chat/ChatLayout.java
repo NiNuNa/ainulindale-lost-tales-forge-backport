@@ -128,9 +128,6 @@ public final class ChatLayout {
      * where they differ from how they first are.
      */
     private static final Map<String, Panels> VIEWS = new HashMap<String, Panels>();
-    /** The channels the file said were closed, while it is read. */
-    private static final Set<ChatChannel> CLOSED_READ =
-            new LinkedHashSet<ChatChannel>();
     /**
      * Conversations that tried to open by themselves while the Chat view
      * had no window: the view's window brings them as it opens. For the
@@ -295,17 +292,6 @@ public final class ChatLayout {
             }
         }
         return conversations;
-    }
-
-    /** The first window, in layout order, standing in the Chat view; null for none. */
-    private static Window firstConversationWindow() {
-        View chat = Views.of(PageCategory.CHANNELS);
-        for (Window window : WindowLayout.windows()) {
-            if (WindowLayout.viewOf(window) == chat) {
-                return window;
-            }
-        }
-        return null;
     }
 
     /**
@@ -1238,7 +1224,6 @@ public final class ChatLayout {
 
     private static final String FEED = "feed";
     private static final String TOOLBAR = "toolbar";
-    private static final String CLOSED = "closed";
     private static final String NOTIFY = "notify";
     /**
      * A feed choice line. Not {@code feed}: the feed's position line is
@@ -1251,7 +1236,7 @@ public final class ChatLayout {
     private static final String CLOSED_CONVERSATION = "closedconversation";
     /** A conversation's timestamp area and member list, where they differ from how they first are. */
     private static final String PANELS = "panels";
-    /** What a view line says of an area or member list put away. */
+    /** What a {@code panels} line says of an area or member list put away. */
     private static final String PUT_AWAY = "hidden";
 
     private static String format(double value) {
@@ -1265,11 +1250,13 @@ public final class ChatLayout {
      * panels	global	area=hidden members=hidden members_width=90.00
      * feed x=50.00 y=88.00
      * toolbar collapsed=false
-     * closed faction
-     * notify everything ooc
-     * notify mentions whisper:Steve|Aldric
-     * feedchoice nothing server_console
+     * notify	everything	ooc
+     * notify	mentions	whisper:Steve|Aldric
+     * feedchoice	nothing	server_console
      * </pre>
+     *
+     * <p>A channel in no window is closed: no line names it, and it opens
+     * with its next line like any other closed channel.</p>
      *
      * <p>A conversation's timestamp area and member list, where either
      * differs from how it first is, stand on a {@code panels} line: the tab
@@ -1292,8 +1279,10 @@ public final class ChatLayout {
      * by hand. Who a copy speaks as stands on a {@code voice} line per
      * place: the place, the copy's tab id, the character's id or {@code -},
      * and {@code narrator} or {@code -} ({@link ClientChatIdentities#describeVoices}).
-     * These lines are tab-separated, since a name or a place may hold
-     * spaces.</p>
+     * These lines and the {@code panels}, {@code notify} and
+     * {@code feedchoice} lines are tab-separated, since a name or a place
+     * may hold spaces; {@code feed} and {@code toolbar} lines are
+     * space-separated.</p>
      */
     private static final WindowLayoutStore.Part PART = new WindowLayoutStore.Part() {
         @Override
@@ -1306,7 +1295,6 @@ public final class ChatLayout {
             ClientChatIdentities.clearKept();
             conversationsPlace = "";
             VIEWS.clear();
-            CLOSED_READ.clear();
             feedOffsetX = 50.0D;
             feedOffsetY = 100.0D;
             feedPlaced = false;
@@ -1338,13 +1326,6 @@ public final class ChatLayout {
             }
             String[] parts = line.split("\\s+");
             String key = parts[0];
-            if (parts.length == 2 && CLOSED.equals(key)) {
-                ChatChannel channel = ChatChannel.fromId(parts[1]);
-                if (channel != null) {
-                    CLOSED_READ.add(channel);
-                }
-                return true;
-            }
             if (FEED.equals(key)) {
                 feedPlaced = true;
                 for (int index = 1; index < parts.length; index++) {
@@ -1383,7 +1364,7 @@ public final class ChatLayout {
             }
         }
 
-        /** A {@code view} line: the tab it is for, then its area, its list and the list's width. */
+        /** A {@code panels} line: the tab it is for, then its area, its list and the list's width. */
         private void readView(String[] fields) {
             ConversationPage tab = fields.length == 3
                     ? ConversationPage.row(ConversationPage.fromId(fields[1])) : null;
@@ -1439,50 +1420,12 @@ public final class ChatLayout {
             }
         }
 
-        /**
-         * Every plain channel the file neither placed nor closed goes to
-         * the Chat view's first window, so a channel added after the file
-         * was written is never silently lost; with no such window, one
-         * opens for them. Staff talk and the consoles are the
-         * exception: they open only by hand, and wait in the {@code +}. A file
-         * that names no window and closes every channel describes the
-         * empty layout and is loaded as one.
-         */
-        @Override
-        public void loaded() {
-            List<ConversationPage> unplaced = new ArrayList<ConversationPage>();
-            for (ChatChannel channel : ChatChannel.presentationOrder()) {
-                ConversationPage tab = ConversationPage.of(channel);
-                if (WindowLayout.isOpen(tab) || CLOSED_READ.contains(channel)) {
-                    continue;
-                }
-                if (!OPENED_BY_HAND.contains(tab)) {
-                    unplaced.add(tab);
-                }
-            }
-            CLOSED_READ.clear();
-            if (unplaced.isEmpty()) {
-                return;
-            }
-            Window holding = firstConversationWindow();
-            if (holding == null) {
-                ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
-                WindowLayout.addWindow(unplaced, unplaced.contains(global)
-                        ? global : unplaced.get(0));
-            } else {
-                WindowLayout.appendTabs(holding, unplaced);
-            }
-        }
-
         @Override
         public void describe(List<String> lines) {
             if (feedPlaced) {
                 lines.add(feedLine());
             }
             lines.add(TOOLBAR + " collapsed=" + toolbarCollapsed);
-            for (ChatChannel channel : closedChannels()) {
-                lines.add(CLOSED + " " + channel.getId());
-            }
             for (ConversationPage tab : notificationTabs()) {
                 lines.add(NOTIFY + "\t" + notification(tab).id() + "\t"
                         + tab.id());

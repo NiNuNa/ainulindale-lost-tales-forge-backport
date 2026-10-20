@@ -24,23 +24,21 @@ public final class LostTalesQuestPlayerMissiveTest {
 
     private static LostTalesQuestDefinition missive(String id) {
         return new LostTalesQuestDefinition(id, "Bounty", "Thin the wolves.",
-                true, LostTalesQuestDefinition.START_MODE_LOCKED,
-                Collections.<String, String>emptyMap(),
+                true, true, LostTalesQuestDefinition.START_MODE_LOCKED, null,
                 Collections.singletonMap("experience", "10"),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
-                Collections.<String, String>emptyMap(),
+                null, null, null, null, null,
                 Collections.singletonList(new LostTalesQuestStageDefinition("10",
                         Collections.singletonList(new LostTalesQuestObjectiveDefinition(
                                 "kill_wolves", "kill", "", false,
-                                Collections.<String, String>singletonMap("entity", "Wolf"))))));
+                                Collections.<String, String>singletonMap("entity", "Wolf"))))),
+                false, null, null);
     }
 
     private static void takeAndFinish(LostTalesQuestPlayerData data, int index) {
         String id = PREFIX + index;
         assertTrue(data.rememberDynamicQuestDefinition(missive(id)));
         data.startQuest(id, "10", index, 0L);
-        assertTrue(data.completeQuest(id, "", index + 1L,
+        assertTrue(data.completeQuest(id, index + 1L,
                 Collections.<String>emptySet()));
     }
 

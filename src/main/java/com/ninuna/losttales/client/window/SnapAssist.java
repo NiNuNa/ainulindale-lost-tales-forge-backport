@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.window;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -287,12 +288,13 @@ public final class SnapAssist {
             }
             SnapPreview.draw(minecraft, pane.glass, share, holes);
             for (Card card : pane.cards) {
+                boolean pointed = hovered != null
+                        && hovered.windowId.equals(card.windowId)
+                        && hovered.zone == card.zone;
                 float fade = WindowStyle.hoverFade(
-                        litOf(card.windowId), hovered != null
-                                && hovered.windowId.equals(card.windowId)
-                                && hovered.zone == card.zone, elapsed);
+                        litOf(card.windowId), pointed, elapsed);
                 this.lit.put(card.windowId, Float.valueOf(fade));
-                drawCard(minecraft, font, card, fade, share, alpha);
+                drawCard(minecraft, font, card, fade, pointed, share, alpha);
             }
             if (this.open && regions != null) {
                 regions.addScreen((int)Math.floor(pane.glass.left),
@@ -308,10 +310,14 @@ public final class SnapAssist {
         return fade == null ? 0.0F : fade.floatValue();
     }
 
-    /** One card: a framed button holding the window's tab icons and its front tab's name. */
-    private static void drawCard(Minecraft minecraft, FontRenderer font,
-                                 Card card, float lit, float share,
-                                 int alpha) {
+    /**
+     * One card: a framed button holding the window's tab icons and its
+     * front tab's name, which fades into the card's end where it is cut
+     * and slides along while the card is {@code pointed} (LOOK-37).
+     */
+    private void drawCard(Minecraft minecraft, FontRenderer font, Card card,
+                          float lit, boolean pointed, float share,
+                          int alpha) {
         Window window = WindowLayout.window(card.windowId);
         if (window == null) {
             return;
@@ -337,19 +343,17 @@ public final class SnapAssist {
             x += LostTalesUiInk.ICON_SIZE + ICON_GAP;
         }
         if (front != null && font != null && x < right) {
-            String name = font.trimStringToWidth(
-                    front.title(),
-                    (int)Math.floor(right - x - 1));
             int rgb = LostTalesUiInk.blend(
                     front.tone(),
                     LostTalesUiInk.IVORY, lit);
             // The capitals centred on the icons' box, the odd pixel up.
-            LostTalesUiInk.drawText(font, name, (int)x + 1,
+            LostTalesUiCutName.drawText(font, front.title(), (int)x + 1,
                     (int)top + LostTalesUiFramedButton.INSET
                             + LostTalesUiInk.centredStart(
                                     LostTalesUiInk.ICON_SIZE,
                                     LostTalesUiInk.CAP_HEIGHT),
-                    rgb, alpha);
+                    (int)Math.floor(right - x - 1), rgb, alpha, this, card,
+                    pointed);
         }
         LostTalesUiFramedButton.drawInk(left, top, width, height, lit, alpha);
     }

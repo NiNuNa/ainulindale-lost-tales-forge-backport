@@ -3,6 +3,11 @@ package com.ninuna.losttales.client.skin;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
+import java.io.IOException;
+import java.util.Iterator;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 /**
  * Brings a player skin into Minecraft's 64x64 layout.
@@ -28,8 +33,41 @@ public final class SkinImageNormalizer {
     private SkinImageNormalizer() {}
 
     public static boolean isSkinSized(BufferedImage image) {
-        return image != null && image.getWidth() == WIDTH
-                && (image.getHeight() == LEGACY_HEIGHT || image.getHeight() == HEIGHT);
+        return image != null && isSkinSized(image.getWidth(), image.getHeight());
+    }
+
+    static boolean isSkinSized(int width, int height) {
+        return width == WIDTH && (height == LEGACY_HEIGHT || height == HEIGHT);
+    }
+
+    /**
+     * Decodes an image from {@code input} (a file or a stream) only where
+     * its header names a skin's size, so a small file that claims a huge
+     * picture is never decoded. Null for anything else.
+     */
+    public static BufferedImage readSkin(Object input) throws IOException {
+        ImageInputStream stream = ImageIO.createImageInputStream(input);
+        if (stream == null) {
+            return null;
+        }
+        try {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(stream);
+            if (!readers.hasNext()) {
+                return null;
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(stream, true, true);
+                if (!isSkinSized(reader.getWidth(0), reader.getHeight(0))) {
+                    return null;
+                }
+                return reader.read(0);
+            } finally {
+                reader.dispose();
+            }
+        } finally {
+            stream.close();
+        }
     }
 
     public static BufferedImage normalize(BufferedImage source) {

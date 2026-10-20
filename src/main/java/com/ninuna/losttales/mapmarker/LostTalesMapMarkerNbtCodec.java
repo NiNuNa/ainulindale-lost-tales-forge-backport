@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -14,12 +15,19 @@ import java.util.Set;
 import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTTagString;
 import net.minecraftforge.common.util.Constants;
 
-/** Versioned, defensive NBT codec for authoritative marker records. */
+/**
+ * Versioned, defensive NBT codec for authoritative marker records. Only
+ * data of the current version is read: any other version, or a store
+ * without its lists, is kept as it is and the store goes read-only. A
+ * record that lacks a key the writer writes, or names a value no record
+ * holds, is quarantined whole. Every record is read, however many there
+ * are (WAY-12); only the quarantine keeps a bound.
+ */
 public final class LostTalesMapMarkerNbtCodec {
-    public static final int CURRENT_DATA_VERSION = 6;
-    private static final int MAX_RECORDS = 16384;
+    public static final int CURRENT_DATA_VERSION = 8;
     private static final int MAX_QUARANTINE = 4096;
 
     private static final String DATA_VERSION = "DataVersion";
@@ -27,6 +35,8 @@ public final class LostTalesMapMarkerNbtCodec {
     private static final String QUARANTINE = "Quarantine";
     /** The character that owns a placed waystone (WAY-08). */
     static final String OWNER_CHARACTER = "OwnerCharacter";
+    /** The settings saved on the marker's page, by name (WAY-16). */
+    static final String SAVED_SETTINGS = "SavedSettings";
 
     private LostTalesMapMarkerNbtCodec() {}
 
@@ -72,29 +82,25 @@ public final class LostTalesMapMarkerNbtCodec {
         NBTTagCompound safe = source == null
                 ? new NBTTagCompound() : source;
         int version = safe.hasKey(DATA_VERSION, Constants.NBT.TAG_INT)
-                ? safe.getInteger(DATA_VERSION) : 0;
-        if (version < 0 || version > CURRENT_DATA_VERSION) {
-            LostTalesLog.warning("Map marker data uses unsupported version %d; preserving it read-only",
+                ? safe.getInteger(DATA_VERSION) : -1;
+        if (version != CURRENT_DATA_VERSION) {
+            LostTalesLog.warning("Map marker data uses version %d, which this build does not read; preserving it read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safe, version);
         }
-        if (safe.hasKey(MARKERS)
-                && !safe.hasKey(MARKERS, Constants.NBT.TAG_LIST)) {
+        if (!safe.hasKey(MARKERS, Constants.NBT.TAG_LIST)
+                || !safe.hasKey(QUARANTINE, Constants.NBT.TAG_LIST)) {
+            LostTalesLog.warning("Map marker data has no marker or quarantine list; preserving it read-only");
             return ReadResult.unsupported(safe, -1);
         }
 
         LinkedHashMap<String, LostTalesMapMarkerRecord> records =
                 new LinkedHashMap<String, LostTalesMapMarkerRecord>();
         ArrayList<NBTTagCompound> quarantine = readQuarantine(safe);
-        boolean repaired = version != CURRENT_DATA_VERSION;
+        boolean repaired = false;
         NBTTagList markers = safe.getTagList(
                 MARKERS, Constants.NBT.TAG_COMPOUND);
-        int count = Math.min(markers.tagCount(), MAX_RECORDS);
-        if (markers.tagCount() > MAX_RECORDS) {
-            repaired = true;
-            quarantine.add(quarantine(
-                    "record_limit_exceeded", null, null));
-        }
+        int count = markers.tagCount();
         for (int index = 0; index < count; index++) {
             NBTTagCompound raw = markers.getCompoundTagAt(index);
             RecordReadResult result = readRecord(raw);
@@ -172,9 +178,14 @@ public final class LostTalesMapMarkerNbtCodec {
             sharedFellowships.appendTag(entry);
         }
         tag.setTag("SharedFellowships", sharedFellowships);
+        NBTTagList savedSettings = new NBTTagList();
+        for (LostTalesMapMarkerSetting setting : record.getSavedSettings()) {
+            savedSettings.appendTag(new NBTTagString(
+                    setting.getSerializedName()));
+        }
+        tag.setTag(SAVED_SETTINGS, savedSettings);
         tag.setString("GenerationState",
                 record.getGenerationState().getSerializedName());
-        tag.setString("GenerationMessage", record.getGenerationMessage());
         tag.setBoolean("Linked", record.isLinked());
         if (record.isLinked()) {
             tag.setInteger("LinkedDimension", record.getLinkedDimensionId());
@@ -192,24 +203,48 @@ public final class LostTalesMapMarkerNbtCodec {
             return RecordReadResult.failed("missing_record");
         }
         int version = tag.hasKey(DATA_VERSION, Constants.NBT.TAG_INT)
-                ? tag.getInteger(DATA_VERSION) : 0;
-        if (version < 0 || version > CURRENT_DATA_VERSION) {
+                ? tag.getInteger(DATA_VERSION) : -1;
+        if (version > CURRENT_DATA_VERSION) {
             return RecordReadResult.unsupported(version);
         }
-        if (!tag.hasKey("Id", Constants.NBT.TAG_STRING)
-                || !tag.hasKey("Name", Constants.NBT.TAG_STRING)
+        if (version != CURRENT_DATA_VERSION) {
+            return RecordReadResult.failed("unsupported_record_version");
+        }
+        if (!hasAll(tag, STRING_KEYS, Constants.NBT.TAG_STRING)
+                || !hasAll(tag, SWITCH_KEYS, Constants.NBT.TAG_BYTE)
+                || !hasAll(tag, NUMBER_KEYS, Constants.NBT.TAG_DOUBLE)
                 || !tag.hasKey("Dimension", Constants.NBT.TAG_INT)
-                || !tag.hasKey("X", Constants.NBT.TAG_DOUBLE)
-                || !tag.hasKey("Y", Constants.NBT.TAG_DOUBLE)
-                || !tag.hasKey("Z", Constants.NBT.TAG_DOUBLE)) {
+                || !tag.hasKey("Priority", Constants.NBT.TAG_INT)
+                || !tag.hasKey("Revision", Constants.NBT.TAG_LONG)
+                || !tag.hasKey("SharedCharacters", Constants.NBT.TAG_LIST)
+                || !tag.hasKey("SharedFellowships", Constants.NBT.TAG_LIST)
+                || !tag.hasKey(SAVED_SETTINGS, Constants.NBT.TAG_LIST)) {
             return RecordReadResult.failed("missing_required_fields");
         }
+        LostTalesMapMarkerSource source =
+                LostTalesMapMarkerSource.forSerializedName(
+                        tag.getString("Source"), null);
+        LostTalesMapMarkerVisibility visibility =
+                LostTalesMapMarkerVisibility.forSerializedName(
+                        tag.getString("Visibility"), null);
+        LostTalesWaystoneGenerationState generationState =
+                LostTalesWaystoneGenerationState.forSerializedName(
+                        tag.getString("GenerationState"), null);
+        if (source == null || visibility == null || generationState == null) {
+            return RecordReadResult.failed("unknown_record_value");
+        }
+        Set<UUID> sharedCharacters = readShares(tag, "SharedCharacters",
+                "Character", LostTalesMapMarkerRecord.MAX_SHARED_CHARACTERS);
+        Set<UUID> sharedFellowships = readShares(tag, "SharedFellowships",
+                "Fellowship", LostTalesMapMarkerRecord.MAX_SHARED_FELLOWSHIPS);
+        if (sharedCharacters == null || sharedFellowships == null) {
+            return RecordReadResult.failed("invalid_shares");
+        }
+        Set<LostTalesMapMarkerSetting> savedSettings = readSavedSettings(tag);
+        if (savedSettings == null) {
+            return RecordReadResult.failed("invalid_saved_settings");
+        }
         try {
-            LostTalesMapMarkerSource source =
-                    LostTalesMapMarkerSource.forSerializedName(
-                            tag.getString("Source"),
-                            LostTalesMapMarkerSource.QUEST_DYNAMIC);
-            boolean hasWaystone = tag.getBoolean("HasWaystone");
             LostTalesMapMarkerRecord.Builder builder =
                     LostTalesMapMarkerRecord.builder(
                                     tag.getString("Id"), source)
@@ -223,43 +258,22 @@ public final class LostTalesMapMarkerNbtCodec {
                             .position(tag.getInteger("Dimension"),
                                     tag.getDouble("X"), tag.getDouble("Y"),
                                     tag.getDouble("Z"))
-                            .radii(tag.hasKey("CompassRadius",
-                                            Constants.NBT.TAG_DOUBLE)
-                                            ? tag.getDouble("CompassRadius")
-                                            : 128.0D,
-                                    tag.hasKey("DiscoveryRadius",
-                                            Constants.NBT.TAG_DOUBLE)
-                                            ? tag.getDouble("DiscoveryRadius")
-                                            : 8.0D)
+                            .radii(tag.getDouble("CompassRadius"),
+                                    tag.getDouble("DiscoveryRadius"))
                             .discovery(tag.getBoolean("Hidden"),
-                                    !tag.hasKey("Discoverable")
-                                            || tag.getBoolean("Discoverable"),
+                                    tag.getBoolean("Discoverable"),
                                     tag.getBoolean("RequiresRegion"))
-                            .waystone(hasWaystone,
+                            .waystone(tag.getBoolean("HasWaystone"),
                                     tag.getString("StructureType"))
-                            .priority(tag.hasKey("Priority", Constants.NBT.TAG_INT)
-                                    ? tag.getInteger("Priority") : 0)
+                            .priority(tag.getInteger("Priority"))
                             .ownerCharacterId(NbtTags.readUuid(
                                     tag, OWNER_CHARACTER))
-                            .visibility(
-                                    LostTalesMapMarkerVisibility.forSerializedName(
-                                            tag.getString("Visibility"),
-                                            source == LostTalesMapMarkerSource.PLAYER_CREATED
-                                                    ? LostTalesMapMarkerVisibility.PRIVATE
-                                                    : LostTalesMapMarkerVisibility.PUBLIC))
-                            .sharedCharacterIds(readSharedCharacters(tag))
-                            .sharedFellowshipIds(
-                                    readSharedFellowships(tag))
-                            .generationState(
-                                    LostTalesWaystoneGenerationState.forSerializedName(
-                                            tag.getString("GenerationState"),
-                                            hasWaystone
-                                                    ? LostTalesWaystoneGenerationState.NOT_ATTEMPTED
-                                                    : LostTalesWaystoneGenerationState.DISABLED),
-                                    tag.getString("GenerationMessage"))
-                            .revision(tag.hasKey("Revision",
-                                            Constants.NBT.TAG_LONG)
-                                            ? tag.getLong("Revision") : 1L);
+                            .visibility(visibility)
+                            .sharedCharacterIds(sharedCharacters)
+                            .sharedFellowshipIds(sharedFellowships)
+                            .generationState(generationState)
+                            .revision(tag.getLong("Revision"))
+                            .savedSettings(savedSettings);
             if (tag.getBoolean("Linked")) {
                 UUID token = NbtTags.readUuid(tag, "LinkToken");
                 if (token == null
@@ -281,49 +295,75 @@ public final class LostTalesMapMarkerNbtCodec {
         }
     }
 
-    private static Set<UUID> readSharedCharacters(NBTTagCompound tag) {
-        LinkedHashSet<UUID> characters = new LinkedHashSet<UUID>();
-        if (!tag.hasKey("SharedCharacters", Constants.NBT.TAG_LIST)) {
-            return characters;
-        }
-        NBTTagList list = tag.getTagList(
-                "SharedCharacters", Constants.NBT.TAG_COMPOUND);
-        int count = Math.min(list.tagCount(),
-                LostTalesMapMarkerRecord.MAX_SHARED_CHARACTERS);
-        for (int index = 0; index < count; index++) {
-            UUID characterId = NbtTags.readUuid(
-                    list.getCompoundTagAt(index), "Character");
-            if (characterId != null) {
-                characters.add(characterId);
+    /** The text keys every record is written with. */
+    private static final String[] STRING_KEYS = {
+        "Id", "Source", "Name", "NamedAfter", "Icon", "Color", "Category",
+        "Description", "StructureType", "Visibility", "GenerationState"
+    };
+    /** The on-and-off keys every record is written with. */
+    private static final String[] SWITCH_KEYS = {
+        "FastTravel", "Hidden", "Discoverable", "RequiresRegion",
+        "HasWaystone", "Linked"
+    };
+    /** The place and radius keys every record is written with. */
+    private static final String[] NUMBER_KEYS = {
+        "X", "Y", "Z", "CompassRadius", "DiscoveryRadius"
+    };
+
+    private static boolean hasAll(NBTTagCompound tag, String[] keys,
+                                  int type) {
+        for (String key : keys) {
+            if (!tag.hasKey(key, type)) {
+                return false;
             }
         }
-        return characters;
+        return true;
     }
 
-    private static Set<UUID> readSharedFellowships(
-            NBTTagCompound tag) {
-        LinkedHashSet<UUID> fellowships =
-                new LinkedHashSet<UUID>();
-        if (!tag.hasKey(
-                "SharedFellowships", Constants.NBT.TAG_LIST)) {
-            return fellowships;
+    /**
+     * A record's shares under {@code listKey}, each id under
+     * {@code idKey}; null for a list past {@code max}, an entry without an
+     * id, or an id written twice, which no writer makes.
+     */
+    private static Set<UUID> readShares(NBTTagCompound tag, String listKey,
+                                        String idKey, int max) {
+        NBTTagList list = tag.getTagList(listKey, Constants.NBT.TAG_COMPOUND);
+        if (list.tagCount() > max) {
+            return null;
         }
-        NBTTagList list = tag.getTagList(
-                "SharedFellowships",
-                Constants.NBT.TAG_COMPOUND);
-        int count = Math.min(
-                list.tagCount(),
-                LostTalesMapMarkerRecord
-                        .MAX_SHARED_FELLOWSHIPS);
-        for (int index = 0; index < count; index++) {
-            UUID fellowshipId = NbtTags.readUuid(
-                    list.getCompoundTagAt(index),
-                    "Fellowship");
-            if (fellowshipId != null) {
-                fellowships.add(fellowshipId);
+        LinkedHashSet<UUID> shares = new LinkedHashSet<UUID>();
+        for (int index = 0; index < list.tagCount(); index++) {
+            UUID id = NbtTags.readUuid(list.getCompoundTagAt(index), idKey);
+            if (id == null || !shares.add(id)) {
+                return null;
             }
         }
-        return fellowships;
+        return shares;
+    }
+
+    /**
+     * The settings a record says were saved on its page; null for a list
+     * of anything but setting names, a name no setting has, or a name
+     * written twice, which no writer makes.
+     */
+    private static Set<LostTalesMapMarkerSetting> readSavedSettings(
+            NBTTagCompound tag) {
+        NBTTagList list = (NBTTagList)tag.getTag(SAVED_SETTINGS);
+        EnumSet<LostTalesMapMarkerSetting> settings =
+                EnumSet.noneOf(LostTalesMapMarkerSetting.class);
+        if (list.tagCount() > 0
+                && list.func_150303_d() != Constants.NBT.TAG_STRING) {
+            return null;
+        }
+        for (int index = 0; index < list.tagCount(); index++) {
+            LostTalesMapMarkerSetting setting =
+                    LostTalesMapMarkerSetting.forSerializedName(
+                            list.getStringTagAt(index));
+            if (setting == null || !settings.add(setting)) {
+                return null;
+            }
+        }
+        return settings;
     }
 
     private static ArrayList<NBTTagCompound> readQuarantine(

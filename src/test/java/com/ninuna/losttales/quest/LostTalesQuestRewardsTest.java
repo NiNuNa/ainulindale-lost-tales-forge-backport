@@ -72,7 +72,8 @@ public final class LostTalesQuestRewardsTest {
                         "pick", "losttales_test:a_blade,losttales_test:a_bow"),
                 null, null, null, null, null, Collections.singletonList(
                         new LostTalesQuestStageDefinition("10",
-                                Collections.singletonList(extra))));
+                                Collections.singletonList(extra))),
+                false, null, null);
         Map<String, String> all = LostTalesQuestRewards.withOptionals(quest);
         assertEquals("10", all.get("optional.scouts.experience"));
         assertEquals(Arrays.asList("+50 alignment with Gondor", "1 silver coin",

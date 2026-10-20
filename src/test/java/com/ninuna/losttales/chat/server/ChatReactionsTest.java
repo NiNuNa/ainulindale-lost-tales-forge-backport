@@ -52,13 +52,13 @@ public final class ChatReactionsTest {
         Set<UUID> hers = new HashSet<UUID>(Arrays.asList(ALICE, beren));
         ChatReactionSummary.Reaction smile = reactions.summaryFor(hers).find("smile");
         assertEquals(2, smile.count);
-        assertTrue(smile.isMine(ALICE));
-        assertTrue(smile.isMine(beren));
+        assertTrue(smile.mineAs.contains(ALICE));
+        assertTrue(smile.mineAs.contains(beren));
         assertFalse("another reader is in none of them",
-                reactions.summaryFor(Collections.singleton(BOB)).find("smile").isMine(BOB));
+                reactions.summaryFor(Collections.singleton(BOB)).find("smile").mineAs.contains(BOB));
         assertTrue(reactions.set("smile", beren, "Beren", false));
-        assertFalse(reactions.summaryFor(hers).find("smile").isMine(beren));
-        assertTrue(reactions.summaryFor(hers).find("smile").isMine(ALICE));
+        assertFalse(reactions.summaryFor(hers).find("smile").mineAs.contains(beren));
+        assertTrue(reactions.summaryFor(hers).find("smile").mineAs.contains(ALICE));
     }
 
     @Test
@@ -103,7 +103,7 @@ public final class ChatReactionsTest {
                 reactions.restore(PARROT, ALICE, "Aldric", ""));
         assertFalse(reactions.restore("not_an_emoji", BOB, "Beren", ""));
         assertTrue(reactions.standOf(PARROT).players());
-        assertTrue(reactions.summaryFor(Collections.singleton(ALICE)).find(PARROT).isMine(ALICE));
+        assertTrue(reactions.summaryFor(Collections.singleton(ALICE)).find(PARROT).mineAs.contains(ALICE));
     }
 
     /**
@@ -122,7 +122,7 @@ public final class ChatReactionsTest {
         assertTrue(reactions.renamedOnRestore());
         assertEquals(1, reactions.snapshot().size());
         assertEquals(2, reactions.summaryFor(Collections.singleton(ALICE)).find("grinning").count);
-        assertTrue(reactions.summaryFor(Collections.singleton(ALICE)).find("grinning").isMine(ALICE));
+        assertTrue(reactions.summaryFor(Collections.singleton(ALICE)).find("grinning").mineAs.contains(ALICE));
         assertTrue(reactions.snapshot().containsKey("grinning"));
         // A kind the save wrote under its own name still takes a reactor once.
         assertTrue(reactions.restore("smile", BOB, "Beren", ""));
@@ -261,7 +261,7 @@ public final class ChatReactionsTest {
         reactions.set(UNICORN, ALICE, "Aldric", true);
         assertTrue(reactions.clearDiscord(UNICORN, "", CHANNEL));
         assertEquals(1, reactions.summaryFor(Collections.singleton(ALICE)).find(UNICORN).count);
-        assertTrue(reactions.summaryFor(Collections.singleton(ALICE)).find(UNICORN).isMine(ALICE));
+        assertTrue(reactions.summaryFor(Collections.singleton(ALICE)).find(UNICORN).mineAs.contains(ALICE));
     }
 
     @Test
@@ -308,10 +308,10 @@ public final class ChatReactionsTest {
         ChatReactionSummary.Reaction smile = forAlice.find("smile");
         assertNotNull(smile);
         assertEquals(2, smile.count);
-        assertTrue(smile.isMine(ALICE));
+        assertTrue(smile.mineAs.contains(ALICE));
         assertEquals("Aldric", smile.names.get(0));
-        assertFalse(forAlice.find("joy").isMine(ALICE));
-        assertFalse(reactions.summaryFor(Collections.<UUID>emptySet()).find("smile").isMine(ALICE));
+        assertFalse(forAlice.find("joy").mineAs.contains(ALICE));
+        assertFalse(reactions.summaryFor(Collections.<UUID>emptySet()).find("smile").mineAs.contains(ALICE));
         assertNull(forAlice.find("wave"));
     }
 

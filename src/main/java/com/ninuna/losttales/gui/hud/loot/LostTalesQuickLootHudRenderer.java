@@ -9,6 +9,7 @@ import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootDropItemPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
@@ -185,13 +186,12 @@ public final class LostTalesQuickLootHudRenderer {
         int screenHeight = resolution.getScaledHeight();
 
         int visibleRows = Math.max(1, LostTalesConfig.quickLootHudMaxRows);
+        // Placed by its box, all its rows; fewer rows fill it from the top.
         HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
                 screenWidth, screenHeight,
                 getPlacementWidth(), getPlacementHeight(),
                 LostTalesConfig.quickLootHudOffsetX,
-                LostTalesConfig.quickLootHudOffsetY,
-                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT,
-                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT);
+                LostTalesConfig.quickLootHudOffsetY);
         int panelX = placement.x;
         int panelY = placement.y;
         int itemX = panelX + 17;
@@ -210,13 +210,17 @@ public final class LostTalesQuickLootHudRenderer {
         GL11.glDisable(GL11.GL_DEPTH_TEST);
 
         drawQuickLootTexture(minecraft, TEXTURE, panelX, panelY, 0, 0, TEXTURE_WIDTH, TOP_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
-        String title = font.trimStringToWidth(
-                snapshot.title == null ? StatCollector.translateToLocal(
-                        LostTalesClientQuickLootCache.CONTAINER_KEY) : snapshot.title,
-                TEXTURE_WIDTH - 12);
-        renderHorizontalOrnament(minecraft, font, panelX, panelY, title);
-        font.drawStringWithShadow(title, panelX + 3,
-                panelY + font.FONT_HEIGHT / 2, LostTalesColors.IVORY);
+        // The container's name and the items' names fade into the panel's
+        // end where they are too long for it; nothing points at the HUD,
+        // so they never slide (LOOK-37).
+        String title = snapshot.title == null ? StatCollector.translateToLocal(
+                LostTalesClientQuickLootCache.CONTAINER_KEY) : snapshot.title;
+        int titleRoom = TEXTURE_WIDTH - 12;
+        renderHorizontalOrnament(minecraft, font, panelX, panelY,
+                (int)LostTalesUiCutName.shownWidth(font.getStringWidth(title),
+                        titleRoom));
+        LostTalesUiCutName.drawShadowed(font, title, panelX + 3,
+                panelY + font.FONT_HEIGHT / 2, titleRoom, LostTalesColors.IVORY);
 
         if (slots.isEmpty()) {
             drawQuickLootTexture(minecraft, TEXTURE, panelX, rowY, 0, ROW_TEXTURE_V, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
@@ -235,10 +239,10 @@ public final class LostTalesQuickLootHudRenderer {
                     drawQuickLootTexture(minecraft, TEXTURE, panelX + SELECTION_OFFSET_X, y + 1, 0, SELECTION_TEXTURE_V, SELECTION_WIDTH, SELECTION_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
                 }
                 renderStack(minecraft, stack, itemX, y + 3);
-                String name = font.trimStringToWidth(
-                        stack == null ? "" : stack.getDisplayName(),
-                        TEXTURE_WIDTH - (itemNameX - panelX) - 8);
-                font.drawStringWithShadow(name, itemNameX, y + 7, LostTalesColors.IVORY);
+                LostTalesUiCutName.drawShadowed(font,
+                        stack == null ? "" : stack.getDisplayName(), itemNameX,
+                        y + 7, TEXTURE_WIDTH - (itemNameX - panelX) - 8,
+                        LostTalesColors.IVORY);
             }
         }
 
@@ -265,8 +269,8 @@ public final class LostTalesQuickLootHudRenderer {
         LostTalesCompassHudRenderHelper.drawTexturedRectNoAlphaTest(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, alpha);
     }
 
-    private static void renderHorizontalOrnament(Minecraft minecraft, FontRenderer font, int panelX, int panelY, String title) {
-        int ornamentX = panelX + 3 + font.getStringWidth(title == null ? "" : title) + 5;
+    private static void renderHorizontalOrnament(Minecraft minecraft, FontRenderer font, int panelX, int panelY, int titleWidth) {
+        int ornamentX = panelX + 3 + titleWidth + 5;
         int ornamentY = panelY + font.FONT_HEIGHT / 2 - 1;
         drawQuickLootTexture(
                 minecraft,

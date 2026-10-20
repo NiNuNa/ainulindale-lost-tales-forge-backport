@@ -23,6 +23,14 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
     public static final String DATA_NAME_PREFIX =
             "losttales_character_player_state_";
     public static final int CURRENT_DATA_VERSION = 13;
+    /**
+     * The most entries the quarantine holds. Each may be a whole player's
+     * state, so the bound is small; a file past it is read-only, and the
+     * store closes when it has no room left (CHAR-37).
+     */
+    public static final int MAX_QUARANTINED = 16;
+    /** The reason of a player's state set aside when an operator put their character back. */
+    public static final String REASON_SWITCH_MIXED_STATE = "switch_mixed_state";
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_ACCOUNTS = "Accounts";
@@ -166,6 +174,18 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
                         Integer.valueOf(index), exception.toString());
             }
         }
+        if (this.quarantinedEntries.size() > MAX_QUARANTINED) {
+            LostTalesLog.warning("Character player state %s would quarantine %d entries, "
+                            + "past its %d; it stays read-only",
+                    this.mapName, Integer.valueOf(this.quarantinedEntries.size()),
+                    Integer.valueOf(MAX_QUARANTINED));
+            this.readOnlyForNewerVersion = true;
+            this.preservedNewerData = (NBTTagCompound) compound.copy();
+            this.accounts.clear();
+            this.quarantinedEntries.clear();
+            this.blockedOwners.clear();
+            return;
+        }
         if (repaired) {
             markDirty();
         }
@@ -250,6 +270,55 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
 
     public int getQuarantinedEntryCount() {
         return this.quarantinedEntries.size();
+    }
+
+    /**
+     * Whether the quarantine has room for {@code entries} more. When it has
+     * not, the store closes, read-only as a save it could not read, so that
+     * nothing leaves it without being kept.
+     */
+    public boolean hasQuarantineRoomFor(int entries) {
+        if (this.readOnlyForNewerVersion) {
+            return false;
+        }
+        if (this.quarantinedEntries.size() + Math.max(0, entries) <= MAX_QUARANTINED) {
+            return true;
+        }
+        this.readOnlyForNewerVersion = true;
+        LostTalesLog.warning("Character player state %s holds its %d quarantined "
+                        + "entries; it stays read-only until the quarantine is emptied",
+                this.mapName, Integer.valueOf(MAX_QUARANTINED));
+        return false;
+    }
+
+    /**
+     * Sets {@code original} aside in the quarantine, kept as it is and never
+     * read back as anyone's state. Unlike an entry the store could not read,
+     * it blocks no owner. The caller asked {@link #hasQuarantineRoomFor}
+     * first.
+     */
+    public void setAside(String reason, NBTTagCompound original) {
+        ensureWritable();
+        if (reason == null || reason.length() == 0 || original == null) {
+            throw new IllegalArgumentException("a reason and the data are required");
+        }
+        if (this.quarantinedEntries.size() >= MAX_QUARANTINED) {
+            throw new IllegalStateException("The character player-state quarantine is full");
+        }
+        NBTTagCompound entry = new NBTTagCompound();
+        entry.setString("Reason", reason);
+        entry.setTag("OriginalData", original.copy());
+        this.quarantinedEntries.add(entry);
+        markDirty();
+    }
+
+    /** A copy of every quarantined entry, in the order it was set aside. */
+    public List<NBTTagCompound> getQuarantinedEntries() {
+        ArrayList<NBTTagCompound> copies = new ArrayList<NBTTagCompound>();
+        for (NBTTagCompound entry : this.quarantinedEntries) {
+            copies.add((NBTTagCompound) entry.copy());
+        }
+        return copies;
     }
 
     private boolean isExpectedOwner(UUID ownerId) {
@@ -459,8 +528,9 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
 
     private void ensureWritable() {
         if (this.readOnlyForNewerVersion) {
-            throw new IllegalStateException(
-                    "Character player state is read-only because it uses unsupported version "
+            throw new IllegalStateException(this.unsupportedDataVersion < 0
+                    ? "Character player state is read-only because its quarantine is full"
+                    : "Character player state is read-only because it uses unsupported version "
                             + this.unsupportedDataVersion);
         }
     }
