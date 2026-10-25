@@ -31,7 +31,6 @@ import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.WheelStep;
-import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowLists;
@@ -39,6 +38,7 @@ import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
@@ -53,7 +53,6 @@ import java.util.Set;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
@@ -424,9 +423,10 @@ public final class CharactersPage extends PageContent
         }
         LostTalesUiHitBox divider = layout.divider();
         if (divider.width > 0) {
-            Gui.drawRect((int)divider.left, (int)divider.top,
-                    (int)divider.right(), (int)divider.bottom(),
-                    LostTalesColors.BORDER_DIM);
+            // The halves part on the windows' standing rule.
+            LostTalesUiRules.drawStandingRule((float)divider.left,
+                    (float)divider.right(), (float)divider.top,
+                    (float)divider.bottom(), alpha);
         }
         if (layout.profile().width > 0) {
             if (this.visit != null) {

@@ -1,8 +1,6 @@
 package com.ninuna.losttales.block.vessel;
 
 import com.ninuna.losttales.item.block.LostTalesItemBlockUrn;
-import java.util.ArrayList;
-import java.util.List;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -11,7 +9,7 @@ import net.minecraft.nbt.NBTTagList;
 /**
  * Vessel items as the running game has them (CONTENT-09): the items the
  * game knows by id, a vessel item made with what it holds, and the stacks
- * a vessel item's checked contents read back as.
+ * a vessel item's checked contents read back as, slot by slot.
  */
 public final class VesselItems {
     /** The game's own items. */
@@ -43,14 +41,16 @@ public final class VesselItems {
         return stack;
     }
 
-    /** The stacks a vessel item holds, checked as a vessel of {@code slots} slots takes them, in slot order. */
-    public static List<ItemStack> contents(ItemStack vessel, int slots) {
-        List<ItemStack> stacks = new ArrayList<ItemStack>();
+    /**
+     * The stacks a vessel item holds, checked as a vessel of {@code slots}
+     * slots takes them: one entry per slot, null for an empty one.
+     */
+    public static ItemStack[] slots(ItemStack vessel, int slots) {
+        ItemStack[] bySlot = new ItemStack[Math.max(0, slots)];
         if (vessel == null) {
-            return stacks;
+            return bySlot;
         }
         NBTTagList items = VesselContents.read(vessel.getTagCompound(), slots, GAME);
-        ItemStack[] bySlot = new ItemStack[Math.max(0, slots)];
         for (int index = 0; index < items.tagCount(); index++) {
             int slot = items.getCompoundTagAt(index).getByte("Slot") & 255;
             ItemStack stack = ItemStack.loadItemStackFromNBT(items.getCompoundTagAt(index));
@@ -58,11 +58,6 @@ public final class VesselItems {
                 bySlot[slot] = stack;
             }
         }
-        for (ItemStack stack : bySlot) {
-            if (stack != null) {
-                stacks.add(stack);
-            }
-        }
-        return stacks;
+        return bySlot;
     }
 }

@@ -4,7 +4,13 @@ import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiOrigin;
 import com.ninuna.losttales.client.input.LostTalesInputBinding.Type;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
+import com.ninuna.losttales.client.window.WindowBar;
+import com.ninuna.losttales.client.window.WindowPlacement;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.ArrayList;
@@ -12,29 +18,31 @@ import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.settings.KeyBinding;
 import org.lwjgl.opengl.GL11;
 
 /**
- * Reusable animated control strip for Lost Tales screens.
+ * The key hints at the foot of a screen of the mod's own, the map's where
+ * it stands outside a window, on a window's bar (LOOK-03, MAP-18): the
+ * bar's height and its surface, the windows' rule as its first row, the
+ * keys on the row its framed buttons stand on, the words in the windows'
+ * ink and the date in the bar's words' sand. It spans the screen as a
+ * full-screen window's bar does, its frame past the screen's edges.
  *
- * <p>Screens only describe their input hints. This class owns their visual
- * language, responsive fitting, input-icon animation and ivory labels. The
- * strip is drawn from the screen's origin and arrives with its screen
+ * <p>Screens only describe their input hints; this fits them, the left
+ * group, the right group and the date, and draws them. The bar is drawn
+ * from the screen's origin and arrives with its screen
  * ({@link LostTalesControlBarAnimation}).</p>
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesControlBar {
-    public static final int HEIGHT = 30;
-    public static final int OUTER_PADDING = 6;
+    public static final int HEIGHT = WindowPlacement.BAR_STRIP_HEIGHT;
+    /** From the screen's side to the first key, as a button stands from a window's frame. */
+    public static final int OUTER_PADDING = WindowStyle.EDGE_GAP;
     public static final int INPUT_TEXT_GAP = 3;
     public static final int CONTROL_GAP = 10;
 
-    private static final int BACKGROUND =
-            LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xA0);
     private static final int STATUS_GAP = 20;
-    private static final int SEPARATOR_INSET = 7;
     private static final float INPUT_SCALE = 1.0F;
 
     private LostTalesControlBar() {}
@@ -70,9 +78,12 @@ public final class LostTalesControlBar {
             int fillTop = top;
             int fillBottom = screenHeight
                     + (int)Math.ceil(Math.max(0.0F, -offset)) + 1;
-            Gui.drawRect(0, fillTop, screenWidth, fillBottom, BACKGROUND);
-            Gui.drawRect(0, top, screenWidth, top + 1,
-                    LostTalesColors.BORDER_DIM);
+            // The bar's surface under its first row, which is the
+            // windows' rule, as a window's bottom rule is its bar's.
+            LostTalesUiInk.fillRect(0, fillTop + 1, screenWidth, fillBottom,
+                    WindowStyle.stripArgb(WindowStyle.opacity(minecraft)));
+            LostTalesUiRules.drawRule(0, screenWidth, top, top + 1, 255);
+            LostTalesUiInk.beginContent();
             drawHints(minecraft, font, screenWidth, top, safeHints,
                     Math.min(Math.max(0, leftGroupSize), safeHints.size()),
                     layout);
@@ -162,8 +173,10 @@ public final class LostTalesControlBar {
     private static void drawHints(
             Minecraft minecraft, FontRenderer font, int screenWidth,
             int top, List<Hint> hints, int split, Layout layout) {
-        int inputY = top
-                + (HEIGHT - LostTalesInputIconRenderer.BASE_ICON_HEIGHT) / 2;
+        // The keys stand on the row a bar's framed buttons stand on.
+        int inputY = WindowBar.buttonTop(top) + LostTalesUiInk.centredStart(
+                LostTalesUiFramedButton.HEIGHT,
+                LostTalesInputIconRenderer.BASE_ICON_HEIGHT);
         int x = OUTER_PADDING;
         for (int index = 0; index < layout.leftHints; index++) {
             if (index > 0) {
@@ -194,13 +207,13 @@ public final class LostTalesControlBar {
         String status = statuses.get(layout.statusIndex);
         int statusX = screenWidth - OUTER_PADDING
                 - font.getStringWidth(status);
-        font.drawStringWithShadow(status, statusX,
-                top + (HEIGHT - font.FONT_HEIGHT) / 2,
-                LostTalesColors.HUD_LABEL);
+        // The date as a bar's quiet words stand, after a bar's divider.
+        LostTalesUiInk.drawText(font, status, statusX,
+                WindowBar.textTop(top),
+                LostTalesColors.rgb(LostTalesColors.SAND), 255);
         int ruleX = statusX - STATUS_GAP / 2;
-        Gui.drawRect(ruleX, top + SEPARATOR_INSET,
-                ruleX + 1, top + HEIGHT - SEPARATOR_INSET,
-                LostTalesColors.BORDER_DIM);
+        WindowStyle.drawDivider(ruleX, WindowBar.glyphTop(top),
+                WindowStyle.LINE_HEIGHT, WindowStyle.DIVIDER_ALPHA);
     }
 
     /** The strip's own state and matrix: from the screen's origin, where the strip stands now. */
@@ -322,14 +335,18 @@ public final class LostTalesControlBar {
             }
             if (withLabel && this.label.length() > 0) {
                 int textX = end + (end > x ? INPUT_TEXT_GAP : 0);
-                int textY = inputY
-                        + (LostTalesInputIconRenderer.BASE_ICON_HEIGHT
-                                - font.FONT_HEIGHT) / 2;
-                font.drawStringWithShadow(this.label, textX, textY,
-                        LostTalesColors.HUD_LABEL);
+                LostTalesUiInk.drawText(font, this.label, textX,
+                        labelTop(inputY), LostTalesUiInk.IVORY, 255);
                 end = textX + font.getStringWidth(this.label);
             }
             return end;
+        }
+
+        /** Where words beside a key stand: their capitals centred on it. */
+        private static int labelTop(int inputY) {
+            return inputY + LostTalesUiInk.centredStart(
+                    LostTalesInputIconRenderer.BASE_ICON_HEIGHT,
+                    LostTalesUiInk.CAP_HEIGHT);
         }
 
         private static int visiblePartsWidth(
@@ -402,11 +419,8 @@ public final class LostTalesControlBar {
                     Minecraft minecraft, FontRenderer font,
                     int x, int inputY) {
                 if (this.text != null) {
-                    int textY = inputY
-                            + (LostTalesInputIconRenderer.BASE_ICON_HEIGHT
-                                    - font.FONT_HEIGHT) / 2;
-                    font.drawStringWithShadow(this.text, x, textY,
-                            LostTalesColors.HUD_LABEL);
+                    LostTalesUiInk.drawText(font, this.text, x,
+                            labelTop(inputY), LostTalesUiInk.IVORY, 255);
                     return x + this.width;
                 }
                 int drawn = this.binding == null

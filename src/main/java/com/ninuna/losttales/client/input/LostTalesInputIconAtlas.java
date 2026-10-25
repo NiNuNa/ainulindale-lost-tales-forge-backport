@@ -1,26 +1,15 @@
 package com.ninuna.losttales.client.input;
 
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.input.Keyboard;
 
-/**
- * The cells of {@code keyboard_keys.png} a key hint is drawn from: the
- * blank key it writes its key's name on in the reader's language (MAP-17),
- * the arrows' glyphs and the mouse wheel.
- *
- * <p>The blank key is a stand-in until its own cells are painted: the
- * narrowest painted key's frame in its three poses (resting, half down,
- * pressed), cut into bands and stretched to the name it carries. Its
- * ends are kept whole and its middle column stretched across; its face
- * is opened to {@link #FACE_ROWS} rows, the font's capitals, and filled
- * with the frame's own face texel; its front gives up the rows the face
- * took. A letter, a digit or a word stands on the face as text. The
- * arrows keep their painted glyphs, which carry no words.</p>
- */
+/** Static layered-sprite metadata for {@code keyboard_keys.png}. */
 @SideOnly(Side.CLIENT)
 public final class LostTalesInputIconAtlas {
     public static final ResourceLocation TEXTURE = new ResourceLocation(
@@ -28,147 +17,175 @@ public final class LostTalesInputIconAtlas {
 
     public static final int TEXTURE_WIDTH = 363;
     public static final int TEXTURE_HEIGHT = 113;
-    /** Every key's height, and the mouse wheel's. */
     public static final int SPRITE_HEIGHT = 13;
-    /** The key's poses: resting, half down and pressed. */
     public static final int KEYBOARD_FRAME_COUNT = 3;
+    private static final int FRAME_SPACING = 1;
+    private static final int GLYPH_HEIGHT = 5;
+    private static final int GLYPH_OFFSET_X = 3;
+    /** Idle aperture starts here; each later pose sits one pixel lower. */
+    private static final int GLYPH_OFFSET_Y = 2;
 
-    /** The painted key the blank one is cut from: its three poses side by side. */
-    static final int KEY_CELL_U = 0;
-    static final int KEY_CELL_V = 0;
-    static final int KEY_CELL_WIDTH = 13;
-    /** From one pose's cell to the next: its width and a clear column. */
-    static final int KEY_CELL_STRIDE = KEY_CELL_WIDTH + 1;
-    /** The columns kept whole at either end: the rounded edge, its rim and shade. */
-    static final int KEY_END_COLUMNS = 5;
-    /** The column stretched between the ends. */
-    static final int KEY_MIDDLE_COLUMN = 6;
-    /** The texel of the frame's face colour, in the resting pose's cell, stretched over the face. */
-    static final int FACE_TEXEL_U = 5;
-    static final int FACE_TEXEL_V = 0;
-    /** The rows above the face: the top outline and the rim. */
-    static final int RIM_ROWS = 2;
-    /** A painted face's rows in the cell, under the rim. */
-    static final int PAINTED_FACE_ROWS = 5;
-    /** The face's rows on the blank key: the font's capitals. */
-    public static final int FACE_ROWS = LostTalesUiInk.CAP_HEIGHT;
-    /** The front's rows on the resting blank key, under the face and its lip. */
-    static final int FRONT_ROWS = SPRITE_HEIGHT - RIM_ROWS - FACE_ROWS - 1;
-    /** From the key's side to its face: the outline, the rim and the shade. */
-    public static final int FACE_INSET = 3;
-    /** Clear columns at least between a name and the face's sides. */
-    static final int LABEL_CLEAR = 1;
-    /** The narrowest key: as wide as a painted letter key. */
-    public static final int MIN_KEY_WIDTH = KEY_CELL_WIDTH;
+    private static final Map<Integer, Sprite> KEYBOARD_SPRITES;
+    private static final Map<Integer, Sprite> MOUSE_BUTTON_SPRITES;
+    private static final Sprite MOUSE_WHEEL_SPRITE =
+            new Sprite(0, 100, 16, SPRITE_HEIGHT);
 
-    /** The arrows' glyphs: up, right, down, left, in the glyph strip after A to Z. */
-    private static final int ARROW_GLYPH_FIRST = 26;
-    private static final int GLYPH_U_STRIDE = 8;
-    static final int GLYPH_V = 14;
-    static final int GLYPH_WIDTH = 7;
-    static final int GLYPH_HEIGHT = 5;
+    static {
+        Map<Integer, Sprite> keyboardSprites =
+                new HashMap<Integer, Sprite>();
 
-    private static final Cell MOUSE_WHEEL = new Cell(0, 100, 16, SPRITE_HEIGHT);
+        // The glyph strip is A-Z, Up, Right, Down, Left, 0-9, then the two
+        // punctuation marks. All forty-two symbols are composed over the same
+        // three reusable 13-pixel frames.
+        int[] singleGlyphCodes = {
+                Keyboard.KEY_A, Keyboard.KEY_B, Keyboard.KEY_C,
+                Keyboard.KEY_D, Keyboard.KEY_E, Keyboard.KEY_F,
+                Keyboard.KEY_G, Keyboard.KEY_H, Keyboard.KEY_I,
+                Keyboard.KEY_J, Keyboard.KEY_K, Keyboard.KEY_L,
+                Keyboard.KEY_M, Keyboard.KEY_N, Keyboard.KEY_O,
+                Keyboard.KEY_P, Keyboard.KEY_Q, Keyboard.KEY_R,
+                Keyboard.KEY_S, Keyboard.KEY_T, Keyboard.KEY_U,
+                Keyboard.KEY_V, Keyboard.KEY_W, Keyboard.KEY_X,
+                Keyboard.KEY_Y, Keyboard.KEY_Z,
+                Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
+                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT,
+                Keyboard.KEY_0, Keyboard.KEY_1, Keyboard.KEY_2,
+                Keyboard.KEY_3, Keyboard.KEY_4, Keyboard.KEY_5,
+                Keyboard.KEY_6, Keyboard.KEY_7, Keyboard.KEY_8,
+                Keyboard.KEY_9,
+                Keyboard.KEY_PERIOD, Keyboard.KEY_COMMA
+        };
+        for (int index = 0; index < singleGlyphCodes.length; index++) {
+            keyboardSprites.put(Integer.valueOf(singleGlyphCodes[index]),
+                    layeredSprite(0, 0, 13,
+                            index * 8, 14, 7));
+        }
+
+        // Two-character keys: F1 to F9, in their own frame family because a
+        // single-glyph frame has no room for two characters.
+        int[] shortFunctionKeys = {
+                Keyboard.KEY_F1, Keyboard.KEY_F2, Keyboard.KEY_F3,
+                Keyboard.KEY_F4, Keyboard.KEY_F5, Keyboard.KEY_F6,
+                Keyboard.KEY_F7, Keyboard.KEY_F8, Keyboard.KEY_F9
+        };
+        for (int index = 0; index < shortFunctionKeys.length; index++) {
+            keyboardSprites.put(Integer.valueOf(shortFunctionKeys[index]),
+                    layeredSprite(0, 20, 17,
+                            index * 12, 34, 11));
+        }
+
+        // Three-character keys: ALT, ESC, TAB, DEL, then F10 to F12.
+        Sprite alt = layeredSprite(0, 40, 21, 0, 54, 15);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_LMENU), alt);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_RMENU), alt);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_ESCAPE),
+                layeredSprite(0, 40, 21, 16, 54, 15));
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_TAB),
+                layeredSprite(0, 40, 21, 32, 54, 15));
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_DELETE),
+                layeredSprite(0, 40, 21, 48, 54, 15));
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_F10),
+                layeredSprite(0, 40, 21, 64, 54, 15));
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_F11),
+                layeredSprite(0, 40, 21, 80, 54, 15));
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_F12),
+                layeredSprite(0, 40, 21, 96, 54, 15));
+
+        // Four-letter keys: CAPS and CTRL.
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_CAPITAL),
+                layeredSprite(0, 60, 25, 0, 74, 19));
+        Sprite control = layeredSprite(0, 60, 25, 20, 74, 19);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_LCONTROL), control);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_RCONTROL), control);
+
+        // Five-letter keys: SHIFT and SPACE.
+        Sprite shift = layeredSprite(0, 80, 29, 0, 94, 23);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_LSHIFT), shift);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_RSHIFT), shift);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_SPACE),
+                layeredSprite(0, 80, 29, 24, 94, 23));
+
+        KEYBOARD_SPRITES = Collections.unmodifiableMap(keyboardSprites);
+
+        // The current atlas still has only the static mouse-wheel artwork.
+        MOUSE_BUTTON_SPRITES = Collections.unmodifiableMap(
+                new HashMap<Integer, Sprite>());
+    }
 
     private LostTalesInputIconAtlas() {}
 
-    /** The mouse wheel's picture. */
-    public static Cell mouseWheel() {
-        return MOUSE_WHEEL;
+    private static Sprite layeredSprite(
+            int frameU, int frameV, int frameWidth,
+            int glyphU, int glyphV, int glyphWidth) {
+        return new Sprite(frameU, frameV, frameWidth, SPRITE_HEIGHT,
+                frameWidth + FRAME_SPACING, KEYBOARD_FRAME_COUNT,
+                glyphU, glyphV, glyphWidth, GLYPH_HEIGHT,
+                GLYPH_OFFSET_X, GLYPH_OFFSET_Y);
     }
 
-    /** The painted glyph an arrow key shows, which carries no words; null for any other key. */
-    public static Cell arrowGlyph(int keyCode) {
-        int index;
-        switch (keyCode) {
-            case Keyboard.KEY_UP:
-                index = 0;
-                break;
-            case Keyboard.KEY_RIGHT:
-                index = 1;
-                break;
-            case Keyboard.KEY_DOWN:
-                index = 2;
-                break;
-            case Keyboard.KEY_LEFT:
-                index = 3;
-                break;
+    public static Sprite findSprite(
+            LostTalesInputBinding.Type type, int keyCode) {
+        if (type == null) {
+            return null;
+        }
+        switch (type) {
+            case KEYBOARD:
+                return KEYBOARD_SPRITES.get(Integer.valueOf(keyCode));
+            case MOUSE_BUTTON:
+                return MOUSE_BUTTON_SPRITES.get(Integer.valueOf(
+                        LostTalesInputBinding.getMouseButtonIndex(keyCode)));
+            case MOUSE_WHEEL:
+                return MOUSE_WHEEL_SPRITE;
             default:
                 return null;
         }
-        return new Cell((ARROW_GLYPH_FIRST + index) * GLYPH_U_STRIDE, GLYPH_V,
-                GLYPH_WIDTH, GLYPH_HEIGHT);
     }
 
-    /**
-     * A blank key's width for a name {@code labelWidth} wide, its shadow
-     * column with it: the name and a clear column each side on the face,
-     * never narrower than a letter key.
-     */
-    public static int keyWidth(int labelWidth) {
-        return Math.max(MIN_KEY_WIDTH,
-                Math.max(0, labelWidth) + 2 * (FACE_INSET + LABEL_CLEAR));
-    }
+    public static final class Sprite {
+        private final int frameU;
+        private final int frameV;
+        private final int width;
+        private final int height;
+        private final int frameStrideX;
+        private final int frameCount;
+        private final int glyphU;
+        private final int glyphV;
+        private final int glyphWidth;
+        private final int glyphHeight;
+        private final int glyphOffsetX;
+        private final int glyphOffsetY;
 
-    /** A key's width with a glyph on it, which fills its face as a painted one does. */
-    public static int glyphKeyWidth(Cell glyph) {
-        return Math.max(MIN_KEY_WIDTH,
-                (glyph == null ? 0 : glyph.width) + 2 * FACE_INSET);
-    }
+        private Sprite(int u, int v, int width, int height) {
+            this(u, v, width, height, 0, 1,
+                    0, 0, 0, 0, 0, 0);
+        }
 
-    /** Where a name {@code labelWidth} wide starts on a key {@code keyWidth} wide: centred on its face. */
-    public static int labelLeft(int keyWidth, int labelWidth) {
-        return FACE_INSET + LostTalesUiInk.centredStart(
-                keyWidth - 2 * FACE_INSET, labelWidth);
-    }
-
-    /** The face's top row in {@code pose}: under the rim, a row lower for each step down. */
-    public static int faceTop(int pose) {
-        return boundedPose(pose) + RIM_ROWS;
-    }
-
-    /** The left of {@code pose}'s cell in the texture. */
-    static int cellU(int pose) {
-        return KEY_CELL_U + boundedPose(pose) * KEY_CELL_STRIDE;
-    }
-
-    /**
-     * The bands the blank key is drawn in, top to bottom, for
-     * {@code pose}: the rim, the face's sides stretched from one painted
-     * face row, the lip under the face, and what is left of the front.
-     * Each band is cut into the ends and the stretched middle.
-     */
-    static Band[] bands(int pose) {
-        int step = boundedPose(pose);
-        int faceTop = step + RIM_ROWS;
-        int lipRow = faceTop + FACE_ROWS;
-        int frontRows = FRONT_ROWS - step;
-        return new Band[] {
-                new Band(step, RIM_ROWS, step, RIM_ROWS),
-                new Band(step + RIM_ROWS + PAINTED_FACE_ROWS / 2, 1,
-                        faceTop, FACE_ROWS),
-                new Band(step + RIM_ROWS + PAINTED_FACE_ROWS, 1, lipRow, 1),
-                new Band(SPRITE_HEIGHT - frontRows, frontRows,
-                        SPRITE_HEIGHT - frontRows, frontRows)
-        };
-    }
-
-    private static int boundedPose(int pose) {
-        return Math.max(0, Math.min(KEYBOARD_FRAME_COUNT - 1, pose));
-    }
-
-    /** A rectangle of the texture, drawn one texel to one pixel. */
-    public static final class Cell {
-        final int u;
-        final int v;
-        final int width;
-        final int height;
-
-        Cell(int u, int v, int width, int height) {
-            this.u = u;
-            this.v = v;
+        private Sprite(int frameU, int frameV, int width, int height,
+                       int frameStrideX, int frameCount,
+                       int glyphU, int glyphV,
+                       int glyphWidth, int glyphHeight,
+                       int glyphOffsetX, int glyphOffsetY) {
+            this.frameU = frameU;
+            this.frameV = frameV;
             this.width = width;
             this.height = height;
+            this.frameStrideX = Math.max(0, frameStrideX);
+            this.frameCount = Math.max(1, frameCount);
+            this.glyphU = glyphU;
+            this.glyphV = glyphV;
+            this.glyphWidth = Math.max(0, glyphWidth);
+            this.glyphHeight = Math.max(0, glyphHeight);
+            this.glyphOffsetX = glyphOffsetX;
+            this.glyphOffsetY = glyphOffsetY;
+        }
+
+        public int getU(int frame) {
+            int bounded = Math.max(0, Math.min(this.frameCount - 1, frame));
+            return this.frameU + bounded * this.frameStrideX;
+        }
+
+        public int getV(int frame) {
+            return this.frameV;
         }
 
         public int getWidth() {
@@ -178,23 +195,34 @@ public final class LostTalesInputIconAtlas {
         public int getHeight() {
             return this.height;
         }
-    }
 
-    /**
-     * Rows of a pose's cell drawn to rows of the key: {@code sourceRows}
-     * from {@code sourceRow}, stretched over {@code rows} from {@code top}.
-     */
-    static final class Band {
-        final int sourceRow;
-        final int sourceRows;
-        final int top;
-        final int rows;
+        public boolean hasGlyph() {
+            return this.glyphWidth > 0 && this.glyphHeight > 0;
+        }
 
-        Band(int sourceRow, int sourceRows, int top, int rows) {
-            this.sourceRow = sourceRow;
-            this.sourceRows = sourceRows;
-            this.top = top;
-            this.rows = rows;
+        public int getGlyphU() {
+            return this.glyphU;
+        }
+
+        public int getGlyphV() {
+            return this.glyphV;
+        }
+
+        public int getGlyphWidth() {
+            return this.glyphWidth;
+        }
+
+        public int getGlyphHeight() {
+            return this.glyphHeight;
+        }
+
+        public int getGlyphOffsetX() {
+            return this.glyphOffsetX;
+        }
+
+        public int getGlyphOffsetY(int frame) {
+            int bounded = Math.max(0, Math.min(this.frameCount - 1, frame));
+            return this.glyphOffsetY + bounded;
         }
     }
 }

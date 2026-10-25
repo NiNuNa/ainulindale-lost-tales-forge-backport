@@ -1,12 +1,22 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.OptionGlyph;
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.client.window.WindowFields;
+import com.ninuna.losttales.client.window.WindowLists;
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.client.window.WordButton;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesUiBracketPanel;
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
-import com.ninuna.losttales.gui.style.LostTalesUiFading;
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
-import com.ninuna.losttales.gui.style.LostTalesUiTextField;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.ArrayList;
@@ -15,13 +25,17 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.opengl.GL11;
 
 /**
- * Modal, map-local editor for a personal waypoint.
+ * Modal, map-local editor for a personal waypoint: a popup in the window
+ * frame (LOOK-28) holding a heading, the windows' fields, the colours, and
+ * framed word buttons, as a window's form holds them (LOOK-24).
  *
- * <p>Two modes share one panel. Creating collects a name and an icon colour;
+ * <p>Two modes share one popup. Creating collects a name and an icon colour;
  * editing adds the fellowships the waypoint is shared with, and the actions
  * that belong to a waypoint that already exists.</p>
  *
@@ -34,26 +48,25 @@ import org.lwjgl.input.Keyboard;
 final class LostTalesMapWaypointPrompt {
     /** LOTR's own limit on a custom waypoint name. */
     static final int MAX_NAME_LENGTH = 30;
-    /** Fellowship rows the panel shows at once; the rest are scrolled to. */
+    /** Fellowship rows the popup shows at once; the rest are scrolled to. */
     static final int VISIBLE_FELLOWSHIPS = 4;
     private static final int SCREEN_SHADE =
             LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x66);
-    private static final int MAX_WIDTH = 320;
-    private static final int CREATE_PANEL_HEIGHT = 134;
-    private static final int EDIT_PANEL_HEIGHT = 212;
+    private static final int MAX_WIDTH = 240;
     private static final int SCREEN_MARGIN = 8;
-    private static final int CONTENT_PADDING = 10;
-    private static final int NAME_TOP = 28;
-    private static final int NOTE_TOP = 48;
-    private static final int FIELD_HEIGHT = 16;
-    private static final int SWATCH_TOP = 70;
+    private static final int FRAME = WindowStyle.POPUP_FRAME;
+    /** The menus' clear room round what the popup holds, across and down. */
+    private static final int PADDING_X = MenuWindow.PADDING_X;
+    private static final int PADDING_Y = MenuWindow.PADDING_Y;
+    /** The count of waypoints used: a menu note's one line. */
+    private static final int NOTE_HEIGHT = MenuWindow.NOTE_PADDING * 2
+            + MenuWindow.NOTE_LINE;
     private static final int SWATCH_SIZE = 16;
-    private static final int SHARE_HEADING_TOP = 92;
-    private static final int SHARE_TOP = 104;
-    private static final int SHARE_ROW_HEIGHT = 12;
-    private static final int BUTTON_BOTTOM_MARGIN = 8;
-    private static final int BUTTON_HEIGHT = 16;
-    private static final int BUTTON_ROW_GAP = 4;
+    private static final int BUTTON_HEIGHT = LostTalesUiFramedButton.HEIGHT;
+    private static final int BUTTON_GAP = WindowStyle.BUTTON_GAP;
+    /** Before a fellowship's row: struck through while the waypoint does not reach it. */
+    private static final OptionGlyph SHARE_GLYPH = OptionGlyph.sprite(
+            LostTalesUiSheet.MEMBERS, LostTalesUiSheet.MEMBERS_HOVER);
 
     enum Action {
         NONE,
@@ -84,57 +97,51 @@ final class LostTalesMapWaypointPrompt {
     }
 
     private final boolean editing;
-    private final LostTalesUiTextField nameField;
-    private final LostTalesUiTextField noteField;
+    private final GuiTextField nameField;
+    private final GuiTextField noteField;
     private final String originalName;
     private List<ShareTarget> shareTargets = Collections.emptyList();
     private String colorName;
     private int shareScroll;
     private ShareTarget pendingShareToggle;
+    private final LostTalesUiButtonMotion confirmMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion travelMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion deleteMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion cancelMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
 
     /** Editor for a waypoint that does not exist yet. */
-    static LostTalesMapWaypointPrompt forCreation(
-            FontRenderer fontRenderer, int screenWidth, int screenHeight) {
-        return new LostTalesMapWaypointPrompt(fontRenderer,
-                screenWidth, screenHeight, false, "", "",
+    static LostTalesMapWaypointPrompt forCreation() {
+        return new LostTalesMapWaypointPrompt(false, "", "",
                 LostTalesCustomWaypointStyle.DEFAULT_PERSONAL_COLOR);
     }
 
     /** Editor for one of the player's existing waypoints. */
     static LostTalesMapWaypointPrompt forEditing(
-            FontRenderer fontRenderer, int screenWidth, int screenHeight,
             String name, String note, String colorName,
             List<ShareTarget> shareTargets) {
         LostTalesMapWaypointPrompt prompt = new LostTalesMapWaypointPrompt(
-                fontRenderer, screenWidth, screenHeight, true,
-                name, note, colorName);
+                true, name, note, colorName);
         prompt.setShareTargets(shareTargets);
         return prompt;
     }
 
     private LostTalesMapWaypointPrompt(
-            FontRenderer fontRenderer, int screenWidth, int screenHeight,
             boolean editing, String name, String note, String colorName) {
         this.editing = editing;
         this.originalName = name == null ? "" : name.trim();
         this.colorName = LostTalesCustomWaypointStyle.isKnownColor(colorName)
                 ? colorName
                 : LostTalesCustomWaypointStyle.DEFAULT_PERSONAL_COLOR;
-        Layout layout = calculateLayout(
-                screenWidth, screenHeight, editing);
-        this.nameField = new LostTalesUiTextField(fontRenderer,
-                layout.nameField.x, layout.nameField.y,
-                layout.nameField.width, layout.nameField.height);
-        this.nameField.setEnableBackgroundDrawing(true);
-        this.nameField.setMaxStringLength(MAX_NAME_LENGTH);
+        this.nameField = WindowFields.make(LostTalesUiCaret.HEIGHT,
+                MAX_NAME_LENGTH, false);
         this.nameField.setText(this.originalName);
         this.nameField.setFocused(true);
-        this.noteField = new LostTalesUiTextField(fontRenderer,
-                layout.noteField.x, layout.noteField.y,
-                layout.noteField.width, layout.noteField.height);
-        this.noteField.setEnableBackgroundDrawing(true);
-        this.noteField.setMaxStringLength(
-                LostTalesCustomWaypointStyle.MAX_NOTE_LENGTH);
+        this.noteField = WindowFields.make(LostTalesUiCaret.HEIGHT,
+                LostTalesCustomWaypointStyle.MAX_NOTE_LENGTH, false);
         this.noteField.setText(note == null ? "" : note);
     }
 
@@ -151,7 +158,7 @@ final class LostTalesMapWaypointPrompt {
         return this.colorName;
     }
 
-    /** The description shown under the name in the waypoint's tooltip. */
+    /** The description shown under the name in the waypoint's card. */
     String getNote() {
         return this.noteField.getText() == null
                 ? "" : this.noteField.getText().trim();
@@ -217,178 +224,223 @@ final class LostTalesMapWaypointPrompt {
         } finally {
             LostTalesMapPopupAnimation.pop();
         }
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
+                | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT);
         LostTalesMapPopupAnimation.push(this, pivotX, pivotY);
         try {
-            LostTalesUiBracketPanel.draw(
-                    layout.x, layout.y, layout.width, layout.height);
-
-        drawCentered(font, layout,
-                I18n.format(this.editing
-                        ? "gui.losttales.map.waypoint.edit_title"
-                        : "gui.losttales.map.waypoint.title"),
-                layout.y + 8, LostTalesColors.TEXT_BRIGHT);
-        if (!this.editing) {
-            drawCentered(font, layout,
-                    I18n.format("gui.losttales.map.waypoint.used",
-                            Integer.valueOf(usedWaypoints),
-                            Integer.valueOf(maxWaypoints)),
-                    layout.y + 19, LostTalesColors.TEXT_MUTED);
-        }
-
-        this.nameField.drawTextBox();
-        this.noteField.drawTextBox();
-        if (getName().length() == 0) {
-            drawFieldHint(font, layout.nameField,
-                    I18n.format("gui.losttales.map.waypoint.name_hint"));
-        }
-        if (getNote().length() == 0) {
-            drawFieldHint(font, layout.noteField,
-                    I18n.format("gui.losttales.map.waypoint.note_hint"));
-        }
-        drawSwatches(minecraft, layout, localMouseX, localMouseY);
-        if (this.editing) {
-            drawShareTargets(font, layout, localMouseX, localMouseY);
-        }
-
-        boolean confirmable = canConfirm(usedWaypoints < maxWaypoints);
-        drawButton(font, layout.confirm,
-                I18n.format(this.editing
-                        ? "gui.losttales.map.waypoint.save"
-                        : "gui.losttales.map.waypoint.create"),
-                layout.confirm.contains(localMouseX, localMouseY),
-                confirmable);
-        if (this.editing) {
-            drawButton(font, layout.travel,
-                    I18n.format("gui.losttales.map.waypoint.travel"),
-                    layout.travel.contains(localMouseX, localMouseY), true);
-            drawButton(font, layout.delete,
-                    I18n.format("gui.losttales.map.waypoint.delete"),
-                    layout.delete.contains(localMouseX, localMouseY), true);
-        }
-        drawButton(font, layout.cancel,
-                I18n.format("gui.losttales.map.waypoint.cancel"),
-                layout.cancel.contains(localMouseX, localMouseY), true);
+            GL11.glDisable(GL11.GL_DEPTH_TEST);
+            int surfaceAlpha = WindowStyle.drawPopupSurface(layout.x,
+                    layout.y, layout.x + layout.width,
+                    layout.y + layout.height, 1.0F);
+            lightChosen(layout, localMouseX, localMouseY, surfaceAlpha);
+            drawContents(minecraft, font, layout, localMouseX, localMouseY,
+                    usedWaypoints, maxWaypoints, surfaceAlpha);
+            WindowStyle.drawPopupEdges(layout.x, layout.y,
+                    layout.x + layout.width, layout.y + layout.height, 1.0F);
         } finally {
             LostTalesMapPopupAnimation.pop();
+            GL11.glPopAttrib();
         }
     }
 
     /**
-     * Placeholder text for an empty field, so its purpose is visible;
-     * fading into the field's end where it is too long (LOOK-37).
+     * Every swatch and fellowship row a press would find lit, the colour
+     * chosen, the fellowships reached and whatever is under the pointer: the
+     * popup's surface recoloured before anything lands on it, a row reaching
+     * the frame taking the ring beside it with it.
      */
-    private static void drawFieldHint(
-            final FontRenderer font, Bounds field, final String hint) {
-        final int x = field.x + 5;
-        final int y = field.y + (field.height - font.FONT_HEIGHT) / 2 + 1;
-        final int dim = LostTalesColors.TEXT_DIM;
-        final int alpha = (dim >>> 24) == 0 ? 255 : dim >>> 24;
-        LostTalesUiCutName.draw(x, font.getStringWidth(hint),
-                Math.max(0, field.width - 10), 0.0F,
-                new LostTalesUiFading.FadingPainter() {
-                    @Override
-                    public void paint(float share) {
-                        int shown = Math.round(alpha * share);
-                        if (shown >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
-                            LostTalesUiInk.beginContent();
-                            font.drawString(hint, x, y,
-                                    LostTalesUiInk.argb(dim, shown));
-                        }
-                    }
-                });
+    private void lightChosen(Layout layout, int mouseX, int mouseY,
+                             int surfaceAlpha) {
+        if (surfaceAlpha <= 0) {
+            return;
+        }
+        for (int index = 0;
+             index < LostTalesCustomWaypointStyle.PALETTE.length;
+             index++) {
+            Bounds swatch = layout.swatch(index);
+            if (LostTalesCustomWaypointStyle.PALETTE[index].equals(
+                    this.colorName) || swatch.contains(mouseX, mouseY)) {
+                recolour(swatch.x, swatch.y, swatch.x + swatch.width,
+                        swatch.y + swatch.height, surfaceAlpha);
+            }
+        }
+        if (!this.editing) {
+            return;
+        }
+        for (int row = 0; row < shownShareRows(); row++) {
+            Bounds bounds = layout.shareRow(row);
+            if (this.shareTargets.get(this.shareScroll + row).isShared()
+                    || bounds.contains(mouseX, mouseY)) {
+                recolour(bounds.x, bounds.y, bounds.x + bounds.width,
+                        bounds.y + bounds.height, surfaceAlpha);
+                WindowStyle.recolourRingBeside(layout.boxLeft(),
+                        layout.boxRight(), bounds.x, bounds.y,
+                        bounds.x + bounds.width, bounds.y + bounds.height,
+                        surfaceAlpha, LostTalesUiTheme.primaryRgb(),
+                        LostTalesUiTheme.secondaryRgb());
+            }
+        }
     }
 
-    /** Words centred in the popup; too long for it, they fill it and fade into its end (LOOK-37). */
-    private static void drawCentered(
-            FontRenderer font, Layout layout, String text, int y,
-            int color) {
-        int room = Math.max(0, layout.width - CONTENT_PADDING * 2);
-        int shown = (int)LostTalesUiCutName.shownWidth(
-                font.getStringWidth(text), room);
-        LostTalesUiCutName.drawShadowed(font, text,
-                layout.x + (layout.width - shown) / 2, y, room, color);
+    private static void recolour(int left, int top, int right, int bottom,
+                                 int surfaceAlpha) {
+        WindowStyle.recolourFlat(left, top, right, bottom, surfaceAlpha,
+                LostTalesUiTheme.primaryRgb(),
+                LostTalesUiTheme.secondaryRgb());
+    }
+
+    private void drawContents(Minecraft minecraft, FontRenderer font,
+                              Layout layout, int mouseX, int mouseY,
+                              int usedWaypoints, int maxWaypoints,
+                              int surfaceAlpha) {
+        int left = layout.contentLeft();
+        int right = layout.contentRight();
+        WindowLists.drawHeading(font, I18n.format(this.editing
+                        ? "gui.losttales.map.waypoint.edit_title"
+                        : "gui.losttales.map.waypoint.title"),
+                left, left, right, layout.headingTop, layout.rowHeight,
+                false, 255);
+        if (!this.editing) {
+            drawNote(font, I18n.format("gui.losttales.map.waypoint.used",
+                    Integer.valueOf(usedWaypoints),
+                    Integer.valueOf(maxWaypoints)), left, layout.noteTop,
+                    right - left);
+        }
+        WindowLists.drawField(font, this.nameField, LostTalesUiSheet.MAP_MARKER,
+                I18n.format("gui.losttales.map.waypoint.name_hint"), left,
+                layout.nameField.y, right, right, 255);
+        WindowLists.drawField(font, this.noteField, LostTalesUiSheet.DRAFT,
+                I18n.format("gui.losttales.map.waypoint.note_hint"), left,
+                layout.noteField.y, right, right, 255);
+        drawSwatches(minecraft, layout);
+        if (this.editing) {
+            drawShareTargets(font, layout, mouseX, mouseY);
+        }
+
+        boolean confirmable = canConfirm(usedWaypoints < maxWaypoints);
+        drawButton(font, layout.confirm, I18n.format(this.editing
+                        ? "gui.losttales.map.waypoint.save"
+                        : "gui.losttales.map.waypoint.create"),
+                layout.confirm.contains(mouseX, mouseY), confirmable, false,
+                this.confirmMotion, surfaceAlpha);
+        if (this.editing) {
+            drawButton(font, layout.travel,
+                    I18n.format("gui.losttales.map.waypoint.travel"),
+                    layout.travel.contains(mouseX, mouseY), true, false,
+                    this.travelMotion, surfaceAlpha);
+            // Deleting the waypoint ends something: red until it lights.
+            drawButton(font, layout.delete,
+                    I18n.format("gui.losttales.map.waypoint.delete"),
+                    layout.delete.contains(mouseX, mouseY), true, true,
+                    this.deleteMotion, surfaceAlpha);
+        }
+        drawButton(font, layout.cancel,
+                I18n.format("gui.losttales.map.waypoint.cancel"),
+                layout.cancel.contains(mouseX, mouseY), true, false,
+                this.cancelMotion, surfaceAlpha);
+    }
+
+    /** A line of words in the aside tone, as a menu's note stands. */
+    private static void drawNote(FontRenderer font, String text, int left,
+                                 int top, int room) {
+        LostTalesUiCutName.drawText(font, text, left, top
+                        + MenuWindow.NOTE_PADDING + LostTalesUiInk.centredStart(
+                                MenuWindow.NOTE_LINE, LostTalesUiInk.CAP_HEIGHT),
+                room, WindowStyle.asideRgb(), 255);
     }
 
     /**
      * Draws the palette as the marker artwork itself, so the player picks the
      * icon they will see on the map rather than a coloured square.
      */
-    private void drawSwatches(Minecraft minecraft, Layout layout,
-                              int mouseX, int mouseY) {
+    private void drawSwatches(Minecraft minecraft, Layout layout) {
         for (int index = 0;
              index < LostTalesCustomWaypointStyle.PALETTE.length;
              index++) {
             Bounds bounds = layout.swatch(index);
-            String color = LostTalesCustomWaypointStyle.PALETTE[index];
-            boolean selected = color.equals(this.colorName);
-            if (selected || bounds.contains(mouseX, mouseY)) {
-                Gui.drawRect(bounds.x, bounds.y,
-                        bounds.x + bounds.width,
-                        bounds.y + bounds.height,
-                        selected
-                                ? LostTalesColors.PANEL_SELECTED
-                                : LostTalesColors.PANEL_HOVER);
-            }
-            if (selected) {
-                Gui.drawRect(bounds.x, bounds.y,
-                        bounds.x + bounds.width, bounds.y + 1,
-                        LostTalesColors.GOLD);
-            }
             LostTalesLotrMapMarkerIconOverlay.renderEditorIconPreview(
                     minecraft, LostTalesCompassMarkerIcon.PERSONAL.name(),
-                    color,
+                    LostTalesCustomWaypointStyle.PALETTE[index],
                     bounds.x + bounds.width / 2.0F,
                     bounds.y + bounds.height / 2.0F);
         }
+        LostTalesUiInk.beginContent();
     }
 
+    /**
+     * The fellowships under their heading, as the legend's kinds stand:
+     * each one's glyph struck through while the waypoint does not reach it,
+     * then its name in ivory, fading into the row's end where it is cut and
+     * sliding along while the pointer rests on it (LOOK-37).
+     */
     private void drawShareTargets(
             FontRenderer font, Layout layout, int mouseX, int mouseY) {
-        font.drawStringWithShadow(
-                I18n.format("gui.losttales.map.waypoint.shared_with"),
-                layout.x + CONTENT_PADDING,
-                layout.y + SHARE_HEADING_TOP,
-                LostTalesColors.TEXT_MUTED);
+        int left = layout.contentLeft();
+        int right = layout.contentRight();
+        String more = this.shareTargets.size() > VISIBLE_FELLOWSHIPS
+                ? I18n.format("gui.losttales.map.waypoint.more_fellowships",
+                        Integer.valueOf(this.shareTargets.size()
+                                - VISIBLE_FELLOWSHIPS))
+                : "";
+        int moreWidth = more.length() == 0 ? 0 : font.getStringWidth(more);
+        int headingRight = moreWidth == 0 ? right
+                : right - moreWidth - BUTTON_GAP;
+        WindowLists.drawHeading(font,
+                I18n.format("gui.losttales.map.waypoint.shared_with"), left,
+                left, headingRight, right, layout.shareHeadingTop,
+                layout.rowHeight, false, 255, null, null, false);
+        if (moreWidth > 0) {
+            LostTalesUiInk.drawText(font, more, right - moreWidth,
+                    WindowLists.headingTextTop(layout.shareHeadingTop,
+                            layout.rowHeight),
+                    WindowStyle.asideRgb(), 255);
+        }
         if (this.shareTargets.isEmpty()) {
-            font.drawStringWithShadow(
-                    I18n.format(
-                            "gui.losttales.map.waypoint.no_fellowships"),
-                    layout.x + CONTENT_PADDING, layout.y + SHARE_TOP,
-                    LostTalesColors.TEXT_DIM);
+            LostTalesUiCutName.drawText(font,
+                    I18n.format("gui.losttales.map.waypoint.no_fellowships"),
+                    left, labelTop(layout.shareRow(0).y, layout.rowHeight),
+                    right - left, WindowStyle.asideRgb(), 255);
             return;
         }
-        int rows = Math.min(VISIBLE_FELLOWSHIPS,
-                this.shareTargets.size());
-        for (int row = 0; row < rows; row++) {
+        int labelLeft = left + TabIcons.SLOT + TabIcons.GAP;
+        for (int row = 0; row < shownShareRows(); row++) {
             ShareTarget target =
                     this.shareTargets.get(this.shareScroll + row);
             Bounds bounds = layout.shareRow(row);
             boolean hovered = bounds.contains(mouseX, mouseY);
-            LostTalesUiBracketPanel.drawRow(
-                    bounds.x, bounds.y, bounds.width, bounds.height,
-                    target.isShared(), hovered);
-            // A name too long for its row fades into the row's end and
-            // slides along under the pointer (LOOK-37).
-            LostTalesUiCutName.drawShadowed(font, target.getName(),
-                    bounds.x + 18,
-                    bounds.y + (bounds.height - font.FONT_HEIGHT) / 2 + 1,
-                    Math.max(0, bounds.width - 24),
-                    target.isShared()
-                            ? LostTalesColors.TEXT_BRIGHT
-                            : LostTalesColors.TEXT_MUTED,
+            int labelTop = labelTop(bounds.y, layout.rowHeight);
+            OptionGlyph glyph = target.isShared() ? SHARE_GLYPH
+                    : SHARE_GLYPH.struck();
+            glyph.draw(left + (TabIcons.SLOT - glyph.width()) / 2,
+                    labelTop + LostTalesUiInk.centredStart(
+                            LostTalesUiInk.CAP_HEIGHT, glyph.height()),
+                    0.0F, 255);
+            LostTalesUiCutName.drawText(font, target.getName(), labelLeft,
+                    labelTop, right - labelLeft, LostTalesUiInk.IVORY, 255,
                     this, Integer.valueOf(this.shareScroll + row), hovered);
         }
-        if (this.shareTargets.size() > VISIBLE_FELLOWSHIPS) {
-            String more = I18n.format(
-                    "gui.losttales.map.waypoint.more_fellowships",
-                    Integer.valueOf(this.shareTargets.size()
-                            - VISIBLE_FELLOWSHIPS));
-            font.drawStringWithShadow(more,
-                    layout.x + layout.width - CONTENT_PADDING
-                            - font.getStringWidth(more),
-                    layout.y + SHARE_HEADING_TOP,
-                    LostTalesColors.TEXT_DIM);
+    }
+
+    /** Where a row's words stand: their capitals centred in the row. */
+    private static int labelTop(int rowY, int rowHeight) {
+        return rowY + LostTalesUiInk.centredStart(rowHeight,
+                LostTalesUiInk.CAP_HEIGHT);
+    }
+
+    private int shownShareRows() {
+        return Math.min(VISIBLE_FELLOWSHIPS, this.shareTargets.size());
+    }
+
+    private static void drawButton(
+            FontRenderer font, Bounds bounds, String label,
+            boolean hovered, boolean enabled, boolean ending,
+            LostTalesUiButtonMotion motion, int surfaceAlpha) {
+        if (bounds.width <= 0 || bounds.height <= 0) {
+            return;
         }
+        WordButton.draw(font, new LostTalesUiHitBox(bounds.x, bounds.y,
+                        bounds.width, bounds.height), label, ending, enabled,
+                hovered, motion, 255, surfaceAlpha);
     }
 
     Action mouseClicked(int screenWidth, int screenHeight,
@@ -405,8 +457,16 @@ final class LostTalesMapWaypointPrompt {
                 this, mouseX, pivotX);
         mouseY = LostTalesMapPopupAnimation.inverseMouseY(
                 this, mouseY, pivotY);
-        this.nameField.mouseClicked(mouseX, mouseY, button);
-        this.noteField.mouseClicked(mouseX, mouseY, button);
+        // One field at a time holds the caret; a press elsewhere leaves it
+        // where it is, so typing always has a field to go to.
+        if (layout.nameField.contains(mouseX, mouseY)) {
+            pressField(this.nameField, this.noteField, mouseX, button);
+            return Action.NONE;
+        }
+        if (layout.noteField.contains(mouseX, mouseY)) {
+            pressField(this.noteField, this.nameField, mouseX, button);
+            return Action.NONE;
+        }
         for (int index = 0;
              index < LostTalesCustomWaypointStyle.PALETTE.length;
              index++) {
@@ -417,9 +477,7 @@ final class LostTalesMapWaypointPrompt {
             }
         }
         if (this.editing) {
-            int rows = Math.min(VISIBLE_FELLOWSHIPS,
-                    this.shareTargets.size());
-            for (int row = 0; row < rows; row++) {
+            for (int row = 0; row < shownShareRows(); row++) {
                 if (layout.shareRow(row).contains(mouseX, mouseY)) {
                     this.pendingShareToggle = this.shareTargets.get(
                             this.shareScroll + row);
@@ -442,6 +500,19 @@ final class LostTalesMapWaypointPrompt {
                     : Action.NONE;
         }
         return Action.NONE;
+    }
+
+    /**
+     * The caret goes where the press landed, kept inside the field so the
+     * field keeps the keys; the other field lets them go.
+     */
+    private static void pressField(GuiTextField pressed, GuiTextField other,
+                                   int mouseX, int button) {
+        other.setFocused(false);
+        pressed.setFocused(true);
+        pressed.mouseClicked(Math.max(pressed.xPosition, Math.min(
+                        pressed.xPosition + pressed.width - 1, mouseX)),
+                pressed.yPosition, button);
     }
 
     /**
@@ -475,9 +546,7 @@ final class LostTalesMapWaypointPrompt {
             }
         }
         if (this.editing) {
-            int rows = Math.min(VISIBLE_FELLOWSHIPS,
-                    this.shareTargets.size());
-            for (int row = 0; row < rows; row++) {
+            for (int row = 0; row < shownShareRows(); row++) {
                 if (layout.shareRow(row).contains(mouseX, mouseY)) {
                     return true;
                 }
@@ -541,142 +610,139 @@ final class LostTalesMapWaypointPrompt {
         return Math.max(0, Math.min(maximum, scroll));
     }
 
-    private static void drawButton(
-            FontRenderer font, Bounds bounds, String label,
-            boolean hovered, boolean enabled) {
-        if (hovered && enabled) {
-            Gui.drawRect(bounds.x, bounds.y,
-                    bounds.x + bounds.width,
-                    bounds.y + bounds.height,
-                    LostTalesColors.PANEL_HOVER);
-            Gui.drawRect(bounds.x, bounds.y,
-                    bounds.x + bounds.width, bounds.y + 1,
-                    LostTalesColors.BORDER);
-        }
-        int room = Math.max(0, bounds.width - 6);
-        int shown = (int)LostTalesUiCutName.shownWidth(
-                font.getStringWidth(label), room);
-        int color = enabled
-                ? hovered
-                        ? LostTalesColors.TEXT_BRIGHT
-                        : LostTalesColors.TEXT
-                : LostTalesColors.TEXT_DIM;
-        // A label too long for its button fades into the button's end and
-        // slides along under the pointer (LOOK-37).
-        LostTalesUiCutName.drawShadowed(font, label,
-                bounds.x + (bounds.width - shown) / 2,
-                bounds.y + (bounds.height - font.FONT_HEIGHT) / 2, room,
-                color, BUTTON_LABELS, label, hovered && enabled);
-    }
-
-    /** What the popup's button labels name themselves to as cut names. */
-    private static final Object BUTTON_LABELS = new Object();
-
+    /**
+     * The popup in the middle of a map {@code screenWidth} by
+     * {@code screenHeight}, top down: its heading, the count of waypoints
+     * used while creating, the two fields, the colours, while editing the
+     * fellowships under their heading, then the buttons at its foot, what
+     * the waypoint can do above what happens to it.
+     */
     static Layout calculateLayout(
             int screenWidth, int screenHeight, boolean editing) {
-        int panelHeight = editing
-                ? EDIT_PANEL_HEIGHT : CREATE_PANEL_HEIGHT;
+        int rowHeight = MenuWindow.rowHeight();
+        int fieldHeight = WindowLists.fieldHeight();
+        int buttonRows = editing ? 2 : 1;
+        int natural = FRAME * 2 + PADDING_Y * 3 + rowHeight
+                + (editing ? 0 : NOTE_HEIGHT) + fieldHeight * 2
+                + SWATCH_SIZE
+                + (editing ? PADDING_Y + rowHeight * (1 + VISIBLE_FELLOWSHIPS)
+                        : 0)
+                + PADDING_Y + buttonRows * BUTTON_HEIGHT
+                + (buttonRows - 1) * BUTTON_GAP;
         int width = Math.min(MAX_WIDTH,
                 Math.max(0, screenWidth - SCREEN_MARGIN * 2));
-        int height = Math.min(panelHeight,
+        int height = Math.min(natural,
                 Math.max(0, screenHeight - SCREEN_MARGIN * 2));
-        int x = Math.max(0, (screenWidth - width) / 2);
-        int y = Math.max(0, (screenHeight - height) / 2);
-        int contentWidth = Math.max(0, width - CONTENT_PADDING * 2);
-        Bounds nameField = new Bounds(
-                x + CONTENT_PADDING,
-                y + Math.min(NAME_TOP, Math.max(0, height - 1)),
-                contentWidth,
-                Math.min(FIELD_HEIGHT,
-                        Math.max(0, height - NAME_TOP)));
-        Bounds noteField = new Bounds(
-                x + CONTENT_PADDING,
-                y + Math.min(NOTE_TOP, Math.max(0, height - 1)),
-                contentWidth,
-                Math.min(FIELD_HEIGHT,
-                        Math.max(0, height - NOTE_TOP)));
+        int x = Math.max(0, LostTalesUiInk.centredStart(screenWidth, width));
+        int y = Math.max(0, LostTalesUiInk.centredStart(screenHeight,
+                height));
+        int contentLeft = x + FRAME + PADDING_X;
+        int contentWidth = Math.max(0, width - (FRAME + PADDING_X) * 2);
+
+        int headingTop = y + FRAME + PADDING_Y;
+        int noteTop = headingTop + rowHeight;
+        int nameTop = noteTop + (editing ? 0 : NOTE_HEIGHT);
+        Bounds nameField = new Bounds(contentLeft, nameTop, contentWidth,
+                fieldHeight);
+        Bounds noteField = new Bounds(contentLeft, nameTop + fieldHeight,
+                contentWidth, fieldHeight);
         int swatchCount = LostTalesCustomWaypointStyle.PALETTE.length;
         int swatchWidth = swatchCount == 0 ? 0
                 : Math.min(contentWidth, SWATCH_SIZE * swatchCount)
                         / swatchCount;
         Bounds swatchRow = new Bounds(
-                x + (width - swatchWidth * swatchCount) / 2,
-                y + Math.min(SWATCH_TOP, Math.max(0, height - 1)),
-                swatchWidth * swatchCount,
-                Math.min(SWATCH_SIZE,
-                        Math.max(0, height - SWATCH_TOP)));
-        Bounds shareRows = new Bounds(
-                x + CONTENT_PADDING,
-                y + Math.min(SHARE_TOP, Math.max(0, height - 1)),
-                contentWidth,
-                Math.min(SHARE_ROW_HEIGHT * VISIBLE_FELLOWSHIPS,
-                        Math.max(0, height - SHARE_TOP)));
+                x + LostTalesUiInk.centredStart(width,
+                        swatchWidth * swatchCount),
+                noteField.y + fieldHeight + PADDING_Y,
+                swatchWidth * swatchCount, SWATCH_SIZE);
+        int shareHeadingTop = swatchRow.y + SWATCH_SIZE + PADDING_Y;
+        // The fellowships' rows run across the whole popup inside its
+        // frame, as a list's rows do, so a lit one reaches the frame.
+        Bounds shareRows = new Bounds(x + FRAME,
+                shareHeadingTop + rowHeight, Math.max(0, width - FRAME * 2),
+                editing ? rowHeight * VISIBLE_FELLOWSHIPS : 0);
 
-        // Editing has four actions, which is more than one row can carry
-        // legibly: what the waypoint can do sits above what happens to it.
-        // Dropping the fellowship marker on it is not offered here — travelling to
-        // it opens the popup that already carries that action.
         int lowerY = Math.max(y,
-                y + height - BUTTON_BOTTOM_MARGIN - BUTTON_HEIGHT);
-        int lowerHeight = Math.max(0,
-                y + height - BUTTON_BOTTOM_MARGIN - lowerY);
-        int upperY = Math.max(y,
-                lowerY - BUTTON_ROW_GAP - BUTTON_HEIGHT);
-        int upperHeight = editing
-                ? Math.max(0, lowerY - BUTTON_ROW_GAP - upperY) : 0;
-        Bounds travel = new Bounds(x + CONTENT_PADDING, upperY,
-                editing ? contentWidth : 0, upperHeight);
+                y + height - FRAME - PADDING_Y - BUTTON_HEIGHT);
+        int upperY = Math.max(y, lowerY - BUTTON_GAP - BUTTON_HEIGHT);
+        Bounds travel = new Bounds(contentLeft, upperY,
+                editing ? contentWidth : 0, editing ? BUTTON_HEIGHT : 0);
         int lowerSlots = editing ? 3 : 2;
-        int slotWidth = contentWidth / lowerSlots;
-        Bounds confirm = new Bounds(x + CONTENT_PADDING, lowerY,
-                slotWidth, lowerHeight);
-        Bounds delete = new Bounds(
-                x + CONTENT_PADDING + slotWidth, lowerY,
-                editing ? slotWidth : 0, lowerHeight);
-        int cancelX = x + CONTENT_PADDING + slotWidth
-                + (editing ? slotWidth : 0);
+        int slotWidth = Math.max(0, (contentWidth
+                - BUTTON_GAP * (lowerSlots - 1)) / lowerSlots);
+        Bounds confirm = new Bounds(contentLeft, lowerY, slotWidth,
+                BUTTON_HEIGHT);
+        Bounds delete = new Bounds(confirm.x + slotWidth + BUTTON_GAP, lowerY,
+                editing ? slotWidth : 0, BUTTON_HEIGHT);
+        int cancelX = editing ? delete.x + slotWidth + BUTTON_GAP
+                : confirm.x + slotWidth + BUTTON_GAP;
         Bounds cancel = new Bounds(cancelX, lowerY,
-                x + CONTENT_PADDING + contentWidth - cancelX,
-                lowerHeight);
-        return new Layout(x, y, width, height, nameField, noteField,
-                swatchRow, swatchWidth, shareRows,
-                travel, confirm, delete, cancel);
+                contentLeft + contentWidth - cancelX, BUTTON_HEIGHT);
+        return new Layout(x, y, width, height, rowHeight, headingTop,
+                noteTop, nameField, noteField, swatchRow, swatchWidth,
+                shareHeadingTop, shareRows, travel, confirm, delete, cancel);
     }
 
     static final class Layout {
+        /** The popup's footprint, the frame inside it. */
         final int x;
         final int y;
         final int width;
         final int height;
+        final int rowHeight;
+        final int headingTop;
+        final int noteTop;
         final Bounds nameField;
         final Bounds noteField;
         final Bounds swatchRow;
         final int swatchWidth;
+        final int shareHeadingTop;
         final Bounds shareRows;
         final Bounds travel;
         final Bounds confirm;
         final Bounds delete;
         final Bounds cancel;
 
-        private Layout(int x, int y, int width, int height,
-                       Bounds nameField, Bounds noteField,
-                       Bounds swatchRow,
-                       int swatchWidth, Bounds shareRows,
-                       Bounds travel,
+        private Layout(int x, int y, int width, int height, int rowHeight,
+                       int headingTop, int noteTop, Bounds nameField,
+                       Bounds noteField, Bounds swatchRow, int swatchWidth,
+                       int shareHeadingTop, Bounds shareRows, Bounds travel,
                        Bounds confirm, Bounds delete, Bounds cancel) {
             this.x = x;
             this.y = y;
             this.width = width;
             this.height = height;
+            this.rowHeight = rowHeight;
+            this.headingTop = headingTop;
+            this.noteTop = noteTop;
             this.nameField = nameField;
             this.noteField = noteField;
             this.swatchRow = swatchRow;
             this.swatchWidth = swatchWidth;
+            this.shareHeadingTop = shareHeadingTop;
             this.shareRows = shareRows;
             this.travel = travel;
             this.confirm = confirm;
             this.delete = delete;
             this.cancel = cancel;
+        }
+
+        /** The box inside the frame, which the lit rows run across. */
+        int boxLeft() {
+            return this.x + FRAME;
+        }
+
+        int boxRight() {
+            return this.x + this.width - FRAME;
+        }
+
+        /** What the popup holds stands the menus' padding inside the box. */
+        int contentLeft() {
+            return boxLeft() + PADDING_X;
+        }
+
+        int contentRight() {
+            return boxRight() - PADDING_X;
         }
 
         Bounds swatch(int index) {
@@ -688,11 +754,11 @@ final class LostTalesMapWaypointPrompt {
 
         Bounds shareRow(int row) {
             return new Bounds(this.shareRows.x,
-                    this.shareRows.y + SHARE_ROW_HEIGHT * row,
+                    this.shareRows.y + this.rowHeight * row,
                     this.shareRows.width,
-                    Math.min(SHARE_ROW_HEIGHT,
+                    Math.min(this.rowHeight,
                             Math.max(0, this.shareRows.height
-                                    - SHARE_ROW_HEIGHT * row)));
+                                    - this.rowHeight * row)));
         }
     }
 
@@ -710,9 +776,8 @@ final class LostTalesMapWaypointPrompt {
         }
 
         boolean contains(int pointX, int pointY) {
-            return this.width > 0 && this.height > 0
-                    && pointX >= this.x && pointX < this.x + this.width
-                    && pointY >= this.y && pointY < this.y + this.height;
+            return LostTalesUiHitBox.contains(pointX, pointY, this.x, this.y,
+                    this.width, this.height);
         }
     }
 }

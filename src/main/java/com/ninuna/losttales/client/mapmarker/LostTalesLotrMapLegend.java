@@ -6,7 +6,6 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.OptionGlyph;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.WheelStep;
-import com.ninuna.losttales.client.window.WindowDrawing;
 import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
@@ -14,7 +13,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
-import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.List;
@@ -111,16 +109,16 @@ final class LostTalesLotrMapLegend {
         beginUntranslatedRender(gui, pivotX, pivotY);
         try {
             GL11.glDisable(GL11.GL_DEPTH_TEST);
-            drawSurface(minecraft, layout, scroll, categories, hovered);
+            drawSurface(layout, scroll, categories, hovered);
             drawRows(minecraft, font, layout, scroll, categories, hovered);
             // The fades hang from the frame on both edges.
             WindowLists.drawScroll(layout.boxLeft(), layout.boxTop(),
                     layout.boxRight(), layout.boxBottom(), layout.rowsTop(),
                     layout.rowsBottom(), scroll.shown, layout.maxScroll(),
                     255);
-            LostTalesUiWindowFrame.drawEdges(layout.boxLeft(),
-                    layout.boxTop(), layout.boxRight(), layout.boxBottom(),
-                    255);
+            WindowStyle.drawPopupEdges(layout.boxLeft() - FRAME,
+                    layout.boxTop() - FRAME, layout.boxRight() + FRAME,
+                    layout.boxBottom() + FRAME, 1.0F);
         } finally {
             endUntranslatedRender();
         }
@@ -135,22 +133,15 @@ final class LostTalesLotrMapLegend {
      * recoloured, cut to the band the rows glide in, the ring beside it
      * with it.
      */
-    private static void drawSurface(Minecraft minecraft, Layout layout,
-                                    Scroll scroll,
+    private static void drawSurface(Layout layout, Scroll scroll,
                                     List<LostTalesMapLegendCategory> categories,
                                     int hovered) {
         float left = layout.boxLeft();
         float top = layout.boxTop();
         float right = layout.boxRight();
         float bottom = layout.boxBottom();
-        LostTalesUiHitBox stands = new LostTalesUiHitBox(left, top,
-                right - left, bottom - top);
-        WindowDrawing.cutBehind(stands, 1.0F);
-        WindowDrawing.softenBehind(stands, 1.0F);
-        int surface = WindowStyle.insetArgb(WindowStyle.opacity(minecraft));
-        int surfaceAlpha = surface >>> 24;
-        LostTalesUiInk.fillRect(left, top, right, bottom, surface);
-        LostTalesUiWindowFrame.drawSurface(left, top, right, bottom, surface);
+        int surfaceAlpha = WindowStyle.drawPopupSurface(left - FRAME,
+                top - FRAME, right + FRAME, bottom + FRAME, 1.0F);
         int listTop = listTop(layout, scroll.shown);
         for (int index = 0; index < categories.size(); index++) {
             if (index != hovered && !LostTalesMapLegendRegistry

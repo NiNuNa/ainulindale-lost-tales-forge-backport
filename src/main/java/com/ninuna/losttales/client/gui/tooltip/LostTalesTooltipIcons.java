@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.gui.tooltip;
 
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.client.Minecraft;
@@ -84,17 +85,29 @@ public final class LostTalesTooltipIcons {
         return marker - CODE_BASE - CODE_BIAS;
     }
 
-    /** The drawn width of one icon, in the tooltip's own pixels. */
+    /**
+     * The room one icon takes, in the tooltip's own pixels: the key a size
+     * smaller than the GUI's, as the windows draw theirs, so it stands no
+     * taller than the words beside it; the text after it starts on the
+     * next whole pixel.
+     */
     static int measureIcon(Minecraft minecraft, int keyCode) {
-        return LostTalesInputIconRenderer.measureInput(minecraft,
-                LostTalesInputBinding.getType(keyCode), keyCode, 1.0F);
+        return (int)Math.ceil(LostTalesInputIconRenderer.windowWidth(
+                minecraft, LostTalesInputBinding.getType(keyCode), keyCode));
     }
 
+    /**
+     * One icon from {@code x}, centred on the capitals of the words drawn
+     * from {@code textY}; the room it takes.
+     */
     static int drawIcon(
-            Minecraft minecraft, int keyCode, float x, float y) {
-        return LostTalesInputIconRenderer.drawInput(minecraft,
-                LostTalesInputBinding.getType(keyCode), keyCode,
-                x, y, 1.0F);
+            Minecraft minecraft, int keyCode, float x, int textY) {
+        LostTalesInputIconRenderer.drawInput(minecraft,
+                LostTalesInputBinding.getType(keyCode), keyCode, x,
+                LostTalesInputIconRenderer.windowTop(textY,
+                        LostTalesUiInk.CAP_HEIGHT + LostTalesUiInk.SHADOW_OFFSET),
+                LostTalesInputIconRenderer.windowScale());
+        return measureIcon(minecraft, keyCode);
     }
 
     /** Width of a line with its icons drawn and their labels left out. */

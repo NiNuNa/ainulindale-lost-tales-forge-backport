@@ -17,19 +17,12 @@ import net.minecraft.client.gui.GuiTextField;
  * stands in. Everything else — typing, selecting, the clipboard — is
  * vanilla's.</p>
  *
- * <p>With its background switched on it stands in a box of its own, as
- * vanilla's field does, in the palette's panel and border tones, and
- * its text sits inside the box where vanilla's would.</p>
- *
  * <p>The field scrolls itself rather than reading vanilla's private
  * offset: it keeps the caret in view and never scrolls past the text's
  * end, which is all a short field needs, and a click lands on the
  * character drawn under it.</p>
  */
 public class LostTalesUiTextField extends GuiTextField {
-
-    /** How far vanilla's field sets its text in from the box around it. */
-    private static final int BOX_INSET = 4;
 
     private final FontRenderer font;
     /** The first character drawn; kept so the caret stays in view. */
@@ -65,18 +58,6 @@ public class LostTalesUiTextField extends GuiTextField {
         this.caretNanos = System.nanoTime();
     }
 
-    /** Where the text starts across: inside the box when there is one. */
-    private int textLeft() {
-        return getEnableBackgroundDrawing() ? this.xPosition + BOX_INSET
-                : this.xPosition;
-    }
-
-    /** Where the text's top stands: centred in the box when there is one. */
-    private int textTop() {
-        return getEnableBackgroundDrawing()
-                ? this.yPosition + (this.height - 8) / 2 : this.yPosition;
-    }
-
     /** Words shown faintly while the field is empty, an example the first key typed replaces; none while null. */
     private String hint;
 
@@ -94,16 +75,13 @@ public class LostTalesUiTextField extends GuiTextField {
         if (!getVisible()) {
             return;
         }
-        if (getEnableBackgroundDrawing()) {
-            drawBox();
-        }
         String text = getText();
         keepCaretInView(text);
         String visible = this.font.trimStringToWidth(
                 text.substring(Math.min(this.scroll, text.length())),
                 getWidth());
-        int left = textLeft();
-        int top = textTop();
+        int left = this.xPosition;
+        int top = this.yPosition;
 
         int caret = Math.max(0,
                 Math.min(visible.length(), getCursorPosition() - this.scroll));
@@ -158,7 +136,7 @@ public class LostTalesUiTextField extends GuiTextField {
         String visible = this.font.trimStringToWidth(text.substring(from),
                 getWidth());
         setCursorPosition(from + this.font.trimStringToWidth(visible,
-                Math.max(0, mouseX - textLeft())).length());
+                Math.max(0, mouseX - this.xPosition)).length());
     }
 
     /**
@@ -215,28 +193,6 @@ public class LostTalesUiTextField extends GuiTextField {
                 text.substring(this.scroll - 1)) <= getWidth()) {
             this.scroll--;
         }
-    }
-
-    /**
-     * The box a field with its background on stands in, where vanilla's
-     * stands: a one-pixel frame in the border tone round the field and
-     * the panel's surface inside it, side by side rather than one over
-     * the other.
-     */
-    private void drawBox() {
-        int left = this.xPosition - 1;
-        int top = this.yPosition - 1;
-        int right = this.xPosition + this.width + 1;
-        int bottom = this.yPosition + this.height + 1;
-        int border = LostTalesColors.BORDER;
-        Gui.drawRect(left, top, right, top + 1, border);
-        Gui.drawRect(left, bottom - 1, right, bottom, border);
-        Gui.drawRect(left, top + 1, left + 1, bottom - 1, border);
-        Gui.drawRect(right - 1, top + 1, right, bottom - 1, border);
-        Gui.drawRect(this.xPosition, this.yPosition,
-                this.xPosition + this.width, this.yPosition + this.height,
-                LostTalesColors.PANEL_FILL);
-        LostTalesUiInk.beginContent();
     }
 
     private void drawSelection(int from, int to, int textTop, int alpha) {

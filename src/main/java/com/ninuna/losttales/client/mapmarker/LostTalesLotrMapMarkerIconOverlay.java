@@ -23,7 +23,9 @@ import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import com.ninuna.losttales.fellowship.sync.FellowshipTrackingSnapshot;
 import cpw.mods.fml.common.FMLLog;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesUiBracketPanel;
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -141,10 +143,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static final float NATIVE_WAYPOINT_HOVER_SCALE =
             highlightedSize(NATIVE_WAYPOINT_DRAW_SIZE)
                     / NATIVE_WAYPOINT_DRAW_SIZE;
-    /** Gap between a selected marker's artwork and the brackets around it. */
+    /** Gap between a selected marker's artwork and the frame around it. */
     private static final float SELECTED_FRAME_PADDING = 2.0F;
-    /** Length of each bracket arm, in GUI pixels. */
-    private static final int SELECTED_FRAME_ARM = 3;
     private static Method transformCoordsMethod;
     private static Field mapXMinField;
     private static Field mapXMaxField;
@@ -2552,9 +2552,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     /**
      * The rectangle around the marker a popup is asking about.
      *
-     * <p>One answer serves both the brackets drawn on the map and the opening
+     * <p>One answer serves both the frame drawn on the map and the opening
      * the popup leaves in its shade, so the marker that is picked out is
-     * exactly the marker that stays lit.</p>
+     * exactly the marker that stays lit. It is never smaller than a framed
+     * button, the least the frame's corners can be drawn round.</p>
      *
      * @param result {@code {x, y, width, height}}
      * @return false when nothing is selected or it cannot be located
@@ -2603,29 +2604,37 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 return false;
             }
             float padding = SELECTED_FRAME_PADDING;
-            result[0] = Math.round(left - padding);
-            result[1] = Math.round(top - padding);
-            result[2] = Math.max(1,
-                    Math.round(right + padding) - result[0]);
-            result[3] = Math.max(1,
-                    Math.round(bottom + padding) - result[1]);
+            int least = LostTalesUiFramedButton.MIN_SIZE;
+            int x = Math.round(left - padding);
+            int y = Math.round(top - padding);
+            int width = Math.round(right + padding) - x;
+            int height = Math.round(bottom + padding) - y;
+            result[0] = width < least ? x - (least - width) / 2 : x;
+            result[1] = height < least ? y - (least - height) / 2 : y;
+            result[2] = Math.max(least, width);
+            result[3] = Math.max(least, height);
             return true;
         } catch (Throwable ignored) {
             return false;
         }
     }
 
-    /** Draws the brackets around whatever {@link #setSelectedMarkerFrame} named. */
+    /**
+     * Draws the window frame's edges round whatever
+     * {@link #setSelectedMarkerFrame} named, their ink on the rectangle's
+     * outermost pixels, as every box of the mod is framed.
+     */
     public static void renderSelectedMarkerFrame(LOTRGuiMap gui) {
         int[] frame = new int[4];
         if (!getSelectedMarkerFrame(gui, frame)) {
             return;
         }
         try {
-            LostTalesUiBracketPanel.drawBrackets(
-                    frame[0], frame[1], frame[2], frame[3],
-                    SELECTED_FRAME_ARM,
-                    LostTalesColors.BORDER);
+            int edge = LostTalesUiWindowFrame.EDGE_WIDTH;
+            LostTalesUiInk.beginContent();
+            LostTalesUiWindowFrame.drawEdges(frame[0] + edge,
+                    frame[1] + edge, frame[0] + frame[2] - edge,
+                    frame[1] + frame[3] - edge, 255);
         } catch (Throwable ignored) {
             // A selection frame is decoration; never take the map down for it.
         }

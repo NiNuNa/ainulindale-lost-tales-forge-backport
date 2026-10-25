@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.client.Minecraft;
@@ -30,6 +31,12 @@ final class LostTalesMapMoveMarkerPrompt {
     private final String question;
     /** Whether Move It does something: a place was picked, or one is picked next. */
     private final boolean canMove;
+    private final LostTalesUiButtonMotion moveMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion leaveMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion removeMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
 
     LostTalesMapMoveMarkerPrompt(String question, boolean canMove) {
         this.question = question == null ? "" : question;
@@ -62,13 +69,16 @@ final class LostTalesMapMoveMarkerPrompt {
             LostTalesMapChoicePrompt.drawButton(font, layout.first,
                     I18n.format("gui.losttales.map.move_marker.move"),
                     layout.first.contains(localMouseX, localMouseY),
-                    this.canMove);
+                    this.canMove, false, this.moveMotion);
             LostTalesMapChoicePrompt.drawButton(font, layout.second,
                     I18n.format("gui.losttales.map.move_marker.leave"),
-                    layout.second.contains(localMouseX, localMouseY), true);
+                    layout.second.contains(localMouseX, localMouseY), true,
+                    false, this.leaveMotion);
+            // Removing the marker ends something: red until it lights.
             LostTalesMapChoicePrompt.drawButton(font, layout.third,
                     I18n.format("gui.losttales.map.move_marker.remove"),
-                    layout.third.contains(localMouseX, localMouseY), true);
+                    layout.third.contains(localMouseX, localMouseY), true,
+                    true, this.removeMotion);
         } finally {
             LostTalesMapPopupAnimation.pop();
         }

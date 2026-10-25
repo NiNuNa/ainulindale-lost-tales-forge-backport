@@ -2717,8 +2717,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         this.editedWaypoint = null;
-        this.waypointPrompt = LostTalesMapWaypointPrompt.forCreation(
-                this.mc.fontRenderer, this.width, this.height);
+        this.waypointPrompt = LostTalesMapWaypointPrompt.forCreation();
         this.mapLegendOpen = false;
         LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
     }
@@ -2752,7 +2751,6 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         }
         this.editedWaypoint = custom;
         this.waypointPrompt = LostTalesMapWaypointPrompt.forEditing(
-                this.mc.fontRenderer, this.width, this.height,
                 name,
                 LostTalesCustomWaypointStyle.getNote(name),
                 LostTalesCustomWaypointStyle.getColor(name, false),

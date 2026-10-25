@@ -426,6 +426,48 @@ public final class WindowStyle {
         drawPopup(left, top, right, bottom, opacity, 0.0F, 0.0F, 0.0F, 0.0F);
     }
 
+    /**
+     * A popup's surface without its edges, for a popup that lights more
+     * than one row: what lies behind cut away, the world under it
+     * softened, the surface and the frame's ring, as {@link #drawPopup}
+     * lays them. Each lit row is then the surface recoloured
+     * ({@link #recolourFlat}, the ring beside it with it,
+     * {@link #recolourRingBeside}) before anything lands on it, and
+     * {@link #drawPopupEdges} lays the frame's edges last. Answers the
+     * surface's alpha, which a recolour takes; 0 where nothing was drawn.
+     */
+    public static int drawPopupSurface(float left, float top, float right,
+                                       float bottom, float opacity) {
+        float share = Math.max(0.0F, Math.min(1.0F, opacity));
+        float boxLeft = left + POPUP_FRAME;
+        float boxTop = top + POPUP_FRAME;
+        float boxRight = right - POPUP_FRAME;
+        float boxBottom = bottom - POPUP_FRAME;
+        int surfaceAlpha = Math.round(INSET_ALPHA * share
+                * opacity(Minecraft.getMinecraft()));
+        if (surfaceAlpha < LostTalesUiInk.MIN_VISIBLE_ALPHA || boxRight <= boxLeft
+                || boxBottom <= boxTop) {
+            return 0;
+        }
+        LostTalesUiHitBox stands = new LostTalesUiHitBox(boxLeft, boxTop,
+                boxRight - boxLeft, boxBottom - boxTop);
+        WindowDrawing.cutBehind(stands, share);
+        WindowDrawing.softenBehind(stands, share);
+        int surface = LostTalesUiInk.argb(LostTalesUiTheme.primaryRgb(), surfaceAlpha);
+        LostTalesUiInk.fillRect(boxLeft, boxTop, boxRight, boxBottom, surface);
+        LostTalesUiWindowFrame.drawSurface(boxLeft, boxTop, boxRight,
+                boxBottom, surface);
+        return surfaceAlpha;
+    }
+
+    /** The frame's edges of a popup {@link #drawPopupSurface} laid. */
+    public static void drawPopupEdges(float left, float top, float right,
+                                      float bottom, float opacity) {
+        LostTalesUiWindowFrame.drawEdges(left + POPUP_FRAME, top + POPUP_FRAME,
+                right - POPUP_FRAME, bottom - POPUP_FRAME,
+                Math.round(255.0F * Math.max(0.0F, Math.min(1.0F, opacity))));
+    }
+
     /** The widest a tip grows before its words go on to another line. */
     public static final int TIP_MAX_WIDTH = 220;
 

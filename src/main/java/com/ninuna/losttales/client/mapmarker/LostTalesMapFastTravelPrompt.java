@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.client.Minecraft;
@@ -34,6 +35,16 @@ final class LostTalesMapFastTravelPrompt {
      * offers a movement that does nothing.
      */
     private final boolean hasAlternatives;
+    private final LostTalesUiButtonMotion yesMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion noMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion markerMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion previousMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion nextMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
 
     LostTalesMapFastTravelPrompt(
             String destinationName, String blockedReasonKey,
@@ -95,23 +106,26 @@ final class LostTalesMapFastTravelPrompt {
             LostTalesMapChoicePrompt.drawButton(font, layout.first,
                     I18n.format("gui.losttales.map.fast_travel.yes"),
                     layout.first.contains(localMouseX, localMouseY),
-                    isTravelOffered());
+                    isTravelOffered(), false, this.yesMotion);
             LostTalesMapChoicePrompt.drawButton(font, layout.second,
                     I18n.format("gui.losttales.map.fast_travel.no"),
-                    layout.second.contains(localMouseX, localMouseY), true);
+                    layout.second.contains(localMouseX, localMouseY), true,
+                    false, this.noMotion);
             LostTalesMapChoicePrompt.drawButton(font, layout.third,
                     I18n.format(
                             "gui.losttales.map.fast_travel.place_marker"),
                     layout.third.contains(localMouseX, localMouseY),
-                    canPlaceMarker);
+                    canPlaceMarker, false, this.markerMotion);
             if (this.hasAlternatives) {
                 LostTalesMapChoicePrompt.drawStepArrow(
                         layout.previous, true,
                         layout.previous.contains(
-                                localMouseX, localMouseY));
+                                localMouseX, localMouseY),
+                        this.previousMotion);
                 LostTalesMapChoicePrompt.drawStepArrow(
                         layout.next, false,
-                        layout.next.contains(localMouseX, localMouseY));
+                        layout.next.contains(localMouseX, localMouseY),
+                        this.nextMotion);
             }
         } finally {
             LostTalesMapPopupAnimation.pop();

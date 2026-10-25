@@ -14,7 +14,8 @@ import net.minecraft.item.ItemStack;
 
 /**
  * A vessel as an item (CONTENT-09): empty ones stack to 16; one holding
- * items stands alone in its slot and lists what it holds in its tooltip.
+ * items stands alone in its slot and shows its slots, with what it holds
+ * in them, in its tooltip.
  */
 public class LostTalesItemBlockUrn extends LostTalesItemBlockBase {
 
@@ -34,7 +35,7 @@ public class LostTalesItemBlockUrn extends LostTalesItemBlockBase {
     public void addInformation(ItemStack itemStack, EntityPlayer player, List list, boolean advancedTooltips) {
         if (itemStack != null && this.field_150939_a instanceof LostTalesBlockUrnBase
                 && VesselContents.holdsItems(itemStack.getTagCompound())) {
-            LostTalesClientUtil.addVesselContents(list, VesselItems.contents(itemStack,
+            LostTalesClientUtil.addVesselContents(list, VesselItems.slots(itemStack,
                     ((LostTalesBlockUrnBase) this.field_150939_a).getInventorySlots()));
         }
         super.addInformation(itemStack, player, list, advancedTooltips);

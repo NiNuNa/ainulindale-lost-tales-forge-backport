@@ -17,13 +17,13 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Mouse;
@@ -363,7 +363,11 @@ public final class Stage extends ScreenPart {
         tessellator.addVertex(right, bottom, 0.0D);
     }
 
-    /** Who stands on the stage, along its foot: the name on the left, the facts on the right. */
+    /**
+     * Who stands on the stage, along its foot, under the windows' rule: the
+     * name in the accent after its label on the left, the facts in ivory on
+     * the right, each fading into its end where it is too long (LOOK-37).
+     */
     private void drawNameplate(String name, String facts) {
         if (name == null || name.length() == 0) {
             return;
@@ -373,26 +377,25 @@ public final class Stage extends ScreenPart {
         int y = this.layout.getBottom() - 11;
         int left = this.layout.getLeft() + 6;
         int right = this.layout.getRight() - 6;
-        String label = I18n.format("gui.losttales.character.name")
-                .toUpperCase(Locale.ENGLISH);
+        String label = I18n.format("gui.losttales.character.name");
         int labelWidth = font.getStringWidth(label);
         int factsWidth = font.getStringWidth(shownFacts);
         int nameRoom = Math.max(30, right - left - labelWidth - factsWidth - 24);
         int shownName = (int)LostTalesUiCutName.shownWidth(
                 font.getStringWidth(name), nameRoom);
         int factsRoom = Math.max(20, right - left - labelWidth - 6 - shownName - 12);
-        Gui.drawRect(left, y - 4, right, y - 3, LostTalesColors.BORDER_DIM);
+        LostTalesUiRules.drawRule(left, right, y - 4, y - 3,
+                WindowStyle.DIVIDER_ALPHA);
         LostTalesUiInk.beginContent();
-        font.drawStringWithShadow(label, left, y, LostTalesColors.TEXT_MUTED);
-        // The name and the facts fade into their ends where they are too
-        // long for the stage's foot (LOOK-37).
-        LostTalesUiCutName.drawShadowed(font, name, left + labelWidth + 6, y,
-                nameRoom, LostTalesColors.GOLD);
+        LostTalesUiInk.drawText(font, label, left, y, WindowStyle.asideRgb(),
+                255);
+        LostTalesUiCutName.drawText(font, name, left + labelWidth + 6, y,
+                nameRoom, LostTalesUiTheme.accentRgb(), 255);
         if (shownFacts.length() > 0) {
-            LostTalesUiCutName.drawShadowed(font, shownFacts,
+            LostTalesUiCutName.drawText(font, shownFacts,
                     right - (int)LostTalesUiCutName.shownWidth(factsWidth,
-                            factsRoom), y, factsRoom,
-                    LostTalesColors.TEXT_BRIGHT);
+                            factsRoom), y, factsRoom, LostTalesUiInk.IVORY,
+                    255);
         }
     }
 

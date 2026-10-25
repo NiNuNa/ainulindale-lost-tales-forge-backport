@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.motion;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.ArrayList;
 import java.util.List;
@@ -131,8 +133,8 @@ final class MotionLabSample {
                         this.restUntil = 0L;
                     }
                 }
-                LostTalesUiInk.fillRect(-span, 0.0F, span, 1.0F,
-                        faded(LostTalesColors.BORDER_DIM, alpha));
+                LostTalesUiRules.drawRule(-span, span, 0.0F, 1.0F,
+                        Math.round(WindowStyle.DIVIDER_ALPHA * alpha / 255.0F));
                 drawBlock(-span + 2.0F * span * value, -2.0F,
                         LostTalesColors.IVORY, 1.0F, 0.0F, 0.0F, 1.0F, 1.0F,
                         alpha);
@@ -202,13 +204,6 @@ final class MotionLabSample {
             }
         }
         return false;
-    }
-
-    /** A colour of the palette at its own opacity times the page's. */
-    private static int faded(int argb, int alpha) {
-        int own = argb >>> 24;
-        return LostTalesUiInk.argb(LostTalesColors.rgb(argb),
-                Math.round(own * Math.max(0, Math.min(255, alpha)) / 255.0F));
     }
 
     /** A six-pixel block, moved, turned, stretched, faded and lit as a part is. */

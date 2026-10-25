@@ -27,6 +27,7 @@ import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WorldPageReach;
 import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -585,10 +586,10 @@ public final class MissiveBoardPage extends PageContent
             drawList(minecraft, font, layout, shown, alpha);
             LostTalesUiHitBox divider = layout.divider();
             if (divider.width > 0) {
-                LostTalesUiInk.fillRect((float)divider.left,
-                        (float)divider.top, (float)divider.right(),
-                        (float)divider.bottom(),
-                        MissiveLetterView.faded(LostTalesColors.BORDER_DIM, alpha));
+                // The halves part on the windows' standing rule.
+                LostTalesUiRules.drawStandingRule((float)divider.left,
+                        (float)divider.right(), (float)divider.top,
+                        (float)divider.bottom(), alpha);
             }
             LostTalesUiHitBox letter = layout.letter();
             if (letter.width > 0 && letter.height > 0) {

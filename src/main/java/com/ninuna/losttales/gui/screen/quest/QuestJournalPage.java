@@ -26,6 +26,7 @@ import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -53,7 +54,6 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
@@ -232,7 +232,7 @@ public final class QuestJournalPage extends PageContent {
         this.hovered = hoverAt(layout, mouseX, mouseY);
 
         List<ClientQuestEntry> quests = getVisibleQuests();
-        drawDivider(layout);
+        drawDivider(layout, alpha);
         drawQuestList(minecraft, quests, layout, alpha);
         drawQuestDetails(quests, layout, alpha);
     }
@@ -281,14 +281,6 @@ public final class QuestJournalPage extends PageContent {
     private QuestJournalLayout layout() {
         return new QuestJournalLayout(this.width, this.height,
                 this.listOut);
-    }
-
-    private void drawRule(LostTalesUiHitBox box, int color) {
-        if (box.width <= 0.0D || box.height <= 0.0D) {
-            return;
-        }
-        Gui.drawRect((int)box.left, (int)box.top, (int)box.right(),
-                (int)box.bottom(), color);
     }
 
     /* ---- The window's strip ---- */
@@ -525,9 +517,15 @@ public final class QuestJournalPage extends PageContent {
         return StatCollector.translateToLocalFormatted(key, args);
     }
 
-    /** One rule between the halves; the chat divides with one, so does this. */
-    private void drawDivider(QuestJournalLayout layout) {
-        drawRule(layout.divider(), LostTalesColors.BORDER_DIM);
+    /** One rule between the halves: the windows' standing rule, as a split's halves part. */
+    private static void drawDivider(QuestJournalLayout layout, int alpha) {
+        LostTalesUiHitBox divider = layout.divider();
+        if (divider.width <= 0.0D || divider.height <= 0.0D) {
+            return;
+        }
+        LostTalesUiRules.drawStandingRule((float)divider.left,
+                (float)divider.right(), (float)divider.top,
+                (float)divider.bottom(), alpha);
     }
 
     /**

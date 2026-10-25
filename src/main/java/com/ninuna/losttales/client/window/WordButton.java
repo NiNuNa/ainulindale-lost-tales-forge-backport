@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -13,7 +14,8 @@ import org.lwjgl.input.Mouse;
  * A framed button holding a word, centred, as a sub-window's foot carries
  * them: Cancel, and the action. An action that ends something wears red
  * until it is lit; one that cannot be taken now stands in the aside tone
- * and never lights.
+ * and never lights. A button wider than its word centres it; a word
+ * too long for its button fades into the button's end (LOOK-37).
  */
 public final class WordButton {
     private WordButton() {}
@@ -55,8 +57,10 @@ public final class WordButton {
         float lit = motion.lit();
         LostTalesUiFramedButton.drawSurface((float)at.left, (float)at.top,
                 (float)at.width, (float)at.height, lit, surfaceAlpha);
-        int width = Math.max(0, font.getStringWidth(label) - 1);
-        int textX = (int)at.left + LostTalesUiFramedButton.WIDE_INSET;
+        int room = Math.max(0, (int)at.width - 2 * LostTalesUiFramedButton.WIDE_INSET);
+        int width = Math.min(room, Math.max(0, font.getStringWidth(label) - 1));
+        int textX = (int)at.left + LostTalesUiFramedButton.WIDE_INSET
+                + LostTalesUiInk.centredStart(room, width);
         int textY = (int)at.top + (LostTalesUiFramedButton.HEIGHT
                 - WindowStyle.LINE_HEIGHT) / 2 + WindowStyle.ROW_TEXT_TOP;
         // Greyed, the word keeps its colour at half strength, as every
@@ -67,8 +71,11 @@ public final class WordButton {
         LostTalesUiButton.beginPose(motion, textX, (float)at.top, width,
                 (float)at.height);
         try {
-            LostTalesUiInk.drawText(font, label, textX, textY, rgb, enabled
-                    ? alpha : Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY));
+            // The room counts the spacing column after the last glyph,
+            // as a word's advance does.
+            LostTalesUiCutName.drawText(font, label, textX, textY, room + 1, rgb,
+                    enabled ? alpha
+                            : Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY));
         } finally {
             LostTalesUiButton.endPose();
         }

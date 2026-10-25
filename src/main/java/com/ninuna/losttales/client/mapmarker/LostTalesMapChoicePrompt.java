@@ -1,65 +1,86 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.OptionGlyph;
+import com.ninuna.losttales.client.window.TabRow;
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.client.window.WordButton;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesUiBracketPanel;
+import com.ninuna.losttales.gui.style.LostTalesUiButton;
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 
 /**
- * The map's modal question: a shaded screen, one panel, a line of text and
- * three actions side by side.
+ * The map's question: a shaded map, and a popup in the window frame with
+ * the question, the reason it cannot be answered yes where there is one,
+ * and three framed word buttons side by side, as a window's question asks
+ * it.
  *
  * <p>Both map popups ask the player exactly this shape of question, so the
- * panel, its geometry and its button strip live here and the popups only
- * decide what the three actions mean. Two copies of this layout drifted apart
- * the moment either was adjusted.</p>
+ * popup, its geometry and its buttons live here and the popups only
+ * decide what the three actions mean.</p>
  */
 @SideOnly(Side.CLIENT)
 final class LostTalesMapChoicePrompt {
     private static final int SCREEN_SHADE =
             LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x66);
-    private static final int MAX_WIDTH = 320;
-    private static final int PANEL_HEIGHT = 70;
+    private static final int MAX_WIDTH = 240;
     private static final int SCREEN_MARGIN = 8;
-    private static final int CONTENT_PADDING = 10;
-    private static final int TITLE_TOP = 14;
-    private static final int SUBTITLE_TOP = 24;
-    private static final int DIVIDER_TOP = 35;
-    private static final int BUTTON_TOP = 42;
-    private static final int BUTTON_BOTTOM_MARGIN = 8;
+    private static final int FRAME = WindowStyle.POPUP_FRAME;
+    /** The menus' clear room round the words and the buttons, across and down. */
+    private static final int PADDING_X = MenuWindow.PADDING_X;
+    private static final int PADDING_Y = MenuWindow.PADDING_Y;
+    /** The words' room: a menu note's two lines and the clear above and under them. */
+    private static final int NOTE_LINE = MenuWindow.NOTE_LINE;
+    private static final int NOTE_PADDING = MenuWindow.NOTE_PADDING;
+    private static final int NOTE_HEIGHT = NOTE_PADDING * 2 + NOTE_LINE * 2;
+    private static final int POPUP_HEIGHT = FRAME * 2 + PADDING_Y * 2
+            + NOTE_HEIGHT + LostTalesUiFramedButton.HEIGHT;
     /**
-     * Gap between the panel and the map point framed beside it, in GUI
-     * pixels. Enough for the marker and the name above it to clear the panel,
-     * and no more: the point of framing it there is that it reads as part of
-     * the question.
+     * Gap between the popup and the map point framed beside it, in GUI
+     * pixels. Enough for the marker and the name above it to clear the
+     * popup, and no more: the point of framing it there is that it reads as
+     * part of the question.
      */
     private static final int ANCHOR_CLEARANCE = 26;
     /** Closest the framed point may come to the edge of the screen. */
     private static final int ANCHOR_SCREEN_MARGIN = 14;
     /**
-     * The step-to-the-next-place arrows, which sit outside the panel rather
-     * than in the button strip: they move the question rather than answering
-     * it, and a player must never reach for one and hit "Yes".
+     * The step-to-the-next-place arrows stand outside the popup rather than
+     * among its buttons: they move the question rather than answering it,
+     * and a player must never reach for one and hit "Yes". Each answers on
+     * a window's end-control square, its glyph in the middle.
      */
-    private static final int STEP_ARROW_WIDTH = 14;
-    private static final int STEP_ARROW_HEIGHT = 22;
-    private static final int STEP_ARROW_GAP = 5;
+    private static final int STEP_ARROW_SIZE = TabRow.END_CONTROL_SIZE;
+    private static final int STEP_ARROW_GAP = WindowStyle.EDGE_GAP;
+    /**
+     * The step arrows' glyphs: the windows' chevron laid on its side, as a
+     * pattern until it is painted.
+     */
+    private static final OptionGlyph PREVIOUS_GLYPH = OptionGlyph.pattern(
+            "..#", ".##", "###", ".##", "..#");
+    private static final OptionGlyph NEXT_GLYPH = OptionGlyph.pattern(
+            "#..", "##.", "###", "##.", "#..");
 
     private LostTalesMapChoicePrompt() {}
 
     /**
      * Where a map point this popup is about should come to rest: centred just
-     * above the panel.
+     * above the popup.
      *
-     * <p>Derived from the panel the popup actually lays out at this screen
-     * size and GUI scale, not from a pixel row measured once. Sitting it just
-     * clear of the panel rather than halfway to the top of the screen is what
-     * makes the marker read as the subject of the question. Only when there is
-     * no room above — a short screen, a large GUI scale — does it go
-     * below.</p>
+     * <p>Derived from the popup actually laid out at this screen size and GUI
+     * scale. Sitting it just clear of the popup rather than halfway to the
+     * top of the screen is what makes the marker read as the subject of the
+     * question. Only when there is no room above (a short screen, a large
+     * GUI scale) does it go below.</p>
      */
     static float focusAnchorY(int screenWidth, int screenHeight) {
         Layout layout = calculateLayout(screenWidth, screenHeight);
@@ -83,24 +104,26 @@ final class LostTalesMapChoicePrompt {
         }
     }
 
+    /**
+     * The popup's surface and frame, the question in ivory and, under it,
+     * the reason it cannot be answered yes in the aside tone.
+     */
     static void renderPanelContents(
             FontRenderer font, Layout layout,
             String title, String subtitle) {
-        LostTalesUiBracketPanel.draw(
-                layout.x, layout.y, layout.width, layout.height);
-        int contentWidth = Math.max(0,
-                layout.width - CONTENT_PADDING * 2);
-        drawCentered(font, layout, title, layout.y + TITLE_TOP,
-                contentWidth, LostTalesColors.TEXT_BRIGHT);
+        WindowStyle.drawPopup(layout.x, layout.y, layout.x + layout.width,
+                layout.y + layout.height, 1.0F);
+        int left = layout.x + FRAME + PADDING_X;
+        int room = Math.max(0, layout.width - (FRAME + PADDING_X) * 2);
+        int lineTop = layout.y + FRAME + PADDING_Y + NOTE_PADDING
+                + LostTalesUiInk.centredStart(NOTE_LINE,
+                        LostTalesUiInk.CAP_HEIGHT);
+        LostTalesUiCutName.drawText(font, title == null ? "" : title, left,
+                lineTop, room, LostTalesUiInk.IVORY, 255);
         if (subtitle != null && subtitle.length() > 0) {
-            drawCentered(font, layout, subtitle, layout.y + SUBTITLE_TOP,
-                    contentWidth, LostTalesColors.TEXT_MUTED);
+            LostTalesUiCutName.drawText(font, subtitle, left,
+                    lineTop + NOTE_LINE, room, WindowStyle.asideRgb(), 255);
         }
-        Gui.drawRect(
-                layout.x + CONTENT_PADDING, layout.y + DIVIDER_TOP,
-                layout.x + layout.width - CONTENT_PADDING,
-                layout.y + DIVIDER_TOP + 1,
-                LostTalesColors.BORDER_DIM);
     }
 
     /**
@@ -130,124 +153,100 @@ final class LostTalesMapChoicePrompt {
         Gui.drawRect(right, top, screenWidth, bottom, SCREEN_SHADE);
     }
 
-    /** Words centred in the panel; too long for it, they fill it and fade into its end (LOOK-37). */
-    private static void drawCentered(
-            FontRenderer font, Layout layout, String text, int y,
-            int contentWidth, int color) {
-        int shown = (int)LostTalesUiCutName.shownWidth(
-                font.getStringWidth(text), contentWidth);
-        LostTalesUiCutName.drawShadowed(font, text,
-                layout.x + (layout.width - shown) / 2, y, contentWidth,
-                color);
-    }
-
+    /**
+     * One answer: a framed word button, its word centred, red until lit
+     * for an answer that ends something, greyed where it cannot be taken.
+     */
     static void drawButton(
             FontRenderer font, Bounds bounds, String label,
-            boolean hovered, boolean enabled) {
-        if (hovered && enabled) {
-            Gui.drawRect(bounds.x, bounds.y,
-                    bounds.x + bounds.width,
-                    bounds.y + bounds.height,
-                    LostTalesColors.PANEL_HOVER);
-            Gui.drawRect(bounds.x, bounds.y,
-                    bounds.x + bounds.width, bounds.y + 1,
-                    LostTalesColors.BORDER);
+            boolean hovered, boolean enabled, boolean ending,
+            LostTalesUiButtonMotion motion) {
+        if (bounds.width <= 0 || bounds.height <= 0) {
+            return;
         }
-        int room = Math.max(0, bounds.width - 6);
-        int shown = (int)LostTalesUiCutName.shownWidth(
-                font.getStringWidth(label), room);
-        int color = enabled
-                ? hovered
-                        ? LostTalesColors.TEXT_BRIGHT
-                        : LostTalesColors.TEXT
-                : LostTalesColors.TEXT_DIM;
-        // A label too long for its button fades into the button's end and
-        // slides along under the pointer (LOOK-37).
-        LostTalesUiCutName.drawShadowed(font, label,
-                bounds.x + (bounds.width - shown) / 2,
-                bounds.y + (bounds.height - font.FONT_HEIGHT) / 2, room,
-                color, BUTTON_LABELS, label, hovered && enabled);
+        WordButton.draw(font, new LostTalesUiHitBox(bounds.x, bounds.y,
+                        bounds.width, bounds.height), label == null ? "" : label,
+                ending, enabled, hovered, motion, 255, popupSurfaceAlpha());
     }
 
-    /** What the prompts' button labels name themselves to as cut names. */
-    private static final Object BUTTON_LABELS = new Object();
+    /** How opaque the popup's surface stands, which its buttons' surfaces match. */
+    static int popupSurfaceAlpha() {
+        return WindowStyle.insetArgb(
+                WindowStyle.opacity(Minecraft.getMinecraft())) >>> 24;
+    }
 
     static Layout calculateLayout(int screenWidth, int screenHeight) {
-        int availableWidth = Math.max(0,
-                screenWidth - SCREEN_MARGIN * 2);
-        int width = Math.min(MAX_WIDTH, availableWidth);
-        int availableHeight = Math.max(0,
-                screenHeight - SCREEN_MARGIN * 2);
-        int height = Math.min(PANEL_HEIGHT, availableHeight);
-        int x = Math.max(0, (screenWidth - width) / 2);
-        int y = Math.max(0, (screenHeight - height) / 2);
-        int contentWidth = Math.max(0, width - CONTENT_PADDING * 2);
-        int buttonY = y + Math.min(BUTTON_TOP,
-                Math.max(0, height - BUTTON_BOTTOM_MARGIN));
-        int buttonHeight = Math.max(0,
-                y + height - BUTTON_BOTTOM_MARGIN - buttonY);
-        int firstWidth = contentWidth / 4;
-        int secondWidth = contentWidth / 4;
-        int thirdWidth = contentWidth - firstWidth - secondWidth;
-        Bounds first = new Bounds(
-                x + CONTENT_PADDING, buttonY, firstWidth, buttonHeight);
-        Bounds second = new Bounds(
-                first.x + first.width, buttonY,
-                secondWidth, buttonHeight);
-        Bounds third = new Bounds(
-                second.x + second.width, buttonY,
-                thirdWidth, buttonHeight);
-        int arrowY = y + Math.max(0, (height - STEP_ARROW_HEIGHT) / 2);
-        int arrowHeight = Math.min(STEP_ARROW_HEIGHT, height);
-        // Off the ends of the panel, and only where the screen has room for
-        // them; a narrow screen keeps the panel and loses the arrows, which
+        int width = Math.min(MAX_WIDTH,
+                Math.max(0, screenWidth - SCREEN_MARGIN * 2));
+        int height = Math.min(POPUP_HEIGHT,
+                Math.max(0, screenHeight - SCREEN_MARGIN * 2));
+        int x = Math.max(0, LostTalesUiInk.centredStart(screenWidth, width));
+        int y = Math.max(0, LostTalesUiInk.centredStart(screenHeight,
+                height));
+        int contentLeft = x + FRAME + PADDING_X;
+        int contentWidth = Math.max(0, width - (FRAME + PADDING_X) * 2);
+        int buttonY = Math.max(y, y + height - FRAME - PADDING_Y
+                - LostTalesUiFramedButton.HEIGHT);
+        int buttonHeight = Math.max(0, Math.min(
+                LostTalesUiFramedButton.HEIGHT, y + height - buttonY));
+        // Three buttons of one width, a framed button's gap apart; the
+        // last takes the pixels the division leaves.
+        int gap = WindowStyle.BUTTON_GAP;
+        int slot = Math.max(0, (contentWidth - gap * 2) / 3);
+        Bounds first = new Bounds(contentLeft, buttonY, slot, buttonHeight);
+        Bounds second = new Bounds(first.x + slot + gap, buttonY, slot,
+                buttonHeight);
+        int thirdX = second.x + slot + gap;
+        Bounds third = new Bounds(thirdX, buttonY,
+                Math.max(0, contentLeft + contentWidth - thirdX),
+                buttonHeight);
+        int arrowY = y + LostTalesUiInk.centredStart(height, STEP_ARROW_SIZE);
+        // Off the ends of the popup, and only where the screen has room for
+        // them; a narrow screen keeps the popup and loses the arrows, which
         // the keys can still do.
-        int previousX = x - STEP_ARROW_GAP - STEP_ARROW_WIDTH;
+        int previousX = x - STEP_ARROW_GAP - STEP_ARROW_SIZE;
         int nextX = x + width + STEP_ARROW_GAP;
         Bounds previous = previousX >= 0
                 ? new Bounds(previousX, arrowY,
-                        STEP_ARROW_WIDTH, arrowHeight)
+                        STEP_ARROW_SIZE, STEP_ARROW_SIZE)
                 : Bounds.none();
-        Bounds next = nextX + STEP_ARROW_WIDTH <= screenWidth
-                ? new Bounds(nextX, arrowY, STEP_ARROW_WIDTH, arrowHeight)
+        Bounds next = nextX + STEP_ARROW_SIZE <= screenWidth
+                ? new Bounds(nextX, arrowY, STEP_ARROW_SIZE, STEP_ARROW_SIZE)
                 : Bounds.none();
         return new Layout(x, y, width, height,
                 first, second, third, previous, next);
     }
 
     /**
-     * Draws one of the step arrows as a plain triangle of rows.
-     *
-     * <p>No artwork: it is two shapes, it has to read at every GUI scale, and
-     * rows of rectangles stay crisp where a stretched sprite would not.</p>
+     * One of the step arrows: its glyph in the middle of its square, in
+     * ivory lighting to the accent under the one shadow, dipping and rising
+     * as every pressable glyph does (LOOK-20).
      *
      * @param pointLeft which way the arrow points
      */
     static void drawStepArrow(
-            Bounds bounds, boolean pointLeft, boolean hovered) {
+            Bounds bounds, boolean pointLeft, boolean hovered,
+            LostTalesUiButtonMotion motion) {
         if (bounds.width <= 0 || bounds.height <= 0) {
             return;
         }
-        int color = hovered
-                ? LostTalesColors.TEXT_BRIGHT
-                : LostTalesColors.TEXT_MUTED;
-        int rows = Math.max(1, bounds.height / 2);
-        int centerY = bounds.y + bounds.height / 2;
-        int tipX = pointLeft ? bounds.x + 2 : bounds.x + bounds.width - 3;
-        for (int row = 0; row < rows; row++) {
-            int reach = row * (bounds.width - 5) / Math.max(1, rows - 1);
-            int left = pointLeft ? tipX : tipX - reach;
-            int right = pointLeft ? tipX + reach + 1 : tipX + 1;
-            Gui.drawRect(left, centerY - row, right,
-                    centerY - row + 1, color);
-            if (row > 0) {
-                Gui.drawRect(left, centerY + row, right,
-                        centerY + row + 1, color);
-            }
+        motion.advance(System.nanoTime(), hovered);
+        OptionGlyph glyph = pointLeft ? PREVIOUS_GLYPH : NEXT_GLYPH;
+        int left = bounds.x + LostTalesUiInk.centredStart(bounds.width,
+                glyph.width());
+        int top = bounds.y + LostTalesUiInk.centredStart(bounds.height,
+                glyph.height());
+        LostTalesUiButton.beginPose(motion, left, top, glyph.width(),
+                glyph.height());
+        try {
+            glyph.draw(left, top, motion.lit(), 255);
+        } finally {
+            LostTalesUiButton.endPose();
+            LostTalesUiInk.beginContent();
         }
     }
 
-    /** Panel rectangle, the three action bounds and the two step arrows. */
+    /** The popup's footprint, the three answers and the two step arrows. */
     static final class Layout {
         final int x;
         final int y;
@@ -294,8 +293,8 @@ final class LostTalesMapChoicePrompt {
 
         boolean contains(int pointX, int pointY) {
             return this.width > 0 && this.height > 0
-                    && pointX >= this.x && pointX < this.x + this.width
-                    && pointY >= this.y && pointY < this.y + this.height;
+                    && LostTalesUiHitBox.contains(pointX, pointY, this.x,
+                            this.y, this.width, this.height);
         }
     }
 }

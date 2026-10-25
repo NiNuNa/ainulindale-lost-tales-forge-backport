@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import org.junit.Test;
 
 public final class LostTalesMapWaypointPromptTest {
@@ -50,10 +51,11 @@ public final class LostTalesMapWaypointPromptTest {
         // What the waypoint can do, above what happens to it.
         assertTrue(layout.travel.x + layout.travel.width
                 <= layout.x + layout.width);
-        assertEquals(layout.confirm.x + layout.confirm.width,
-                layout.delete.x);
-        assertEquals(layout.delete.x + layout.delete.width,
-                layout.cancel.x);
+        // A framed button's gap apart, as buttons side by side stand.
+        assertEquals(layout.confirm.x + layout.confirm.width
+                + WindowStyle.BUTTON_GAP, layout.delete.x);
+        assertEquals(layout.delete.x + layout.delete.width
+                + WindowStyle.BUTTON_GAP, layout.cancel.x);
         assertTrue(layout.cancel.x + layout.cancel.width
                 <= layout.x + layout.width);
         assertTrue("the rows must not overlap",

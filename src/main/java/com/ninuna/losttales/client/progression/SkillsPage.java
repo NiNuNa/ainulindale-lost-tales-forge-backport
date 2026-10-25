@@ -14,6 +14,7 @@ import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalLayout;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -37,7 +38,6 @@ import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
@@ -116,8 +116,10 @@ public final class SkillsPage extends PageContent {
             hover(layout, rows, lines, mouseX, mouseY);
             LostTalesUiHitBox divider = layout.divider();
             if (divider.width > 0.0D) {
-                Gui.drawRect((int) divider.left, (int) divider.top, (int) divider.right(),
-                        (int) divider.bottom(), LostTalesColors.BORDER_DIM);
+                // The halves part on the windows' standing rule.
+                LostTalesUiRules.drawStandingRule((float) divider.left,
+                        (float) divider.right(), (float) divider.top,
+                        (float) divider.bottom(), alpha);
             }
             drawList(minecraft, layout, rows, alpha);
             drawDetail(layout, lines, alpha);

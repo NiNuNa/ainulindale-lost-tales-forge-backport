@@ -4,9 +4,10 @@ import com.ninuna.losttales.client.fellowship.ClientFellowshipMemberStatusCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.client.window.WindowLists;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesUiBracketPanel;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
@@ -40,7 +41,8 @@ import java.util.UUID;
 
 /**
  * Compact fellowship HUD: the members of the fellowship the player travels
- * with who are nearest them, one row each.
+ * with who are nearest them, one row each, a hairline between rows, on a
+ * panel in the window frame as every box of the mod stands (LOOK-28).
  */
 public final class LostTalesFellowshipHudRenderer {
 
@@ -109,11 +111,12 @@ public final class LostTalesFellowshipHudRenderer {
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         try {
-            // The panel wears the windows' primary colour, as every HUD
-            // panel does.
-            LostTalesUiBracketPanel.draw(bounds.x, bounds.y, bounds.width,
-                    bounds.height, LostTalesColors.withAlpha(
-                            LostTalesUiTheme.primaryRgb(), 0x90));
+            // The panel stands as a popup of the windows does: their surface
+            // and their frame.
+            WindowStyle.drawPopupSurface(bounds.x, bounds.y,
+                    bounds.x + bounds.width, bounds.y + bounds.height, 1.0F);
+            WindowStyle.drawPopupEdges(bounds.x, bounds.y,
+                    bounds.x + bounds.width, bounds.y + bounds.height, 1.0F);
             for (int index = 0;
                  index < others.size() && index < bounds.rowCount;
                  index++) {
@@ -121,6 +124,17 @@ public final class LostTalesFellowshipHudRenderer {
                 FellowshipMemberStatusSnapshot status = statuses == null
                         ? null : statuses.getMemberStatus(
                         member.getIdentityId());
+                int rowY = bounds.y + FellowshipHudLayout.PANEL_PADDING
+                        + index * FellowshipHudLayout.ROW_HEIGHT;
+                if (index > 0) {
+                    // The windows' quiet hairline between two rows, on
+                    // the last pixel of the row above.
+                    WindowLists.drawSeparator(
+                            bounds.x + FellowshipHudLayout.PANEL_PADDING,
+                            bounds.x + bounds.width
+                                    - FellowshipHudLayout.PANEL_PADDING,
+                            rowY - WindowLists.SEPARATOR_HEIGHT / 2 - 1, 255);
+                }
                 renderMemberRow(
                         minecraft,
                         member,
@@ -128,8 +142,7 @@ public final class LostTalesFellowshipHudRenderer {
                         stale,
                         fellowship.isLeader(member.getIdentityId()),
                         bounds.x + FellowshipHudLayout.PANEL_PADDING,
-                        bounds.y + FellowshipHudLayout.PANEL_PADDING
-                                + index * FellowshipHudLayout.ROW_HEIGHT,
+                        rowY,
                         bounds.width - FellowshipHudLayout.PANEL_PADDING * 2);
             }
         } finally {
@@ -150,9 +163,6 @@ public final class LostTalesFellowshipHudRenderer {
         int fellowshipColor = color(member.getColor());
         Gui.drawRect(x, y + 1, x + 2, y + FellowshipHudLayout.ROW_HEIGHT - 2,
                 fellowshipColor);
-        Gui.drawRect(x + 3, y + FellowshipHudLayout.ROW_HEIGHT - 1,
-                x + width, y + FellowshipHudLayout.ROW_HEIGHT,
-                LostTalesColors.BORDER_DIM);
 
         boolean hasLiveStatus = !stale && status != null
                 && status.getAvailability().hasLiveEntityData();
@@ -173,11 +183,9 @@ public final class LostTalesFellowshipHudRenderer {
                     0.55F, false);
         }
 
+        // The held item stands on the panel itself: one surface per area.
         int heldItemX = x + width - 18;
         if (heldItem != null) {
-            Gui.drawRect(heldItemX - 1, y + 8,
-                    heldItemX + 17, y + 26,
-                    LostTalesColors.withAlpha(LostTalesUiTheme.primaryRgb(), 0x66));
             renderStack(minecraft, heldItem, heldItemX, y + 9, 1.0F, true);
         }
 
@@ -189,10 +197,9 @@ public final class LostTalesFellowshipHudRenderer {
                 : (heldItem == null ? x + width - 4 : heldItemX - 3);
         // A name too long for the panel fades into its end; nothing
         // points at the HUD, so it never slides (LOOK-37).
-        LostTalesUiCutName.drawShadowed(font, member.getCharacterName(),
+        LostTalesUiCutName.drawText(font, member.getCharacterName(),
                 textX, y + 3, Math.max(8, nameRight - textX),
-                muted ? LostTalesColors.TEXT_MUTED
-                        : LostTalesColors.TEXT_BRIGHT);
+                muted ? WindowStyle.asideRgb() : LostTalesUiInk.IVORY, 255);
         if (leader) {
             LostTalesUiInk.fillDiamond(
                     leaderX, y + 7,
@@ -218,9 +225,9 @@ public final class LostTalesFellowshipHudRenderer {
                     brightness);
         } else {
             String statusText = describeUnavailableStatus(status, stale);
-            LostTalesUiCutName.drawShadowed(font, statusText, textX, y + 15,
+            LostTalesUiCutName.drawText(font, statusText, textX, y + 15,
                     Math.max(8, contentRight - textX),
-                    statusColor(status, stale));
+                    statusRgb(status, stale), 255);
         }
     }
 
@@ -239,18 +246,19 @@ public final class LostTalesFellowshipHudRenderer {
         return I18n.format("gui.losttales.fellowship.hud.unavailable");
     }
 
-    private static int statusColor(FellowshipMemberStatusSnapshot status,
-                                   boolean stale) {
+    /** A dead member's line in red, a present one's in ivory, anything else in the aside tone. */
+    private static int statusRgb(FellowshipMemberStatusSnapshot status,
+                                 boolean stale) {
         if (stale || status == null) {
-            return LostTalesColors.TEXT_DIM;
+            return WindowStyle.asideRgb();
         }
         if (status.getAvailability() == FellowshipMemberAvailability.DEAD) {
-            return LostTalesColors.RED;
+            return LostTalesColors.rgb(LostTalesColors.RED);
         }
         if (status.getAvailability() == FellowshipMemberAvailability.ACTIVE) {
-            return LostTalesColors.TEXT;
+            return LostTalesUiInk.IVORY;
         }
-        return LostTalesColors.TEXT_MUTED;
+        return WindowStyle.asideRgb();
     }
 
     private static void drawHearts(Minecraft minecraft,

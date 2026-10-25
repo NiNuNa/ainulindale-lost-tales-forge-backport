@@ -1,7 +1,8 @@
 package com.ninuna.losttales.client.mapmarker;
 
-import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesUiBracketPanel;
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.ArrayList;
@@ -10,21 +11,19 @@ import net.minecraft.client.gui.FontRenderer;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The hover card the map draws for whatever the pointer owns.
+ * The card the map draws for whatever the pointer owns: a titled tip in
+ * the window frame (LOOK-28), its name in the accent and its description
+ * under it in ivory, broken where a tip breaks.
  *
- * <p>Replaces LOTR's own tooltip so every piece of text on the map carries
- * the shared HUD colours instead of two different sets, and so a marker can
- * show a description LOTR has no field for. Purely presentational: it renders
- * what the caller resolved and decides nothing about it.</p>
+ * <p>Replaces LOTR's own tooltip so every word on the map stands in the
+ * windows' look, and so a marker can show a description LOTR has no
+ * field for. Purely presentational: it draws what the caller resolved and
+ * decides nothing about it.</p>
  */
 @SideOnly(Side.CLIENT)
 final class LostTalesMapMarkerTooltip {
     /** Gap between the marker's artwork and the top of the card. */
     static final int MARKER_CLEARANCE = 4;
-    static final int PADDING = 4;
-    static final int LINE_GAP = 1;
-    /** Widest the card may grow before its body text wraps. */
-    static final int MAX_WIDTH = 160;
     private static final int EDGE_MARGIN = 2;
 
     private LostTalesMapMarkerTooltip() {}
@@ -44,12 +43,9 @@ final class LostTalesMapMarkerTooltip {
         List<String> lines = layoutLines(font, title, body);
         int width = 0;
         for (String line : lines) {
-            width = Math.max(width, font.getStringWidth(line));
+            width = Math.max(width, WindowStyle.popupLineWidth(font, line));
         }
-        width += PADDING * 2;
-        int height = PADDING * 2
-                + lines.size() * font.FONT_HEIGHT
-                + Math.max(0, lines.size() - 1) * LINE_GAP;
+        int height = WindowStyle.popupLinesHeight(lines.size());
 
         // Kept fractional. The marker under the card moves by fractions of a
         // pixel as the map zooms; rounding the card's own position turns that
@@ -65,38 +61,29 @@ final class LostTalesMapMarkerTooltip {
         GL11.glPushMatrix();
         GL11.glTranslatef(x, y, 0.0F);
         try {
-            LostTalesUiBracketPanel.draw(0, 0, width, height);
-            int lineY = PADDING;
+            WindowStyle.drawPopup(0, 0, width, height, 1.0F);
+            LostTalesUiInk.beginContent();
             for (int index = 0; index < lines.size(); index++) {
-                String line = lines.get(index);
-                font.drawStringWithShadow(line,
-                        (width - font.getStringWidth(line)) / 2, lineY,
-                        index == 0
-                                ? LostTalesColors.TEXT_BRIGHT
-                                : LostTalesColors.TEXT_MUTED);
-                lineY += font.FONT_HEIGHT + LINE_GAP;
+                LostTalesUiInk.drawText(font, lines.get(index),
+                        WindowStyle.POPUP_INSET,
+                        WindowStyle.POPUP_INSET
+                                + index * WindowStyle.LINE_HEIGHT,
+                        index == 0 ? LostTalesUiTheme.accentRgb()
+                                : LostTalesUiInk.IVORY, 255);
             }
         } finally {
             GL11.glPopMatrix();
         }
     }
 
-    /** Title first, then the body wrapped to the card's maximum width. */
+    /** The name first, then the description broken where a tip breaks. */
     static List<String> layoutLines(
             FontRenderer font, String title, String body) {
         ArrayList<String> lines = new ArrayList<String>();
         lines.add(title);
         String trimmed = body == null ? "" : body.trim();
-        if (trimmed.length() == 0) {
-            return lines;
-        }
-        int wrapWidth = Math.max(1, MAX_WIDTH - PADDING * 2);
-        for (Object wrapped : font.listFormattedStringToWidth(
-                trimmed, wrapWidth)) {
-            if (wrapped instanceof String
-                    && ((String)wrapped).length() > 0) {
-                lines.add((String)wrapped);
-            }
+        if (trimmed.length() > 0) {
+            lines.addAll(WindowStyle.tipLines(font, trimmed));
         }
         return lines;
     }

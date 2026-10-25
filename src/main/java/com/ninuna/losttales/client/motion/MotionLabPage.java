@@ -21,6 +21,8 @@ import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowPage;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
+import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
@@ -339,10 +341,10 @@ public final class MotionLabPage extends PageContent {
             drawList(layout, lines, alpha, surfaceAlpha);
             LostTalesUiHitBox divider = layout.divider();
             if (divider.width > 0) {
-                LostTalesUiInk.fillRect((float)divider.left,
-                        (float)divider.top, (float)divider.right(),
-                        (float)divider.bottom(),
-                        faded(LostTalesColors.BORDER_DIM, alpha));
+                // The halves part on the windows' standing rule.
+                LostTalesUiRules.drawStandingRule((float)divider.left,
+                        (float)divider.right(), (float)divider.top,
+                        (float)divider.bottom(), alpha);
             }
             drawContent(layout, about, alpha, surfaceAlpha, now);
         } finally {
@@ -423,12 +425,6 @@ public final class MotionLabPage extends PageContent {
     /** The whole pixels a scroll stands at; its fraction is drawn through the matrix. */
     private static int whole(double scroll) {
         return (int)Math.floor(scroll);
-    }
-
-    /** A colour of the palette at its own opacity times the page's. */
-    private static int faded(int argb, int alpha) {
-        return LostTalesUiInk.argb(LostTalesColors.rgb(argb), Math.round(
-                (argb >>> 24) * Math.max(0, Math.min(255, alpha)) / 255.0F));
     }
 
     /* ---- The list ---- */
@@ -594,11 +590,11 @@ public final class MotionLabPage extends PageContent {
         float top = (float)box.top;
         float right = (float)box.right();
         float bottom = (float)box.bottom();
-        int rule = faded(LostTalesColors.BORDER_DIM, alpha);
-        LostTalesUiInk.fillRect(left, top, right, top + 1, rule);
-        LostTalesUiInk.fillRect(left, bottom - 1, right, bottom, rule);
-        LostTalesUiInk.fillRect(left, top + 1, left + 1, bottom - 1, rule);
-        LostTalesUiInk.fillRect(right - 1, top + 1, right, bottom - 1, rule);
+        // The window frame's edges, their ink on the box's outermost
+        // pixels, as every box of the mod is framed.
+        LostTalesUiInk.beginContent();
+        LostTalesUiWindowFrame.drawEdges(left + 1, top + 1, right - 1,
+                bottom - 1, alpha);
         boolean clipped = LostTalesUiClip.beginLocal(this.mc, left + 1,
                 top + 1, right - 1, bottom - 1);
         try {

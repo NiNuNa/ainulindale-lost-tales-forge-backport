@@ -56,6 +56,7 @@ import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.gui.LostTalesHudFade;
 import com.ninuna.losttales.client.gui.LostTalesPlayerListOverlay;
+import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSlots;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContext;
@@ -203,6 +204,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientWaystoneTravelContext.clear();
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();
+        LostTalesTooltipSlots.clear();
         ClientCharacterRosterCache.clear();
         FirstVisit.clear();
         // A roster sync still queued from this world must not be applied

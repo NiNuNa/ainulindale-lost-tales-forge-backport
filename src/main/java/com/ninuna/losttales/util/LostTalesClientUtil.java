@@ -10,20 +10,19 @@ import com.ninuna.losttales.armour.ArmourWords;
 import com.ninuna.losttales.armour.NamedSet;
 import com.ninuna.losttales.armour.Relics;
 import com.ninuna.losttales.armour.SetBonus;
-import com.ninuna.losttales.armour.SetEffect;
 import com.ninuna.losttales.armour.WornArmour;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
 import com.ninuna.losttales.block.vessel.VesselTooltip;
+import com.ninuna.losttales.client.armour.SetBonusWords;
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipIcons;
+import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSlots;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.material.ELostTalesItemMaterial;
 import com.ninuna.losttales.progression.PerkWords;
 import com.ninuna.losttales.progression.skill.PerkEffect;
-import com.ninuna.losttales.progression.skill.SkillDefinition;
-import com.ninuna.losttales.client.progression.ClientProgression;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.relauncher.ReflectionHelper;
 import cpw.mods.fml.relauncher.Side;
@@ -83,13 +82,24 @@ public final class LostTalesClientUtil {
         addItemBlockDetails(list, itemStack, block, credits);
     }
 
-    /** What a vessel item holds (CONTENT-09): each item's name and count, as a bundle lists them. */
-    public static void addVesselContents(List list, List<ItemStack> contents) {
+    /**
+     * What a vessel item holds (CONTENT-09), from its stacks slot by slot
+     * (null for an empty slot): its slots with the items drawn in them and
+     * their counts, as a shulker box's tooltip shows them, and a line
+     * counting any items past the slots shown; where tooltips cannot draw
+     * them, each item's name and count instead.
+     */
+    public static void addVesselContents(List list, ItemStack[] slots) {
         List<VesselTooltip.Entry> entries = new ArrayList<VesselTooltip.Entry>();
-        for (ItemStack stack : contents) {
-            entries.add(new VesselTooltip.Entry(stack.getDisplayName(), stack.stackSize));
+        int[] counts = new int[slots.length];
+        for (int slot = 0; slot < slots.length; slot++) {
+            ItemStack stack = slots[slot];
+            if (stack != null) {
+                entries.add(new VesselTooltip.Entry(stack.getDisplayName(), stack.stackSize));
+                counts[slot] = stack.stackSize;
+            }
         }
-        list.addAll(VesselTooltip.lines(entries, new VesselTooltip.Words() {
+        List<String> words = VesselTooltip.lines(entries, new VesselTooltip.Words() {
             @Override
             public String item(String name, int count) {
                 return "§7" + word("vessel.item", name, Integer.valueOf(count));
@@ -97,9 +107,20 @@ public final class LostTalesClientUtil {
 
             @Override
             public String more(int count) {
-                return "§7§o" + word("vessel.more", Integer.valueOf(count));
+                return vesselMore(count);
             }
-        }));
+        });
+        int shown = VesselTooltip.shownSlots(slots.length);
+        int hidden = VesselTooltip.hiddenItems(counts, shown);
+        ItemStack[] shownSlots = new ItemStack[shown];
+        System.arraycopy(slots, 0, shownSlots, 0, shown);
+        list.addAll(LostTalesTooltipSlots.mark(shownSlots,
+                hidden > 0 ? vesselMore(hidden) : null, words));
+    }
+
+    /** The line saying how many more items a vessel holds than it shows. */
+    private static String vesselMore(int count) {
+        return "§7§o" + word("vessel.more", Integer.valueOf(count));
     }
 
     /**
@@ -256,7 +277,7 @@ public final class LostTalesClientUtil {
         list.addAll(ArmourTooltip.lines(new ArmourTooltip.Words() {
             @Override
             public String weightSet(ArmourWeight setWeight) {
-                return word(setWeight == ArmourWeight.HEAVY ? "set.heavy" : "set.light");
+                return SetBonusWords.weightSetName(setWeight);
             }
 
             @Override
@@ -266,19 +287,12 @@ public final class LostTalesClientUtil {
 
             @Override
             public String bonus(SetBonus bonus) {
-                String share = PerkWords.written(PerkEffect.Unit.PERCENT, bonus.getAmount());
-                if (bonus.getEffect() == SetEffect.EXPERIENCE) {
-                    SkillDefinition skill = ClientProgression.skill(bonus.getSkill());
-                    return word("set.bonus.experience", share, skill == null
-                            ? bonus.getSkill() : PerkWords.skillName(skill));
-                }
-                return word("set.bonus." + bonus.getEffect().word(), share);
+                return SetBonusWords.effect(bonus);
             }
 
             @Override
             public String weightBonus(ArmourWeight setWeight, double amount) {
-                return word(setWeight == ArmourWeight.HEAVY ? "set.bonus.knockback"
-                        : "set.bonus.speed", PerkWords.written(PerkEffect.Unit.PERCENT, amount));
+                return SetBonusWords.weightBonus(setWeight, amount);
             }
 
             @Override

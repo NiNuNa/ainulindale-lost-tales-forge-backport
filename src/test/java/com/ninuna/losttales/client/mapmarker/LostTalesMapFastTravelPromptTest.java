@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.mapmarker;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import org.junit.Test;
 
 public final class LostTalesMapFastTravelPromptTest {
@@ -60,8 +61,12 @@ public final class LostTalesMapFastTravelPromptTest {
         LostTalesMapChoicePrompt.Layout layout =
                 LostTalesMapChoicePrompt.calculateLayout(140, 90);
 
-        assertEquals(layout.first.x + layout.first.width, layout.second.x);
-        assertEquals(layout.second.x + layout.second.width, layout.third.x);
+        // A framed button's gap apart, as buttons side by side stand.
+        assertEquals(layout.first.x + layout.first.width
+                + WindowStyle.BUTTON_GAP, layout.second.x);
+        assertEquals(layout.second.x + layout.second.width
+                + WindowStyle.BUTTON_GAP, layout.third.x);
+        assertTrue(layout.first.width > 0);
         assertTrue(layout.third.x + layout.third.width
                 <= layout.x + layout.width);
     }

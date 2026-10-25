@@ -49,7 +49,7 @@ import com.ninuna.losttales.gui.screen.character.creator.CreatorTextControl;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorTileGrid;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorToggle;
 import com.ninuna.losttales.gui.screen.character.creator.PlainChoice;
-import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -59,7 +59,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.init.Items;
@@ -874,9 +873,10 @@ public final class CharacterEditorPage extends PageContent
         }
         LostTalesUiHitBox divider = within(box, layout.divider());
         if (divider.width > 0) {
-            Gui.drawRect((int)divider.left, (int)divider.top,
-                    (int)divider.right(), (int)divider.bottom(),
-                    LostTalesColors.BORDER_DIM);
+            // The halves part on the windows' standing rule.
+            LostTalesUiRules.drawStandingRule((float)divider.left,
+                    (float)divider.right(), (float)divider.top,
+                    (float)divider.bottom(), alpha);
         }
         LostTalesUiHitBox rows = within(box, layout.section());
         this.rowsBox = rows.width > 0 ? rows : null;

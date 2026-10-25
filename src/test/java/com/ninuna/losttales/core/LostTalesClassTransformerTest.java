@@ -278,6 +278,8 @@ public final class LostTalesClassTransformerTest {
     private static final String SMOOTH_INVENTORY_HOOK_OWNER =
             "com/ninuna/losttales/client/gui/inventory/"
                     + "LostTalesSmoothInventoryHooks";
+    private static final String SET_BONUS_COLUMN_HOOK_OWNER =
+            "com/ninuna/losttales/client/armour/SetBonusColumnHooks";
 
     private static final String PERK_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/LostTalesLotrPerkPatchHooks";
@@ -964,6 +966,33 @@ public final class LostTalesClassTransformerTest {
                 container, "func_146977_a",
                 SMOOTH_INVENTORY_HOOK_OWNER,
                 "renderItemOverlayIntoGUI"));
+    }
+
+    @Test
+    public void inventoryEffectRendererMakesRoomForSetBonuses()
+            throws Exception {
+        ClassNode screen = transform(
+                "net.minecraft.client.renderer.InventoryEffectRenderer");
+        MethodNode initGui = findMethod(screen, "initGui");
+        assertEquals("the one effect check goes through the hook",
+                1, countCalls(initGui, SET_BONUS_COLUMN_HOOK_OWNER,
+                        "noEffects"));
+        assertEquals("no effect check is left to vanilla",
+                0, countCalls(initGui, "java/util/Collection", "isEmpty"));
+    }
+
+    @Test
+    public void inventoryEffectRendererPatchIsIdempotent() throws Exception {
+        String name = "net.minecraft.client.renderer.InventoryEffectRenderer";
+        LostTalesClassTransformer transformer = new LostTalesClassTransformer();
+        byte[] once = transformer.transform(name, name,
+                readResource(name.replace('.', '/') + ".class"));
+        ClassNode twice = new ClassNode();
+        new ClassReader(transformer.transform(name, name, once))
+                .accept(twice, 0);
+        GuardedCalls.unguard(twice);
+        assertEquals(1, countCalls(findMethod(twice, "initGui"),
+                SET_BONUS_COLUMN_HOOK_OWNER, "noEffects"));
     }
 
     @Test

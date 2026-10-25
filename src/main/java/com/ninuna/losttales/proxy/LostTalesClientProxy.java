@@ -165,6 +165,7 @@ import com.ninuna.losttales.network.packet.ProgressionStatePacket;
 import com.ninuna.losttales.network.packet.ProgressionStatuePacket;
 import com.ninuna.losttales.progression.perk.PerkIndex;
 import com.ninuna.losttales.client.armour.ArmourTooltipEvents;
+import com.ninuna.losttales.client.armour.SetBonusColumnEvents;
 import com.ninuna.losttales.client.progression.PerkClientEvents;
 import com.ninuna.losttales.client.progression.ResetStatuePage;
 import com.ninuna.losttales.client.progression.SkillsPage;
@@ -224,6 +225,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(new LostTalesMainMenuHandler());
         MinecraftForge.EVENT_BUS.register(new PerkClientEvents());
         MinecraftForge.EVENT_BUS.register(new ArmourTooltipEvents());
+        MinecraftForge.EVENT_BUS.register(new SetBonusColumnEvents());
         ELostTalesMapLabels.initAndRegisterMapLabels();
 
         GeoArmorRenderer.registerArmorRenderer(LostTalesItemArmor3D.class, new LostTalesItemRendererArmor3D());

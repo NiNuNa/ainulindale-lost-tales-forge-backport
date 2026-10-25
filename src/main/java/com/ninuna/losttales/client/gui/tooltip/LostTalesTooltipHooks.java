@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -14,17 +15,20 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
 /**
- * Draws the tooltips that carry a key icon, in place of the vanilla one.
+ * Draws the tooltips that carry a key icon or item slots, in place of the
+ * vanilla one.
  *
  * <p>Called from the head of {@code GuiScreen.drawHoveringText} by the
- * coremod: a tooltip with no {@link LostTalesTooltipIcons} marker in it is
- * declined and vanilla draws it exactly as before, so the only tooltips that
- * come through here are Lost Tales' own.</p>
+ * coremod: a tooltip with no {@link LostTalesTooltipIcons} or
+ * {@link LostTalesTooltipSlots} mark in it is declined and vanilla draws it
+ * exactly as before, so the only tooltips that come through here are Lost
+ * Tales' own.</p>
  *
  * <p>Taking the whole tooltip rather than overlaying the icon afterwards is
- * what keeps the box honest. The icon is a pixel taller than a line of text,
- * so the line it sits on has to be measured taller and the box grown to match
- * — measurement and drawing are the same pass here, and cannot disagree.</p>
+ * what keeps the box honest: a line's width counts its keys, and where a
+ * key is taller than a line of text its line is measured to the key, as a
+ * row of slots is measured to the slots. Measurement and drawing are the
+ * same pass here, and cannot disagree.</p>
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesTooltipHooks {
@@ -33,11 +37,8 @@ public final class LostTalesTooltipHooks {
     /** The first line is measured short, and the gap under it added once. */
     private static final int FIRST_LINE_HEIGHT = 8;
     private static final int TITLE_GAP = 2;
-    /** An icon line is as tall as the artwork, with a pixel either side. */
-    private static final int ICON_LINE_PADDING = 1;
-    private static final int ICON_LINE_HEIGHT = Math.max(TEXT_LINE_HEIGHT,
-            LostTalesInputIconRenderer.BASE_ICON_HEIGHT
-                    + ICON_LINE_PADDING * 2);
+    /** Under a row of slots, the two clear rows a line of text leaves under its words. */
+    private static final int SLOTS_BELOW = TEXT_LINE_HEIGHT - FIRST_LINE_HEIGHT;
 
     /** Vanilla's tooltip frame, in the palette entries nearest its colours. */
     private static final int BACKGROUND_COLOR =
@@ -62,14 +63,14 @@ public final class LostTalesTooltipHooks {
         try {
             if (gui == null || font == null
                     || lines == null || lines.isEmpty()
-                    || !containsIcon(lines)) {
+                    || !containsMark(lines)) {
                 return false;
             }
             Minecraft minecraft = Minecraft.getMinecraft();
             if (minecraft == null) {
                 return false;
             }
-            draw(minecraft, gui, lines, mouseX, mouseY, font);
+            draw(minecraft, gui, rows(lines), mouseX, mouseY, font);
             return true;
         } catch (Throwable throwable) {
             // A tooltip that cannot be drawn here is still vanilla's to draw,
@@ -78,30 +79,72 @@ public final class LostTalesTooltipHooks {
         }
     }
 
-    private static boolean containsIcon(List lines) {
+    private static boolean containsMark(List lines) {
         for (int index = 0; index < lines.size(); index++) {
             Object value = lines.get(index);
             if (value instanceof String
-                    && LostTalesTooltipIcons.hasIcon((String)value)) {
+                    && (LostTalesTooltipIcons.hasIcon((String)value)
+                    || LostTalesTooltipSlots.inBlock((String)value))) {
                 return true;
             }
         }
         return false;
     }
 
+    /** One row of the tooltip: a line of text, or slots. */
+    static final class Row {
+        final String text;
+        final LostTalesTooltipSlots.Slots slots;
+
+        Row(String text, LostTalesTooltipSlots.Slots slots) {
+            this.text = text;
+            this.slots = slots;
+        }
+    }
+
+    /**
+     * The rows the lines are drawn as. A marked block whose slots are
+     * still kept becomes one row of slots, and the line counting the
+     * items past them where there are any; a block whose slots are not is
+     * its words, line by line, as any other renderer shows it.
+     */
+    static List<Row> rows(List lines) {
+        List<Row> rows = new ArrayList<Row>(lines.size());
+        boolean drawnAsSlots = false;
+        for (int index = 0; index < lines.size(); index++) {
+            String line = lineAt(lines, index);
+            if (!LostTalesTooltipSlots.inBlock(line)) {
+                drawnAsSlots = false;
+                rows.add(new Row(line, null));
+                continue;
+            }
+            LostTalesTooltipSlots.Slots slots =
+                    LostTalesTooltipSlots.slotsOf(line);
+            if (slots != null) {
+                drawnAsSlots = true;
+                rows.add(new Row(null, slots));
+                if (slots.more != null) {
+                    rows.add(new Row(slots.more, null));
+                }
+            } else if (!drawnAsSlots) {
+                rows.add(new Row(LostTalesTooltipSlots.words(line), null));
+            }
+        }
+        return rows;
+    }
+
     private static void draw(
-            Minecraft minecraft, GuiScreen gui, List lines,
+            Minecraft minecraft, GuiScreen gui, List<Row> rows,
             int mouseX, int mouseY, FontRenderer font) {
-        int lineCount = lines.size();
+        int rowCount = rows.size();
         int width = 0;
         int height = 0;
-        for (int index = 0; index < lineCount; index++) {
-            String line = lineAt(lines, index);
-            width = Math.max(width, LostTalesTooltipIcons.measureLine(
-                    minecraft, font, line));
-            height += lineHeight(line, index);
+        for (int index = 0; index < rowCount; index++) {
+            Row row = rows.get(index);
+            width = Math.max(width, rowWidth(minecraft, font, row));
+            height += rowHeight(row, index);
         }
-        if (lineCount > 1) {
+        if (rowCount > 1) {
             height += TITLE_GAP;
         }
 
@@ -122,13 +165,18 @@ public final class LostTalesTooltipHooks {
         GL11.glDisable(GL11.GL_DEPTH_TEST);
         try {
             CANVAS.drawFrame(x, y, width, height);
-            int lineY = y;
-            for (int index = 0; index < lineCount; index++) {
-                String line = lineAt(lines, index);
-                drawLine(minecraft, font, line, x, lineY);
-                lineY += lineHeight(line, index);
-                if (index == 0 && lineCount > 1) {
-                    lineY += TITLE_GAP;
+            int rowY = y;
+            for (int index = 0; index < rowCount; index++) {
+                Row row = rows.get(index);
+                if (row.slots != null) {
+                    LostTalesTooltipSlots.draw(minecraft, font, row.slots,
+                            x, rowY);
+                } else {
+                    drawLine(minecraft, font, row.text, x, rowY);
+                }
+                rowY += rowHeight(row, index);
+                if (index == 0 && rowCount > 1) {
+                    rowY += TITLE_GAP;
                 }
             }
         } finally {
@@ -144,11 +192,30 @@ public final class LostTalesTooltipHooks {
         return value instanceof String ? (String)value : String.valueOf(value);
     }
 
-    private static int lineHeight(String line, int index) {
-        if (LostTalesTooltipIcons.hasIcon(line)) {
-            return ICON_LINE_HEIGHT;
+    private static int rowWidth(Minecraft minecraft, FontRenderer font,
+                                Row row) {
+        return row.slots != null ? row.slots.width
+                : LostTalesTooltipIcons.measureLine(minecraft, font, row.text);
+    }
+
+    private static int rowHeight(Row row, int index) {
+        if (row.slots != null) {
+            return row.slots.height + SLOTS_BELOW;
+        }
+        if (LostTalesTooltipIcons.hasIcon(row.text)) {
+            return iconLineHeight();
         }
         return index == 0 ? FIRST_LINE_HEIGHT : TEXT_LINE_HEIGHT;
+    }
+
+    /**
+     * A line with a key in it: a line of text, or the key with a pixel
+     * clear above and below it where that is taller (GUI scale 1, where
+     * the windows' key size is the GUI's own, and a pixel at 3 and 4).
+     */
+    private static int iconLineHeight() {
+        return Math.max(TEXT_LINE_HEIGHT, (int)Math.ceil(
+                LostTalesInputIconRenderer.windowHeight()) + 2);
     }
 
     /**
@@ -164,7 +231,7 @@ public final class LostTalesTooltipHooks {
             font.drawStringWithShadow(line, x, y, LostTalesColors.IVORY);
             return;
         }
-        int textY = y + (ICON_LINE_HEIGHT - font.FONT_HEIGHT) / 2;
+        int textY = y + (iconLineHeight() - font.FONT_HEIGHT) / 2;
         int cursorX = x;
         int index = 0;
         String format = "";
@@ -189,7 +256,7 @@ public final class LostTalesTooltipHooks {
             int keyCode = LostTalesTooltipIcons.decodeKeyCode(
                     line.charAt(start + 1));
             cursorX += LostTalesTooltipIcons.drawIcon(
-                    minecraft, keyCode, cursorX, y + ICON_LINE_PADDING);
+                    minecraft, keyCode, cursorX, textY);
             index = end + 1;
         }
     }

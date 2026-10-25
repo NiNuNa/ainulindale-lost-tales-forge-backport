@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.hud.fellowship;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 
 import java.util.Arrays;
@@ -14,7 +15,8 @@ public final class FellowshipHudLayout {
 
     public static final int PANEL_WIDTH = 166;
     public static final int ROW_HEIGHT = 29;
-    public static final int PANEL_PADDING = 4;
+    /** From the panel's edge to its rows: the window frame and two clear pixels. */
+    public static final int PANEL_PADDING = WindowStyle.POPUP_INSET;
     /** The most rows the panel stacks: the members nearest the player. */
     public static final int MAX_ROWS = 7;
     /** The rows the panel's box holds, a fellowship of four, when a fellowship may hold as many. */

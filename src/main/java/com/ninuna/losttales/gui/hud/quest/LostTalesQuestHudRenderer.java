@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.QuestMarks;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
@@ -38,7 +39,8 @@ public final class LostTalesQuestHudRenderer {
     private static final int QUEST_ENTRY_PROGRESS_HEIGHT = 5;
     private static final int QUEST_ENTRY_GAP = 5;
     private static final int NOTIFICATION_WIDTH = 272;
-    private static final int NOTIFICATION_HEIGHT = 34;
+    /** A banner: two lines in a popup of the windows. */
+    private static final int NOTIFICATION_HEIGHT = WindowStyle.popupLinesHeight(2);
     private static final int MAX_VISIBLE_NOTIFICATIONS = 4;
     /** The tracked quests the tracker's box holds, when as many are tracked. */
     static final int BOX_QUESTS = 2;
@@ -267,33 +269,30 @@ public final class LostTalesQuestHudRenderer {
                 continue;
             }
 
-            int a = MathHelper.clamp_int((int) (alpha * 210.0F), 0, 210);
             int y = LostTalesNotificationHud.claim(resolution.getScaledWidth(),
                     resolution.getScaledHeight(), NOTIFICATION_HEIGHT);
-            int accent = notification.getType().getColor();
-            int background = LostTalesColors.withAlpha(LostTalesUiTheme.primaryRgb(), a);
-            int border = LostTalesColors.withAlpha(accent,
-                    MathHelper.clamp_int((int) (alpha * 170.0F), 0, 170));
-            int textColor = LostTalesColors.withAlpha(LostTalesColors.TEXT_BRIGHT,
-                    MathHelper.clamp_int((int)(alpha * 255.0F), 0, 255));
-            int accentColor = LostTalesColors.withAlpha(accent,
-                    MathHelper.clamp_int((int) (alpha * 255.0F), 0, 255));
-
-            Gui.drawRect(x + 1, y + 1, x + NOTIFICATION_WIDTH + 1, y + NOTIFICATION_HEIGHT + 1,
-                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK,
-                            MathHelper.clamp_int((int) (alpha * 95.0F), 0, 95)));
-            Gui.drawRect(x, y, x + NOTIFICATION_WIDTH, y + NOTIFICATION_HEIGHT, background);
-            Gui.drawRect(x, y, x + 3, y + NOTIFICATION_HEIGHT, border);
-            Gui.drawRect(x, y + NOTIFICATION_HEIGHT - 1, x + NOTIFICATION_WIDTH, y + NOTIFICATION_HEIGHT, accentColor);
-            String title = notification.getType().getDisplayTitle();
+            int ink = MathHelper.clamp_int(Math.round(alpha * 255.0F), 0, 255);
+            // A popup of the windows, fading as the banner comes and goes.
+            WindowStyle.drawPopupSurface(x, y, x + NOTIFICATION_WIDTH,
+                    y + NOTIFICATION_HEIGHT, alpha);
+            WindowStyle.drawPopupEdges(x, y, x + NOTIFICATION_WIDTH,
+                    y + NOTIFICATION_HEIGHT, alpha);
             LostTalesUiInk.beginContent();
-            // Words too long for the notice fade into its end (LOOK-37).
+            // What kind of news it is in that kind's colour, what happened
+            // under it in ivory; words too long for the banner fade into its
+            // end (LOOK-37).
+            String title = notification.getType().getDisplayTitle();
             String message = notification.getMessage();
-            LostTalesUiCutName.drawShadowed(font, title == null ? "" : title,
-                    x + 8, y + 4, NOTIFICATION_WIDTH - 16, accentColor);
-            LostTalesUiCutName.drawShadowed(font,
-                    message == null ? "" : message, x + 8, y + 17,
-                    NOTIFICATION_WIDTH - 16, textColor);
+            int left = x + WindowStyle.POPUP_INSET;
+            int room = NOTIFICATION_WIDTH - WindowStyle.POPUP_INSET * 2;
+            int top = y + WindowStyle.POPUP_INSET;
+            LostTalesUiCutName.drawText(font, title == null ? "" : title,
+                    left, top, room,
+                    LostTalesColors.rgb(notification.getType().getColor()), ink);
+            LostTalesUiCutName.drawText(font,
+                    message == null ? "" : message, left,
+                    top + WindowStyle.LINE_HEIGHT, room, LostTalesUiInk.IVORY,
+                    ink);
         }
     }
 

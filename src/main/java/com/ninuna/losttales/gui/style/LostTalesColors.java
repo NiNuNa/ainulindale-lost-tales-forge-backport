@@ -85,12 +85,7 @@ public final class LostTalesColors {
     /** Two-thirds of the 8-bit alpha range is exactly 170. */
     public static final int SHADOW_ALPHA = Math.round(255.0F * SHADOW_OPACITY);
 
-    // ---- Translucent surfaces (palette entries with a chosen alpha) ----
-    public static final int PANEL_FILL = withAlpha(PLUM_BLACK, 0xBC);
-    public static final int PANEL_HOVER = withAlpha(IVORY, 0x4A);
-    public static final int PANEL_SELECTED = withAlpha(PLUM_DARK, 0x64);
-    public static final int BORDER = withAlpha(SAND, 0x82);
-    public static final int BORDER_DIM = withAlpha(MAUVE, 0x44);
+    // ---- Translucent colours (palette entries with a chosen alpha) ----
     public static final int BLACK_SHADOW = withAlpha(PLUM_BLACK, SHADOW_ALPHA);
 
     // ---- The palette by name, for options a player picks a colour for ----

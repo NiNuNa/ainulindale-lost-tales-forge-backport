@@ -48,8 +48,8 @@ public final class LostTalesInputBinding {
     }
 
     /**
-     * The key's short name, as a key hint writes it on its blank key and
-     * a sentence names it, in the game's language (MAP-17): letters,
+     * The key's short name, as a key hint without art of its own writes
+     * it and a sentence names it, in the game's language (MAP-17): letters,
      * digits and the function keys as they are ({@code A}, {@code 5},
      * {@code F5}), every other key by its lang line ({@link #namedKey},
      * the number pad's as {@code Num} and the key), and a key nobody

@@ -144,6 +144,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.guiAnimationTransformer.active";
     public static final String SMOOTH_INVENTORY_ACTIVE_PROPERTY =
             "losttales.smoothInventoryTransformer.active";
+    /** The inventory making room for the set bonuses as for a potion (CONTENT-12). */
+    public static final String SET_BONUS_ROOM_ACTIVE_PROPERTY =
+            "losttales.setBonusRoomTransformer.active";
     private static final String GUI_ANIMATION_DRAW_ACTIVE_PROPERTY =
             "losttales.guiAnimationDrawTransformer.active";
     private static final String GUI_ANIMATION_INPUT_ACTIVE_PROPERTY =
@@ -225,6 +228,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "net.minecraft.client.gui.GuiNewChat";
     private static final String GUI_CONTAINER =
             "net.minecraft.client.gui.inventory.GuiContainer";
+    private static final String INVENTORY_EFFECT_RENDERER =
+            "net.minecraft.client.renderer.InventoryEffectRenderer";
     private static final String MINECRAFT =
             "net.minecraft.client.Minecraft";
     private static final String PLAYER_CONTROLLER =
@@ -409,6 +414,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String SMOOTH_INVENTORY_HOOK_OWNER =
             "com/ninuna/losttales/client/gui/inventory/"
                     + "LostTalesSmoothInventoryHooks";
+    private static final String SET_BONUS_COLUMN_HOOK_OWNER =
+            "com/ninuna/losttales/client/armour/SetBonusColumnHooks";
     private static final String TOOLTIP_SMOOTHING_OWNER =
             "com/ninuna/losttales/client/gui/tooltip/"
                     + "LostTalesTooltipSmoothing";
@@ -581,6 +588,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (GUI_CONTAINER.equals(transformedName)) {
             return transformGuiContainer(basicClass);
+        }
+        if (INVENTORY_EFFECT_RENDERER.equals(transformedName)) {
+            return transformInventoryEffectRenderer(basicClass);
         }
         if (MINECRAFT.equals(transformedName)) {
             return transformMinecraftWindowDefaults(transformMinecraftMenuFramerate(
@@ -4483,6 +4493,74 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         } catch (Throwable throwable) {
             rollBack();
             warn("Failed to patch smooth inventory item rendering: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Makes the inventory's room for the effect column count the set
+     * bonuses in force as well as the potions (CONTENT-12): the
+     * {@code isEmpty()} that {@code InventoryEffectRenderer.initGui} asks of
+     * the player's effects goes through {@code SetBonusColumnHooks.noEffects},
+     * so vanilla moves the inventory over as it does for a potion, before
+     * the screen or another mod places anything from its left edge.
+     */
+    private static byte[] transformInventoryEffectRenderer(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("initGui".equals(method.name)
+                        || "func_73866_w_".equals(method.name))
+                        || !"()V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, SET_BONUS_COLUMN_HOOK_OWNER,
+                        "noEffects")) {
+                    activate(SET_BONUS_ROOM_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                MethodInsnNode isEmpty = null;
+                for (AbstractInsnNode instruction =
+                     method.instructions.getFirst(); instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (call.getOpcode() == Opcodes.INVOKEINTERFACE
+                            && "java/util/Collection".equals(call.owner)
+                            && "isEmpty".equals(call.name)
+                            && "()Z".equals(call.desc)) {
+                        if (isEmpty != null) {
+                            warn("InventoryEffectRenderer#initGui asks more "
+                                    + "than one collection; set bonuses take "
+                                    + "the room the inventory leaves");
+                            return basicClass;
+                        }
+                        isEmpty = call;
+                    }
+                }
+                if (isEmpty == null) {
+                    warn("Could not locate the effect check in "
+                            + "InventoryEffectRenderer#initGui; set bonuses "
+                            + "take the room the inventory leaves");
+                    return basicClass;
+                }
+                redirect(isEmpty, SET_BONUS_COLUMN_HOOK_OWNER, "noEffects",
+                        "(Ljava/util/Collection;)Z");
+                activate(SET_BONUS_ROOM_ACTIVE_PROPERTY);
+                info("Patched InventoryEffectRenderer to make room for set "
+                        + "bonuses");
+                return write(owner);
+            }
+            warn("Could not locate InventoryEffectRenderer#initGui; set "
+                    + "bonuses take the room the inventory leaves");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch InventoryEffectRenderer for set bonuses: "
                     + throwable);
             return basicClass;
         }

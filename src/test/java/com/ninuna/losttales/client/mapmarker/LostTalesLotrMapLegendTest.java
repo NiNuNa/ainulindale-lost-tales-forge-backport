@@ -39,8 +39,10 @@ public final class LostTalesLotrMapLegendTest {
 
     @Test
     public void aShortMapScrollsTheRowsItHasNoRoomFor() {
+        // 90 pixels of map above the key-hint bar.
         LostTalesLotrMapLegend.Layout layout =
-                LostTalesLotrMapLegend.calculateLayout(320, 120,
+                LostTalesLotrMapLegend.calculateLayout(320,
+                        90 + LostTalesLotrMapControlBar.HEIGHT,
                         LostTalesLotrMapControlBar.HEIGHT, KINDS, CONTENT,
                         ROW);
 
@@ -111,8 +113,10 @@ public final class LostTalesLotrMapLegendTest {
 
     @Test
     public void layoutHidesWhenTheScaledScreenIsTooShort() {
+        // 40 pixels of map above the key-hint bar.
         LostTalesLotrMapLegend.Layout layout =
-                LostTalesLotrMapLegend.calculateLayout(320, 70,
+                LostTalesLotrMapLegend.calculateLayout(320,
+                        40 + LostTalesLotrMapControlBar.HEIGHT,
                         LostTalesLotrMapControlBar.HEIGHT, KINDS, CONTENT,
                         ROW);
 

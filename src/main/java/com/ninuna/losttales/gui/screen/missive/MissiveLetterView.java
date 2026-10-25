@@ -457,10 +457,4 @@ final class MissiveLetterView {
                 fadeEdgeBottom(box), inner.top, inner.bottom(),
                 this.shownScroll, maxScroll(inner), alpha);
     }
-
-    /** A colour of the palette at its own opacity times the page's. */
-    static int faded(int argb, int alpha) {
-        return LostTalesUiInk.argb(LostTalesColors.rgb(argb), Math.round(
-                (argb >>> 24) * Math.max(0, Math.min(255, alpha)) / 255.0F));
-    }
 }

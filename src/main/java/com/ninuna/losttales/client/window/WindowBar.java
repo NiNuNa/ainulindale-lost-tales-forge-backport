@@ -338,17 +338,17 @@ public final class WindowBar {
     }
 
     /** Top of the framed buttons on a bar starting at {@code top}: the clear rows below the rule. */
-    static int buttonTop(int top) {
+    public static int buttonTop(int top) {
         return top + 1 + 2;
     }
 
     /** Top of the glyphs' squares and of the well, centred on the framed buttons. */
-    static int glyphTop(int top) {
+    public static int glyphTop(int top) {
         return buttonTop(top) + (LostTalesUiFramedButton.HEIGHT - GLYPH_SIZE) / 2;
     }
 
     /** The row a word stands on in the bar, as a message row puts its text. */
-    static int textTop(int top) {
+    public static int textTop(int top) {
         return glyphTop(top) + WindowStyle.ROW_TEXT_TOP;
     }
 
