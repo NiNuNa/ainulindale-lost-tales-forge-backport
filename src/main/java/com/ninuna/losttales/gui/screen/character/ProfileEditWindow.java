@@ -169,8 +169,7 @@ final class ProfileEditWindow extends SubWindowContent {
         Minecraft minecraft = Minecraft.getMinecraft();
         this.context = new CreatorContext(minecraft, minecraft.fontRenderer,
                 minecraft.thePlayer == null ? null
-                        : minecraft.thePlayer.getUniqueID(),
-                CreatorContext.Presentation.ROWS);
+                        : minecraft.thePlayer.getUniqueID());
         List<CreatorControl> about = new ArrayList<CreatorControl>();
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
             CreatorTextArea area = new CreatorTextArea(this.context,
@@ -203,7 +202,7 @@ final class ProfileEditWindow extends SubWindowContent {
                     public int typedMax() {
                         return CharacterValidator.MAX_AGE;
                     }
-                }, I18n.format("gui.losttales.character.creator.age.oldest")));
+                }));
         facts.add(new CreatorNote(this.context,
                 I18n.format("gui.losttales.character.creator.age.hint")));
         for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {

@@ -1,0 +1,27 @@
+{
+  "id": "losttales:striders_garb",
+  "relic": true,
+  "helmet": [
+    "lotr:item.helmetRanger"
+  ],
+  "chestplate": [
+    "lotr:item.bodyRanger"
+  ],
+  "leggings": [
+    "lotr:item.legsRanger"
+  ],
+  "boots": [
+    "lotr:item.bootsRanger"
+  ],
+  "bonus": [
+    {
+      "effect": "speed",
+      "amount": 0.1
+    },
+    {
+      "effect": "experience",
+      "amount": 0.2,
+      "skill": "losttales:lore"
+    }
+  ]
+}

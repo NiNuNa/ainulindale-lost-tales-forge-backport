@@ -30,6 +30,20 @@ public final class CharacterPlayerStateStorage {
         return data;
     }
 
+    /**
+     * The account's store as it stands, for a read; null where none was
+     * ever written. Unlike {@link #get}, nothing is made.
+     */
+    public static CharacterPlayerStateWorldData find(World world, UUID ownerId) {
+        if (ownerId == null) {
+            return null;
+        }
+        WorldServer overworld = LostTalesDimensionHelper.overworld(world);
+        return (CharacterPlayerStateWorldData) overworld.mapStorage.loadData(
+                CharacterPlayerStateWorldData.class,
+                CharacterPlayerStateWorldData.dataName(ownerId));
+    }
+
     public static void flush(World world) {
         LostTalesDimensionHelper.flushOverworldStorage(world);
     }

@@ -9,8 +9,9 @@ import java.util.Set;
 
 /**
  * Everything a character has grown: its skills, its character level, the
- * perks it took, its deeds and the title it wears, and how often it reset
- * a tree at a statue. One character's own (CHAR-28): a switch swaps the
+ * perks it took, its deeds and the title it wears, how often it reset a
+ * tree at a statue, and the LOTR waypoints it reached, each of which Lore
+ * counts once (PROG-01). One character's own (CHAR-28): a switch swaps the
  * whole of it. Bounded on every collection; a change past a bound is
  * refused.
  */
@@ -22,6 +23,8 @@ public final class ProgressionState {
     public static final int MAX_ID_CHARACTERS = 128;
     public static final int MAX_RANK = 16;
     public static final int MAX_RESETS = 1000;
+    /** LOTR holds under 300 waypoints; the bound leaves room for a server's mods. */
+    public static final int MAX_WAYPOINTS = 1024;
 
     private final Map<String, SkillStanding> skills =
             new LinkedHashMap<String, SkillStanding>();
@@ -34,6 +37,8 @@ public final class ProgressionState {
     private final Map<String, Long> deedCounters = new LinkedHashMap<String, Long>();
     private String title = "";
     private int resets;
+    /** The LOTR waypoints reached, as deed files name them ({@code lotr:BREE}). */
+    private final Set<String> waypoints = new LinkedHashSet<String>();
 
     public static String perkKey(String skillId, String perkId) {
         return skillId + "/" + perkId;
@@ -53,6 +58,7 @@ public final class ProgressionState {
         copy.deedCounters.putAll(this.deedCounters);
         copy.title = this.title;
         copy.resets = this.resets;
+        copy.waypoints.addAll(this.waypoints);
         return copy;
     }
 
@@ -225,5 +231,29 @@ public final class ProgressionState {
             throw new IllegalArgumentException("resets run from 0 to " + MAX_RESETS);
         }
         this.resets = resets;
+    }
+
+    public boolean hasWaypoint(String waypointId) {
+        return this.waypoints.contains(waypointId);
+    }
+
+    public Set<String> waypoints() {
+        return Collections.unmodifiableSet(this.waypoints);
+    }
+
+    /** Marks a LOTR waypoint reached; answers whether it was new. */
+    public boolean addWaypoint(String waypointId) {
+        if (!fitsId(waypointId)) {
+            throw new IllegalArgumentException("a waypoint needs an id");
+        }
+        if (this.waypoints.contains(waypointId)) {
+            return false;
+        }
+        if (this.waypoints.size() >= MAX_WAYPOINTS) {
+            throw new IllegalStateException("a character reaches at most "
+                    + MAX_WAYPOINTS + " waypoints");
+        }
+        this.waypoints.add(waypointId);
+        return true;
     }
 }

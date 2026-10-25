@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.gui;
 
 import com.ninuna.losttales.gui.style.LostTalesButtonStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import net.minecraft.client.Minecraft;
@@ -84,10 +84,10 @@ public class LostTalesButton extends GuiButton {
         int y = this.yPosition + (this.height - 8) / 2;
         // Separate passes preserve the palette shadow instead of deriving a
         // darker text color through vanilla's drawStringWithShadow.
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         font.drawString(this.displayString, x + 1, y + 1,
                 LostTalesColors.BLACK_SHADOW);
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         font.drawString(this.displayString, x, y, color);
     }
 }

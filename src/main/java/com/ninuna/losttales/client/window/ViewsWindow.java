@@ -137,19 +137,24 @@ final class ViewsWindow extends SubWindowContent {
             View view = views.get(index);
             boolean under = index == this.pointed;
             LostTalesUiHitBox at = buttonBox(box.left, box.top, index, views);
+            // A view that may not open now stands greyed and never lifts.
+            boolean open = Views.closedWhy(view).length() == 0;
+            boolean lifts = under && open;
             LostTalesUiButtonMotion motion = motion(view.id());
-            motion.advance(now, WindowView.isOn(view) || under, under,
-                    under && pressed);
+            motion.advance(now, WindowView.isOn(view) || lifts, lifts,
+                    lifts && pressed);
             drawSurface(at, motion.lit(), surfaceAlpha);
             WindowPage icon = iconOf(view);
             if (icon != null) {
                 float iconX = (float)at.left + LostTalesUiFramedButton.WIDE_INSET;
                 float iconY = (float)at.top + LostTalesUiFramedButton.WIDE_INSET;
+                int ink = open ? alpha
+                        : Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY);
                 LostTalesUiButton.beginPose(motion, iconX, iconY,
                         LostTalesUiInk.ICON_SIZE, LostTalesUiInk.ICON_SIZE);
                 try {
                     LostTalesUiInk.beginContent();
-                    icon.drawIcon(minecraft, iconX, iconY, alpha, TabMark.NONE);
+                    icon.drawIcon(minecraft, iconX, iconY, ink, TabMark.NONE);
                 } finally {
                     LostTalesUiButton.endPose();
                 }
@@ -205,7 +210,8 @@ final class ViewsWindow extends SubWindowContent {
 
     /**
      * The icon a view's button wears: a category's view its first page's
-     * among every page that can be opened; a custom view the page in front
+     * among every page that can be opened, else its first page's of all,
+     * as for a view that may not open now; a custom view the page in front
      * of its window brought forward last, else the New Page's. Null where
      * none can be shown.
      */
@@ -226,6 +232,11 @@ final class ViewsWindow extends SubWindowContent {
             if (entry.icon != null
                     && Views.of(entry.icon.category()) == view) {
                 return entry.icon;
+            }
+        }
+        for (WindowPages.Page page : WindowPages.all()) {
+            if (!page.opensByGame() && Views.of(page.category()) == view) {
+                return page.tab();
             }
         }
         return null;
@@ -249,7 +260,12 @@ final class ViewsWindow extends SubWindowContent {
         }
         View view = views.get(index);
         if (button == 0) {
-            screen.swapTo(view);
+            String closed = Views.closedWhy(view);
+            if (closed.length() > 0) {
+                screen.sayWhyGreyedHere(closed);
+            } else {
+                screen.swapTo(view);
+            }
         } else if (button == 1) {
             screen.showViewMenu(view, new SubWindowAnchor(
                     (int)Math.floor(at.left), (int)Math.floor(at.top),
@@ -259,9 +275,14 @@ final class ViewsWindow extends SubWindowContent {
         return true;
     }
 
+    /** A view's name and key; none on a view that may not open now, whose press says why. */
     @Override
     public PointerTip tip(FontRenderer font) {
-        return this.pointed == -1 ? null : PointerTip.of(font, tipWords());
+        List<View> views = Views.all();
+        boolean closed = this.pointed >= 0 && this.pointed < views.size()
+                && Views.closedWhy(views.get(this.pointed)).length() > 0;
+        return this.pointed == -1 || closed ? null
+                : PointerTip.of(font, tipWords());
     }
 
     /** The view's name with its key, {@code Map (M)}; the {@code +}'s, {@code New View}. */

@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.render.player;
 
 import com.ninuna.losttales.character.registry.CharacterBodyModelDefinition;
 import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
+import com.ninuna.losttales.client.character.CharacterGearPreview;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.renderer.entity.RenderManager;
@@ -19,10 +20,14 @@ import java.util.Set;
  * for a player without one. Vanilla's RenderPlayer only draws an entity the
  * resolver cannot describe.
  *
- * A configured renderer exists per body model, skin layout, arm width and
+ * A configured renderer exists per body model, skin layout, arms and
  * chest choice. They are built the first time a player needs them and kept
  * for the rest of the client run; one that fails to build is logged once
  * and its players fall back to vanilla.
+ *
+ * While a stage shows another character, the local player is drawn in
+ * that character's armour and held item ({@link CharacterGearPreview}),
+ * for this draw alone.
  */
 public final class LostTalesRaceAwarePlayerRenderer extends RenderPlayer {
 
@@ -34,13 +39,18 @@ public final class LostTalesRaceAwarePlayerRenderer extends RenderPlayer {
     public void doRender(AbstractClientPlayer player,
                          double x, double y, double z,
                          float entityYaw, float partialTicks) {
-        LostTalesConfiguredPlayerRenderer renderer = rendererFor(player);
-        if (renderer == null) {
-            super.doRender(player, x, y, z, entityYaw, partialTicks);
-            return;
+        CharacterGearPreview.Dressing dressing = CharacterGearPreview.dress(player);
+        try {
+            LostTalesConfiguredPlayerRenderer renderer = rendererFor(player);
+            if (renderer == null) {
+                super.doRender(player, x, y, z, entityYaw, partialTicks);
+                return;
+            }
+            renderer.setRenderManager(RenderManager.instance);
+            renderer.doRender(player, x, y, z, entityYaw, partialTicks);
+        } finally {
+            CharacterGearPreview.undress(dressing);
         }
-        renderer.setRenderManager(RenderManager.instance);
-        renderer.doRender(player, x, y, z, entityYaw, partialTicks);
     }
 
     @Override
@@ -79,7 +89,7 @@ public final class LostTalesRaceAwarePlayerRenderer extends RenderPlayer {
                     CharacterBodyModelRegistry.get(appearance.getModelId());
             LostTalesConfiguredPlayerRenderer renderer =
                     LostTalesPlayerBodyModelFactory.create(definition,
-                            appearance.getLayout(), appearance.getBodyTypeId(),
+                            appearance.getLayout(), appearance.getArmsId(),
                             appearance.getChestTypeId());
             if (renderer != null && renderer.isConfigured()) {
                 return renderer;

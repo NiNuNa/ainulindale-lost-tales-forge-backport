@@ -271,6 +271,19 @@ public final class LostTalesQuestDefinitionValidator {
                 validateAlignment(value, where, out);
             } else if (LostTalesQuestRewards.SKILLS.equals(key)) {
                 validateSkills(value, where, out);
+            } else if (LostTalesQuestRewards.RELIC.equals(key)) {
+                validateList(value, where + " relic", out);
+                for (String relic : LostTalesQuestRewards.relics(rewards)) {
+                    if (!com.ninuna.losttales.armour.Relics.isWritten(relic)) {
+                        out.warn(where + " has 'relic' " + relic + "; it is a relic set's id,"
+                                + " with a slot after a slash for one piece");
+                    }
+                }
+            } else if (LostTalesQuestRewards.STARTER.equals(key)) {
+                if (!LostTalesQuestRewards.isStarterId(value)) {
+                    out.warn(where + " has 'starter' " + value + "; it is one quest's"
+                            + " id, written namespace:path");
+                }
             } else if (LostTalesQuestRewards.COINS.equals(key)
                     && (Integer.parseInt(value) < 1
                     || Integer.parseInt(value) > LostTalesQuestRewards.MAX_COINS)) {
@@ -364,7 +377,8 @@ public final class LostTalesQuestDefinitionValidator {
      * The quest's rules: {@code returnTo} is {@code giver}, for a quest
      * with a giver and a hand-in line; a {@code timeLimit} is a number of
      * in-game days; {@code failOn} names death or the giver killed, the
-     * second only where there is a giver.
+     * second only where there is a giver; {@code repeatAfter} is a number
+     * of in-game days, on a repeatable quest.
      */
     private static void validateRules(LostTalesQuestDefinition quest, Warnings out) {
         String where = "quest=" + quest.getId();
@@ -385,6 +399,17 @@ public final class LostTalesQuestDefinitionValidator {
             }
         }
         validateTimeLimit(rules, where, out);
+        if (rules.containsKey(LostTalesQuestRules.REPEAT_AFTER)) {
+            if (LostTalesQuestRules.repeatAfterTicks(quest) <= 0L) {
+                out.warn(where + " has 'repeatAfter' " + LostTalesQuestParams.value(
+                        rules, LostTalesQuestRules.REPEAT_AFTER) + "; it is a number of"
+                        + " in-game days, " + LostTalesQuestRules.MIN_DAYS + " to "
+                        + (int) LostTalesQuestRules.MAX_DAYS);
+            } else if (!quest.isRepeatable()) {
+                out.warn(where + " waits before it is taken again ('repeatAfter'),"
+                        + " but is not repeatable");
+            }
+        }
         Map<String, String> podium = LostTalesQuestRules.podiumRewards(quest);
         if (!podium.isEmpty()) {
             if (!quest.isWorldQuest()) {
@@ -683,7 +708,8 @@ public final class LostTalesQuestDefinitionValidator {
     static final Set<String> REWARD_KEYS = new HashSet<String>(Arrays.asList(
             "experience", "levels", "item", "count", "meta", "items",
             LostTalesQuestRewards.ALIGNMENT, LostTalesQuestRewards.COINS,
-            LostTalesQuestRewards.PICK, LostTalesQuestRewards.SKILLS));
+            LostTalesQuestRewards.PICK, LostTalesQuestRewards.SKILLS,
+            LostTalesQuestRewards.STARTER, LostTalesQuestRewards.RELIC));
 
     /** The reward keys that are whole numbers. */
     private static final Set<String> INTEGER_REWARDS = new HashSet<String>(

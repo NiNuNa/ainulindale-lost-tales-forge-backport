@@ -4,17 +4,20 @@ import com.ninuna.losttales.LostTalesMetaData;
 import cpw.mods.fml.common.FMLLog;
 import java.util.Locale;
 import lotr.common.LOTRLevelData;
+import lotr.common.LOTRMod;
 import lotr.common.LOTRPlayerData;
 import lotr.common.fac.LOTRAlignmentValues;
 import lotr.common.fac.LOTRFaction;
 import lotr.common.item.LOTRItemCoin;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.Item;
 
 /**
- * What a Lost Tales quest pays in LOTR's own coin: alignment with a faction
- * and coins, each through the call LOTR's own mini-quests pay with
- * (QUEST-33). A faction is named as the mod names it everywhere,
- * {@code lotr:gondor}.
+ * What a Lost Tales quest pays in LOTR's own coin (QUEST-33): alignment
+ * with a faction, through the call LOTR's own mini-quests pay it with, and
+ * LOTR's coins, counted out as LOTR counts them, which the quest hands
+ * over as items so what finds no room waits (QUEST-44). A faction is named
+ * as the mod names it everywhere, {@code lotr:gondor}.
  */
 public final class LotrQuestRewards {
     private LotrQuestRewards() {}
@@ -54,6 +57,54 @@ public final class LotrQuestRewards {
                     player.getCommandSenderName(), unpaid.toString());
             return false;
         }
+    }
+
+    /**
+     * The id LOTR registers its coins under, {@code lotr:item.silverCoin};
+     * empty where LOTR's coin cannot be read.
+     */
+    public static String coinItemId() {
+        try {
+            Object name = Item.itemRegistry.getNameForObject(LOTRMod.silverCoin);
+            return name == null ? "" : String.valueOf(name);
+        } catch (RuntimeException unreadable) {
+            return "";
+        } catch (LinkageError incompatible) {
+            return "";
+        }
+    }
+
+    /**
+     * LOTR's coins worth {@code value}, counted out as LOTR's own
+     * {@code giveCoins} counts them, the largest coin first: how many of
+     * each, by the coin's meta. Null where LOTR's coin values cannot be
+     * read, or for no value.
+     */
+    public static int[] coinCounts(int value) {
+        int[] values;
+        try {
+            values = LOTRItemCoin.values;
+        } catch (LinkageError incompatible) {
+            return null;
+        }
+        return countOut(values, value);
+    }
+
+    /** {@code value} counted out in coins of {@code values}, the largest first; null for none. */
+    static int[] countOut(int[] values, int value) {
+        if (values == null || values.length == 0 || value <= 0) {
+            return null;
+        }
+        int[] counts = new int[values.length];
+        int left = value;
+        for (int meta = values.length - 1; meta >= 0; meta--) {
+            if (values[meta] <= 0) {
+                return null;
+            }
+            counts[meta] = left / values[meta];
+            left -= counts[meta] * values[meta];
+        }
+        return left == 0 ? counts : null;
     }
 
     /** Gives the player coins worth {@code value}, in LOTR's own coins; what does not fit drops. */

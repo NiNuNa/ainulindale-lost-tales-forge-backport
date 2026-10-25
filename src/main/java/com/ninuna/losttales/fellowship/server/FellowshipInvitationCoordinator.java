@@ -2,6 +2,7 @@ package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.server.KnownAccounts;
 import com.ninuna.losttales.character.storage.CharacterIndex;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.validation.CharacterNames;
@@ -12,6 +13,7 @@ import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationWorldData;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
@@ -380,6 +382,9 @@ final class FellowshipInvitationCoordinator {
         for (Fellowship fellowship : fellowships) {
             names.put(fellowship.getFellowshipId(), fellowship.getName());
         }
+        Map<UUID, String> accounts = new HashMap<UUID, String>();
+        addAccountNames(accounts, incoming);
+        addAccountNames(accounts, outgoing);
         Fellowship travelling = fellowshipData.getTravellingFellowship(active.gameplayId());
         return FellowshipInvitationState.success(
                 active.gameplayId(),
@@ -388,7 +393,31 @@ final class FellowshipInvitationCoordinator {
                 FellowshipService.createRefusal(player, active.gameplayId(), fellowships),
                 incoming,
                 outgoing,
-                names);
+                names,
+                accounts);
+    }
+
+    /**
+     * The names of the accounts behind the characters the invitations
+     * name, each read once: an online player's own, else the one the
+     * server last saw it log in with. Accounts are no secret; each reader's
+     * Show Accounts decides whether they show (FEL-31).
+     */
+    private static void addAccountNames(Map<UUID, String> accounts,
+                                        List<FellowshipInvitation> invitations) {
+        for (FellowshipInvitation invitation : invitations) {
+            addAccountName(accounts, invitation.getInvitingOwnerId());
+            addAccountName(accounts, invitation.getTargetOwnerId());
+        }
+    }
+
+    private static void addAccountName(Map<UUID, String> accounts, UUID account) {
+        if (account == null || accounts.containsKey(account)) {
+            return;
+        }
+        EntityPlayerMP online = LostTalesServerPlayers.findOnline(account);
+        accounts.put(account, online != null ? online.getCommandSenderName()
+                : KnownAccounts.nameOf(account));
     }
 
     /**

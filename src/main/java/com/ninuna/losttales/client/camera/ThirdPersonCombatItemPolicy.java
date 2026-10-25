@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.camera;
 
-import com.ninuna.losttales.gameplay.projectile.ThirdPersonProjectileItemPolicy;
+import com.ninuna.losttales.thirdperson.ThirdPersonProjectileItemPolicy;
 import java.util.Locale;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;

@@ -312,6 +312,31 @@ public final class WindowScreen extends GuiChat
         open(screenForPage(pageId, false));
     }
 
+    /** Whether {@code view} may not open now ({@link Views#closedWhy}). */
+    private static boolean isClosed(View view) {
+        return Views.closedWhy(view).length() > 0;
+    }
+
+    /**
+     * Opens a page the game opens over its category's view, in a window of
+     * its own there ({@link WindowLayout#openOver}), the page holding the
+     * keys: the screen opens on that view, or swaps to it.
+     */
+    public static void openOver(OtherPage page) {
+        View view = page == null ? null : Views.of(page.category());
+        if (WindowLayout.openOver(page, view) == null) {
+            return;
+        }
+        pageToFocus = page;
+        WindowScreen current = current();
+        if (current != null) {
+            current.swapTo(view);
+            return;
+        }
+        viewNext = view;
+        open(new WindowScreen(""));
+    }
+
     /**
      * A custom view's key, by the view's number: opens the screen on that
      * view, as the player left it, making it first where it does not stand
@@ -319,6 +344,13 @@ public final class WindowScreen extends GuiChat
      */
     public static void openCustomView(int number) {
         View view = Views.numbered(number);
+        if (view != null && isClosed(view)) {
+            WindowScreen current = current();
+            if (current != null) {
+                current.sayClosed(view);
+            }
+            return;
+        }
         if (view == null) {
             view = Views.make(number);
             if (view == null) {
@@ -379,6 +411,9 @@ public final class WindowScreen extends GuiChat
     private static GuiScreen screenForPage(String pageId, boolean byKey) {
         Minecraft minecraft = Minecraft.getMinecraft();
         OtherPage page = WindowPages.tab(pageId);
+        if (page != null && isClosed(Views.of(page.category()))) {
+            return null;
+        }
         boolean onScreen = minecraft != null
                 && minecraft.currentScreen instanceof WindowScreen;
         Window holding = minecraft == null || page == null ? null
@@ -820,9 +855,10 @@ public final class WindowScreen extends GuiChat
         this.subWindows.cancel();
         // The sub-windows close with the screen and come back with it.
         SubWindowPlaces.rememberOpen(this.subWindows.openWindows());
-        // A search belongs to the open screen and goes with it, and a
-        // tip left showing waits for the next opening of the chat.
-        WindowSearch.close();
+        // The search field belongs to the open screen and leaves its well
+        // with it, each copy keeping its words; a tip left showing waits
+        // for the next opening of the chat.
+        WindowSearch.release();
         ContentView.leaveAll();
         FirstTips.screenClosed();
         // Cut names slid along under the pointer start home next time.
@@ -857,12 +893,7 @@ public final class WindowScreen extends GuiChat
         if (handleSnapKey(press)) {
             return;
         }
-        // A custom view's key that types nothing reaches the screen
-        // whatever field holds the keys.
-        int keyed = press.command || press.alt ? 0
-                : Views.numberForKey(keyCode);
-        if (!press.types && keyed > 0) {
-            openCustomView(keyed);
+        if (viewKeyPressed(press)) {
             return;
         }
         if (viewKey(press)) {
@@ -887,8 +918,7 @@ public final class WindowScreen extends GuiChat
         }
         // The page in front takes its keys, the screen's own Ctrl
         // shortcuts aside; what it does not use goes no further, but for
-        // Escape, which the screen answers as it does anywhere. A page's
-        // key comes first, unless the page is typing or asking.
+        // Escape, which the screen answers as it does anywhere.
         if (this.focusedPage != null && fieldKeeps(press)) {
             PageContent content = WindowPages.contentOf(this.focusedPage);
             // Escape gives a window its page fills its row, strip and bar
@@ -899,13 +929,6 @@ public final class WindowScreen extends GuiChat
                     && (content == null || !content.holdsKeys())
                     && ContentView.leave(WindowLayout.windowOf(
                             this.focusedPage))) {
-                return;
-            }
-            if (content != null && !content.holdsKeys()
-                    && (pressPageKey(press) || keyed > 0)) {
-                if (keyed > 0) {
-                    openCustomView(keyed);
-                }
                 return;
             }
             // A page's own keys are single letters and a few more; with
@@ -1043,9 +1066,9 @@ public final class WindowScreen extends GuiChat
     /**
      * Lets the page in front of {@code window} fill the window, with the
      * keys ({@link ContentView}); while it fills it, gives the window its
-     * row, strip and bar back. The search goes, its well being out of
-     * sight. The borderless button, its row in the page's options and
-     * Alt+Enter.
+     * row, strip and bar back. The search field leaves the well, which is
+     * out of sight; the page keeps its words. The borderless button, its
+     * row in the page's options and Alt+Enter.
      */
     void toggleBorderless(Window window) {
         if (window == null) {
@@ -1055,7 +1078,7 @@ public final class WindowScreen extends GuiChat
             return;
         }
         if (WindowSearch.isOpenOn(window.getId())) {
-            closeSearch();
+            releaseSearch();
         }
         jumpToTab(window.getActiveTab());
     }
@@ -1145,15 +1168,105 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * A page's key over the page holding the keys, as a game's screens
-     * switch: another view's key swaps the screen to that view, the
-     * windows pinned to the GUI beside it; the key of the view the screen
-     * shows closes the screen, every page waiting in its window. False when
-     * the press is no page's key, or its page cannot come forward.
+     * A view's key on the screen, as a game's screens switch
+     * ({@link ViewKeys}): another view's key swaps the screen to that view,
+     * the windows pinned to the GUI beside it, and the key of the view the
+     * screen shows closes the screen, every page waiting in its window. A
+     * custom view's key comes first, then a page's (M, J, the Fellowships,
+     * Characters and Skills keys), then the chat's key and the command key.
+     * False when the press goes on: no view's key, typed into a field, a
+     * key of the page in front, or a page that cannot come forward.
      */
-    private boolean pressPageKey(LostTalesKeyPress press) {
-        return !press.command && !press.alt
-                && turnTo(WindowPages.tabForKey(press.key));
+    private boolean viewKeyPressed(LostTalesKeyPress press) {
+        int key = press.key;
+        int custom = key <= 0 ? 0 : Views.numberForKey(key);
+        OtherPage page = key <= 0 || custom > 0 ? null
+                : WindowPages.tabForKey(key);
+        View channels = Views.of(PageCategory.CHANNELS);
+        View consoles = Views.of(PageCategory.CONSOLES);
+        boolean chat = key > 0 && custom == 0 && page == null
+                && channels != null && key == channels.key();
+        boolean command = key > 0 && custom == 0 && page == null && !chat
+                && consoles != null && key == consoles.key();
+        View view = custom > 0 ? Views.numbered(custom)
+                : page != null ? Views.of(page.category())
+                : chat ? channels : command ? consoles : null;
+        ViewKeys.Act act = ViewKeys.act(custom > 0 || view != null,
+                press.command || press.alt, fieldTypedIn(), press.types,
+                pageAnswersKey(key), view != null && WindowView.isOn(view));
+        if (act == ViewKeys.Act.PASS) {
+            return false;
+        }
+        if (act == ViewKeys.Act.CLOSE) {
+            closeScreen();
+            return true;
+        }
+        if (custom > 0) {
+            openCustomView(custom);
+            return true;
+        }
+        if (page != null) {
+            return turnTo(page);
+        }
+        chatKey(view, command);
+        return true;
+    }
+
+    /**
+     * Whether a field holds the keys now: the search's, the field of the
+     * sub-window in front, the page's in front of the keys, or the chat's
+     * while a conversation is shown and nothing else holds them.
+     */
+    private boolean fieldTypedIn() {
+        SubWindow front = this.subWindows.focused();
+        if (this.toolStrip.isFocused()
+                || front != null && front.content.holdsKeys()) {
+            return true;
+        }
+        if (this.focusedPage != null) {
+            PageContent content = WindowPages.contentOf(this.focusedPage);
+            return content != null && content.holdsKeys();
+        }
+        return hasField();
+    }
+
+    /** Whether the page in front of the keys has a key of its own on {@code key}, as its help lists it. */
+    private boolean pageAnswersKey(int key) {
+        PageContent content = WindowPages.contentOf(this.focusedPage);
+        return content != null && !content.holdsKeys()
+                && PageKeys.answersKey(content.keyAreas(), key);
+    }
+
+    /**
+     * The chat's key or the command key on the screen: the screen swaps to
+     * Chat Channels or Consoles, and the chat brings the page its key opens
+     * with ({@link ScreenPart#chatKey}): the conversation last used there,
+     * or the Console with {@code /} typed. With no chat, the page in front
+     * of the view's window last in front.
+     */
+    private void chatKey(View view, boolean command) {
+        if (isClosed(view)) {
+            sayClosed(view);
+            return;
+        }
+        if (this.toolStrip.isFocused()) {
+            leaveSearch();
+        }
+        WindowView.forView(view);
+        WindowLayout.buildView(view);
+        this.showedWindows = !isEmpty();
+        leavePage();
+        for (ScreenPart part : this.parts) {
+            if (part.chatKey(command)) {
+                syncTypingFocus();
+                return;
+            }
+        }
+        WindowPage front = viewFront(view);
+        if (front != null) {
+            jumpToTab(front);
+        }
+        syncTypingFocus();
     }
 
     /**
@@ -1164,6 +1277,10 @@ public final class WindowScreen extends GuiChat
      * page. False for no page, or one that cannot come forward.
      */
     public boolean turnTo(OtherPage page) {
+        if (page != null && isClosed(Views.of(page.category()))) {
+            sayClosed(Views.of(page.category()));
+            return true;
+        }
         if (page == null || !page.isAvailable()) {
             return false;
         }
@@ -1193,6 +1310,10 @@ public final class WindowScreen extends GuiChat
         if (view == null) {
             return;
         }
+        if (isClosed(view)) {
+            sayClosed(view);
+            return;
+        }
         WindowView.forView(view);
         WindowLayout.buildView(view);
         this.showedWindows = !isEmpty();
@@ -1203,6 +1324,13 @@ public final class WindowScreen extends GuiChat
             leavePage();
         }
         syncTypingFocus();
+    }
+
+    /** Why a view may not open now, over the bar of the window the keys are in. */
+    private void sayClosed(View view) {
+        Window window = isEmpty() ? null : keysWindow();
+        showNotice(window == null ? null : window.getId(),
+                Views.closedWhy(view));
     }
 
     /**
@@ -1305,11 +1433,12 @@ public final class WindowScreen extends GuiChat
 
     /**
      * Opens the search over the window the keys are in and gives it the
-     * keys.
+     * keys, the words the page in front keeps standing in it.
      */
     private void openSearch() {
         Window typed = keysWindow();
-        WindowPage inFront = typed == null ? null : typed.getActiveTab();
+        WindowPage inFront = typed == null ? null
+                : WindowSearch.frontOf(typed.getId());
         if (inFront == null || inFront.searchUnavailable().length() > 0) {
             return;
         }
@@ -1320,14 +1449,42 @@ public final class WindowScreen extends GuiChat
         if (front != null) {
             front.content.releaseKeys();
         }
-        WindowSearch.open(typed.getId());
+        WindowSearch.open(typed.getId(), inFront);
         this.toolStrip.setText(WindowSearch.query());
         focusSearch(true);
     }
 
-    /** Closes the search: what it lit goes, and the keys go back. */
+    /**
+     * Clears the words of the copy the field types for, and the field
+     * leaves its well: what they lit goes, and the keys go back.
+     */
     private void closeSearch() {
-        WindowSearch.close();
+        String windowId = WindowSearch.windowId();
+        WindowPage copy = WindowSearch.frontOf(windowId);
+        if (WindowSearch.typesFor(copy)) {
+            WindowSearch.clear(copy.id());
+        }
+        releaseSearch();
+    }
+
+    /**
+     * Clears the words the page in front of {@code window} keeps in its
+     * well, whether the field stands there or not: the well's cross.
+     */
+    private void clearSearchIn(Window window) {
+        if (WindowSearch.isOpenOn(window.getId())) {
+            closeSearch();
+            return;
+        }
+        WindowPage copy = WindowSearch.frontOf(window.getId());
+        if (copy != null) {
+            WindowSearch.clear(copy.id());
+        }
+    }
+
+    /** The field leaves its well, empty, and the keys go back; every copy keeps its words. */
+    private void releaseSearch() {
+        WindowSearch.release();
         this.toolStrip.setText("");
         focusSearch(false);
     }
@@ -1340,7 +1497,7 @@ public final class WindowScreen extends GuiChat
 
     /**
      * A menu opened from the keyboard takes the keys, so the search that
-     * held them lets them go: an empty one closes.
+     * held them lets them go.
      */
     public void leaveSearchForMenu() {
         if (this.toolStrip.isFocused()) {
@@ -1349,25 +1506,20 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * The keys go back: a search with words in it stays open with what it
-     * found lit, and an empty one closes, since there is nothing of it to
-     * keep.
+     * The keys go back and the field leaves its well: words typed there
+     * stay with the copy in front of it, lighting what they found, and
+     * come back as the field does (WIN-25).
      */
     private void leaveSearch() {
-        if (WindowSearch.query().length() == 0) {
-            closeSearch();
-        } else {
-            focusSearch(false);
-        }
+        releaseSearch();
     }
 
     /**
-     * The page the search is open over, while a page is in front of its
-     * window; null for a part's search or none.
+     * The page the search field types for, while a page is in front of
+     * its window; null for a part's search or none.
      */
     private static OtherPage searchedPage() {
-        Window searched = WindowLayout.window(WindowSearch.windowId());
-        WindowPage front = searched == null ? null : searched.getActiveTab();
+        WindowPage front = WindowSearch.frontOf(WindowSearch.windowId());
         return front instanceof OtherPage ? (OtherPage)front : null;
     }
 
@@ -1395,7 +1547,8 @@ public final class WindowScreen extends GuiChat
                 return;
             }
         } else if (enter) {
-            walkSearch(!isShiftKeyDown());
+            walkSearch(WindowLayout.window(WindowSearch.windowId()),
+                    !isShiftKeyDown());
             return;
         }
         if (this.toolStrip.keyTyped(typedChar, keyCode)) {
@@ -1403,10 +1556,16 @@ public final class WindowScreen extends GuiChat
         }
     }
 
-    /** Walks to the next find down, or the previous one up, in what a part shows. */
-    private void walkSearch(boolean forward) {
+    /**
+     * Walks to the next find down, or the previous one up, in what a part
+     * shows in {@code window}, by the words its copy in front keeps.
+     */
+    private void walkSearch(Window window, boolean forward) {
+        if (window == null) {
+            return;
+        }
         for (ScreenPart part : this.parts) {
-            if (part.walkSearch(forward)) {
+            if (part.walkSearch(window, forward)) {
                 return;
             }
         }
@@ -1421,8 +1580,10 @@ public final class WindowScreen extends GuiChat
     void searchIn(Window window) {
         selectWindow(window);
         leavePage();
-        if (!WindowSearch.isOpenOn(window.getId())) {
-            WindowSearch.open(window.getId());
+        WindowPage front = WindowSearch.frontOf(window.getId());
+        if (!WindowSearch.isOpenOn(window.getId())
+                || !WindowSearch.typesFor(front)) {
+            WindowSearch.open(window.getId(), front);
             this.toolStrip.setText(WindowSearch.query());
         }
         focusSearch(true);
@@ -1540,18 +1701,17 @@ public final class WindowScreen extends GuiChat
                 this.toolStrip.clickField(press.row, x, y);
                 return;
             case ICON:
-                if (WindowSearch.isOpenOn(press.window.getId())
-                        && WindowSearch.query().length() > 0) {
-                    closeSearch();
+                if (WindowSearch.wordsIn(press.window.getId()).length() > 0) {
+                    clearSearchIn(press.window);
                 } else {
                     searchIn(press.window);
                 }
                 return;
             case PREVIOUS:
-                walkSearch(false);
+                walkSearch(press.window, false);
                 return;
             case NEXT:
-                walkSearch(true);
+                walkSearch(press.window, true);
                 return;
             default:
                 return;
@@ -2400,13 +2560,21 @@ public final class WindowScreen extends GuiChat
                              double pointerY, float partialTicks) {
         LostTalesGuiAnimationSample opening = WindowOpening.sample();
         List<Window> windows = WindowLayout.stacked();
-        // The search follows the input: moved to another window, it
-        // closes. A page is never typed in, so its search stands for as
-        // long as the page is in front of its window.
+        // The search field follows the input: moved to another window, it
+        // leaves its well. A page is never typed in, so the field stands
+        // in its well for as long as the page is in front of its window.
+        // It types for the copy in front of its window alone: another
+        // coming forward there takes it out of the well. Every copy keeps
+        // its words, and its well shows them.
         if (searchedPage() == null) {
-            WindowSearch.closeUnless(inputWindowId());
+            WindowSearch.releaseUnless(inputWindowId());
         }
-        if (!WindowSearch.isOpen() && this.toolStrip.isFocused()) {
+        if (WindowSearch.isOpen() && !WindowSearch.typesFor(
+                WindowSearch.frontOf(WindowSearch.windowId()))) {
+            WindowSearch.release();
+        }
+        if (!WindowSearch.isOpen() && this.toolStrip.fieldFocused()) {
+            this.toolStrip.setText("");
             focusSearch(false);
         }
         String previewed = this.gestures.snapPreview().windowId();
@@ -2534,13 +2702,12 @@ public final class WindowScreen extends GuiChat
         }
         boolean furniture = frame.contentShare() < 1.0F;
         // A page in front takes the window under its tool strip. It
-        // reads the well's words, none while its search is closed,
-        // before the strip counts what they found.
+        // reads the words its copy keeps in the well, none while it keeps
+        // none, before the strip counts what they found.
         boolean page = frame.page != null;
         PageContent pageContent = WindowPages.contentOf(frame.page);
         if (pageContent != null) {
-            pageContent.search(WindowSearch.isOpenOn(window.getId())
-                    ? WindowSearch.query() : "");
+            pageContent.search(WindowSearch.wordsOf(frame.page));
         }
         // The well searches the page in front; the other page of a split
         // shows all it holds.

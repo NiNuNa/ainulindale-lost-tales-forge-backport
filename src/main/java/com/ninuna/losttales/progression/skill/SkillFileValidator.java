@@ -51,7 +51,11 @@ public final class SkillFileValidator {
         int index = 0;
         for (SkillCount count : skill.getCounts()) {
             index++;
-            count(warnings, "count " + index + " (" + count.getAct().word() + ")", count);
+            String where = "count " + index + " (" + count.getAct().word() + ")";
+            count(warnings, where, count);
+            if (count.getAct() == SkillAct.ARMOUR && skill.getWeight() == null) {
+                warnings.add(where + " counts armour, which only a skill with a weight does");
+            }
         }
         if (skill.getPerks().size() > MAX_PERKS) {
             warnings.add("its tree holds more than " + MAX_PERKS + " perks");

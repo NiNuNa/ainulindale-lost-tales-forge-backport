@@ -19,7 +19,7 @@ public final class ResolvedPlayerAppearance {
 
     private final String modelId;
     private final CharacterSkinLayout layout;
-    private final String bodyTypeId;
+    private final String armsId;
     private final String chestTypeId;
     private final float rendererScale;
     private final boolean accountSkin;
@@ -27,7 +27,7 @@ public final class ResolvedPlayerAppearance {
     private final String rendererKey;
 
     ResolvedPlayerAppearance(String modelId, CharacterSkinLayout layout,
-                             String bodyTypeId, String chestTypeId, float rendererScale,
+                             String armsId, String chestTypeId, float rendererScale,
                              boolean accountSkin, ResourceLocation texture) {
         if (modelId == null || modelId.length() == 0) {
             throw new IllegalArgumentException("modelId must not be blank");
@@ -37,12 +37,12 @@ public final class ResolvedPlayerAppearance {
         }
         this.modelId = modelId;
         this.layout = layout;
-        this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
+        this.armsId = armsId == null ? "" : armsId;
         this.chestTypeId = CharacterChestTypeRegistry.normalizeOrNone(chestTypeId);
         this.rendererScale = rendererScale > 0.0F ? rendererScale : 1.0F;
         this.accountSkin = accountSkin;
         this.texture = texture;
-        this.rendererKey = rendererKey(modelId, layout, this.bodyTypeId, this.chestTypeId);
+        this.rendererKey = rendererKey(modelId, layout, this.armsId, this.chestTypeId);
     }
 
     public String getModelId() {
@@ -54,9 +54,9 @@ public final class ResolvedPlayerAppearance {
         return this.layout;
     }
 
-    /** Arm width of the body; empty for a model with only one. */
-    public String getBodyTypeId() {
-        return this.bodyTypeId;
+    /** Arms of the body; empty for a model with only one. */
+    public String getArmsId() {
+        return this.armsId;
     }
 
     /** The chest type drawn; {@link CharacterChestTypeRegistry#NONE} when none. */
@@ -90,15 +90,15 @@ public final class ResolvedPlayerAppearance {
     /** The same appearance drawn with another texture. */
     ResolvedPlayerAppearance withTexture(ResourceLocation replacement) {
         return new ResolvedPlayerAppearance(this.modelId, this.layout,
-                this.bodyTypeId, this.chestTypeId, this.rendererScale, this.accountSkin,
+                this.armsId, this.chestTypeId, this.rendererScale, this.accountSkin,
                 replacement);
     }
 
     static String rendererKey(String modelId, CharacterSkinLayout layout,
-                              String bodyTypeId, String chestTypeId) {
+                              String armsId, String chestTypeId) {
         String key = modelId + KEY_SEPARATOR + layout.name().toLowerCase(Locale.ROOT)
                 + KEY_SEPARATOR + CharacterChestTypeRegistry.normalizeOrNone(chestTypeId);
-        return bodyTypeId == null || bodyTypeId.length() == 0
-                ? key : key + KEY_SEPARATOR + bodyTypeId;
+        return armsId == null || armsId.length() == 0
+                ? key : key + KEY_SEPARATOR + armsId;
     }
 }

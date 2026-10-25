@@ -1,6 +1,7 @@
 package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.config.LostTalesConfigWords;
+import com.ninuna.losttales.config.NextStartOptions;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigApplyResult;
 import com.ninuna.losttales.config.server.ServerConfigChange;
@@ -121,6 +122,9 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
         if (LostTalesConfigWords.hasEnglish(tip)) {
             say(sender, EnumChatFormatting.DARK_GRAY, tip);
         }
+        if (NextStartOptions.waitsForNextStart(entry.getCategory(), entry.getKey())) {
+            say(sender, EnumChatFormatting.DARK_GRAY, SAY + "next_start");
+        }
     }
 
     private void set(ICommandSender sender, String[] args) {
@@ -145,20 +149,31 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
 
     /**
      * What the config service made of a change, for the role and Discord
-     * commands too: its message, what it applied and restarted, and each
-     * refusal with its reason.
+     * commands too: its message, what it applied and restarted, what it
+     * saved for the next start (DATA-12), and each refusal with its reason.
      */
     static void report(ICommandSender sender, ServerConfigApplyResult result) {
         if (result.getMessage().length() > 0) {
             say(sender, EnumChatFormatting.RED, result.getMessage());
         }
-        if (!result.getApplied().isEmpty()) {
-            if (result.getRestarted().isEmpty()) {
-                say(sender, EnumChatFormatting.GREEN, SAY + "applied",
-                        join(result.getApplied()));
+        List<String> now = result.getAppliedNow();
+        List<String> waiting = result.getWaiting();
+        boolean restarted = !result.getRestarted().isEmpty();
+        if (!now.isEmpty()) {
+            if (!restarted) {
+                say(sender, EnumChatFormatting.GREEN, SAY + "applied", join(now));
             } else {
                 say(sender, EnumChatFormatting.GREEN, SAY + "applied.restarted",
-                        join(result.getApplied()), restartedWords(result.getRestarted()));
+                        join(now), restartedWords(result.getRestarted()));
+            }
+        }
+        if (!waiting.isEmpty()) {
+            if (now.isEmpty() && restarted) {
+                say(sender, EnumChatFormatting.YELLOW, SAY + "saved.next_start.restarted",
+                        join(waiting), restartedWords(result.getRestarted()));
+            } else {
+                say(sender, EnumChatFormatting.YELLOW, SAY + "saved.next_start",
+                        join(waiting));
             }
         }
         for (ServerConfigApplyResult.Refusal refusal : result.getRefused()) {

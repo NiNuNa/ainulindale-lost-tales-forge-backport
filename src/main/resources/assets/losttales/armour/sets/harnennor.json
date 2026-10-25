@@ -1,0 +1,22 @@
+{
+  "id": "losttales:harnennor",
+  "helmet": [
+    "lotr:item.helmetHarnedor"
+  ],
+  "chestplate": [
+    "lotr:item.bodyHarnedor"
+  ],
+  "leggings": [
+    "lotr:item.legsHarnedor"
+  ],
+  "boots": [
+    "lotr:item.bootsHarnedor"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:riding"
+    }
+  ]
+}

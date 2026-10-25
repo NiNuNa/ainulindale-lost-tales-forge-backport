@@ -25,6 +25,7 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.resources.I18n;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
@@ -32,10 +33,13 @@ import org.lwjgl.opengl.GL11;
  * Finds a place by name and takes the map there.
  *
  * <p>Typing narrows one list of everything the player is allowed to be told
- * about: the locations they have found, their own and shared waypoints, and
- * their fellowship's markers. A location that has not been discovered is not in the
- * list at all — offering to fly the camera to a name the map itself refuses to
- * print would give away exactly what discovery withholds.</p>
+ * about: the locations they have found, the waystones and quest markers the
+ * map shows them, their fellowships' marks, and LOTR's waypoints of their
+ * own and shared with them, each of those after its kind as the map names
+ * it ({@code Personal: Bree}, MAP-13). A location that has not been
+ * discovered is not in the list at all: offering to fly the camera to a
+ * name the map itself refuses to print would give away exactly what
+ * discovery withholds.</p>
  *
  * <p>The popup owns the search and the choice, and nothing else. Picking an
  * entry hands a marker back to the map screen, which moves the camera with the
@@ -90,18 +94,32 @@ final class LostTalesMapSearchPrompt {
         this.results = entries;
     }
 
-    /** Collects every place the player may be told about, sorted by name. */
-    static LostTalesMapSearchPrompt open(
-            List<LostTalesMapMarkerData> markers) {
-        return new LostTalesMapSearchPrompt(places(markers));
+    /** Opens on every place the player may be told about ({@link #places}). */
+    static LostTalesMapSearchPrompt open(List<Entry> places) {
+        return new LostTalesMapSearchPrompt(places);
     }
 
     /**
      * Every place the player may be told about, sorted by name: what Find
-     * Location searches, in its popup or in a window's well.
+     * Location searches, in its popup or in a window's well. The
+     * player's own and shared waypoints stand among the places, a shared
+     * one they hid only while LOTR's map shows the hidden ones
+     * ({@code hiddenShown}).
      */
-    static List<Entry> places(List<LostTalesMapMarkerData> markers) {
+    static List<Entry> places(List<LostTalesMapMarkerData> markers,
+                              List<LostTalesMapCustomWaypoint> waypoints,
+                              boolean hiddenShown) {
         ArrayList<Entry> entries = new ArrayList<Entry>();
+        if (waypoints != null) {
+            for (LostTalesMapCustomWaypoint waypoint : waypoints) {
+                if (waypoint != null && waypoint.isListed(hiddenShown)) {
+                    entries.add(Entry.waypoint(waypoint.marker(),
+                            waypoint.getName(),
+                            StatCollector.translateToLocalFormatted(
+                                    waypoint.kindKey(), waypoint.getName())));
+                }
+            }
+        }
         if (markers != null) {
             for (LostTalesMapMarkerData marker : markers) {
                 if (marker == null
@@ -277,7 +295,7 @@ final class LostTalesMapSearchPrompt {
                         labelTop + LostTalesUiInk.centredStart(
                                 LostTalesUiInk.CAP_HEIGHT, icon) + half,
                         1.0F);
-                LostTalesUiCutName.drawText(font, entry.name, labelLeft,
+                LostTalesUiCutName.drawText(font, entry.label, labelLeft,
                         labelTop, labelRight - labelLeft, LostTalesUiInk.IVORY,
                         255, this, Integer.valueOf(index), index == hovered);
             }
@@ -477,29 +495,58 @@ final class LostTalesMapSearchPrompt {
         return new Layout(x, y, width, height, rowHeight, fieldHeight);
     }
 
-    /** One searchable place: the marker itself and the name it is found by. */
+    /**
+     * One searchable place: the marker itself, the name it is sorted and
+     * found by, and what its row reads.
+     */
     static final class Entry {
         private final LostTalesMapMarkerData marker;
         private final String name;
-        /** The name, the words the marker was given and its id, lowered, for a search. */
+        /** The words on its row: the name, after its kind for a waypoint. */
+        private final String label;
+        /**
+         * What a search reads, lowered: its names first, then what it is
+         * only found by, never by the start.
+         */
         private final String[] searched;
+        /** How many of {@link #searched} are names, which a query may start. */
+        private final int names;
 
+        /** A place: found by the name shown, the words it was given and its id. */
         Entry(LostTalesMapMarkerData marker, String name) {
+            this(marker, name, name, marker == null
+                    ? new String[] {lower(name)}
+                    : new String[] {lower(name),
+                            lower(marker.getGivenName()), lower(marker.getId())},
+                    2);
+        }
+
+        private Entry(LostTalesMapMarkerData marker, String name,
+                      String label, String[] searched, int names) {
             this.marker = marker;
             this.name = name == null ? "" : name;
-            this.searched = marker == null
-                    ? new String[] {this.name.toLowerCase()}
-                    : new String[] {this.name.toLowerCase(),
-                            lower(marker.getGivenName()), lower(marker.getId())};
+            this.label = label == null ? this.name : label;
+            this.searched = searched;
+            this.names = names;
+        }
+
+        /**
+         * A waypoint, its row reading {@code label} ({@code Personal:
+         * Bree}): found by its name, and by its kind's words anywhere.
+         */
+        static Entry waypoint(LostTalesMapMarkerData marker, String name,
+                              String label) {
+            return new Entry(marker, name, label,
+                    new String[] {lower(name), lower(label)}, 1);
         }
 
         private static String lower(String value) {
             return value == null ? "" : value.trim().toLowerCase();
         }
 
-        /** Whether a name starts with the query; an id only ever contains it, as most ids start alike. */
+        /** Whether a name starts with the query; anything else only ever contains it, as most ids start alike. */
         boolean startsWith(String needle) {
-            for (int index = 0; index < Math.min(2, this.searched.length); index++) {
+            for (int index = 0; index < Math.min(this.names, this.searched.length); index++) {
                 if (this.searched[index].startsWith(needle)) {
                     return true;
                 }
@@ -518,6 +565,11 @@ final class LostTalesMapSearchPrompt {
 
         LostTalesMapMarkerData getMarker() {
             return this.marker;
+        }
+
+        /** The words on its row. */
+        String getLabel() {
+            return this.label;
         }
     }
 

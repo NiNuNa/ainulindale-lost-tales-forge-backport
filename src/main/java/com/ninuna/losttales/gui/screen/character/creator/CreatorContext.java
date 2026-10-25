@@ -6,56 +6,31 @@ import net.minecraft.client.gui.FontRenderer;
 import java.util.UUID;
 
 /**
- * What every control draws with: the game, the font, the account, and how
- * the controls stand. The creator's controls stand boxed in its column; a
- * window's stand as its rows, and the window tells them each frame how
- * strongly it is drawn and how wide a lit row reaches.
+ * What every control draws with: the game, the font and the account. The
+ * controls stand as a window's rows, and the window tells them each frame
+ * how strongly it is drawn and how wide a lit row reaches.
  */
 public final class CreatorContext {
-
-    /** How the controls stand. */
-    public enum Presentation {
-        /** The creator's column: a label over a boxed field, arrows in boxes. */
-        BOXED,
-        /**
-         * A window's rows, as its Settings stand: one row a control, its
-         * label at the left and its value at the right end.
-         */
-        ROWS
-    }
 
     private final Minecraft minecraft;
     private final FontRenderer font;
     private final UUID accountId;
-    private final Presentation presentation;
     private int alpha = 255;
     private int surfaceAlpha = 255;
     private int rowLeft;
     private int rowRight;
 
-    /** The creator's boxed controls. */
     public CreatorContext(Minecraft minecraft, FontRenderer font,
                           UUID accountId) {
-        this(minecraft, font, accountId, Presentation.BOXED);
-    }
-
-    public CreatorContext(Minecraft minecraft, FontRenderer font,
-                          UUID accountId, Presentation presentation) {
         this.minecraft = minecraft;
         this.font = font;
         this.accountId = accountId;
-        this.presentation = presentation;
     }
 
     public Minecraft getMinecraft() { return this.minecraft; }
     public FontRenderer getFont() { return this.font; }
     /** The signed-in account, whose own skin some tiles show; may be null. */
     public UUID getAccountId() { return this.accountId; }
-
-    /** Whether the controls stand as a window's rows. */
-    public boolean inRows() {
-        return this.presentation == Presentation.ROWS;
-    }
 
     /**
      * The window's frame about to be drawn: its strength, its surface's,

@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.gui;
 
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -29,7 +29,7 @@ public final class LostTalesMainMenuTitle {
             return;
         }
         Minecraft.getMinecraft().getTextureManager().bindTexture(TEXTURE);
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         int minFilter = GL11.glGetTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER);
         int magFilter = GL11.glGetTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER);

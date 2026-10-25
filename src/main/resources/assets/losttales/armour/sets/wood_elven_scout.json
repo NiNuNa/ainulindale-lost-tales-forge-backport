@@ -1,0 +1,22 @@
+{
+  "id": "losttales:wood_elven_scout",
+  "helmet": [
+    "lotr:item.helmetWoodElvenScout"
+  ],
+  "chestplate": [
+    "lotr:item.bodyWoodElvenScout"
+  ],
+  "leggings": [
+    "lotr:item.legsWoodElvenScout"
+  ],
+  "boots": [
+    "lotr:item.bootsWoodElvenScout"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:archery"
+    }
+  ]
+}

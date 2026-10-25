@@ -112,7 +112,7 @@ public final class ChatEmojiMarkerTest {
     private static LostTalesChatMessagePacket packet(String message) {
         return ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", message)
                 .title("Ranger").colors(0x55AA55, 0x336633).at(123456789L)
-                .skin("losttales:human_ranger_male_2").build();
+                .skin("losttales:human_ranger_masculine_2").build();
     }
 
     /** The line as the chat shows it, filed where its packet says. */

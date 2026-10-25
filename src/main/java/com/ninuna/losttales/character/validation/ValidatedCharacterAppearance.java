@@ -14,23 +14,23 @@ public final class ValidatedCharacterAppearance {
 
     private final String name;
     private final String raceId;
-    private final String genderId;
-    private final String skinId;
     private final String bodyTypeId;
+    private final String skinId;
+    private final String armsId;
     private final String chestTypeId;
     private final String history;
     private final int age;
 
     public ValidatedCharacterAppearance(String name,
-                                        String raceId, String genderId,
-                                        String skinId, String bodyTypeId,
+                                        String raceId, String bodyTypeId,
+                                        String skinId, String armsId,
                                         String chestTypeId, String history,
                                         int age) {
         this.name = name;
         this.raceId = raceId;
-        this.genderId = genderId;
-        this.skinId = skinId;
         this.bodyTypeId = bodyTypeId;
+        this.skinId = skinId;
+        this.armsId = armsId;
         this.chestTypeId = chestTypeId;
         this.history = history;
         this.age = age;
@@ -38,9 +38,9 @@ public final class ValidatedCharacterAppearance {
 
     public String getName() { return this.name; }
     public String getRaceId() { return this.raceId; }
-    public String getGenderId() { return this.genderId; }
-    public String getSkinId() { return this.skinId; }
     public String getBodyTypeId() { return this.bodyTypeId; }
+    public String getSkinId() { return this.skinId; }
+    public String getArmsId() { return this.armsId; }
     public String getChestTypeId() { return this.chestTypeId; }
     public String getHistory() { return this.history; }
     public int getAge() { return this.age; }

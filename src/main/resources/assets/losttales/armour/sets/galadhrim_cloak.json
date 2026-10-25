@@ -1,0 +1,21 @@
+{
+  "id": "losttales:galadhrim_cloak",
+  "helmet": [
+    "lotr:item.helmetHithlain"
+  ],
+  "chestplate": [
+    "lotr:item.bodyHithlain"
+  ],
+  "leggings": [
+    "lotr:item.legsHithlain"
+  ],
+  "boots": [
+    "lotr:item.bootsHithlain"
+  ],
+  "bonus": [
+    {
+      "effect": "arrows",
+      "amount": 0.2
+    }
+  ]
+}

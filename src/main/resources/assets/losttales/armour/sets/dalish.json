@@ -1,0 +1,22 @@
+{
+  "id": "losttales:dalish",
+  "helmet": [
+    "lotr:item.helmetDale"
+  ],
+  "chestplate": [
+    "lotr:item.bodyDale"
+  ],
+  "leggings": [
+    "lotr:item.legsDale"
+  ],
+  "boots": [
+    "lotr:item.bootsDale"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:archery"
+    }
+  ]
+}

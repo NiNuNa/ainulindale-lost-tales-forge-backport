@@ -8,7 +8,9 @@ import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.ClientQuestFellows;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.quest.QuestMarks;
+import com.ninuna.losttales.quest.player.WaitingReward;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.client.window.BarItem;
@@ -24,7 +26,6 @@ import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -54,6 +55,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
@@ -83,6 +85,8 @@ public final class QuestJournalPage extends PageContent {
     private static final String OPEN_SIGN = "- ";
     /** The mark at a tracked quest's row's right end. */
     private static final String TRACKED_MARK = "◆";
+    /** What parts the members under an objective: Tobin 2/3 · Dior done. */
+    private static final String FELLOW_GAP = " · ";
     /**
      * The quest list's button at the strip's left end: the input bar's
      * quest mark, lit and resting alike until its lit cell is drawn.
@@ -102,6 +106,14 @@ public final class QuestJournalPage extends PageContent {
     private static final String SHARE = "share";
     private static final String ABANDON = "abandon";
     private static final String CLEAR = "clear";
+    private static final String COLLECT = "collect";
+    /** The lang keys of the server's answer to Collect, said over the bar (QUEST-44). */
+    private static final List<String> COLLECT_LINES = Arrays.asList(
+            "chat.losttales.quest.collect.done",
+            "chat.losttales.quest.collect.some",
+            "chat.losttales.quest.collect.full",
+            "chat.losttales.quest.collect.nothing",
+            "chat.losttales.quest.collect.not_now");
     /** The key that tracks the quest being read, as the tip names it. */
     private static final int TRACK_KEY = Keyboard.KEY_SPACE;
     /** The lang keys of the server's word on tracking a quest, which answers Track. */
@@ -288,12 +300,13 @@ public final class QuestJournalPage extends PageContent {
     }
 
     /**
-     * The server's word on tracking a quest answers the journal's Track
-     * while the journal is shown: it stands over the bar, not in the chat.
+     * The server's word on tracking a quest, or on collecting its waiting
+     * rewards, answers the journal's Track or Collect while the journal is
+     * shown: it stands over the bar, not in the chat.
      */
     @Override
     public boolean answersLine(String key) {
-        return TRACKING_LINES.contains(key);
+        return TRACKING_LINES.contains(key) || COLLECT_LINES.contains(key);
     }
 
     @Override
@@ -766,7 +779,7 @@ public final class QuestJournalPage extends PageContent {
             return;
         }
         if (quests.isEmpty()) {
-            LostTalesSkyrimUiStyle.beginContent();
+            LostTalesUiInk.beginContent();
             drawWrappedText(translate("gui.losttales.quest.empty.detail"),
                     (int)rows.left, (int)rows.top + MenuWindow.PADDING_Y
                             + MenuWindow.NOTE_PADDING, (int)rows.width,
@@ -784,7 +797,7 @@ public final class QuestJournalPage extends PageContent {
 
         enableScissor((int)area.left, (int)area.top, (int)area.width,
                 (int)area.height);
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         double y = area.top - this.detailShown;
         for (DetailLine line : lines) {
             if (y + line.height() >= area.top && y <= area.bottom()) {
@@ -817,6 +830,10 @@ public final class QuestJournalPage extends PageContent {
         }
         int textTop = y + LostTalesUiInk.centredStart(DETAIL_LINE_HEIGHT,
                 LostTalesUiInk.CAP_HEIGHT);
+        if (line.fellows != null) {
+            drawFellowLine(line, left, textTop, alpha);
+            return;
+        }
         if (line.objective) {
             LostTalesUiInk.drawText(this.fontRendererObj,
                     line.complete ? QuestMarks.DONE : line.active
@@ -853,12 +870,14 @@ public final class QuestJournalPage extends PageContent {
      * from the left, Abandon last in red, or Clear for a finished LOTR
      * quest, which only such a quest may leave History by. Each is there
      * whatever is read, greyed and saying why when it cannot be taken; a
-     * world quest takes none of them, being the whole server's.
+     * world quest takes none of them, being the whole server's. Collect
+     * stands before the last only while rewards wait under the quest read
+     * (QUEST-44), a world quest's too.
      */
     @Override
     public List<BarItem> barItems() {
         ClientQuestEntry quest = getSelectedQuest();
-        List<BarItem> items = new ArrayList<BarItem>(3);
+        List<BarItem> items = new ArrayList<BarItem>(4);
         String track = translate(quest != null && quest.isTracked()
                 ? "gui.losttales.quest.action.untrack"
                 : "gui.losttales.quest.action.track");
@@ -872,6 +891,12 @@ public final class QuestJournalPage extends PageContent {
                         LostTalesUiSheet.SEND, LostTalesUiSheet.SEND_HOVER)
                 .tip(share), quest, "gui.losttales.quest.action.why.share",
                 "gui.losttales.quest.action.why.world_share"));
+        if (quest != null && !LostTalesClientQuestProgressStore
+                .getWaitingRewards(quest.getReference()).isEmpty()) {
+            String collect = translate("gui.losttales.quest.action.collect");
+            items.add(BarItem.button(COLLECT, collect,
+                    new ItemStack(Blocks.chest)).tip(collect));
+        }
         if (clears(quest)) {
             String clear = translate("gui.losttales.quest.action.clear");
             items.add(BarItem.button(CLEAR, clear, LostTalesUiSheet.CLOSE,
@@ -931,6 +956,10 @@ public final class QuestJournalPage extends PageContent {
             }
         } else if (ABANDON.equals(id) || CLEAR.equals(id)) {
             ask(quest, CLEAR.equals(id));
+        } else if (COLLECT.equals(id)) {
+            // The server hands over what fits and says how it went.
+            LostTalesNetworkHandler.CHANNEL.sendToServer(new LostTalesQuestActionPacket(
+                    LostTalesQuestActionPacket.ACTION_COLLECT, quest.getReference()));
         }
     }
 
@@ -1022,6 +1051,7 @@ public final class QuestJournalPage extends PageContent {
         addStageSummary(lines, quest, progress, completed,
                 entry.getHistoryEntry(), width);
         addRewardSummary(lines, quest, width, completed || failed);
+        addWaitingRewards(lines, entry.getReference(), width);
 
         return lines;
     }
@@ -1086,6 +1116,7 @@ public final class QuestJournalPage extends PageContent {
             }
             addBlankLine(lines);
         }
+        addWaitingRewards(lines, quest.getReference(), width);
         return lines;
     }
 
@@ -1171,13 +1202,11 @@ public final class QuestJournalPage extends PageContent {
                         objectiveActive && !objectiveComplete);
                 if (current) {
                     // The fellowships' members at this stage or past it
-                    // (QUEST-25): Tobin 2/3 · Dior done.
-                    String fellows = ClientQuestFellows.lineFor(quest.getId(),
-                            objective.getId(), getObjectiveTargetCount(objective));
-                    if (fellows.length() > 0) {
-                        addWrappedLines(lines, fellows, WindowStyle.asideRgb(),
-                                20, width - 16);
-                    }
+                    // (QUEST-25): Tobin 2/3 · Dior done, those not
+                    // travelling with the player dimmed.
+                    addFellowLines(lines, ClientQuestFellows.partsFor(
+                            quest.getId(), objective.getId(),
+                            getObjectiveTargetCount(objective)), 20, width - 16);
                 }
                 addedAny = true;
             }
@@ -1197,6 +1226,28 @@ public final class QuestJournalPage extends PageContent {
         }
         if (completed) {
             addWrappedLines(lines, translate("gui.losttales.quest.status.completed"), WindowStyle.asideRgb(), 16, width - 16);
+        }
+        addBlankLine(lines);
+    }
+
+    /**
+     * The rewards waiting under the quest for room (QUEST-44), each named
+     * as the rewards are, under a note that says Collect takes them; none
+     * shown where nothing waits.
+     */
+    private void addWaitingRewards(List<DetailLine> lines, String questId,
+                                   int width) {
+        List<WaitingReward> waiting =
+                LostTalesClientQuestProgressStore.getWaitingRewards(questId);
+        if (waiting.isEmpty()) {
+            return;
+        }
+        addSectionTitle(lines, translate("gui.losttales.quest.section.waiting"));
+        addWrappedLines(lines, translate("gui.losttales.quest.waiting.note"),
+                WindowStyle.asideRgb(), 8, width - 16);
+        for (WaitingReward reward : waiting) {
+            addWrappedLines(lines, LostTalesQuestRewardText.waitingPhrase(reward),
+                    LostTalesUiInk.IVORY, 16, width - 16);
         }
         addBlankLine(lines);
     }
@@ -1376,6 +1427,108 @@ public final class QuestJournalPage extends PageContent {
                 lines.add(new DetailLine(wrapped.get(i), color, indent + 22, false));
             }
         }
+    }
+
+    /**
+     * The members under an objective (QUEST-25), wrapped by whole
+     * members: each name and count a part, parted by a dot.
+     */
+    private void addFellowLines(List<DetailLine> lines,
+                                List<ClientQuestFellows.Part> parts,
+                                int indent, int width) {
+        if (parts.isEmpty()) {
+            return;
+        }
+        int room = Math.max(20, width - Math.max(0, indent));
+        int gap = this.fontRendererObj.getStringWidth(FELLOW_GAP);
+        List<ClientQuestFellows.Part> row = new ArrayList<ClientQuestFellows.Part>();
+        int used = 0;
+        for (ClientQuestFellows.Part part : parts) {
+            int partWidth = this.fontRendererObj.getStringWidth(part.getText());
+            if (!row.isEmpty() && used + gap + partWidth > room) {
+                lines.add(DetailLine.fellows(row, indent));
+                row = new ArrayList<ClientQuestFellows.Part>();
+                used = 0;
+            }
+            used += (row.isEmpty() ? 0 : gap) + partWidth;
+            row.add(part);
+        }
+        lines.add(DetailLine.fellows(row, indent));
+    }
+
+    /**
+     * One row of members: each in the aside tone where they travel with
+     * the player, dimmed where they do not, the dots between in the aside
+     * tone.
+     */
+    private void drawFellowLine(DetailLine line, int left, int textTop,
+                                int alpha) {
+        int x = left + line.indent;
+        int gap = this.fontRendererObj.getStringWidth(FELLOW_GAP);
+        for (int index = 0; index < line.fellows.size(); index++) {
+            if (index > 0) {
+                LostTalesUiInk.drawText(this.fontRendererObj, FELLOW_GAP, x,
+                        textTop, WindowStyle.asideRgb(), alpha);
+                x += gap;
+            }
+            ClientQuestFellows.Part part = line.fellows.get(index);
+            LostTalesUiInk.drawText(this.fontRendererObj, part.getText(), x,
+                    textTop, part.isTravelling() ? WindowStyle.asideRgb()
+                            : LostTalesColors.rgb(LostTalesColors.TEXT_DIM),
+                    alpha);
+            x += this.fontRendererObj.getStringWidth(part.getText());
+        }
+    }
+
+    /**
+     * The member drawn under the point in the quest being read, or null:
+     * counted from where the detail draws its lines, part by part as
+     * {@link #drawFellowLine} lays them.
+     */
+    private ClientQuestFellows.Part fellowAt(int mouseX, int mouseY) {
+        QuestJournalLayout layout = layout();
+        LostTalesUiHitBox area = layout.detail();
+        LostTalesUiHitBox rows = layout.detailRows();
+        ClientQuestEntry quest = getSelectedQuest();
+        if (quest == null || !area.contains(mouseX, mouseY)) {
+            return null;
+        }
+        int gap = this.fontRendererObj.getStringWidth(FELLOW_GAP);
+        double y = area.top - this.detailShown;
+        for (DetailLine line : buildDetailLines(quest, (int)rows.width)) {
+            int top = (int)Math.round(y);
+            y += line.height();
+            if (line.fellows == null || mouseY < top
+                    || mouseY >= top + line.height()) {
+                continue;
+            }
+            int x = (int)rows.left + line.indent;
+            for (int index = 0; index < line.fellows.size(); index++) {
+                if (index > 0) {
+                    x += gap;
+                }
+                ClientQuestFellows.Part part = line.fellows.get(index);
+                int partWidth = this.fontRendererObj.getStringWidth(part.getText());
+                if (LostTalesUiHitBox.contains(mouseX, mouseY, x, top,
+                        partWidth, line.height())) {
+                    return part;
+                }
+                x += partWidth;
+            }
+            return null;
+        }
+        return null;
+    }
+
+    /** A member not travelling with the player says so under the pointer (QUEST-25). */
+    @Override
+    public String tipAt(LostTalesUiHitBox box, double x, double y) {
+        if (this.fontRendererObj == null) {
+            return "";
+        }
+        ClientQuestFellows.Part part = fellowAt(pageX(box, x), pageY(box, y));
+        return part == null || part.isTravelling() ? ""
+                : translate("gui.losttales.quest.fellow.away");
     }
 
     private void addWrappedLines(List<DetailLine> lines, String text, int color, int indent, int width) {
@@ -1901,12 +2054,22 @@ public final class QuestJournalPage extends PageContent {
         private boolean objective;
         private boolean complete;
         private boolean active;
+        /** A row of members under an objective (QUEST-25); null for any other line. */
+        private List<ClientQuestFellows.Part> fellows;
 
         private DetailLine(String text, int color, int indent, boolean centered) {
             this.text = text == null ? "" : text;
             this.color = color;
             this.indent = Math.max(0, indent);
             this.centered = centered;
+        }
+
+        private static DetailLine fellows(List<ClientQuestFellows.Part> parts,
+                                          int indent) {
+            DetailLine line = new DetailLine("", WindowStyle.asideRgb(), indent, false);
+            line.fellows = Collections.unmodifiableList(
+                    new ArrayList<ClientQuestFellows.Part>(parts));
+            return line;
         }
 
         /** A heading a menu row, a separator its hairline's room, words a note's line. */

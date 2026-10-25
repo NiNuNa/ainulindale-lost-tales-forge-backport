@@ -53,6 +53,8 @@ import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
+import com.ninuna.losttales.network.packet.AccessoryCatalogPacket;
+import com.ninuna.losttales.network.packet.ArmourCatalogPacket;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCapeUpdateRequestPacket;
@@ -72,6 +74,8 @@ import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfileRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRaceCatalogPacket;
+import com.ninuna.losttales.network.packet.character.CharacterGearPacket;
+import com.ninuna.losttales.network.packet.character.CharacterGearRequestPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipActionRequestPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipOperationResultPacket;
@@ -181,5 +185,9 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(ProgressionRequestPacket.Handler.class, ProgressionRequestPacket.class, 79, Side.SERVER);
         CHANNEL.registerMessage(ProgressionStatuePacket.Handler.class, ProgressionStatuePacket.class, 80, Side.CLIENT);
         CHANNEL.registerMessage(CharacterRaceCatalogPacket.Handler.class, CharacterRaceCatalogPacket.class, 81, Side.CLIENT);
+        CHANNEL.registerMessage(CharacterGearRequestPacket.Handler.class, CharacterGearRequestPacket.class, 82, Side.SERVER);
+        CHANNEL.registerMessage(CharacterGearPacket.Handler.class, CharacterGearPacket.class, 83, Side.CLIENT);
+        CHANNEL.registerMessage(AccessoryCatalogPacket.Handler.class, AccessoryCatalogPacket.class, 84, Side.CLIENT);
+        CHANNEL.registerMessage(ArmourCatalogPacket.Handler.class, ArmourCatalogPacket.class, 85, Side.CLIENT);
     }
 }

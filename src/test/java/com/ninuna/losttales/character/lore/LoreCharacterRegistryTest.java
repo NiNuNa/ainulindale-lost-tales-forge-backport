@@ -1,6 +1,9 @@
 package com.ninuna.losttales.character.lore;
 
-import com.ninuna.losttales.character.model.CharacterProfile;
+import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
+import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
+import com.ninuna.losttales.progression.ProgressionFiles;
+import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -8,215 +11,41 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
-import java.io.StringReader;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+/**
+ * The lore characters as the server reads them (CHAR-43): the 80 bundled
+ * files through the shared reader, a server's own beside them, one of a
+ * bundled id in that figure's place, and no two figures of one name.
+ */
 public final class LoreCharacterRegistryTest {
+
+    private static final String LOOK = "\"race\":\"losttales:human\","
+            + "\"body_type\":\"losttales:masculine\","
+            + "\"skin\":\"losttales:human_bree_masculine_0\"";
 
     @Rule
     public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-    @Test
-    public void parserAcceptsFoundationIdentityAndAppearance() {
-        LoreCharacterDefinitionJsonParser.ParseResult result = parse(
-                "{\"dataVersion\":1,"
-                        + "\"id\":\"losttales:test_character\","
-                        + "\"name\":\"Test Character\","
-                        + "\"description\":\"A test identity.\","
-                        + "\"appearance\":{"
-                        + "\"raceId\":\"losttales:human\","
-                        + "\"genderId\":\"losttales:male\","
-                        + "\"modelId\":\"lotr:human\","
-                        + "\"skinId\":\"losttales:human_bree_male_0\"}}"
-        );
-
-        assertTrue(result.getErrors().toString(), result.isValid());
-        assertEquals("losttales:test_character",
-                result.getDefinition().getId());
-        assertEquals("Test Character", result.getDefinition().getName());
-        assertEquals("A test identity.",
-                result.getDefinition().getDescription());
-        assertTrue(result.getDefinition().hasAppearance());
-        assertEquals("lotr:human",
-                result.getDefinition().getAppearance().getModelId());
-        assertEquals("a file without an age is eighteen",
-                LoreCharacterDefinition.DEFAULT_AGE,
-                result.getDefinition().getAge());
-    }
-
-    /**
-     * A definition may give the whole profile the character is claimed
-     * with; its History is the description where the profile names none.
-     */
-    @Test
-    public void aProfileIsReadAndTheDescriptionIsTheHistoryOtherwise() {
-        LoreCharacterDefinitionJsonParser.ParseResult given = parse(
-                "{\"dataVersion\":1,\"id\":\"losttales:profiled\","
-                        + "\"name\":\"Profiled\",\"description\":\"A grey wanderer.\","
-                        + "\"appearance\":null,\"profile\":{"
-                        + "\"appearance\":\"Tall,  grey.\","
-                        + "\"personality\":\"Patient.\\n\\n\\nKind.\","
-                        + "\"facts\":{\"eyes\":\"Grey\",\"home\":\"Nowhere long\"},"
-                        + "\"glances\":[{\"emoji\":\"smiley\",\"title\":\"Pipe\","
-                        + "\"line\":\"Always smoking.\"},"
-                        + "{\"emoji\":\"grinning\",\"title\":\"Staff\"}]}}");
-        assertTrue(given.getErrors().toString(), given.isValid());
-        CharacterProfile profile = given.getDefinition().getProfile();
-        assertEquals("Tall, grey.",
-                profile.section(CharacterProfile.Section.APPEARANCE));
-        assertEquals("Patient.\n\nKind.",
-                profile.section(CharacterProfile.Section.PERSONALITY));
-        assertEquals("A grey wanderer.",
-                profile.section(CharacterProfile.Section.HISTORY));
-        assertEquals("Grey", profile.fact(CharacterProfile.Fact.EYES));
-        assertEquals(2, profile.glances().size());
-        assertEquals("", profile.glances().get(1).getLine());
-
-        LoreCharacterDefinitionJsonParser.ParseResult plain = parse(
-                "{\"dataVersion\":1,\"id\":\"losttales:plain\","
-                        + "\"name\":\"Plain\",\"description\":\"Of Bree.\","
-                        + "\"appearance\":null}");
-        assertTrue(plain.getErrors().toString(), plain.isValid());
-        assertEquals(CharacterProfile.EMPTY.withSection(
-                CharacterProfile.Section.HISTORY, "Of Bree."),
-                plain.getDefinition().getProfile());
+    @After
+    public void forget() {
+        LoreCharacterRegistry.clear();
     }
 
     @Test
-    public void aProfileOutsideItsBoundsIsRefused() {
-        String head = "{\"dataVersion\":1,\"id\":\"losttales:bad\","
-                + "\"name\":\"Bad\",\"description\":\"\",\"appearance\":null,"
-                + "\"profile\":";
-        String[] profiles = {
-                "{\"mood\":\"Grim\"}",
-                "{\"facts\":{\"weight\":\"Heavy\"}}",
-                "{\"facts\":{\"eyes\":\"Grey and green and blue and more\"}}",
-                "{\"glances\":[{\"emoji\":\"not_an_emoji\",\"title\":\"Pipe\"}]}",
-                "{\"glances\":[{\"emoji\":\"smiley\"}]}",
-                "{\"glances\":[{},{},{},{},{},{}]}",
-                "\"A string\""};
-        for (String profile : profiles) {
-            assertFalse(profile, parse(head + profile + "}").isValid());
-        }
-    }
+    public void theEightyBundledFilesLoadWithNoWarning() {
+        List<String> problems = load(null);
 
-    /** A file's History holds 2,048 characters; its Appearance, its Personality and its description 512. */
-    @Test
-    public void eachTextIsHeldToItsOwnLength() {
-        String head = "{\"dataVersion\":1,\"id\":\"losttales:long\","
-                + "\"name\":\"Long\",\"appearance\":null,";
-        String history = repeat(CharacterProfile.Section.HISTORY.getMaxLength());
-        LoreCharacterDefinitionJsonParser.ParseResult whole = parse(head
-                + "\"description\":\"\",\"profile\":{\"history\":\""
-                + history + "\"}}");
-        assertTrue(whole.getErrors().toString(), whole.isValid());
-        assertEquals(history, whole.getDefinition().getProfile()
-                .section(CharacterProfile.Section.HISTORY));
-        assertFalse("past the History's length", parse(head
-                + "\"description\":\"\",\"profile\":{\"history\":\""
-                + history + "a\"}}").isValid());
-        assertFalse("an Appearance is not as long as a History", parse(head
-                + "\"description\":\"\",\"profile\":{\"appearance\":\""
-                + repeat(CharacterProfile.Section.APPEARANCE.getMaxLength() + 1)
-                + "\"}}").isValid());
-
-        String description = repeat(
-                LoreCharacterDefinition.MAX_DESCRIPTION_LENGTH);
-        LoreCharacterDefinitionJsonParser.ParseResult described = parse(head
-                + "\"description\":\"" + description + "\"}");
-        assertTrue(described.getErrors().toString(), described.isValid());
-        assertEquals("the description stands in for the History", description,
-                described.getDefinition().getProfile()
-                        .section(CharacterProfile.Section.HISTORY));
-        assertFalse(parse(head + "\"description\":\"" + description
-                + "a\"}").isValid());
-    }
-
-    @Test
-    public void anAgeIsReadWhenGivenAndHeldToACharactersBounds() {
-        LoreCharacterDefinitionJsonParser.ParseResult aged = parse(
-                "{\"dataVersion\":1,\"id\":\"losttales:aged\","
-                        + "\"name\":\"Aged\",\"description\":\"\","
-                        + "\"age\":2931,\"appearance\":null}");
-        LoreCharacterDefinitionJsonParser.ParseResult unborn = parse(
-                "{\"dataVersion\":1,\"id\":\"losttales:unborn\","
-                        + "\"name\":\"Unborn\",\"description\":\"\","
-                        + "\"age\":0,\"appearance\":null}");
-
-        assertTrue(aged.getErrors().toString(), aged.isValid());
-        assertEquals(2931, aged.getDefinition().getAge());
-        assertFalse(unborn.isValid());
-    }
-
-    @Test
-    public void parserRejectsUnknownOrMissingFields() {
-        LoreCharacterDefinitionJsonParser.ParseResult unknown = parse(
-                "{\"dataVersion\":1,"
-                        + "\"id\":\"losttales:too_much\","
-                        + "\"name\":\"Too Much\","
-                        + "\"description\":\"\","
-                        + "\"appearance\":null,"
-                        + "\"unsupported\":true}"
-        );
-        LoreCharacterDefinitionJsonParser.ParseResult missing = parse(
-                "{\"dataVersion\":1,\"id\":\"losttales:missing\"}"
-        );
-
-        assertFalse(unknown.isValid());
-        assertTrue(unknown.getErrors().get(0).contains("unknown field unsupported"));
-        assertFalse(missing.isValid());
-        assertTrue(missing.getErrors().get(0).contains("must contain dataVersion, id, name, description, and appearance"));
-    }
-
-    @Test
-    public void appearanceMustUseCompatibleRaceModelAndSkin() {
-        LoreCharacterDefinitionJsonParser.ParseResult result = parse(
-                "{\"dataVersion\":1,"
-                        + "\"id\":\"losttales:bad_appearance\","
-                        + "\"name\":\"Bad Appearance\","
-                        + "\"description\":\"\","
-                        + "\"appearance\":{"
-                        + "\"raceId\":\"losttales:human\","
-                        + "\"genderId\":\"losttales:male\","
-                        + "\"modelId\":\"lotr:hobbit\","
-                        + "\"skinId\":\"losttales:hobbit_shire_male_0\"}}"
-        );
-
-        assertFalse(result.isValid());
-        assertTrue(result.getErrors().get(0).contains("modelId is incompatible"));
-    }
-
-    /** There is no half-troll: a lore file naming one is refused (CHAR-09). */
-    @Test
-    public void aLoreFileNamingAHalfTrollIsRefused() {
-        LoreCharacterDefinitionJsonParser.ParseResult result = parse(
-                "{\"dataVersion\":1,"
-                        + "\"id\":\"losttales:bogdal\","
-                        + "\"name\":\"Bogdal\","
-                        + "\"description\":\"\","
-                        + "\"appearance\":{"
-                        + "\"raceId\":\"losttales:half_troll\","
-                        + "\"genderId\":\"losttales:non_binary\","
-                        + "\"modelId\":\"lotr:half_troll\","
-                        + "\"skinId\":\"losttales:half_troll_0\"}}"
-        );
-
-        assertFalse(result.isValid());
-        assertTrue(result.getErrors().get(0).contains("not a supported playable race"));
-    }
-
-    @Test
-    public void bundledRegistryContainsUniqueFoundationEntries() {
-        LoreCharacterRegistry.load(null);
-
-        assertTrue(LoreCharacterRegistry.getLoadErrors().toString(),
-                LoreCharacterRegistry.getLoadErrors().isEmpty());
+        assertEquals(new ArrayList<String>(), problems);
         assertEquals(80, LoreCharacterRegistry.getAll().size());
         assertNotNull(LoreCharacterRegistry.get("losttales:gandalf"));
         assertNotNull(LoreCharacterRegistry.get("losttales:frodo"));
@@ -229,86 +58,131 @@ public final class LoreCharacterRegistryTest {
         }
     }
 
+    /** Each of the 80 names a faction LOTR or the mod has, one its race may start in (CHAR-44). */
     @Test
-    public void normalizedNamesCannotCreateDuplicateCharacters() throws Exception {
-        File configRoot = createExternalDefinition(
-                "duplicate_name.json",
-                "myserver:duplicate_eomer",
-                "Eomer");
-
-        LoreCharacterRegistry.load(configRoot);
-
-        assertEquals(80, LoreCharacterRegistry.getAll().size());
-        assertEquals(1, LoreCharacterRegistry.getLoadErrors().size());
-        assertTrue(LoreCharacterRegistry.getLoadErrors().get(0)
-                .contains("duplicates display name"));
+    public void everyBundledFigureStartsWhereItsRaceMay() {
+        LoreTestGame game = new LoreTestGame();
+        load(null);
+        for (LoreCharacterDefinition definition : LoreCharacterRegistry.getAll()) {
+            CharacterFactionDefinition faction = game.faction(definition.getFactionId());
+            assertNotNull(definition.getId() + " starts in " + definition.getFactionId(), faction);
+            CharacterRaceDefinition race = game.race(definition.getAppearance().getRaceId());
+            assertTrue(definition.getId(), LoreCharacterFiles.raceTakes(race, faction));
+        }
+        assertEquals("lotr:hobbit", LoreCharacterRegistry.get("losttales:frodo").getFactionId());
+        assertEquals("lotr:mordor", LoreCharacterRegistry.get("losttales:sauron").getFactionId());
+        assertEquals("lotr:lothlorien",
+                LoreCharacterRegistry.get("losttales:galadriel").getFactionId());
     }
 
     @Test
-    public void stableIdsCannotReplaceRegisteredCharacters() throws Exception {
-        File configRoot = createExternalDefinition(
-                "duplicate_id.json",
-                "losttales:gandalf",
-                "Different Name");
+    public void aServersFileOfABundledIdTakesItsPlace() throws Exception {
+        File folder = folder("replace", "gandalf.json", "{\"id\":\"losttales:gandalf\","
+                + "\"name\":\"Gandalf the White\"," + LOOK + ",\"faction\":\"lotr:gondor\"}");
 
-        LoreCharacterRegistry.load(configRoot);
-
+        assertEquals(new ArrayList<String>(), load(folder));
         assertEquals(80, LoreCharacterRegistry.getAll().size());
-        assertEquals("Gandalf",
+        assertEquals("Gandalf the White",
                 LoreCharacterRegistry.get("losttales:gandalf").getName());
-        assertEquals(1, LoreCharacterRegistry.getLoadErrors().size());
-        assertTrue(LoreCharacterRegistry.getLoadErrors().get(0)
-                .contains("duplicates id"));
+        assertEquals("lotr:gondor", LoreCharacterRegistry.get("losttales:gandalf").getFactionId());
+        assertNull("the bundled name goes with the bundled file",
+                LoreCharacterRegistry.getByName("Gandalf"));
+        assertNotNull(LoreCharacterRegistry.getByName("Gandalf the White"));
     }
 
     @Test
-    public void uniqueServerLocalFileAddsOneIdentity() throws Exception {
-        File configRoot = createExternalDefinition(
-                "server_entry.json",
-                "myserver:server_entry",
-                "Server Entry");
+    public void aServersNewFigureJoinsTheBundledOnes() throws Exception {
+        File folder = folder("new", "aldor.json", "{\"id\":\"myserver:aldor\","
+                + "\"name\":\"Aldor\"," + LOOK + ",\"faction\":\"lotr:bree\"}");
 
-        LoreCharacterRegistry.load(configRoot);
+        assertEquals(new ArrayList<String>(), load(folder));
+        assertEquals(81, LoreCharacterRegistry.getAll().size());
+        assertNotNull(LoreCharacterRegistry.get("myserver:aldor"));
+        assertNotNull(LoreCharacterRegistry.getByName("aldor"));
+    }
 
-        assertTrue(LoreCharacterRegistry.getLoadErrors().toString(),
-                LoreCharacterRegistry.getLoadErrors().isEmpty());
-        assertNotNull(LoreCharacterRegistry.get("myserver:server_entry"));
+    /** A server's figure under another's name is left out, whichever comes first by order. */
+    @Test
+    public void aServersFigureTakingAnothersNameIsLeftOut() throws Exception {
+        File folder = folder("names", "duplicate_eomer.json", "{\"id\":\"myserver:duplicate\","
+                + "\"name\":\"Eomer\"," + LOOK + ",\"faction\":\"lotr:rohan\"}");
+        write(folder, "alatar.json", "{\"id\":\"losttales:alatar\",\"name\":\"Frodo\","
+                + LOOK + ",\"faction\":\"lotr:bree\"}");
+
+        List<String> problems = load(folder);
+
+        assertEquals(problems.toString(), 2, problems.size());
+        assertTrue(problems.toString(), problems.get(0).contains("losttales:alatar: its name"
+                + " Frodo is the lore character losttales:frodo's"));
+        assertTrue(problems.toString(), problems.get(1).contains("is the lore character"
+                + " losttales:eomer's"));
+        assertEquals(80, LoreCharacterRegistry.getAll().size());
+        assertEquals("the bundled Alatar stays", "Alatar",
+                LoreCharacterRegistry.get("losttales:alatar").getName());
+        assertEquals("Frodo", LoreCharacterRegistry.getByName("Frodo").getName());
+    }
+
+    /** A server's file with a warning leaves the bundled figure of its id in place. */
+    @Test
+    public void aServersFileWithAWarningLeavesTheBundledFigure() throws Exception {
+        File folder = folder("warned", "gandalf.json", "{\"id\":\"losttales:gandalf\","
+                + "\"name\":\"Gandalf the White\"," + LOOK + "}");
+
+        List<String> problems = load(folder);
+
+        assertEquals(problems.toString(), 1, problems.size());
+        assertTrue(problems.get(0), problems.get(0).startsWith("gandalf.json: names no faction"));
+        assertEquals("Gandalf", LoreCharacterRegistry.get("losttales:gandalf").getName());
+    }
+
+    @Test
+    public void aBrokenFileIsLeftOutAndTheOthersLoad() throws Exception {
+        File folder = folder("broken", "broken.json", "{ this is not a lore character");
+        write(folder, "aldor.json", "{\"id\":\"myserver:aldor\",\"name\":\"Aldor\","
+                + LOOK + ",\"faction\":\"lotr:bree\"}");
+
+        List<String> problems = load(folder);
+
+        assertEquals(problems.toString(), 1, problems.size());
+        assertTrue(problems.get(0), problems.get(0).startsWith("broken.json cannot be read"));
         assertEquals(81, LoreCharacterRegistry.getAll().size());
     }
 
-    private File createExternalDefinition(String filename, String id,
-                                          String name) throws Exception {
-        File configRoot = this.temporaryFolder.newFolder(filename + "_config");
-        File directory = new File(
-                configRoot, LoreCharacterRegistry.EXTERNAL_DIRECTORY);
-        assertTrue(directory.mkdirs());
-        File definition = new File(directory, filename);
-        Writer writer = new OutputStreamWriter(
-                new FileOutputStream(definition), StandardCharsets.UTF_8);
+    /** Nothing is known before the server reads the files, nor after it stops. */
+    @Test
+    public void theFiguresAreKnownFromTheReadToTheStop() {
+        LoreCharacterRegistry.clear();
+        assertFalse(LoreCharacterRegistry.isLoaded());
+        assertTrue(LoreCharacterRegistry.getAll().isEmpty());
+        assertNull(LoreCharacterRegistry.getByName("Gandalf"));
+
+        load(null);
+        assertTrue(LoreCharacterRegistry.isLoaded());
+        assertNotNull(LoreCharacterRegistry.getByName("Gandalf"));
+
+        LoreCharacterRegistry.clear();
+        assertFalse(LoreCharacterRegistry.isLoaded());
+        assertNull(LoreCharacterRegistry.get("losttales:gandalf"));
+        assertTrue(LoreCharacterRegistry.getLoadErrors().isEmpty());
+    }
+
+    private static List<String> load(File folder) {
+        return LoreCharacterRegistry.load(ProgressionFiles.CLASSPATH, folder, new LoreTestGame());
+    }
+
+    private File folder(String name, String file, String json) throws Exception {
+        File folder = this.temporaryFolder.newFolder(name);
+        write(folder, file, json);
+        return folder;
+    }
+
+    private static void write(File folder, String file, String json) throws Exception {
+        Writer writer = new OutputStreamWriter(new FileOutputStream(new File(folder, file)),
+                StandardCharsets.UTF_8);
         try {
-            writer.write("{\n"
-                    + "  \"dataVersion\": 1,\n"
-                    + "  \"id\": \"" + id + "\",\n"
-                    + "  \"name\": \"" + name + "\",\n"
-                    + "  \"description\": \"\",\n"
-                    + "  \"appearance\": null\n"
-                    + "}\n");
+            writer.write(json);
         } finally {
             writer.close();
         }
-        return configRoot;
-    }
-
-    private static String repeat(int count) {
-        StringBuilder text = new StringBuilder();
-        for (int index = 0; index < count; index++) {
-            text.append('a');
-        }
-        return text.toString();
-    }
-
-    private static LoreCharacterDefinitionJsonParser.ParseResult parse(String json) {
-        return LoreCharacterDefinitionJsonParser.parseDefinition(
-                new StringReader(json), "test.json");
     }
 }

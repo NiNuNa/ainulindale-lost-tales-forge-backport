@@ -1,12 +1,16 @@
 package com.ninuna.losttales.progression;
 
+import com.ninuna.losttales.armour.ArmourWeight;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceFiles;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.data.DataFiles;
 import com.ninuna.losttales.progression.skill.PerkDefinition;
 import com.ninuna.losttales.progression.skill.PerkEffect;
+import com.ninuna.losttales.progression.skill.SkillAct;
+import com.ninuna.losttales.progression.skill.SkillCount;
 import com.ninuna.losttales.progression.skill.SkillDefinition;
+import com.ninuna.losttales.progression.skill.WeaponKind;
 import com.ninuna.losttales.util.LostTalesLangFile;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,9 +26,12 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The skill and race files shipped in the jar, read the way the server
- * reads them: every file loads with no warning, the eleven trees hold
- * the perks agreed on 2026-10-19, every race starts one skill at 10 and
- * three at 5, and every word a bundled skill shows has its lang line.
+ * reads them: every file loads with no warning, the twelve trees hold
+ * the perks agreed on 2026-10-19 and 2026-10-25, every race starts one
+ * skill at 10 and three at 5 as PROG-05 gives them, every word a bundled
+ * skill shows has its lang line, Archery counts slings and blowguns, Lore
+ * counts LOTR's waypoints, the weapon skills count blocks and the armour
+ * skills what their weight keeps (PROG-01, PROG-17).
  */
 public final class BundledProgressionFilesTest {
 
@@ -39,9 +46,10 @@ public final class BundledProgressionFilesTest {
             ids.add(skill.getId());
         }
         assertEquals(Arrays.asList("losttales:archery", "losttales:blades",
-                "losttales:heavy_arms", "losttales:polearms", "losttales:defence",
-                "losttales:riding", "losttales:smithing", "losttales:cooking",
-                "losttales:husbandry", "losttales:mining", "losttales:lore"), ids);
+                "losttales:heavy_arms", "losttales:polearms", "losttales:light_armour",
+                "losttales:heavy_armour", "losttales:riding", "losttales:smithing",
+                "losttales:cooking", "losttales:husbandry", "losttales:mining",
+                "losttales:lore"), ids);
     }
 
     @Test
@@ -58,8 +66,13 @@ public final class BundledProgressionFilesTest {
                 "warlord:100");
         assertTree(skills, "losttales:polearms", "point:10,30,50", "thrower:20", "brace:40",
                 "recovery:50", "horse_breaker:60", "phalanx:80<brace:1", "pikemaster:100");
-        assertTree(skills, "losttales:defence", "hardy:10,30,50", "fall_breaker:20",
-                "mender:40", "fireproof:50", "steadfast:70", "last_stand:100<steadfast:1");
+        assertTree(skills, "losttales:light_armour", "agile_defender:10,30,50",
+                "soft_step:20", "custom_fit:30", "unhindered:40", "matching_set:50",
+                "wind_walker:60", "deft_movement:80<custom_fit:1", "elusive:100<deft_movement:1");
+        assertTree(skills, "losttales:heavy_armour", "juggernaut:10,30,50",
+                "conditioning:20,60", "well_fitted:30", "tower_of_strength:40",
+                "matching_set:50", "cushioned:70", "standing_firm:80<tower_of_strength:1",
+                "last_stand:100");
         assertTree(skills, "losttales:riding", "horse_sense:10", "long_road:20,50",
                 "tamer:30", "mounted_archer:40", "caretaker:50", "steady_seat:60",
                 "charger:80<long_road:2", "rider_of_the_mark:100");
@@ -95,6 +108,61 @@ public final class BundledProgressionFilesTest {
     }
 
     @Test
+    public void theRacesStartAsTheCardGivesThem() {
+        Map<String, SkillDefinition> skills = skills();
+        DataFiles.Result<CharacterRaceDefinition> read = DataFiles.readBundled(
+                CharacterRaceRegistry.CLASSPATH, CharacterRaceFiles.INDEX,
+                CharacterRaceFiles.LIST_KEY, CharacterRaceFiles.kind(skills.keySet()));
+        Map<String, Map<String, Integer>> starts = new LinkedHashMap<String, Map<String, Integer>>();
+        for (CharacterRaceDefinition race : read.values) {
+            starts.put(race.getId(), race.getStartingSkills());
+        }
+        assertStarts(starts, "losttales:elf", "archery", "blades", "lore", "light_armour");
+        assertStarts(starts, "losttales:dwarf", "smithing", "mining", "heavy_arms", "heavy_armour");
+        assertStarts(starts, "losttales:uruk", "heavy_arms", "heavy_armour", "polearms", "archery");
+    }
+
+    @Test
+    public void theArmourSkillsCountWhatTheirWeightKeeps() {
+        Map<String, SkillDefinition> skills = skills();
+        assertEquals(ArmourWeight.LIGHT, skills.get("losttales:light_armour").getWeight());
+        assertEquals(ArmourWeight.HEAVY, skills.get("losttales:heavy_armour").getWeight());
+        for (String id : new String[] { "losttales:light_armour", "losttales:heavy_armour" }) {
+            List<SkillAct> acts = new ArrayList<SkillAct>();
+            for (SkillCount count : skills.get(id).getCounts()) {
+                acts.add(count.getAct());
+            }
+            assertEquals(id, Collections.singletonList(SkillAct.ARMOUR), acts);
+        }
+        for (String id : new String[] { "losttales:blades", "losttales:heavy_arms",
+                "losttales:polearms" }) {
+            boolean blocks = false;
+            for (SkillCount count : skills.get(id).getCounts()) {
+                blocks |= count.getAct() == SkillAct.BLOCK && !count.getWeapons().isEmpty();
+            }
+            assertTrue(id + " counts blows blocked with its weapons", blocks);
+        }
+        for (SkillDefinition skill : skills.values()) {
+            if (skill.getWeight() == null) {
+                for (SkillCount count : skill.getCounts()) {
+                    assertTrue(skill.getId() + " counts no armour",
+                            count.getAct() != SkillAct.ARMOUR);
+                }
+            }
+        }
+    }
+
+    private static void assertStarts(Map<String, Map<String, Integer>> starts, String race,
+                                     String ten, String... fives) {
+        Map<String, Integer> expected = new LinkedHashMap<String, Integer>();
+        expected.put("losttales:" + ten, Integer.valueOf(10));
+        for (String five : fives) {
+            expected.put("losttales:" + five, Integer.valueOf(5));
+        }
+        assertEquals(race, expected, starts.get(race));
+    }
+
+    @Test
     public void everyBundledSkillAndPerkHasItsWords() {
         Map<String, String> english = LostTalesLangFile.english();
         for (SkillDefinition skill : skills().values()) {
@@ -114,6 +182,39 @@ public final class BundledProgressionFilesTest {
                 }
             }
         }
+    }
+
+    @Test
+    public void archeryCountsBowsCrossbowsSlingsAndBlowguns() {
+        SkillDefinition archery = skills().get("losttales:archery");
+        int counted = 0;
+        for (SkillCount count : archery.getCounts()) {
+            if (count.getAct() == SkillAct.HIT || count.getAct() == SkillAct.KILL) {
+                for (WeaponKind kind : new WeaponKind[] { WeaponKind.BOW, WeaponKind.CROSSBOW,
+                        WeaponKind.SLING, WeaponKind.BLOWGUN }) {
+                    assertTrue(count.getAct().word() + " names " + kind.word(),
+                            count.getWeapons().contains(kind.word()));
+                }
+                counted++;
+            }
+        }
+        assertEquals("a hit and a kill", 2, counted);
+    }
+
+    @Test
+    public void loreCountsLotrsRegionsAndWaypointsAndTheModsMarkersAndWaystones() {
+        SkillDefinition lore = skills().get("losttales:lore");
+        Map<String, Double> worth = null;
+        for (SkillCount count : lore.getCounts()) {
+            if (count.getAct() == SkillAct.DISCOVER) {
+                worth = count.getWorth().entries();
+            }
+        }
+        assertNotNull("Lore counts finds", worth);
+        assertEquals(Double.valueOf(25.0D), worth.get("region"));
+        assertEquals(Double.valueOf(15.0D), worth.get("waypoint"));
+        assertEquals(Double.valueOf(15.0D), worth.get("waystone"));
+        assertEquals(Double.valueOf(10.0D), worth.get("marker"));
     }
 
     private static void assertLine(Map<String, String> english, String key) {

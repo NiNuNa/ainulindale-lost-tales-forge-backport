@@ -1,0 +1,21 @@
+{
+  "id": "losttales:morgul",
+  "helmet": [
+    "lotr:item.helmetMorgul"
+  ],
+  "chestplate": [
+    "lotr:item.bodyMorgul"
+  ],
+  "leggings": [
+    "lotr:item.legsMorgul"
+  ],
+  "boots": [
+    "lotr:item.bootsMorgul"
+  ],
+  "bonus": [
+    {
+      "effect": "poison",
+      "amount": 0.2
+    }
+  ]
+}

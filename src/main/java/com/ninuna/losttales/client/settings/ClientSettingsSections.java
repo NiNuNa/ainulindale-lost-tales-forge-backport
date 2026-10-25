@@ -120,35 +120,27 @@ public final class ClientSettingsSections {
     /* ---- HUD ---- */
 
     /**
-     * Each panel under its name, in HUD Settings: whether it follows the
-     * HUD key, where the panel has a switch of its own, and where it
-     * stands, a share of the room it can move in. Whether the HUD and each panel show,
-     * and the layout, are the HUD Placement page's own options.
+     * Each panel under its name, in HUD Settings: where it stands, a
+     * share of the room it can move in. Whether the HUD and each panel
+     * show, and the layout, are the HUD Placement page's own options;
+     * every panel follows the HUD key (MAP-15).
      */
     private static Settings.Section hud() {
         return new OptionSection("hud") {
             {
-                panel("compass", "compass", "Compass", true);
-                panel("fellowship", "fellowship", "Fellowship", true);
-                panel("quick_loot", "quickloot", "QuickLoot", true);
+                panel("compass", "compass", "Compass");
+                panel("fellowship", "fellowship", "Fellowship");
+                panel("quick_loot", "quickloot", "QuickLoot");
                 add(number(OptionFile.CLIENT, "quickLootHudMaxRows", 1.0D, 0));
-                panel("quest", "quest", "Quest", true);
-                panel("notifications", "notifications", "notification", false);
+                panel("quest", "quest", "Quest");
+                panel("notifications", "notifications", "notification");
             }
 
-            /**
-             * A panel's rows under its name: whether it follows the HUD
-             * key, where the panel has a switch, and its place.
-             */
-            private void panel(String group, String element, String name,
-                               boolean switched) {
+            /** A panel's rows under its name: its place. */
+            private void panel(String group, String element, String name) {
                 group(PREFIX + "hud.group." + group);
                 String field = Character.toLowerCase(name.charAt(0))
                         + name.substring(1);
-                if (switched) {
-                    add(toggle(OptionFile.CLIENT, "linkShow" + name + "Hud",
-                            PREFIX + "hud.panel.link"));
-                }
                 add(offset(element, field + "HudOffsetX", field + "HudOffsetY",
                         true));
                 add(offset(element, field + "HudOffsetY", field + "HudOffsetX",
@@ -204,7 +196,6 @@ public final class ClientSettingsSections {
                 add(number(OptionFile.CLIENT, "compassHudDisplayRadius", 5.0D, 0));
                 add(toggle(OptionFile.CLIENT, "showStaticCompassMarkers"));
                 add(toggle(OptionFile.CLIENT, "showLotrWaypointCompassMarkers"));
-                add(toggle(OptionFile.CLIENT, "onlyShowUnlockedLotrWaypoints"));
                 add(toggle(OptionFile.CLIENT, "showHostileCompassMarkers"));
                 add(number(OptionFile.CLIENT, "hostileCompassMarkerScanRadius", 1.0D, 0));
                 add(number(OptionFile.CLIENT, "fellowshipCompassMarkerFadeRadius", 10.0D, 0));
@@ -600,8 +591,8 @@ public final class ClientSettingsSections {
         return new OptionSection("developer") {
             {
                 add(line(OptionFile.CLIENT, "devSkinOverridePath"));
-                add(choice(OptionFile.CLIENT, "devSkinOverrideBodyType",
-                        LostTalesConfig.DEV_SKIN_BODY_TYPES, "developer.arms."));
+                add(choice(OptionFile.CLIENT, "devSkinOverrideArms",
+                        LostTalesConfig.DEV_SKIN_ARMS, "developer.arms."));
             }
         };
     }

@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.gui.style.LostTalesUiFading;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -267,6 +268,11 @@ public final class ToolStrip {
         return WindowSearch.isOpen() && this.field != null && this.field.isFocused();
     }
 
+    /** Whether the field holds the caret, standing in a well or not. */
+    boolean fieldFocused() {
+        return this.field != null && this.field.isFocused();
+    }
+
     public void focus(boolean on) {
         if (this.field != null) {
             this.field.setFocused(on);
@@ -291,7 +297,7 @@ public final class ToolStrip {
     /**
      * Lays a window's strip out for its row before the row is drawn, and
      * tells the row where the well is cut out of the strip's surface.
-     * The search's field moves to the window its search is open on.
+     * The search's field moves to the window whose well it stands in.
      */
     public void prepare(FontRenderer font, WindowFrame frame,
                  TabRow.Row row) {
@@ -305,8 +311,7 @@ public final class ToolStrip {
             frame.tabBar.setToolStripHole(null);
             return;
         }
-        boolean typed = WindowSearch.isOpenOn(frame.windowId)
-                && WindowSearch.query().length() > 0;
+        boolean typed = WindowSearch.wordsOf(front).length() > 0;
         Panel panel = front.panel();
         Layout laid = layOut(TabRow.toolStripLeft(row),
                 (int)Math.floor(frame.tabBar.toolStripRight(font, row)),
@@ -603,7 +608,11 @@ public final class ToolStrip {
                     glyphTop(laid, LostTalesUiSheet.SEARCH.getHeight()), ink);
             return;
         }
-        boolean typed = searching && WindowSearch.query().length() > 0;
+        // Each copy keeps its words in its well: the field draws them in
+        // the well it stands in, and every other well draws its copy's
+        // words as they stand, cut where they do not fit.
+        String words = WindowSearch.wordsOf(front);
+        boolean typed = words.length() > 0;
         if (searching && this.field != null) {
             if (this.field.getText().length() == 0) {
                 drawPrompt(font, laid, front, row,
@@ -611,6 +620,9 @@ public final class ToolStrip {
                         ink);
             }
             this.field.drawTextBox();
+        } else if (typed) {
+            LostTalesUiCutName.drawText(font, words, laid.fieldX,
+                    laid.textTop, laid.fieldWidth, LostTalesUiInk.IVORY, ink);
         } else {
             drawPrompt(font, laid, front, row, laid.fieldX
                     + LostTalesUiCaret.WIDTH + 1, ink);
@@ -985,8 +997,7 @@ public final class ToolStrip {
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.view.enter");
             case ICON:
-                return WindowSearch.isOpenOn(window.getId())
-                        && WindowSearch.query().length() > 0
+                return WindowSearch.wordsIn(window.getId()).length() > 0
                         ? StatCollector.translateToLocal(
                                 "gui.losttales.window.search.close")
                         : "";

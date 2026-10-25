@@ -1,7 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
@@ -57,7 +57,7 @@ public final class ChatIdentitySelectionTest {
                 .slot(0)
                 .name(name)
                 .race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
                 .skin(CharacterSkinRegistry.ACCOUNT_SKIN_ID)
                 .startingFaction("lotr:gondor")
                 .build();

@@ -2,9 +2,9 @@ package com.ninuna.losttales.character.validation;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import org.junit.Test;
@@ -63,8 +63,8 @@ public final class CharacterNameLookTest {
         CharacterRoster roster = new CharacterRoster(OWNER, 3, null, 0L);
         assertTrue(roster.addCharacter(RoleplayCharacter.builder(UUID.randomUUID(), OWNER)
                 .slot(0).name("Ace").race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
-                .skin("losttales:human_bree_male_0").age(30)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
+                .skin("losttales:human_bree_masculine_0").age(30)
                 .startingFaction("lotr:bree").createdAt(1L).build()));
         // All Cyrillic, so one script, and it reads as Ace.
         assertEquals(CharacterErrorId.DUPLICATE_NAME,
@@ -88,10 +88,10 @@ public final class CharacterNameLookTest {
                                                                 String name) {
         return CharacterValidator.validateAppearance(roster, null,
                 name, CharacterRaceRegistry.HUMAN,
-                CharacterGenderRegistry.MALE,
+                CharacterBodyTypeRegistry.MASCULINE,
                 CharacterSkinRegistry.getDefaultSkinId(CharacterRaceRegistry.HUMAN,
-                        CharacterGenderRegistry.MALE, OWNER),
-                CharacterBodyTypeRegistry.WIDE,
+                        CharacterBodyTypeRegistry.MASCULINE, OWNER),
+                CharacterArmsRegistry.BROAD,
                 CharacterChestTypeRegistry.NONE, "", 25);
     }
 }

@@ -19,7 +19,8 @@ import org.lwjgl.opengl.GL11;
 /**
  * Labels in the world over the places tracked quests send the player: the
  * quest's title and the distance, drawn the way a nameplate is, facing the
- * camera. A label shows out to twice the configured distance.
+ * camera. A label shows out to the distance Quest Settings name, 48 blocks
+ * at least.
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesWorldQuestMarkerRenderer {
@@ -103,10 +104,9 @@ public final class LostTalesWorldQuestMarkerRenderer {
         }
     }
 
+    /** Whether the labels show: their own switch, whatever the tracker's says (QUEST-46). */
     private static boolean shouldRender(Minecraft minecraft) {
-        return LostTalesConfig.showLostTalesHud
-                && LostTalesConfig.showQuestHud
-                && LostTalesConfig.showWorldQuestMarkers
+        return QuestHudSwitches.current().worldLabels
                 && minecraft != null
                 && minecraft.thePlayer != null
                 && minecraft.theWorld != null

@@ -1,6 +1,6 @@
 package com.ninuna.losttales.command;
 
-import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
+import com.ninuna.losttales.entity.combat.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.fellowship.server.FellowshipIntegrityReport;
 import com.ninuna.losttales.fellowship.server.FellowshipService;
 import com.ninuna.losttales.fellowship.server.FellowshipSyncManager;

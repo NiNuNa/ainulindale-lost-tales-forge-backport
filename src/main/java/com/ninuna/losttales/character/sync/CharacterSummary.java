@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.sync;
 
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 
 import com.ninuna.losttales.util.LostTalesIdentifiers;
@@ -15,9 +15,9 @@ public final class CharacterSummary {
     private final int slotIndex;
     private final String name;
     private final String raceId;
-    private final String genderId;
-    private final String skinId;
     private final String bodyTypeId;
+    private final String skinId;
+    private final String armsId;
     private final String chestTypeId;
     private final boolean showMinecraftCape;
     private final String cosmeticCapeId;
@@ -25,14 +25,14 @@ public final class CharacterSummary {
     private final String factionId;
 
     /**
-     * A body or chest type the registry does not know takes the sex's
+     * Arms or a chest the registry does not know take the body type's
      * default. The faction is the character's own: its pledge while it
      * has one, else its starting faction.
      */
     public CharacterSummary(UUID characterId, int slotIndex, String name,
-                            String raceId, String genderId, String skinId,
+                            String raceId, String bodyTypeId, String skinId,
                             boolean showMinecraftCape, String cosmeticCapeId,
-                            int age, String factionId, String bodyTypeId,
+                            int age, String factionId, String armsId,
                             String chestTypeId) {
         if (characterId == null) {
             throw new IllegalArgumentException("characterId must not be null");
@@ -41,14 +41,14 @@ public final class CharacterSummary {
         this.slotIndex = slotIndex;
         this.name = name == null ? "" : name;
         this.raceId = raceId == null ? "" : raceId;
-        this.genderId = genderId == null ? "" : genderId;
+        this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
         this.skinId = skinId == null ? "" : skinId;
-        this.bodyTypeId = CharacterBodyTypeRegistry.contains(bodyTypeId)
-                ? LostTalesIdentifiers.normalize(bodyTypeId)
-                : CharacterBodyTypeRegistry.defaultFor(genderId);
+        this.armsId = CharacterArmsRegistry.contains(armsId)
+                ? LostTalesIdentifiers.normalize(armsId)
+                : CharacterArmsRegistry.defaultFor(bodyTypeId);
         this.chestTypeId = CharacterChestTypeRegistry.contains(chestTypeId)
                 ? LostTalesIdentifiers.normalize(chestTypeId)
-                : CharacterChestTypeRegistry.defaultFor(genderId);
+                : CharacterChestTypeRegistry.defaultFor(bodyTypeId);
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = cosmeticCapeId == null ? "" : cosmeticCapeId;
         this.age = age;
@@ -64,13 +64,13 @@ public final class CharacterSummary {
                 character.getSlotIndex(),
                 character.getName(),
                 character.getRaceId(),
-                character.getGenderId(),
+                character.getBodyTypeId(),
                 character.getSkinId(),
                 character.isMinecraftCapeVisible(),
                 character.getCosmeticCapeId(),
                 character.getAge(),
                 character.getFactionId(),
-                character.getBodyTypeId(),
+                character.getArmsId(),
                 character.getChestTypeId()
         );
     }
@@ -91,16 +91,16 @@ public final class CharacterSummary {
         return this.raceId;
     }
 
-    public String getGenderId() {
-        return this.genderId;
+    public String getBodyTypeId() {
+        return this.bodyTypeId;
     }
 
     public String getSkinId() {
         return this.skinId;
     }
 
-    public String getBodyTypeId() {
-        return this.bodyTypeId;
+    public String getArmsId() {
+        return this.armsId;
     }
 
     public String getChestTypeId() {

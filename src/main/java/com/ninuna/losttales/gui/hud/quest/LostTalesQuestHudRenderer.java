@@ -9,7 +9,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
@@ -25,9 +25,10 @@ import org.lwjgl.opengl.GL11;
 import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 /**
  * The quest tracker, Lost Tales and LOTR quests together, and the banners
- * the quest log's changes raise. Every tracked running quest stands on the
- * tracker, up to its size and then a count of the rest (QUEST-21); where a
- * quest's places lie is the compass's and the world labels' to show.
+ * the quest log's changes raise, each shown by its own switch (QUEST-46).
+ * Every tracked running quest stands on the tracker, up to its size and
+ * then a count of the rest (QUEST-21); where a quest's places lie is the
+ * compass's and the world labels' to show.
  */
 public final class LostTalesQuestHudRenderer {
     private static final int PANEL_WIDTH = 238;
@@ -65,8 +66,10 @@ public final class LostTalesQuestHudRenderer {
                 + (quests - 1) * QUEST_ENTRY_GAP;
     }
 
+    /** The tracker and the banners, each where its own switch shows it (QUEST-46). */
     public static void render(Minecraft minecraft, float partialTicks) {
-        if (!LostTalesConfig.showLostTalesHud || !LostTalesConfig.showQuestHud || minecraft == null || minecraft.thePlayer == null || minecraft.theWorld == null || minecraft.gameSettings.hideGUI) {
+        QuestHudSwitches shown = QuestHudSwitches.current();
+        if (!shown.tracker && !shown.banners || minecraft == null || minecraft.thePlayer == null || minecraft.theWorld == null || minecraft.gameSettings.hideGUI) {
             return;
         }
 
@@ -76,8 +79,12 @@ public final class LostTalesQuestHudRenderer {
         GL11.glPushMatrix();
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_DEPTH_TEST);
-        renderActiveQuestTracker(minecraft, resolution);
-        renderNotifications(minecraft, resolution);
+        if (shown.tracker) {
+            renderActiveQuestTracker(minecraft, resolution);
+        }
+        if (shown.banners) {
+            renderNotifications(minecraft, resolution);
+        }
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glPopMatrix();
     }
@@ -121,7 +128,7 @@ public final class LostTalesQuestHudRenderer {
         if (overflow > 0) {
             String more = StatCollector.translateToLocalFormatted(
                     "gui.losttales.quest.hud.more", String.valueOf(overflow));
-            LostTalesSkyrimUiStyle.beginContent();
+            LostTalesUiInk.beginContent();
             font.drawStringWithShadow(more,
                     x + PANEL_WIDTH - PANEL_PADDING - font.getStringWidth(more),
                     lineY - 1,
@@ -163,7 +170,7 @@ public final class LostTalesQuestHudRenderer {
                 titleY + 6, ruleColor);
         Gui.drawRect(right - 8, titleY + 5, right, titleY + 6, ruleColor);
         drawSmallDiamond(left + 5, titleY + 5, titleRgb);
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         LostTalesUiCutName.drawShadowed(font, title, right - titleWidth,
                 titleY, titleRoom, titleRgb);
 
@@ -190,14 +197,14 @@ public final class LostTalesQuestHudRenderer {
                                 ? LostTalesColors.GREEN
                                 : LostTalesUiTheme.accentRgb(), 0xAA));
             }
-            LostTalesSkyrimUiStyle.beginContent();
+            LostTalesUiInk.beginContent();
         }
     }
 
     private static void drawSmallDiamond(int centerX, int centerY, int color) {
         Gui.drawRect(centerX, centerY - 3, centerX + 1, centerY + 4, color);
         Gui.drawRect(centerX - 2, centerY - 1, centerX + 3, centerY + 2, color);
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
     }
 
     private static List<TrackedQuestHudEntry> collectTrackedQuestEntries(Minecraft minecraft) {
@@ -241,9 +248,6 @@ public final class LostTalesQuestHudRenderer {
     }
 
     private static void renderNotifications(Minecraft minecraft, ScaledResolution resolution) {
-        if (!LostTalesConfig.showQuestHudNotifications) {
-            return;
-        }
         List<LostTalesClientQuestNotificationStore.Notification> notifications = LostTalesClientQuestNotificationStore.getVisibleNotifications();
         if (notifications.isEmpty()) {
             return;
@@ -282,7 +286,7 @@ public final class LostTalesQuestHudRenderer {
             Gui.drawRect(x, y, x + 3, y + NOTIFICATION_HEIGHT, border);
             Gui.drawRect(x, y + NOTIFICATION_HEIGHT - 1, x + NOTIFICATION_WIDTH, y + NOTIFICATION_HEIGHT, accentColor);
             String title = notification.getType().getDisplayTitle();
-            LostTalesSkyrimUiStyle.beginContent();
+            LostTalesUiInk.beginContent();
             // Words too long for the notice fade into its end (LOOK-37).
             String message = notification.getMessage();
             LostTalesUiCutName.drawShadowed(font, title == null ? "" : title,

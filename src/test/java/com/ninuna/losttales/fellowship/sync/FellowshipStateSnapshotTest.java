@@ -145,6 +145,7 @@ public final class FellowshipStateSnapshotTest {
 
     private static FellowshipInvitationSnapshot invitation(UUID fellowshipId) {
         return new FellowshipInvitationSnapshot(UUID.randomUUID(), fellowshipId,
-                "Company", PLAYED, OWNER, "Aldric", new UUID(5L, 5L), "Hurin", 2L);
+                "Company", PLAYED, OWNER, "Aldric", "Steve", new UUID(5L, 5L), "Hurin",
+                "Alex", 2L);
     }
 }

@@ -141,25 +141,25 @@ public final class MissiveSealTest {
     }
 
     /**
-     * A letter pinned back on a board is posted at the board's time and
-     * sealed again: its old seal no longer fits, the new one does, and
-     * nothing else it says changed.
+     * A letter's days run from its first posting (QUEST-34), and the seal
+     * covers that time: a letter whose posting time was moved by hand, to
+     * buy it fresh days, no longer carries a seal that fits.
      */
     @Test
-    public void aRepostedLetterIsSealedAgain() {
+    public void theSealCoversTheFirstPosting() {
         LostTalesMissiveData letter = LostTalesMissiveData.builder(
                 "losttales:missive/generated/b/1_0", "kill").titleId("dangerous_work")
                 .generationWorldTime(1000L)
                 .objective(new LostTalesMissiveObjectiveData("o", "kill", false, null))
                 .build();
-        byte[] old = MissiveSeal.sign(key(7), letter);
-        LostTalesMissiveData posted = letter.postedAt(50000L);
-        assertEquals(50000L, posted.getGenerationWorldTime());
-        assertEquals(letter.getQuestId(), posted.getQuestId());
-        assertEquals(letter.getTitleId(), posted.getTitleId());
-        assertFalse(MissiveSeal.verifies(key(7), posted, old));
-        assertTrue(MissiveSeal.verifies(key(7), posted,
-                MissiveSeal.sign(key(7), posted)));
+        LostTalesMissiveData moved = LostTalesMissiveData.builder(
+                "losttales:missive/generated/b/1_0", "kill").titleId("dangerous_work")
+                .generationWorldTime(50000L)
+                .objective(new LostTalesMissiveObjectiveData("o", "kill", false, null))
+                .build();
+        byte[] seal = MissiveSeal.sign(key(7), letter);
+        assertTrue(MissiveSeal.verifies(key(7), letter, seal));
+        assertFalse(MissiveSeal.verifies(key(7), moved, seal));
     }
 
     @Test

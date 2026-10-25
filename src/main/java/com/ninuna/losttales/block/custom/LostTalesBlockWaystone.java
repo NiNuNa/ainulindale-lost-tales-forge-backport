@@ -163,11 +163,42 @@ public final class LostTalesBlockWaystone
             return super.removedByPlayer(
                     world, player, x, y, z, willHarvest);
         }
+        // Broken at the top half, the waystone drops where its bottom half
+        // stood, by the one rule of both halves.
+        boolean drops = drops(player.capabilities.isCreativeMode,
+                willHarvest, canHarvestBlock(player, metadata));
         world.setBlockToAir(x, baseY, z);
-        if (!player.capabilities.isCreativeMode) {
+        if (drops) {
             dropBlockAsItem(world, x, baseY, z, 0, 0);
         }
         return true;
+    }
+
+    /**
+     * Breaking the bottom half drops the waystone only by the same rule as
+     * the top half ({@link #drops}), whoever asks for the harvest: another
+     * mod's tool that harvests without asking drops nothing it should not,
+     * and a harvest by nobody drops nothing.
+     */
+    @Override
+    public void harvestBlock(World world, EntityPlayer player,
+                             int x, int y, int z, int metadata) {
+        if (player != null && drops(player.capabilities.isCreativeMode,
+                true, canHarvestBlock(player, metadata))) {
+            super.harvestBlock(world, player, x, y, z, metadata);
+        }
+    }
+
+    /**
+     * Whether breaking either half drops the waystone (WAY-19): never in
+     * creative, and only when the breaking harvests it with a tool that
+     * harvests it, a stone pickaxe or better, as the block's harvest
+     * level asks of every half ({@code setHarvestLevel("pickaxe", 1)}).
+     * Another mod's pickaxe counts by the harvest level it declares.
+     */
+    static boolean drops(boolean creative, boolean willHarvest,
+                         boolean toolHarvests) {
+        return !creative && willHarvest && toolHarvests;
     }
 
     @Override

@@ -33,14 +33,12 @@ import net.minecraftforge.event.entity.player.EntityInteractEvent;
 
 /**
  * The perks of riding and the herds (PROG-06): a mount's speed and jump
- * under its rider, taming, feeding, shearing, breeding and butchering,
- * and Steadfast's footing. The server's alone; attribute changes never
- * save with the creature.
+ * under its rider, taming, feeding, shearing, breeding and butchering.
+ * The server's alone; attribute changes never save with the creature.
  */
 public final class PerkAnimalEvents {
     private static final UUID LONG_ROAD = UUID.fromString("5b5f4a52-6c86-4a2e-9a51-6a0b1b5a8a01");
     private static final UUID RIDER_OF_THE_MARK = UUID.fromString("5b5f4a52-6c86-4a2e-9a51-6a0b1b5a8a02");
-    private static final UUID STEADFAST = UUID.fromString("5b5f4a52-6c86-4a2e-9a51-6a0b1b5a8a03");
     /** Vanilla's ages: a parent the tick it bred, a newborn. */
     private static final int JUST_BRED_AGE = 6000;
     private static final int NEWBORN_AGE = -24000;
@@ -156,8 +154,6 @@ public final class PerkAnimalEvents {
         }
         EntityPlayerMP player = (EntityPlayerMP) event.player;
         PerkIndex perks = Perks.of(player);
-        raise(player.getEntityAttribute(SharedMonsterAttributes.knockbackResistance),
-                STEADFAST, "Steadfast", Math.min(1.0D, perks.total(PerkEffect.STEADFAST)), 0);
         PerkRuntime.Moments moments = PerkRuntime.of(player);
         Entity mount = player.ridingEntity;
         int mountId = mount instanceof EntityLivingBase ? mount.getEntityId() : -1;

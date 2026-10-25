@@ -2,10 +2,12 @@ package com.ninuna.losttales.faction;
 
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.util.LostTalesLangFile;
 import com.ninuna.losttales.util.LostTalesPair;
 import com.ninuna.losttales.util.LostTalesUtil;
 import com.ninuna.losttales.world.map.waypoint.ELostTalesWaypoint;
 import java.util.EnumSet;
+import java.util.Map;
 import lotr.common.LOTRAchievement;
 import lotr.common.LOTRDimension;
 import lotr.common.fac.LOTRControlZone;
@@ -302,23 +304,24 @@ public enum ELostTalesFaction {
     }
 
     /**
-     * A rank may only be registered gendered when en_US.lang carries the
-     * matching rank.<name>_fm and rank.<name>_fm.f entries — without them the
-     * feminine title displays as a raw lang key.
+     * A rank has a feminine form wherever the mod's English lang file has
+     * its {@code _fm} line (FACTION-03). The English file is the one every
+     * language's keys follow, so the answer is the same on every side and
+     * in every language.
      */
     private boolean hasFeminineRank(String rankName) {
-        switch (this) {
-            case LOSSOTH:
-                return "b".equals(rankName) || "f".equals(rankName) || "h".equals(rankName);
-            case OROCARNI:
-                return "g".equals(rankName) || "h".equals(rankName);
-            case MOON_ELVES:
-                return "f".equals(rankName);
-            case BLUE_GOBLINS:
-                return "h".equals(rankName);
-            default:
-                return false;
-        }
+        return hasFeminineRank(LostTalesLangFile.english(), getFaction().codeName(), rankName);
+    }
+
+    /** True when {@code lines} hold the feminine title of the faction's rank. */
+    static boolean hasFeminineRank(Map<String, String> lines, String factionCode,
+                                   String rankName) {
+        return lines.containsKey(rankKey(factionCode, rankName) + "_fm");
+    }
+
+    /** LOTR's lang key of a rank's title: {@code lotr.faction.<code>.rank.<name>}. */
+    static String rankKey(String factionCode, String rankName) {
+        return "lotr.faction." + factionCode + ".rank." + rankName;
     }
 
     public LOTRFaction getFaction() {

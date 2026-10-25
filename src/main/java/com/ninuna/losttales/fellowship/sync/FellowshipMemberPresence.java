@@ -2,13 +2,15 @@ package com.ninuna.losttales.fellowship.sync;
 
 /**
  * Where a member stands, as the Fellowship page shows it: away (their
- * account is offline), here (online as the character who is the member), or
- * elsewhere (online as another of their characters).
+ * account is offline), here (online as the character who is the member),
+ * elsewhere (online as another of their characters), or a ghost (online
+ * playing no character, making one).
  */
 public enum FellowshipMemberPresence {
     AWAY(0),
     HERE(1),
-    ELSEWHERE(2);
+    ELSEWHERE(2),
+    GHOST(3);
 
     private final int networkId;
 

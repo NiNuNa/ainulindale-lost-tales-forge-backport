@@ -1,22 +1,33 @@
 package com.ninuna.losttales.world.structure.odane;
 
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneMan;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import com.ninuna.losttales.world.waystone.LostTalesStructureScan;
+import com.ninuna.losttales.world.waystone.LostTalesWaystoneHouse;
+import com.ninuna.losttales.world.waystone.LostTalesWaystoneHousePlacer;
+import com.ninuna.losttales.world.waystone.LostTalesWaystoneStructurePlacer;
+import com.ninuna.losttales.world.waystone.LostTalesWaystoneStructureRegistry;
 import java.util.Random;
 import lotr.common.world.structure2.LOTRWorldGenStructureBase2;
 import net.minecraft.block.Block;
 import net.minecraft.world.World;
 
+/**
+ * The Odane glowstone house, built from the house files' {@code glowstone_house}
+ * as a generated waystone's house is (CONTENT-10, WAY-17): the bundled one, or
+ * a server's own of that name in its place. With no such house loaded, nothing
+ * is built.
+ */
 public class LostTalesWorldGenOdaneGlowstoneHouse extends LOTRWorldGenStructureBase2 {
 
-    private static final String SCAN_RESOURCE = "/assets/losttales/structures/glowstone_house.strscan";
-    private static final int MIN_X = 0;
-    private static final int MAX_X = 3;
-    private static final int MIN_Z = -4;
-    private static final int MAX_Z = 0;
+    /** The houses that loaded, bundled and the server's own. */
+    private static final OdaneHousePlan.Houses LOADED = new OdaneHousePlan.Houses() {
+        @Override
+        public LostTalesWaystoneHouse get(String id) {
+            LostTalesWaystoneStructurePlacer placer = LostTalesWaystoneStructureRegistry.get(id);
+            return placer instanceof LostTalesWaystoneHousePlacer
+                    ? ((LostTalesWaystoneHousePlacer) placer).getHouse() : null;
+        }
+    };
 
     public LostTalesWorldGenOdaneGlowstoneHouse(boolean notify) {
         super(notify);
@@ -24,29 +35,37 @@ public class LostTalesWorldGenOdaneGlowstoneHouse extends LOTRWorldGenStructureB
 
     @Override
     public boolean generateWithSetRotation(World world, Random random, int i, int j, int k, int rotation) {
+        OdaneHousePlan plan = OdaneHousePlan.from(LOADED);
+        if (plan == null) {
+            return false;
+        }
         this.setOriginAndRotation(world, i, j, k, rotation, 0);
 
-        if (this.restrictions && !this.isGroundSuitable(world)) {
+        if (this.restrictions && !this.isGroundSuitable(world, plan)) {
             return false;
         }
 
-        this.clearHouseSpace(world);
-        if (!this.generateGlowstoneHouseScan(world)) {
-            return false;
+        this.clearHouseSpace(world, plan);
+        for (LostTalesStructureScan.Block block : plan.getBlocks()) {
+            Block placed = Block.getBlockFromName(block.name);
+            if (placed != null) {
+                this.setBlockAndMetadata(world, block.x, block.y, block.z, placed, block.metadata);
+            }
         }
 
+        int[] resident = plan.getResident();
         LostTalesEntityOdaneMan npc = new LostTalesEntityOdaneMan(world);
-        this.spawnNPCAndSetHome(npc, world, 1, 1, -2, 16);
+        this.spawnNPCAndSetHome(npc, world, resident[0], resident[1], resident[2], 16);
 
         return true;
     }
 
-    private boolean isGroundSuitable(World world) {
+    private boolean isGroundSuitable(World world, OdaneHousePlan plan) {
         int minY = Integer.MAX_VALUE;
         int maxY = Integer.MIN_VALUE;
 
-        for (int x = MIN_X; x <= MAX_X; x++) {
-            for (int z = MIN_Z; z <= MAX_Z; z++) {
+        for (int x = plan.getMinX(); x <= plan.getMaxX(); x++) {
+            for (int z = plan.getMinZ(); z <= plan.getMaxZ(); z++) {
                 int y = this.getTopBlock(world, x, z) - 1;
                 if (!this.isSurface(world, x, y, z)) {
                     return false;
@@ -60,76 +79,16 @@ public class LostTalesWorldGenOdaneGlowstoneHouse extends LOTRWorldGenStructureB
             }
         }
 
-        return maxY - minY <= 2;
+        return OdaneHousePlan.isLevelEnough(minY, maxY);
     }
 
-    private void clearHouseSpace(World world) {
-        for (int x = MIN_X; x <= MAX_X; x++) {
-            for (int z = MIN_Z; z <= MAX_Z; z++) {
-                for (int y = 1; y <= 5; y++) {
+    private void clearHouseSpace(World world, OdaneHousePlan plan) {
+        for (int x = plan.getMinX(); x <= plan.getMaxX(); x++) {
+            for (int z = plan.getMinZ(); z <= plan.getMaxZ(); z++) {
+                for (int y = 1; y <= plan.getClearance(); y++) {
                     this.setAir(world, x, y, z);
                 }
             }
         }
-    }
-
-    private boolean generateGlowstoneHouseScan(World world) {
-        InputStream input = LostTalesWorldGenOdaneGlowstoneHouse.class.getResourceAsStream(SCAN_RESOURCE);
-        if (input == null) {
-            return false;
-        }
-
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new InputStreamReader(input, "UTF-8"));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                this.generateScanLine(world, line.trim());
-            }
-            return true;
-        } catch (IOException e) {
-            return false;
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException ignored) {}
-            }
-        }
-    }
-
-    private void generateScanLine(World world, String line) {
-        if (line.length() == 0 || line.startsWith("#")) {
-            return;
-        }
-
-        String[] parts = line.split("\\.");
-        if (parts.length < 5) {
-            return;
-        }
-
-        try {
-            int x = Integer.parseInt(parts[0]);
-            int y = Integer.parseInt(parts[1]);
-            int z = Integer.parseInt(parts[2]);
-            String blockName = parts[3].replace("\"", "");
-            int meta = Integer.parseInt(parts[4]);
-            Block block = this.getBlockByScanName(blockName);
-
-            if (block != null) {
-                this.setBlockAndMetadata(world, x, y, z, block, meta);
-            }
-        } catch (NumberFormatException ignored) {}
-    }
-
-    private Block getBlockByScanName(String blockName) {
-        Block block = Block.getBlockFromName(blockName);
-        if (block == null) {
-            block = (Block) Block.blockRegistry.getObject(blockName);
-        }
-        if (block == null && blockName.indexOf(':') < 0) {
-            block = (Block) Block.blockRegistry.getObject("minecraft:" + blockName);
-        }
-        return block;
     }
 }

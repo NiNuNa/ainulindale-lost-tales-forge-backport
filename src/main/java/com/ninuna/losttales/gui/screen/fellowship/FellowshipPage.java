@@ -232,12 +232,13 @@ public final class FellowshipPage extends PageContent {
         PageSearch search = PageSearch.of(this.query);
         List<Row> incoming = new ArrayList<Row>();
         for (FellowshipInvitationSnapshot invitation : snapshot.getIncomingInvitations()) {
-            if (search.matches(invitation.getFellowshipName(),
-                    invitation.getInvitingCharacterName())) {
+            String inviter = ClientFellowshipDisplayNames.named(
+                    invitation.getInvitingCharacterName(),
+                    invitation.getInvitingAccountName());
+            if (search.matches(invitation.getFellowshipName(), inviter)) {
                 incoming.add(new Row(Kind.INCOMING, I18n.format(
                         "gui.losttales.fellowship.invitation.row",
-                        invitation.getFellowshipName(),
-                        invitation.getInvitingCharacterName()),
+                        invitation.getFellowshipName(), inviter),
                         null, null, invitation, rowHeight));
             }
         }
@@ -263,11 +264,13 @@ public final class FellowshipPage extends PageContent {
                 }
             }
             for (FellowshipInvitationSnapshot invitation : snapshot.getOutgoingInvitations()) {
+                String invited = ClientFellowshipDisplayNames.named(
+                        invitation.getTargetCharacterName(),
+                        invitation.getTargetAccountName());
                 if (invitation.getFellowshipId().equals(fellowship.getFellowshipId())
-                        && (named || search.matches(invitation.getTargetCharacterName()))) {
+                        && (named || search.matches(invited))) {
                     inside.add(new Row(Kind.OUTGOING, I18n.format(
-                            "gui.losttales.fellowship.invited",
-                            invitation.getTargetCharacterName()),
+                            "gui.losttales.fellowship.invited", invited),
                             fellowship, null, invitation, rowHeight));
                 }
             }
@@ -688,8 +691,8 @@ public final class FellowshipPage extends PageContent {
 
     /**
      * What stands at a row's right: Travelling on the fellowship travelled
-     * with; Leader or Guide, You, and Away or the character played instead
-     * on a member; the time left on an invitation.
+     * with; Leader or Guide, You, and Away, the character played instead or
+     * Making a Character on a member; the time left on an invitation.
      */
     private static String asideOf(FellowshipStateSnapshot snapshot, Row row) {
         if (row.kind == Kind.FELLOWSHIP) {
@@ -711,10 +714,11 @@ public final class FellowshipPage extends PageContent {
             } else if (row.member.getPresence() == FellowshipMemberPresence.AWAY) {
                 words.add(I18n.format("gui.losttales.fellowship.away"));
             } else if (row.member.getPresence() == FellowshipMemberPresence.ELSEWHERE) {
-                words.add(row.member.getElsewhereName().length() == 0
-                        ? I18n.format("gui.losttales.fellowship.elsewhere")
-                        : I18n.format("gui.losttales.fellowship.playing_as",
-                                row.member.getElsewhereName()));
+                words.add(I18n.format("gui.losttales.fellowship.playing_as",
+                        row.member.getElsewhereName()));
+            } else if (row.member.getPresence() == FellowshipMemberPresence.GHOST) {
+                // The Tab list's word for a ghost (CHAR-02, FEL-32).
+                words.add(I18n.format("gui.losttales.fellowship.ghost"));
             }
             StringBuilder aside = new StringBuilder();
             for (String word : words) {
@@ -1347,18 +1351,17 @@ public final class FellowshipPage extends PageContent {
         }
         List<String> names = new ArrayList<String>();
         for (FellowshipInviteTargetSnapshot target : offeredTargets()) {
-            // The account stands after the name only where the server sent it.
-            names.add(target.getPlayerName().length() == 0
-                    || target.getCharacterName().equals(target.getPlayerName())
-                    ? target.getCharacterName()
-                    : target.getCharacterName() + " (" + target.getPlayerName()
-                            + ")");
+            names.add(ClientFellowshipDisplayNames.named(target.getCharacterName(),
+                    target.getPlayerName()));
         }
         return field.offers(names, names.isEmpty() ? -1
                 : Math.min(this.offered, names.size() - 1));
     }
 
-    /** The players the field offers: those the picked fellowship may invite whose names hold what is typed. */
+    /**
+     * The players the field offers: those the picked fellowship may invite
+     * whose names, as the field shows them, hold what is typed.
+     */
     private List<FellowshipInviteTargetSnapshot> offeredTargets() {
         FellowshipStateSnapshot snapshot = getSnapshot();
         FellowshipSnapshot fellowship = current(snapshot);
@@ -1369,8 +1372,8 @@ public final class FellowshipPage extends PageContent {
         List<FellowshipInviteTargetSnapshot> shown =
                 new ArrayList<FellowshipInviteTargetSnapshot>();
         for (FellowshipInviteTargetSnapshot target : snapshot.getInviteTargets(fellowship)) {
-            if (search.matches(target.getCharacterName(),
-                    target.getPlayerName())) {
+            if (search.matches(ClientFellowshipDisplayNames.named(
+                    target.getCharacterName(), target.getPlayerName()))) {
                 shown.add(target);
             }
         }

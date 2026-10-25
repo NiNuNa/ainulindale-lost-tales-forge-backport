@@ -265,8 +265,8 @@ public final class FellowshipStateSyncPacket implements IMessage {
             FellowshipMemberPresence presence = FellowshipMemberPresence.fromNetworkId(
                     buffer.readUnsignedByte());
             String elsewhereName = presence == FellowshipMemberPresence.ELSEWHERE
-                    ? LostTalesPacketCodec.readUtf8String(
-                    buffer, FellowshipPacketCodec.MAX_NAME_BYTES) : "";
+                    ? FellowshipPacketCodec.shownName(LostTalesPacketCodec.readUtf8String(
+                    buffer, FellowshipPacketCodec.MAX_NAME_BYTES)) : "";
             if (color == null || presence == null || !identityIds.add(identityId)) {
                 throw new FellowshipPacketCodec.DecodeException(
                         "invalid fellowship member");
@@ -403,10 +403,14 @@ public final class FellowshipStateSyncPacket implements IMessage {
             String invitingCharacterName = FellowshipPacketCodec.shownName(
                     LostTalesPacketCodec.readUtf8String(
                             buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
+            String invitingAccountName = LostTalesPacketCodec.readUtf8String(
+                    buffer, FellowshipPacketCodec.MAX_NAME_BYTES);
             UUID targetIdentityId = LostTalesPacketCodec.readUuid(buffer);
             String targetCharacterName = FellowshipPacketCodec.shownName(
                     LostTalesPacketCodec.readUtf8String(
                             buffer, FellowshipPacketCodec.MAX_NAME_BYTES));
+            String targetAccountName = LostTalesPacketCodec.readUtf8String(
+                    buffer, FellowshipPacketCodec.MAX_NAME_BYTES);
             long expiresAt = buffer.readLong();
             if (!invitationIds.add(invitationId)
                     || !Fellowship.isWellFormedName(fellowshipName)
@@ -421,8 +425,10 @@ public final class FellowshipStateSyncPacket implements IMessage {
                     invitingIdentityId,
                     invitingOwnerId,
                     invitingCharacterName,
+                    invitingAccountName,
                     targetIdentityId,
                     targetCharacterName,
+                    targetAccountName,
                     expiresAt));
         }
         return invitations;
@@ -440,10 +446,18 @@ public final class FellowshipStateSyncPacket implements IMessage {
                 buffer,
                 invitation.getInvitingCharacterName(),
                 FellowshipPacketCodec.MAX_NAME_BYTES);
+        LostTalesPacketCodec.writeUtf8String(
+                buffer,
+                invitation.getInvitingAccountName(),
+                FellowshipPacketCodec.MAX_NAME_BYTES);
         LostTalesPacketCodec.writeUuid(buffer, invitation.getTargetIdentityId());
         LostTalesPacketCodec.writeUtf8String(
                 buffer,
                 invitation.getTargetCharacterName(),
+                FellowshipPacketCodec.MAX_NAME_BYTES);
+        LostTalesPacketCodec.writeUtf8String(
+                buffer,
+                invitation.getTargetAccountName(),
                 FellowshipPacketCodec.MAX_NAME_BYTES);
         buffer.writeLong(invitation.getExpiresAt());
     }

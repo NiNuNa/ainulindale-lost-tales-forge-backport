@@ -50,6 +50,11 @@ public final class StartingKitsTest {
         }
 
         @Override
+        public boolean relicTakes(String relicId, String itemId) {
+            return "losttales:striders_garb".equals(relicId);
+        }
+
+        @Override
         public boolean wornThrough(String itemId, int damage) {
             return false;
         }

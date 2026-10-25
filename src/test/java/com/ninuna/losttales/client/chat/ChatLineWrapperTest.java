@@ -333,7 +333,7 @@ public final class ChatLineWrapperTest {
                 ChatPacketFixtures.line(
                         ChatChannel.GLOBAL, "Arathorn", "Ranger",
                         "The road goes ever on and on, down from the " + "door where it began.")
-                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_male_2").build());
+                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_masculine_2").build());
         for (int state = 0; state < 2; state++) {
             boolean chatOpen = state == 1;
             List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
@@ -377,7 +377,7 @@ public final class ChatLineWrapperTest {
                 ChatPacketFixtures.line(
                         ChatChannel.GLOBAL, "Arathorn", "Ranger",
                         "and on, down from the door where it began.").colors(0x55AA55, 0x336633)
-                        .skin("losttales:human_ranger_male_2").build();
+                        .skin("losttales:human_ranger_masculine_2").build();
         IChatComponent grouped = LostTalesChatPresentation.build(packet,
                 ConversationPage.of(ChatChannel.GLOBAL), new int[0], true);
         for (int state = 0; state < 2; state++) {
@@ -413,7 +413,7 @@ public final class ChatLineWrapperTest {
                 + "name long enough to wrap around the window";
         IChatComponent line = LostTalesChatPresentation.build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "Ranger", command)
-                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_male_2").build(),
+                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_masculine_2").build(),
                 ConversationPage.of(ChatChannel.GLOBAL), new int[0], false,
                 ChatBodyKind.COMMAND);
         for (int state = 0; state < 2; state++) {
@@ -519,7 +519,7 @@ public final class ChatLineWrapperTest {
     public void theBodyChevronIsDrawnButNeverReadBack() {
         IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "Ranger", "Halt.")
-                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_male_2").build());
+                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_masculine_2").build());
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
                 message, 400, true, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
@@ -633,7 +633,7 @@ public final class ChatLineWrapperTest {
     public void anOpenWindowStandsTheHeadAsTheAvatarAndDropsTheBrackets() {
         IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "Ranger", "Well met.")
-                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_male_2").build());
+                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_masculine_2").build());
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS,
                 message, 200, true, 1.0F, 1.0F, 1.0F, null);
         ChatHeadMarker.Data avatar = ChatAvatar.of(open.get(0));
@@ -669,7 +669,7 @@ public final class ChatLineWrapperTest {
     public void anOpenWindowsNameRowEndsOnItsTime() {
         LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
                 ChatChannel.GLOBAL, "Arathorn", "Ranger", "Well met.").colors(0x55AA55, 0x336633)
-                .skin("losttales:human_ranger_male_2").build();
+                .skin("losttales:human_ranger_masculine_2").build();
         IChatComponent message = build(packet);
         IChatComponent stamp = ChatStampMarker.of("9:54 PM", 30);
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS, message,
@@ -708,7 +708,7 @@ public final class ChatLineWrapperTest {
     public void aTimeWithNoRoomBesideTheNameTakesARowOfItsOwn() {
         IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "Ranger", "Well met.")
-                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_male_2").build());
+                        .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_masculine_2").build());
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS, message,
                 80, true, 1.0F, 1.0F, 1.0F, ChatStampMarker.of("9:54 PM", 30));
         assertEquals(-1, stampAt(runs(open.get(0))));
@@ -852,9 +852,28 @@ public final class ChatLineWrapperTest {
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
                 quoted(quote.toString(), "hi"), width, false, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
-        // One row for the cut quote; the message follows on its own.
-        assertEquals(10, plain(lines.get(0)).length());
+        // One row for the cut quote, its words reaching past the room as
+        // far as the fade does and marked cut where the room ends
+        // (CHAT-86); the message follows on its own.
+        int reach = Math.round(com.ninuna.losttales.gui.style.LostTalesUiFading.REACH);
+        String kept = plain(lines.get(0));
+        assertTrue(METRICS.width(kept) > width);
+        assertTrue(METRICS.width(kept) <= width + reach);
+        int[] cut = ChatReplyMarker.cutOf(lines.get(0));
+        assertNotNull(cut);
+        assertEquals(width, cut[0]);
+        assertEquals(METRICS.width(kept), cut[1]);
         assertTrue(plain(lines.get(1)).startsWith("Global: "));
+    }
+
+    /** A quote that fits its room is not cut, and carries no mark. */
+    @Test
+    public void aQuoteThatFitsIsNotMarkedCut() {
+        int width = METRICS.width("xxxxxxxxxxxxxxxxxxxx");
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                quoted("xxxx", "hi"), width, false, 1.0F, 1.0F, 1.0F, null);
+        assertNotNull(lines);
+        assertNull(ChatReplyMarker.cutOf(lines.get(0)));
     }
 
     /** Without a break marker nothing changes: one line, as before. */

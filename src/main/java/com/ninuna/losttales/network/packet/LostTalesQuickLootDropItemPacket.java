@@ -1,6 +1,6 @@
 package com.ninuna.losttales.network.packet;
 
-import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
+import com.ninuna.losttales.quickloot.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;

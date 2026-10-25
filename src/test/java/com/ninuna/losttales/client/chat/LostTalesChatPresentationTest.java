@@ -167,7 +167,7 @@ public final class LostTalesChatPresentationTest {
                 ChatPacketFixtures.line(
                         ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "The road is clear.")
                         .title("Ranger").colors(0x55AA55, 0x336633).at(123456789L)
-                        .skin("losttales:human_ranger_male_2").build();
+                        .skin("losttales:human_ranger_masculine_2").build();
         IChatComponent message = build(packet);
 
         StringBuilder plainText = new StringBuilder();
@@ -231,7 +231,7 @@ public final class LostTalesChatPresentationTest {
         assertEquals(Boolean.TRUE,
                 markerComponent.getChatStyle().getBold());
         assertEquals("The road is clear.", headMarker.copyText);
-        assertEquals("losttales:human_ranger_male_2",
+        assertEquals("losttales:human_ranger_masculine_2",
                 headMarker.skinId);
         assertEquals(0x55AA55, headMarker.titleColor);
         assertEquals(0x336633, headMarker.nameColor);
@@ -340,7 +340,7 @@ public final class LostTalesChatPresentationTest {
                 ChatPacketFixtures.line(
                         ChatChannel.PROXIMITY, "Arathorn", "RangerOfTheNorth", "Halt.")
                         .colors(0x55AA55, 0x336633).at(123456789L)
-                        .skin("losttales:human_ranger_male_2").build();
+                        .skin("losttales:human_ranger_masculine_2").build();
         StringBuilder plainText = new StringBuilder();
         for (Object value : build(packet)) {
             plainText.append(((IChatComponent)value)
@@ -364,7 +364,7 @@ public final class LostTalesChatPresentationTest {
         assertNotEquals(ChatChannel.FACTION.getDisplayName(), prefix);
         IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.FACTION, "Amdir", "Player", "Mae govannen.")
-                        .colors(0x778899, 0x245A32).at(123456789L).skin("losttales:elf_high_male_0")
+                        .colors(0x778899, 0x245A32).at(123456789L).skin("losttales:elf_high_masculine_0")
                         .build());
         for (Object value : message) {
             IChatComponent part = (IChatComponent)value;
@@ -435,7 +435,7 @@ public final class LostTalesChatPresentationTest {
                 ChatPacketFixtures.line(
                         ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "&6gold words")
                         .colors(0x55AA55, 0x336633).at(123456789L)
-                        .skin("losttales:human_ranger_male_2").build();
+                        .skin("losttales:human_ranger_masculine_2").build();
         IChatComponent message = build(packet);
         StringBuilder plainText = new StringBuilder();
         ChatHeadMarker.Data marker = null;
@@ -611,7 +611,7 @@ public final class LostTalesChatPresentationTest {
                     ChatPacketFixtures.line(
                             ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", command)
                             .colors(0x55AA55, 0x336633).at(123456789L)
-                            .skin("losttales:human_ranger_male_2").build();
+                            .skin("losttales:human_ranger_masculine_2").build();
             IChatComponent said = LostTalesChatPresentation.build(packet,
                     ConversationPage.of(ChatChannel.GLOBAL), new int[0], false,
                     ChatBodyKind.MESSAGE);
@@ -656,7 +656,7 @@ public final class LostTalesChatPresentationTest {
     public void aQuotedCommandIsInlineCode() {
         LostTalesChatMessagePacket answer = ChatPacketFixtures.line(
                 ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "Done.")
-                .colors(0x55AA55, 0x336633).at(123456789L).skin("losttales:human_ranger_male_2")
+                .colors(0x55AA55, 0x336633).at(123456789L).skin("losttales:human_ranger_masculine_2")
                 .build();
         IChatComponent command = quoteWordsOf(answer.withReply(
                 com.ninuna.losttales.chat.ChatReplyReference.unanchored(
@@ -908,7 +908,7 @@ public final class LostTalesChatPresentationTest {
             UUID character = UUID.randomUUID();
             LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
                     ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "hi @Aragorn and @Nobody")
-                    .colors(0x55AA55, 0x336633).at(123456789L).skin("losttales:human_ranger_male_2")
+                    .colors(0x55AA55, 0x336633).at(123456789L).skin("losttales:human_ranger_masculine_2")
                     .build().withNamedPlayers(
                             java.util.Collections.singletonList(
                                     new com.ninuna.losttales.chat

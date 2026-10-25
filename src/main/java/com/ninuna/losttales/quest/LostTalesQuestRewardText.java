@@ -1,7 +1,14 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.armour.Armour;
+import com.ninuna.losttales.armour.ArmourCatalogue;
+import com.ninuna.losttales.armour.ArmourSlot;
+import com.ninuna.losttales.armour.ArmourWords;
+import com.ninuna.losttales.armour.NamedSet;
+import com.ninuna.losttales.armour.Relics;
 import com.ninuna.losttales.compat.lotr.LotrQuestRewards;
 import com.ninuna.losttales.progression.SkillWords;
+import com.ninuna.losttales.quest.player.WaitingReward;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +20,9 @@ import net.minecraft.util.StatCollector;
  * What a quest pays, in the words every place shows: the journal, the
  * conversation, a quest card in the chat and a missive letter. Items go
  * by their names, never their ids ({@code 2x Bread}), a faction by LOTR's
- * name for it. A map from {@link LostTalesQuestRewards#withOptionals}
+ * name for it, another quest's starter as the item names itself, a relic
+ * piece by its own name and its set's. A map
+ * from {@link LostTalesQuestRewards#withOptionals}
  * names each optional objective's reward too, marked optional, so every
  * reward shows before a quest is taken (QUEST-33). Works on both sides: a
  * dedicated server names items in its own language.
@@ -104,6 +113,19 @@ public final class LostTalesQuestRewardText {
                     result.add(StatCollector.translateToLocalFormatted(
                             "gui.losttales.quest.reward.pick", items.toString()));
                 }
+            } else if (LostTalesQuestRewards.STARTER.equals(key)) {
+                String starter = LostTalesQuestRewards.starter(rewards);
+                if (starter.length() > 0) {
+                    result.add(starterPhrase(starter, 1));
+                }
+            } else if (LostTalesQuestRewards.RELIC.equals(key)) {
+                for (String relic : LostTalesQuestRewards.relics(rewards)) {
+                    for (Relics.Piece piece : Relics.pieces(Armour.sideCatalogue(), relic,
+                            Relics.GAME)) {
+                        addPhrase(result, relicPhrase(piece.getItemId(),
+                                piece.getSet().getId(), 1));
+                    }
+                }
             } else if (("count".equals(key) || "meta".equals(key))
                     && LostTalesQuestParams.value(rewards, "item").length() > 0) {
                 // Parts of the item, which its own phrase says.
@@ -134,6 +156,62 @@ public final class LostTalesQuestRewardText {
      */
     public static String itemPhrase(String written) {
         return itemPhrase(LostTalesQuestItemSpec.parse(written, 1, 0));
+    }
+
+    /**
+     * A reward waiting for room (QUEST-44) as every other reward is named:
+     * {@code 2x Bread}, or {@code Quest Starter: Stone and Shelter}.
+     */
+    public static String waitingPhrase(WaitingReward reward) {
+        if (reward == null) {
+            return "";
+        }
+        if (reward.isStarter()) {
+            return starterPhrase(reward.getId(), reward.getCount());
+        }
+        if (reward.getRelic().length() > 0) {
+            return relicPhrase(reward.getId(), reward.getRelic(), reward.getCount());
+        }
+        return itemPhrase(LostTalesQuestItemSpec.parse(reward.getId()
+                + "@" + reward.getMeta() + "*" + reward.getCount(), 1, 0));
+    }
+
+    /**
+     * A quest's starter, as the item names itself
+     * ({@code Quest Starter: The Sealed Note}): the quest's lang line, else
+     * its id; {@code 2x} before it for more than one.
+     */
+    static String starterPhrase(String questId, int count) {
+        String key = LostTalesQuestWords.isKeySafe(questId)
+                ? LostTalesQuestWords.titleKey(questId) : "";
+        String title = QuestStarters.title(questId, "", key.length() > 0
+                && StatCollector.canTranslate(key)
+                ? StatCollector.translateToLocal(key) : "");
+        return (count > 1 ? count + "x " : "") + StatCollector.translateToLocalFormatted(
+                "item.quest_starter.named", title);
+    }
+
+    /**
+     * A relic piece as {@code Strider's Hood (Strider's Garb)}: its own name,
+     * else its item's, and its relic set's; the item alone where the set is
+     * not known here.
+     */
+    static String relicPhrase(String itemId, String relicId, int count) {
+        String item = itemPhrase(LostTalesQuestItemSpec.parse(itemId + "*" + count, 1, 0));
+        ArmourCatalogue catalogue = Armour.sideCatalogue();
+        NamedSet set = catalogue.set(relicId);
+        if (set == null || !set.isRelic()) {
+            return item;
+        }
+        String piece = "";
+        for (ArmourSlot slot : ArmourSlot.values()) {
+            if (piece.length() == 0 && set.items(slot).contains(itemId)) {
+                piece = ArmourWords.pieceName(set, slot);
+            }
+        }
+        String name = piece.length() > 0 ? (count > 1 ? count + "x " : "") + piece : item;
+        return StatCollector.translateToLocalFormatted("gui.losttales.quest.reward.relic",
+                name, ArmourWords.setName(set));
     }
 
     /** One item as {@code 2x Bread}; empty for none. */

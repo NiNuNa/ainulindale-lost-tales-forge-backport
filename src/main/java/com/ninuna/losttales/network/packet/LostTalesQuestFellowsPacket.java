@@ -15,8 +15,10 @@ import java.util.Map;
 
 /**
  * How the members of the player's fellowships stand in the quests the
- * player runs too (QUEST-25), the whole list each time: the journal shows
- * them under each objective. A list that fails to read changes nothing.
+ * player runs too (QUEST-25), the whole list each time: each member's name,
+ * whether past the player's stage, whether travelling with the player, and
+ * the counts. The journal shows them under each objective. A list that
+ * fails to read changes nothing.
  */
 public final class LostTalesQuestFellowsPacket implements IMessage {
     private static final int MAX_NAME_BYTES = QuestFellowCount.MAX_NAME_CHARACTERS * 4;
@@ -55,6 +57,7 @@ public final class LostTalesQuestFellowsPacket implements IMessage {
                     throw new LostTalesPacketCodec.DecodeException("invalid fellow count");
                 }
                 boolean past = buf.readBoolean();
+                boolean travelling = buf.readBoolean();
                 int objectives = LostTalesPacketCodec.readCount(buf,
                         past ? 0 : QuestFellowCount.MAX_OBJECTIVES, "fellow objective");
                 Map<String, Integer> each = new LinkedHashMap<String, Integer>();
@@ -68,7 +71,8 @@ public final class LostTalesQuestFellowsPacket implements IMessage {
                                 "invalid fellow objective");
                     }
                 }
-                this.counts.add(new QuestFellowCount(questId, name, past, each));
+                this.counts.add(new QuestFellowCount(questId, name, past,
+                        travelling, each));
             }
             LostTalesPacketCodec.requireFinished(buf);
         } catch (RuntimeException exception) {
@@ -87,6 +91,7 @@ public final class LostTalesQuestFellowsPacket implements IMessage {
                     LostTalesQuestSyncPacket.MAX_IDENTIFIER_BYTES);
             LostTalesPacketCodec.writeUtf8String(buf, count.getName(), MAX_NAME_BYTES);
             buf.writeBoolean(count.isPast());
+            buf.writeBoolean(count.isTravelling());
             LostTalesPacketCodec.writeCount(buf, count.getCounts().size(),
                     count.isPast() ? 0 : QuestFellowCount.MAX_OBJECTIVES,
                     "fellow objective");

@@ -1,13 +1,29 @@
 package com.ninuna.losttales.util;
 
+import com.ninuna.losttales.armour.Armour;
+import com.ninuna.losttales.armour.ArmourCatalogue;
+import com.ninuna.losttales.armour.ArmourSettings;
+import com.ninuna.losttales.armour.ArmourSlot;
+import com.ninuna.losttales.armour.ArmourTooltip;
+import com.ninuna.losttales.armour.ArmourWeight;
+import com.ninuna.losttales.armour.ArmourWords;
+import com.ninuna.losttales.armour.NamedSet;
+import com.ninuna.losttales.armour.Relics;
+import com.ninuna.losttales.armour.SetBonus;
+import com.ninuna.losttales.armour.SetEffect;
+import com.ninuna.losttales.armour.WornArmour;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
+import com.ninuna.losttales.block.vessel.VesselTooltip;
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipIcons;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.item.ELostTalesItem;
-import com.ninuna.losttales.item.armor.LostTalesItemArmorBase;
 import com.ninuna.losttales.item.material.ELostTalesItemMaterial;
+import com.ninuna.losttales.progression.PerkWords;
+import com.ninuna.losttales.progression.skill.PerkEffect;
+import com.ninuna.losttales.progression.skill.SkillDefinition;
+import com.ninuna.losttales.client.progression.ClientProgression;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.relauncher.ReflectionHelper;
 import cpw.mods.fml.relauncher.Side;
@@ -20,6 +36,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.EnumRarity;
+import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StatCollector;
@@ -31,7 +48,6 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -44,6 +60,13 @@ import java.util.Locale;
 public final class LostTalesClientUtil {
     /** What the lang keys of the item tooltips' words begin with. */
     private static final String TOOLTIP = "item.losttales.tooltip.";
+    /** The keyboard as it is now. */
+    private static final LostTalesTooltipKeys.Held KEYBOARD = new LostTalesTooltipKeys.Held() {
+        @Override
+        public boolean isDown(int keyCode) {
+            return Keyboard.isCreated() && Keyboard.isKeyDown(keyCode);
+        }
+    };
 
     private LostTalesClientUtil() {}
 
@@ -52,15 +75,31 @@ public final class LostTalesClientUtil {
                                           EntityPlayer player, ELostTalesItem.Type itemType) {
         addItemLore(list, getItemLore(itemStack));
         addItemDetails(list, itemStack, credits, material, itemType);
-        if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
-            addArmorSetInformation(itemStack, player, list);
-        }
     }
 
     public static void addItemBlockInformation(List list, ItemStack itemStack,
                                                Block block, ELostTalesUser credits) {
         addItemLore(list, getItemLore(itemStack));
         addItemBlockDetails(list, itemStack, block, credits);
+    }
+
+    /** What a vessel item holds (CONTENT-09): each item's name and count, as a bundle lists them. */
+    public static void addVesselContents(List list, List<ItemStack> contents) {
+        List<VesselTooltip.Entry> entries = new ArrayList<VesselTooltip.Entry>();
+        for (ItemStack stack : contents) {
+            entries.add(new VesselTooltip.Entry(stack.getDisplayName(), stack.stackSize));
+        }
+        list.addAll(VesselTooltip.lines(entries, new VesselTooltip.Words() {
+            @Override
+            public String item(String name, int count) {
+                return "§7" + word("vessel.item", name, Integer.valueOf(count));
+            }
+
+            @Override
+            public String more(int count) {
+                return "§7§o" + word("vessel.more", Integer.valueOf(count));
+            }
+        }));
     }
 
     /**
@@ -79,14 +118,14 @@ public final class LostTalesClientUtil {
     }
 
     /**
-     * The lore with Shift held, else the line naming Shift; nothing for an
-     * item without lore.
+     * The lore with either Shift held, else the line naming Shift; nothing
+     * for an item without lore.
      */
     public static void addItemLore(List list, String[] itemLore) {
         if (itemLore.length == 0) {
             return;
         }
-        if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)) {
+        if (LostTalesTooltipKeys.showsLore(KEYBOARD)) {
             for (String lore : itemLore) {
                 list.add("§7§o" + lore);
             }
@@ -130,7 +169,7 @@ public final class LostTalesClientUtil {
     public static void addItemDetails(List list, ItemStack itemStack, String credits,
                                       ELostTalesItemMaterial material,
                                       ELostTalesItem.Type itemType) {
-        if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL)) {
+        if (LostTalesTooltipKeys.showsDetails(KEYBOARD)) {
             list.add("");
             list.add(labelled("faction", I18n.format("lotr.faction."
                     + material.getFaction().codeName() + ".name")));
@@ -151,7 +190,7 @@ public final class LostTalesClientUtil {
 
     public static void addItemBlockDetails(List list, ItemStack itemStack,
                                            Block block, ELostTalesUser credits) {
-        if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL)) {
+        if (LostTalesTooltipKeys.showsDetails(KEYBOARD)) {
             list.add("");
             if (block instanceof LostTalesBlockPlushie) {
                 LostTalesBlockPlushie plushie = (LostTalesBlockPlushie)block;
@@ -173,62 +212,87 @@ public final class LostTalesClientUtil {
     }
 
     /**
-     * For an armour piece the player wears: how many of the four pieces of
-     * its set, light or heavy, they wear, and what each armour slot holds.
+     * For any armour piece, the mod's, LOTR's, vanilla's or another mod's
+     * (CONTENT-06, CONTENT-07, CONTENT-11): a relic piece's own name and
+     * lore line, then, with the Modifier held, its weight set and named
+     * sets as {@link ArmourTooltip} gives them; else the line naming the
+     * Modifier. Nothing for a piece of neither weight in no named set.
      */
-    public static void addArmorSetInformation(ItemStack itemStack, EntityPlayer player,
-                                              List list) {
-        ItemStack helmet = player.getCurrentArmor(3);
-        ItemStack armor = player.getCurrentArmor(2);
-        ItemStack leggings = player.getCurrentArmor(1);
-        ItemStack boots = player.getCurrentArmor(0);
-        String infoTextBase = "§8>§o ";
-        String[] names = new String[]{infoTextBase, infoTextBase, infoTextBase, infoTextBase};
+    public static void addArmourInformation(List<String> list, ItemStack itemStack,
+                                            final EntityPlayer player) {
+        if (list == null || itemStack == null || !(itemStack.getItem() instanceof ItemArmor)) {
+            return;
+        }
+        ItemArmor item = (ItemArmor) itemStack.getItem();
+        ArmourCatalogue catalogue = Armour.clientCatalogue();
+        ArmourSlot slot = ArmourSlot.ofArmourType(item.armorType);
+        String itemId = Armour.itemId(item);
+        String relicId = Relics.relicOf(itemStack);
+        NamedSet relic = relicId.length() == 0 ? null : catalogue.set(relicId);
+        if (relic != null && relic.isRelic() && slot != null
+                && relic.items(slot).contains(itemId)) {
+            String name = ArmourWords.pieceName(relic, slot);
+            if (name.length() > 0 && !list.isEmpty() && !itemStack.hasDisplayName()) {
+                list.set(0, "§6" + name);
+            }
+            String lore = ArmourWords.pieceLore(relic, slot);
+            if (lore.length() > 0) {
+                list.add(Math.min(1, list.size()), "§5§o" + lore);
+            }
+        }
+        ArmourWeight weight = catalogue.weightOf(itemId, Armour.material(item));
+        if (!ArmourTooltip.tells(catalogue, weight, slot, itemId, relicId)) {
+            return;
+        }
+        list.add("");
+        if (!LostTalesKeyBindings.isModifierKeyDown()) {
+            list.add(hold("set", LostTalesTooltipIcons.key(
+                    LostTalesKeyBindings.getModifierKeyBinding(),
+                    "§e[" + LostTalesKeyBindings.getModifierKeyDisplayName() + "]")));
+            return;
+        }
+        WornArmour worn = player == null ? WornArmour.NONE : Armour.worn(player);
+        ArmourSettings settings = Armour.settings(player);
+        list.addAll(ArmourTooltip.lines(new ArmourTooltip.Words() {
+            @Override
+            public String weightSet(ArmourWeight setWeight) {
+                return word(setWeight == ArmourWeight.HEAVY ? "set.heavy" : "set.light");
+            }
 
-        if (itemStack == helmet || itemStack == armor || itemStack == leggings || itemStack == boots) {
-            list.add("");
-            if (LostTalesKeyBindings.isModifierKeyDown()) {
-                if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
-                    boolean heavy = ((LostTalesItemArmorBase)itemStack.getItem()).getItemType()
-                            == ELostTalesItem.Type.ARMOR_HEAVY;
-                    int worn = displayArmorSetDetails(heavy, names, helmet, armor, leggings, boots);
-                    list.add("§e[" + worn + "/4] §r§7"
-                            + word(heavy ? "set.heavy" : "set.light"));
+            @Override
+            public String setName(NamedSet set) {
+                return ArmourWords.setName(set);
+            }
+
+            @Override
+            public String bonus(SetBonus bonus) {
+                String share = PerkWords.written(PerkEffect.Unit.PERCENT, bonus.getAmount());
+                if (bonus.getEffect() == SetEffect.EXPERIENCE) {
+                    SkillDefinition skill = ClientProgression.skill(bonus.getSkill());
+                    return word("set.bonus.experience", share, skill == null
+                            ? bonus.getSkill() : PerkWords.skillName(skill));
                 }
-                Collections.addAll(list, names);
-            } else {
-                list.add(hold("set", LostTalesTooltipIcons.key(
-                        LostTalesKeyBindings.getModifierKeyBinding(),
-                        "§e[" + LostTalesKeyBindings
-                                .getModifierKeyDisplayName() + "]")));
+                return word("set.bonus." + bonus.getEffect().word(), share);
             }
-        }
-    }
 
-    private static int displayArmorSetDetails(boolean heavy, String[] names,
-                                              ItemStack helmet, ItemStack armor,
-                                              ItemStack leggings, ItemStack boots) {
-        int count = 0;
-        count = getArmorSetDetails(helmet, heavy, names, count, 0);
-        count = getArmorSetDetails(armor, heavy, names, count, 1);
-        count = getArmorSetDetails(leggings, heavy, names, count, 2);
-        return getArmorSetDetails(boots, heavy, names, count, 3);
-    }
-
-    private static int getArmorSetDetails(ItemStack stack, boolean heavy,
-                                          String[] names, int count, int slot) {
-        if (stack != null) {
-            if (stack.getItem() instanceof LostTalesItemArmorBase
-                    && heavy == (((LostTalesItemArmorBase)stack.getItem()).getItemType()
-                    == ELostTalesItem.Type.ARMOR_HEAVY)) {
-                names[slot] = "§e>§o ";
-                count++;
+            @Override
+            public String weightBonus(ArmourWeight setWeight, double amount) {
+                return word(setWeight == ArmourWeight.HEAVY ? "set.bonus.knockback"
+                        : "set.bonus.speed", PerkWords.written(PerkEffect.Unit.PERCENT, amount));
             }
-            names[slot] += stack.getDisplayName();
-        } else {
-            names[slot] += word("set.empty");
-        }
-        return count;
+
+            @Override
+            public String slow(double share) {
+                return word("set.slow", PerkWords.written(PerkEffect.Unit.PERCENT, share));
+            }
+
+            @Override
+            public String slotItem(ArmourSlot each) {
+                ItemStack worn = player == null ? null
+                        : player.getCurrentArmor(each.getInventoryIndex());
+                return worn == null ? word("set.empty") : worn.getDisplayName();
+            }
+        }, worn, catalogue, settings, weight, slot, itemId, relicId));
     }
 
     public static void setClientMapImage(ResourceLocation mapTexture) {

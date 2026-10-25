@@ -1,0 +1,21 @@
+{
+  "id": "losttales:black_uruk",
+  "helmet": [
+    "lotr:item.helmetBlackUruk"
+  ],
+  "chestplate": [
+    "lotr:item.bodyBlackUruk"
+  ],
+  "leggings": [
+    "lotr:item.legsBlackUruk"
+  ],
+  "boots": [
+    "lotr:item.bootsBlackUruk"
+  ],
+  "bonus": [
+    {
+      "effect": "protection",
+      "amount": 0.05
+    }
+  ]
+}

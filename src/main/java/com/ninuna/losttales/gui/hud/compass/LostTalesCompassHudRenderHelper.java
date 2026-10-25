@@ -1,6 +1,6 @@
 package com.ninuna.losttales.gui.hud.compass;
 
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -15,7 +15,7 @@ public final class LostTalesCompassHudRenderHelper {
 
     /** Backdrop shared by every compass element: marker icons, labels, and height indicators. */
     private static final int SHADOW_RGB =
-            LostTalesSkyrimUiStyle.rgb(LostTalesSkyrimUiStyle.HUD_SHADOW);
+            LostTalesColors.rgb(LostTalesColors.HUD_SHADOW);
     private static final float SHADOW_RED = ((SHADOW_RGB >> 16) & 0xFF) / 255.0F;
     private static final float SHADOW_GREEN = ((SHADOW_RGB >> 8) & 0xFF) / 255.0F;
     private static final float SHADOW_BLUE = (SHADOW_RGB & 0xFF) / 255.0F;

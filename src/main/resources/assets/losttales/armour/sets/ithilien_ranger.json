@@ -1,0 +1,22 @@
+{
+  "id": "losttales:ithilien_ranger",
+  "helmet": [
+    "lotr:item.helmetRangerIthilien"
+  ],
+  "chestplate": [
+    "lotr:item.bodyRangerIthilien"
+  ],
+  "leggings": [
+    "lotr:item.legsRangerIthilien"
+  ],
+  "boots": [
+    "lotr:item.bootsRangerIthilien"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:archery"
+    }
+  ]
+}

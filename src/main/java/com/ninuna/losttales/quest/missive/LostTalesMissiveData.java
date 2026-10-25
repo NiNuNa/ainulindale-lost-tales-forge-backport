@@ -91,18 +91,13 @@ public final class LostTalesMissiveData {
         return this.target;
     }
 
-    /** The world time the notice was posted at, on the board it stands on; a board takes it down after its expiry. */
+    /**
+     * The world time the notice was first posted at. Its days run from
+     * here wherever its letter goes up again (QUEST-34); a board takes it
+     * down after its expiry.
+     */
     public long getGenerationWorldTime() {
         return this.generationWorldTime;
-    }
-
-    /** The same missive, posted at {@code worldTime}: a letter pinned back on a board. */
-    public LostTalesMissiveData postedAt(long worldTime) {
-        return new LostTalesMissiveData(this.questId, this.questType,
-                this.written, this.titleId, this.descriptionId, this.issuerId,
-                this.flavorId, this.target, worldTime,
-                this.timeLimitTicks, this.generationContext, this.objectives,
-                this.rewardData);
     }
 
     public long getTimeLimitTicks() {

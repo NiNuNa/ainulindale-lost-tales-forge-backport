@@ -1,11 +1,18 @@
 package com.ninuna.losttales.compat.discord;
 
+import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatChannelDescriptor;
+import com.ninuna.losttales.chat.ChatChannelScope;
+import com.ninuna.losttales.chat.ChatPresentationMode;
+import com.ninuna.losttales.chat.ChatRecipientRule;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -44,8 +51,37 @@ public final class LostTalesDiscordBridgeRestartTest {
         DiscordChannelBindings same = bound(
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + HOOK_A,
                 "global=GAME_TO_DISCORD;channel=222;webhook=" + HOOK_B,
-                "proximity=GAME_TO_DISCORD;channel=333;webhook=" + HOOK_B + "-p");
+                "operator=GAME_TO_DISCORD;channel=333;webhook=" + HOOK_B + "-p");
         assertTrue(LostTalesDiscordBridge.topicsLeft(kept, same, true).isEmpty());
+    }
+
+    /**
+     * A channel heard only nearby is among those the bridge cannot carry,
+     * so a server channel whose rule turns to proximity moves the set the
+     * bridge restarts on (DISC-03).
+     */
+    @Test
+    public void aChannelHeardNearbyIsAmongThoseTheBridgeCannotCarry() {
+        try {
+            assertTrue(LostTalesDiscordBridge.closedChannels().contains("proximity"));
+            assertFalse(LostTalesDiscordBridge.closedChannels().contains("ooc"));
+            ChatChannel.installDefined(Arrays.asList(
+                    defined("tavern", ChatRecipientRule.PROXIMITY),
+                    defined("square", ChatRecipientRule.EVERYONE)),
+                    null);
+            assertTrue(LostTalesDiscordBridge.closedChannels().contains("tavern"));
+            assertFalse(LostTalesDiscordBridge.closedChannels().contains("square"));
+        } finally {
+            ChatChannel.resetToBuiltIn();
+        }
+    }
+
+    private static ChatChannelDescriptor defined(
+            String id, ChatRecipientRule rule) {
+        return new ChatChannelDescriptor(id, id,
+                ChatPresentationMode.IN_CHARACTER, rule,
+                ChatChannelAccess.NONE, 0xFFFFFF, true,
+                ChatChannelScope.NONE);
     }
 
     /** A restart reads on from where it got to, but only in channels read both before and after. */

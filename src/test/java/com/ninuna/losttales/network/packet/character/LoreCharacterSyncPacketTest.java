@@ -1,7 +1,8 @@
 package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.character.lore.LoreCharacterDefinition;
-import com.ninuna.losttales.character.lore.LoreCharacterDefinitionJsonParser;
+import com.ninuna.losttales.character.lore.LoreCharacterFiles;
+import com.ninuna.losttales.character.lore.LoreTestGame;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSnapshot;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSummary;
 import io.netty.buffer.ByteBuf;
@@ -10,7 +11,9 @@ import org.junit.Test;
 
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
@@ -19,6 +22,14 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class LoreCharacterSyncPacketTest {
+
+    /** A lore file read and checked as the server does; {@code warnings} takes what it raises. */
+    private static LoreCharacterDefinition read(String json, List<String> warnings) {
+        LoreCharacterDefinition definition = LoreCharacterFiles.parse(
+                new StringReader(json), "lore.json", warnings);
+        warnings.addAll(LoreCharacterFiles.warningsOf(definition, new LoreTestGame()));
+        return definition;
+    }
 
     private static final UUID CHARACTER_ID = UUID.fromString(
             "b1000000-0000-0000-0000-00000000001b");
@@ -69,14 +80,12 @@ public final class LoreCharacterSyncPacketTest {
                 <= LoreCharacterDefinition.MAX_NAME_BYTES) {
             name.append("𐍈");
         }
-        LoreCharacterDefinitionJsonParser.ParseResult parsed =
-                LoreCharacterDefinitionJsonParser.parseDefinition(new StringReader(
-                        "{\"dataVersion\":1,\"id\":\"" + id + "\",\"name\":\""
-                                + name + "\",\"description\":\"\","
-                                + "\"appearance\":null}"), "long.json");
-        assertTrue(parsed.getErrors().toString(), parsed.isValid());
+        List<String> warnings = new ArrayList<String>();
+        LoreCharacterDefinition parsed = read("{\"id\":\"" + id + "\",\"name\":\""
+                + name + "\",\"faction\":\"lotr:gondor\"}", warnings);
+        assertEquals(new ArrayList<String>(), warnings);
         LoreCharacterSummary longest = new LoreCharacterSummary(
-                parsed.getDefinition().getId(), parsed.getDefinition().getName(),
+                parsed.getId(), parsed.getName(),
                 "", "", false, false, false, false, "", null, 0L);
         ByteBuf buffer = Unpooled.buffer();
         try {
@@ -98,20 +107,20 @@ public final class LoreCharacterSyncPacketTest {
         while (id.length() <= LoreCharacterDefinition.MAX_ID_LENGTH) {
             id.append('a');
         }
-        assertFalse(LoreCharacterDefinitionJsonParser.parseDefinition(
-                new StringReader("{\"dataVersion\":1,\"id\":\"" + id
-                        + "\",\"name\":\"Long\",\"description\":\"\","
-                        + "\"appearance\":null}"), "id.json").isValid());
+        List<String> longId = new ArrayList<String>();
+        read("{\"id\":\"" + id + "\",\"name\":\"Long\",\"faction\":\"lotr:gondor\"}",
+                longId);
+        assertFalse(longId.isEmpty());
         StringBuilder name = new StringBuilder();
         for (int index = 0; index < LoreCharacterDefinition.MAX_NAME_BYTES / 3 + 1;
                 index++) {
             name.append('ლ');
         }
         assertTrue(name.length() <= LoreCharacterDefinition.MAX_NAME_LENGTH);
-        assertFalse(LoreCharacterDefinitionJsonParser.parseDefinition(
-                new StringReader("{\"dataVersion\":1,\"id\":\"myserver:long\","
-                        + "\"name\":\"" + name + "\",\"description\":\"\","
-                        + "\"appearance\":null}"), "name.json").isValid());
+        List<String> longName = new ArrayList<String>();
+        read("{\"id\":\"myserver:long\",\"name\":\"" + name
+                + "\",\"faction\":\"lotr:gondor\"}", longName);
+        assertFalse(longName.isEmpty());
     }
 
     @Test

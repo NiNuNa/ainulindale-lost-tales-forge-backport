@@ -1,0 +1,21 @@
+{
+  "id": "losttales:pelargir",
+  "helmet": [
+    "lotr:item.helmetPelargir"
+  ],
+  "chestplate": [
+    "lotr:item.bodyPelargir"
+  ],
+  "leggings": [
+    "lotr:item.legsPelargir"
+  ],
+  "boots": [
+    "lotr:item.bootsPelargir"
+  ],
+  "bonus": [
+    {
+      "effect": "falls",
+      "amount": 0.2
+    }
+  ]
+}

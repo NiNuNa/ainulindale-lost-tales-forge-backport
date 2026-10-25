@@ -1,7 +1,7 @@
 package com.ninuna.losttales.character.switching;
 
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
+import com.ninuna.losttales.entity.combat.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.util.LostTalesMath;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.eventhandler.EventPriority;

@@ -58,7 +58,8 @@ public final class ChatMenusTest {
         UUID grey = new UUID(7L, 7L);
         ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
                 Collections.<UUID>emptyList(),
-                Collections.singletonList(new ChatFellowship(grey, "Grey Company", 0x123456))));
+                Collections.singletonList(new ChatFellowship(grey, "Grey Company", 0x123456)),
+                Collections.singletonList(grey)));
         try {
             List<ConversationPage> offered = ChatMenus.channelTabs(false);
             assertTrue(offered.contains(ConversationPage.of(ChatChannel.FELLOWSHIP, grey.toString())));

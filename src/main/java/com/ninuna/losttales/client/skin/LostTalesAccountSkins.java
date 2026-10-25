@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.skin;
 
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.character.skin.AccountSkinProfile;
@@ -40,16 +40,16 @@ import java.util.UUID;
  */
 public final class LostTalesAccountSkins {
 
-    /** The texture and arm width one player renders with. */
+    /** The texture and arms one player renders with. */
     public static final class AccountSkin {
         private final ResourceLocation texture;
-        private final String bodyTypeId;
+        private final String armsId;
         private final boolean awaitingProfile;
 
-        AccountSkin(ResourceLocation texture, String bodyTypeId,
+        AccountSkin(ResourceLocation texture, String armsId,
                     boolean awaitingProfile) {
             this.texture = texture;
-            this.bodyTypeId = bodyTypeId;
+            this.armsId = armsId;
             this.awaitingProfile = awaitingProfile;
         }
 
@@ -57,8 +57,8 @@ public final class LostTalesAccountSkins {
             return this.texture;
         }
 
-        public String getBodyTypeId() {
-            return this.bodyTypeId;
+        public String getArmsId() {
+            return this.armsId;
         }
     }
 
@@ -152,7 +152,7 @@ public final class LostTalesAccountSkins {
     /**
      * The skin an account's own profile names, brought into the 64x64
      * layout. The profile is all this needs: the hash names the texture,
-     * the URL fetches it, and the model says which arm width it was
+     * the URL fetches it, and the model says which arms it was
      * painted for.
      */
     private static AccountSkin resolveProfile(GameProfile gameProfile) {
@@ -174,14 +174,14 @@ public final class LostTalesAccountSkins {
                     "account skin " + profile.getHash()));
         }
         return new AccountSkin(location,
-                profile.isSlim() ? CharacterBodyTypeRegistry.SLIM
-                        : CharacterBodyTypeRegistry.WIDE,
+                profile.isSlim() ? CharacterArmsRegistry.SLENDER
+                        : CharacterArmsRegistry.BROAD,
                 false);
     }
 
     /**
      * The developer override: a local PNG drawn on the local player, with the
-     * configured arm width. Lets modern skins be tested with an offline
+     * configured arms. Lets modern skins be tested with an offline
      * account that has no profile textures.
      */
     private static AccountSkin resolveOverride(Minecraft minecraft,
@@ -192,11 +192,11 @@ public final class LostTalesAccountSkins {
             return null;
         }
         String configured = LostTalesIdentifiers.normalize(
-                LostTalesConfig.devSkinOverrideBodyType);
+                LostTalesConfig.devSkinOverrideArms);
         if (configured.indexOf(':') < 0) {
             configured = LostTalesMetaData.MOD_ID + ":" + configured;
         }
-        String bodyTypeId = CharacterBodyTypeRegistry.normalizeOrWide(configured);
+        String armsId = CharacterArmsRegistry.normalizeOrBroad(configured);
         TextureManager textures = minecraft.getTextureManager();
         if (textures.getTexture(OVERRIDE_TEXTURE) == null) {
             BufferedImage image = readOverride(new File(path.trim()));
@@ -208,10 +208,10 @@ public final class LostTalesAccountSkins {
             if (!overrideLogged) {
                 overrideLogged = true;
                 FMLLog.info("[%s] Drawing the local player with the developer skin "
-                        + "override %s (%s)", LostTalesMetaData.MOD_ID, path, bodyTypeId);
+                        + "override %s (%s)", LostTalesMetaData.MOD_ID, path, armsId);
             }
         }
-        return new AccountSkin(OVERRIDE_TEXTURE, bodyTypeId, false);
+        return new AccountSkin(OVERRIDE_TEXTURE, armsId, false);
     }
 
     private static BufferedImage readOverride(File file) {
@@ -238,14 +238,14 @@ public final class LostTalesAccountSkins {
             // The vanilla default is 64x32; the model samples it wrongly but
             // the player is still drawn rather than missing.
             return new AccountSkin(VANILLA_DEFAULT_SKIN,
-                    CharacterBodyTypeRegistry.WIDE, awaitingProfile);
+                    CharacterArmsRegistry.BROAD, awaitingProfile);
         }
         if (!defaultRegistered) {
             defaultRegistered = true;
             minecraft.getTextureManager().loadTexture(DEFAULT_TEXTURE,
                     new AccountSkinTexture(image, null, "default skin"));
         }
-        return new AccountSkin(DEFAULT_TEXTURE, CharacterBodyTypeRegistry.WIDE,
+        return new AccountSkin(DEFAULT_TEXTURE, CharacterArmsRegistry.BROAD,
                 awaitingProfile);
     }
 

@@ -26,14 +26,14 @@ public final class CharacterCreateRequestPacket implements IMessage {
     private int slotIndex;
     private String name = "";
     private String raceId = "";
-    private String genderId = "";
+    private String bodyTypeId = "";
     private String skinId = "";
     private String history = "";
     private int age;
     private String startingFactionId = "";
     private String startingWaypointId = "";
     private boolean unconventionalSettings;
-    private String bodyTypeId = "";
+    private String armsId = "";
     private String chestTypeId = "";
     private boolean showMinecraftCape = true;
     private String cosmeticCapeId = "";
@@ -50,14 +50,14 @@ public final class CharacterCreateRequestPacket implements IMessage {
         this.slotIndex = request.getSlotIndex();
         this.name = request.getName();
         this.raceId = request.getRaceId();
-        this.genderId = request.getGenderId();
+        this.bodyTypeId = request.getBodyTypeId();
         this.skinId = request.getSkinId();
         this.history = request.getHistory();
         this.age = request.getAge();
         this.startingFactionId = request.getStartingFactionId();
         this.startingWaypointId = request.getStartingWaypointId();
         this.unconventionalSettings = request.hasUnconventionalSettings();
-        this.bodyTypeId = request.getBodyTypeId();
+        this.armsId = request.getArmsId();
         this.chestTypeId = request.getChestTypeId();
         this.showMinecraftCape = request.isMinecraftCapeVisible();
         this.cosmeticCapeId = request.getCosmeticCapeId();
@@ -71,7 +71,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
             this.slotIndex = buffer.readByte();
             this.name = LostTalesPacketCodec.readUtf8String(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
             this.raceId = LostTalesPacketCodec.readUtf8String(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            this.genderId = LostTalesPacketCodec.readUtf8String(
+            this.bodyTypeId = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.skinId = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -82,7 +82,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
             this.startingWaypointId = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.unconventionalSettings = buffer.readBoolean();
-            this.bodyTypeId = LostTalesPacketCodec.readUtf8String(
+            this.armsId = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.chestTypeId = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -113,7 +113,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(buffer, this.name, CharacterPacketCodec.MAX_NAME_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, this.raceId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         LostTalesPacketCodec.writeUtf8String(
-                buffer, this.genderId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                buffer, this.bodyTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.skinId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         LostTalesPacketCodec.writeUtf8String(
@@ -123,9 +123,9 @@ public final class CharacterCreateRequestPacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(buffer, this.startingWaypointId,
                 CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         buffer.writeBoolean(this.unconventionalSettings);
-        // The requested arm width and chest type.
+        // The requested arms and chest type.
         LostTalesPacketCodec.writeUtf8String(
-                buffer, this.bodyTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                buffer, this.armsId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.chestTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         // The cape, as the creator's cape page chose it.
@@ -140,14 +140,14 @@ public final class CharacterCreateRequestPacket implements IMessage {
                 this.slotIndex,
                 this.name,
                 this.raceId,
-                this.genderId,
+                this.bodyTypeId,
                 this.skinId,
                 this.age,
                 this.startingFactionId,
                 this.startingWaypointId,
                 this.unconventionalSettings,
                 this.history,
-                this.bodyTypeId,
+                this.armsId,
                 this.chestTypeId,
                 this.showMinecraftCape,
                 this.cosmeticCapeId

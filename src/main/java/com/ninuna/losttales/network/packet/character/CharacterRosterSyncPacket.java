@@ -63,7 +63,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 int slotIndex = buffer.readByte();
                 String name = LostTalesPacketCodec.readUtf8String(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
                 String raceId = LostTalesPacketCodec.readUtf8String(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String genderId = LostTalesPacketCodec.readUtf8String(
+                String bodyTypeId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String skinId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -72,7 +72,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 int age = buffer.readInt();
                 String factionId = LostTalesPacketCodec.readUtf8String(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String bodyTypeId = LostTalesPacketCodec.readUtf8String(
+                String armsId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String chestTypeId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -88,13 +88,13 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         slotIndex,
                         name,
                         raceId,
-                        genderId,
+                        bodyTypeId,
                         skinId,
                         showMinecraftCape,
                         cosmeticCapeId,
                         age,
                         factionId,
-                        bodyTypeId,
+                        armsId,
                         chestTypeId
                 ));
             }
@@ -164,7 +164,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer, character.getName(), CharacterPacketCodec.MAX_NAME_BYTES);
             LostTalesPacketCodec.writeUtf8String(buffer, character.getRaceId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             LostTalesPacketCodec.writeUtf8String(
-                    buffer, character.getGenderId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                    buffer, character.getBodyTypeId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             LostTalesPacketCodec.writeUtf8String(
                     buffer, character.getSkinId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeBoolean(character.isMinecraftCapeVisible());
@@ -172,9 +172,9 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeInt(character.getAge());
             LostTalesPacketCodec.writeUtf8String(buffer, character.getFactionId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            // The arm width and chest type chosen for the character.
+            // The arms and chest type chosen for the character.
             LostTalesPacketCodec.writeUtf8String(
-                    buffer, character.getBodyTypeId(),
+                    buffer, character.getArmsId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             LostTalesPacketCodec.writeUtf8String(
                     buffer, character.getChestTypeId(),

@@ -335,7 +335,7 @@ public class LostTalesKeyBindings {
     /**
      * A binding's key written out in the game's language ({@code Left Shift}):
      * the keys with a full name of their own from the lang file, every
-     * other key by LWJGL's name for it.
+     * other key by the short name its key hint writes.
      */
     static String getKeyDisplayName(KeyBinding keyBinding) {
         if (keyBinding == null) return "";
@@ -355,17 +355,8 @@ public class LostTalesKeyBindings {
         if (full != null) {
             return StatCollector.translateToLocal(FULL_NAME_PREFIX + full);
         }
-        switch (keyCode) {
-            case Keyboard.KEY_RETURN:
-                return LostTalesInputBinding.word("enter");
-            case Keyboard.KEY_SPACE:
-                return LostTalesInputBinding.word("space");
-            default:
-                String name = Keyboard.getKeyName(keyCode);
-                return name == null
-                        ? LostTalesInputBinding.word("code", Integer.valueOf(keyCode))
-                        : name;
-        }
+        return LostTalesInputBinding.getFallbackLabel(
+                LostTalesInputBinding.Type.KEYBOARD, keyCode);
     }
 
     /**
@@ -392,6 +383,20 @@ public class LostTalesKeyBindings {
                 return "escape";
             case Keyboard.KEY_TAB:
                 return "tab";
+            case Keyboard.KEY_DELETE:
+                return "delete";
+            case Keyboard.KEY_INSERT:
+                return "insert";
+            case Keyboard.KEY_PRIOR:
+                return "page_up";
+            case Keyboard.KEY_NEXT:
+                return "page_down";
+            case Keyboard.KEY_NUMLOCK:
+                return "num_lock";
+            case Keyboard.KEY_SCROLL:
+                return "scroll_lock";
+            case Keyboard.KEY_SYSRQ:
+                return "print_screen";
             default:
                 return null;
         }

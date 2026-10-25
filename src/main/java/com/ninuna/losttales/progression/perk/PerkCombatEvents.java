@@ -27,9 +27,10 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 
 /**
- * The combat and defence perks (PROG-06): what a blow deals and what it
- * leaves behind, and what a blow to the player takes. Runs before the
- * counting reads the blow, on the server alone.
+ * The combat perks (PROG-06): what a blow deals and what it leaves
+ * behind, and what falls, companions and a last stand take of a blow to
+ * the player. The armour's own protection is {@code ArmourEvents}'.
+ * Runs before the counting reads the blow, on the server alone.
  */
 public final class PerkCombatEvents {
     /** A mount moving this many blocks a tick gallops. */
@@ -201,11 +202,10 @@ public final class PerkCombatEvents {
         }
     }
 
-    /** A blow the player takes: what armour, falls, fire, companions and a last stand leave of it. */
+    /** A blow the player takes: what falls, companions and a last stand leave of it. */
     private static float taken(EntityPlayerMP player, DamageSource source, float amount) {
         PerkIndex perks = Perks.of(player);
-        if (!perks.has(PerkEffect.ARMOUR_ABSORB) && !perks.has(PerkEffect.FALL_DAMAGE)
-                && !perks.has(PerkEffect.MOUNTED_FALL) && !perks.has(PerkEffect.BURN_SHORTER)
+        if (!perks.has(PerkEffect.FALL_DAMAGE) && !perks.has(PerkEffect.MOUNTED_FALL)
                 && !perks.has(PerkEffect.PHALANX) && !perks.has(PerkEffect.LAST_STAND)) {
             return amount;
         }
@@ -213,17 +213,6 @@ public final class PerkCombatEvents {
         if (source == DamageSource.fall) {
             left *= 1.0D - Math.min(1.0D, perks.total(PerkEffect.FALL_DAMAGE)
                     + (player.ridingEntity != null ? perks.total(PerkEffect.MOUNTED_FALL) : 0.0D));
-        }
-        if (source.isFireDamage() && player.isBurning()
-                && RANDOM.nextDouble() < perks.total(PerkEffect.BURN_SHORTER)) {
-            player.extinguish();
-        }
-        double absorb = perks.total(PerkEffect.ARMOUR_ABSORB);
-        int armour = player.getTotalArmorValue();
-        if (absorb > 0.0D && armour > 0 && !source.isUnblockable()) {
-            double kept = Math.min(20, armour) / 25.0D;
-            double more = absorb * Math.min(20, armour) / 20.0D;
-            left *= Math.max(0.0D, 1.0D - kept - more) / (1.0D - kept);
         }
         TakenPerk phalanx = perks.first(PerkEffect.PHALANX);
         if (phalanx != null && FellowshipCompanions.anyWithin(player, phalanx.param("radius", 4.0D))) {

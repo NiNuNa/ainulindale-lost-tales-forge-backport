@@ -20,8 +20,8 @@ import java.util.Set;
  * The waystone houses the server builds (WAY-17): the bundled ones, read
  * as they are first asked for, and a server's own from
  * {@code config/losttales/structures/}, read as the server starts and on
- * {@code /losttales mapmarker reseed}, each in place of a bundled one of
- * its id. A house whose file was left out builds nothing; a marker naming
+ * {@code /losttales reload markers} and {@code mapmarker reseed}, each in
+ * place of a bundled one of its id. A house whose file was left out builds nothing; a marker naming
  * it is refused before it loads. The server's own are forgotten as the
  * server stops.
  */
@@ -82,19 +82,50 @@ public final class LostTalesWaystoneStructureRegistry {
         if (folder == null) {
             return problems;
         }
+        putServerHouses(readServerHouses(folder, problems));
+        return problems;
+    }
+
+    /**
+     * The server's own houses in {@code folder}, read but not yet in place;
+     * why each file left out was left out goes to {@code problems}.
+     */
+    public static synchronized Map<String, LostTalesWaystoneHousePlacer> readServerHouses(
+            File folder, List<String> problems) {
+        initialize();
+        Map<String, LostTalesWaystoneHousePlacer> own =
+                new LinkedHashMap<String, LostTalesWaystoneHousePlacer>();
+        if (folder == null) {
+            return own;
+        }
         DataFiles.Result<LostTalesWaystoneHouse> server = DataFiles.readFolder(folder,
                 LostTalesWaystoneHouseFiles.kind(
                         LostTalesWaystoneHouseFiles.folderScans(folder), GAME_BLOCKS));
         List<String> said = new ArrayList<String>(server.problems);
-        Map<String, LostTalesWaystoneHousePlacer> own = placers(server.values, said);
+        own.putAll(placers(server.values, said));
         log("Server waystone house", said);
         for (String problem : said) {
             problems.add("Server waystone house: " + problem);
         }
+        return own;
+    }
+
+    /** Puts a server's own houses, as {@link #readServerHouses} read them, beside the bundled ones. */
+    public static synchronized void putServerHouses(
+            Map<String, LostTalesWaystoneHousePlacer> own) {
+        initialize();
         PLACERS.clear();
         PLACERS.putAll(BUNDLED);
         PLACERS.putAll(own);
-        return problems;
+    }
+
+    /** The ids of the bundled houses and of {@code own}, as they would be with {@code own} in place. */
+    public static synchronized Set<String> houseIdsWith(
+            Map<String, LostTalesWaystoneHousePlacer> own) {
+        initialize();
+        Set<String> ids = new LinkedHashSet<String>(BUNDLED.keySet());
+        ids.addAll(own.keySet());
+        return Collections.unmodifiableSet(ids);
     }
 
     /** Forgets the server's own houses; the bundled ones stay. */

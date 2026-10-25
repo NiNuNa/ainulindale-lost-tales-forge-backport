@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.packet;
 
+import com.ninuna.losttales.armour.ArmourWeight;
 import com.ninuna.losttales.progression.ProgressionState;
 import com.ninuna.losttales.progression.skill.PerkDefinition;
 import com.ninuna.losttales.progression.skill.SkillAct;
@@ -36,6 +37,7 @@ public final class ProgressionCodec {
         buf.writeInt(skill.getOrder());
         LostTalesPacketCodec.writeUtf8String(buf, skill.getName(), MAX_NAME_BYTES);
         LostTalesPacketCodec.writeUtf8String(buf, skill.getDescription(), MAX_DESCRIPTION_BYTES);
+        buf.writeByte(skill.getWeight() == null ? 0 : skill.getWeight().ordinal() + 1);
         writeIds(buf, skill.weapons(), SkillFileValidator.MAX_WEAPONS);
         LostTalesPacketCodec.writeCount(buf, skill.getPerks().size(),
                 SkillFileValidator.MAX_PERKS, "perk");
@@ -50,6 +52,15 @@ public final class ProgressionCodec {
         int order = buf.readInt();
         String name = LostTalesPacketCodec.readUtf8String(buf, MAX_NAME_BYTES);
         String description = LostTalesPacketCodec.readUtf8String(buf, MAX_DESCRIPTION_BYTES);
+        int weightIndex = buf.readUnsignedByte();
+        ArmourWeight weight = null;
+        if (weightIndex > 0) {
+            weight = weightIndex <= ArmourWeight.values().length
+                    ? ArmourWeight.values()[weightIndex - 1] : null;
+            if (weight == null || !weight.counts()) {
+                throw new LostTalesPacketCodec.DecodeException("no such weight");
+            }
+        }
         List<String> weapons = readIds(buf, SkillFileValidator.MAX_WEAPONS);
         int perkCount = LostTalesPacketCodec.readCount(buf, SkillFileValidator.MAX_PERKS, "perk");
         List<PerkDefinition> perks = new ArrayList<PerkDefinition>();
@@ -59,7 +70,7 @@ public final class ProgressionCodec {
         // The weapons travel as a hit count of their own; nothing is worth anything on a client.
         List<SkillCount> counts = weapons.isEmpty() ? Collections.<SkillCount>emptyList()
                 : Collections.singletonList(new SkillCount(SkillAct.HIT, 0.0D, weapons, null, null));
-        return new SkillDefinition(id, icon, order, name, description, counts, perks);
+        return new SkillDefinition(id, icon, order, name, description, counts, perks, weight);
     }
 
     private static void writePerk(ByteBuf buf, PerkDefinition perk) {

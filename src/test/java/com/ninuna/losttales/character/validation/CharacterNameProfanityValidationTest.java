@@ -3,11 +3,12 @@ package com.ninuna.losttales.character.validation;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
@@ -31,6 +32,7 @@ public final class CharacterNameProfanityValidationTest {
     @After
     public void tearDown() {
         ChatProfanityCatalog.resetToBundled();
+        LoreCharacterRegistry.clear();
     }
 
     @Test
@@ -80,6 +82,8 @@ public final class CharacterNameProfanityValidationTest {
 
     @Test
     public void aLoreCharactersNameIsReservedHoweverItIsWritten() {
+        // The server reads the lore files as it starts (CHAR-43).
+        LoreCharacterRegistry.load(null);
         assertEquals(CharacterErrorId.NAME_RESERVED,
                 validate("Glorfindel").getErrorId());
         assertEquals(CharacterErrorId.NAME_RESERVED,
@@ -99,10 +103,10 @@ public final class CharacterNameProfanityValidationTest {
         return CharacterValidator.validateAppearance(
                 new CharacterRoster(OWNER), null,
                 name, CharacterRaceRegistry.HUMAN,
-                CharacterGenderRegistry.MALE,
+                CharacterBodyTypeRegistry.MASCULINE,
                 CharacterSkinRegistry.getDefaultSkinId(CharacterRaceRegistry.HUMAN,
-                        CharacterGenderRegistry.MALE, OWNER),
-                CharacterBodyTypeRegistry.WIDE,
+                        CharacterBodyTypeRegistry.MASCULINE, OWNER),
+                CharacterArmsRegistry.BROAD,
                 CharacterChestTypeRegistry.NONE, "", 25);
     }
 }

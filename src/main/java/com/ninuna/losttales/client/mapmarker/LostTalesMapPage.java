@@ -54,9 +54,10 @@ import org.lwjgl.opengl.GL11;
  *
  * <p>The map is made the first time the page is drawn and let go when it
  * leaves the screen, as closing the map screen let it go: it comes back
- * where the player left it ({@link LostTalesMapViewMemory}). Its tab stays
- * in its window when the screen closes, as every tab does, and while the
- * window fades in the map fades with it as one picture.</p>
+ * where the player left this copy of it, each copy keeping its own view
+ * for the connection ({@link LostTalesMapViewMemory}, MAP-12). Its tab
+ * stays in its window when the screen closes, as every tab does, and
+ * while the window fades in the map fades with it as one picture.</p>
  *
  * <p>Pinned to the screen while playing it is a map that follows the
  * player: at the zoom, turn and lean they left it with, the player in the
@@ -81,6 +82,12 @@ public final class LostTalesMapPage extends PageContent {
     private LostTalesLotrMapGui map;
     /** The part of LOTR's map it keeps in static fields, this page's own. */
     private final LostTalesLotrMapStatics statics = new LostTalesLotrMapStatics();
+    /**
+     * Where this copy of the map was left. It goes with the copy's
+     * content: a copy opened anew starts over the player, and every copy
+     * as the player leaves the world.
+     */
+    private final LostTalesMapViewMemory view = new LostTalesMapViewMemory();
     /** The map fading in with its window as one picture. */
     private final LostTalesUiLayerFade fade = new LostTalesUiLayerFade();
     private boolean hasKeys;
@@ -383,6 +390,11 @@ public final class LostTalesMapPage extends PageContent {
         } else if (ZOOM_IN.equals(id)) {
             entered().zoomStep(1);
         }
+    }
+
+    /** Where this copy of the map was left. */
+    LostTalesMapViewMemory viewMemory() {
+        return this.view;
     }
 
     /** Whether the map holds the keys: it answers WASD and the arrows only then. */

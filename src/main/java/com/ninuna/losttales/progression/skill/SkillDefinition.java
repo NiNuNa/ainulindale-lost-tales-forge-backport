@@ -1,5 +1,6 @@
 package com.ninuna.losttales.progression.skill;
 
+import com.ninuna.losttales.armour.ArmourWeight;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -7,7 +8,9 @@ import java.util.List;
 /**
  * A skill as its data file writes it (PROG-01): what counts toward it,
  * its perk tree (PROG-06), the item its page shows it by and where it
- * stands among the others. A bundled skill's words are lang lines named
+ * stands among the others. An armour skill names its weight (PROG-17):
+ * it counts what that weight's pieces keep from a blow, and its perks
+ * need that weight's pieces. A bundled skill's words are lang lines named
  * by its id; a server's own file may write them itself.
  */
 public final class SkillDefinition {
@@ -18,10 +21,18 @@ public final class SkillDefinition {
     private final String description;
     private final List<SkillCount> counts;
     private final List<PerkDefinition> perks;
+    private final ArmourWeight weight;
 
     public SkillDefinition(String id, String icon, int order, String name,
                            String description, List<SkillCount> counts,
                            List<PerkDefinition> perks) {
+        this(id, icon, order, name, description, counts, perks, null);
+    }
+
+    public SkillDefinition(String id, String icon, int order, String name,
+                           String description, List<SkillCount> counts,
+                           List<PerkDefinition> perks, ArmourWeight weight) {
+        this.weight = weight == null || !weight.counts() ? null : weight;
         this.id = id == null ? "" : id;
         this.icon = icon == null ? "" : icon;
         this.order = order;
@@ -61,6 +72,11 @@ public final class SkillDefinition {
         return this.perks;
     }
 
+    /** The armour weight the skill is about, light or heavy; null for any other skill. */
+    public ArmourWeight getWeight() {
+        return this.weight;
+    }
+
     public PerkDefinition perk(String perkId) {
         for (PerkDefinition perk : this.perks) {
             if (perk.getId().equals(perkId)) {
@@ -89,6 +105,6 @@ public final class SkillDefinition {
     public SkillDefinition worded(String name, String description,
                                   List<PerkDefinition> wordedPerks) {
         return new SkillDefinition(this.id, this.icon, this.order, name,
-                description, this.counts, wordedPerks);
+                description, this.counts, wordedPerks, this.weight);
     }
 }

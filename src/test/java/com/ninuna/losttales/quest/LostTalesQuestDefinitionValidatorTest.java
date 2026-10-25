@@ -254,4 +254,76 @@ public final class LostTalesQuestDefinitionValidatorTest {
                 "{\"id\":\"a\",\"type\":\"kill\",\"params\":{\"count\":\"3\"}}")
                 + "]}", "nobody is there to defeat");
     }
+
+    /**
+     * A reward's {@code starter} names one quest by its id, a namespace
+     * and a path (QUEST-43); whether that quest exists is asked as it is
+     * paid, so any well-shaped id reads.
+     */
+    @Test
+    public void aStarterRewardNamesOneQuest() {
+        String stages = "\"stages\":[" + stage("10", String.format(GATHER, "logs")) + "]}";
+        assertEquals(Collections.<String>emptyList(), warnings(HEAD
+                + "\"rewards\":{\"starter\":\"myserver:chain/part_two\"}," + stages));
+        LostTalesQuestDefinition quest = LostTalesQuestDefinitionJsonParser.parseQuest(
+                new StringReader(HEAD + "\"rewards\":{\"starter\":"
+                        + "\"losttales:path/survivalist/night_watch\"}," + stages),
+                "quests/test/q.json");
+        assertEquals("losttales:path/survivalist/night_watch",
+                LostTalesQuestRewards.starter(quest.getRewards()));
+        assertOneWarning(HEAD + "\"rewards\":{\"starter\":\"night_watch\"}," + stages,
+                "it is one quest's id");
+        assertOneWarning(HEAD + "\"rewards\":{\"starter\":"
+                + "\"losttales:a,losttales:b\"}," + stages, "it is one quest's id");
+        assertOneWarning(HEAD + "\"rewards\":{\"starter\":\"losttales: a\"},"
+                + stages, "it is one quest's id");
+        // An optional objective may pay one too.
+        assertEquals(Collections.<String>emptyList(), warnings(HEAD
+                + "\"stages\":[" + stage("10", String.format(GATHER, "logs"),
+                "{\"id\":\"extra\",\"type\":\"gather\",\"optional\":true,"
+                        + "\"params\":{\"item\":\"minecraft:log\",\"count\":\"8\","
+                        + "\"reward.starter\":\"losttales:test/next\"}}") + "]}"));
+    }
+
+    /**
+     * A reward's {@code relic} names relic pieces (CONTENT-11): a relic
+     * set's id for all four, with a slot after a slash for one, parted by
+     * commas; whether the set exists is asked as it is paid.
+     */
+    @Test
+    public void aRelicRewardNamesASetOrASetAndASlot() {
+        String stages = "\"stages\":[" + stage("10", String.format(GATHER, "logs")) + "]}";
+        assertEquals(Collections.<String>emptyList(), warnings(HEAD
+                + "\"rewards\":{\"relic\":\"losttales:striders_garb\"}," + stages));
+        assertEquals(Collections.<String>emptyList(), warnings(HEAD
+                + "\"rewards\":{\"relic\":\"losttales:striders_garb/helmet,"
+                + "losttales:striders_garb/boots\"}," + stages));
+        assertOneWarning(HEAD + "\"rewards\":{\"relic\":\"losttales:striders_garb/cloak\"},"
+                + stages, "a relic set's id");
+        assertOneWarning(HEAD + "\"rewards\":{\"relic\":\"Strider\"}," + stages,
+                "a relic set's id");
+    }
+
+    /**
+     * {@code repeatAfter} is a number of in-game days, 0.05 to 365, on a
+     * repeatable quest (QUEST-45).
+     */
+    @Test
+    public void aRepeatWaitIsDaysOnARepeatableQuest() {
+        String stages = "\"stages\":[" + stage("10", String.format(GATHER, "logs")) + "]}";
+        assertEquals(Collections.<String>emptyList(), warnings(HEAD
+                + "\"repeatable\":true,\"repeatAfter\":\"1\"," + stages));
+        LostTalesQuestDefinition quest = LostTalesQuestDefinitionJsonParser.parseQuest(
+                new StringReader(HEAD + "\"repeatable\":true,\"repeatAfter\":\"0.5\","
+                        + stages), "quests/test/q.json");
+        assertEquals(12000L, LostTalesQuestRules.repeatAfterTicks(quest));
+        assertOneWarning(HEAD + "\"repeatable\":true,\"repeatAfter\":\"soon\","
+                + stages, "it is a number of in-game days");
+        assertOneWarning(HEAD + "\"repeatable\":true,\"repeatAfter\":\"400\","
+                + stages, "it is a number of in-game days");
+        assertOneWarning(HEAD + "\"repeatAfter\":\"1\"," + stages,
+                "but is not repeatable");
+        assertOneWarning(HEAD + "\"repeatable\":true,\"repeatAfter\":[1],"
+                + stages, "'repeatAfter' as a list or a block");
+    }
 }

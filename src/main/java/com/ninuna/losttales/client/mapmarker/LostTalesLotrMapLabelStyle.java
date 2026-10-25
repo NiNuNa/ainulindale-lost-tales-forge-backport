@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.client.gui.FontRenderer;
@@ -18,7 +18,7 @@ import net.minecraft.client.gui.FontRenderer;
 public final class LostTalesLotrMapLabelStyle {
     /** The interface's own white, without its alpha. */
     static final int LABEL_RGB =
-            LostTalesSkyrimUiStyle.rgb(LostTalesSkyrimUiStyle.HUD_LABEL);
+            LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
     /** What LOTR writes its region names in. */
     private static final int PLAIN_WHITE = 0x00FFFFFF;
 

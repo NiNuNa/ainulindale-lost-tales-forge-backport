@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:wulf_ii",
   "name": "Wulf II",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_dunlending_male_1"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_dunlending_masculine_1",
+  "faction": "lotr:dunland"
 }

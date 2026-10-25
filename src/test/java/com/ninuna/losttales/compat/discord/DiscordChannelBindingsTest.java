@@ -1,8 +1,13 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatChannelDescriptor;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatCodeNames;
+import com.ninuna.losttales.chat.ChatPresentationMode;
+import com.ninuna.losttales.chat.ChatRecipientRule;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -64,11 +69,14 @@ public final class DiscordChannelBindingsTest {
         assertEquals(1, bindings.forGame(ChatChannel.GLOBAL, "").size());
         assertEquals(1, warnings.messages.size());
         assertTrue(warnings.messages.get(0), warnings.messages.get(0).contains("gate"));
-        assertEquals(Collections.singleton(ChatChannel.OOC.getId()),
+        // Proximity is never carried, so it stands among them whatever the gates say.
+        assertEquals(new java.util.TreeSet<String>(Arrays.asList(
+                        ChatChannel.OOC.getId(), ChatChannel.PROXIMITY.getId())),
                 LostTalesDiscordBridge.closedChannels());
 
         ChatChannelGates.install(ChatChannelGates.defaults());
-        assertTrue(LostTalesDiscordBridge.closedChannels().isEmpty());
+        assertEquals(Collections.singleton(ChatChannel.PROXIMITY.getId()),
+                LostTalesDiscordBridge.closedChannels());
     }
 
     private static final String WEBHOOK = "https://discord.com/api/webhooks/1/abc";
@@ -170,7 +178,7 @@ public final class DiscordChannelBindingsTest {
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + WEBHOOK,
                 "global=GAME_TO_DISCORD;channel=222;webhook=" + WEBHOOK,
                 "ooc=GAME_TO_DISCORD;channel=333;webhook=" + WEBHOOK,
-                "proximity=GAME_TO_DISCORD;channel=444;webhook=" + WEBHOOK + "-own",
+                "operator=GAME_TO_DISCORD;channel=444;webhook=" + WEBHOOK + "-own",
         }, true, warnings);
         assertEquals(1, warnings.refusals.size());
         assertTrue(warnings.refusals.get(0), warnings.refusals.get(0).contains(
@@ -180,7 +188,7 @@ public final class DiscordChannelBindingsTest {
         assertEquals(1, warnings.messages.size());
         assertTrue(warnings.messages.get(0).contains("names a webhook it names already"));
         // Every webhook posts for one game channel, once.
-        assertEquals(Arrays.asList("ooc", "proximity"), idsOf(bindings.destinations()));
+        assertEquals(Arrays.asList("ooc", "operator"), idsOf(bindings.destinations()));
         assertEquals(1, bindings.forGame(ChatChannel.OOC, "").size());
         assertNull(bindings.byId("ooc#2"));
     }
@@ -427,20 +435,50 @@ public final class DiscordChannelBindingsTest {
     public void whatABindingCannotDoIsTrimmedWithAWarning() {
         Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
-                "proximity=BIDIRECTIONAL;channel=222;webhook=" + WEBHOOK + "-p",
                 "faction=BIDIRECTIONAL;channel=333;webhook=" + WEBHOOK + "-f",
                 "operator=DISCORD_TO_GAME;channel=333;webhook=" + WEBHOOK + "-o",
         }, true, warnings);
-        assertEquals("proximity has nowhere on Discord to read from",
-                DiscordBridgeDirection.GAME_TO_DISCORD,
-                bindings.byId("proximity").getDirection());
         assertNull("the faction channel is linked per faction only",
                 bindings.byId("faction"));
         assertEquals("the refused faction entry owns nothing, so Operator may read 333",
                 DiscordBridgeDirection.DISCORD_TO_GAME,
                 bindings.byId("operator").getDirection());
-        assertEquals(2, warnings.messages.size());
+        assertEquals(1, warnings.messages.size());
         assertTrue(warnings.refusals.isEmpty());
+    }
+
+    /**
+     * A link saved for Proximity, or for a server's channel heard nearby,
+     * is refused as the bridge starts, with a line saying why, and owns
+     * nothing; the links beside it stand (DISC-03).
+     */
+    @Test
+    public void aSavedLinkOfAChannelHeardNearbyIsRefused() {
+        ChatChannel.installDefined(Collections.singletonList(new ChatChannelDescriptor(
+                "tavern", "Tavern", ChatPresentationMode.IN_CHARACTER,
+                ChatRecipientRule.PROXIMITY, ChatChannelAccess.NONE, 0xFFFFFF, true,
+                ChatChannelScope.NONE)), null);
+        try {
+            Collected warnings = new Collected();
+            DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
+                    "proximity=GAME_TO_DISCORD;channel=222;webhook=" + WEBHOOK + "-p",
+                    "tavern=BIDIRECTIONAL;channel=333;webhook=" + WEBHOOK + "-t",
+                    "ooc=BIDIRECTIONAL;channel=222;webhook=" + WEBHOOK + "-o",
+            }, true, warnings);
+            assertNull(bindings.byId("proximity"));
+            assertNull(bindings.byId("tavern"));
+            assertEquals(Arrays.asList("ooc"), idsOf(bindings.all()));
+            assertEquals("a refused entry owns no Discord channel", "ooc",
+                    bindings.ownerOfChannel("222"));
+            assertEquals(2, warnings.messages.size());
+            assertTrue(warnings.messages.get(0), warnings.messages.get(0).contains(
+                    "Proximity Chat channel refused: that channel is heard only nearby"));
+            assertTrue(warnings.messages.get(1), warnings.messages.get(1).contains(
+                    "Tavern channel refused: that channel is heard only nearby"));
+            assertTrue(warnings.refusals.isEmpty());
+        } finally {
+            ChatChannel.resetToBuiltIn();
+        }
     }
 
     @Test
@@ -486,11 +524,11 @@ public final class DiscordChannelBindingsTest {
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "global=GAME_TO_DISCORD;channel=4;webhook=" + WEBHOOK + "-a",
                 "ooc=BIDIRECTIONAL;channel=1;webhook=" + WEBHOOK + "-b",
-                "proximity=GAME_TO_DISCORD;channel=5;webhook=" + WEBHOOK + "-p",
+                "rohan=GAME_TO_DISCORD;channel=5;webhook=" + WEBHOOK + "-p",
                 "gondor=DISCORD_TO_GAME;channel=2;webhook=" + WEBHOOK + "-g",
                 "operator=BIDIRECTIONAL;channel=1;webhook=" + WEBHOOK + "-c",
         }, true, null);
-        assertEquals(Arrays.asList("global", "ooc", "proximity"),
+        assertEquals(Arrays.asList("global", "ooc", "rohan"),
                 idsOf(bindings.destinations()));
         assertEquals("every channel a binding reads or posts, once each; "
                         + "a switched-off entry binds nothing",

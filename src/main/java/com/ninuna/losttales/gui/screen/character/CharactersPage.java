@@ -1,6 +1,5 @@
 package com.ninuna.losttales.gui.screen.character;
 
-import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.CharacterSlotState;
@@ -16,6 +15,7 @@ import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterProfileCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
+import com.ninuna.losttales.client.camera.StageShot;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
@@ -24,6 +24,9 @@ import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.OtherPage;
+import com.ninuna.losttales.client.window.PageKeys;
+import com.ninuna.losttales.client.window.Stage;
+import com.ninuna.losttales.client.window.StageSubject;
 import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.ToolStrip;
@@ -32,7 +35,6 @@ import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowLists;
-import com.ninuna.losttales.client.window.WindowMenus;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
@@ -53,7 +55,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import org.lwjgl.input.Keyboard;
@@ -63,14 +64,16 @@ import org.lwjgl.opengl.GL11;
  * The Characters page: every slot in a roster
  * the tool strip's left button folds away, the deleted characters still
  * to be restored at its foot, and the picked character's profile beside
- * it in one column, its figure live for the one played and posed from
- * its look for any other. The window holds
+ * it in one column. The Profile view is a stage (CHAR-42): the camera
+ * faces the player beside the window, wearing the look of the character
+ * picked, as it is for the one played. The window holds
  * the rest: the well's search narrows the roster, and the input bar holds
  * Play as, Edit Profile, Change Look, Capes and Delete, last in red —
  * Create in Play as's place for an empty slot, Restore alone for a deleted
- * character. Edit Profile, Change Look, Capes, the lore characters and the
+ * character. Create, Change Look and Capes open the Character Editor
+ * ({@link CharacterEditorPage}); Edit Profile, the lore characters and the
  * questions before a deletion or a restore open as sub-windows in the
- * page's window; the creator stays a screen of its own. Another person's
+ * page's window. Another person's
  * profile, opened from their card or their menu, stands in the
  * roster's place, read only, until Back. A long History opens under its
  * Read more and folds again under its Show less, the words under it
@@ -79,7 +82,8 @@ import org.lwjgl.opengl.GL11;
  * <p>It draws only the server's roster and never changes it on its own;
  * every request is checked again by the server.</p>
  */
-public final class CharactersPage extends PageContent {
+public final class CharactersPage extends PageContent
+        implements StageSubject {
     /** The code name the page is registered and remembered under. */
     public static final String PAGE_ID = "characters";
 
@@ -126,7 +130,6 @@ public final class CharactersPage extends PageContent {
     }
 
     private final Minecraft mc = Minecraft.getMinecraft();
-    private final CharacterFigureStage figure = new CharacterFigureStage();
     private FontRenderer font;
     private int width = -1;
     private int height = -1;
@@ -146,8 +149,6 @@ public final class CharactersPage extends PageContent {
     private String query = "";
     private int pendingRequestId;
     private int rosterRequestId;
-    /** Whether the figure is held and turning. */
-    private boolean holdingFigure;
     /** The person whose profile stands in the roster's place; null for the player's own. */
     private Visit visit;
     /** The characters whose History is open, until the page closes. */
@@ -204,8 +205,25 @@ public final class CharactersPage extends PageContent {
             this.pickedKey = key;
             this.profileScroll = 0;
             this.shownProfileScroll = 0.0D;
-            this.figure.reset();
         }
+    }
+
+    /**
+     * The Character Editor closed on the server's yes: a new character is
+     * picked by its {@code slot} (-1 for none), and what was done stands
+     * over the bar.
+     */
+    void afterEditor(int slot, UUID changed, String done) {
+        CharacterRosterSnapshot snapshot = snapshot();
+        if (snapshot != null && slot >= 0) {
+            CharacterSummary made = snapshot.getCharacterAtSlot(slot);
+            if (made != null) {
+                this.query = "";
+                pick(new CharacterRosterRows.Row(
+                        CharacterRosterRows.Kind.CHARACTER, slot, made).key());
+            }
+        }
+        sayDone(done);
     }
 
     /** The slot a lore character is claimed into: the empty one picked, else the first empty one; -1 for none. */
@@ -260,7 +278,6 @@ public final class CharactersPage extends PageContent {
         this.visit = visit;
         this.profileScroll = 0;
         this.shownProfileScroll = 0.0D;
-        this.figure.reset();
         ClientCharacterProfileCache.refresh(visit.characterId);
     }
 
@@ -269,7 +286,6 @@ public final class CharactersPage extends PageContent {
             this.visit = null;
             this.profileScroll = 0;
             this.shownProfileScroll = 0.0D;
-            this.figure.reset();
         }
     }
 
@@ -714,24 +730,16 @@ public final class CharactersPage extends PageContent {
             return;
         }
         boolean played = CharacterRosterRows.isPlayed(snapshot, picked);
-        LostTalesUiHitBox words = layout.words();
         CharacterSummary character = picked.character;
         UUID characterId = character.getCharacterId();
         ClientCharacterProfileCache.want(characterId);
         CharacterProfileColumn column = new CharacterProfileColumn(this.mc,
-                this.font, (int)words.width, ProfileSubject.of(character),
+                this.font, (int)profile.width, ProfileSubject.of(character),
                 ClientCharacterProfileCache.get(characterId),
                 ClientCharacterProfileCache.isUnavailable(characterId),
                 accountName(), played, isLore(character),
                 this.openHistories.contains(characterId));
-        // While Change Look is open the figure wears the look it holds.
-        LookEditWindow editing = LookEditWindow.openFor(characterId);
-        CharacterAppearance draft = editing == null ? null
-                : editing.draftLook(snapshot.getOwnerId());
-        drawColumn(layout, column, characterId, played && draft == null
-                        ? this.mc.thePlayer : null,
-                snapshot.getOwnerId(), draft != null ? draft
-                        : lookOf(snapshot, character), clipX, clipY, alpha);
+        drawColumn(layout, column, characterId, alpha);
     }
 
     /** Whole days, as the roster says them: one day, or so many days. */
@@ -768,71 +776,58 @@ public final class CharactersPage extends PageContent {
 
     /**
      * The person visited: their character's profile as their appearance
-     * shows it when it is the one they play, else by its name alone, and
-     * its figure posed from that appearance where there is one.
+     * shows it when it is the one they play, else by its name alone.
      */
     private void drawVisit(CharactersLayout layout, double clipX, double clipY,
                            int alpha) {
-        CharacterAppearance look = ClientCharacterAppearanceCache
-                .getAuthoritative(this.visit.playerId);
-        boolean known = look != null
-                && this.visit.characterId.equals(look.getCharacterId());
+        CharacterAppearance look = visitedLook();
+        boolean known = look != null;
         ClientCharacterProfileCache.want(this.visit.characterId);
         CharacterProfile profile = ClientCharacterProfileCache.get(
                 this.visit.characterId);
         CharacterProfileColumn column = new CharacterProfileColumn(this.mc,
-                this.font, (int)layout.words().width, known
+                this.font, (int)layout.profile().width, known
                         ? ProfileSubject.of(look)
                         : ProfileSubject.named(this.visit.name,
                                 this.visit.skinId),
                 profile, ClientCharacterProfileCache.isUnavailable(
                         this.visit.characterId), "", false, false,
                 this.openHistories.contains(this.visit.characterId));
-        drawColumn(layout, column, this.visit.characterId, null,
-                this.visit.playerId,
-                known ? look : null, clipX, clipY, alpha);
+        drawColumn(layout, column, this.visit.characterId, alpha);
     }
 
-    /** The profile's words and its figure in the profile's box, scrolled as one. */
+    /** The visited character's look while it is the one its player plays; null otherwise. */
+    private CharacterAppearance visitedLook() {
+        CharacterAppearance look = ClientCharacterAppearanceCache
+                .getAuthoritative(this.visit.playerId);
+        return look != null
+                && this.visit.characterId.equals(look.getCharacterId())
+                ? look : null;
+    }
+
+    /** The profile's words in the profile's box, scrolled. */
     private void drawColumn(CharactersLayout layout,
                             CharacterProfileColumn column, UUID characterId,
-                            EntityLivingBase entity,
-                            UUID ownerId, CharacterAppearance look,
-                            double clipX, double clipY, int alpha) {
+                            int alpha) {
         LostTalesUiHitBox profile = layout.profile();
-        LostTalesUiHitBox words = layout.words();
         revealHistory(column, characterId);
-        int most = Math.max(0, layout.wordsOffset() + column.height()
-                - (int)profile.height);
+        int most = Math.max(0, column.height() - (int)profile.height);
         this.profileScroll = Math.max(0, Math.min(this.profileScroll, most));
         this.shownProfileScroll = glide(this.shownProfileScroll,
                 this.profileScroll);
         int scrolled = whole(this.shownProfileScroll);
         float fraction = (float)(this.shownProfileScroll - scrolled);
-        this.foldBox = column.foldBox(this.font, words.left, words.top
-                + layout.wordsOffset() - this.shownProfileScroll);
+        this.foldBox = column.foldBox(this.font, profile.left, profile.top
+                - this.shownProfileScroll);
         boolean clipped = LostTalesUiClip.beginLocal(this.mc,
                 (float)profile.left, (float)profile.top,
                 (float)profile.right(), (float)profile.bottom());
         try {
-            // A figure beside the words stands still; above them it
-            // scrolls with them.
-            GL11.glPushMatrix();
-            try {
-                if (!layout.figureBeside()) {
-                    GL11.glTranslatef(0.0F, -fraction, 0.0F);
-                }
-                this.figure.draw(this.mc, layout.figure(scrolled), clipX,
-                        clipY, entity, ownerId, look, alpha);
-            } finally {
-                GL11.glPopMatrix();
-            }
             GL11.glPushMatrix();
             try {
                 GL11.glTranslatef(0.0F, -fraction, 0.0F);
-                column.draw(this.font, (int)words.left, (int)words.top
-                        + layout.wordsOffset() - scrolled, (int)words.width,
-                        alpha);
+                column.draw(this.font, (int)profile.left, (int)profile.top
+                        - scrolled, (int)profile.width, alpha);
             } finally {
                 GL11.glPopMatrix();
             }
@@ -890,13 +885,13 @@ public final class CharactersPage extends PageContent {
                 && layout.profile().contains(x, y);
     }
 
-    /** A character's look, for the figure posed from it. */
-    private static CharacterAppearance lookOf(CharacterRosterSnapshot snapshot,
+    /** A character's look, worn by the player on the stage. */
+    private static CharacterAppearance lookOf(UUID playerId,
                                               CharacterSummary character) {
         return character == null ? null : CharacterAppearance.preview(
-                snapshot.getOwnerId(), character.getRaceId(),
-                character.getGenderId(), character.getSkinId(),
-                character.getBodyTypeId(), character.getChestTypeId(),
+                playerId, character.getRaceId(), character.getBodyTypeId(),
+                character.getSkinId(), character.getArmsId(),
+                character.getChestTypeId(),
                 character.isMinecraftCapeVisible(),
                 character.getCosmeticCapeId());
     }
@@ -938,28 +933,7 @@ public final class CharactersPage extends PageContent {
             flipHistory();
             return true;
         }
-        if (layout.figure(whole(this.shownProfileScroll)).contains(pageX, pageY)
-                && layout.profile().contains(pageX, pageY)) {
-            this.holdingFigure = true;
-            this.figure.grab(pageX, pageY);
-            return true;
-        }
         return false;
-    }
-
-    @Override
-    public void mouseDragged(Minecraft minecraft, LostTalesUiHitBox box,
-                             double x, double y, int button) {
-        if (this.holdingFigure) {
-            this.figure.drag(pageX(box, x), pageY(box, y));
-        }
-    }
-
-    @Override
-    public void mouseReleased(Minecraft minecraft, LostTalesUiHitBox box,
-                              double x, double y, int button) {
-        this.holdingFigure = false;
-        this.figure.release();
     }
 
     @Override
@@ -967,15 +941,11 @@ public final class CharactersPage extends PageContent {
         if (this.width < 0) {
             return false;
         }
-        int pageX = pageX(box, x);
-        int pageY = pageY(box, y);
         CharactersLayout layout = layout();
         CharacterRosterSnapshot snapshot = snapshot();
         return snapshot != null && (rowAt(rows(snapshot), rosterList(layout),
                 x - box.left, y - box.top) != null
-                || onFold(layout, x - box.left, y - box.top)
-                || layout.figure(whole(this.shownProfileScroll))
-                        .contains(pageX, pageY));
+                || onFold(layout, x - box.left, y - box.top));
     }
 
     /** The page closed: every History folds again. */
@@ -986,7 +956,7 @@ public final class CharactersPage extends PageContent {
         }
     }
 
-    /** The wheel zooms the figure over it; anywhere else it scrolls what is under it. */
+    /** The wheel scrolls what is under it. */
     @Override
     public boolean scroll(LostTalesUiHitBox box, double x, double y,
                           int lines) {
@@ -1001,11 +971,6 @@ public final class CharactersPage extends PageContent {
                     MenuWindow.rowHeight());
             return true;
         }
-        if (layout.figure(whole(this.shownProfileScroll)).contains(pageX, pageY)
-                && layout.figureBeside()) {
-            this.figure.zoomBy(-lines);
-            return true;
-        }
         if (layout.profile().contains(pageX, pageY)) {
             this.profileScroll = Math.max(0,
                     this.profileScroll + lines * NOTE_LINE);
@@ -1016,18 +981,21 @@ public final class CharactersPage extends PageContent {
 
     /* ---- The keys ---- */
 
-    /** The keys the Characters page answers to, for its help. */
+    /** The keys the Characters page answers to, and the stage's, for its help. */
     @Override
     public List<PageKeys.Area> keyAreas() {
-        return PageKeys.pageArea("gui.losttales.page.characters",
+        List<PageKeys.Area> areas = new ArrayList<PageKeys.Area>();
+        areas.add(PageKeys.area("gui.losttales.page.characters",
                 PageKeys.pageKey(PAGE_ID, "pick",
                         Keyboard.KEY_UP, PageKeys.OR, Keyboard.KEY_DOWN),
                 PageKeys.pageKey(PAGE_ID, "refresh", Keyboard.KEY_R),
-                PageKeys.pageKey(PAGE_ID, "turn", PageKeys.DRAG),
-                PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
+                PageKeys.pageKey(PAGE_ID, "light", Keyboard.KEY_L),
+                PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL)));
+        areas.add(Stage.keyArea());
+        return areas;
     }
 
-    /** The arrows walk the roster; R asks the server again. */
+    /** The arrows walk the roster; R asks the server again; L lights the character on the stage. */
     @Override
     public boolean keyTyped(char typedChar, int keyCode) {
         if (this.width < 0) {
@@ -1035,6 +1003,10 @@ public final class CharactersPage extends PageContent {
         }
         if (keyCode == Keyboard.KEY_R) {
             refresh();
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_L) {
+            Stage.toggleLight();
             return true;
         }
         if (keyCode == Keyboard.KEY_UP || keyCode == Keyboard.KEY_DOWN) {
@@ -1297,9 +1269,7 @@ public final class CharactersPage extends PageContent {
         }
         CharacterSummary character = picked.character;
         if (CREATE.equals(id) && picked.kind == CharacterRosterRows.Kind.EMPTY) {
-            WindowScreen screen = WindowScreen.current();
-            this.mc.displayGuiScreen(new LostTalesCharacterCreationGui(screen,
-                    picked.slot));
+            CharacterEditorPage.openToCreate(picked.slot);
         } else if (PLAY_AS.equals(id) && character != null
                 && !CharacterRosterRows.isPlayed(snapshot, picked)) {
             track(ClientCharacterNetwork.selectCharacter(
@@ -1308,9 +1278,11 @@ public final class CharactersPage extends PageContent {
         } else if (EDIT.equals(id) && character != null && !isLore(character)) {
             openEditor(character);
         } else if (LOOK.equals(id) && character != null && !isLore(character)) {
-            openLookEditor(character);
+            CharacterEditorPage.openToChange(character.getCharacterId(),
+                    EditorSection.SKIN);
         } else if (CAPES.equals(id) && character != null) {
-            openCapes(character);
+            CharacterEditorPage.openToChange(character.getCharacterId(),
+                    EditorSection.CAPES);
         } else if (DELETE.equals(id) && character != null
                 && !isLore(character)
                 && !CharacterRosterRows.isPlayed(snapshot, picked)) {
@@ -1322,11 +1294,6 @@ public final class CharactersPage extends PageContent {
     }
 
     /* ---- The sub-windows ---- */
-
-    private String windowId() {
-        Window window = WindowLayout.windowOf(tab());
-        return window == null ? null : window.getId();
-    }
 
     private void openEditor(CharacterSummary character) {
         WindowScreen screen = WindowScreen.current();
@@ -1343,34 +1310,6 @@ public final class CharactersPage extends PageContent {
                 : new ProfileEditWindow(character.getCharacterId());
         editor.restart();
         screen.openOverPage(tab, CharacterSubWindows.PROFILE_EDIT, key, editor);
-    }
-
-    /** Change Look for the character picked: its skin, arm width and chest. */
-    private void openLookEditor(CharacterSummary character) {
-        WindowScreen screen = WindowScreen.current();
-        OtherPage tab = tab();
-        if (screen == null || tab == null) {
-            return;
-        }
-        String key = character.getCharacterId().toString();
-        SubWindow open = screen.subWindows().find(
-                CharacterSubWindows.LOOK_EDIT, key);
-        LookEditWindow editor = open != null
-                && open.content instanceof LookEditWindow
-                ? (LookEditWindow)open.content
-                : new LookEditWindow(character.getCharacterId());
-        editor.restart();
-        screen.openOverPage(tab, CharacterSubWindows.LOOK_EDIT, key, editor);
-    }
-
-    /** The capes of the character picked. */
-    private void openCapes(CharacterSummary character) {
-        WindowScreen screen = WindowScreen.current();
-        if (screen != null) {
-            screen.menus().show(CharacterSubWindows.CAPES,
-                    CharacterMenus.capesAbout(this, character),
-                    WindowMenus.centredIn(windowId()), true);
-        }
     }
 
     private void openLoreCharacters() {
@@ -1408,6 +1347,99 @@ public final class CharactersPage extends PageContent {
                                 "gui.losttales.character.restoring");
                     }
                 });
+    }
+
+    /* ---- The stage ---- */
+
+    /**
+     * The look the player wears on the stage: the character picked, a
+     * visited one while its player plays it, none for the one played,
+     * which stands as it is.
+     */
+    @Override
+    public CharacterAppearance stageLook(UUID playerId) {
+        if (this.visit != null) {
+            CharacterAppearance look = visitedLook();
+            return look == null ? null : CharacterAppearance.preview(playerId,
+                    look.getRaceId(), look.getBodyTypeId(), look.getSkinId(),
+                    look.getArmsId(), look.getChestTypeId(),
+                    look.isMinecraftCapeVisible(), look.getCosmeticCapeId());
+        }
+        CharacterRosterSnapshot snapshot = snapshot();
+        CharacterRosterRows.Row picked = snapshot == null ? null
+                : picked(snapshot, rows(snapshot));
+        if (picked == null || picked.character == null
+                || CharacterRosterRows.isPlayed(snapshot, picked)) {
+            return null;
+        }
+        return lookOf(playerId, picked.character);
+    }
+
+    /**
+     * What the player wears with the look (CHAR-42): the armour and held
+     * item of the character picked, from its saved life; nothing of theirs
+     * for a visited one; their own for the one played.
+     */
+    @Override
+    public StageSubject.Gear stageGear() {
+        if (this.visit != null) {
+            return StageSubject.Gear.NONE;
+        }
+        CharacterRosterSnapshot snapshot = snapshot();
+        CharacterRosterRows.Row picked = snapshot == null ? null
+                : picked(snapshot, rows(snapshot));
+        if (picked == null || picked.character == null
+                || CharacterRosterRows.isPlayed(snapshot, picked)) {
+            return StageSubject.Gear.OWN;
+        }
+        return StageSubject.Gear.of(picked.character.getCharacterId());
+    }
+
+    @Override
+    public StageShot stageShot() {
+        return StageShot.FULL_FRONT;
+    }
+
+    @Override
+    public String stageName() {
+        if (this.visit != null) {
+            return this.visit.name;
+        }
+        CharacterSummary character = pickedCharacter();
+        return character == null ? "" : character.getName();
+    }
+
+    @Override
+    public String stageFacts() {
+        CharacterSummary character = this.visit == null ? pickedCharacter()
+                : null;
+        CharacterAppearance look = this.visit == null ? null : visitedLook();
+        String raceId = character != null ? character.getRaceId()
+                : look != null ? look.getRaceId() : "";
+        if (raceId.length() == 0) {
+            return "";
+        }
+        return I18n.format("gui.losttales.character.creator.nameplate.facts",
+                ClientCharacterDisplayNames.race(raceId),
+                ClientCharacterDisplayNames.bodyType(character != null
+                        ? character.getBodyTypeId() : look.getBodyTypeId()),
+                Integer.valueOf(Math.max(1, character != null
+                        ? character.getAge() : look.getAge())));
+    }
+
+    /** The character picked in the roster; null for a slot, a deleted one, or none. */
+    private CharacterSummary pickedCharacter() {
+        CharacterRosterSnapshot snapshot = snapshot();
+        CharacterRosterRows.Row picked = snapshot == null ? null
+                : picked(snapshot, rows(snapshot));
+        return picked == null ? null : picked.character;
+    }
+
+    /** Not on a first visit: the Character Editor stands alone in the view until the first character is made. */
+    @Override
+    public boolean isAvailable() {
+        CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
+        return roster == null || !roster.isWaitingForFirstCharacter();
     }
 
     /** Asks before a character is deleted; on the player's yes it goes with the roster as it stood. */

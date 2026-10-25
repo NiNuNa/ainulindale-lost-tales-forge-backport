@@ -25,6 +25,7 @@ public final class ProgressionStateNbt {
     static final String TAG_DEED_COUNTERS = "DeedCounters";
     static final String TAG_TITLE = "Title";
     static final String TAG_RESETS = "Resets";
+    static final String TAG_WAYPOINTS = "Waypoints";
     static final String TAG_ID = "Id";
     static final String TAG_SKILL = "Skill";
     static final String TAG_PERK = "Perk";
@@ -76,6 +77,13 @@ public final class ProgressionStateNbt {
         tag.setTag(TAG_DEED_COUNTERS, counters);
         tag.setString(TAG_TITLE, state.getTitle());
         tag.setInteger(TAG_RESETS, state.getResets());
+        NBTTagList waypoints = new NBTTagList();
+        for (String waypoint : state.waypoints()) {
+            NBTTagCompound entry = new NBTTagCompound();
+            entry.setString(TAG_ID, waypoint);
+            waypoints.appendTag(entry);
+        }
+        tag.setTag(TAG_WAYPOINTS, waypoints);
         return tag;
     }
 
@@ -86,7 +94,7 @@ public final class ProgressionStateNbt {
         }
         requireKeys(tag, TAG_VERSION, TAG_SKILLS, TAG_CHARACTER_LEVEL,
                 TAG_CHARACTER_INTO, TAG_PERKS, TAG_DEEDS, TAG_DEED_COUNTERS,
-                TAG_TITLE, TAG_RESETS);
+                TAG_TITLE, TAG_RESETS, TAG_WAYPOINTS);
         if (!tag.hasKey(TAG_VERSION, Constants.NBT.TAG_INT)
                 || tag.getInteger(TAG_VERSION) != VERSION) {
             throw new IllegalArgumentException("progression of another version");
@@ -135,6 +143,12 @@ public final class ProgressionStateNbt {
         }
         state.setTitle(tag.getString(TAG_TITLE));
         state.setResets(integer(tag, TAG_RESETS));
+        for (NBTTagCompound entry : entries(tag, TAG_WAYPOINTS, ProgressionState.MAX_WAYPOINTS)) {
+            requireKeys(entry, TAG_ID);
+            if (!state.addWaypoint(string(entry, TAG_ID))) {
+                throw new IllegalArgumentException("a waypoint written twice");
+            }
+        }
         return state;
     }
 

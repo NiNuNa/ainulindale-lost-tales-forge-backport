@@ -12,14 +12,15 @@ import java.util.Map;
  * Every colour drawn anywhere in the project must be one of these entries,
  * optionally with a caller-chosen alpha via {@link #withAlpha(int, int)}.
  * The semantic aliases below are the names the GUIs, HUD, map, and chat
- * actually use; they are remapped onto palette entries so a palette change
- * restyles the whole mod from this one file.</p>
+ * actually use; each is a palette entry, so a role's colour is chosen in
+ * this one file. Every colour is read here by name
+ * ({@code LostTalesColors.SAND}); nothing extends the class.</p>
  *
  * <p>This class deliberately has no client-only dependencies, so the same
  * semantic colours can be used while the dedicated server snapshots chat
  * presentation and while the client renders GUIs, HUDs, and chat.</p>
  */
-public class LostTalesColors {
+public final class LostTalesColors {
 
     // ---- Nanner Pancakes palette (opaque ARGB, sheet order) ----
     public static final int SEAFOAM = 0xFFA0DDD3;
@@ -146,7 +147,7 @@ public class LostTalesColors {
         return byName;
     }
 
-    protected LostTalesColors() {}
+    private LostTalesColors() {}
 
     /** Every palette entry's name, in sheet order; what a colour option offers. */
     public static String[] paletteNames() {

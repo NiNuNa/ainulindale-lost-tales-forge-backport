@@ -1,5 +1,6 @@
 package com.ninuna.losttales.mapmarker;
 
+import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
 import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
@@ -20,19 +21,24 @@ import net.minecraftforge.common.util.Constants;
 
 /**
  * Versioned, defensive NBT codec for authoritative marker records. Only
- * data of the current version is read: any other version, or a store
- * without its lists, is kept as it is and the store goes read-only. A
- * record that lacks a key the writer writes, or names a value no record
- * holds, is quarantined whole. Every record is read, however many there
- * are (WAY-12); only the quarantine keeps a bound.
+ * data of the current version is read: any other version, a store
+ * without its list of records, or one whose quarantine this build cannot
+ * read, is kept as it is and the store goes read-only. A record that
+ * lacks a key the writer writes, or names a value no record holds, is
+ * quarantined whole (DATA-10). Every record is read, however many there
+ * are (WAY-12); only the quarantine keeps a bound,
+ * {@link NbtQuarantine#MAX_ENTRIES}: a read that would set more aside
+ * keeps the whole store as it is, read-only.
  */
 public final class LostTalesMapMarkerNbtCodec {
-    public static final int CURRENT_DATA_VERSION = 8;
-    private static final int MAX_QUARANTINE = 4096;
+    public static final int CURRENT_DATA_VERSION = 10;
+    /** The most records the marker quarantine holds. */
+    public static final int MAX_QUARANTINED = NbtQuarantine.MAX_ENTRIES;
 
     private static final String DATA_VERSION = "DataVersion";
     private static final String MARKERS = "Markers";
-    private static final String QUARANTINE = "Quarantine";
+    /** Where a record set aside stood in the list of records. */
+    static final String MARKER_INDEX = "MarkerIndex";
     /** The character that owns a placed waystone (WAY-08). */
     static final String OWNER_CHARACTER = "OwnerCharacter";
     /** The settings saved on the marker's page, by name (WAY-16). */
@@ -65,17 +71,7 @@ public final class LostTalesMapMarkerNbtCodec {
             }
         }
         output.setTag(MARKERS, markerList);
-
-        NBTTagList quarantine = new NBTTagList();
-        if (quarantinedEntries != null) {
-            int count = 0;
-            for (NBTTagCompound entry : quarantinedEntries) {
-                if (entry != null && count++ < MAX_QUARANTINE) {
-                    quarantine.appendTag(entry.copy());
-                }
-            }
-        }
-        output.setTag(QUARANTINE, quarantine);
+        NbtQuarantine.write(output, quarantinedEntries);
     }
 
     public static ReadResult read(NBTTagCompound source) {
@@ -89,14 +85,24 @@ public final class LostTalesMapMarkerNbtCodec {
             return ReadResult.unsupported(safe, version);
         }
         if (!safe.hasKey(MARKERS, Constants.NBT.TAG_LIST)
-                || !safe.hasKey(QUARANTINE, Constants.NBT.TAG_LIST)) {
-            LostTalesLog.warning("Map marker data has no marker or quarantine list; preserving it read-only");
+                || !NbtTags.hasCompoundListWithinLimit(
+                        safe, MARKERS, Integer.MAX_VALUE)) {
+            LostTalesLog.warning("Map marker data has no list of records; preserving it read-only");
             return ReadResult.unsupported(safe, -1);
+        }
+        NbtQuarantine.Read stored = NbtQuarantine.read(safe);
+        if (!stored.isSupported()) {
+            LostTalesLog.warning("Map marker quarantine is malformed or uses version %d, which this build does not read; preserving the data read-only",
+                    Integer.valueOf(stored.getUnsupportedVersion()));
+            return ReadResult.unsupported(
+                    safe, stored.getUnsupportedVersion());
         }
 
         LinkedHashMap<String, LostTalesMapMarkerRecord> records =
                 new LinkedHashMap<String, LostTalesMapMarkerRecord>();
-        ArrayList<NBTTagCompound> quarantine = readQuarantine(safe);
+        Map<String, Integer> indexById = new LinkedHashMap<String, Integer>();
+        ArrayList<NBTTagCompound> quarantine =
+                new ArrayList<NBTTagCompound>(stored.getEntries());
         boolean repaired = false;
         NBTTagList markers = safe.getTagList(
                 MARKERS, Constants.NBT.TAG_COMPOUND);
@@ -109,29 +115,35 @@ public final class LostTalesMapMarkerNbtCodec {
                         safe, result.unsupportedVersion);
             }
             if (result.record == null) {
-                quarantine.add(quarantine(
-                        result.failureReason, Integer.valueOf(index), raw));
+                quarantine.add(NbtQuarantine.entry(
+                        result.failureReason, MARKER_INDEX, index, raw));
                 repaired = true;
                 continue;
             }
-            LostTalesMapMarkerRecord previous =
-                    records.get(result.record.getId());
+            String id = result.record.getId();
+            LostTalesMapMarkerRecord previous = records.get(id);
             if (previous == null) {
-                records.put(result.record.getId(), result.record);
-            } else {
-                LostTalesMapMarkerRecord retained =
-                        previous.getRevision() >= result.record.getRevision()
-                                ? previous : result.record;
-                LostTalesMapMarkerRecord discarded =
-                        retained == previous ? result.record : previous;
-                records.put(retained.getId(), retained);
-                quarantine.add(quarantine(
-                        "duplicate_marker_id", Integer.valueOf(index),
-                        writeRecord(discarded)));
-                repaired = true;
+                records.put(id, result.record);
+                indexById.put(id, Integer.valueOf(index));
+                continue;
             }
+            // The higher revision stays; on a tie, the one read first.
+            int setAside = index;
+            if (result.record.getRevision() > previous.getRevision()) {
+                setAside = indexById.get(id).intValue();
+                records.put(id, result.record);
+                indexById.put(id, Integer.valueOf(index));
+            }
+            quarantine.add(NbtQuarantine.entry("duplicate_marker_id",
+                    MARKER_INDEX, setAside, markers.getCompoundTagAt(setAside)));
+            repaired = true;
         }
-        trimQuarantine(quarantine);
+        if (quarantine.size() > MAX_QUARANTINED) {
+            LostTalesLog.warning("Map marker quarantine would hold %d records, past its %d; preserving the data read-only",
+                    Integer.valueOf(quarantine.size()),
+                    Integer.valueOf(MAX_QUARANTINED));
+            return ReadResult.unsupported(safe, -1);
+        }
         return ReadResult.success(records, quarantine, repaired);
     }
 
@@ -364,42 +376,6 @@ public final class LostTalesMapMarkerNbtCodec {
             }
         }
         return settings;
-    }
-
-    private static ArrayList<NBTTagCompound> readQuarantine(
-            NBTTagCompound source) {
-        ArrayList<NBTTagCompound> entries =
-                new ArrayList<NBTTagCompound>();
-        if (!source.hasKey(QUARANTINE, Constants.NBT.TAG_LIST)) {
-            return entries;
-        }
-        NBTTagList list = source.getTagList(
-                QUARANTINE, Constants.NBT.TAG_COMPOUND);
-        int count = Math.min(list.tagCount(), MAX_QUARANTINE);
-        for (int index = 0; index < count; index++) {
-            entries.add((NBTTagCompound)
-                    list.getCompoundTagAt(index).copy());
-        }
-        return entries;
-    }
-
-    private static NBTTagCompound quarantine(
-            String reason, Integer index, NBTTagCompound original) {
-        NBTTagCompound entry = new NBTTagCompound();
-        entry.setString("Reason", reason == null ? "unknown" : reason);
-        if (index != null) {
-            entry.setInteger("MarkerIndex", index.intValue());
-        }
-        if (original != null) {
-            entry.setTag("OriginalData", original.copy());
-        }
-        return entry;
-    }
-
-    private static void trimQuarantine(List<NBTTagCompound> entries) {
-        while (entries.size() > MAX_QUARANTINE) {
-            entries.remove(0);
-        }
     }
 
     public static final class ReadResult {

@@ -14,7 +14,7 @@ public final class LostTalesMapMarkerEditableSettingsTest {
         UUID token = UUID.randomUUID();
         LostTalesMapMarkerRecord original =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/editor", "Aldric",
+                        "losttales:player/editor",
                         UUID.randomUUID(), 100,
                         4, 70, 8, token);
         LostTalesMapMarkerEditableSettings settings =
@@ -56,7 +56,7 @@ public final class LostTalesMapMarkerEditableSettingsTest {
     @Test
     public void aPlacedWaystoneWearsTheShack() {
         assertEquals("shack", LostTalesMapMarkerRecord.createPlayerMarker(
-                "losttales:player/icon", "Aldric", UUID.randomUUID(), 100,
+                "losttales:player/icon", UUID.randomUUID(), 100,
                 4, 70, 8, UUID.randomUUID()).getIconName());
     }
 
@@ -66,7 +66,7 @@ public final class LostTalesMapMarkerEditableSettingsTest {
         UUID token = UUID.randomUUID();
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/link", "Aldric", UUID.randomUUID(),
+                        "losttales:player/link", UUID.randomUUID(),
                         100, 4, 70, 8, token);
         assertTrue(record.isLinkedTo(100, 4, 70, 8, token));
         assertEquals(false, record.isLinkedTo(100, 4, 70, 8,

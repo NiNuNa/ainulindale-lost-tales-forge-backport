@@ -34,7 +34,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.AnvilRepairEvent;
 import net.minecraftforge.event.entity.player.ArrowLooseEvent;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
@@ -43,8 +42,8 @@ import net.minecraftforge.event.entity.player.PlayerUseItemEvent;
 import net.minecraftforge.event.world.BlockEvent;
 
 /**
- * The perks of work (PROG-06): drawing and loosing, the wear of tools,
- * weapons and armour, mining and felling speed, what a harvest and a
+ * The perks of work (PROG-06): drawing and loosing, the wear of tools
+ * and weapons, mining and felling speed, what a harvest and a
  * mine drop, smelting, forging and repairing, filling a keg and
  * shortening LOTR's fast-travel wait. A bow's draw runs alike on both
  * sides so the client draws what the server looses; the rest is the
@@ -189,7 +188,7 @@ public final class PerkWorkEvents {
         arrow.motionZ = z / length * speed;
     }
 
-    // Wear: weapons in a blow, tools in a break, armour in a blow taken.
+    // Wear: weapons in a blow, tools in a break.
 
     @SubscribeEvent
     public void onAttack(AttackEntityEvent event) {
@@ -202,22 +201,6 @@ public final class PerkWorkEvents {
     public void onBlockBreak(BlockEvent.BreakEvent event) {
         if (!event.isCanceled() && event.getPlayer() instanceof EntityPlayerMP) {
             watchHeld(event.getPlayer());
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void onHurt(LivingHurtEvent event) {
-        if (event.isCanceled() || !(event.entityLiving instanceof EntityPlayerMP)) {
-            return;
-        }
-        EntityPlayer player = (EntityPlayer) event.entityLiving;
-        double share = Perks.of(player).total(PerkEffect.ARMOUR_WEAR);
-        if (share > 0.0D) {
-            for (ItemStack armour : player.inventory.armorInventory) {
-                if (armour != null && armour.isItemStackDamageable()) {
-                    PerkRuntime.of(player).wear.add(new PerkRuntime.Wear(armour, share));
-                }
-            }
         }
     }
 

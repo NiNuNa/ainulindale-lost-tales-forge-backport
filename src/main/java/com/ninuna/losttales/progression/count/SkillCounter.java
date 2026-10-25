@@ -1,5 +1,6 @@
 package com.ninuna.losttales.progression.count;
 
+import com.ninuna.losttales.armour.ArmourWeight;
 import com.ninuna.losttales.compat.lotr.LotrWeaponKinds;
 import com.ninuna.losttales.progression.ProgressionCatalog;
 import com.ninuna.losttales.progression.ProgressionService;
@@ -8,6 +9,7 @@ import com.ninuna.losttales.progression.skill.SkillCount;
 import com.ninuna.losttales.progression.skill.SkillDefinition;
 import com.ninuna.losttales.progression.skill.WeaponKind;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 
@@ -51,6 +53,34 @@ public final class SkillCounter {
                 double worth = CountWorth.of(count, thing, measure);
                 if (worth > 0.0D) {
                     ProgressionService.count(player, skill.getId(), key, repeats, worth);
+                }
+            }
+        }
+    }
+
+    /**
+     * What armour kept from a foe's blow, by weight: each skill with a
+     * weight counts its weight's share (PROG-17), repeats under
+     * {@code repeatKey} shrinking it as a hit's do.
+     */
+    public static void armourAct(EntityPlayerMP player, Thing thing,
+                                 Map<ArmourWeight, Double> kept, String repeatKey) {
+        if (player == null || kept == null || kept.isEmpty()) {
+            return;
+        }
+        String key = repeatKey == null ? "" : repeatKey;
+        for (SkillDefinition skill : ProgressionCatalog.skills()) {
+            Double share = skill.getWeight() == null ? null : kept.get(skill.getWeight());
+            if (share == null || !(share.doubleValue() > 0.0D)) {
+                continue;
+            }
+            for (SkillCount count : skill.getCounts()) {
+                if (count.getAct() != SkillAct.ARMOUR) {
+                    continue;
+                }
+                double worth = CountWorth.of(count, thing, share.doubleValue());
+                if (worth > 0.0D) {
+                    ProgressionService.count(player, skill.getId(), key, true, worth);
                 }
             }
         }

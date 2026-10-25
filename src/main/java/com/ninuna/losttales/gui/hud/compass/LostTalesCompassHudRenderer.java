@@ -4,7 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraController;
 import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerBatchBuilder;
@@ -97,7 +97,7 @@ public class LostTalesCompassHudRenderer {
     private static final int MAP_MARKER_MIN_TEXT_ALPHA = 4;
     /** Matches the marker icon artwork rather than pure white. */
     private static final int MAP_MARKER_LABEL_COLOR =
-            LostTalesSkyrimUiStyle.rgb(LostTalesSkyrimUiStyle.HUD_LABEL);
+            LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
 
     private static final List<LostTalesCompassMarkerProvider> MARKER_PROVIDERS = createMarkerProviders();
     private static final LostTalesCompassHeightIndicatorAnimation HEIGHT_INDICATOR_ANIMATION =

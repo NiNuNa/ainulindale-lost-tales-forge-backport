@@ -12,6 +12,11 @@
       "act": "kill",
       "weapons": ["battleaxe", "axe", "hammer", "throwing_axe"],
       "per": 0.5
+    },
+    {
+      "act": "block",
+      "weapons": ["battleaxe", "axe", "hammer"],
+      "per": 1.0
     }
   ],
   "perks": [

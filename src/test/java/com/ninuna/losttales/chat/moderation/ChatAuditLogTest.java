@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.moderation;
 
+import com.ninuna.losttales.storage.WorldClock;
 import java.util.UUID;
 import org.junit.Test;
 
@@ -90,5 +91,21 @@ public final class ChatAuditLogTest {
         assertFalse(ChatAuditLog.isExpiredFileName(null, NOON, 30));
         assertFalse(ChatAuditLog.isExpiredFileName(
                 ChatAuditLog.fileNameFor(NOON), NOON + DAY / 2, 0));
+    }
+
+    /** A file whose retention ended inside a jump of the clock is kept (DATA-09). */
+    @Test
+    public void aFileTheClocksJumpExpiredIsKept() {
+        WorldClock.Hold jump = new WorldClock.Hold() {
+            @Override
+            public boolean holds(long dueAt) {
+                return dueAt > NOON - 10L * DAY && dueAt <= NOON;
+            }
+        };
+        assertTrue(ChatAuditLog.isExpiredFileName("chat-2026-08-01.jsonl", NOON, 1));
+        assertTrue("due long before the jump", ChatAuditLog.isExpiredFileName(
+                "chat-2026-08-01.jsonl", NOON, 1, jump));
+        assertFalse("its retention ended inside the jump", ChatAuditLog.isExpiredFileName(
+                "chat-2026-08-28.jsonl", NOON, 1, jump));
     }
 }

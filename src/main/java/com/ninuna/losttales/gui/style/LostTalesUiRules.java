@@ -99,7 +99,7 @@ public final class LostTalesUiRules {
         if (far == edge) {
             return;
         }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(true);
         for (int rowIndex = 0; rowIndex < EDGE_FADE_ROWS; rowIndex++) {
             // Each band runs from nearer the edge to farther from it;
             // its top and bottom are then taken in screen order so the
@@ -140,7 +140,7 @@ public final class LostTalesUiRules {
                 tessellator.addVertex(x0, y1, 0.0D);
             }
         }
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        LostTalesUiInk.endQuads(tessellator, true);
     }
 
     /**
@@ -169,10 +169,10 @@ public final class LostTalesUiRules {
             return;
         }
         float middle = (top + bottom) / 2.0F;
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(true);
         drawStandingRamp(tessellator, left, right, top, middle, 0, safeAlpha);
         drawStandingRamp(tessellator, left, right, middle, bottom, safeAlpha, 0);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        LostTalesUiInk.endQuads(tessellator, true);
     }
 
     /** One half of a standing rule, its alpha {@code topAlpha} at its top and {@code bottomAlpha} at its bottom. */
@@ -205,7 +205,7 @@ public final class LostTalesUiRules {
                 || right <= left || bottom <= top) {
             return;
         }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(true);
         if (holeRight <= holeLeft || holeRight <= left || holeLeft >= right) {
             drawRuleSpan(tessellator, left, right, left, right, top, bottom,
                     safeAlpha);
@@ -215,7 +215,7 @@ public final class LostTalesUiRules {
             drawRuleRamp(tessellator, right, Math.min(right, holeRight), top,
                     bottom, safeAlpha);
         }
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        LostTalesUiInk.endQuads(tessellator, true);
     }
 
     /**
@@ -293,7 +293,7 @@ public final class LostTalesUiRules {
             return;
         }
         float centre = (top + bottom) / 2.0F;
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(true);
         // Same winding as the backdrop: the GUI pass culls back faces.
         // Top half: transparent end to opaque centre.
         tessellator.setColorRGBA_I(LostTalesUiInk.IVORY, safeAlpha);
@@ -309,6 +309,6 @@ public final class LostTalesUiRules {
         tessellator.setColorRGBA_I(LostTalesUiInk.IVORY, safeAlpha);
         tessellator.addVertex(right, centre, 0.0D);
         tessellator.addVertex(left, centre, 0.0D);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        LostTalesUiInk.endQuads(tessellator, true);
     }
 }

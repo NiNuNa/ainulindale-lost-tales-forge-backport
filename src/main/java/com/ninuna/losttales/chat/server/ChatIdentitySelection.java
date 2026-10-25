@@ -338,9 +338,54 @@ public final class ChatIdentitySelection {
     public static void sendState(EntityPlayerMP player) {
         List<ChatFellowship> fellowships = chatFellowships(player);
         List<UUID> read = readIds(player);
-        LAST_STATE.put(player.getUniqueID(), signature(player, read, fellowships));
+        List<UUID> account = accountFellowshipIds(player);
+        LAST_STATE.put(player.getUniqueID(),
+                signature(player, read, fellowships, account));
         LostTalesNetworkHandler.CHANNEL.sendTo(
-                new LostTalesChatIdentitySyncPacket(read, fellowships), player);
+                new LostTalesChatIdentitySyncPacket(read, fellowships, account),
+                player);
+    }
+
+    /**
+     * The fellowships any character of the player's is in, or the account
+     * itself before its first character, each once, at most
+     * {@link LostTalesChatIdentitySyncPacket#MAX_ACCOUNT_FELLOWSHIPS}: a
+     * fellowship's conversation stays in the player's windows while one is
+     * in it (WIN-18). Null when the roster or the fellowships could not be
+     * read, so the client drops nothing on a guess.
+     */
+    static List<UUID> accountFellowshipIds(EntityPlayerMP player) {
+        UUID owner = player.getUniqueID();
+        List<UUID> ids = new ArrayList<UUID>();
+        try {
+            List<UUID> identities = new ArrayList<UUID>();
+            identities.add(owner);
+            CharacterRoster roster = CharacterStorage.get(player.worldObj)
+                    .getRoster(owner);
+            if (roster != null) {
+                for (RoleplayCharacter character : roster.getCharacters()) {
+                    if (character != null && character.getCharacterId() != null) {
+                        identities.add(character.getCharacterId());
+                    }
+                }
+            }
+            FellowshipWorldData data = FellowshipStorage.get(player.worldObj);
+            for (UUID identity : identities) {
+                for (Fellowship fellowship : data.getFellowshipsForIdentity(identity)) {
+                    FellowshipMember member = fellowship.getMember(identity);
+                    UUID id = fellowship.getFellowshipId();
+                    if (member != null && owner.equals(member.getOwnerId())
+                            && !ids.contains(id) && ids.size()
+                                    < LostTalesChatIdentitySyncPacket.MAX_ACCOUNT_FELLOWSHIPS) {
+                        ids.add(id);
+                    }
+                }
+            }
+        } catch (RuntimeException failure) {
+            warn(failure);
+            return null;
+        }
+        return ids;
     }
 
     /** The ids of the characters read as besides the one played, as kept. */
@@ -365,7 +410,8 @@ public final class ChatIdentitySelection {
     }
 
     private static String signature(EntityPlayerMP player, List<UUID> read,
-                                    List<ChatFellowship> fellowships) {
+                                    List<ChatFellowship> fellowships,
+                                    List<UUID> account) {
         StringBuilder state = new StringBuilder();
         state.append(playedId(player)).append(':').append(read).append(':');
         for (ChatFellowship fellowship : fellowships) {
@@ -373,7 +419,8 @@ public final class ChatIdentitySelection {
                     .append('/').append(fellowship.getName()).append(';');
         }
         return state.append(':').append(roles(player)).append(':')
-                .append(readFactions(player)).toString();
+                .append(readFactions(player)).append(':')
+                .append(account == null ? "?" : account.toString()).toString();
     }
 
     /** Membership and role changes refresh the chat without replacing gameplay fellowship data. */
@@ -386,7 +433,8 @@ public final class ChatIdentitySelection {
         for (Object value : server.getConfigurationManager().playerEntityList) {
             if (!(value instanceof EntityPlayerMP)) { continue; }
             EntityPlayerMP player = (EntityPlayerMP)value;
-            String state = signature(player, readIds(player), chatFellowships(player));
+            String state = signature(player, readIds(player),
+                    chatFellowships(player), accountFellowshipIds(player));
             if (!state.equals(LAST_STATE.get(player.getUniqueID()))) {
                 LostTalesChatService.sendAccess(player);
             }

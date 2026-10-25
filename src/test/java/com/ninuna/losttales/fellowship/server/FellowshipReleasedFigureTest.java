@@ -1,7 +1,7 @@
 package com.ninuna.losttales.fellowship.server;
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.storage.CharacterIndex;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
@@ -106,8 +106,8 @@ public final class FellowshipReleasedFigureTest {
         assertTrue(characters.getOrCreateRoster(holder).addCharacter(
                 RoleplayCharacter.builder(beren.getIdentityId(), holder)
                         .slot(0).name("Beren").race(CharacterRaceRegistry.HUMAN)
-                        .gender(CharacterGenderRegistry.MALE)
-                        .skin("losttales:human_bree_male_0").age(30)
+                        .bodyType(CharacterBodyTypeRegistry.MASCULINE)
+                        .skin("losttales:human_bree_masculine_0").age(30)
                         .startingFaction("lotr:bree").createdAt(1L).build()));
         assertNull(FellowshipService.memberRemovalReason(beren, characters.characterIndex(),
                 Collections.<UUID>emptySet()));

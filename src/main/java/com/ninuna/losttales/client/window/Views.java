@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.StatCollector;
@@ -69,6 +70,39 @@ public final class Views {
         PageCategory home = category == null ? null : category.home();
         View own = home == null ? null : OWN.get(home);
         return own != null ? own : OWN.get(PageCategory.CHANNELS);
+    }
+
+    /** Says why a view stays closed now, as a first visit keeps the views a character is needed for. */
+    public interface Gate {
+        /** Why {@code view} stays closed now; empty while it may open. */
+        String closedWhy(View view);
+    }
+
+    private static final List<Gate> GATES = new CopyOnWriteArrayList<Gate>();
+
+    /** Adds a system's say over which views may open. */
+    public static void addGate(Gate gate) {
+        if (gate != null && !GATES.contains(gate)) {
+            GATES.add(gate);
+        }
+    }
+
+    /**
+     * Why {@code view} stays closed now, the first gate's reason; empty
+     * while every gate lets it open. A closed view's button stands greyed,
+     * its key says why, and its category's pages show nowhere.
+     */
+    public static String closedWhy(View view) {
+        if (view == null) {
+            return "";
+        }
+        for (Gate gate : GATES) {
+            String why = gate.closedWhy(view);
+            if (why != null && why.length() > 0) {
+                return why;
+            }
+        }
+        return "";
     }
 
     /** The view of that id; null for none. */

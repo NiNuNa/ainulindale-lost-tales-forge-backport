@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.window;
 
+import com.ninuna.losttales.config.LostTalesConfig;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -7,6 +8,7 @@ import org.junit.Test;
 import org.lwjgl.input.Keyboard;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -75,6 +77,38 @@ public final class SettingsTest {
         List<MenuWindow.Entry> kept = new ArrayList<MenuWindow.Entry>();
         Settings.section(kept, "Shortcuts", Arrays.asList(search), "f");
         assertEquals(2, kept.size());
+    }
+
+    /**
+     * Blur the World Behind Windows stands greyed while Blur Behind Screens
+     * is off, a press saying why and changing nothing (WIN-51).
+     */
+    @Test
+    public void theWindowsBlurWaitsOnBlurBehindScreens() {
+        boolean screens = LostTalesConfig.enableGuiBackgroundBlur;
+        boolean windows = LostTalesConfig.windowBackgroundBlur;
+        try {
+            Settings.WindowBlur blur = new Settings.WindowBlur();
+            LostTalesConfig.windowBackgroundBlur = true;
+            LostTalesConfig.enableGuiBackgroundBlur = false;
+            MenuWindow.Entry greyed = blur.row();
+            assertFalse(greyed.isTakeable());
+            assertTrue("a press says why", greyed.unavailable.length() > 0);
+            blur.step(false);
+            blur.step(true);
+            assertTrue("a press changes nothing",
+                    LostTalesConfig.windowBackgroundBlur);
+
+            LostTalesConfig.enableGuiBackgroundBlur = true;
+            MenuWindow.Entry open = blur.row();
+            assertTrue(open.isTakeable());
+            assertEquals("", open.unavailable);
+            blur.step(false);
+            assertFalse(LostTalesConfig.windowBackgroundBlur);
+        } finally {
+            LostTalesConfig.enableGuiBackgroundBlur = screens;
+            LostTalesConfig.windowBackgroundBlur = windows;
+        }
     }
 
     @Test

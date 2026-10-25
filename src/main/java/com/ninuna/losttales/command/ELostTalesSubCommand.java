@@ -16,7 +16,7 @@ import net.minecraft.command.ICommandSender;
  */
 public enum ELostTalesSubCommand {
     QUEST(new LostTalesCommandQuest("quest", LostTalesMetaData.MOD_ID + " quest"),
-            "quest <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|reload|world> ...",
+            "quest <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|world> ...",
             "quest", "quests", "q"),
     MAP_MARKER(new LostTalesCommandMapMarker("mapmarker",
             LostTalesMetaData.MOD_ID + " mapmarker"),
@@ -34,6 +34,9 @@ public enum ELostTalesSubCommand {
     CONFIG(new LostTalesCommandConfig(),
             "config <list|get|set|reload> ...",
             "config", "cfg"),
+    RELOAD(new LostTalesCommandReload(),
+            "reload <quests|skills|markers|races|capes|kits|missives|lore|all>",
+            "reload"),
     DISCORD(new LostTalesCommandDiscord(),
             "discord <list|link|unlink> ...",
             "discord"),
@@ -44,8 +47,14 @@ public enum ELostTalesSubCommand {
             "structures <ban|allow|list> [player|character]",
             "structures", "structure"),
     SKILLS(new LostTalesCommandSkills(),
-            "skills <reload|show|give> ...",
-            "skills", "skill", "progression");
+            "skills <show|give> ...",
+            "skills", "skill", "progression"),
+    RELIC(new LostTalesCommandRelic(),
+            "relic <player> <relic> [helmet|chestplate|leggings|boots]",
+            "relic", "relics"),
+    CLOCK(new LostTalesCommandClock(),
+            "clock [accept]",
+            "clock");
 
     private final CommandBase command;
     private final String usage;

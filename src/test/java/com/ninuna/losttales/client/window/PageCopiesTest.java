@@ -55,7 +55,7 @@ public final class PageCopiesTest {
                     new ItemStack(Items.map), null, PageCategory.SETTINGS, empty);
         }
         if (WindowPages.byId(WORLD) == null) {
-            WindowPages.registerWorldPage(WORLD, "gui.test.copies.world",
+            WindowPages.registerGamePage(WORLD, "gui.test.copies.world",
                     new ItemStack(Items.compass), PageCategory.MAP, empty);
         }
     }

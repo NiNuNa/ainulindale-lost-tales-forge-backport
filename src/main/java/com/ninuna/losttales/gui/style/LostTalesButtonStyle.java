@@ -58,7 +58,7 @@ public final class LostTalesButtonStyle {
                 bottom - CORNER_SIZE, edge);
 
         minecraft.getTextureManager().bindTexture(TEXTURE);
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         int u = highlighted ? HIGHLIGHT_U : 0;
         Tessellator tessellator = Tessellator.instance;

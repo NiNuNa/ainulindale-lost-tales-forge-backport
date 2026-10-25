@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:gror",
   "name": "Grór",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:dwarf",
-    "genderId": "losttales:male",
-    "modelId": "lotr:dwarf",
-    "skinId": "losttales:dwarf_erebor_male_0"
-  }
+  "race": "losttales:dwarf",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:dwarf_erebor_masculine_0",
+  "faction": "lotr:durins_folk"
 }

@@ -25,6 +25,11 @@ import java.util.UUID;
  * <p>A reply to a line the server holds no record of quotes it as
  * {@link #UNKEPT}: a message no longer kept, with no author and no words,
  * since nothing but the replier's own word could say what that line was.</p>
+ *
+ * <p>A quote of a line an unseen voice said ({@link ChatUnseenVoice}) is
+ * kept by the server with its author, and marked ({@link #isUnseen}); a
+ * reader who may not know who spoke is sent it masked
+ * ({@link #unseenVoice}).</p>
  */
 public final class ChatReplyReference {
     /** An author whose colour the quote was not told. */
@@ -44,11 +49,8 @@ public final class ChatReplyReference {
     public static final int MAX_AUTHOR_BYTES = 256;
     /** The quoted text: one glanceable line, not the message again. */
     public static final int MAX_EXCERPT_CHARACTERS = 96;
-    /** Worst-case UTF-8 for {@link #MAX_EXCERPT_CHARACTERS}, plus the mark. */
-    public static final int MAX_EXCERPT_BYTES =
-            (MAX_EXCERPT_CHARACTERS + 3) * 3;
-    /** What stands in for the text an excerpt had to cut. */
-    private static final String ELLIPSIS = "...";
+    /** Worst-case UTF-8 for {@link #MAX_EXCERPT_CHARACTERS}. */
+    public static final int MAX_EXCERPT_BYTES = MAX_EXCERPT_CHARACTERS * 3;
     /** The quoted sender's skin id, bounded as the message packet bounds its own. */
     public static final int MAX_SKIN_ID_BYTES = 128;
     /** A forward's link to where its message was said: {@code #code/id}. */
@@ -86,6 +88,12 @@ public final class ChatReplyReference {
     private final boolean action;
     /** Whether this is {@link #UNKEPT}: a quote of a line no record holds. */
     private final boolean unkept;
+    /**
+     * Whether the quoted line was said by an unseen voice: the author and
+     * head here are the speaker's own, or, once masked, the unseen
+     * voice's ({@link #isUnseenVoice}).
+     */
+    private final boolean unseen;
 
     private ChatReplyReference() {
         this.messageId = ChatMessageIds.NONE;
@@ -99,19 +107,21 @@ public final class ChatReplyReference {
         this.forwardedFrom = "";
         this.action = false;
         this.unkept = true;
+        this.unseen = false;
     }
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor) {
         this(messageId, author, excerpt, authorColor, null, false, "",
-                false, "", false);
+                false, "", false, false);
     }
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor,
                                UUID senderId, boolean accountLine,
                                String skinId, boolean npcLine,
-                               String forwardedFrom, boolean action) {
+                               String forwardedFrom, boolean action,
+                               boolean unseen) {
         this.messageId = messageId;
         this.author = author == null ? "" : author;
         this.excerpt = excerpt == null ? "" : excerpt;
@@ -123,6 +133,7 @@ public final class ChatReplyReference {
         this.forwardedFrom = forwardedFrom == null ? "" : forwardedFrom;
         this.action = action;
         this.unkept = false;
+        this.unseen = unseen;
     }
 
     /**
@@ -139,7 +150,7 @@ public final class ChatReplyReference {
         }
         return new ChatReplyReference(this.messageId, this.author,
                 this.excerpt, this.authorColor, senderId, accountLine,
-                skinId, false, this.forwardedFrom, this.action);
+                skinId, false, this.forwardedFrom, this.action, this.unseen);
     }
 
     /**
@@ -155,12 +166,53 @@ public final class ChatReplyReference {
         return new ChatReplyReference(this.messageId, this.author,
                 this.excerpt, this.authorColor, this.senderId,
                 this.accountLine, this.skinId, this.npcLine,
-                this.forwardedFrom, action);
+                this.forwardedFrom, action, this.unseen);
     }
 
     /** Whether the quoted line is an action rather than something said. */
     public boolean isAction() {
         return this.action;
+    }
+
+    /**
+     * The same quote marked as one of a line an unseen voice said, or not.
+     * Only a quote naming its message may be one: a quote of nothing, of
+     * a line no longer kept or of a client's own line stays as it is.
+     */
+    public ChatReplyReference asUnseen(boolean unseen) {
+        if (unseen == this.unseen || (unseen && !isAnchored())) {
+            return this;
+        }
+        return new ChatReplyReference(this.messageId, this.author,
+                this.excerpt, this.authorColor, this.senderId,
+                this.accountLine, this.skinId, this.npcLine,
+                this.forwardedFrom, this.action, unseen);
+    }
+
+    /** Whether the quoted line was said by an unseen voice. */
+    public boolean isUnseen() {
+        return this.unseen;
+    }
+
+    /**
+     * The same quote as a reader who may not know who spoke reads it: the
+     * unseen voice for its author, with no head of its own and the quiet
+     * colour, the words as they are. Any quote not of an unseen voice, and
+     * one masked already, stays as it is.
+     */
+    public ChatReplyReference unseenVoice() {
+        if (!this.unseen || isUnseenVoice()) {
+            return this;
+        }
+        return new ChatReplyReference(this.messageId, ChatUnseenVoice.NAME,
+                this.excerpt, ChatUnseenVoice.color(),
+                ChatUnseenVoice.SENDER_ID, false, ChatUnseenVoice.SKIN_ID,
+                false, this.forwardedFrom, this.action, true);
+    }
+
+    /** Whether the quote is masked: it names the unseen voice, not who spoke. */
+    public boolean isUnseenVoice() {
+        return this.unseen && ChatUnseenVoice.SENDER_ID.equals(this.senderId);
     }
 
     /**
@@ -174,7 +226,7 @@ public final class ChatReplyReference {
         }
         return new ChatReplyReference(this.messageId, this.author,
                 this.excerpt, this.authorColor, npcId, false, texturePath,
-                true, this.forwardedFrom, this.action);
+                true, this.forwardedFrom, this.action, this.unseen);
     }
 
     /**
@@ -288,7 +340,7 @@ public final class ChatReplyReference {
             return NONE;
         }
         return new ChatReplyReference(messageId, name, "", authorColor, null,
-                false, "", false, link, false);
+                false, "", false, link, false, false);
     }
 
     /** Whether this is a forward's: the message a forward carries on. */
@@ -303,14 +355,20 @@ public final class ChatReplyReference {
 
     /**
      * The message as one glanceable line, its paragraphs run together,
-     * cut with a trailing mark.
+     * its first {@link #MAX_EXCERPT_CHARACTERS} kept and no mark added: a
+     * game fades a quote out at the end of its room (CHAT-86), as it does
+     * a cut name. A cut never splits a character in two.
      */
     public static String excerptOf(String message) {
         String text = ChatMessageValidator.oneLine(message).trim();
         if (text.length() <= MAX_EXCERPT_CHARACTERS) {
             return text;
         }
-        return text.substring(0, MAX_EXCERPT_CHARACTERS) + ELLIPSIS;
+        int end = MAX_EXCERPT_CHARACTERS;
+        if (Character.isHighSurrogate(text.charAt(end - 1))) {
+            end--;
+        }
+        return text.substring(0, end).trim();
     }
 
     /**

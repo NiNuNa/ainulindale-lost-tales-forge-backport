@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:urgar",
   "name": "Urgar",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:uruk",
-    "genderId": "losttales:non_binary",
-    "modelId": "lotr:uruk",
-    "skinId": "losttales:uruk_hai_1"
-  }
+  "race": "losttales:uruk",
+  "body_type": "losttales:neutral",
+  "skin": "losttales:uruk_hai_1",
+  "faction": "lotr:isengard"
 }

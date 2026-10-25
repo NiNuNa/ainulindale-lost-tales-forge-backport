@@ -26,7 +26,7 @@ public final class LostTalesWaystoneIconTest {
         assertTrue("the icon a placed waystone wears",
                 LostTalesWaystoneSettingsService.isIconName(
                         LostTalesMapMarkerRecord.createPlayerMarker(
-                                "losttales:player/icon", "Aldric",
+                                "losttales:player/icon",
                                 java.util.UUID.randomUUID(), 0, 1, 64, 1,
                                 java.util.UUID.randomUUID()).getIconName()));
         assertTrue(LostTalesWaystoneSettingsService.isIconName("big-port"));

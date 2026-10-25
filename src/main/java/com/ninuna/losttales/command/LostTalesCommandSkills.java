@@ -7,7 +7,6 @@ import com.ninuna.losttales.progression.ProgressionRules;
 import com.ninuna.losttales.progression.ProgressionService;
 import com.ninuna.losttales.progression.ProgressionSettings;
 import com.ninuna.losttales.progression.ProgressionState;
-import com.ninuna.losttales.progression.ProgressionSync;
 import com.ninuna.losttales.progression.SkillStanding;
 import com.ninuna.losttales.progression.SkillWords;
 import com.ninuna.losttales.progression.skill.SkillDefinition;
@@ -16,21 +15,18 @@ import java.util.List;
 import java.util.Locale;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.EnumChatFormatting;
 
 /**
- * The progression's operator tools (PROG-01, PROG-11): {@code reload}
- * reads the skill and deed files again and sends every client the new
- * catalog (the race files, starts included, are read as the server
- * starts, CHAR-38); {@code show <player>} says where a played character
- * stands; {@code give <player> <skill> <experience>} gives a character
- * experience, as a quest would, for an event or a test.
+ * The progression's operator tools (PROG-01, PROG-11): {@code show
+ * <player>} says where a played character stands; {@code give <player>
+ * <skill> <experience>} gives a character experience, as a quest would,
+ * for an event or a test. The skill and deed files are read again by
+ * {@code /losttales reload skills}.
  */
 public final class LostTalesCommandSkills extends LostTalesCommandBase {
 
     static final String SAY = "chat.losttales.command.skills.";
-    private static final int MAX_PROBLEMS_SAID = 64;
     private static final int MAX_GIFT = 1000000;
 
     public LostTalesCommandSkills() {
@@ -39,7 +35,7 @@ public final class LostTalesCommandSkills extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/losttales skills <reload|show|give> ...";
+        return "/losttales skills <show|give> ...";
     }
 
     @Override
@@ -55,9 +51,7 @@ public final class LostTalesCommandSkills extends LostTalesCommandBase {
             return;
         }
         String action = args[0].toLowerCase(Locale.ROOT);
-        if ("reload".equals(action)) {
-            reload(sender);
-        } else if ("show".equals(action) && args.length == 2) {
+        if ("show".equals(action) && args.length == 2) {
             show(sender, args[1]);
         } else if ("give".equals(action) && args.length == 4) {
             give(sender, args[1], args[2], args[3]);
@@ -66,26 +60,12 @@ public final class LostTalesCommandSkills extends LostTalesCommandBase {
         }
     }
 
-    private void reload(ICommandSender sender) {
-        List<String> problems = ProgressionCatalog.load();
-        int said = 0;
-        for (String problem : problems) {
-            if (said++ >= MAX_PROBLEMS_SAID) {
-                break;
-            }
-            say(sender, EnumChatFormatting.YELLOW, SAY + "reload.left_out", problem);
-        }
-        say(sender, EnumChatFormatting.GREEN, SAY + "reload.done",
-                Integer.valueOf(ProgressionCatalog.skills().size()),
-                Integer.valueOf(ProgressionCatalog.deeds().size()));
-        ProgressionSync.sendCatalogToAll(MinecraftServer.getServer());
-    }
-
-    private void show(ICommandSender sender, String name) {
-        EntityPlayerMP player = online(sender, name);
+    private void show(ICommandSender sender, String typed) {
+        EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, typed);
         if (player == null) {
             return;
         }
+        String name = player.getCommandSenderName();
         ProgressionPlayerData data = ProgressionPlayerData.get(player);
         if (data == null || ProgressionService.playedCharacter(player) == null) {
             say(sender, EnumChatFormatting.RED, SAY + "no_character", name);
@@ -106,11 +86,12 @@ public final class LostTalesCommandSkills extends LostTalesCommandBase {
         }
     }
 
-    private void give(ICommandSender sender, String name, String skillId, String written) {
-        EntityPlayerMP player = online(sender, name);
+    private void give(ICommandSender sender, String typed, String skillId, String written) {
+        EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, typed);
         if (player == null) {
             return;
         }
+        String name = player.getCommandSenderName();
         SkillDefinition skill = ProgressionCatalog.skill(skillId);
         if (skill == null) {
             say(sender, EnumChatFormatting.RED, SAY + "unknown_skill", skillId);
@@ -131,23 +112,12 @@ public final class LostTalesCommandSkills extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "no_character", name);
             return;
         }
-        double gained = ProgressionService.reward(player, skill.getId(), amount);
+        double gained = ProgressionService.give(player, skill.getId(), amount);
         say(sender, EnumChatFormatting.GREEN, SAY + "give.done", name,
                 Long.valueOf(Math.round(gained)), SkillWords.name(skill));
     }
 
-    private EntityPlayerMP online(ICommandSender sender, String name) {
-        MinecraftServer server = MinecraftServer.getServer();
-        EntityPlayerMP player = server == null ? null
-                : server.getConfigurationManager().func_152612_a(name);
-        if (player == null) {
-            say(sender, EnumChatFormatting.RED, PLAYER_UNKNOWN, name);
-        }
-        return player;
-    }
-
     private void sendUsage(ICommandSender sender) {
-        usage(sender, "/losttales skills reload");
         usage(sender, "/losttales skills show <player>");
         usage(sender, "/losttales skills give <player> <skill> <experience>");
     }
@@ -158,12 +128,12 @@ public final class LostTalesCommandSkills extends LostTalesCommandBase {
             return null;
         }
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "reload", "show", "give");
+            return getListOfStringsMatchingLastWord(args, "show", "give");
         }
         if (args.length == 2 && ("show".equalsIgnoreCase(args[0])
                 || "give".equalsIgnoreCase(args[0]))) {
             return getListOfStringsMatchingLastWord(args,
-                    MinecraftServer.getServer().getAllUsernames());
+                    LostTalesCommandSubject.names(sender));
         }
         if (args.length == 3 && "give".equalsIgnoreCase(args[0])) {
             List<String> ids = new ArrayList<String>();

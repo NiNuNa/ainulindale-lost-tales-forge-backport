@@ -111,12 +111,12 @@ public final class CharacterRaceCatalogPacketTest {
 
     private static final String BEORNING = "{"
             + "\"id\": \"myserver:beorning\", \"name\": \"Beorning\", \"body\": \"human\","
-            + "\"sexes\": [\"losttales:male\", \"losttales:female\"],"
+            + "\"body_types\": [\"losttales:masculine\", \"losttales:feminine\"],"
             + "\"size\": {\"width\": 0.65, \"height\": 1.9},"
             + "\"health\": 22, \"speed\": 1.0, \"attack\": 3,"
             + "\"faction_categories\": [\"human\"], \"factions\": [\"lotr:dale\"],"
             + "\"skins\": [{\"group\": \"beorning\", \"name\": \"Beorning\","
-            + " \"sex\": \"losttales:male\", \"texture\": \"lotr:mob/bree/bree_male\", \"count\": 4}],"
+            + " \"body_type\": \"losttales:masculine\", \"texture\": \"lotr:mob/bree/bree_male\", \"count\": 4}],"
             + "\"skills\": {\"losttales:husbandry\": 10}"
             + "}";
 

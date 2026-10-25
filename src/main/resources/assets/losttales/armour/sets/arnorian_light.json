@@ -1,0 +1,22 @@
+{
+  "id": "losttales:arnorian_light",
+  "helmet": [
+    "losttales:arnorian_helmet_light",
+    "losttales:arnorian_helmet_light_2"
+  ],
+  "chestplate": [
+    "losttales:arnorian_armor_light"
+  ],
+  "leggings": [
+    "losttales:arnorian_leggings_light"
+  ],
+  "boots": [
+    "losttales:arnorian_boots_light"
+  ],
+  "bonus": [
+    {
+      "effect": "speed",
+      "amount": 0.05
+    }
+  ]
+}

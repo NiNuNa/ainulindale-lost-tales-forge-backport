@@ -1,0 +1,21 @@
+{
+  "id": "losttales:black_numenorean",
+  "helmet": [
+    "lotr:item.helmetBlackNumenorean"
+  ],
+  "chestplate": [
+    "lotr:item.bodyBlackNumenorean"
+  ],
+  "leggings": [
+    "lotr:item.legsBlackNumenorean"
+  ],
+  "boots": [
+    "lotr:item.bootsBlackNumenorean"
+  ],
+  "bonus": [
+    {
+      "effect": "fire",
+      "amount": 0.2
+    }
+  ]
+}

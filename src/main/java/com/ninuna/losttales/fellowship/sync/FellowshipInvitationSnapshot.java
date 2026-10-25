@@ -7,7 +7,9 @@ import java.util.UUID;
 
 /**
  * An invitation as its target, and the leader and guides of the fellowship
- * that sent it, see it, with the fellowship's name.
+ * that sent it, see it, with the fellowship's name and the accounts behind
+ * both characters. The accounts are always sent; each reader's Show
+ * Accounts decides whether they show (FEL-31).
  */
 public final class FellowshipInvitationSnapshot {
 
@@ -17,8 +19,12 @@ public final class FellowshipInvitationSnapshot {
     private final UUID invitingIdentityId;
     private final UUID invitingOwnerId;
     private final String invitingCharacterName;
+    /** The inviting character's account name; empty where the server knows none. */
+    private final String invitingAccountName;
     private final UUID targetIdentityId;
     private final String targetCharacterName;
+    /** The invited character's account name; empty where the server knows none. */
+    private final String targetAccountName;
     private final long expiresAt;
 
     public FellowshipInvitationSnapshot(UUID invitationId,
@@ -27,8 +33,10 @@ public final class FellowshipInvitationSnapshot {
                                         UUID invitingIdentityId,
                                         UUID invitingOwnerId,
                                         String invitingCharacterName,
+                                        String invitingAccountName,
                                         UUID targetIdentityId,
                                         String targetCharacterName,
+                                        String targetAccountName,
                                         long expiresAt) {
         if (invitationId == null || fellowshipId == null
                 || invitingIdentityId == null || invitingOwnerId == null
@@ -45,13 +53,18 @@ public final class FellowshipInvitationSnapshot {
         this.invitingIdentityId = invitingIdentityId;
         this.invitingOwnerId = invitingOwnerId;
         this.invitingCharacterName = normalizeName(invitingCharacterName);
+        this.invitingAccountName = normalizeName(invitingAccountName);
         this.targetIdentityId = targetIdentityId;
         this.targetCharacterName = normalizeName(targetCharacterName);
+        this.targetAccountName = normalizeName(targetAccountName);
         this.expiresAt = expiresAt;
     }
 
+    /** The invitation with its fellowship's name and the names of the accounts behind it. */
     public static FellowshipInvitationSnapshot fromInvitation(FellowshipInvitation invitation,
-                                                              String fellowshipName) {
+                                                              String fellowshipName,
+                                                              String invitingAccountName,
+                                                              String targetAccountName) {
         if (invitation == null) {
             throw new IllegalArgumentException("invitation must not be null");
         }
@@ -62,8 +75,10 @@ public final class FellowshipInvitationSnapshot {
                 invitation.getInvitingIdentityId(),
                 invitation.getInvitingOwnerId(),
                 invitation.getInvitingCharacterName(),
+                invitingAccountName,
                 invitation.getTargetIdentityId(),
                 invitation.getTargetCharacterName(),
+                targetAccountName,
                 invitation.getExpiresAt());
     }
 
@@ -91,12 +106,22 @@ public final class FellowshipInvitationSnapshot {
         return this.invitingCharacterName;
     }
 
+    /** The inviting character's account name; empty where the server knows none. */
+    public String getInvitingAccountName() {
+        return this.invitingAccountName;
+    }
+
     public UUID getTargetIdentityId() {
         return this.targetIdentityId;
     }
 
     public String getTargetCharacterName() {
         return this.targetCharacterName;
+    }
+
+    /** The invited character's account name; empty where the server knows none. */
+    public String getTargetAccountName() {
+        return this.targetAccountName;
     }
 
     public long getExpiresAt() {

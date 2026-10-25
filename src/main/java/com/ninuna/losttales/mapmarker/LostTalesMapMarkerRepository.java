@@ -30,8 +30,7 @@ public final class LostTalesMapMarkerRepository {
                 PlayableIdentityResolver.resolve(player).getCharacter();
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        id, placerName(placer),
-                        placer == null ? null : placer.getCharacterId(),
+                        id, placer == null ? null : placer.getCharacterId(),
                         player.dimension, x, y, z, linkToken);
         LostTalesMapMarkerWorldData data = get(player.worldObj);
         if (data.getRecord(id) != null) {
@@ -40,15 +39,5 @@ public final class LostTalesMapMarkerRepository {
         }
         data.saveRecord(record);
         return record;
-    }
-
-    /**
-     * The name a waystone is called after: the character that placed it,
-     * so it never names an account. Empty when nobody is played; no record
-     * takes that, and the placing fails.
-     */
-    static String placerName(RoleplayCharacter played) {
-        String name = played == null ? null : played.getName();
-        return name == null ? "" : name.trim();
     }
 }

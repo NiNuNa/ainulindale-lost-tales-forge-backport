@@ -4,7 +4,7 @@ import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
+import com.ninuna.losttales.entity.combat.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.util.LostTalesMath;
 import java.util.List;
 import net.minecraft.entity.player.EntityPlayerMP;

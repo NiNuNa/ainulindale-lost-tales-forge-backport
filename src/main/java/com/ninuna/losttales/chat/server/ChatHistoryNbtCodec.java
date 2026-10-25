@@ -44,9 +44,10 @@ public final class ChatHistoryNbtCodec {
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
     /**
      * The one entry layout this codec writes and reads, with or without
-     * reactions and whatever their emoji.
+     * reactions and whatever their emoji, and with the readers of a
+     * quote heard nearby where a reply has them.
      */
-    public static final int CURRENT_ENTRY_DATA_VERSION = 5;
+    public static final int CURRENT_ENTRY_DATA_VERSION = 6;
     /** Safety bound on kept lines read back; entries past it are quarantined. */
     public static final int MAX_ENTRIES = ChatHistory.MAX_KEPT;
 
@@ -70,6 +71,7 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_AUDIENCE_FACTION = "Faction";
     private static final String TAG_AUDIENCE_GATED = "Gated";
     private static final String TAG_REACTIONS = "Reactions";
+    private static final String TAG_QUOTE_READERS = "QuoteReaders";
     private static final String TAG_REACTION_EMOJI = "Emoji";
     private static final String TAG_REACTION_REACTORS = "Reactors";
     private static final String TAG_REACTOR_ID = "Id";
@@ -420,6 +422,9 @@ public final class ChatHistoryNbtCodec {
         if (reacted) {
             tag.setTag(TAG_REACTIONS, writeReactions(entry.reactions));
         }
+        if (entry.quoteReaders != null) {
+            tag.setTag(TAG_QUOTE_READERS, writeUuids(entry.quoteReaders));
+        }
         return tag;
     }
 
@@ -595,10 +600,18 @@ public final class ChatHistoryNbtCodec {
         if (reactions == null) {
             return EntryReadResult.failure("invalid_reactions");
         }
+        Set<UUID> quoteReaders = null;
+        if (raw.hasKey(TAG_QUOTE_READERS)) {
+            List<UUID> readers = readUuids(raw, TAG_QUOTE_READERS);
+            if (readers == null) {
+                return EntryReadResult.failure("invalid_quote_readers");
+            }
+            quoteReaders = Collections.unmodifiableSet(new HashSet<UUID>(readers));
+        }
         return EntryReadResult.success(new ChatHistory.Entry(authorId,
                 author.trim(), raw.getString(TAG_EXCERPT), new HashSet<UUID>(seenBy),
                 channelId, forSender, forOthers, audience,
-                raw.getLong(TAG_TIMESTAMP), reactions),
+                raw.getLong(TAG_TIMESTAMP), reactions, quoteReaders),
                 reactions.renamedOnRestore());
     }
 

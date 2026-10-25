@@ -66,9 +66,11 @@ public final class ChatSpeechBubbles {
         }
         ChatChannel channel = packet.getChannel();
         UUID speaker = packet.getSenderId();
-        // The Narrator tells; nothing is said over a head.
+        // The Narrator tells; nothing is said over a head, nor over an
+        // unseen voice's, which nobody sees.
         if (speaker == null || !ChatRolePresentation.isInCharacter(channel)
                 || packet.isNarrator() || packet.isNotInWorld()
+                || packet.isUnseen()
                 || !ClientChatChannelState.isAvailable(LostTalesChatPresentation.fileUnder(packet))) {
             return;
         }

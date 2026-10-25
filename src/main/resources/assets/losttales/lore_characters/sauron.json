@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:sauron",
   "name": "Sauron",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:uruk",
-    "genderId": "losttales:non_binary",
-    "modelId": "lotr:uruk",
-    "skinId": "losttales:black_uruk_2"
-  }
+  "race": "losttales:uruk",
+  "body_type": "losttales:neutral",
+  "skin": "losttales:black_uruk_2",
+  "faction": "lotr:mordor"
 }

@@ -189,8 +189,9 @@ public final class ChatHistoryTest {
                 Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
         String excerpt = ChatHistory.quoteFor(
                 id, ChatHistoryRequesters.reader(ALICE), ChatChannel.GLOBAL, "").getExcerpt();
-        assertTrue(excerpt.length() < ChatReplyReference.MAX_EXCERPT_CHARACTERS + 5);
-        assertTrue(excerpt.endsWith("..."));
+        // Its first letters, with no mark: a game fades it out (CHAT-86).
+        assertEquals(long_.substring(0, ChatReplyReference.MAX_EXCERPT_CHARACTERS),
+                excerpt);
     }
 
     @Test

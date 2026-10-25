@@ -1,0 +1,22 @@
+{
+  "id": "losttales:blue_dwarven",
+  "helmet": [
+    "lotr:item.helmetBlueDwarven"
+  ],
+  "chestplate": [
+    "lotr:item.bodyBlueDwarven"
+  ],
+  "leggings": [
+    "lotr:item.legsBlueDwarven"
+  ],
+  "boots": [
+    "lotr:item.bootsBlueDwarven"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:smithing"
+    }
+  ]
+}

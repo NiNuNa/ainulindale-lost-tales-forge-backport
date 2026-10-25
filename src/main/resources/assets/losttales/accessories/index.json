@@ -1,0 +1,10 @@
+{
+  "accessories": [
+    "accessories/the_one_ring.json",
+    "accessories/gold_ring.json",
+    "accessories/silver_ring.json",
+    "accessories/mithril_ring.json",
+    "accessories/hobbit_ring.json",
+    "accessories/dwarven_ring.json"
+  ]
+}

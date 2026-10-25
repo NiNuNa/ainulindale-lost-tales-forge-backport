@@ -1,7 +1,7 @@
 {
   "id": "losttales:husbandry",
   "icon": "minecraft:wheat",
-  "order": 9,
+  "order": 10,
   "counts": [
     {
       "act": "harvest",

@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.switching;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.state.CharacterPlayerStateAccount;
 import com.ninuna.losttales.character.state.CharacterPlayerStateRecord;
@@ -294,8 +294,8 @@ public final class CharacterSwitchSourceRestoreTest {
                 .slot(slot)
                 .name("Restore " + slot)
                 .race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
-                .skin("losttales:human_bree_male_0")
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
+                .skin("losttales:human_bree_masculine_0")
                 .build();
     }
 

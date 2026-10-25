@@ -1,0 +1,21 @@
+{
+  "id": "losttales:mordor",
+  "helmet": [
+    "lotr:item.helmetOrc"
+  ],
+  "chestplate": [
+    "lotr:item.bodyOrc"
+  ],
+  "leggings": [
+    "lotr:item.legsOrc"
+  ],
+  "boots": [
+    "lotr:item.bootsOrc"
+  ],
+  "bonus": [
+    {
+      "effect": "fire",
+      "amount": 0.2
+    }
+  ]
+}

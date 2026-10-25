@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:snotgash",
   "name": "Snotgash",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:orc",
-    "genderId": "losttales:non_binary",
-    "modelId": "lotr:orc",
-    "skinId": "losttales:orc_0"
-  }
+  "race": "losttales:orc",
+  "body_type": "losttales:neutral",
+  "skin": "losttales:orc_0",
+  "faction": "lotr:mordor"
 }

@@ -7,6 +7,7 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData;
+import com.ninuna.losttales.mapmarker.LostTalesWaystonePlacers;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneVisits;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
@@ -113,7 +114,8 @@ public final class LostTalesLotrWaystoneTravelAdapter {
                     LostTalesMapMarkerNames.component(
                             resolved.destination.getId(),
                             resolved.destination.getName(),
-                            resolved.destination.getNamedAfter()));
+                            LostTalesWaystonePlacers.shown(player.worldObj,
+                                    resolved.destination.getNamedAfter())));
             return;
         }
         if (!lotrData.canFastTravel()) {
@@ -366,7 +368,7 @@ public final class LostTalesLotrWaystoneTravelAdapter {
         int markerZ = MathHelper.floor_double(destination.getZ());
         if (!destination.isLinked()) {
             return createWaypointAt(
-                    destination, travelId,
+                    world, destination, travelId,
                     markerX, markerY, markerZ);
         }
 
@@ -377,7 +379,7 @@ public final class LostTalesLotrWaystoneTravelAdapter {
                 destination.getWaystoneStructureType());
         if (arrival != null) {
             LOTRCustomWaypoint outsideHouse = createWaypointAt(
-                    destination, travelId,
+                    world, destination, travelId,
                     destination.getLinkedX() + arrival[0],
                     destination.getLinkedY() + arrival[1],
                     destination.getLinkedZ() + arrival[2]);
@@ -388,7 +390,7 @@ public final class LostTalesLotrWaystoneTravelAdapter {
         }
         for (int[] offset : ADJACENT_OFFSETS) {
             LOTRCustomWaypoint adjacent = createWaypointAt(
-                    destination, travelId,
+                    world, destination, travelId,
                     destination.getLinkedX() + offset[0],
                     destination.getLinkedY(),
                     destination.getLinkedZ() + offset[1]);
@@ -401,14 +403,16 @@ public final class LostTalesLotrWaystoneTravelAdapter {
     }
 
     private static LOTRCustomWaypoint createWaypointAt(
-            LostTalesMapMarkerRecord destination, int travelId,
-            int x, int y, int z) {
+            World world, LostTalesMapMarkerRecord destination,
+            int travelId, int x, int y, int z) {
         // LOTR keeps a waypoint's name as one string, so an unnamed
-        // waystone's is the server's words for what it is called after.
+        // waystone's is the server's words for what it is called after:
+        // its placing character by the name it has now (WAY-01).
         String name = destination.getName().length() > 0
                 ? destination.getName()
                 : LostTalesMapMarkerNamedAfter.shownName(
-                        destination.getNamedAfter());
+                        LostTalesWaystonePlacers.shown(world,
+                                destination.getNamedAfter()));
         return new LOTRCustomWaypoint(
                 name.length() > 0 ? name : destination.getId(),
                 LostTalesMapCoordinateHelper.worldToMapImageX(

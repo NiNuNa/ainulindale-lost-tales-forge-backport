@@ -17,7 +17,8 @@ import java.util.UUID;
  * for one that starts either way the server allows; a letter, for a
  * missive. A quest a giver offers in conversation starts only by that
  * conversation, a card or a command: a touch offers it, and an item is
- * refused.</p>
+ * refused. A repeatable quest done waits its {@code repeatAfter} before
+ * any way takes it again, a command's too (QUEST-45).</p>
  */
 public final class QuestStartRules {
 
@@ -39,18 +40,22 @@ public final class QuestStartRules {
         OFFER,
         ALREADY_ACTIVE,
         ALREADY_COMPLETED,
-        NOT_RESTARTABLE
+        NOT_RESTARTABLE,
+        /** A repeatable quest done, its wait before it comes back not past (QUEST-45). */
+        TOO_SOON
     }
 
     /**
      * Judges a start of {@code quest} for the player whose log is
      * {@code data}, by {@code way}, with or without its proof, under the
-     * server's item and interaction start settings.
+     * server's item and interaction start settings, at world time
+     * {@code now}.
      */
     public static Verdict judge(LostTalesQuestDefinition quest,
                                 LostTalesQuestPlayerData data,
                                 QuestStartProof.Way way, boolean proven,
-                                boolean itemStarts, boolean interactionStarts) {
+                                boolean itemStarts, boolean interactionStarts,
+                                long now) {
         if (quest == null || way == null) {
             return Verdict.UNKNOWN_QUEST;
         }
@@ -78,6 +83,9 @@ public final class QuestStartRules {
         if (!quest.mayTakeAgain(history)) {
             return history != null && history.isCompleted()
                     ? Verdict.ALREADY_COMPLETED : Verdict.NOT_RESTARTABLE;
+        }
+        if (!quest.mayTakeAgain(history, now)) {
+            return Verdict.TOO_SOON;
         }
         return Verdict.ADMIT;
     }

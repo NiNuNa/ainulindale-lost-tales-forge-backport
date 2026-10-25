@@ -10,9 +10,12 @@ import com.ninuna.losttales.client.chat.ChatFeedPlacement;
 import com.ninuna.losttales.client.chat.ChatLayout;
 import com.ninuna.losttales.client.quest.ClientQuestNews;
 import com.ninuna.losttales.client.window.PinnedWindows;
+import com.ninuna.losttales.client.window.Stage;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.ClientServerConfigCache;
 import com.ninuna.losttales.client.accessory.ClientAccessoryEffectCache;
+import com.ninuna.losttales.client.accessory.ConcealedShade;
+import com.ninuna.losttales.client.accessory.ConcealmentView;
 import com.ninuna.losttales.client.accessory.WraithWorldVisualEffect;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
@@ -31,7 +34,7 @@ import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache
 import com.ninuna.losttales.client.character.ClientCharacterProfileCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
-import com.ninuna.losttales.gui.screen.character.FirstCharacterCreator;
+import com.ninuna.losttales.gui.screen.character.FirstVisit;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.window.WindowSession;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
@@ -47,12 +50,11 @@ import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.client.chat.ClientChatShowcaseStore;
 import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
-import com.ninuna.losttales.client.character.CreatorCharacterLight;
+import com.ninuna.losttales.client.camera.StageLight;
 import com.ninuna.losttales.client.gui.LostTalesGuiInventory;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.gui.LostTalesHudFade;
-import com.ninuna.losttales.client.gui.LostTalesHudHidingScreen;
 import com.ninuna.losttales.client.gui.LostTalesPlayerListOverlay;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
@@ -202,13 +204,15 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();
         ClientCharacterRosterCache.clear();
-        FirstCharacterCreator.clear();
+        FirstVisit.clear();
         // A roster sync still queued from this world must not be applied
         // in the next, whose revisions are its own.
         CharacterClientTaskQueue.clear();
         LostTalesCharacterFigureRenderer.clear();
         ClientCharacterAppearanceCache.clear();
         ClientCharacterProfileCache.clear();
+        com.ninuna.losttales.client.character.ClientCharacterGearCache.clear();
+        com.ninuna.losttales.client.character.CharacterGearPreview.clear();
         PlayerAppearanceResolver.clear();
         LostTalesAccountSkins.clear();
         LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
@@ -252,6 +256,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // themselves persist like every other preference.
         ClientChatIgnores.clearSessionNames();
         ClientAccessoryEffectCache.clear();
+        ConcealedShade.reset();
         LostTalesHudFade.reset();
         ChatFeedPlacement.reset();
         WraithWorldVisualEffect.reset();
@@ -260,6 +265,10 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // The bundled races and capes again, until the next server sends its own.
         com.ninuna.losttales.character.registry.CharacterRaceRegistry.resetToBundled();
         com.ninuna.losttales.character.cape.CharacterCapeCatalog.resetToBundled();
+        // And the bundled accessories (ACC-01).
+        com.ninuna.losttales.accessory.Accessories.resetClient();
+        // And the bundled armour weights and named sets (CONTENT-06, CONTENT-07).
+        com.ninuna.losttales.armour.Armour.resetClient();
         ThirdPersonCameraRuntime.resetSession();
     }
 
@@ -478,26 +487,65 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void applyThirdPersonHeadPitch(RenderPlayerEvent.Pre event) {
         ThirdPersonHeadRenderHook.onPre(event);
-        CreatorCharacterLight.onRenderPlayerPre(event);
+        StageLight.onRenderPlayerPre(event);
     }
 
+    /** A concealed player is drawn for nobody but the wearer, who sees a faint shade (ACC-02). */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void hideConcealedPlayer(RenderPlayerEvent.Pre event) {
         if (event != null && event.entityPlayer != null
-                && ClientAccessoryEffectCache.isConcealed(
-                event.entityPlayer)) {
+                && ConcealedShade.viewOf(event.entityPlayer) == ConcealmentView.HIDDEN) {
             event.setCanceled(true);
+        }
+    }
+
+    /** The wearer's shade starts as their body is drawn, once nothing has cancelled it. */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void beginConcealedShade(RenderLivingEvent.Pre event) {
+        if (event != null && event.entity instanceof net.minecraft.entity.player.EntityPlayer
+                && ConcealedShade.viewOf((net.minecraft.entity.player.EntityPlayer) event.entity)
+                == ConcealmentView.SHADE) {
+            ConcealedShade.begin(event.entity);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void shadeConcealedArmour(RenderPlayerEvent.SetArmorModel event) {
+        if (event != null && ConcealedShade.isDrawing(event.entityPlayer)) {
+            ConcealedShade.layOn();
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void shadeConcealedItems(RenderPlayerEvent.Specials.Pre event) {
+        if (event != null && ConcealedShade.isDrawing(event.entityPlayer)) {
+            ConcealedShade.layOn();
+        }
+    }
+
+    /** The shade ends before anything is drawn over the head, and at the latest as the body's draw ends. */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void endConcealedShadeBeforeSpecials(RenderLivingEvent.Specials.Pre event) {
+        if (event != null && ConcealedShade.isDrawing(event.entity)) {
+            ConcealedShade.end();
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void endConcealedShade(RenderLivingEvent.Post event) {
+        if (event != null && ConcealedShade.isDrawing(event.entity)) {
+            ConcealedShade.end();
         }
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void restoreThirdPersonHeadPitch(RenderPlayerEvent.Post event) {
-        CreatorCharacterLight.onRenderPlayerPost(event);
+        StageLight.onRenderPlayerPost(event);
         ThirdPersonHeadRenderHook.onPost(event);
     }
 
     /**
-     * A screen that asks for the bare world gets it: every element of the
+     * A stage gets the bare world ({@link Stage}): every element of the
      * game's overlay is cancelled one by one, and this mod's own panels
      * below step aside too.
      *
@@ -515,8 +563,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     private static boolean isHudHidden() {
-        return Minecraft.getMinecraft().currentScreen
-                instanceof LostTalesHudHidingScreen;
+        return Stage.isShown();
     }
 
     /**

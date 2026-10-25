@@ -1,7 +1,7 @@
 {
   "id": "losttales:smithing",
   "icon": "minecraft:anvil",
-  "order": 7,
+  "order": 8,
   "counts": [
     {
       "act": "smelt",

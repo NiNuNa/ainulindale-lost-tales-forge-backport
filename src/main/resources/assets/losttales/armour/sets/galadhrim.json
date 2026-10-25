@@ -1,0 +1,24 @@
+{
+  "id": "losttales:galadhrim",
+  "helmet": [
+    "lotr:item.helmetElven",
+    "losttales:galadhrim_helmet_light",
+    "losttales:galadhrim_helmet_light_hood"
+  ],
+  "chestplate": [
+    "lotr:item.bodyElven"
+  ],
+  "leggings": [
+    "lotr:item.legsElven"
+  ],
+  "boots": [
+    "lotr:item.bootsElven"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:archery"
+    }
+  ]
+}

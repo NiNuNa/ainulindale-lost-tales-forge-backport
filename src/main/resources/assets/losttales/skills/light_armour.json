@@ -1,0 +1,67 @@
+{
+  "id": "losttales:light_armour",
+  "icon": "minecraft:chainmail_chestplate",
+  "order": 5,
+  "weight": "light",
+  "counts": [
+    {
+      "act": "armour",
+      "per": 1.0
+    }
+  ],
+  "perks": [
+    {
+      "id": "agile_defender",
+      "levels": [10, 30, 50],
+      "effect": "weight_protection",
+      "amount": 0.05
+    },
+    {
+      "id": "soft_step",
+      "levels": [20],
+      "effect": "soft_step",
+      "amount": 0.5,
+      "params": {
+        "volume": 0.5
+      }
+    },
+    {
+      "id": "custom_fit",
+      "levels": [30],
+      "effect": "protection",
+      "amount": 0.1
+    },
+    {
+      "id": "unhindered",
+      "levels": [40],
+      "effect": "speed",
+      "amount": 0.05
+    },
+    {
+      "id": "matching_set",
+      "levels": [50],
+      "effect": "matching_set",
+      "amount": 0.1
+    },
+    {
+      "id": "wind_walker",
+      "levels": [60],
+      "effect": "sprint_hunger",
+      "amount": 0.25
+    },
+    {
+      "id": "deft_movement",
+      "levels": [80],
+      "effect": "melee_evade",
+      "amount": 0.1,
+      "needs": "custom_fit"
+    },
+    {
+      "id": "elusive",
+      "levels": [100],
+      "effect": "missile_evade",
+      "amount": 0.15,
+      "needs": "deft_movement"
+    }
+  ]
+}

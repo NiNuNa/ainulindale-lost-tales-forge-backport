@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiBracketPanel;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -86,21 +86,21 @@ final class LostTalesMapChoicePrompt {
     static void renderPanelContents(
             FontRenderer font, Layout layout,
             String title, String subtitle) {
-        LostTalesSkyrimUiStyle.drawPanel(
+        LostTalesUiBracketPanel.draw(
                 layout.x, layout.y, layout.width, layout.height);
         int contentWidth = Math.max(0,
                 layout.width - CONTENT_PADDING * 2);
         drawCentered(font, layout, title, layout.y + TITLE_TOP,
-                contentWidth, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
+                contentWidth, LostTalesColors.TEXT_BRIGHT);
         if (subtitle != null && subtitle.length() > 0) {
             drawCentered(font, layout, subtitle, layout.y + SUBTITLE_TOP,
-                    contentWidth, LostTalesSkyrimUiStyle.TEXT_MUTED);
+                    contentWidth, LostTalesColors.TEXT_MUTED);
         }
         Gui.drawRect(
                 layout.x + CONTENT_PADDING, layout.y + DIVIDER_TOP,
                 layout.x + layout.width - CONTENT_PADDING,
                 layout.y + DIVIDER_TOP + 1,
-                LostTalesSkyrimUiStyle.BORDER_DIM);
+                LostTalesColors.BORDER_DIM);
     }
 
     /**
@@ -148,19 +148,19 @@ final class LostTalesMapChoicePrompt {
             Gui.drawRect(bounds.x, bounds.y,
                     bounds.x + bounds.width,
                     bounds.y + bounds.height,
-                    LostTalesSkyrimUiStyle.PANEL_HOVER);
+                    LostTalesColors.PANEL_HOVER);
             Gui.drawRect(bounds.x, bounds.y,
                     bounds.x + bounds.width, bounds.y + 1,
-                    LostTalesSkyrimUiStyle.BORDER);
+                    LostTalesColors.BORDER);
         }
         int room = Math.max(0, bounds.width - 6);
         int shown = (int)LostTalesUiCutName.shownWidth(
                 font.getStringWidth(label), room);
         int color = enabled
                 ? hovered
-                        ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                        : LostTalesSkyrimUiStyle.TEXT
-                : LostTalesSkyrimUiStyle.TEXT_DIM;
+                        ? LostTalesColors.TEXT_BRIGHT
+                        : LostTalesColors.TEXT
+                : LostTalesColors.TEXT_DIM;
         // A label too long for its button fades into the button's end and
         // slides along under the pointer (LOOK-37).
         LostTalesUiCutName.drawShadowed(font, label,
@@ -229,8 +229,8 @@ final class LostTalesMapChoicePrompt {
             return;
         }
         int color = hovered
-                ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                : LostTalesSkyrimUiStyle.TEXT_MUTED;
+                ? LostTalesColors.TEXT_BRIGHT
+                : LostTalesColors.TEXT_MUTED;
         int rows = Math.max(1, bounds.height / 2);
         int centerY = bounds.y + bounds.height / 2;
         int tipX = pointLeft ? bounds.x + 2 : bounds.x + bounds.width - 3;

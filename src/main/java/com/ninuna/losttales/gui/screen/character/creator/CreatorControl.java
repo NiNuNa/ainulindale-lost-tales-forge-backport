@@ -1,26 +1,18 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
 /**
- * One row of the creator's column, or of a window's form: a stepper, a
- * slider, a field, a grid.
+ * One row of a window's form, or a few rows standing together: a
+ * stepper, a slider, a field, a grid. It is drawn from the shapes in
+ * {@link CreatorRows}.
  *
- * <p>A control is placed by the column every frame — the column scrolls,
+ * <p>A control is placed by the form every frame — the form scrolls,
  * so where a control is drawn is not where it was last frame — and asked
  * for its height so the next one can be stacked under it. Input reaches a
  * control only when the pointer is on it, or, for keys, when it holds the
  * focus. Everything a control answers with is a boolean saying whether it
  * took the input, so the screen can fall through to its own handling.</p>
- *
- * <p>Its context says how it stands: boxed in the creator's column, a
- * label over its value, or as a window's row ({@link CreatorRows}). It
- * lays itself out, draws and answers the pointer in that one way.</p>
  */
 public abstract class CreatorControl {
-
-    /** The row's usual height; controls that need more say so. */
-    protected static final int ROW_HEIGHT = 26;
-    /** Between a row's label and its value. */
-    protected static final int LABEL_HEIGHT = 10;
 
     protected final CreatorContext context;
     protected int x;
@@ -86,6 +78,14 @@ public abstract class CreatorControl {
         return this.focused;
     }
 
+    /**
+     * Whether the control keeps every key while it holds the focus, as a
+     * field being typed in does: the page's own keys wait.
+     */
+    public boolean holdsKeys() {
+        return false;
+    }
+
     public void setFocused(boolean focused) {
         this.focused = focused && canFocus();
     }
@@ -95,26 +95,13 @@ public abstract class CreatorControl {
 
     /** Whether that point is on the row. */
     public boolean contains(int mouseX, int mouseY) {
-        return CreatorWidgets.within(mouseX, mouseY, this.x, this.y,
-                this.width, height());
+        return within(mouseX, mouseY, this.x, this.y, this.width, height());
     }
 
-    /** Whether the control stands as a window's row rather than boxed in the creator's column. */
-    protected final boolean inRows() {
-        return this.context.inRows();
-    }
-
-    /** Where a row's value sits, under its label. */
-    protected final int valueTop() {
-        return this.y + LABEL_HEIGHT;
-    }
-
-    /**
-     * The row's label, in the top-left corner every labelled row shares,
-     * fading into the row's end where it is too long for it (LOOK-37).
-     */
-    protected final void drawLabel(String label) {
-        CreatorWidgets.drawLabel(this.context.getFont(), label, this.x, this.y,
-                this.width);
+    /** Whether that point is in the box from {@code x}, {@code y}, {@code width} wide and {@code height} high. */
+    protected static boolean within(int mouseX, int mouseY, int x, int y,
+                                    int width, int height) {
+        return mouseX >= x && mouseX < x + width
+                && mouseY >= y && mouseY < y + height;
     }
 }

@@ -2,10 +2,11 @@ package com.ninuna.losttales.client.window;
 
 /**
  * What the window system lets go of as the player leaves a world: the
- * pages that stood for things in it, every page's content, the screen's
- * entrance, the marked tabs, the search, the pages filling their
- * windows but those held there, the sub-windows open as the screen last
- * closed, the view, and what the pinned windows were showing. The layout
+ * pages only the game opens, every page's content, the screen's
+ * entrance, the marked tabs, every copy's search words, the pages
+ * filling their windows but those held there, the sub-windows open as the
+ * screen last closed, the view, and what the pinned windows were showing.
+ * The layout
  * itself is the account's and stays, the views with it.
  */
 public final class WindowSession {
@@ -13,13 +14,13 @@ public final class WindowSession {
 
     /** Called once the player has left the world, on the client thread. */
     public static void clear() {
-        // A page that stands for a thing in this world (a waystone) goes
-        // before every page lets its content go.
-        WindowPages.closeWorldPages();
+        // A page only the game opens (a waystone's, the Character Editor)
+        // goes before every page lets its content go.
+        WindowPages.closeGamePages();
         WindowPages.forgetContents();
         WindowOpening.clear();
         TabSelection.clear();
-        WindowSearch.close();
+        WindowSearch.forgetAll();
         ContentView.leaveAll();
         SubWindowPlaces.forgetOpen();
         WindowView.clear();

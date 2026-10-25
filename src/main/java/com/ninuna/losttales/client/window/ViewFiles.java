@@ -52,9 +52,9 @@ public final class ViewFiles {
         }
 
         @Override
-        public boolean opensFromWorld(String id) {
+        public boolean opensByGame(String id) {
             WindowPages.Page page = WindowPages.byId(id);
-            return page != null && page.opensFromWorld();
+            return page != null && page.opensByGame();
         }
 
         @Override
@@ -71,7 +71,7 @@ public final class ViewFiles {
         }
 
         @Override
-        public boolean opensFromWorld(String id) {
+        public boolean opensByGame(String id) {
             return false;
         }
 

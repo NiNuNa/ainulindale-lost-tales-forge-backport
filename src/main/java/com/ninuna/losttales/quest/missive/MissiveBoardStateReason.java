@@ -40,7 +40,9 @@ public enum MissiveBoardStateReason {
     /** The player's finished missives were handed in at the board (QUEST-31). */
     HANDED_IN(18, "gui.losttales.missive_board.said.handed_in", false),
     /** None of the player's missives waits for a board. */
-    NOTHING_TO_HAND_IN(19, "chat.losttales.missive.nothing_to_hand_in", true);
+    NOTHING_TO_HAND_IN(19, "chat.losttales.missive.nothing_to_hand_in", true),
+    /** The world's record of missives taken cannot be read, so no letter goes up (QUEST-34). */
+    CANNOT_PIN(20, "chat.losttales.missive.cannot_pin", true);
 
     private final int networkId;
     private final String messageKey;

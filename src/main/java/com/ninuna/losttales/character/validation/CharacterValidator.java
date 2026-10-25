@@ -3,11 +3,11 @@ package com.ninuna.losttales.character.validation;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterFactionResolver;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
@@ -29,7 +29,7 @@ import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
 /**
  * Every check a character is held to, on the server and in the creator
  * alike: the player's state, the roster's revision and slots, the name,
- * race, sex, look, profile, age, faction and starting waypoint. Each
+ * race, body type, look, profile, age, faction and starting waypoint. Each
  * refusal is a {@link CharacterErrorId}. The server checks a name against
  * the other rosters and the accounts it has seen as well
  * ({@code CharacterService}).
@@ -84,8 +84,8 @@ public final class CharacterValidator {
     public static CharacterAppearanceValidationResult validateAppearance(
             CharacterRoster roster, UUID exceptCharacterId,
             String requestedName, String requestedRaceId,
-            String requestedGenderId, String requestedSkinId,
-            String requestedBodyTypeId, String requestedChestTypeId,
+            String requestedBodyTypeId, String requestedSkinId,
+            String requestedArmsId, String requestedChestTypeId,
             String requestedHistory, int requestedAge) {
         if (roster == null) {
             return CharacterAppearanceValidationResult.failure(
@@ -147,21 +147,21 @@ public final class CharacterValidator {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_RACE);
         }
-        String genderId = LostTalesIdentifiers.normalize(requestedGenderId);
-        if (!isValidIdentifierLength(genderId)
-                || !CharacterGenderRegistry.contains(genderId)
-                || !race.isGenderAllowed(genderId)) {
+        String bodyTypeId = LostTalesIdentifiers.normalize(requestedBodyTypeId);
+        if (!isValidIdentifierLength(bodyTypeId)
+                || !CharacterBodyTypeRegistry.contains(bodyTypeId)
+                || !race.isBodyTypeAllowed(bodyTypeId)) {
             return CharacterAppearanceValidationResult.failure(
-                    CharacterErrorId.INVALID_GENDER);
+                    CharacterErrorId.INVALID_BODY_TYPE);
         }
 
-        Look look = look(race.getId(), genderId, requestedSkinId,
-                requestedBodyTypeId, requestedChestTypeId);
+        Look look = look(race.getId(), bodyTypeId, requestedSkinId,
+                requestedArmsId, requestedChestTypeId);
         if (look.errorId != CharacterErrorId.NONE) {
             return CharacterAppearanceValidationResult.failure(look.errorId);
         }
         String skinId = look.skinId;
-        String bodyTypeId = look.bodyTypeId;
+        String armsId = look.armsId;
         String chestTypeId = look.chestTypeId;
 
         // Whoever makes a character writes its History; the rest of the
@@ -178,51 +178,51 @@ public final class CharacterValidator {
 
         return CharacterAppearanceValidationResult.success(
                 new ValidatedCharacterAppearance(normalizedName,
-                        race.getId(), genderId, skinId, bodyTypeId, chestTypeId,
+                        race.getId(), bodyTypeId, skinId, armsId, chestTypeId,
                         history, requestedAge));
     }
 
     /**
-     * A new look for a character that stays who it is: its skin, arm width
+     * A new look for a character that stays who it is: its skin, arms
      * and chest, held to the same checks as the creator's — a skin the
-     * character's race and sex may wear, the account skin among them where
-     * the race allows it, and an arm width and chest the registries know.
-     * An empty arm width or chest takes the sex's own. Name, race, sex,
+     * character's race and body type may wear, the account skin among them where
+     * the race allows it, and arms and a chest the registries know.
+     * Empty arms or an empty chest take the body type's own. Name, race, body type,
      * History and age are the character's as they stand.
      */
     public static CharacterAppearanceValidationResult validateLook(
             RoleplayCharacter character, String requestedSkinId,
-            String requestedBodyTypeId, String requestedChestTypeId) {
+            String requestedArmsId, String requestedChestTypeId) {
         if (character == null) {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.CHARACTER_NOT_FOUND);
         }
-        Look look = look(character.getRaceId(), character.getGenderId(),
-                requestedSkinId, requestedBodyTypeId, requestedChestTypeId);
+        Look look = look(character.getRaceId(), character.getBodyTypeId(),
+                requestedSkinId, requestedArmsId, requestedChestTypeId);
         if (look.errorId != CharacterErrorId.NONE) {
             return CharacterAppearanceValidationResult.failure(look.errorId);
         }
         return CharacterAppearanceValidationResult.success(
                 new ValidatedCharacterAppearance(character.getName(),
-                        character.getRaceId(), character.getGenderId(),
-                        look.skinId, look.bodyTypeId, look.chestTypeId,
+                        character.getRaceId(), character.getBodyTypeId(),
+                        look.skinId, look.armsId, look.chestTypeId,
                         character.getProfile().section(
                                 CharacterProfile.Section.HISTORY),
                         character.getAge()));
     }
 
-    /** A skin, an arm width and a chest as checked, or why they are refused. */
+    /** A skin, arms and a chest as checked, or why they are refused. */
     private static final class Look {
         final CharacterErrorId errorId;
         final String skinId;
-        final String bodyTypeId;
+        final String armsId;
         final String chestTypeId;
 
-        Look(CharacterErrorId errorId, String skinId, String bodyTypeId,
+        Look(CharacterErrorId errorId, String skinId, String armsId,
              String chestTypeId) {
             this.errorId = errorId;
             this.skinId = skinId;
-            this.bodyTypeId = bodyTypeId;
+            this.armsId = armsId;
             this.chestTypeId = chestTypeId;
         }
 
@@ -232,36 +232,36 @@ public final class CharacterValidator {
     }
 
     /**
-     * The look a race and sex may wear: the skin one they are compatible
-     * with, the arm width and the chest each a registry's or, empty, the
-     * sex's own.
+     * The look a race and body type may wear: the skin one they are compatible
+     * with, the arms and the chest each a registry's or, empty, the
+     * body type's own.
      */
-    private static Look look(String raceId, String genderId,
+    private static Look look(String raceId, String bodyTypeId,
                              String requestedSkinId,
-                             String requestedBodyTypeId,
+                             String requestedArmsId,
                              String requestedChestTypeId) {
         String skinId = LostTalesIdentifiers.normalize(requestedSkinId);
         if (!isValidIdentifierLength(skinId)
-                || !CharacterSkinRegistry.isCompatible(skinId, raceId, genderId)) {
+                || !CharacterSkinRegistry.isCompatible(skinId, raceId, bodyTypeId)) {
             return Look.refused(CharacterErrorId.INVALID_SKIN);
         }
-        String bodyTypeId = LostTalesIdentifiers.normalize(
-                requestedBodyTypeId);
-        if (bodyTypeId.length() == 0) {
-            bodyTypeId = CharacterBodyTypeRegistry.defaultFor(genderId);
-        } else if (!isValidIdentifierLength(bodyTypeId)
-                || !CharacterBodyTypeRegistry.contains(bodyTypeId)) {
-            return Look.refused(CharacterErrorId.INVALID_BODY_TYPE);
+        String armsId = LostTalesIdentifiers.normalize(
+                requestedArmsId);
+        if (armsId.length() == 0) {
+            armsId = CharacterArmsRegistry.defaultFor(bodyTypeId);
+        } else if (!isValidIdentifierLength(armsId)
+                || !CharacterArmsRegistry.contains(armsId)) {
+            return Look.refused(CharacterErrorId.INVALID_ARMS);
         }
         String chestTypeId = LostTalesIdentifiers.normalize(
                 requestedChestTypeId);
         if (chestTypeId.length() == 0) {
-            chestTypeId = CharacterChestTypeRegistry.defaultFor(genderId);
+            chestTypeId = CharacterChestTypeRegistry.defaultFor(bodyTypeId);
         } else if (!isValidIdentifierLength(chestTypeId)
                 || !CharacterChestTypeRegistry.contains(chestTypeId)) {
             return Look.refused(CharacterErrorId.INVALID_CHEST_TYPE);
         }
-        return new Look(CharacterErrorId.NONE, skinId, bodyTypeId, chestTypeId);
+        return new Look(CharacterErrorId.NONE, skinId, armsId, chestTypeId);
     }
 
     public static CharacterCreationValidationResult validateCreation(
@@ -293,16 +293,16 @@ public final class CharacterValidator {
 
         CharacterAppearanceValidationResult appearance = validateAppearance(
                 roster, null, request.getName(), request.getRaceId(),
-                request.getGenderId(), request.getSkinId(),
-                request.getBodyTypeId(), request.getChestTypeId(),
+                request.getBodyTypeId(), request.getSkinId(),
+                request.getArmsId(), request.getChestTypeId(),
                 request.getHistory(), request.getAge());
         if (!appearance.isValid()) {
             return CharacterCreationValidationResult.failure(appearance.getErrorId());
         }
         String normalizedName = appearance.getAppearance().getName();
-        String genderId = appearance.getAppearance().getGenderId();
-        String skinId = appearance.getAppearance().getSkinId();
         String bodyTypeId = appearance.getAppearance().getBodyTypeId();
+        String skinId = appearance.getAppearance().getSkinId();
+        String armsId = appearance.getAppearance().getArmsId();
         String chestTypeId = appearance.getAppearance().getChestTypeId();
         String history = appearance.getAppearance().getHistory();
         int age = appearance.getAppearance().getAge();
@@ -350,14 +350,14 @@ public final class CharacterValidator {
                 slotIndex,
                 normalizedName,
                 race.getId(),
-                genderId,
+                bodyTypeId,
                 skinId,
                 age,
                 faction.getId(),
                 waypointId,
                 unconventional,
                 history,
-                bodyTypeId,
+                armsId,
                 chestTypeId
         ));
     }

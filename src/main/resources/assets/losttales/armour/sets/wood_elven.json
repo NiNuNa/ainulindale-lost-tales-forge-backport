@@ -1,0 +1,21 @@
+{
+  "id": "losttales:wood_elven",
+  "helmet": [
+    "lotr:item.helmetWoodElven"
+  ],
+  "chestplate": [
+    "lotr:item.bodyWoodElven"
+  ],
+  "leggings": [
+    "lotr:item.legsWoodElven"
+  ],
+  "boots": [
+    "lotr:item.bootsWoodElven"
+  ],
+  "bonus": [
+    {
+      "effect": "poison",
+      "amount": 0.2
+    }
+  ]
+}

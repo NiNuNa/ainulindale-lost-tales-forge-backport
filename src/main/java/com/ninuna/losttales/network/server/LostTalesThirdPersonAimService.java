@@ -1,6 +1,6 @@
 package com.ninuna.losttales.network.server;
 
-import com.ninuna.losttales.gameplay.projectile.ThirdPersonProjectileItemPolicy;
+import com.ninuna.losttales.thirdperson.ThirdPersonProjectileItemPolicy;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;

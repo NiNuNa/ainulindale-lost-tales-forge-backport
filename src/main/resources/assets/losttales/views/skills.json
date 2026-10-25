@@ -1,0 +1,7 @@
+{
+  "view": "skills",
+  "locked": true,
+  "place": "middle",
+  "stage": false,
+  "pages": ["skills"]
+}

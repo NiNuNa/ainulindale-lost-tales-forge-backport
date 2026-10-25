@@ -1,7 +1,7 @@
 package com.ninuna.losttales.character.lore.transfer;
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.state.CharacterPlayerStateRecord;
@@ -113,10 +113,10 @@ public final class LoreCharacterTransferWorldDataTest {
     private static RoleplayCharacter character() {
         String skin = CharacterSkinRegistry.getCompatibleSkins(
                 CharacterRaceRegistry.HUMAN,
-                CharacterGenderRegistry.MALE).get(0).getId();
+                CharacterBodyTypeRegistry.MASCULINE).get(0).getId();
         return RoleplayCharacter.builder(CHARACTER, OWNER)
                 .name("Gandalf").race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE).skin(skin).age(18)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE).skin(skin).age(18)
                 .startingFaction("lotr:bree").createdAt(1L)
                 .profile(CharacterProfile.EMPTY.withSection(
                         CharacterProfile.Section.HISTORY, "A wandering wizard."))

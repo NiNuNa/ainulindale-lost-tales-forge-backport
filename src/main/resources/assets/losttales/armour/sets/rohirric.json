@@ -1,0 +1,22 @@
+{
+  "id": "losttales:rohirric",
+  "helmet": [
+    "lotr:item.helmetRohan"
+  ],
+  "chestplate": [
+    "lotr:item.bodyRohan"
+  ],
+  "leggings": [
+    "lotr:item.legsRohan"
+  ],
+  "boots": [
+    "lotr:item.bootsRohan"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:riding"
+    }
+  ]
+}

@@ -115,7 +115,7 @@ public final class AccessoryStateComponent implements CharacterStateComponent {
             ItemStack equipped = decode(
                     state.getCompoundTag(TAG_EQUIPPED), "equipped");
             if (equipped.stackSize != 1
-                    || !AccessoryCompatibilityRegistry.getInstance()
+                    || !AccessoryCompatibilityRegistry.server()
                     .isCompatible(AccessorySlotType.RING, equipped)) {
                 throw new CharacterStateValidationException(
                         "Accessory equipped entry is incompatible or overstacked");

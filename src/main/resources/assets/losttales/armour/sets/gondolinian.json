@@ -1,0 +1,22 @@
+{
+  "id": "losttales:gondolinian",
+  "helmet": [
+    "lotr:item.helmetGondolin"
+  ],
+  "chestplate": [
+    "lotr:item.bodyGondolin"
+  ],
+  "leggings": [
+    "lotr:item.legsGondolin"
+  ],
+  "boots": [
+    "lotr:item.bootsGondolin"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:blades"
+    }
+  ]
+}

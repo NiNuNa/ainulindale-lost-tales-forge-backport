@@ -260,8 +260,9 @@ public final class ServerSettingsPage extends PageContent {
 
     /**
      * What the server made of a Save, over the bar: why it turned all of
-     * it down, the first refusal and how many more, or saved and what it
-     * restarted. The changes applied are what the server holds now.
+     * it down, the first refusal and how many more, or saved, what it
+     * restarted and what waits for the next start (DATA-12). The changes
+     * saved are what the server holds now.
      */
     private void answer(ServerConfigApplyResult result) {
         List<ServerConfigChange> changes = this.sent;
@@ -284,11 +285,29 @@ public final class ServerSettingsPage extends PageContent {
                             Integer.valueOf(refused.size() - 1)));
         } else if (result.getApplied().isEmpty()) {
             sayDone(word("nothing_changed"));
-        } else if (result.getRestarted().isEmpty()) {
-            sayDone(word("saved"));
         } else {
-            sayDone(word("saved.restarted", result.restartedIn(LostTalesWords.LANG)));
+            String waiting = settingNames(result.getWaiting());
+            if (result.getRestarted().isEmpty()) {
+                sayDone(waiting.length() == 0 ? word("saved")
+                        : word("saved.next_start", waiting));
+            } else {
+                String restarted = result.restartedIn(LostTalesWords.LANG);
+                sayDone(waiting.length() == 0 ? word("saved.restarted", restarted)
+                        : word("saved.restarted.next_start", restarted, waiting));
+            }
         }
+    }
+
+    /** Settings' names from their {@code category.key}, joined by commas; empty for none. */
+    private static String settingNames(List<String> qualifiedNames) {
+        StringBuilder joined = new StringBuilder();
+        for (String name : qualifiedNames) {
+            if (joined.length() > 0) {
+                joined.append(", ");
+            }
+            joined.append(settingName(name));
+        }
+        return joined.toString();
     }
 
     /** A setting's name from its {@code category.key}, in the player's language. */

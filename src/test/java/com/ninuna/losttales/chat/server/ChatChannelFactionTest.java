@@ -1,7 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
@@ -40,7 +40,7 @@ public final class ChatChannelFactionTest {
         return RoleplayCharacter.builder(new UUID(1L, 2L), new UUID(3L, 4L))
                 .name("Aldric")
                 .race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
                 .skin(CharacterSkinRegistry.ACCOUNT_SKIN_ID)
                 .age(18)
                 .startingFaction(faction)

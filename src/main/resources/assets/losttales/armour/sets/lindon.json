@@ -1,0 +1,22 @@
+{
+  "id": "losttales:lindon",
+  "helmet": [
+    "lotr:item.helmetHighElven"
+  ],
+  "chestplate": [
+    "lotr:item.bodyHighElven"
+  ],
+  "leggings": [
+    "lotr:item.legsHighElven"
+  ],
+  "boots": [
+    "lotr:item.bootsHighElven"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:polearms"
+    }
+  ]
+}

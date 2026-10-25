@@ -1,9 +1,14 @@
 package com.ninuna.losttales.progression.count;
 
+import com.ninuna.losttales.armour.Armour;
+import com.ninuna.losttales.armour.ArmourWeight;
+import com.ninuna.losttales.armour.WornArmour;
 import com.ninuna.losttales.compat.lotr.LotrCountHooks;
+import com.ninuna.losttales.compat.lotr.LotrWaypointsNear;
 import com.ninuna.losttales.compat.lotr.LotrWeaponKinds;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.progression.ProgressionService;
+import com.ninuna.losttales.progression.deed.DeedFiles;
 import com.ninuna.losttales.progression.perk.PerkAnimalEvents;
 import com.ninuna.losttales.progression.perk.PerkWorkEvents;
 import com.ninuna.losttales.progression.skill.SkillAct;
@@ -19,7 +24,9 @@ import cpw.mods.fml.common.gameevent.PlayerEvent.ItemSmeltedEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockCocoa;
@@ -54,12 +61,13 @@ import net.minecraftforge.event.world.BlockEvent;
 
 /**
  * Turns what players do into skill experience (PROG-01, PROG-02): hits
- * and kills on a foe that fights back, blows armour and blocking took,
+ * and kills on a foe that fights back, blows a block and armour kept,
  * distance ridden, mounts and animals tamed and fed, items smelted and
  * crafted, anvil repairs, kegs filled, crops and herbs harvested, blocks
- * mined, young bred and regions opened. Players count toward the combat
- * skills only where the server says so. Registered on both buses; reads
- * only what other mods' entities, items and blocks show any game.
+ * mined, young bred, regions opened and LOTR waypoints first reached.
+ * Players count toward the combat skills only where the server says so.
+ * Registered on both buses; reads only what other mods' entities, items
+ * and blocks show any game.
  */
 public final class CountEvents {
     private static final int SAMPLE_TICKS = 20;
@@ -71,7 +79,8 @@ public final class CountEvents {
     private static final int NEWBORN_AGE = -24000;
     private static final double PARENT_REACH = 8.0D;
 
-    // Combat: hits and kills (Archery, Blades, Heavy Arms, Polearms) and blows taken (Defence).
+    // Combat: hits, kills and blocks (Archery, Blades, Heavy Arms, Polearms) and blows
+    // armour kept (Light Armour, Heavy Armour).
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onLivingHurt(LivingHurtEvent event) {
@@ -95,9 +104,18 @@ public final class CountEvents {
                 && isFoe((EntityPlayerMP) target, (EntityLivingBase) source.getEntity())) {
             EntityPlayerMP player = (EntityPlayerMP) target;
             Entity foe = source.getEntity();
-            SkillCounter.act(player, SkillAct.GUARD, Things.of(foe),
-                    guarded(player, event.ammount),
-                    SkillCounter.key(SkillAct.GUARD, foe.getUniqueID().toString()), true);
+            Thing thing = Things.of(foe);
+            String foeKey = foe.getUniqueID().toString();
+            double blocked = blocked(player, event.ammount);
+            if (blocked > 0.0D) {
+                ItemStack held = player.getHeldItem();
+                SkillCounter.weaponAct(player, SkillAct.BLOCK, thing, blocked,
+                        SkillCounter.key(SkillAct.BLOCK, foeKey), true,
+                        LotrWeaponKinds.kindOf(held), held);
+            }
+            WornArmour worn = Armour.worn(player);
+            SkillCounter.armourAct(player, thing, kept(worn, event.ammount - blocked,
+                    player.getTotalArmorValue()), SkillCounter.key(SkillAct.ARMOUR, foeKey));
         }
     }
 
@@ -121,9 +139,10 @@ public final class CountEvents {
     /**
      * Whether the target fights back: anything with an attack of its own
      * or hostile by nature, never the attacker's own tamed animal; another
-     * player only where the server counts players.
+     * player only where the server counts players. The combat skills and
+     * the kill deeds (PROG-11) both judge a foe by it.
      */
-    static boolean isFoe(EntityPlayerMP attacker, EntityLivingBase target) {
+    public static boolean isFoe(EntityPlayerMP attacker, EntityLivingBase target) {
         if (target instanceof EntityPlayer) {
             return LostTalesConfig.playersCountForCombat;
         }
@@ -152,14 +171,32 @@ public final class CountEvents {
         return new Weapon(LotrWeaponKinds.kindOf(held), held);
     }
 
-    /** What armour and blocking kept from a blow, as vanilla shares it out. */
-    static double guarded(EntityPlayerMP player, float amount) {
-        double blocked = 0.0D;
-        if (player.isBlocking() && amount > 1.0F) {
-            blocked = (amount - 1.0F) * 0.5D;
+    /** What a block kept from a blow, as vanilla halves it before the armour. */
+    static double blocked(EntityPlayerMP player, float amount) {
+        return player.isBlocking() && amount > 1.0F ? (amount - 1.0F) * 0.5D : 0.0D;
+    }
+
+    /**
+     * What armour of {@code armourPoints} keeps of what a block let
+     * through, shared between the weights by the armour points each
+     * weight's pieces give (PROG-17); a piece of neither weight keeps its
+     * share for no skill.
+     */
+    public static Map<ArmourWeight, Double> kept(WornArmour worn, double amount,
+                                                 int armourPoints) {
+        Map<ArmourWeight, Double> kept = new EnumMap<ArmourWeight, Double>(ArmourWeight.class);
+        int total = worn.totalPoints();
+        if (!(amount > 0.0D) || total <= 0 || armourPoints <= 0) {
+            return kept;
         }
-        double armour = Math.min(20, player.getTotalArmorValue()) / 25.0D;
-        return blocked + (amount - blocked) * armour;
+        double armour = amount * Math.min(20, armourPoints) / 25.0D;
+        for (ArmourWeight weight : new ArmourWeight[] { ArmourWeight.LIGHT, ArmourWeight.HEAVY }) {
+            int points = worn.points(weight);
+            if (points > 0) {
+                kept.put(weight, Double.valueOf(armour * points / total));
+            }
+        }
+        return kept;
     }
 
     /** A weapon by its kind and the item itself, either of which a file may name. */
@@ -408,7 +445,29 @@ public final class CountEvents {
         }
     }
 
-    /** A first find: {@code kind} is region, waypoint or marker, {@code id} what was found. */
+    /**
+     * Each LOTR waypoint the played character stands near (as near as a
+     * deed's place counts at first) is kept with its growth, and Lore
+     * counts it the first time (PROG-01). Asked every two seconds with the
+     * deeds' places ({@code DeedEvents}); a look reads a few cells of a
+     * grid, never the world.
+     */
+    public static void lookForWaypoints(EntityPlayerMP player) {
+        if (player == null || !SkillCounter.anyCounts(SkillAct.DISCOVER)) {
+            return;
+        }
+        List<String> near = LotrWaypointsNear.near(player, DeedFiles.DEFAULT_RADIUS);
+        for (String waypoint : near) {
+            if (ProgressionService.waypointReached(player, waypoint)) {
+                discovered(player, "waypoint", waypoint);
+            }
+        }
+    }
+
+    /**
+     * A first find: {@code kind} is region or waypoint (LOTR's), or marker
+     * or waystone (the mod's map markers); {@code id} what was found.
+     */
     public static void discovered(EntityPlayerMP player, String kind, String id) {
         SkillCounter.act(player, SkillAct.DISCOVER, Thing.named(kind), 1.0D,
                 SkillCounter.key(SkillAct.DISCOVER, kind + "|" + id), true);

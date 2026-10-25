@@ -46,8 +46,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The Skills page in the Profile view, beside the Characters page
- * (PROG-13): the character level and its perk points over the skills on
+ * The Skills page, in the Skills view (PROG-13, PROG-17): the character level and its perk points over the skills on
  * the left, then the deeds; on the right the skill picked, its level and
  * how far to the next, what counts toward it, and its perk tree, a perk
  * taken from the bar; or every deed, by category, and how far each

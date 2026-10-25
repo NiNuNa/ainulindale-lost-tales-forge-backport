@@ -3,13 +3,14 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.Tessellator;
@@ -42,12 +43,17 @@ public final class NewPage extends PageContent {
     /** The item its tab wears: a book of tales. */
     public static final ItemStack ICON = new ItemStack(Items.book);
 
-    /** The wheel's points, clockwise from the top, and the category standing at each. */
-    private static final PageCategory[] POINTS = {
-            PageCategory.PROFILE, PageCategory.SETTINGS,
-            PageCategory.CHANNELS, PageCategory.WHISPERS,
-            PageCategory.MAP, PageCategory.CONSOLES,
-            PageCategory.QUEST_JOURNAL, PageCategory.FELLOWSHIPS};
+    /**
+     * The wheel's points, clockwise from the top: the category standing at
+     * each, then any subcategory with no point of its own, under it, as
+     * the skills stand under the profile.
+     */
+    private static final PageCategory[][] POINTS = {
+            {PageCategory.PROFILE, PageCategory.SKILLS},
+            {PageCategory.SETTINGS}, {PageCategory.CHANNELS},
+            {PageCategory.WHISPERS}, {PageCategory.MAP},
+            {PageCategory.CONSOLES}, {PageCategory.QUEST_JOURNAL},
+            {PageCategory.FELLOWSHIPS}};
     /** Each point's cell in a three by three grid over the page: its column and its row. */
     private static final int[][] CELLS = {
             {1, 0}, {2, 0}, {2, 1}, {2, 2}, {1, 2}, {0, 2}, {0, 1}, {0, 0}};
@@ -67,13 +73,15 @@ public final class NewPage extends PageContent {
     /** Clear rows between the centre's shadow and the name under it. */
     private static final int NAME_GAP = 2;
     /** The diamond's width; the name under it is centred on it. */
-    private static final int DIAMOND_WIDTH = 5;
+    private static final int DIAMOND_WIDTH = LostTalesUiInk.DIAMOND_WIDTH;
 
     private final PageRows[] sections = new PageRows[POINTS.length];
     private final PageRows list;
-    /** The rows the list shows, and the category each of its names heads. */
+    /** The rows the list shows. */
     private final List<MenuWindow.Entry> listRows = new ArrayList<MenuWindow.Entry>();
-    private final List<PageCategory> listHeadings = new ArrayList<PageCategory>();
+    /** The category each name heads, as the wheel or the list last laid its rows. */
+    private final Map<MenuWindow.Entry, PageCategory> headings =
+            new IdentityHashMap<MenuWindow.Entry, PageCategory>();
     /** What the tool strip's well holds; empty for the wheel. */
     private String query = "";
     /** The page the arrows walked to, by its row's id; null for none. Return opens it. */
@@ -119,19 +127,35 @@ public final class NewPage extends PageContent {
         return TabMenus.everyPage(WindowScreen.current(), filter);
     }
 
-    /** A category's name over its pages, or over a note that it has none now; the page walked to lit. */
-    private List<MenuWindow.Entry> sectionRows(PageCategory category,
+    /**
+     * A point's category's name over its pages, or over a note that it has
+     * none now, then each subcategory under it with its pages, one with
+     * none left out; the page walked to lit.
+     */
+    private List<MenuWindow.Entry> sectionRows(PageCategory[] point,
                                                List<MenuWindow.Entry> pages) {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
-        rows.add(MenuWindow.Entry.header(category.title()));
-        List<MenuWindow.Entry> own = TabMenus.rowsOf(pages, category);
-        if (own.isEmpty()) {
-            rows.add(MenuWindow.Entry.passive(StatCollector.translateToLocal(
-                    "gui.losttales.new_page.none")));
-        } else {
-            rows.addAll(chooseKeyPage(own));
+        for (int index = 0; index < point.length; index++) {
+            List<MenuWindow.Entry> own = TabMenus.rowsOf(pages, point[index]);
+            if (index > 0 && own.isEmpty()) {
+                continue;
+            }
+            rows.add(heading(point[index]));
+            if (own.isEmpty()) {
+                rows.add(MenuWindow.Entry.passive(StatCollector.translateToLocal(
+                        "gui.losttales.new_page.none")));
+            } else {
+                rows.addAll(chooseKeyPage(own));
+            }
         }
         return rows;
+    }
+
+    /** A category's name, as the row heading its pages. */
+    private MenuWindow.Entry heading(PageCategory category) {
+        MenuWindow.Entry heading = MenuWindow.Entry.header(category.title());
+        this.headings.put(heading, category);
+        return heading;
     }
 
     /** The rows, the one the arrows walked to chosen, so it stays lit. */
@@ -146,15 +170,16 @@ public final class NewPage extends PageContent {
     private void layList(String filter) {
         List<MenuWindow.Entry> pages = pages(filter);
         this.listRows.clear();
-        this.listHeadings.clear();
-        for (PageCategory category : POINTS) {
-            List<MenuWindow.Entry> own = TabMenus.rowsOf(pages, category);
-            if (own.isEmpty()) {
-                continue;
+        this.headings.clear();
+        for (PageCategory[] point : POINTS) {
+            for (PageCategory category : point) {
+                List<MenuWindow.Entry> own = TabMenus.rowsOf(pages, category);
+                if (own.isEmpty()) {
+                    continue;
+                }
+                this.listRows.add(heading(category));
+                this.listRows.addAll(chooseKeyPage(own));
             }
-            this.listRows.add(MenuWindow.Entry.header(category.title()));
-            this.listHeadings.add(category);
-            this.listRows.addAll(chooseKeyPage(own));
         }
         if (this.listRows.isEmpty()) {
             this.listRows.add(MenuWindow.Entry.passive(
@@ -182,6 +207,7 @@ public final class NewPage extends PageContent {
             return null;
         }
         List<MenuWindow.Entry> pages = pages("");
+        this.headings.clear();
         LostTalesUiHitBox[] boxes = new LostTalesUiHitBox[POINTS.length];
         int left = (int)Math.floor(box.left);
         int top = (int)Math.floor(box.top);
@@ -306,7 +332,7 @@ public final class NewPage extends PageContent {
         int error = dx + dy;
         int x = fromX;
         int y = fromY;
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(false);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(false);
         tessellator.setColorRGBA_I(argb & 0xFFFFFF, argb >>> 24);
         while (true) {
             if (distance(x, y, fromX, fromY) > SPOKE_FROM
@@ -329,7 +355,7 @@ public final class NewPage extends PageContent {
                 y += stepY;
             }
         }
-        LostTalesSkyrimUiStyle.endQuads(tessellator, false);
+        LostTalesUiInk.endQuads(tessellator, false);
     }
 
     private static int distance(int x, int y, int otherX, int otherY) {
@@ -386,11 +412,11 @@ public final class NewPage extends PageContent {
     private static void drawCentre(int centreX, int centreY, boolean lit,
                                    int alpha) {
         LostTalesUiInk.beginContent();
-        LostTalesSkyrimUiStyle.drawDiamond(centreX + LostTalesUiInk.SHADOW_OFFSET,
+        LostTalesUiInk.fillDiamond(centreX + LostTalesUiInk.SHADOW_OFFSET,
                 centreY + LostTalesUiInk.SHADOW_OFFSET,
                 LostTalesUiInk.argb(LostTalesUiInk.SHADOW,
                         LostTalesUiInk.shadowAlpha(alpha)));
-        LostTalesSkyrimUiStyle.drawDiamond(centreX, centreY,
+        LostTalesUiInk.fillDiamond(centreX, centreY,
                 LostTalesUiInk.argb(lit ? LostTalesUiTheme.accentRgb()
                         : LostTalesColors.rgb(LostTalesColors.ROSE_GRAY), alpha));
         LostTalesUiInk.beginContent();
@@ -433,9 +459,7 @@ public final class NewPage extends PageContent {
             rows = this.list;
             at = PageRows.column(box);
             MenuWindow.Entry under = rows.rowAt(at, x, y);
-            int headingIndex = under == null || !under.header ? -1
-                    : headingIndex(under);
-            heading = headingIndex < 0 ? null : this.listHeadings.get(headingIndex);
+            heading = under == null ? null : this.headings.get(under);
         } else {
             int point = pointAt(wheel, x, y);
             if (point < 0) {
@@ -444,26 +468,12 @@ public final class NewPage extends PageContent {
             rows = this.sections[point];
             at = wheel[point];
             MenuWindow.Entry under = rows.rowAt(at, x, y);
-            heading = under != null && under.header ? POINTS[point] : null;
+            heading = under == null ? null : this.headings.get(under);
         }
         if (heading != null) {
             return button == 1 && openCategoryMenu(heading, at, y);
         }
         return rows.press(at, x, y, button);
-    }
-
-    /** Which of the list's category names a row is; -1 for none of them. */
-    private int headingIndex(MenuWindow.Entry heading) {
-        int index = 0;
-        for (MenuWindow.Entry row : this.listRows) {
-            if (row == heading) {
-                return index;
-            }
-            if (row.header) {
-                index++;
-            }
-        }
-        return -1;
     }
 
     /** A category's menu, hung from its name's row. */
@@ -567,11 +577,13 @@ public final class NewPage extends PageContent {
         List<MenuWindow.Entry> pages = pages(this.query);
         List<List<MenuWindow.Entry>> columns =
                 new ArrayList<List<MenuWindow.Entry>>();
-        for (PageCategory category : POINTS) {
+        for (PageCategory[] point : POINTS) {
             List<MenuWindow.Entry> own = new ArrayList<MenuWindow.Entry>();
-            for (MenuWindow.Entry row : TabMenus.rowsOf(pages, category)) {
-                if (row.icon != null && row.isTakeable()) {
-                    own.add(row);
+            for (PageCategory category : point) {
+                for (MenuWindow.Entry row : TabMenus.rowsOf(pages, category)) {
+                    if (row.icon != null && row.isTakeable()) {
+                        own.add(row);
+                    }
                 }
             }
             columns.add(own);

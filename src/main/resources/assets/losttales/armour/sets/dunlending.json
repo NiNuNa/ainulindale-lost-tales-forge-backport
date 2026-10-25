@@ -1,0 +1,22 @@
+{
+  "id": "losttales:dunlending",
+  "helmet": [
+    "lotr:item.helmetDunlending"
+  ],
+  "chestplate": [
+    "lotr:item.bodyDunlending"
+  ],
+  "leggings": [
+    "lotr:item.legsDunlending"
+  ],
+  "boots": [
+    "lotr:item.bootsDunlending"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:heavy_arms"
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 {
   "view": "map",
   "locked": true,
+  "place": "middle",
+  "stage": false,
   "pages": ["map"]
 }

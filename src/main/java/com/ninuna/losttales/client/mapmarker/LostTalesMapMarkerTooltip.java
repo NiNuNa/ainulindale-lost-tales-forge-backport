@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiBracketPanel;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.ArrayList;
@@ -64,15 +65,15 @@ final class LostTalesMapMarkerTooltip {
         GL11.glPushMatrix();
         GL11.glTranslatef(x, y, 0.0F);
         try {
-            LostTalesSkyrimUiStyle.drawPanel(0, 0, width, height);
+            LostTalesUiBracketPanel.draw(0, 0, width, height);
             int lineY = PADDING;
             for (int index = 0; index < lines.size(); index++) {
                 String line = lines.get(index);
                 font.drawStringWithShadow(line,
                         (width - font.getStringWidth(line)) / 2, lineY,
                         index == 0
-                                ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                                : LostTalesSkyrimUiStyle.TEXT_MUTED);
+                                ? LostTalesColors.TEXT_BRIGHT
+                                : LostTalesColors.TEXT_MUTED);
                 lineY += font.FONT_HEIGHT + LINE_GAP;
             }
         } finally {

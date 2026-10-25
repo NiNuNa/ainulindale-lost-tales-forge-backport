@@ -19,9 +19,10 @@ import java.util.Set;
 /**
  * Every quest the logical server knows, from three places: the quest files
  * bundled with the mod, read from its classpath; the files a server writes
- * in its own folder ({@link ServerQuestFiles}), read as it starts; and the
- * quests made while the game runs, missives. A bundled quest's id is never
- * taken by the other two, nor a server file's by a missive.
+ * in its own folder ({@link ServerQuestFiles}), read as it starts and on
+ * {@code /losttales reload quests}; and the quests made while the game
+ * runs, missives. A bundled quest's id is never taken by the other two, nor
+ * a server file's by a missive.
  */
 public final class LostTalesQuestRegistry {
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
@@ -102,6 +103,52 @@ public final class LostTalesQuestRegistry {
             LostTalesMapMarkerCatalog.logQuestMarkerWarnings(result.quests);
         }
         return result;
+    }
+
+    /**
+     * Reads the bundled quest files and the server's own again and puts
+     * both in place at once, as {@code /losttales reload quests} asks: a
+     * read that fails leaves every quest as it was. Logs every file left
+     * out and why, and answers the reasons, the bundled files' first.
+     */
+    public static synchronized List<String> reload() {
+        BundledQuestFiles.Result bundled = BundledQuestFiles.read(CLASSPATH);
+        Set<String> bundledIds = new HashSet<String>();
+        for (LostTalesQuestDefinition quest : bundled.quests) {
+            bundledIds.add(quest.getId());
+        }
+        ServerQuestFiles.Result server = ServerQuestFiles.read(
+                ServerQuestFiles.directory(), bundledIds, QuestItemNames.GAME);
+        STATIC_QUESTS_BY_ID.clear();
+        for (LostTalesQuestDefinition quest : bundled.quests) {
+            STATIC_QUESTS_BY_ID.put(quest.getId(), quest);
+        }
+        SERVER_QUESTS_BY_ID.clear();
+        for (LostTalesQuestDefinition quest : server.quests) {
+            SERVER_QUESTS_BY_ID.put(quest.getId(), quest);
+            RUNTIME_QUESTS_BY_ID.remove(quest.getId());
+        }
+        loaded = true;
+        rebuildSortedQuests();
+        List<String> problems = new ArrayList<String>();
+        for (String problem : bundled.problems) {
+            FMLLog.warning("[%s] Bundled quest left out: %s",
+                    LostTalesMetaData.MOD_ID, problem);
+            problems.add(problem);
+        }
+        for (String problem : server.problems) {
+            FMLLog.warning("[%s] Server quest left out: %s",
+                    LostTalesMetaData.MOD_ID, problem);
+            problems.add(problem);
+        }
+        LostTalesMapMarkerCatalog.logQuestMarkerWarnings(sortedQuests);
+        return problems;
+    }
+
+    /** How many quests the bundled files hold, as last read. */
+    public static synchronized int bundledQuestCount() {
+        ensureLoaded();
+        return STATIC_QUESTS_BY_ID.size();
     }
 
     /** Forgets the server's own quests as the server stops. */

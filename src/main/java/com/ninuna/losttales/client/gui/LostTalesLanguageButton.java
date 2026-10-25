@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.gui;
 
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.GL11;
@@ -26,7 +26,7 @@ final class LostTalesLanguageButton extends LostTalesButton {
         int y = this.yPosition + this.height / 2 - ICON_SIZE / 2;
         int textureY = highlighted ? 130 : 110;
         minecraft.getTextureManager().bindTexture(buttonTextures);
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         GL11.glColor4f(1.0F, 1.0F, 1.0F, this.enabled ? 1.0F : 0.5F);
         try {
             // Sample only the icon, excluding the gray button behind it.

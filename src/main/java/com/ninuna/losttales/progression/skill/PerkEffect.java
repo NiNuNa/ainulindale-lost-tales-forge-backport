@@ -10,7 +10,9 @@ import java.util.Locale;
  * lower-case word. The code knows each one; a file picks one per perk and
  * sets its numbers: {@code amount} for each rank, in the effect's
  * {@link Unit}, and the named {@code params} the effect reads. A server
- * adds perks from these and nothing else.
+ * adds perks from these and nothing else. A perk of an armour skill
+ * (PROG-17) works only in that skill's weight: one of ranks for each
+ * piece of it worn, a quarter per piece; any other with all four pieces.
  */
 public enum PerkEffect {
     // Weapons, every combat tree: the skill's own weapons unless the perk names others.
@@ -43,12 +45,28 @@ public enum PerkEffect {
     BEAST_BREAKER(Unit.PERCENT),
     PHALANX(Unit.PERCENT, "radius"),
     UNHORSE(Unit.PERCENT),
-    // Defence.
-    ARMOUR_ABSORB(Unit.PERCENT),
+    // Light Armour and Heavy Armour (PROG-17); protection follows PROG-19.
+    /** The skill's weight lets a share less of a blow through, per rank. */
+    WEIGHT_PROTECTION(Unit.PERCENT),
+    /** Your armour lets a share less of a blow through. */
+    PROTECTION(Unit.PERCENT),
+    /** One named set's four pieces let a share less of a blow through. */
+    MATCHING_SET(Unit.PERCENT),
+    /** While you sneak, foes notice you a share less far, and others hear your steps a share quieter. */
+    SOFT_STEP(Unit.PERCENT, "volume"),
+    /** A share more speed. */
+    SPEED(Unit.PERCENT),
+    /** A melee blow has a chance to do no harm. */
+    MELEE_EVADE(Unit.PERCENT),
+    /** An arrow, a bolt or a thrown weapon has a chance to miss you. */
+    MISSILE_EVADE(Unit.PERCENT),
+    /** Heavy armour slows you a share less per rank. */
+    CONDITIONING(Unit.PERCENT),
+    /** More chance that a blow does not push you. */
+    KNOCKBACK(Unit.PERCENT),
     FALL_DAMAGE(Unit.PERCENT),
-    ARMOUR_WEAR(Unit.PERCENT),
-    BURN_SHORTER(Unit.PERCENT),
-    STEADFAST(Unit.PERCENT),
+    /** While you sneak or stand still, nothing knocks you back and blows do a share less. */
+    STANDING_FIRM(Unit.PERCENT),
     LAST_STAND(Unit.PERCENT, "health", "seconds", "cooldown"),
     // Riding.
     HORSE_SENSE(Unit.NONE),
@@ -127,6 +145,15 @@ public enum PerkEffect {
      */
     public List<String> getParams() {
         return this.params;
+    }
+
+    /**
+     * Whether the effect already works piece by piece, as Conditioning
+     * takes its share off each heavy piece's slowdown, so its ranks count
+     * whole for any piece of its weight rather than a quarter per piece.
+     */
+    public boolean worksPerPiece() {
+        return this == CONDITIONING;
     }
 
     public String word() {

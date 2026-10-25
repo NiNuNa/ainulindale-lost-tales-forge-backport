@@ -1,0 +1,22 @@
+{
+  "id": "losttales:gondorian",
+  "helmet": [
+    "lotr:item.helmetGondor",
+    "lotr:item.helmetGondorWinged"
+  ],
+  "chestplate": [
+    "lotr:item.bodyGondor"
+  ],
+  "leggings": [
+    "lotr:item.legsGondor"
+  ],
+  "boots": [
+    "lotr:item.bootsGondor"
+  ],
+  "bonus": [
+    {
+      "effect": "protection",
+      "amount": 0.05
+    }
+  ]
+}

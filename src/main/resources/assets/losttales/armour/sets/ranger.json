@@ -1,0 +1,21 @@
+{
+  "id": "losttales:ranger",
+  "helmet": [
+    "lotr:item.helmetRanger"
+  ],
+  "chestplate": [
+    "lotr:item.bodyRanger"
+  ],
+  "leggings": [
+    "lotr:item.legsRanger"
+  ],
+  "boots": [
+    "lotr:item.bootsRanger"
+  ],
+  "bonus": [
+    {
+      "effect": "speed",
+      "amount": 0.05
+    }
+  ]
+}

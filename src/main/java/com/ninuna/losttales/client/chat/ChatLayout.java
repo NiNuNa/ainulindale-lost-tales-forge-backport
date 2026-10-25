@@ -868,6 +868,69 @@ public final class ChatLayout {
         }
     }
 
+    /**
+     * Takes the conversation of every fellowship no character of the
+     * account is in any more out of every window, locked or not, each of
+     * its copies, and so out of the layout file with what it kept there:
+     * its panels, its two settings, a close by hand (WIN-18). While any
+     * character of the account is still in it, it stays, hidden unless the
+     * character played is in it.
+     */
+    public static synchronized void dropFellowshipsLeft() {
+        List<WindowPage> removed = WindowLayout.removeTabs(
+                new WindowLayout.TabFilter() {
+                    @Override
+                    public boolean matches(WindowPage tab) {
+                        return isLeftFellowship(ConversationPage.from(tab));
+                    }
+                });
+        boolean changed = !removed.isEmpty();
+        for (WindowPage tab : removed) {
+            ConversationPage copy = ConversationPage.from(tab);
+            copy.forgetCopy();
+            ConversationPage row = ConversationPage.row(copy);
+            if (row != null) {
+                VIEWS.remove(row.id());
+            }
+        }
+        Iterator<ConversationPage> closed = CLOSED_BY_HAND.iterator();
+        while (closed.hasNext()) {
+            if (isLeftFellowship(closed.next())) {
+                closed.remove();
+                changed = true;
+            }
+        }
+        Iterator<ConversationPage> waiting = WAITING.iterator();
+        while (waiting.hasNext()) {
+            if (isLeftFellowship(waiting.next())) {
+                waiting.remove();
+            }
+        }
+        changed |= forgetLeft(NOTIFICATIONS.keySet().iterator());
+        changed |= forgetLeft(FEED_CHOICES.keySet().iterator());
+        if (changed) {
+            WindowLayout.persist();
+        }
+    }
+
+    /** Whether a tab is the conversation of a fellowship no character of the account is in. */
+    private static boolean isLeftFellowship(ConversationPage tab) {
+        return tab != null && tab.isFellowship()
+                && !ClientChatIdentitySelection.keepsFellowship(tab.getOwnerKey());
+    }
+
+    /** Takes every left fellowship's conversation out of a setting's rows; answers whether any went. */
+    private static boolean forgetLeft(Iterator<ConversationPage> rows) {
+        boolean any = false;
+        while (rows.hasNext()) {
+            if (isLeftFellowship(rows.next())) {
+                rows.remove();
+                any = true;
+            }
+        }
+        return any;
+    }
+
     /* ---- NPC conversations ---- */
 
     /**

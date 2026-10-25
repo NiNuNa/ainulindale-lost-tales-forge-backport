@@ -2,7 +2,7 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
@@ -151,7 +151,7 @@ public final class ChatMemberDirectoryTest {
                 .slot(slot)
                 .name(name)
                 .race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
                 .startingFaction("lotr:gondor")
                 .build();
     }

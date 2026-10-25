@@ -19,6 +19,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
+import com.ninuna.losttales.gui.style.LostTalesUiFading;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
@@ -48,7 +49,6 @@ import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.client.gui.ScaledResolution;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
 import net.minecraft.client.renderer.Tessellator;
@@ -1460,6 +1460,15 @@ public final class LostTalesChatOverlayRenderer {
                     if (alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
                         continue;
                     }
+                    String noticeKey = ChatWindowLines.noticeKey(line);
+                    if (noticeKey != null) {
+                        // A conversation's notice over its oldest line,
+                        // a whisper's word on the server's log of
+                        // whispers; the row is nobody's line.
+                        drawNoticeRow(font, wordsLeft, panelRight,
+                                y - rowHeight, noticeKey, alpha);
+                        continue;
+                    }
                     String dayLabel = ChatWindowLines.dateDividerLabel(line);
                     if (dayLabel != null) {
                         // A day's first message stands under a dated rule
@@ -1754,11 +1763,21 @@ public final class LostTalesChatOverlayRenderer {
                     // The row's backdrops go down over its band before its
                     // words, riding the words as they slide in and fading
                     // with them.
-                    ChatRunBackdrops.draw(font, component, line.getChatLineID(),
-                            surfaceRgb, alpha, open, rowMotion);
-                    LostTalesChatVisualStyle.drawFormatted(font,
-                            component, marker, 0, 0, alpha, open, rowMotion,
-                            line.getChatLineID());
+                    int[] quoteCut = ChatReplyMarker.cutOf(component);
+                    if (quoteCut != null) {
+                        // A reply's quote cut at the end of its room fades
+                        // out into it (CHAT-86).
+                        drawCutQuote(font, component, marker,
+                                line.getChatLineID(), surfaceRgb, alpha, open,
+                                quoteCut);
+                    } else {
+                        ChatRunBackdrops.draw(font, component,
+                                line.getChatLineID(), surfaceRgb, alpha, open,
+                                rowMotion);
+                        LostTalesChatVisualStyle.drawFormatted(font,
+                                component, marker, 0, 0, alpha, open,
+                                rowMotion, line.getChatLineID());
+                    }
                     drawHead(minecraft, font, component,
                             HEAD_TOP_OFFSET, alpha, open);
                     ChatWorldMark.drawIn(font, component, open, alpha);
@@ -1850,6 +1869,13 @@ public final class LostTalesChatOverlayRenderer {
                         0, -TEXT_OFFSET,
                         Math.max(20, Math.round(panelRight) - 4),
                         LostTalesChatVisualStyle.asideRgb(), inviteAlpha);
+                if (frame.view != null && frame.view.showsWhisperLog()) {
+                    // A whisper not begun yet opens with its notice too,
+                    // over the invitation where its first line will stand.
+                    drawNoticeRow(font, 0.0F, panelRight,
+                            -2.0F * LINE_HEIGHT, ConversationPage.WHISPERS_LOGGED_KEY,
+                            inviteAlpha);
+                }
             }
             if (open) {
                 if (columns.shows() && columns.separatorX() >= 0.0F) {
@@ -2194,6 +2220,72 @@ public final class LostTalesChatOverlayRenderer {
      * caller's stack space; {@code wordsLeft} is where the words'
      * stretch begins, past the timestamp column.
      */
+    /**
+     * A reply's quote cut at the end of its room (CHAT-86): drawn whole
+     * from its start, its runs and their backdrops fading out into the
+     * room's end as a cut name does (LOOK-37), with no dots. {@code cut}
+     * holds where the room ends and where the words do, in the row's own
+     * pixels.
+     */
+    private static void drawCutQuote(final FontRenderer font,
+                                     final IChatComponent component,
+                                     final ChatHeadMarker.Data marker,
+                                     final int chatLineId, final int surfaceRgb,
+                                     final int alpha, final boolean open,
+                                     int[] cut) {
+        LostTalesUiCutName.draw(0.0F, cut[1], cut[0], 0.0F,
+                new LostTalesUiFading.FadingPainter() {
+                    @Override
+                    public void paint(float share) {
+                        int shown = Math.round(alpha * share);
+                        ChatRunBackdrops.draw(font, component, chatLineId,
+                                surfaceRgb, shown, open, null);
+                        LostTalesChatVisualStyle.drawFormatted(font,
+                                component, marker, 0, 0, shown, open, null,
+                                chatLineId);
+                    }
+                });
+    }
+
+    /**
+     * A notice standing over a conversation's oldest line (CHAT-85): its
+     * words faint, the chat's small text in its aside tone and in
+     * italics, centred as a day's date is, and where the window is too
+     * narrow for them, started at the left and fading into the end of
+     * their room (LOOK-37).
+     */
+    private static void drawNoticeRow(FontRenderer font, float wordsLeft,
+                                      float panelRight, float top,
+                                      String key, int alpha) {
+        if (alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        float left = wordsLeft + 3.0F;
+        float right = panelRight - 3.0F;
+        if (right <= left) {
+            return;
+        }
+        float pixel = Math.min(1.0F, LostTalesChatVisualStyle.stackSmallScale());
+        float textTop = top + WindowStyle.ROW_TEXT_TOP + (pixel < 1.0F
+                ? LostTalesChatVisualStyle.stackSmallTopOffset() : 0.0F);
+        String words = "\u00a7o" + StatCollector.translateToLocal(key);
+        int textWidth = font.getStringWidth(words);
+        float room = (right - left) / pixel;
+        float textX = textWidth <= room
+                ? floorToStackPixel((left + right - (textWidth - 1) * pixel)
+                        / 2.0F)
+                : floorToStackPixel(left);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(textX, textTop, 0.0F);
+            GL11.glScalef(pixel, pixel, 1.0F);
+            LostTalesUiCutName.drawText(font, words, 0.0F, 0, room,
+                    LostTalesChatVisualStyle.asideRgb(), alpha);
+        } finally {
+            GL11.glPopMatrix();
+        }
+    }
+
     private static void drawDividerRow(FontRenderer font, float wordsLeft,
                                        float panelRight, float top,
                                        String label, int rgb, int alpha) {
@@ -2286,7 +2378,7 @@ public final class LostTalesChatOverlayRenderer {
                 < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(true);
         // Same winding as the backdrop: the GUI pass culls back faces.
         tessellator.setColorRGBA_I(rgb, rightAlpha);
         tessellator.addVertex(right, top + height, 0.0D);
@@ -2294,7 +2386,7 @@ public final class LostTalesChatOverlayRenderer {
         tessellator.setColorRGBA_I(rgb, leftAlpha);
         tessellator.addVertex(left, top, 0.0D);
         tessellator.addVertex(left, top + height, 0.0D);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        LostTalesUiInk.endQuads(tessellator, true);
     }
 
     /** Width of the scrollbar's track and thumb. */
@@ -2561,7 +2653,7 @@ public final class LostTalesChatOverlayRenderer {
         GL11.glDepthMask(true);
         GL11.glDepthFunc(GL11.GL_ALWAYS);
         GL11.glColorMask(false, false, false, false);
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(false);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(false);
         tessellator.setColorRGBA_I(0, 255);
         depthQuad(tessellator, left, top, right, bottom, BASE_DEPTH);
         for (int index = 0; index < holes.count; index++) {
@@ -2579,7 +2671,7 @@ public final class LostTalesChatOverlayRenderer {
             depthQuad(tessellator, holeLeft + corner, holeBottom - corner,
                     holeRight - corner, holeBottom, depth);
         }
-        LostTalesSkyrimUiStyle.endQuads(tessellator, false);
+        LostTalesUiInk.endQuads(tessellator, false);
         GL11.glColorMask(true, true, true, true);
         // Nothing drawn from here writes a depth but an item icon, whose
         // depth goes in behind the history, so every layer is tested
@@ -3126,7 +3218,7 @@ public final class LostTalesChatOverlayRenderer {
         }
         float centre = (span[0] + span[1]) / 2.0F;
         float reach = Math.max(1.0F, (span[1] - span[0]) / 2.0F);
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(true);
         // Split at the middle, so the strongest point is a vertex.
         if (top < centre && centre < bottom) {
             mentionBarQuad(tessellator, left, right, top, centre, centre,
@@ -3137,7 +3229,7 @@ public final class LostTalesChatOverlayRenderer {
             mentionBarQuad(tessellator, left, right, top, bottom, centre,
                     reach, alpha, rgb);
         }
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        LostTalesUiInk.endQuads(tessellator, true);
     }
 
     private static void mentionBarQuad(Tessellator tessellator, float left,
@@ -3821,7 +3913,7 @@ public final class LostTalesChatOverlayRenderer {
                 || steps < 1) {
             return;
         }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(true);
         if (destinationFactor != GL11.GL_ONE_MINUS_SRC_ALPHA) {
             OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, destinationFactor,
                     GL11.GL_ZERO, GL11.GL_ONE);
@@ -3859,7 +3951,7 @@ public final class LostTalesChatOverlayRenderer {
             tessellator.addVertex(x0, top, 0.0D);
             tessellator.addVertex(x0, bottom, 0.0D);
         }
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        LostTalesUiInk.endQuads(tessellator, true);
     }
 
     private static void drawHead(Minecraft minecraft, FontRenderer font,
@@ -3993,6 +4085,10 @@ public final class LostTalesChatOverlayRenderer {
     static void drawFace(final Minecraft minecraft,
                          final ChatHeadMarker.Data marker, final float x,
                          final float y, final float size, final int alpha) {
+        if (marker.isUnseenVoice()) {
+            // Nobody sees an unseen voice: its slot stays empty (CHAT-84).
+            return;
+        }
         float reach = size * 0.125F;
         LostTalesUiFlatLayers.draw(alpha, x - reach, y - reach,
                 x + size + reach + LostTalesUiCornerMark.OVERHANG_X + 1,

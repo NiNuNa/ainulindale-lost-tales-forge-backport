@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:gollum",
   "name": "Gollum",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:hobbit",
-    "genderId": "losttales:male",
-    "modelId": "lotr:hobbit",
-    "skinId": "losttales:hobbit_shire_male_3"
-  }
+  "race": "losttales:hobbit",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:hobbit_shire_masculine_3",
+  "faction": "lotr:hobbit"
 }

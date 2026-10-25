@@ -3,22 +3,22 @@ package com.ninuna.losttales.character.registry;
 /**
  * One entry of a race file's skins (CHAR-38): a group of {@code count}
  * pictures, {@code 0.png} and on, in the folder {@code texture} names,
- * for one sex or, with none named, every sex the race has. A bundled
+ * for one body type or, with none named, every body type the race has. A bundled
  * group's words are the lang line {@code gui.losttales.character.skin_group.<group>};
  * a server's are written in its file.
  */
 public final class CharacterRaceSkins {
     private final String group;
     private final String name;
-    private final String sexId;
+    private final String bodyTypeId;
     private final String texture;
     private final int count;
 
-    public CharacterRaceSkins(String group, String name, String sexId,
+    public CharacterRaceSkins(String group, String name, String bodyTypeId,
                               String texture, int count) {
         this.group = group == null ? "" : group;
         this.name = name == null ? "" : name;
-        this.sexId = sexId == null ? "" : sexId;
+        this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
         this.texture = texture == null ? "" : texture;
         this.count = count;
     }
@@ -32,9 +32,9 @@ public final class CharacterRaceSkins {
         return this.name;
     }
 
-    /** The sex the pictures are painted for; empty for every sex the race has. */
-    public String getSexId() {
-        return this.sexId;
+    /** The body type the pictures are painted for; empty for every body type the race has. */
+    public String getBodyTypeId() {
+        return this.bodyTypeId;
     }
 
     /** The folder of the pictures: LOTR's ({@code lotr:mob/...}) or the mod's own. */

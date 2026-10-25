@@ -19,9 +19,12 @@ import net.minecraft.entity.ai.attributes.IAttribute;
 import net.minecraft.entity.ai.attributes.IAttributeInstance;
 import net.minecraft.world.World;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -29,7 +32,8 @@ import java.util.Map;
  * names ({@code values_from}, CHAR-38), speed relative to the Bree-man's.
  * The race's own size always stands: NPC collision boxes are mob details
  * and need not match their drawn size. A race that names no NPC, and any
- * race while LOTR cannot be asked, has its file's values.
+ * race while LOTR cannot be asked, has its file's values. The log names
+ * each number of a file the NPC's replaced.
  */
 public final class LotrRaceProfileAdapter {
 
@@ -94,8 +98,63 @@ public final class LotrRaceProfileAdapter {
             profile = createProfile(race,
                     this.representatives.get(race.getLotrRaceAssociation()), fallback);
             this.profiles.put(canonicalRaceId, profile);
+            List<String> replaced = replacedNumbers(fallback, profile);
+            if (!replaced.isEmpty()) {
+                FMLLog.info("[%s] Race %s takes its values from %s: %s",
+                        LostTalesMetaData.MOD_ID, canonicalRaceId,
+                        race.getLotrRaceAssociation(), join(replaced));
+            }
         }
         return profile;
+    }
+
+    /**
+     * Each number of the race's file that the NPC's replaced, as the log
+     * names it: {@code health 30 in place of 20}. A number the NPC left as
+     * the file wrote it is not named.
+     */
+    static List<String> replacedNumbers(CharacterRaceGameplayProfile file,
+                                        CharacterRaceGameplayProfile taken) {
+        List<String> replaced = new ArrayList<String>();
+        if (file == null || taken == null || file == taken) {
+            return replaced;
+        }
+        addReplaced(replaced, "health", "", file.getMaxHealth(), taken.getMaxHealth());
+        addReplaced(replaced, "speed", "x", file.getMovementSpeedMultiplier(),
+                taken.getMovementSpeedMultiplier());
+        addReplaced(replaced, "attack", "", file.getAttackDamage(), taken.getAttackDamage());
+        return replaced;
+    }
+
+    private static void addReplaced(List<String> replaced, String what, String mark,
+                                    double file, double taken) {
+        if (Math.abs(file - taken) > 1.0E-6D) {
+            replaced.add(what + " " + mark + number(taken) + " in place of "
+                    + mark + number(file));
+        }
+    }
+
+    /** A whole number without decimals, any other with up to three. */
+    static String number(double value) {
+        if (value == Math.rint(value) && !Double.isInfinite(value)) {
+            return String.valueOf((long)value);
+        }
+        String shown = String.format(Locale.ROOT, "%.3f", Double.valueOf(value));
+        while (shown.endsWith("0")) {
+            shown = shown.substring(0, shown.length() - 1);
+        }
+        return shown;
+    }
+
+    private static String join(List<String> parts) {
+        StringBuilder joined = new StringBuilder();
+        for (String part : parts) {
+            if (joined.length() > 0) {
+                joined.append(", ");
+            }
+            joined.append(part);
+        }
+        return joined.toString();
     }
 
     public synchronized void clear() {

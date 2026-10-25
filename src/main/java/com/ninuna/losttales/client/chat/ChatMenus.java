@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatNarrator;
+import com.ninuna.losttales.chat.ChatUnseenVoice;
 import com.ninuna.losttales.util.LostTalesWords;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
@@ -915,7 +916,8 @@ final class ChatMenus {
      * ids, when it holds your profile and your ids alone. A Discord member
      * can be ignored but not whispered to, so their menu offers no message
      * row; the bridge's own nameless id is nobody and opens nothing, nor
-     * does the Narrator, who is nobody to whisper to, ignore or mute. Its
+     * does the Narrator, who is nobody to whisper to, ignore or mute, nor
+     * an unseen voice, which names nobody (CHAT-84). Its
      * strip names who it is about, as their card's does.
      */
     boolean openPersonMenu(LostTalesChatHoverCard.Target person, int mouseX,
@@ -926,6 +928,7 @@ final class ChatMenus {
                 || LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
                         person.playerId)
                 || ChatNarrator.SENDER_ID.equals(person.playerId)
+                || ChatUnseenVoice.SENDER_ID.equals(person.playerId)
                 || LostTalesChatMessagePacket.isSystemSender(person.playerId)
                 || (isSelf(person) && !mayCopyIds())) {
             return false;

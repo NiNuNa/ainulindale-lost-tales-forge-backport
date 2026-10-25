@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.gui.style.FoldRule;
+import com.ninuna.losttales.gui.style.LostTalesUiFading;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.util.ChatComponentText;
@@ -338,8 +339,11 @@ final class ChatLineWrapper {
 
     /**
      * The row above the message, cut to the width rather than wrapped:
-     * parts are placed while they fit whole, the one that does not is
-     * trimmed to what is left, and anything after it is dropped. Laid
+     * parts are placed while they fit whole, the one that does not keeps
+     * as much again as its fade reaches past the room, and anything after
+     * it is dropped; the row is then marked cut where its room ends
+     * ({@link ChatReplyMarker#cutAt}), so its words fade out there
+     * (CHAT-86). Laid
      * out for an open window, the row opens on a gap of {@code indent}
      * pixels, the quote wears no bubble, the quoted name loses its
      * opening bracket and its closing mark stands a word's space after
@@ -377,10 +381,15 @@ final class ChatLineWrapper {
             }
             String text = part.getUnformattedTextForChat();
             String formatting = part.getChatStyle().getFormattingCode();
-            int fits = fitLength(metrics, formatting, text, width - used);
-            if (fits > 0) {
-                builder.place(copy(part, text.substring(0, fits)), 0);
+            int kept = isAtomic(part) ? 0 : fitLength(metrics, formatting,
+                    text, width - used + Math.round(LostTalesUiFading.REACH));
+            if (kept > 0) {
+                IChatComponent piece = copy(part, text.substring(0, kept));
+                builder.place(piece, 0);
+                used += partWidth(metrics, piece);
             }
+            builder.place(ChatReplyMarker.cutAt(indent + width,
+                    indent + used), 0);
             return;
         }
     }

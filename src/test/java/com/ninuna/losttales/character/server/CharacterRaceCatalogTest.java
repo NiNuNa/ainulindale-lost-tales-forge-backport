@@ -6,7 +6,7 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBody;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterFactionResolver;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.data.DataFiles;
@@ -84,7 +84,7 @@ public final class CharacterRaceCatalogTest {
 
     @Test
     public void aRaceWhoseSkinsTakeAnotherRacesIdsIsLeftOut() throws IOException {
-        // The losttales namespace and a bundled group: losttales:human_bree_male_0 again.
+        // The losttales namespace and a bundled group: losttales:human_bree_masculine_0 again.
         write("copy.json", race("losttales:copy", "human_bree", "lotr:dale"));
 
         List<String> problems = new ArrayList<String>();
@@ -162,10 +162,10 @@ public final class CharacterRaceCatalogTest {
     /** A race file on the human body with one skin group. */
     private static String race(String id, String group, String faction) {
         return "{\"id\": \"" + id + "\", \"name\": \"Kin\", \"body\": \"human\","
-                + " \"sexes\": [\"losttales:male\"], \"size\": {\"width\": 0.6, \"height\": 1.9},"
+                + " \"body_types\": [\"losttales:masculine\"], \"size\": {\"width\": 0.6, \"height\": 1.9},"
                 + " \"health\": 20, \"speed\": 1, \"attack\": 2, \"factions\": [\"" + faction + "\"],"
                 + " \"skins\": [{\"group\": \"" + group + "\", \"name\": \"Kin\","
-                + " \"sex\": \"losttales:male\", \"texture\": \"lotr:mob/bree/bree_male\", \"count\": 2}]}";
+                + " \"body_type\": \"losttales:masculine\", \"texture\": \"lotr:mob/bree/bree_male\", \"count\": 2}]}";
     }
 
     private void write(String name, String json) throws IOException {
@@ -181,7 +181,7 @@ public final class CharacterRaceCatalogTest {
     private static RoleplayCharacter character(String raceId, CharacterBody body, int slot) {
         return RoleplayCharacter.builder(UUID.randomUUID(), OWNER)
                 .slot(slot).name("Kin " + slot).race(raceId).body(body)
-                .gender(CharacterGenderRegistry.MALE).skin("losttales:human_bree_male_0")
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE).skin("losttales:human_bree_masculine_0")
                 .build();
     }
 

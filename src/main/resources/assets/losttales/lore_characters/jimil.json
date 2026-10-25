@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:jimil",
   "name": "Jimil, Sun-Chief",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_haradrim_male_1"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_haradrim_masculine_1",
+  "faction": "lotr:near_harad"
 }

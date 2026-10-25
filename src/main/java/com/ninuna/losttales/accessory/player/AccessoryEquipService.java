@@ -44,7 +44,7 @@ public final class AccessoryEquipService {
                 AccessoryInventory.RING_SLOT);
         if (previous == heldStack || previous != null
                 && (previous.stackSize != 1
-                || !AccessoryCompatibilityRegistry.getInstance()
+                || !AccessoryCompatibilityRegistry.server()
                 .isCompatible(AccessorySlotType.RING, previous))) {
             return false;
         }

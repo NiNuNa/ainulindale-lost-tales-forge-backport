@@ -6,8 +6,9 @@ import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiBracketPanel;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberAvailability;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberSnapshot;
@@ -110,7 +111,7 @@ public final class LostTalesFellowshipHudRenderer {
         try {
             // The panel wears the windows' primary colour, as every HUD
             // panel does.
-            LostTalesSkyrimUiStyle.drawPanel(bounds.x, bounds.y, bounds.width,
+            LostTalesUiBracketPanel.draw(bounds.x, bounds.y, bounds.width,
                     bounds.height, LostTalesColors.withAlpha(
                             LostTalesUiTheme.primaryRgb(), 0x90));
             for (int index = 0;
@@ -151,7 +152,7 @@ public final class LostTalesFellowshipHudRenderer {
                 fellowshipColor);
         Gui.drawRect(x + 3, y + FellowshipHudLayout.ROW_HEIGHT - 1,
                 x + width, y + FellowshipHudLayout.ROW_HEIGHT,
-                LostTalesSkyrimUiStyle.BORDER_DIM);
+                LostTalesColors.BORDER_DIM);
 
         boolean hasLiveStatus = !stale && status != null
                 && status.getAvailability().hasLiveEntityData();
@@ -190,10 +191,10 @@ public final class LostTalesFellowshipHudRenderer {
         // points at the HUD, so it never slides (LOOK-37).
         LostTalesUiCutName.drawShadowed(font, member.getCharacterName(),
                 textX, y + 3, Math.max(8, nameRight - textX),
-                muted ? LostTalesSkyrimUiStyle.TEXT_MUTED
-                        : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
+                muted ? LostTalesColors.TEXT_MUTED
+                        : LostTalesColors.TEXT_BRIGHT);
         if (leader) {
-            LostTalesSkyrimUiStyle.drawDiamond(
+            LostTalesUiInk.fillDiamond(
                     leaderX, y + 7,
                     LostTalesColors.withAlpha(LostTalesUiTheme.accentRgb(), 0xFF));
         }
@@ -241,15 +242,15 @@ public final class LostTalesFellowshipHudRenderer {
     private static int statusColor(FellowshipMemberStatusSnapshot status,
                                    boolean stale) {
         if (stale || status == null) {
-            return LostTalesSkyrimUiStyle.TEXT_DIM;
+            return LostTalesColors.TEXT_DIM;
         }
         if (status.getAvailability() == FellowshipMemberAvailability.DEAD) {
-            return LostTalesSkyrimUiStyle.RED;
+            return LostTalesColors.RED;
         }
         if (status.getAvailability() == FellowshipMemberAvailability.ACTIVE) {
-            return LostTalesSkyrimUiStyle.TEXT;
+            return LostTalesColors.TEXT;
         }
-        return LostTalesSkyrimUiStyle.TEXT_MUTED;
+        return LostTalesColors.TEXT_MUTED;
     }
 
     private static void drawHearts(Minecraft minecraft,

@@ -1,0 +1,22 @@
+{
+  "id": "losttales:arnorian",
+  "helmet": [
+    "lotr:item.helmetArnor"
+  ],
+  "chestplate": [
+    "lotr:item.bodyArnor"
+  ],
+  "leggings": [
+    "lotr:item.legsArnor"
+  ],
+  "boots": [
+    "lotr:item.bootsArnor"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:lore"
+    }
+  ]
+}

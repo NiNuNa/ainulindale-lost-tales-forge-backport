@@ -14,6 +14,12 @@ public final class LostTalesMapScene {
     private static final long ANIMATION_START = System.nanoTime();
     // Rendering is on Minecraft's GL thread. Nested views restore their caller.
     private static BackgroundView background;
+    /**
+     * The main menu's flyover held still (MAP-14). LOTR keeps one flyover
+     * for every main menu, and so does this.
+     */
+    private static final LostTalesMapBackgroundStill MENU_STILL =
+            new LostTalesMapBackgroundStill();
     private static boolean backgroundFailureLogged;
 
     private LostTalesMapScene() {}
@@ -23,7 +29,11 @@ public final class LostTalesMapScene {
         return LostTalesLotrSmoothMapRenderer.render(gui, sepia, alpha, overlay);
     }
 
-    /** Retains LOTR's flyover path, palette and caller-owned vignette. */
+    /**
+     * Retains LOTR's flyover path, palette and caller-owned vignette. With
+     * Animations off or reduced motion the backgrounds do not sway and
+     * the main menu's flyover holds where it stands (MAP-14).
+     */
     public static boolean renderBackground(LOTRGuiRendererMap renderer,
             GuiScreen screen, LOTRGuiMap gui, float partialTicks,
             int left, int top, int right, int bottom, boolean sepia) {
@@ -38,13 +48,29 @@ public final class LostTalesMapScene {
         try {
             previousImageBounds = LostTalesLotrSmoothMapRenderer.captureImageBounds();
             float partial = Math.max(0.0F, Math.min(1.0F, partialTicks));
-            gui.setFakeMapProperties(
-                    (float)(renderer.prevMapX + (renderer.mapX - renderer.prevMapX) * partial),
-                    (float)(renderer.prevMapY + (renderer.mapY - renderer.prevMapY) * partial),
-                    (float)Math.pow(2.0D, renderer.zoomExp), renderer.zoomExp, renderer.zoomStable);
+            double mapX = renderer.prevMapX + (renderer.mapX - renderer.prevMapX) * partial;
+            double mapY = renderer.prevMapY + (renderer.mapY - renderer.prevMapY) * partial;
+            float zoomExp = renderer.zoomExp;
+            LostTalesMapPresentation presentation = presentationFor(screen);
+            boolean still = LostTalesMapBackgroundStill.stills();
+            if (presentation == LostTalesMapPresentation.MAIN_MENU) {
+                double[] place = MENU_STILL.place(still, mapX, mapY);
+                mapX = place[0];
+                mapY = place[1];
+                if (still) {
+                    // LOTR's flyover carries on from here once motion is back.
+                    renderer.prevMapX = mapX;
+                    renderer.mapX = mapX;
+                    renderer.prevMapY = mapY;
+                    renderer.mapY = mapY;
+                    zoomExp = LostTalesMapBackgroundStill.RESTING_ZOOM_EXP;
+                }
+            }
+            gui.setFakeMapProperties((float)mapX, (float)mapY,
+                    (float)Math.pow(2.0D, zoomExp), zoomExp, renderer.zoomStable);
             previousBounds = LOTRGuiMap.setFakeStaticProperties(
                     right - left, bottom - top, left, right, top, bottom);
-            background = new BackgroundView(gui, presentationFor(screen), animationSeconds());
+            background = new BackgroundView(gui, presentation, animationSeconds(), still);
             gui.enableZoomOutWPFading = false;
             if (!renderMap(gui, sepia, 1.0F, true)) {
                 // Retain native ground as a fallback, but keep ownership of
@@ -109,7 +135,8 @@ public final class LostTalesMapScene {
     static float backgroundDegrees(LOTRGuiMap gui) {
         return isBackground(gui) && LostTalesLotrMapRotation.isSupported()
                 && Boolean.getBoolean(LostTalesClassTransformer.LOTR_MAP_SCENE_ACTIVE_PROPERTY)
-                ? (float)Math.sin(background.seconds / 24.0D) * 3.0F : 0.0F;
+                ? LostTalesMapBackgroundStill.swayDegrees(background.seconds,
+                        background.still) : 0.0F;
     }
 
     static float backgroundLean(LOTRGuiMap gui) {
@@ -141,12 +168,16 @@ public final class LostTalesMapScene {
         final LOTRGuiMap gui;
         final LostTalesMapPresentation presentation;
         final double seconds;
+        /** Whether the background holds still this frame (MAP-14). */
+        final boolean still;
         boolean roadsRendered;
 
-        BackgroundView(LOTRGuiMap gui, LostTalesMapPresentation presentation, double seconds) {
+        BackgroundView(LOTRGuiMap gui, LostTalesMapPresentation presentation,
+                       double seconds, boolean still) {
             this.gui = gui;
             this.presentation = presentation;
             this.seconds = seconds;
+            this.still = still;
         }
     }
 }

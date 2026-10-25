@@ -3,7 +3,7 @@ package com.ninuna.losttales.character.server;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.cape.CharacterCapeDefinition;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import java.util.Arrays;
@@ -64,7 +64,7 @@ public final class AllowlistedCharacterCapeEligibilityPolicyTest {
     private static RoleplayCharacter character(String startingFaction, String pledge) {
         return RoleplayCharacter.builder(UUID.randomUUID(), OWNER)
                 .slot(0).name("Beregond").race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE).skin("losttales:human_gondor_male_0")
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE).skin("losttales:human_gondor_masculine_0")
                 .startingFaction(startingFaction).pledgedFaction(pledge).build();
     }
 }

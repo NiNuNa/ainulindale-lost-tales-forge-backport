@@ -2,7 +2,8 @@ package com.ninuna.losttales.client.input;
 
 import com.ninuna.losttales.client.input.LostTalesInputBinding.Type;
 import com.ninuna.losttales.client.input.LostTalesInputIconAnimation.Pose;
-import com.ninuna.losttales.client.input.LostTalesInputIconAtlas.Sprite;
+import com.ninuna.losttales.client.input.LostTalesInputIconAtlas.Band;
+import com.ninuna.losttales.client.input.LostTalesInputIconAtlas.Cell;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -22,7 +23,14 @@ import net.minecraft.client.settings.KeyBinding;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
-/** Generic renderer for key-binding and mouse-wheel input hints. */
+/**
+ * Every key hint the mod draws: the HUD's, quick loot's, the map's,
+ * tooltips' and the windows' help and shortcuts all come here (MAP-17).
+ * A key is a blank key with its name written on it in the reader's
+ * language ({@link LostTalesInputBinding#getFallbackLabel}), an arrow
+ * its painted glyph, the mouse wheel its picture. Without the key
+ * texture, a key is its name in a plain frame.
+ */
 @SideOnly(Side.CLIENT)
 public final class LostTalesInputIconRenderer {
     public static final int BASE_ICON_HEIGHT = LostTalesInputIconAtlas.SPRITE_HEIGHT;
@@ -68,7 +76,7 @@ public final class LostTalesInputIconRenderer {
      * the GUI's own: one display pixel fewer to each pixel of the artwork,
      * two for three at GUI scale 3, never under one. A key drawn at it
      * starts and ends on display pixels wherever it stands on the GUI's
-     * grid.
+     * grid, and so does the name written on it.
      */
     public static float windowScale() {
         int factor = LostTalesDisplayPixels.scaleFactor();
@@ -85,12 +93,6 @@ public final class LostTalesInputIconRenderer {
      * unrounded: what follows it starts on the display pixel after it.
      */
     public static float windowWidth(Minecraft minecraft, int keyCode) {
-        Sprite sprite = LostTalesInputIconAtlas.findSprite(Type.KEYBOARD,
-                keyCode);
-        if (minecraft != null && sprite != null
-                && isTextureAvailable(minecraft)) {
-            return sprite.getWidth() * windowScale();
-        }
         return measureInput(minecraft, Type.KEYBOARD, keyCode, 1.0F)
                 * windowScale();
     }
@@ -110,16 +112,32 @@ public final class LostTalesInputIconRenderer {
         if (minecraft == null || scale <= 0.0F) {
             return 0;
         }
-        Sprite sprite = LostTalesInputIconAtlas.findSprite(type, keyCode);
-        if (sprite != null && isTextureAvailable(minecraft)) {
-            return (int)Math.ceil(sprite.getWidth() * scale);
-        }
-        String label = LostTalesInputBinding.getFallbackLabel(type, keyCode);
         FontRenderer font = minecraft.fontRenderer;
-        int width = font == null ? FALLBACK_MIN_WIDTH
-                : Math.max(FALLBACK_MIN_WIDTH,
-                font.getStringWidth(label) + FALLBACK_HORIZONTAL_PADDING * 2);
+        String label = LostTalesInputBinding.getFallbackLabel(type, keyCode);
+        int width;
+        if (isTextureAvailable(minecraft)) {
+            width = artWidth(font, type, keyCode, label);
+        } else {
+            width = font == null ? FALLBACK_MIN_WIDTH
+                    : Math.max(FALLBACK_MIN_WIDTH,
+                    font.getStringWidth(label) + FALLBACK_HORIZONTAL_PADDING * 2);
+        }
         return (int)Math.ceil(width * scale);
+    }
+
+    /** The width of a key drawn from the texture: the wheel's picture, an arrow's key, or a blank key sized to its name. */
+    private static int artWidth(FontRenderer font, Type type, int keyCode,
+                                String label) {
+        if (type == Type.MOUSE_WHEEL) {
+            return LostTalesInputIconAtlas.mouseWheel().getWidth();
+        }
+        Cell arrow = type == Type.KEYBOARD
+                ? LostTalesInputIconAtlas.arrowGlyph(keyCode) : null;
+        if (arrow != null) {
+            return LostTalesInputIconAtlas.glyphKeyWidth(arrow);
+        }
+        return LostTalesInputIconAtlas.keyWidth(
+                font == null ? 0 : font.getStringWidth(label));
     }
 
     public static int drawInput(Minecraft minecraft, Type type, int keyCode, float x, float y, float scale) {
@@ -133,16 +151,23 @@ public final class LostTalesInputIconRenderer {
             return measureInput(minecraft, type, keyCode, scale);
         }
         float opacity = Math.min(1.0F, alpha);
-
-        Sprite sprite = LostTalesInputIconAtlas.findSprite(type, keyCode);
         Pose pose = animationPose(type, keyCode);
-        if (sprite != null && isTextureAvailable(minecraft)) {
-            drawSprite(minecraft, sprite, pose, x, y, scale, opacity);
-            return (int) Math.ceil(sprite.getWidth() * scale);
-        }
-
         String label = LostTalesInputBinding.getFallbackLabel(type, keyCode);
-        return drawFallback(minecraft.fontRenderer, label, pose, x, y, scale, opacity);
+        FontRenderer font = minecraft.fontRenderer;
+        if (!isTextureAvailable(minecraft)) {
+            return drawFallback(font, label, pose, x, y, scale, opacity);
+        }
+        int width = artWidth(font, type, keyCode, label);
+        if (type == Type.MOUSE_WHEEL) {
+            drawArt(minecraft, true, null, null, null, width, pose, x, y,
+                    scale, opacity);
+        } else {
+            Cell arrow = type == Type.KEYBOARD
+                    ? LostTalesInputIconAtlas.arrowGlyph(keyCode) : null;
+            drawArt(minecraft, false, font, arrow == null ? label : null,
+                    arrow, width, pose, x, y, scale, opacity);
+        }
+        return (int)Math.ceil(width * scale);
     }
 
     /** Rechecks the texture after resource-pack reloads without parsing the image. */
@@ -205,9 +230,17 @@ public final class LostTalesInputIconRenderer {
         }
     }
 
-    private static void drawSprite(
-            Minecraft minecraft, Sprite sprite, Pose pose,
-            float x, float y, float scale, float alpha) {
+    /**
+     * One key in its pose: the mouse wheel's picture, or the blank key
+     * {@code width} wide with {@code label} written on its face or
+     * {@code arrow} painted there. Its shadow and its highlight are the
+     * key's own; the name rides the key and casts the one text shadow.
+     */
+    private static void drawArt(
+            Minecraft minecraft, boolean wheel, FontRenderer font,
+            String label, Cell arrow, int width, Pose pose, float x, float y,
+            float scale, float alpha) {
+        int height = BASE_ICON_HEIGHT;
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT);
         GL11.glPushMatrix();
         try {
@@ -221,11 +254,12 @@ public final class LostTalesInputIconRenderer {
             if (pose.getShadowAlpha() > 0.0F) {
                 GL11.glPushMatrix();
                 try {
-                    applyPoseTransform(pose, sprite.getWidth(),
-                            sprite.getHeight(), true);
-                    GL11.glColor4f(0.14F, 0.11F, 0.09F,
+                    applyPoseTransform(pose, width, height, true);
+                    GL11.glColor4f(LostTalesColors.redF(LostTalesColors.PLUM_BLACK),
+                            LostTalesColors.greenF(LostTalesColors.PLUM_BLACK),
+                            LostTalesColors.blueF(LostTalesColors.PLUM_BLACK),
                             pose.getShadowAlpha() * alpha);
-                    drawSpriteLayers(sprite, pose.getFrame());
+                    drawLayers(wheel, arrow, width, pose.getFrame());
                 } finally {
                     GL11.glPopMatrix();
                 }
@@ -233,14 +267,13 @@ public final class LostTalesInputIconRenderer {
 
             GL11.glPushMatrix();
             try {
-                applyPoseTransform(pose, sprite.getWidth(),
-                        sprite.getHeight(), false);
+                applyPoseTransform(pose, width, height, false);
                 float brightness = pose.getBrightness();
                 float warmth = pose.getPressure();
                 GL11.glColor4f(brightness,
                         brightness * (1.0F - 0.018F * warmth),
                         brightness * (1.0F - 0.045F * warmth), alpha);
-                drawSpriteLayers(sprite, pose.getFrame());
+                drawLayers(wheel, arrow, width, pose.getFrame());
 
                 // Fixed-function colour multiplication cannot brighten past
                 // white. A restrained additive echo supplies the highlight
@@ -250,10 +283,21 @@ public final class LostTalesInputIconRenderer {
                 if (highlightAlpha > 0.003F) {
                     OpenGlHelper.glBlendFunc(
                             GL11.GL_SRC_ALPHA, GL11.GL_ONE, 1, 0);
-                    GL11.glColor4f(1.0F, 0.78F, 0.55F, highlightAlpha * alpha);
-                    drawSpriteLayers(sprite, pose.getFrame());
+                    GL11.glColor4f(LostTalesColors.redF(LostTalesColors.HONEY),
+                            LostTalesColors.greenF(LostTalesColors.HONEY),
+                            LostTalesColors.blueF(LostTalesColors.HONEY),
+                            highlightAlpha * alpha);
+                    drawLayers(wheel, arrow, width, pose.getFrame());
                     OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
                             GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+                }
+                if (label != null && font != null) {
+                    int labelWidth = font.getStringWidth(label);
+                    LostTalesUiInk.drawText(font, label,
+                            LostTalesInputIconAtlas.labelLeft(width, labelWidth),
+                            LostTalesInputIconAtlas.faceTop(pose.getFrame()),
+                            LostTalesUiInk.IVORY,
+                            Math.max(0, Math.min(255, Math.round(alpha * 255.0F))));
                 }
             } finally {
                 GL11.glPopMatrix();
@@ -280,24 +324,57 @@ public final class LostTalesInputIconRenderer {
         GL11.glTranslatef(-width * 0.5F, -height * 0.5F, 0.0F);
     }
 
-    /** Draws the reusable key frame and its independently selected glyph. */
-    private static void drawSpriteLayers(Sprite sprite, int frame) {
-        drawAtlasQuad(0.0F, 0.0F,
-                sprite.getWidth(), sprite.getHeight(),
-                sprite.getU(frame), sprite.getV(frame),
-                sprite.getWidth(), sprite.getHeight());
-        if (sprite.hasGlyph()) {
-            drawAtlasQuad(sprite.getGlyphOffsetX(),
-                    sprite.getGlyphOffsetY(frame),
-                    sprite.getGlyphWidth(), sprite.getGlyphHeight(),
-                    sprite.getGlyphU(), sprite.getGlyphV(),
-                    sprite.getGlyphWidth(), sprite.getGlyphHeight());
+    /**
+     * The key's texels in the colour set before: the wheel's picture, or
+     * the blank key's face, its bands, and an arrow's glyph on the face.
+     */
+    private static void drawLayers(boolean wheel, Cell arrow, int width,
+                                   int pose) {
+        if (wheel) {
+            Cell cell = LostTalesInputIconAtlas.mouseWheel();
+            drawAtlasQuad(0.0F, 0.0F, cell.width, cell.height,
+                    cell.u, cell.v, cell.width, cell.height);
+            return;
+        }
+        int inset = LostTalesInputIconAtlas.FACE_INSET;
+        int faceTop = LostTalesInputIconAtlas.faceTop(pose);
+        drawAtlasQuad(inset, faceTop, width - 2 * inset,
+                LostTalesInputIconAtlas.FACE_ROWS,
+                LostTalesInputIconAtlas.FACE_TEXEL_U,
+                LostTalesInputIconAtlas.FACE_TEXEL_V, 1, 1);
+        int cellU = LostTalesInputIconAtlas.cellU(pose);
+        int ends = LostTalesInputIconAtlas.KEY_END_COLUMNS;
+        int cellWidth = LostTalesInputIconAtlas.KEY_CELL_WIDTH;
+        int v = LostTalesInputIconAtlas.KEY_CELL_V;
+        for (Band band : LostTalesInputIconAtlas.bands(pose)) {
+            if (band.rows <= 0 || band.sourceRows <= 0) {
+                continue;
+            }
+            drawAtlasQuad(0.0F, band.top, ends, band.rows,
+                    cellU, v + band.sourceRow, ends, band.sourceRows);
+            drawAtlasQuad(ends, band.top, width - 2 * ends, band.rows,
+                    cellU + LostTalesInputIconAtlas.KEY_MIDDLE_COLUMN,
+                    v + band.sourceRow, 1, band.sourceRows);
+            drawAtlasQuad(width - ends, band.top, ends, band.rows,
+                    cellU + cellWidth - ends, v + band.sourceRow, ends,
+                    band.sourceRows);
+        }
+        if (arrow != null) {
+            drawAtlasQuad(inset + LostTalesUiInk.centredStart(
+                            width - 2 * inset, arrow.width),
+                    faceTop + LostTalesUiInk.centredStart(
+                            LostTalesInputIconAtlas.FACE_ROWS, arrow.height),
+                    arrow.width, arrow.height, arrow.u, arrow.v,
+                    arrow.width, arrow.height);
         }
     }
 
     private static void drawAtlasQuad(
             float x, float y, float width, float height,
             int u, int v, int sourceWidth, int sourceHeight) {
+        if (width <= 0.0F || height <= 0.0F) {
+            return;
+        }
         float u0 = (float)u
                 / (float)LostTalesInputIconAtlas.TEXTURE_WIDTH;
         float u1 = (float)(u + sourceWidth)

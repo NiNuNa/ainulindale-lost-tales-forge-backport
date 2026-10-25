@@ -10,9 +10,9 @@ public final class CharacterCreationRequest {
     private final int slotIndex;
     private final String name;
     private final String raceId;
-    private final String genderId;
-    private final String skinId;
     private final String bodyTypeId;
+    private final String skinId;
+    private final String armsId;
     private final String chestTypeId;
     private final String history;
     private final int age;
@@ -22,14 +22,14 @@ public final class CharacterCreationRequest {
     private final boolean showMinecraftCape;
     private final String cosmeticCapeId;
 
-    /** Empty body and chest types let validation pick the defaults for the sex. */
+    /** Empty arms and chest let validation pick the body type's own. */
     public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
-                                    String name, String raceId, String genderId,
+                                    String name, String raceId, String bodyTypeId,
                                     String skinId, int age,
                                     String startingFactionId,
                                     String startingWaypointId,
                                     boolean unconventionalSettings,
-                                    String history, String bodyTypeId,
+                                    String history, String armsId,
                                     String chestTypeId, boolean showMinecraftCape,
                                     String cosmeticCapeId) {
         this.expectedRosterRevision = expectedRosterRevision;
@@ -38,9 +38,9 @@ public final class CharacterCreationRequest {
         this.slotIndex = slotIndex;
         this.name = name;
         this.raceId = raceId;
-        this.genderId = genderId;
+        this.bodyTypeId = bodyTypeId;
         this.skinId = skinId;
-        this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
+        this.armsId = armsId == null ? "" : armsId;
         this.chestTypeId = chestTypeId == null ? "" : chestTypeId;
         this.history = history;
         this.age = age;
@@ -65,20 +65,20 @@ public final class CharacterCreationRequest {
         return this.raceId;
     }
 
-    public String getGenderId() {
-        return this.genderId;
+    public String getBodyTypeId() {
+        return this.bodyTypeId;
     }
 
     public String getSkinId() {
         return this.skinId;
     }
 
-    /** Requested arm width; empty means the default for the sex. */
-    public String getBodyTypeId() {
-        return this.bodyTypeId;
+    /** Requested arms; empty means the default for the body type. */
+    public String getArmsId() {
+        return this.armsId;
     }
 
-    /** Requested chest type; empty means the default for the sex. */
+    /** Requested chest type; empty means the default for the body type. */
     public String getChestTypeId() {
         return this.chestTypeId;
     }

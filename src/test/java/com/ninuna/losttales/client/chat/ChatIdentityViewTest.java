@@ -603,6 +603,7 @@ public final class ChatIdentityViewTest {
     private static LostTalesChatIdentitySyncPacket sync(UUID fellowship, int color) {
         return new LostTalesChatIdentitySyncPacket(Collections.<UUID>emptyList(),
                 Collections.singletonList(new ChatFellowship(fellowship,
-                        "Company " + fellowship.getLeastSignificantBits(), color)));
+                        "Company " + fellowship.getLeastSignificantBits(), color)),
+                Collections.singletonList(fellowship));
     }
 }

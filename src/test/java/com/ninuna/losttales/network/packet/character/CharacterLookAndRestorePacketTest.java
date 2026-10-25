@@ -23,15 +23,15 @@ public final class CharacterLookAndRestorePacketTest {
     public void aLookUpdateRoundTrips() {
         ByteBuf buffer = Unpooled.buffer();
         new CharacterLookUpdateRequestPacket(4, 9L, CHARACTER,
-                "losttales:human_bree_male_3", "losttales:slim",
+                "losttales:human_bree_masculine_3", "losttales:slender",
                 "losttales:classic").toBytes(buffer);
         CharacterLookUpdateRequestPacket decoded =
                 new CharacterLookUpdateRequestPacket();
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
         assertEquals(CHARACTER, decoded.getCharacterId());
-        assertEquals("losttales:human_bree_male_3", decoded.getSkinId());
-        assertEquals("losttales:slim", decoded.getBodyTypeId());
+        assertEquals("losttales:human_bree_masculine_3", decoded.getSkinId());
+        assertEquals("losttales:slender", decoded.getArmsId());
         assertEquals("losttales:classic", decoded.getChestTypeId());
     }
 

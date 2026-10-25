@@ -1,0 +1,6 @@
+{
+  "id": "lotr:dwarven_ring",
+  "slot": "ring",
+  "item": "lotr:item.dwarvenRing",
+  "effects": []
+}

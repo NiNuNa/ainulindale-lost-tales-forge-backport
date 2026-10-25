@@ -1,5 +1,7 @@
 {
   "view": "profile",
   "locked": true,
-  "pages": ["characters", "skills"]
+  "place": "left_third",
+  "stage": true,
+  "pages": ["characters"]
 }

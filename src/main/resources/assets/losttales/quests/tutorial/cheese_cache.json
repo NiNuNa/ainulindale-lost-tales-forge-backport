@@ -1,6 +1,7 @@
 {
   "id": "losttales:tutorial/cheese_cache",
   "repeatable": true,
+  "repeatAfter": "1",
   "restartable": true,
   "startMode": "interaction",
   "interaction": {

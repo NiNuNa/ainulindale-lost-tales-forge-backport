@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.ChatColorMarkers;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.chat.ChatNarrator;
+import com.ninuna.losttales.chat.ChatUnseenVoice;
 import java.nio.charset.Charset;
 import java.util.Base64;
 import java.util.UUID;
@@ -253,6 +254,12 @@ final class ChatHeadMarker {
             return this.accountIdentity
                     && LostTalesChatMessagePacket.isSystemSender(
                             this.senderId);
+        }
+
+        /** Whether the line is an unseen voice's: its head slot stays empty (CHAT-84). */
+        boolean isUnseenVoice() {
+            return !this.accountIdentity
+                    && ChatUnseenVoice.isUnseenSkin(this.skinId);
         }
 
         /** Whether the line is in the Narrator's voice: its head slot holds the Narrator's mark. */

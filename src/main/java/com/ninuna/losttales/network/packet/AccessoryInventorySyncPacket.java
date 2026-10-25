@@ -1,8 +1,6 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
-import com.ninuna.losttales.accessory.AccessoryCompatibilityRegistry;
-import com.ninuna.losttales.accessory.AccessorySlotType;
 import cpw.mods.fml.common.network.ByteBufUtils;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -86,10 +84,12 @@ public final class AccessoryInventorySyncPacket implements IMessage {
         return this.malformed;
     }
 
+    /**
+     * One ring or none. Whether the slot takes it is asked as the snapshot
+     * is applied, against the list the server sent ahead of it (ACC-01).
+     */
     private static boolean isValidStack(ItemStack stack) {
-        return stack == null || stack.stackSize == 1
-                && AccessoryCompatibilityRegistry.getInstance().isCompatible(
-                AccessorySlotType.RING, stack);
+        return stack == null || stack.stackSize == 1;
     }
 
     /** Common-safe handler; all client access remains behind the sided proxy. */

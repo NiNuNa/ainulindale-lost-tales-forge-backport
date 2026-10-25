@@ -23,7 +23,7 @@ import static org.junit.Assert.assertTrue;
  */
 public final class CharacterSkinRegistryTest {
 
-    private static final String EXILED_DWARF = "losttales:dwarf_exiled_male_0";
+    private static final String EXILED_DWARF = "losttales:dwarf_exiled_masculine_0";
 
     @Test
     public void bundledSkinsShipAsSkinSizedTextures() throws Exception {
@@ -65,12 +65,12 @@ public final class CharacterSkinRegistryTest {
     @Test
     public void exiledDwarfIsOfferedNextToLotrMaleDwarfSkins() {
         List<CharacterSkinDefinition> male = CharacterSkinRegistry.getCompatibleSkins(
-                CharacterRaceRegistry.DWARF, CharacterGenderRegistry.MALE);
+                CharacterRaceRegistry.DWARF, CharacterBodyTypeRegistry.MASCULINE);
         Set<String> ids = new HashSet<String>();
         for (CharacterSkinDefinition definition : male) {
             ids.add(definition.getId());
         }
-        assertTrue(ids.contains("losttales:dwarf_erebor_male_0"));
+        assertTrue(ids.contains("losttales:dwarf_erebor_masculine_0"));
         assertTrue(ids.contains(EXILED_DWARF));
 
         CharacterSkinDefinition exiled = CharacterSkinRegistry.get(EXILED_DWARF);
@@ -79,11 +79,11 @@ public final class CharacterSkinRegistryTest {
         assertEquals("losttales:textures/skins/dwarf/exiled_male/0.png",
                 exiled.getTextureLocation());
         assertTrue(CharacterSkinRegistry.isCompatible(EXILED_DWARF,
-                CharacterRaceRegistry.DWARF, CharacterGenderRegistry.MALE));
+                CharacterRaceRegistry.DWARF, CharacterBodyTypeRegistry.MASCULINE));
         assertFalse(CharacterSkinRegistry.isCompatible(EXILED_DWARF,
-                CharacterRaceRegistry.DWARF, CharacterGenderRegistry.FEMALE));
+                CharacterRaceRegistry.DWARF, CharacterBodyTypeRegistry.FEMININE));
         assertFalse(CharacterSkinRegistry.isCompatible(EXILED_DWARF,
-                CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE));
+                CharacterRaceRegistry.HUMAN, CharacterBodyTypeRegistry.MASCULINE));
     }
 
     @Test
@@ -112,7 +112,7 @@ public final class CharacterSkinRegistryTest {
     public void everyRaceOffersTheAccountSkinFirst() {
         for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
             CharacterSkinDefinition first = CharacterSkinRegistry.getCompatibleSkins(
-                    race.getId(), race.getAllowedGenderIds().iterator().next()).get(0);
+                    race.getId(), race.getAllowedBodyTypeIds().iterator().next()).get(0);
             assertTrue(race.getId(), first.isAccountSkin());
             assertEquals(race.getId(), CharacterSkinLayout.MINECRAFT_64X64,
                     first.getLayout());
@@ -121,7 +121,7 @@ public final class CharacterSkinRegistryTest {
         }
         assertEquals("losttales:account_skin_elf",
                 CharacterSkinRegistry.getCompatibleSkins(
-                        CharacterRaceRegistry.ELF, CharacterGenderRegistry.FEMALE)
+                        CharacterRaceRegistry.ELF, CharacterBodyTypeRegistry.FEMININE)
                         .get(0).getId());
     }
 
@@ -134,18 +134,18 @@ public final class CharacterSkinRegistryTest {
         assertFalse(isBundled(account));
         assertEquals(CharacterRaceRegistry.HUMAN, account.getRaceId());
         assertTrue(CharacterSkinRegistry.isCompatible(CharacterSkinRegistry.ACCOUNT_SKIN_ID,
-                CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.FEMALE));
+                CharacterRaceRegistry.HUMAN, CharacterBodyTypeRegistry.FEMININE));
         assertTrue(CharacterSkinRegistry.isCompatible(CharacterSkinRegistry.ACCOUNT_SKIN_ID,
-                CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE));
+                CharacterRaceRegistry.HUMAN, CharacterBodyTypeRegistry.MASCULINE));
         assertFalse(CharacterSkinRegistry.isCompatible(CharacterSkinRegistry.ACCOUNT_SKIN_ID,
-                CharacterRaceRegistry.ELF, CharacterGenderRegistry.MALE));
+                CharacterRaceRegistry.ELF, CharacterBodyTypeRegistry.MASCULINE));
         assertEquals(CharacterSkinRegistry.ACCOUNT_SKIN_ID,
                 CharacterSkinRegistry.getCompatibleSkins(
-                        CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE)
+                        CharacterRaceRegistry.HUMAN, CharacterBodyTypeRegistry.MASCULINE)
                         .get(0).getId());
         for (int seed = 0; seed < 64; seed++) {
             String fallback = CharacterSkinRegistry.getDefaultSkinId(
-                    CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE,
+                    CharacterRaceRegistry.HUMAN, CharacterBodyTypeRegistry.MASCULINE,
                     new java.util.UUID(seed, seed * 31L));
             assertFalse(fallback, CharacterSkinRegistry.get(fallback).isAccountSkin());
         }
@@ -181,14 +181,14 @@ public final class CharacterSkinRegistryTest {
 
     /**
      * Every skin the catalogue offers, as the creator asks for them: each
-     * race's, for each sex it may be.
+     * race's, for each body type it may be.
      */
     private static Set<CharacterSkinDefinition> everySkin() {
         Set<CharacterSkinDefinition> skins = new LinkedHashSet<CharacterSkinDefinition>();
         for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
-            for (String genderId : race.getAllowedGenderIds()) {
+            for (String bodyTypeId : race.getAllowedBodyTypeIds()) {
                 skins.addAll(CharacterSkinRegistry.getCompatibleSkins(
-                        race.getId(), genderId));
+                        race.getId(), bodyTypeId));
             }
         }
         return skins;

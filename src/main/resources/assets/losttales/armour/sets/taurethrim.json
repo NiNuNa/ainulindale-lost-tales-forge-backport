@@ -1,0 +1,22 @@
+{
+  "id": "losttales:taurethrim",
+  "helmet": [
+    "lotr:item.helmetTauredain",
+    "lotr:item.helmetTauredainChieftain"
+  ],
+  "chestplate": [
+    "lotr:item.bodyTauredain"
+  ],
+  "leggings": [
+    "lotr:item.legsTauredain"
+  ],
+  "boots": [
+    "lotr:item.bootsTauredain"
+  ],
+  "bonus": [
+    {
+      "effect": "poison",
+      "amount": 0.2
+    }
+  ]
+}

@@ -12,11 +12,35 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
 
-/** Client replacement snapshot of server-approved combat marker entities. */
+/**
+ * Client replacement snapshot of server-approved combat marker entities,
+ * each named in this game's language from the kind the server sent
+ * (MAP-16).
+ */
 @SideOnly(Side.CLIENT)
 public final class LostTalesClientMobAggroCache {
-    /** The word for an enemy the server sends no name for. */
+    /** The word for an enemy whose kind this game has no name for. */
     public static final String ENEMY_KEY = "gui.losttales.marker.enemy";
+
+    /** The lang lines a contact's name is read from. */
+    interface Words {
+        boolean has(String key);
+
+        String read(String key);
+    }
+
+    /** This game's own lang lines, in the language it is set to. */
+    private static final Words GAME_WORDS = new Words() {
+        @Override
+        public boolean has(String key) {
+            return StatCollector.canTranslate(key);
+        }
+
+        @Override
+        public String read(String key) {
+            return StatCollector.translateToLocal(key);
+        }
+    };
     private static final int STALE_SNAPSHOT_TICKS = 240;
     private static volatile List<TrackedEnemy> trackedEnemies =
             Collections.emptyList();
@@ -133,6 +157,25 @@ public final class LostTalesClientMobAggroCache {
         return StatCollector.translateToLocal(ENEMY_KEY);
     }
 
+    /** The lang key a creature's kind is named by, as the game names every creature. */
+    static String kindKey(String kind) {
+        return "entity." + kind + ".name";
+    }
+
+    /**
+     * What a contact is called: the name a player gave it, as written;
+     * else its kind's name in {@code words}; else the word for an enemy.
+     */
+    static String nameOf(String kind, String ownName, Words words) {
+        if (ownName != null && ownName.trim().length() > 0) {
+            return ownName.trim();
+        }
+        if (kind != null && kind.length() > 0 && words.has(kindKey(kind))) {
+            return words.read(kindKey(kind));
+        }
+        return words.read(ENEMY_KEY);
+    }
+
     private static void clearInternal() {
         trackedEnemies = Collections.emptyList();
         dimensionId = Integer.MIN_VALUE;
@@ -155,7 +198,7 @@ public final class LostTalesClientMobAggroCache {
         private TrackedEnemy(LostTalesMobAggroSyncPacket.Entry entry) {
             this.entityId = entry.getEntityId();
             this.sharedFromFellowship = entry.isSharedFromFellowship();
-            this.name = entry.getName();
+            this.name = nameOf(entry.getKind(), entry.getOwnName(), GAME_WORDS);
             this.x = entry.getX();
             this.y = entry.getY();
             this.z = entry.getZ();
@@ -169,9 +212,9 @@ public final class LostTalesClientMobAggroCache {
             return this.sharedFromFellowship;
         }
 
-        /** The name the server sent, or this game's word for an enemy where it sent none. */
+        /** What the contact is called in this game's language ({@link #nameOf}). */
         public String getName() {
-            return this.name.length() > 0 ? this.name : enemyWord();
+            return this.name;
         }
 
         public double getX() {

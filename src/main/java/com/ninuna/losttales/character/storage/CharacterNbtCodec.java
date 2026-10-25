@@ -5,9 +5,9 @@ import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBody;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.storage.NbtQuarantine;
@@ -56,9 +56,9 @@ public final class CharacterNbtCodec {
     private static final String TAG_REVISION = "Revision";
     private static final String TAG_NAME = "Name";
     private static final String TAG_RACE_ID = "RaceId";
-    private static final String TAG_GENDER_ID = "GenderId";
-    private static final String TAG_SKIN_ID = "SkinId";
     private static final String TAG_BODY_TYPE_ID = "BodyTypeId";
+    private static final String TAG_SKIN_ID = "SkinId";
+    private static final String TAG_ARMS_ID = "ArmsId";
     private static final String TAG_CHEST_TYPE_ID = "ChestTypeId";
     private static final String TAG_PROFILE = "Profile";
     private static final String TAG_PROFILE_APPEARANCE = "Appearance";
@@ -260,9 +260,9 @@ public final class CharacterNbtCodec {
         tag.setString(TAG_NAME, character.getName());
         tag.setString(TAG_RACE_ID, character.getRaceId());
         tag.setString(TAG_BODY, character.getBody().getWord());
-        tag.setString(TAG_GENDER_ID, character.getGenderId());
-        tag.setString(TAG_SKIN_ID, character.getSkinId());
         tag.setString(TAG_BODY_TYPE_ID, character.getBodyTypeId());
+        tag.setString(TAG_SKIN_ID, character.getSkinId());
+        tag.setString(TAG_ARMS_ID, character.getArmsId());
         tag.setString(TAG_CHEST_TYPE_ID, character.getChestTypeId());
         tag.setTag(TAG_PROFILE, writeProfile(character.getProfile()));
         tag.setBoolean(TAG_SHOW_MINECRAFT_CAPE, character.isMinecraftCapeVisible());
@@ -572,8 +572,8 @@ public final class CharacterNbtCodec {
     /**
      * A character record exactly as this build writes it: every field
      * present, of its type, and in the form the character holds it: names
-     * of the registries in their normalized form, a skin, an arm width and
-     * a chest the race and sex may have, an age within its bounds, the
+     * of the registries in their normalized form, a skin, arms and
+     * a chest the race and body type may have, an age within its bounds, the
      * faction's start at or after the character's making. Nothing is
      * filled in or put right; a record of any other shape is malformed.
      */
@@ -600,7 +600,7 @@ public final class CharacterNbtCodec {
         if (isBlank(name)) {
             throw new MalformedRecord("missing_name");
         }
-        // The race is kept as it was saved, and the sex and skin with it:
+        // The race is kept as it was saved, and the body type and skin with it:
         // races are data a server may change or take away, and a race gone
         // plays as the body it stood on (CHAR-38). What a race offers is
         // asked where a character is made or changed.
@@ -614,9 +614,9 @@ public final class CharacterNbtCodec {
         if (body == null) {
             throw new MalformedRecord("unknown_body");
         }
-        String genderId = requireString(tag, TAG_GENDER_ID, "missing_sex");
-        if (!isCanonical(genderId) || !CharacterGenderRegistry.contains(genderId)) {
-            throw new MalformedRecord("unknown_sex");
+        String bodyTypeId = requireString(tag, TAG_BODY_TYPE_ID, "missing_body_type");
+        if (!isCanonical(bodyTypeId) || !CharacterBodyTypeRegistry.contains(bodyTypeId)) {
+            throw new MalformedRecord("unknown_body_type");
         }
         String startingFactionId = requireString(tag, TAG_STARTING_FACTION_ID,
                 "missing_starting_faction");
@@ -639,11 +639,11 @@ public final class CharacterNbtCodec {
                 || skinId.length() > MAX_STABLE_IDENTIFIER_LENGTH) {
             throw new MalformedRecord("malformed_skin");
         }
-        String bodyTypeId = requireString(tag, TAG_BODY_TYPE_ID,
-                "missing_body_type");
-        if (!isCanonical(bodyTypeId)
-                || !CharacterBodyTypeRegistry.contains(bodyTypeId)) {
-            throw new MalformedRecord("unknown_body_type");
+        String armsId = requireString(tag, TAG_ARMS_ID,
+                "missing_arms");
+        if (!isCanonical(armsId)
+                || !CharacterArmsRegistry.contains(armsId)) {
+            throw new MalformedRecord("unknown_arms");
         }
         String chestTypeId = requireString(tag, TAG_CHEST_TYPE_ID,
                 "missing_chest_type");
@@ -692,7 +692,7 @@ public final class CharacterNbtCodec {
 
         return RoleplayCharacter
                 .builder(characterId, characterOwnerId)
-                .slot(slotIndex).name(name).race(raceId).body(body).gender(genderId)
+                .slot(slotIndex).name(name).race(raceId).body(body).bodyType(bodyTypeId)
                 .skin(skinId).age(age).startingFaction(startingFactionId)
                 .pledgedFaction(pledgedFactionId)
                 .factionSince(factionSince)
@@ -703,7 +703,7 @@ public final class CharacterNbtCodec {
                 .startingWaypoint(startingWaypointId)
                 .unconventionalSettings(unconventionalSettings)
                 .profile(profile)
-                .bodyType(bodyTypeId)
+                .arms(armsId)
                 .chestType(chestTypeId)
                 .build();
     }

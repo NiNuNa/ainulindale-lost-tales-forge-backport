@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.render.player;
 
 import com.ninuna.losttales.character.registry.CharacterBodyModelDefinition;
 import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
@@ -23,7 +23,7 @@ import java.util.UUID;
 /**
  * Turns a player's synchronized appearance into the model, texture, and
  * scale the renderer draws with. A ghost is a plain human on the Lost
- * Tales player body, wearing the account skin with the arm width the
+ * Tales player body, wearing the account skin with the arms the
  * server read off the profile; a player with no entry yet is drawn the
  * same way from their own skin alone.
  *
@@ -101,7 +101,7 @@ public final class PlayerAppearanceResolver {
             return new ResolvedPlayerAppearance(
                     CharacterBodyModelRegistry.LOSTTALES_PLAYER,
                     CharacterSkinLayout.MINECRAFT_64X64,
-                    CharacterBodyTypeRegistry.normalizeOrWide(appearance.getBodyTypeId()),
+                    CharacterArmsRegistry.normalizeOrBroad(appearance.getArmsId()),
                     CharacterChestTypeRegistry.NONE,
                     1.0F, true, null);
         }
@@ -123,18 +123,18 @@ public final class PlayerAppearanceResolver {
         String chestTypeId = model.hasChestVariant()
                 ? CharacterChestTypeRegistry.normalizeOrNone(appearance.getChestTypeId())
                 : CharacterChestTypeRegistry.NONE;
-        String bodyTypeId = model.supportsBodyTypes()
-                ? CharacterBodyTypeRegistry.normalizeOrWide(appearance.getBodyTypeId())
+        String armsId = model.supportsArms()
+                ? CharacterArmsRegistry.normalizeOrBroad(appearance.getArmsId())
                 : "";
         boolean accountSkin = skin != null && skin.isAccountSkin();
         ResourceLocation texture = skin == null || accountSkin ? null : textureFor(skin);
         CharacterSkinLayout layout = skin == null ? model.getLayout() : skin.getLayout();
         return new ResolvedPlayerAppearance(
-                model.getId(), layout, bodyTypeId, chestTypeId,
+                model.getId(), layout, armsId, chestTypeId,
                 race.getRendererScale(), accountSkin, texture);
     }
 
-    /** A plain human on the Lost Tales body with the account's skin and arm width. */
+    /** A plain human on the Lost Tales body with the account's skin and arms. */
     private static ResolvedPlayerAppearance resolveDefault(
             LostTalesAccountSkins.AccountSkin skin) {
         if (skin == null) {
@@ -143,7 +143,7 @@ public final class PlayerAppearanceResolver {
         return new ResolvedPlayerAppearance(
                 CharacterBodyModelRegistry.LOSTTALES_PLAYER,
                 CharacterSkinLayout.MINECRAFT_64X64,
-                skin.getBodyTypeId(),
+                skin.getArmsId(),
                 CharacterChestTypeRegistry.NONE,
                 1.0F,
                 true,
@@ -155,7 +155,7 @@ public final class PlayerAppearanceResolver {
     }
 
     /**
-     * The selected skin when it fits the race and sex, else one of the
+     * The selected skin when it fits the race and body type, else one of the
      * race's own picked by the character's id, so the same character
      * always falls back to the same skin; the player's id stands in for a
      * preview, which has no character yet.
@@ -164,13 +164,13 @@ public final class PlayerAppearanceResolver {
             UUID playerId, CharacterAppearance appearance) {
         CharacterSkinDefinition selected = CharacterSkinRegistry.get(appearance.getSkinId());
         if (selected != null && selected.isCompatibleWith(
-                appearance.getRaceId(), appearance.getGenderId())) {
+                appearance.getRaceId(), appearance.getBodyTypeId())) {
             return selected;
         }
         UUID seed = appearance.getCharacterId() != null
                 ? appearance.getCharacterId() : playerId;
         String fallbackId = CharacterSkinRegistry.getDefaultSkinId(
-                appearance.getRaceId(), appearance.getGenderId(), seed);
+                appearance.getRaceId(), appearance.getBodyTypeId(), seed);
         return CharacterSkinRegistry.get(fallbackId);
     }
 

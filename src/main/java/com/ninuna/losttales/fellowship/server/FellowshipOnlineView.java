@@ -30,11 +30,15 @@ final class FellowshipOnlineView implements FellowshipSnapshot.Presence {
         final UUID gameplayId;
         /** The active character's name; empty while the first is being made. */
         final String characterName;
+        /** Whether the account plays no character: a ghost, making one. */
+        final boolean ghost;
 
-        private Online(EntityPlayerMP player, UUID gameplayId, String characterName) {
+        private Online(EntityPlayerMP player, UUID gameplayId, String characterName,
+                       boolean ghost) {
             this.player = player;
             this.gameplayId = gameplayId;
             this.characterName = characterName;
+            this.ghost = ghost;
         }
     }
 
@@ -61,8 +65,8 @@ final class FellowshipOnlineView implements FellowshipSnapshot.Presence {
                 CharacterRoster roster = characterData.getRoster(ownerId);
                 RoleplayCharacter active = roster == null ? null : roster.getActiveCharacter();
                 byOwner.put(ownerId, active != null && ownerId.equals(active.getOwnerId())
-                        ? new Online(player, active.getCharacterId(), active.getName())
-                        : new Online(player, ownerId, ""));
+                        ? new Online(player, active.getCharacterId(), active.getName(), false)
+                        : new Online(player, ownerId, "", true));
             }
         }
         return new FellowshipOnlineView(byOwner);
@@ -84,17 +88,27 @@ final class FellowshipOnlineView implements FellowshipSnapshot.Presence {
     @Override
     public FellowshipMemberPresence of(FellowshipMember member) {
         Online online = get(member.getOwnerId());
-        if (online == null) {
-            return FellowshipMemberPresence.AWAY;
+        return online == null ? FellowshipMemberPresence.AWAY
+                : presenceOf(member.getIdentityId(), online.ghost ? null : online.gameplayId);
+    }
+
+    /**
+     * Where a member whose account is online stands: here while it plays
+     * the member, a ghost while it plays no character ({@code played}
+     * null), elsewhere while it plays another (FEL-32).
+     */
+    static FellowshipMemberPresence presenceOf(UUID memberId, UUID played) {
+        if (played == null) {
+            return FellowshipMemberPresence.GHOST;
         }
-        return member.getIdentityId().equals(online.gameplayId)
+        return played.equals(memberId)
                 ? FellowshipMemberPresence.HERE : FellowshipMemberPresence.ELSEWHERE;
     }
 
     @Override
     public String elsewhereName(FellowshipMember member) {
         Online online = get(member.getOwnerId());
-        return online == null || member.getIdentityId().equals(online.gameplayId)
+        return online == null || online.ghost || member.getIdentityId().equals(online.gameplayId)
                 ? "" : online.characterName;
     }
 }

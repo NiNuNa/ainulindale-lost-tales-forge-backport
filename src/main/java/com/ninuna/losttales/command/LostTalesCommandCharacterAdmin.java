@@ -42,6 +42,7 @@ import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.fellowship.server.FellowshipSyncManager;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
 import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.storage.WorldClock;
 import com.ninuna.losttales.util.LostTalesDuration;
 import com.ninuna.losttales.util.LostTalesLog;
 import java.util.List;
@@ -56,7 +57,11 @@ import net.minecraft.world.World;
 /**
  * Operator-only switch-state diagnostics and recovery controls. The
  * status lines name each store's fields as the code does and show their
- * values as they are: ids, numbers, true and false.
+ * values as they are: ids, numbers, true and false. The account is named
+ * as every command names a person ({@link LostTalesCommandSubject},
+ * DATA-05): any account or character this world has seen, a character
+ * standing for the account that owns it, here or away; only a recovery
+ * needs the player here.
  */
 public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
 
@@ -69,11 +74,11 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/losttales character <status|recover|cooldown|freeze|unfreeze|deleted> [player]"
-                + " or <rollback|purge> <player> <character-uuid> [confirm]"
-                + " or restore <player|account-uuid> <character-uuid>"
-                + " or rename <player|account-uuid> <character-uuid> <new name>"
-                + " or discard-journal <player|account-uuid>"
+        return "/losttales character <status|recover|cooldown|freeze|unfreeze|deleted> [player|character]"
+                + " or <rollback|purge> <player|character> <character-uuid> [confirm]"
+                + " or restore <player|character|account-uuid> <character-uuid>"
+                + " or rename <player|character|account-uuid> <character-uuid> <new name>"
+                + " or discard-journal <player|character|account-uuid>"
                 + " or lore <status|recover|inspect> [lore-character-id]";
     }
 
@@ -98,8 +103,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             processDiscardJournal(sender, args);
             return;
         }
-        // A restore and a rename name the account the same way, so the
-        // player need not be here.
+        // A restore and a rename need the account named, whoever runs them.
         if ("restore".equalsIgnoreCase(args[0])) {
             processRestore(sender, args);
             return;
@@ -108,15 +112,27 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             processRename(sender, args);
             return;
         }
-        EntityPlayerMP target = resolveTarget(sender, args.length > 1 ? args[1] : null);
-        if (target == null) {
-            say(sender, EnumChatFormatting.RED, PLAYER_REQUIRED);
+        String action = args[0];
+        if (!ACCOUNT_ACTIONS.contains(action.toLowerCase(java.util.Locale.ROOT))) {
+            sendUsage(sender);
             return;
         }
-        String action = args[0];
+        World world = overworld(sender);
+        LostTalesCommandSubject subject = world == null ? null
+                : LostTalesCommandSubject.account(sender, args, 1);
+        if (subject == null) {
+            return;
+        }
+        UUID ownerId = subject.owner;
         if ("status".equalsIgnoreCase(action) || "inspect".equalsIgnoreCase(action)) {
-            reportStatus(sender, target);
+            reportStatus(sender, world, ownerId, subject.label);
         } else if ("recover".equalsIgnoreCase(action)) {
+            EntityPlayerMP target = subject.online();
+            if (target == null) {
+                say(sender, EnumChatFormatting.RED, LostTalesCommandSubject.OFFLINE,
+                        subject.label);
+                return;
+            }
             CharacterSwitchCoordinator coordinator =
                     CharacterSwitchCoordinator.getInstance();
             // A journal an operator discarded is restored by the recovery
@@ -140,10 +156,10 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             } else {
                 say(sender, EnumChatFormatting.RED, SAY + "recover.failed", result.getId());
             }
-            reportStatus(sender, target);
+            reportStatus(sender, world, ownerId, subject.label);
         } else if ("deleted".equalsIgnoreCase(action)
                 || "tombstones".equalsIgnoreCase(action)) {
-            reportDeleted(sender, target);
+            reportDeleted(sender, world, ownerId, subject.label);
         } else if ("rollback".equalsIgnoreCase(action)) {
             UUID characterId = parseCharacterId(sender, args);
             if (characterId == null) {
@@ -151,8 +167,8 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             }
             CharacterDeletionMaintenanceResult result =
                     CharacterDeletionService.getInstance().rollbackInactive(
-                            target, characterId);
-            reportMaintenanceResult(sender, target, characterId,
+                            world, ownerId, characterId);
+            reportMaintenanceResult(sender, world, ownerId, subject.label, characterId,
                     SAY + "rollback.done", SAY + "rollback.failed", result);
         } else if ("purge".equalsIgnoreCase(action)) {
             UUID characterId = parseCharacterId(sender, args);
@@ -161,37 +177,41 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             }
             if (args.length < 4 || !"confirm".equalsIgnoreCase(args[3])) {
                 say(sender, EnumChatFormatting.RED, SAY + "purge.confirm",
-                        target.getCommandSenderName(), characterId);
+                        args[1], characterId);
                 return;
             }
             CharacterDeletionMaintenanceResult result =
                     CharacterDeletionService.getInstance().purge(
-                            target, characterId);
-            reportMaintenanceResult(sender, target, characterId,
+                            world, ownerId, characterId);
+            reportMaintenanceResult(sender, world, ownerId, subject.label, characterId,
                     SAY + "purge.done", SAY + "purge.failed", result);
         } else if ("cooldown".equalsIgnoreCase(action)
                 || "resetcooldown".equalsIgnoreCase(action)) {
             boolean reset = CharacterSwitchCoordinator.getInstance().resetCooldown(
-                    target.worldObj, target.getUniqueID());
+                    world, ownerId);
             if (reset) {
                 say(sender, EnumChatFormatting.GREEN, SAY + "cooldown.done");
             } else {
                 say(sender, EnumChatFormatting.RED, SAY + "cooldown.failed");
             }
-            reportStatus(sender, target);
+            reportStatus(sender, world, ownerId, subject.label);
         } else if ("freeze".equalsIgnoreCase(action)) {
-            setFrozen(sender, target, true);
-        } else if ("unfreeze".equalsIgnoreCase(action)
-                || "thaw".equalsIgnoreCase(action)) {
-            setFrozen(sender, target, false);
+            setFrozen(sender, world, ownerId, subject.label, true);
         } else {
-            sendUsage(sender);
+            setFrozen(sender, world, ownerId, subject.label, false);
         }
     }
 
+    /** The actions that name an account second, in lower case. */
+    private static final java.util.Set<String> ACCOUNT_ACTIONS =
+            new java.util.HashSet<String>(java.util.Arrays.asList(
+                    "status", "inspect", "recover", "deleted", "tombstones",
+                    "rollback", "purge", "cooldown", "resetcooldown", "freeze",
+                    "unfreeze", "thaw"));
+
     /**
      * Discards one account's switch journal (CHAR-37), naming the account
-     * by an online player's name or by its UUID — the id the server log
+     * as every command does, or by its UUID — the id the server log
      * prints beside every switch failure — so an account that is
      * disconnected or refused at login can be settled while offline. The
      * character the switch was leaving comes back as the server saved it,
@@ -203,14 +223,12 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         if (world == null) {
             return;
         }
-        UUID ownerId = accountOf(sender, args);
-        if (ownerId == null) {
+        LostTalesCommandSubject subject = named(sender, args);
+        if (subject == null) {
             return;
         }
-        EntityPlayerMP online = resolveTarget(sender, args[1]);
-        if (online != null && !ownerId.equals(online.getUniqueID())) {
-            online = null;
-        }
+        UUID ownerId = subject.owner;
+        EntityPlayerMP online = subject.online();
 
         CharacterSwitchCoordinator.JournalDiscard result =
                 CharacterSwitchCoordinator.getInstance().discardJournal(
@@ -231,7 +249,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                 // is told whom the player plays, as after a switch.
                 CharacterLifecycleStateTracker.markReady(online);
                 followPlayed(online);
-                reportStatus(sender, online);
+                reportStatus(sender, world, ownerId, subject.label);
                 return;
             case AT_NEXT_JOIN:
                 say(sender, EnumChatFormatting.GREEN, SAY + "journal.next_join",
@@ -330,25 +348,16 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
     }
 
     /**
-     * The account the second argument names: an online player by name, or
-     * an account's UUID, the id the server log prints. Null, said why, for
-     * neither.
+     * The account the second argument names, which must be given: any
+     * account or character this world has seen, or an account's UUID, the
+     * id the server log prints. Null, said why, for none.
      */
-    private UUID accountOf(ICommandSender sender, String[] args) {
+    private static LostTalesCommandSubject named(ICommandSender sender, String[] args) {
         if (args.length < 2) {
             say(sender, EnumChatFormatting.RED, SAY + "account.name");
             return null;
         }
-        EntityPlayerMP online = resolveTarget(sender, args[1]);
-        if (online != null) {
-            return online.getUniqueID();
-        }
-        try {
-            return UUID.fromString(args[1]);
-        } catch (IllegalArgumentException exception) {
-            say(sender, EnumChatFormatting.RED, SAY + "account.unknown", args[1]);
-            return null;
-        }
+        return LostTalesCommandSubject.account(sender, args[1]);
     }
 
     /** The overworld, the one the character stores live in; null, said why, with none. */
@@ -374,16 +383,17 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
      */
     private void processRestore(ICommandSender sender, String[] args) {
         World world = overworld(sender);
-        UUID ownerId = world == null ? null : accountOf(sender, args);
-        UUID characterId = ownerId == null ? null : parseCharacterId(sender, args);
+        LostTalesCommandSubject subject = world == null ? null : named(sender, args);
+        UUID characterId = subject == null ? null : parseCharacterId(sender, args);
         if (characterId == null) {
             return;
         }
-        EntityPlayerMP online = resolveTarget(sender, args[1]);
+        UUID ownerId = subject.owner;
+        EntityPlayerMP online = subject.online();
         CharacterDeletionMaintenanceResult result =
                 CharacterDeletionService.getInstance().restore(world, ownerId,
                         accountNameOf(ownerId, online), online, characterId);
-        reportMaintenanceResult(sender, online, characterId,
+        reportMaintenanceResult(sender, world, ownerId, subject.label, characterId,
                 SAY + "restore.done", SAY + "restore.failed", result);
     }
 
@@ -393,11 +403,12 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
      */
     private void processRename(ICommandSender sender, String[] args) {
         World world = overworld(sender);
-        UUID ownerId = world == null ? null : accountOf(sender, args);
-        UUID characterId = ownerId == null ? null : parseCharacterId(sender, args);
+        LostTalesCommandSubject subject = world == null ? null : named(sender, args);
+        UUID characterId = subject == null ? null : parseCharacterId(sender, args);
         if (characterId == null) {
             return;
         }
+        UUID ownerId = subject.owner;
         StringBuilder name = new StringBuilder();
         for (int index = 3; index < args.length; index++) {
             if (name.length() > 0) {
@@ -409,7 +420,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "rename.name");
             return;
         }
-        EntityPlayerMP online = resolveTarget(sender, args[1]);
+        EntityPlayerMP online = subject.online();
         CharacterOperationResult result = CharacterService.getInstance().renameByAdmin(
                 world, ownerId, accountNameOf(ownerId, online),
                 characterId, name.toString());
@@ -429,6 +440,8 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                     CharacterSyncManager.UNSOLICITED_REQUEST_ID, result.getRoster());
             CharacterAppearanceSyncManager.broadcastPlayer(online, result.getRoster());
         }
+        // The waystones called after it read the new name on every map (WAY-01).
+        LostTalesMapMarkerSyncManager.placerChanged(world, characterId);
         say(sender, EnumChatFormatting.GREEN, SAY + "rename.done",
                 result.getCharacter().getName());
     }
@@ -549,22 +562,23 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         return value == null || value.length() == 0 ? "" : " (" + value + ")";
     }
 
-    private void setFrozen(ICommandSender sender, EntityPlayerMP target, boolean frozen) {
+    private void setFrozen(ICommandSender sender, World world, UUID ownerId,
+                           IChatComponent label, boolean frozen) {
         boolean changed = CharacterSwitchCoordinator.getInstance().setFrozen(
-                target.worldObj, target.getUniqueID(), frozen);
+                world, ownerId, frozen);
         if (!changed) {
             say(sender, EnumChatFormatting.RED, SAY + "freeze.failed");
         } else {
             say(sender, EnumChatFormatting.GREEN, frozen ? SAY + "freeze.done"
                     : SAY + "unfreeze.done");
         }
-        reportStatus(sender, target);
+        reportStatus(sender, world, ownerId, label);
     }
 
-    private void reportStatus(ICommandSender sender, EntityPlayerMP target) {
+    /** The account's switch state, store by store; its player here or not. */
+    private void reportStatus(ICommandSender sender, World world, UUID ownerId,
+                              IChatComponent label) {
         try {
-            World world = target.worldObj;
-            UUID ownerId = target.getUniqueID();
             CharacterWorldData characterData = CharacterStorage.get(world);
             CharacterSwitchWorldData switchData = CharacterSwitchStorage.get(world);
             CharacterPlayerStateWorldData playerStateData =
@@ -576,8 +590,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             CharacterPlayerStateAccount playerState =
                     playerStateData.getAccount(ownerId);
 
-            say(sender, EnumChatFormatting.GOLD, SAY + "status.header",
-                    target.getCommandSenderName());
+            say(sender, EnumChatFormatting.GOLD, SAY + "status.header", label);
             say(sender, EnumChatFormatting.GRAY, SAY + "status.owner", ownerId,
                     roster == null || roster.getActiveCharacterId() == null
                             ? words(SAY + "status.account") : roster.getActiveCharacterId(),
@@ -634,26 +647,32 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         }
     }
 
-    private void reportDeleted(ICommandSender sender, EntityPlayerMP target) {
+    /**
+     * The account's deleted characters and where each stands: waiting out
+     * its retention, past it, or held past it by a jump of the clock.
+     */
+    private void reportDeleted(ICommandSender sender, World world, UUID ownerId,
+                               IChatComponent label) {
         try {
             List<CharacterDeletionTombstone> tombstones =
                     CharacterDeletionService.getInstance().getTombstones(
-                            target.worldObj, target.getUniqueID());
+                            world, ownerId);
             if (tombstones.isEmpty()) {
-                say(sender, EnumChatFormatting.GRAY, SAY + "deleted.none",
-                        target.getCommandSenderName());
+                say(sender, EnumChatFormatting.GRAY, SAY + "deleted.none", label);
                 return;
             }
-            say(sender, EnumChatFormatting.GOLD, SAY + "deleted.header",
-                    target.getCommandSenderName());
+            say(sender, EnumChatFormatting.GOLD, SAY + "deleted.header", label);
             long now = System.currentTimeMillis();
+            WorldClock.Hold hold = WorldClock.hold();
             for (CharacterDeletionTombstone tombstone : tombstones) {
-                IChatComponent retention = tombstone.isCommitted()
-                        ? (tombstone.isPurgeAllowed(now)
-                        ? words(SAY + "deleted.purge_eligible")
-                        : words(SAY + "deleted.purge_in", formatDuration(
-                                tombstone.getPurgeAfter() - now)))
-                        : words(SAY + "deleted.not_committed");
+                IChatComponent retention = !tombstone.isCommitted()
+                        ? words(SAY + "deleted.not_committed")
+                        : !tombstone.isPurgeAllowed(now)
+                        ? words(SAY + "deleted.purge_in", formatDuration(
+                                tombstone.getPurgeAfter() - now))
+                        : hold.holds(tombstone.getPurgeAfter())
+                        ? words(SAY + "deleted.held")
+                        : words(SAY + "deleted.purge_eligible");
                 say(sender, EnumChatFormatting.GRAY, SAY + "deleted.entry",
                         tombstone.getCharacterCopy().getName(),
                         tombstone.getCharacterId(),
@@ -681,20 +700,20 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
 
     /**
      * The answer to a restore, rollback or purge: {@code doneKey} with the
-     * character's id, or {@code failedKey} with why.
+     * character's id and the account's status, or {@code failedKey} with why.
      */
     private void reportMaintenanceResult(
             ICommandSender sender,
-            EntityPlayerMP target,
+            World world,
+            UUID ownerId,
+            IChatComponent label,
             UUID characterId,
             String doneKey,
             String failedKey,
             CharacterDeletionMaintenanceResult result) {
         if (result == CharacterDeletionMaintenanceResult.SUCCESS) {
             say(sender, EnumChatFormatting.GREEN, doneKey, characterId);
-            if (target != null) {
-                reportStatus(sender, target);
-            }
+            reportStatus(sender, world, ownerId, label);
             return;
         }
         if (result == CharacterDeletionMaintenanceResult.RECONCILED) {
@@ -730,7 +749,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             case RETENTION_ACTIVE:
                 CharacterDeletionTombstone tombstone =
                         CharacterDeletionService.getInstance().getTombstone(
-                                target.worldObj, characterId);
+                                world, characterId);
                 detail = tombstone == null
                         ? words(SAY + "failure.retention")
                         : words(SAY + "failure.retention.for", formatDuration(
@@ -747,17 +766,6 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                 break;
         }
         say(sender, EnumChatFormatting.RED, failedKey, detail);
-    }
-
-    private EntityPlayerMP resolveTarget(ICommandSender sender, String playerName) {
-        if (playerName != null && playerName.length() > 0) {
-            try {
-                return getPlayer(sender, playerName);
-            } catch (RuntimeException exception) {
-                return null;
-            }
-        }
-        return sender instanceof EntityPlayerMP ? (EntityPlayerMP) sender : null;
     }
 
     /** A wait as the reader's game words it: every part from the largest there is. */
@@ -809,7 +817,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         }
         if (args != null && args.length == 2) {
             return getListOfStringsMatchingLastWord(args,
-                    MinecraftServer.getServer().getAllUsernames());
+                    LostTalesCommandSubject.names(sender));
         }
         if (args != null && args.length == 4
                 && "purge".equalsIgnoreCase(args[0])) {

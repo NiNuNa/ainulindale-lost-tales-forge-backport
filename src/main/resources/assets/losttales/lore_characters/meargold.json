@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:meargold",
   "name": "Meargold",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_rohan_male_2"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_rohan_masculine_2",
+  "faction": "lotr:rohan"
 }

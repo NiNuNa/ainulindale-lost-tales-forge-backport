@@ -1,0 +1,21 @@
+{
+  "id": "losttales:bone",
+  "helmet": [
+    "lotr:item.helmetBone"
+  ],
+  "chestplate": [
+    "lotr:item.bodyBone"
+  ],
+  "leggings": [
+    "lotr:item.legsBone"
+  ],
+  "boots": [
+    "lotr:item.bootsBone"
+  ],
+  "bonus": [
+    {
+      "effect": "poison",
+      "amount": 0.2
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.progression;
 
+import com.ninuna.losttales.armour.Armour;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -17,7 +18,8 @@ import net.minecraftforge.common.util.FakePlayer;
 
 /**
  * The server's hand on a character's growth: experience a skill gains by
- * what its player does (PROG-01 to PROG-04, PROG-08), and the perks a
+ * what its player does, a quest pays or an operator gives (PROG-01 to
+ * PROG-04, PROG-08), the LOTR waypoints it reached, and the perks a
  * player takes (PROG-06). Only a played character grows; a ghost, a fake
  * player and a save that cannot be read change nothing. What a skill
  * gains is never shared (PROG-09) and a death takes none of it (PROG-10).
@@ -44,10 +46,12 @@ public final class ProgressionService {
     /**
      * Counts an act: {@code worth} experience toward {@code skillId}, less
      * for a repeat of the same act on the same thing lately (PROG-08), and
-     * within the skill's hourly cap. {@code repeatKey} names what repeats
-     * are counted under, none when empty; where {@code repeats} is false
-     * the act shrinks as those repeats do and is none itself (a hit
-     * shrinks as kills of its kind do). Answers the experience gained.
+     * within the skill's hourly cap ({@link GrantSource#ACT}).
+     * {@code repeatKey} names what repeats are counted under, none when
+     * empty; where {@code repeats} is false the act shrinks as those
+     * repeats do and is none itself (a hit shrinks as kills of its kind
+     * do). A named set worn whose bonus feeds the skill adds its share
+     * (CONTENT-07). Answers the experience gained.
      */
     public static double count(EntityPlayerMP player, String skillId, String repeatKey,
                                boolean repeats, double worth) {
@@ -66,21 +70,30 @@ public final class ProgressionService {
             share = repeats ? memory.countRepeat(key, ProgressionSettings.repeatRule(), now)
                     : memory.peekShare(key, ProgressionSettings.repeatRule(), now);
         }
-        return grant(player, character, skillId, worth * share, true);
+        double sets = 1.0D + Armour.worn(player).experience(skillId);
+        return grant(player, character, skillId, worth * share * sets, GrantSource.ACT);
     }
 
     /**
-     * Gives experience that is no act (an operator's gift): no repeat
-     * counts against it, the hourly cap does.
+     * An operator's {@code give} ({@link GrantSource#GIVE}): no repeat and
+     * no hourly cap holds it back.
      */
-    public static double reward(EntityPlayerMP player, String skillId, double amount) {
+    public static double give(EntityPlayerMP player, String skillId, double amount) {
         RoleplayCharacter character = playedCharacter(player);
-        return character == null ? 0.0D : grant(player, character, skillId, amount, true);
+        return character == null ? 0.0D
+                : grant(player, character, skillId, amount, GrantSource.GIVE);
     }
 
-    /** A quest's reward in skill experience (PROG-04, QUEST-19), more under Storyteller. */
+    /**
+     * A quest's reward in skill experience (PROG-04, QUEST-19), more under
+     * Storyteller ({@link GrantSource#QUEST}): no repeat and no hourly cap
+     * holds it back.
+     */
     public static double questReward(EntityPlayerMP player, String skillId, double amount) {
-        return reward(player, skillId, amount * storyteller(player));
+        RoleplayCharacter character = playedCharacter(player);
+        return character == null ? 0.0D
+                : grant(player, character, skillId, amount * storyteller(player),
+                        GrantSource.QUEST);
     }
 
     /** What Storyteller makes a quest's skill experience worth, times; 1 without it. */
@@ -89,14 +102,14 @@ public final class ProgressionService {
     }
 
     private static double grant(EntityPlayerMP player, RoleplayCharacter character,
-                                String skillId, double amount, boolean note) {
+                                String skillId, double amount, GrantSource source) {
         SkillDefinition skill = ProgressionCatalog.skill(skillId);
         ProgressionPlayerData data = ProgressionPlayerData.get(player);
         if (skill == null || data == null || data.isReadOnly() || !(amount > 0.0D)) {
             return 0.0D;
         }
-        double allowed = memory(character.getCharacterId()).allowWithinHour(skillId,
-                amount, LostTalesConfig.skillHourlyCap, System.currentTimeMillis());
+        double allowed = source.allow(memory(character.getCharacterId()), skillId, amount,
+                LostTalesConfig.skillHourlyCap, System.currentTimeMillis());
         if (!(allowed > 0.0D)) {
             return 0.0D;
         }
@@ -107,7 +120,7 @@ public final class ProgressionService {
             return 0.0D;
         }
         data.replace(state);
-        if (note && gain.changedLevels()) {
+        if (gain.changedLevels()) {
             int reached = gain.levelsReached.get(gain.levelsReached.size() - 1).intValue();
             player.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.skill.note.level", SkillWords.name(skill),
@@ -120,6 +133,29 @@ public final class ProgressionService {
             ProgressionEvents.levelsReached(player, state, gain);
         }
         return allowed;
+    }
+
+    /**
+     * Keeps a LOTR waypoint the played character stands near as reached
+     * (PROG-01); answers whether it was the first time, which is when Lore
+     * counts it. Nothing is kept for a ghost, a read-only save or a
+     * character that reached as many waypoints as it may.
+     */
+    public static boolean waypointReached(EntityPlayerMP player, String waypointId) {
+        ProgressionPlayerData data = ProgressionPlayerData.get(player);
+        if (data == null || data.isReadOnly() || !ProgressionState.fitsId(waypointId)
+                || data.view().hasWaypoint(waypointId) || playedCharacter(player) == null) {
+            return false;
+        }
+        ProgressionState state = data.state();
+        try {
+            if (!state.addWaypoint(waypointId)) {
+                return false;
+            }
+        } catch (IllegalStateException full) {
+            return false;
+        }
+        return data.replace(state);
     }
 
     /** Takes the next rank of a perk the player asked for, if its needs are met. */

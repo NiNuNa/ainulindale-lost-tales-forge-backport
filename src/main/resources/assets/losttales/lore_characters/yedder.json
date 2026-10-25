@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:yedder",
   "name": "Yedder",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:uruk",
-    "genderId": "losttales:non_binary",
-    "modelId": "lotr:uruk",
-    "skinId": "losttales:uruk_hai_2"
-  }
+  "race": "losttales:uruk",
+  "body_type": "losttales:neutral",
+  "skin": "losttales:uruk_hai_2",
+  "faction": "lotr:isengard"
 }

@@ -124,13 +124,13 @@ public final class CharacterNetworkRequestHandler {
                 });
     }
 
-    /** Changes one character's look: its skin, arm width and chest. */
+    /** Changes one character's look: its skin, arms and chest. */
     public static void handleLookUpdateRequest(final EntityPlayerMP player,
                                                final int requestId,
                                                final long expectedRosterRevision,
                                                final UUID characterId,
                                                final String skinId,
-                                               final String bodyTypeId,
+                                               final String armsId,
                                                final String chestTypeId) {
         execute(player, requestId, CharacterOperationType.LOOK_UPDATE,
                 new Operation() {
@@ -138,7 +138,7 @@ public final class CharacterNetworkRequestHandler {
                     public CharacterOperationResult run() {
                         return CharacterService.getInstance().updateLook(
                                 player, expectedRosterRevision, characterId,
-                                skinId, bodyTypeId, chestTypeId);
+                                skinId, armsId, chestTypeId);
                     }
                 });
     }

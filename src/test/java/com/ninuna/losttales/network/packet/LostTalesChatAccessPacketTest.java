@@ -74,6 +74,17 @@ public final class LostTalesChatAccessPacketTest {
                 .showsDiscordStatuses());
     }
 
+    /** Whether whispers are logged travels last, for a whisper's notice (CHAT-85). */
+    @Test
+    public void theWhisperLogFlagRoundTrips() {
+        assertTrue(roundTrip(ChatPacketFixtures.access(0).build()
+                .withWhispersLogged(true)).logsWhispers());
+        LostTalesChatAccessPacket unlogged = roundTrip(
+                ChatPacketFixtures.access(0).build());
+        assertFalse(unlogged.isMalformed());
+        assertFalse(unlogged.logsWhispers());
+    }
+
     /** A payload that stops short of the whole layout is refused whole. */
     @Test
     public void aPayloadThatStopsShortIsMalformed() {

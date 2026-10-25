@@ -9,6 +9,7 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestRewardText;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestWords;
+import com.ninuna.losttales.quest.QuestRumourPlace;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.quest.world.WorldQuestRules;
@@ -261,7 +262,7 @@ public final class ClientQuestCatalog {
     /**
      * The rumours heard of quests the character has not taken (QUEST-20),
      * under Rumours: each its teller's words alone, never what the quest
-     * asks or pays.
+     * asks or pays, and the place it points to under its state.
      */
     private static List<ClientQuestEntry> rumours() {
         List<ClientQuestEntry> rumours = new ArrayList<ClientQuestEntry>();
@@ -271,8 +272,13 @@ public final class ClientQuestCatalog {
             if (quest == null || LostTalesClientQuestProgressStore.isQuestActive(questId)) {
                 continue;
             }
+            QuestRumourPlace place =
+                    LostTalesClientQuestProgressStore.getRumourPlace(questId);
+            String where = place == null ? ""
+                    : StatCollector.translateToLocalFormatted(
+                            "gui.losttales.quest.rumour.place", place.shownName());
             rumours.add(new ClientQuestEntry(ClientQuestEntry.Source.LOST_TALES,
-                    questId, LostTalesQuestWords.title(quest), "",
+                    questId, LostTalesQuestWords.title(quest), where,
                     categoryName(LostTalesQuestCategory.RUMOURS),
                     LostTalesQuestWords.rumourLine(quest),
                     ClientQuestEntry.Status.RUMOUR, false, 0, 0, -1L,
@@ -281,6 +287,46 @@ public final class ClientQuestCatalog {
                     Collections.<ClientQuestEntry.Target>emptyList(), null, null));
         }
         return rumours;
+    }
+
+    /**
+     * The rumours the map pins (QUEST-20): of quests not taken, each at a
+     * place not found yet, with the title of the quest it leads to. A
+     * place found stands as its own marker instead.
+     */
+    public static List<RumourPin> rumourPins() {
+        List<RumourPin> pins = new ArrayList<RumourPin>();
+        for (QuestRumourPlace place : LostTalesClientQuestProgressStore.getRumourPlaces()) {
+            LostTalesQuestDefinition quest =
+                    LostTalesClientQuestDefinitionStore.getQuest(place.getQuestId());
+            if (quest == null
+                    || LostTalesClientQuestProgressStore.isQuestActive(place.getQuestId())
+                    || LostTalesClientQuestProgressStore.isMarkerDiscovered(
+                            place.getMarkerId())) {
+                continue;
+            }
+            pins.add(new RumourPin(place, LostTalesQuestWords.title(quest)));
+        }
+        return pins;
+    }
+
+    /** A rumour's place on the map and the title of the quest it leads to. */
+    public static final class RumourPin {
+        private final QuestRumourPlace place;
+        private final String title;
+
+        RumourPin(QuestRumourPlace place, String title) {
+            this.place = place;
+            this.title = title == null ? "" : title;
+        }
+
+        public QuestRumourPlace getPlace() {
+            return this.place;
+        }
+
+        public String getTitle() {
+            return this.title;
+        }
     }
 
     private static List<LostTalesQuestObjectiveDefinition> visibleObjectives(

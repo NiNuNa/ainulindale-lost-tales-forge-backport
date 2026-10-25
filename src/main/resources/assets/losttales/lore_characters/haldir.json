@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:haldir",
   "name": "Haldir",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:elf",
-    "genderId": "losttales:male",
-    "modelId": "lotr:elf",
-    "skinId": "losttales:elf_galadhrim_male_0"
-  }
+  "race": "losttales:elf",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:elf_galadhrim_masculine_0",
+  "faction": "lotr:lothlorien"
 }

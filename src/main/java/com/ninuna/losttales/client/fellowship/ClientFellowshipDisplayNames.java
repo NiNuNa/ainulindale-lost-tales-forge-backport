@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.fellowship;
 
+import com.ninuna.losttales.client.chat.ChatAccountAside;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
 import com.ninuna.losttales.fellowship.sync.FellowshipOperationType;
@@ -27,6 +29,21 @@ public final class ClientFellowshipDisplayNames {
         return key.equals(translated)
                 ? I18n.format("gui.losttales.fellowship.success.generic")
                 : translated;
+    }
+
+    /**
+     * A character's name as the fellowship page and the Inbox show it: the
+     * account behind it after it, {@code Aldric (Steve)}, while this
+     * player's Show Accounts is on (CHAR-26, FEL-31), else the name alone.
+     */
+    public static String named(String characterName, String account) {
+        return named(characterName, account, LostTalesConfig.chatShowAccounts);
+    }
+
+    /** The same, with the setting given. */
+    public static String named(String characterName, String account, boolean showAccounts) {
+        String name = characterName == null ? "" : characterName;
+        return showAccounts ? name + ChatAccountAside.suffix(name, account, true) : name;
     }
 
     public static String color(FellowshipColor color) {

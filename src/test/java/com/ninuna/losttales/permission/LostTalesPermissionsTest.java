@@ -55,6 +55,24 @@ public final class LostTalesPermissionsTest {
         assertNull(LostTalesCapability.byId(null));
     }
 
+    /**
+     * Without a role, the server's settings and the roles are held by
+     * operators of level 3 and every other built-in capability by
+     * operators of level 2 (DATA-07).
+     */
+    @Test
+    public void theServersSettingsAndTheRolesNeedLevelThree() {
+        assertEquals(3, LostTalesCapability.SERVER_CONFIG.getRequiredOpLevel());
+        assertEquals(3, LostTalesCapability.ROLES_MANAGE.getRequiredOpLevel());
+        for (LostTalesCapability capability : LostTalesCapability.all()) {
+            if (capability != LostTalesCapability.SERVER_CONFIG
+                    && capability != LostTalesCapability.ROLES_MANAGE
+                    && !capability.getId().startsWith("test.")) {
+                assertEquals(capability.getId(), 2, capability.getRequiredOpLevel());
+            }
+        }
+    }
+
     /** The set is open, and registering an id twice states the same capability. */
     @Test
     public void aCapabilityMayBeRegisteredAndIsNeverRedefined() {

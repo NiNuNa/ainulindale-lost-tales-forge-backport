@@ -21,7 +21,7 @@ import java.util.UUID;
  * A character stood facing the viewer, drawn as the body model itself.
  *
  * <p>Not a picture of one: the same {@link LostTalesPlayerModel} the world
- * draws, built for the same body, skin layout, arm width and chest, and
+ * draws, built for the same body, skin layout, arms and chest, and
  * turned to face out of the screen. A hobbit is short and an elf has ears
  * because the model has them, not because a flat drawing remembered to —
  * and whatever a later race brings comes with it.</p>
@@ -61,7 +61,7 @@ public final class LostTalesCharacterFigureRenderer {
     /** Turns the model to face out, as a yaw of zero does in the world. */
     private static final float FACING_VIEWER_YAW = 180.0F;
 
-    /** One model per body, layout, arm width and chest; a handful at most. */
+    /** One model per body, layout, arms and chest; a handful at most. */
     private static final Map<String, ModelBiped> MODELS =
             new HashMap<String, ModelBiped>();
 
@@ -103,7 +103,7 @@ public final class LostTalesCharacterFigureRenderer {
                 return false;
             }
             // An account skin is the owner's own, as the world draws it;
-            // the arm width is the character's, as it is in the world.
+            // the arms are the character's, as they are in the world.
             ResourceLocation texture = resolved.usesAccountSkin()
                     ? LostTalesAccountSkins.forAccount(minecraft, ownerId)
                             .getTexture()
@@ -111,7 +111,7 @@ public final class LostTalesCharacterFigureRenderer {
             if (texture == null) {
                 return false;
             }
-            ModelBiped model = modelFor(resolved, resolved.getBodyTypeId());
+            ModelBiped model = modelFor(resolved, resolved.getArmsId());
             if (model == null) {
                 return false;
             }
@@ -225,18 +225,18 @@ public final class LostTalesCharacterFigureRenderer {
     /**
      * The model for that body, kept: building one lays out every box, and
      * a menu draws the same figure every frame. There are as many as
-     * there are bodies times arm widths times chests, which is a handful.
+     * there are bodies times arms times chests, which is a handful.
      */
     private static synchronized ModelBiped modelFor(
-            ResolvedPlayerAppearance resolved, String bodyTypeId) {
+            ResolvedPlayerAppearance resolved, String armsId) {
         String key = resolved.getModelId() + '|' + resolved.getLayout()
-                + '|' + bodyTypeId + '|' + resolved.getChestTypeId();
+                + '|' + armsId + '|' + resolved.getChestTypeId();
         ModelBiped model = MODELS.get(key);
         if (model == null) {
             CharacterBodyModelDefinition definition =
                     CharacterBodyModelRegistry.get(resolved.getModelId());
             model = LostTalesPlayerBodyModelFactory.createMainModel(
-                    definition, resolved.getLayout(), bodyTypeId,
+                    definition, resolved.getLayout(), armsId,
                     resolved.getChestTypeId());
             if (model == null) {
                 return null;

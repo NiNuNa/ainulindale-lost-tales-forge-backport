@@ -30,9 +30,9 @@ public final class LostTalesPlayerModelTest {
         assertEquals(5.0F, model.bipedLeftArm.rotationPointX, 0.0F);
     }
 
-    /** Java Edition keeps slim arms level with wide ones (MC-275473). */
+    /** Java Edition keeps slender arms level with broad ones (MC-275473). */
     @Test
-    public void slimBodyNarrowsBothArmsAndKeepsTheirHeight() {
+    public void slenderArmsNarrowBothArmsAndKeepTheirHeight() {
         LostTalesPlayerModel model = plainBody(true);
         assertEquals(3.0F, width(model.bipedRightArm), 0.0F);
         assertEquals(3.0F, width(model.bipedLeftArm), 0.0F);
@@ -86,8 +86,8 @@ public final class LostTalesPlayerModelTest {
     }
 
     /** The plain player body in Minecraft's layout, without a chest. */
-    private static LostTalesPlayerModel plainBody(boolean slim) {
-        return new LostTalesPlayerModel(0.0F, slim, PlayerBodyShape.PLAYER,
+    private static LostTalesPlayerModel plainBody(boolean slender) {
+        return new LostTalesPlayerModel(0.0F, slender, PlayerBodyShape.PLAYER,
                 CharacterSkinLayout.MINECRAFT_64X64, null, false);
     }
 

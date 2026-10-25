@@ -6,7 +6,7 @@ import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
-import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
+import com.ninuna.losttales.quickloot.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;

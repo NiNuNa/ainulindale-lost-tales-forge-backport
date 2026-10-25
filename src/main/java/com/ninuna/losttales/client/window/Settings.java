@@ -205,10 +205,18 @@ public final class Settings {
             return true;
         }
 
-        /** Its row: its name and what it reads now. */
+        /**
+         * Why it can do nothing now, which a press on its greyed row says;
+         * empty while it can (LOOK-15).
+         */
+        public String unavailable() {
+            return "";
+        }
+
+        /** Its row: its name and what it reads now, greyed while it can do nothing. */
         public MenuWindow.Entry row() {
             return new MenuWindow.Entry(SETTING_PREFIX + this.key, label())
-                    .withValue(value());
+                    .withValue(value()).unavailable(unavailable());
         }
     }
 
@@ -242,7 +250,9 @@ public final class Settings {
 
         @Override
         public void step(boolean back) {
-            set(!get());
+            if (unavailable().length() == 0) {
+                set(!get());
+            }
         }
 
         @Override
@@ -971,18 +981,7 @@ public final class Settings {
                     options.chatOpacity = share;
                 }
             });
-            windows.add(new ModSwitch("windowBackgroundBlur",
-                    optionName("windowBackgroundBlur")) {
-                @Override
-                protected boolean get() {
-                    return LostTalesConfig.windowBackgroundBlur;
-                }
-
-                @Override
-                protected void set(boolean on) {
-                    LostTalesConfig.windowBackgroundBlur = on;
-                }
-            });
+            windows.add(new WindowBlur());
             windows.add(new ModSwitch("hideHudWithWindows",
                     optionName("hideHudWithWindows")) {
                 @Override
@@ -1009,6 +1008,34 @@ public final class Settings {
                 }
             });
             return windows;
+        }
+    }
+
+    /**
+     * Blur the World Behind Windows, which blurs only while Blur Behind
+     * Screens is on: while that is off it stands greyed, and a press says
+     * so (WIN-51).
+     */
+    static final class WindowBlur extends ModSwitch {
+        WindowBlur() {
+            super("windowBackgroundBlur", optionName("windowBackgroundBlur"));
+        }
+
+        @Override
+        protected boolean get() {
+            return LostTalesConfig.windowBackgroundBlur;
+        }
+
+        @Override
+        protected void set(boolean on) {
+            LostTalesConfig.windowBackgroundBlur = on;
+        }
+
+        @Override
+        public String unavailable() {
+            return LostTalesConfig.enableGuiBackgroundBlur ? ""
+                    : StatCollector.translateToLocal(
+                            "gui.losttales.window.settings.blur_screens_off");
         }
     }
 

@@ -3,7 +3,7 @@ package com.ninuna.losttales.quest.missive;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.compat.lotr.LotrContainerProtection;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
+import com.ninuna.losttales.quickloot.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesMissiveBoardStatePacket;
 import java.util.ArrayList;
@@ -141,8 +141,11 @@ public final class MissiveBoardService {
 
     /**
      * Pins the letter in the inventory's {@code slot} onto the board, where
-     * it has room. The letter is posted anew, at the board's time, and
-     * sealed again, so the board keeps it for its whole expiry.
+     * it has room. A letter's days run from its first posting (QUEST-34):
+     * it goes up as it is, keeping them, and comes down with them. A
+     * letter whose missive was taken already, or whose days are past, is
+     * refused, as is any while the world's record of missives taken cannot
+     * be read.
      */
     public static void pin(EntityPlayerMP player, int dimensionId, int x,
                            int y, int z, int slot, String expectedQuestId) {
@@ -163,7 +166,14 @@ public final class MissiveBoardService {
             answer(player, board, MissiveBoardStateReason.DAMAGED);
             return;
         }
-        ItemStack posted = repost(player.worldObj, stack);
+        MissiveBoardStateReason refusal = pinRefusal(MissivesTaken.refusal(
+                player.worldObj, LostTalesMissiveNbt.readFromItemStack(stack)));
+        if (refusal != null) {
+            answer(player, board, refusal);
+            return;
+        }
+        ItemStack posted = stack.copy();
+        posted.stackSize = 1;
         if (!board.hasRoomForMissive() || !board.addMissive(posted)) {
             answer(player, board, MissiveBoardStateReason.BOARD_FULL);
             return;
@@ -175,18 +185,17 @@ public final class MissiveBoardService {
     }
 
     /**
-     * A copy of a genuine letter posted at the world's time now, sealed
-     * again with the world's key. Only a letter whose seal was checked is
-     * handed here.
+     * Why a letter may not go up on a board, from why its missive may not
+     * be taken (QUEST-34): taken already, or its days past, in the same
+     * words; a record that cannot be read in words of pinning. Null where
+     * it may.
      */
-    static ItemStack repost(World world, ItemStack letter) {
-        ItemStack posted = letter.copy();
-        posted.stackSize = 1;
-        LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(letter);
-        LostTalesMissiveNbt.writeToItemStack(posted,
-                missive.postedAt(world.getTotalWorldTime()));
-        MissiveSeals.seal(world, posted);
-        return posted;
+    static MissiveBoardStateReason pinRefusal(MissiveBoardStateReason taking) {
+        if (taking == null) {
+            return null;
+        }
+        return taking == MissiveBoardStateReason.NOT_NOW
+                ? MissiveBoardStateReason.CANNOT_PIN : taking;
     }
 
     /**

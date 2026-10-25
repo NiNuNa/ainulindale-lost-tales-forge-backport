@@ -8,14 +8,10 @@ import com.ninuna.losttales.client.window.SubWindowKind;
  * their places is read.
  */
 public final class CharacterSubWindows {
-    /** The capes of one identity. */
-    public static final SubWindowKind CAPES = kind("capes");
     /** The world's lore characters, to claim or release. */
     public static final SubWindowKind LORE = kind("lore");
     /** A character's profile and age, in sections picked by word buttons. */
     public static final SubWindowKind PROFILE_EDIT = kind("profile_edit");
-    /** A character's look: its skin, arm width and chest. */
-    public static final SubWindowKind LOOK_EDIT = kind("look_edit");
 
     private CharacterSubWindows() {}
 
@@ -23,8 +19,8 @@ public final class CharacterSubWindows {
         return SubWindowKind.register(id, "gui.losttales.character.sub." + id);
     }
 
-    /** Registers the kinds and the menus behind them. */
+    /** Registers the kinds, which loading this class does. */
     public static void install() {
-        CharacterMenus.install();
+        // The kinds stand once the class is loaded.
     }
 }

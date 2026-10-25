@@ -1,0 +1,22 @@
+{
+  "id": "losttales:rhunic",
+  "helmet": [
+    "lotr:item.helmetRhun"
+  ],
+  "chestplate": [
+    "lotr:item.bodyRhun"
+  ],
+  "leggings": [
+    "lotr:item.legsRhun"
+  ],
+  "boots": [
+    "lotr:item.bootsRhun"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:polearms"
+    }
+  ]
+}

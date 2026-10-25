@@ -105,7 +105,7 @@ public final class CharacterRosterRowsTest {
 
     private static CharacterSummary summary(UUID id, int slot, String name) {
         return new CharacterSummary(id, slot, name, "losttales:human",
-                "losttales:male", "losttales:account_skin",
+                "losttales:masculine", "losttales:account_skin",
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30,
                 "lotr:gondor", "", "");

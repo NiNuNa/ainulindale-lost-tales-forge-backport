@@ -1,0 +1,21 @@
+{
+  "id": "losttales:utumno",
+  "helmet": [
+    "lotr:item.helmetUtumno"
+  ],
+  "chestplate": [
+    "lotr:item.bodyUtumno"
+  ],
+  "leggings": [
+    "lotr:item.legsUtumno"
+  ],
+  "boots": [
+    "lotr:item.bootsUtumno"
+  ],
+  "bonus": [
+    {
+      "effect": "fire",
+      "amount": 0.2
+    }
+  ]
+}

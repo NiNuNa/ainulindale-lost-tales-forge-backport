@@ -27,9 +27,9 @@ public enum CharacterErrorId {
     /** A new character's name is the name of an account the server has seen. */
     ACCOUNT_NAME("account_name"),
     INVALID_RACE("invalid_race"),
-    INVALID_GENDER("invalid_gender"),
-    INVALID_SKIN("invalid_skin"),
     INVALID_BODY_TYPE("invalid_body_type"),
+    INVALID_SKIN("invalid_skin"),
+    INVALID_ARMS("invalid_arms"),
     INVALID_CHEST_TYPE("invalid_chest_type"),
     INVALID_PROFILE_TEXT("invalid_profile_text"),
     INVALID_PROFILE_TEXT_PROFANE("invalid_profile_text_profane"),

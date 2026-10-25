@@ -41,7 +41,7 @@ public final class CharacterRosterSyncPacketTest {
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(OWNER,
                 CharacterRoster.MAX_SLOTS, null, 12L, characters,
                 Arrays.asList(new DeletedCharacterSummary(deletedId, "Aldric",
-                        "losttales:human", "losttales:human_bree_male_0", 12)));
+                        "losttales:human", "losttales:human_bree_masculine_0", 12)));
 
         CharacterRosterSyncPacket decoded = roundTrip(snapshot);
         assertFalse(decoded.isMalformed());
@@ -53,7 +53,7 @@ public final class CharacterRosterSyncPacketTest {
         assertEquals(deletedId, deleted.getCharacterId());
         assertEquals("Aldric", deleted.getName());
         assertEquals(12, deleted.getDaysLeft());
-        assertEquals("losttales:human_bree_male_0", deleted.getSkinId());
+        assertEquals("losttales:human_bree_masculine_0", deleted.getSkinId());
     }
 
     @Test
@@ -113,7 +113,7 @@ public final class CharacterRosterSyncPacketTest {
     private static CharacterSummary summary(UUID id, int slot, String name,
                                             String faction) {
         return new CharacterSummary(id, slot, name, "losttales:human",
-                "losttales:male", "losttales:human_bree_male_0",
+                "losttales:masculine", "losttales:human_bree_masculine_0",
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, faction, "", "");
     }

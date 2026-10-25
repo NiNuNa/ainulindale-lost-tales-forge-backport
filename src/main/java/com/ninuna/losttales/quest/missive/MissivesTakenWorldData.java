@@ -19,9 +19,12 @@ import net.minecraftforge.common.util.Constants;
  * duplication bug, never pays twice, nor once for each player who holds
  * one.
  *
- * <p>An entry is kept for as long as its notice could stand on a board;
- * past that its letter is refused as expired anyway. Where notices never
- * expire, the latest {@link #MAX_ENTRIES} are kept. Data of another
+ * <p>An entry is kept for as long as a copy of its letter could still go
+ * up on a board or be accepted: a letter keeps its first posting's days
+ * wherever it is pinned, so the record keeps each for the longest days a
+ * notice may stand from then ({@link MissivesTaken}), and for good while
+ * notices never expire. Past {@link #MAX_ENTRIES} a new one is refused,
+ * so no missive is taken until older ones are forgotten. Data of another
  * version, or not shaped as written, is kept as it was and the store goes
  * read-only: then no missive can be taken, rather than one taken twice. An
  * entry that cannot be read is kept aside, untouched.</p>
@@ -123,10 +126,10 @@ public final class MissivesTakenWorldData extends WorldSavedData {
     }
 
     /**
-     * Records the missive as taken. Entries whose notices could no longer
-     * stand at {@code now} ({@code keepTicks} after posting; kept for good
-     * where it is 0) go first; past {@link #MAX_ENTRIES} the oldest go.
-     * Answers whether it was recorded: never while the store is read-only.
+     * Records the missive as taken. Entries no copy could bring back at
+     * {@code now} ({@code keepTicks} after their first posting; kept for
+     * good where it is 0) go first. Answers whether it was recorded: never
+     * while the store is read-only, nor once it holds {@link #MAX_ENTRIES}.
      */
     public synchronized boolean take(String questId, long postedAt, long now,
                                      long keepTicks) {
@@ -134,12 +137,11 @@ public final class MissivesTakenWorldData extends WorldSavedData {
                 || !LostTalesQuestIds.fits(questId)) {
             return false;
         }
-        forgetPast(now, keepTicks);
-        this.taken.remove(questId);
-        while (this.taken.size() >= MAX_ENTRIES) {
-            Iterator<String> oldest = this.taken.keySet().iterator();
-            oldest.next();
-            oldest.remove();
+        if (forgetPast(now, keepTicks)) {
+            markDirty();
+        }
+        if (!this.taken.containsKey(questId) && this.taken.size() >= MAX_ENTRIES) {
+            return false;
         }
         this.taken.put(questId, Long.valueOf(Math.max(0L, postedAt)));
         markDirty();
@@ -151,15 +153,19 @@ public final class MissivesTakenWorldData extends WorldSavedData {
         return this.taken.size();
     }
 
-    private void forgetPast(long now, long keepTicks) {
+    /** Forgets the entries posted {@code keepTicks} or longer before {@code now}; answers whether any went. */
+    private boolean forgetPast(long now, long keepTicks) {
         if (keepTicks <= 0L) {
-            return;
+            return false;
         }
+        boolean forgot = false;
         Iterator<Map.Entry<String, Long>> entries = this.taken.entrySet().iterator();
         while (entries.hasNext()) {
             if (entries.next().getValue().longValue() + keepTicks <= now) {
                 entries.remove();
+                forgot = true;
             }
         }
+        return forgot;
     }
 }

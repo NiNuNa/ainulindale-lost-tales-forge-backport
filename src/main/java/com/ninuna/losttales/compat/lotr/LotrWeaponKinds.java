@@ -112,7 +112,8 @@ public final class LotrWeaponKinds {
         if (projectile instanceof LOTREntityDart) {
             return WeaponKind.BLOWGUN;
         }
-        if (projectile instanceof LOTREntityPebble) {
+        // A pebble thrown by hand is no sling's.
+        if (projectile instanceof LOTREntityPebble && ((LOTREntityPebble) projectile).isSling()) {
             return WeaponKind.SLING;
         }
         return null;

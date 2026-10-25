@@ -14,12 +14,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Server-to-client replacement snapshot of entities engaged with this fellowship. */
+/**
+ * Server-to-client replacement snapshot of entities engaged with this
+ * fellowship. Each contact travels as its creature's kind, the entity
+ * string id the game registers it under, and each client names it in its
+ * own language (MAP-16); a name a player gave the creature travels beside
+ * it as written.
+ */
 public class LostTalesMobAggroSyncPacket implements IMessage {
     public static final int MAX_ENTITY_IDS = 512;
     public static final int MIN_TRACKING_RADIUS = 8;
     public static final int MAX_TRACKING_RADIUS = 128;
     public static final int MAX_ENTITY_NAME_BYTES = 128;
+    /** The longest kind sent: every registered id the game and its mods use fits. */
+    public static final int MAX_KIND_BYTES = 128;
     private static final int HEADER_BYTES = 16;
     private static final double MAX_WORLD_COORDINATE = 30000000.0D;
     private static final double MAX_VERTICAL_COORDINATE = 4096.0D;
@@ -84,10 +92,12 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
                 double x = buffer.readDouble();
                 double y = buffer.readDouble();
                 double z = buffer.readDouble();
-                String name = LostTalesPacketCodec.readUtf8String(
+                String kind = LostTalesPacketCodec.readUtf8String(
+                        buffer, MAX_KIND_BYTES);
+                String ownName = LostTalesPacketCodec.readUtf8String(
                         buffer, MAX_ENTITY_NAME_BYTES);
                 Entry entry = new Entry(entityId, engagement,
-                        sharedFromFellowship, name, x, y, z);
+                        sharedFromFellowship, kind, ownName, x, y, z);
                 if (!entry.isValid()
                         || !seenEntityIds.add(Integer.valueOf(entityId))) {
                     throw new LostTalesPacketCodec.DecodeException(
@@ -117,7 +127,9 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
             buffer.writeDouble(entry.getY());
             buffer.writeDouble(entry.getZ());
             LostTalesPacketCodec.writeUtf8String(
-                    buffer, entry.getName(), MAX_ENTITY_NAME_BYTES);
+                    buffer, entry.getKind(), MAX_KIND_BYTES);
+            LostTalesPacketCodec.writeUtf8String(
+                    buffer, entry.getOwnName(), MAX_ENTITY_NAME_BYTES);
         }
     }
 
@@ -155,24 +167,68 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
                 Math.min(MAX_TRACKING_RADIUS, radius));
     }
 
+    /**
+     * Whether {@code kind} may travel as a creature's kind: empty for a
+     * creature the game registers under no id, else at most
+     * {@link #MAX_KIND_BYTES} of letters, digits, dots, colons, dashes and
+     * underscores, as entity ids are written.
+     */
+    public static boolean isKind(String kind) {
+        if (kind == null || kind.length() > MAX_KIND_BYTES) {
+            return false;
+        }
+        for (int index = 0; index < kind.length(); index++) {
+            char letter = kind.charAt(index);
+            boolean fits = letter >= 'a' && letter <= 'z' || letter >= 'A' && letter <= 'Z'
+                    || letter >= '0' && letter <= '9'
+                    || letter == '.' || letter == ':' || letter == '-' || letter == '_';
+            if (!fits) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The kind an entity id travels as: the id where it may, else empty. */
+    public static String kindOf(String entityString) {
+        String kind = entityString == null ? "" : entityString.trim();
+        return isKind(kind) ? kind : "";
+    }
+
+    /** A name a player gave, trimmed and cut to the packet's bound; empty for none. */
+    public static String boundedName(String value) {
+        String name = value == null ? "" : value.trim();
+        while (name.getBytes(StandardCharsets.UTF_8).length > MAX_ENTITY_NAME_BYTES
+                && name.length() > 1) {
+            name = name.substring(0, name.length() - 1);
+        }
+        return name;
+    }
+
     public static final class Entry {
         private final int entityId;
         private final LostTalesCombatEngagement engagement;
         private final boolean sharedFromFellowship;
-        private final String name;
+        private final String kind;
+        private final String ownName;
         private final double x;
         private final double y;
         private final double z;
 
+        /**
+         * A contact: its creature's {@code kind} (empty where the game has
+         * no id for it) and {@code ownName}, the name a player gave it, empty
+         * for none. The client words every other name from the kind.
+         */
         public Entry(int entityId, LostTalesCombatEngagement engagement,
-                     boolean sharedFromFellowship, String name,
+                     boolean sharedFromFellowship, String kind, String ownName,
                      double x, double y, double z) {
             this.entityId = entityId;
             this.engagement = engagement == null
                     ? LostTalesCombatEngagement.NONE : engagement;
             this.sharedFromFellowship = sharedFromFellowship;
-            // Empty where the server has no name for it; the client words it.
-            this.name = name == null ? "" : name.trim();
+            this.kind = kind == null ? "" : kind.trim();
+            this.ownName = ownName == null ? "" : ownName.trim();
             this.x = x;
             this.y = y;
             this.z = z;
@@ -190,8 +246,14 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
             return this.sharedFromFellowship;
         }
 
-        public String getName() {
-            return this.name;
+        /** The creature's kind, its entity id; empty where the game has none for it. */
+        public String getKind() {
+            return this.kind;
+        }
+
+        /** The name a player gave the creature, as written; empty for none. */
+        public String getOwnName() {
+            return this.ownName;
         }
 
         public double getX() {
@@ -213,7 +275,8 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
                     && Math.abs(this.x) <= MAX_WORLD_COORDINATE
                     && Math.abs(this.z) <= MAX_WORLD_COORDINATE
                     && Math.abs(this.y) <= MAX_VERTICAL_COORDINATE
-                    && this.name.getBytes(StandardCharsets.UTF_8).length
+                    && isKind(this.kind)
+                    && this.ownName.getBytes(StandardCharsets.UTF_8).length
                     <= MAX_ENTITY_NAME_BYTES;
         }
 
@@ -229,7 +292,8 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
             return this.entityId == other.entityId
                     && this.engagement == other.engagement
                     && this.sharedFromFellowship == other.sharedFromFellowship
-                    && this.name.equals(other.name)
+                    && this.kind.equals(other.kind)
+                    && this.ownName.equals(other.ownName)
                     && Double.doubleToLongBits(this.x)
                     == Double.doubleToLongBits(other.x)
                     && Double.doubleToLongBits(this.y)
@@ -243,7 +307,8 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
             int result = this.entityId;
             result = 31 * result + this.engagement.hashCode();
             result = 31 * result + (this.sharedFromFellowship ? 1 : 0);
-            result = 31 * result + this.name.hashCode();
+            result = 31 * result + this.kind.hashCode();
+            result = 31 * result + this.ownName.hashCode();
             long bits = Double.doubleToLongBits(this.x);
             result = 31 * result + (int) (bits ^ bits >>> 32);
             bits = Double.doubleToLongBits(this.y);

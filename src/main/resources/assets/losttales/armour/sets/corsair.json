@@ -1,0 +1,21 @@
+{
+  "id": "losttales:corsair",
+  "helmet": [
+    "lotr:item.helmetCorsair"
+  ],
+  "chestplate": [
+    "lotr:item.bodyCorsair"
+  ],
+  "leggings": [
+    "lotr:item.legsCorsair"
+  ],
+  "boots": [
+    "lotr:item.bootsCorsair"
+  ],
+  "bonus": [
+    {
+      "effect": "falls",
+      "amount": 0.2
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 {
   "view": "settings",
   "locked": true,
+  "place": "middle",
+  "stage": false,
   "pages": ["category"]
 }

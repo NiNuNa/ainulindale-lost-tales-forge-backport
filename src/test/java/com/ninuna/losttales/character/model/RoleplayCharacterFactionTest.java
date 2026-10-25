@@ -1,7 +1,7 @@
 package com.ninuna.losttales.character.model;
 
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterSummary;
@@ -96,7 +96,7 @@ public final class RoleplayCharacterFactionTest {
         assertTrue(roster.addCharacter(character));
         roster.setActiveCharacterId(CHARACTER);
         assertEquals("lotr:rohan", CharacterAppearance.fromRoster(OWNER,
-                "Steve", roster, CharacterBodyTypeRegistry.WIDE).getFactionId());
+                "Steve", roster, CharacterArmsRegistry.BROAD).getFactionId());
     }
 
     @Test
@@ -113,8 +113,8 @@ public final class RoleplayCharacterFactionTest {
                                                String pledgedFactionId) {
         return RoleplayCharacter.builder(CHARACTER, OWNER)
                 .slot(0).name("Aldric").race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
-                .skin("losttales:human_gondor_male_0").age(30)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
+                .skin("losttales:human_gondor_masculine_0").age(30)
                 .startingFaction(startingFactionId)
                 .pledgedFaction(pledgedFactionId)
                 .createdAt(1L)

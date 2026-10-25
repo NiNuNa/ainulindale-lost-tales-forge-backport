@@ -1,0 +1,21 @@
+{
+  "id": "losttales:lamedon",
+  "helmet": [
+    "lotr:item.helmetLamedon"
+  ],
+  "chestplate": [
+    "lotr:item.bodyLamedon"
+  ],
+  "leggings": [
+    "lotr:item.legsLamedon"
+  ],
+  "boots": [
+    "lotr:item.bootsLamedon"
+  ],
+  "bonus": [
+    {
+      "effect": "falls",
+      "amount": 0.2
+    }
+  ]
+}

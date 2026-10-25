@@ -1,0 +1,21 @@
+{
+  "id": "losttales:arnorian_heavy_captain",
+  "helmet": [
+    "losttales:arnorian_helmet_heavy_captain"
+  ],
+  "chestplate": [
+    "losttales:arnorian_armor_heavy_captain"
+  ],
+  "leggings": [
+    "losttales:arnorian_leggings_heavy_captain"
+  ],
+  "boots": [
+    "losttales:arnorian_boots_heavy_captain"
+  ],
+  "bonus": [
+    {
+      "effect": "knockback",
+      "amount": 0.1
+    }
+  ]
+}

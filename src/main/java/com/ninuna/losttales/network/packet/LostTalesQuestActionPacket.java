@@ -4,6 +4,7 @@ import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.quest.LostTalesQuestIds;
+import com.ninuna.losttales.quest.LostTalesQuestRewardHelper;
 import com.ninuna.losttales.quest.LostTalesQuestRewards;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.QuestStartGate;
@@ -52,6 +53,12 @@ public class LostTalesQuestActionPacket implements IMessage {
      * way as a hand-in.
      */
     public static final String ACTION_CHOOSE = "choose";
+    /**
+     * Collecting the rewards waiting under a quest in the journal
+     * (QUEST-44). The server hands over only what its own log keeps
+     * waiting under the quest named, so a forged id collects nothing.
+     */
+    public static final String ACTION_COLLECT = "collect";
     /** The highest choice a request may name: the last of a pick or of a stage's choices. */
     public static final int MAX_CHOICE = LostTalesQuestRewards.MAX_PICKS - 1;
 
@@ -134,7 +141,8 @@ public class LostTalesQuestActionPacket implements IMessage {
                 || ACTION_CLEAR.equals(action)
                 || ACTION_ACCEPT.equals(action)
                 || ACTION_HAND_IN.equals(action)
-                || ACTION_CHOOSE.equals(action);
+                || ACTION_CHOOSE.equals(action)
+                || ACTION_COLLECT.equals(action);
     }
 
     private static boolean hasValidIdentifierUsage(String action, String identifier) {
@@ -142,7 +150,8 @@ public class LostTalesQuestActionPacket implements IMessage {
                 || ACTION_CLEAR.equals(action)
                 || ACTION_ACCEPT.equals(action)
                 || ACTION_HAND_IN.equals(action)
-                || ACTION_CHOOSE.equals(action)) {
+                || ACTION_CHOOSE.equals(action)
+                || ACTION_COLLECT.equals(action)) {
             return identifier.length() > 0;
         }
         return true;
@@ -169,6 +178,8 @@ public class LostTalesQuestActionPacket implements IMessage {
             LostTalesQuestManager.handInFromConversation(player, questId, choice);
         } else if (ACTION_CHOOSE.equals(action)) {
             LostTalesQuestManager.choose(player, questId, choice);
+        } else if (ACTION_COLLECT.equals(action)) {
+            LostTalesQuestRewardHelper.collect(player, questId);
         }
     }
 

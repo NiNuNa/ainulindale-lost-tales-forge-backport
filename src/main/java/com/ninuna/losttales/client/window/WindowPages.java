@@ -36,7 +36,7 @@ public final class WindowPages {
         private final KeyBinding key;
         private final PageCategory category;
         private final Factory factory;
-        private final boolean fromWorld;
+        private final boolean byGame;
         /** Whether the page opens once though the player opens it: one whose copies would share everything. */
         private final boolean once;
         private final OtherPage tab;
@@ -45,7 +45,7 @@ public final class WindowPages {
                 new HashMap<Integer, PageContent>();
 
         Page(String id, String titleKey, ItemStack icon, KeyBinding key,
-             PageCategory category, Factory factory, boolean fromWorld,
+             PageCategory category, Factory factory, boolean byGame,
              boolean once) {
             this.id = id;
             this.titleKey = titleKey;
@@ -53,7 +53,7 @@ public final class WindowPages {
             this.key = key;
             this.category = category;
             this.factory = factory;
-            this.fromWorld = fromWorld;
+            this.byGame = byGame;
             this.once = once;
             this.tab = new OtherPage(this, 1);
         }
@@ -64,16 +64,17 @@ public final class WindowPages {
         }
 
         /**
-         * Whether the page stands for a thing in the world — a waystone —
-         * and opens only from it ({@link #registerWorldPage}).
+         * Whether only the game opens the page: a waystone's as the player
+         * uses it, the Character Editor as a character is made
+         * ({@link #registerGamePage}).
          */
-        public boolean opensFromWorld() {
-            return this.fromWorld;
+        public boolean opensByGame() {
+            return this.byGame;
         }
 
-        /** Whether the page may stand open more than once: every page but one of the world's or one registered to open once. */
+        /** Whether the page may stand open more than once: every page but one only the game opens or one registered to open once. */
         boolean opensMoreThanOnce() {
-            return !this.fromWorld && !this.once;
+            return !this.byGame && !this.once;
         }
 
         /** Whether the page's key is bound to the keyboard's {@code keyCode}. */
@@ -202,17 +203,18 @@ public final class WindowPages {
     }
 
     /**
-     * Registers a page that stands for a thing in the world — a
-     * waystone — and opens only from it, never by a key: the {@code +}
-     * never offers it, the layout file leaves its tab out, and its tab
-     * closes as the player leaves the world, since the thing may be gone
-     * by the next visit.
+     * Registers a page only the game opens, once at most: a waystone's as
+     * the player uses it, the Character Editor as a character is made or
+     * changed. No key opens it, the {@code +} never offers it, the layout
+     * file leaves its tab out, and its tab closes as the player leaves the
+     * world. A page standing for a thing in the world closes too once the
+     * thing is out of reach ({@link WorldPageWatch}).
      */
-    public static synchronized void registerWorldPage(String id,
-                                                      String titleKey,
-                                                      ItemStack icon,
-                                                      PageCategory category,
-                                                      Factory factory) {
+    public static synchronized void registerGamePage(String id,
+                                                     String titleKey,
+                                                     ItemStack icon,
+                                                     PageCategory category,
+                                                     Factory factory) {
         add(new Page(id, titleKey, icon, null, category, factory, true, true));
     }
 
@@ -227,20 +229,20 @@ public final class WindowPages {
         PAGES.put(page.id, page);
     }
 
-    /** Whether the page can be opened by hand: one the player opens, not one that opens from a thing in the world, and shown now. */
+    /** Whether the page can be opened by hand: one the player opens, not one only the game opens, and shown now. */
     static boolean isOffered(Page page) {
-        return !page.opensFromWorld() && page.tab().isAvailable();
+        return !page.opensByGame() && page.tab().isAvailable();
     }
 
     /**
-     * Leaving the world closes every page that stands for a thing in it,
-     * locked window or not; a window left empty goes. Not written: such a
-     * tab is never in the layout file.
+     * Leaving the world closes every page only the game opens, locked
+     * window or not; a window left empty goes. Not written: such a tab is
+     * never in the layout file.
      */
-    public static void closeWorldPages() {
+    public static void closeGamePages() {
         final List<OtherPage> bound = new ArrayList<OtherPage>();
         for (Page page : all()) {
-            if (page.opensFromWorld() && WindowLayout.isOpen(page.tab())) {
+            if (page.opensByGame() && WindowLayout.isOpen(page.tab())) {
                 bound.add(page.tab());
             }
         }

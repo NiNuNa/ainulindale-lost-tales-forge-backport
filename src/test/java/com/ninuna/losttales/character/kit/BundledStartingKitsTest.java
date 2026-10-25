@@ -99,6 +99,11 @@ public final class BundledStartingKitsTest {
             }
 
             @Override
+            public boolean relicTakes(String relicId, String itemId) {
+                return false;
+            }
+
+            @Override
             public boolean wornThrough(String itemId, int damage) {
                 return false;
             }

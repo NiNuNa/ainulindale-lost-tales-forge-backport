@@ -62,8 +62,10 @@ public final class OtherPage extends WindowPage {
     }
 
     @Override
+    /** What the page says it is doing, else its registered name. */
     public String title() {
-        return this.page.title();
+        String own = content().tabTitle();
+        return own == null || own.length() == 0 ? this.page.title() : own;
     }
 
     @Override
@@ -78,9 +80,11 @@ public final class OtherPage extends WindowPage {
                 TabIcons.SIZE, alpha);
     }
 
+    /** Shown while its content can be and its category's view may open. */
     @Override
     public boolean isAvailable() {
-        return content().isAvailable();
+        return content().isAvailable()
+                && Views.closedWhy(Views.of(category())).length() == 0;
     }
 
     @Override
@@ -96,10 +100,10 @@ public final class OtherPage extends WindowPage {
                         WindowFrame.visibleTabs(window)));
     }
 
-    /** A page that stands for a thing in the world ends with the session. */
+    /** A page only the game opens ends with the session. */
     @Override
     public boolean isKeptInLayout() {
-        return !this.page.opensFromWorld();
+        return !this.page.opensByGame();
     }
 
     @Override

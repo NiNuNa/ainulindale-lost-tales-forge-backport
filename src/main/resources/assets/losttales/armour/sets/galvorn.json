@@ -1,0 +1,21 @@
+{
+  "id": "losttales:galvorn",
+  "helmet": [
+    "lotr:item.helmetGalvorn"
+  ],
+  "chestplate": [
+    "lotr:item.bodyGalvorn"
+  ],
+  "leggings": [
+    "lotr:item.legsGalvorn"
+  ],
+  "boots": [
+    "lotr:item.bootsGalvorn"
+  ],
+  "bonus": [
+    {
+      "effect": "arrows",
+      "amount": 0.2
+    }
+  ]
+}

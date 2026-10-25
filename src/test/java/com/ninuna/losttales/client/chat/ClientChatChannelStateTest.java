@@ -340,7 +340,8 @@ public final class ClientChatChannelStateTest {
     private static void joinFellowship(UUID characterId) {
         ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
                 Collections.<UUID>emptyList(), Collections.singletonList(new ChatFellowship(
-                        new UUID(9L, 9L), "Grey Company", 0x123456))));
+                        new UUID(9L, 9L), "Grey Company", 0x123456)),
+                Collections.singletonList(new UUID(9L, 9L))));
     }
 
     private static UUID acceptRoster(String factionId) {

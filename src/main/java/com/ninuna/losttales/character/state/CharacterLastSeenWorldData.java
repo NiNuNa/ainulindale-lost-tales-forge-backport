@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.state;
 
 import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.storage.WorldClock;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -19,7 +20,8 @@ import net.minecraftforge.common.util.Constants;
  * and never a character its owner has kept to themselves. An identity is seen when its player logs out playing it,
  * switches away from it, or speaks as it; a time is written at most once
  * {@link #RECORD_EVERY_MILLIS} per identity, and one older than
- * {@link #FORGET_AFTER_MILLIS} is forgotten as the store loads.
+ * {@link #FORGET_AFTER_MILLIS} is forgotten as the store loads, unless the
+ * world's clock holds the moment it fell due (DATA-09).
  *
  * <p>Fails closed: a store of another data version is kept whole and says
  * nobody has been seen, so a member list shows fewer names, never more. A
@@ -58,6 +60,7 @@ public final class CharacterLastSeenWorldData extends WorldSavedData {
         }
         this.quarantined.addAll(quarantine.getEntries());
         long now = System.currentTimeMillis();
+        WorldClock.Hold hold = WorldClock.hold();
         NBTTagList list = compound.getTagList(TAG_SEEN, Constants.NBT.TAG_COMPOUND);
         for (int index = 0; index < list.tagCount(); index++) {
             NBTTagCompound entry = list.getCompoundTagAt(index);
@@ -70,12 +73,20 @@ public final class CharacterLastSeenWorldData extends WorldSavedData {
                 continue;
             }
             long at = entry.getLong(TAG_AT);
-            if (now - at > FORGET_AFTER_MILLIS) {
+            if (forgotten(at, now, hold)) {
                 markDirty();
                 continue;
             }
             this.seen.put(id, Long.valueOf(at));
         }
+    }
+
+    /**
+     * Whether a time seen is forgotten: older than {@link #FORGET_AFTER_MILLIS},
+     * unless the world's clock holds the moment it fell due (DATA-09).
+     */
+    static boolean forgotten(long at, long now, WorldClock.Hold hold) {
+        return now - at > FORGET_AFTER_MILLIS && !hold.holds(at + FORGET_AFTER_MILLIS);
     }
 
     @Override

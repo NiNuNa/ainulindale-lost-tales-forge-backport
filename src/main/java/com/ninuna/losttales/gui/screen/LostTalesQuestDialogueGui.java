@@ -6,7 +6,6 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.screen.quest.QuestDialogueLayout;
 import com.ninuna.losttales.gui.screen.quest.QuestDialogueModel;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -197,7 +196,7 @@ public class LostTalesQuestDialogueGui extends GuiScreen
      * exchange. The quest is named under it, quietly.
      */
     private void drawSpeaker(QuestDialogueLayout layout) {
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         drawRightAligned(layout, this.model.getSpeaker(), layout.nameY(),
                 LostTalesColors.TEXT_BRIGHT);
 
@@ -246,7 +245,7 @@ public class LostTalesQuestDialogueGui extends GuiScreen
      */
     private void drawReplies(QuestDialogueLayout layout) {
         List<QuestDialogueModel.Option> replies = this.model.getReplies();
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         for (int index = 0; index < replies.size(); index++) {
             LostTalesUiHitBox row = layout.replyAt(index, this.chosenShown);
             double distance = Math.abs(index - this.chosenShown);

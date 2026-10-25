@@ -13,11 +13,11 @@ public final class CharacterBodyModelDefinition {
     private final String id;
     private final CharacterSkinLayout layout;
     private final boolean chestVariant;
-    private final boolean bodyTypes;
+    private final boolean armsChoice;
     private final boolean vanillaArmPivots;
 
     CharacterBodyModelDefinition(String id, CharacterSkinLayout layout,
-                                 boolean chestVariant, boolean bodyTypes,
+                                 boolean chestVariant, boolean armsChoice,
                                  boolean vanillaArmPivots) {
         if (id == null || id.length() == 0) {
             throw new IllegalArgumentException("body model id must not be blank");
@@ -28,7 +28,7 @@ public final class CharacterBodyModelDefinition {
         this.id = id;
         this.layout = layout;
         this.chestVariant = chestVariant;
-        this.bodyTypes = bodyTypes;
+        this.armsChoice = armsChoice;
         this.vanillaArmPivots = vanillaArmPivots;
     }
 
@@ -46,9 +46,9 @@ public final class CharacterBodyModelDefinition {
         return this.chestVariant;
     }
 
-    /** True when the model is built once per {@link CharacterBodyTypeRegistry} entry. */
-    public boolean supportsBodyTypes() {
-        return this.bodyTypes;
+    /** True when the model is built once per {@link CharacterArmsRegistry} entry. */
+    public boolean supportsArms() {
+        return this.armsChoice;
     }
 
     /**

@@ -215,6 +215,7 @@ public final class WindowLayout {
         window.tabs().addAll(tabs);
         window.setActiveTab(tabs.get(0));
         window.setLocked(defaults.locked);
+        window.setFill(defaults.place);
         WINDOWS.add(window);
         raise(window.getId());
         changed();
@@ -289,6 +290,32 @@ public final class WindowLayout {
         }
         buildView(view);
         return openIn(tab, view, null);
+    }
+
+    /**
+     * Opens a page the game opens over a view's own windows in a window of
+     * its own: in {@code view}, at the view's place, locked, in front, as
+     * the Character Editor stands over the Characters page. A page open
+     * already comes forward where it stands. Answers its window; null for
+     * none.
+     */
+    public static synchronized Window openOver(WindowPage tab, View view) {
+        if (tab == null || view == null) {
+            return null;
+        }
+        Window window = windowOf(tab);
+        if (window == null) {
+            window = newWindow();
+            window.setView(view);
+            window.tabs().add(tab);
+            window.setLocked(true);
+            window.setFill(ViewDefaults.placeOf(view));
+            WINDOWS.add(window);
+        }
+        window.setActiveTab(tab);
+        raise(window.getId());
+        changed();
+        return window;
     }
 
     /** The window holding {@code shown}, with it in front and the window raised; null for none. */
@@ -475,6 +502,7 @@ public final class WindowLayout {
             WindowPage copy = first.withInstance(instance);
             if (copy != null && !holds(copy)) {
                 copy.forgetCopy();
+                WindowSearch.forget(copy);
                 return copy;
             }
         }
@@ -580,13 +608,13 @@ public final class WindowLayout {
     }
 
     /**
-     * Whether a pinned window shows the tab: every tab but a page that
-     * stands for a thing in the world, which closes as the player walks
-     * away from it.
+     * Whether a pinned window shows the tab: every tab but a page only the
+     * game opens, which is about something under way: a waystone the
+     * player stands at, a character being made.
      */
     static boolean staysPut(WindowPage tab) {
         return tab != null && !(tab instanceof OtherPage
-                && ((OtherPage)tab).page().opensFromWorld());
+                && ((OtherPage)tab).page().opensByGame());
     }
 
     /* ---- Tabs ---- */
@@ -1603,9 +1631,9 @@ public final class WindowLayout {
     }
 
     /**
-     * Puts a window's layout back as its view first lays it out: at the
-     * default place, in the middle of the screen at two thirds of it;
-     * pinned nowhere, its splits parted, its page no longer held filling
+     * Puts a window's layout back as its view first lays it out: at its
+     * view's place, the middle of the screen at two thirds of it unless the
+     * view's file names a part of the screen; pinned nowhere, its splits parted, its page no longer held filling
      * it, and locked again. Its
      * pages stay; what each lays out is put back by the page
      * ({@link WindowPage#resetView}), and the settings keep their own
@@ -1619,7 +1647,7 @@ public final class WindowLayout {
         }
         window.setOwnWidth(0);
         window.setOwnHeight(0.0D);
-        window.setFill(Window.ScreenFill.NONE);
+        window.setFill(ViewDefaults.placeOf(viewOf(window)));
         window.setPinnedToHud(false);
         window.setPinnedToGui(false);
         window.splits().clear();

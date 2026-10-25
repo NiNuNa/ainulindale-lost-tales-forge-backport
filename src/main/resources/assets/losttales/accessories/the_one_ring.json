@@ -1,0 +1,6 @@
+{
+  "id": "losttales:the_one_ring",
+  "slot": "ring",
+  "item": "losttales:the_one_ring",
+  "effects": ["losttales:concealment", "losttales:wraith_world"]
+}

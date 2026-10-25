@@ -1612,7 +1612,10 @@ public final class LostTalesQuestManager {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         LotrQuestJournalAdapter.prune(player, data);
         ServerQuestSync.revealLog(player, data);
-        QuestLogSync.send(player, LostTalesQuestSyncPacket.fromPlayerData(data),
+        // The places the rumours point to go with them, found nowhere yet
+        // (QUEST-20).
+        QuestLogSync.send(player, LostTalesQuestSyncPacket.fromPlayerData(data)
+                        .withRumourPlaces(QuestRumourPlaces.of(player, data)),
                 data != null && data.takeReplaced());
         // The fellowships' members see where this player stands, and the
         // player where they do (QUEST-25).

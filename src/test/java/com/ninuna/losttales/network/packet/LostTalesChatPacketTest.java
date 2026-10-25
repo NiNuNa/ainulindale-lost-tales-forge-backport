@@ -1298,9 +1298,12 @@ public final class LostTalesChatPacketTest {
         LostTalesPacketCodec.writeUtf8String(probe, "", 384);
         probe.writeInt(0);
         // Then whether the character was not in the world, and what its
-        // author typed, nothing.
+        // author typed, nothing; then whether an unseen voice said it,
+        // and whether its quote is of one.
         probe.writeBoolean(false);
         LostTalesPacketCodec.writeUtf8String(probe, "", 4096);
+        probe.writeBoolean(false);
+        probe.writeBoolean(false);
         return probe.readableBytes();
     }
 }

@@ -33,8 +33,8 @@ public final class LostTalesWaystoneOwnershipTest {
         assertNull(outcome.refusal());
         LostTalesMapMarkerRecord handed = outcome.updated();
         assertEquals(FARAMIR, handed.getOwnerCharacterId());
-        assertEquals("it keeps whom it is called after", "player:Aragorn",
-                handed.getNamedAfter());
+        assertTrue("it keeps whom it is called after",
+                handed.isCalledAfter(ARAGORN));
         assertTrue(handed.getRevision() > placed.getRevision());
         assertTrue(LostTalesMapMarkerVisibilityPolicy.canView(handed,
                 FARAMIR, false, Collections.<UUID>emptySet()));
@@ -304,7 +304,7 @@ public final class LostTalesWaystoneOwnershipTest {
 
     private static LostTalesMapMarkerRecord placed() {
         return LostTalesMapMarkerRecord.createPlayerMarker(
-                "losttales:player/bree", "Aragorn", ARAGORN,
+                "losttales:player/bree", ARAGORN,
                 0, 10.0D, 64.0D, 20.0D, UUID.fromString(
                         "30000000-0000-0000-0000-000000000003"));
     }

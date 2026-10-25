@@ -12,6 +12,11 @@
       "act": "kill",
       "weapons": ["sword", "dagger"],
       "per": 0.5
+    },
+    {
+      "act": "block",
+      "weapons": ["sword", "dagger"],
+      "per": 1.0
     }
   ],
   "perks": [

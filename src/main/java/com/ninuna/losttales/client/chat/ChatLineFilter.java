@@ -75,6 +75,16 @@ final class ChatLineFilter {
                 && !this.includeUntracked;
     }
 
+    /**
+     * The one conversation the view shows every line of and nothing
+     * besides, or null for a view of several, of mentions, or of the
+     * console's untracked lines.
+     */
+    ConversationPage only() {
+        return this.tabs.size() == 1 && this.mentionTabs.isEmpty()
+                && !this.includeUntracked ? this.tabs.iterator().next() : null;
+    }
+
     /** Whether every line of the tab passes. */
     boolean accepts(ConversationPage tab) {
         // Asked with a line's own tab, which already names the

@@ -1,0 +1,21 @@
+{
+  "id": "losttales:pinnath_gelin",
+  "helmet": [
+    "lotr:item.helmetPinnathGelin"
+  ],
+  "chestplate": [
+    "lotr:item.bodyPinnathGelin"
+  ],
+  "leggings": [
+    "lotr:item.legsPinnathGelin"
+  ],
+  "boots": [
+    "lotr:item.bootsPinnathGelin"
+  ],
+  "bonus": [
+    {
+      "effect": "arrows",
+      "amount": 0.2
+    }
+  ]
+}

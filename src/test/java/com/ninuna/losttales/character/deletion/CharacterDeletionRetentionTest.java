@@ -3,12 +3,13 @@ package com.ninuna.losttales.character.deletion;
 import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.server.SeenAccountNames;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.sync.DeletedCharacterSummary;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.storage.WorldClock;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
@@ -152,6 +153,43 @@ public final class CharacterDeletionRetentionTest {
     }
 
     /**
+     * A retention that ended inside a jump of the clock (DATA-09) is not
+     * over: the character stays restorable, is not purged on its own,
+     * and takes no place from one that may go; it is counted as held.
+     */
+    @Test
+    public void aRetentionTheClocksJumpEndedWaitsForAnOperator() {
+        final long jumpFrom = 90L * DAY;
+        final long jumpTo = 100L * DAY;
+        WorldClock.Hold jump = new WorldClock.Hold() {
+            @Override
+            public boolean holds(long dueAt) {
+                return dueAt > jumpFrom && dueAt <= jumpTo;
+            }
+        };
+        long now = jumpTo;
+        CharacterDeletionTombstone held = committed(character(OWNER, "Held", 1),
+                1000L, 95L * DAY);
+        CharacterDeletionTombstone due = committed(character(OWNER, "Due", 2),
+                1000L, 80L * DAY);
+        assertTrue(CharacterDeletionService.isRestorable(held, OWNER, now, jump));
+        assertFalse(CharacterDeletionService.isRestorable(held, OWNER, now));
+        assertFalse("due before the jump, it was due anyway",
+                CharacterDeletionService.isRestorable(due, OWNER, now, jump));
+
+        CharacterDeletionWorldData data = new CharacterDeletionWorldData(
+                CharacterDeletionWorldData.DATA_NAME);
+        data.saveTombstone(held);
+        data.saveTombstone(due);
+        List<CharacterDeletionTombstone> expired = data.getExpired(null, now, 1, jump);
+        assertEquals(1, expired.size());
+        assertEquals("Due", expired.get(0).getCharacterCopy().getName());
+        assertEquals(2, data.getExpired(null, now, 10).size());
+        assertEquals(1, data.countHeld(now, jump));
+        assertEquals(0, data.countHeld(now, WorldClock.NONE));
+    }
+
+    /**
      * The store reads only its own version: one that names none, or a
      * deleted character without its, is kept as it is and the store goes
      * read-only, as every character store does.
@@ -208,8 +246,8 @@ public final class CharacterDeletionRetentionTest {
                                                int slot) {
         return RoleplayCharacter.builder(UUID.randomUUID(), owner)
                 .slot(slot).name(name).race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
-                .skin("losttales:human_bree_male_0").age(30)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
+                .skin("losttales:human_bree_masculine_0").age(30)
                 .startingFaction("lotr:bree").createdAt(1L)
                 .build();
     }

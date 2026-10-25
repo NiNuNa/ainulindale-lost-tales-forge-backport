@@ -3,7 +3,7 @@ package com.ninuna.losttales.character.sync;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
@@ -14,9 +14,9 @@ import java.util.UUID;
 /**
  * Public projection of an online player's active identity: what other
  * clients need to render it and to describe it in the chat player card
- * (name, race, gender, body and chest type, faction, age). A player still
+ * (name, race, body type, arms and chest, faction, age). A player still
  * making their first character is a ghost shown as the account: the
- * account skin on the plain human body, with the arm width its skin
+ * account skin on the plain human body, with the arms its skin
  * declares, and no cape.
  * Nothing here is private roster state — slots, waypoints and the switch
  * state stay with the owner.
@@ -35,9 +35,9 @@ public final class CharacterAppearance {
     private final String accountName;
     private final String characterName;
     private final String raceId;
-    private final String genderId;
-    private final String skinId;
     private final String bodyTypeId;
+    private final String skinId;
+    private final String armsId;
     private final String chestTypeId;
     private final boolean showMinecraftCape;
     private final String cosmeticCapeId;
@@ -45,27 +45,27 @@ public final class CharacterAppearance {
     private final int age;
 
     /**
-     * Preview constructor carrying chosen body and chest types. A type the
-     * registry does not know, an empty one included, takes the sex's
+     * Preview constructor carrying the chosen arms and chest. A type the
+     * registry does not know, an empty one included, takes the body type's
      * default.
      */
     public CharacterAppearance(UUID playerId, String raceId,
-                               String genderId, String skinId, String bodyTypeId,
+                               String bodyTypeId, String skinId, String armsId,
                                String chestTypeId) {
-        this(playerId, "", "", raceId, genderId, skinId,
+        this(playerId, "", "", raceId, bodyTypeId, skinId,
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                "", 0, bodyTypeId, chestTypeId);
+                "", 0, armsId, chestTypeId);
     }
 
-    /** Preview projection carrying capes and chosen body and chest types. */
+    /** Preview projection carrying capes and the chosen arms and chest. */
     public static CharacterAppearance preview(UUID playerId, String raceId,
-                                              String genderId, String skinId,
-                                              String bodyTypeId, String chestTypeId,
+                                              String bodyTypeId, String skinId,
+                                              String armsId, String chestTypeId,
                                               boolean showMinecraftCape,
                                               String cosmeticCapeId) {
-        return new CharacterAppearance(playerId, "", "", raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId, "", 0, bodyTypeId, chestTypeId);
+        return new CharacterAppearance(playerId, "", "", raceId, bodyTypeId, skinId,
+                showMinecraftCape, cosmeticCapeId, "", 0, armsId, chestTypeId);
     }
 
     /**
@@ -79,13 +79,13 @@ public final class CharacterAppearance {
      */
     public CharacterAppearance(UUID playerId, String accountName,
                                String characterName,
-                               String raceId, String genderId, String skinId,
+                               String raceId, String bodyTypeId, String skinId,
                                boolean showMinecraftCape, String cosmeticCapeId,
-                               String factionId, int age, String bodyTypeId,
+                               String factionId, int age, String armsId,
                                String chestTypeId) {
         this(CharacterAppearanceKind.CHARACTER, playerId, accountName,
-                characterName, raceId, genderId, skinId, showMinecraftCape,
-                cosmeticCapeId, factionId, age, bodyTypeId, chestTypeId);
+                characterName, raceId, bodyTypeId, skinId, showMinecraftCape,
+                cosmeticCapeId, factionId, age, armsId, chestTypeId);
     }
 
     /**
@@ -95,22 +95,22 @@ public final class CharacterAppearance {
      */
     public CharacterAppearance(CharacterAppearanceKind kind, UUID playerId,
                                String accountName, String characterName,
-                               String raceId, String genderId, String skinId,
+                               String raceId, String bodyTypeId, String skinId,
                                boolean showMinecraftCape, String cosmeticCapeId,
-                               String factionId, int age, String bodyTypeId,
+                               String factionId, int age, String armsId,
                                String chestTypeId) {
-        this(kind, playerId, null, accountName, characterName, raceId, genderId,
+        this(kind, playerId, null, accountName, characterName, raceId, bodyTypeId,
                 skinId, showMinecraftCape, cosmeticCapeId, factionId, age,
-                bodyTypeId, chestTypeId);
+                armsId, chestTypeId);
     }
 
     /** The canonical projection with the character's stable id; see {@link #getCharacterId}. */
     public CharacterAppearance(CharacterAppearanceKind kind, UUID playerId,
                                UUID characterId,
                                String accountName, String characterName,
-                               String raceId, String genderId, String skinId,
+                               String raceId, String bodyTypeId, String skinId,
                                boolean showMinecraftCape, String cosmeticCapeId,
-                               String factionId, int age, String bodyTypeId,
+                               String factionId, int age, String armsId,
                                String chestTypeId) {
         if (playerId == null) {
             throw new IllegalArgumentException("playerId must not be null");
@@ -121,14 +121,14 @@ public final class CharacterAppearance {
         this.accountName = normalizeName(accountName);
         this.characterName = normalizeName(characterName);
         this.raceId = LostTalesIdentifiers.normalize(raceId);
-        this.genderId = LostTalesIdentifiers.normalize(genderId);
+        this.bodyTypeId = LostTalesIdentifiers.normalize(bodyTypeId);
         this.skinId = LostTalesIdentifiers.normalize(skinId);
-        this.bodyTypeId = CharacterBodyTypeRegistry.contains(bodyTypeId)
-                ? LostTalesIdentifiers.normalize(bodyTypeId)
-                : CharacterBodyTypeRegistry.defaultFor(this.genderId);
+        this.armsId = CharacterArmsRegistry.contains(armsId)
+                ? LostTalesIdentifiers.normalize(armsId)
+                : CharacterArmsRegistry.defaultFor(this.bodyTypeId);
         this.chestTypeId = CharacterChestTypeRegistry.contains(chestTypeId)
                 ? LostTalesIdentifiers.normalize(chestTypeId)
-                : CharacterChestTypeRegistry.defaultFor(this.genderId);
+                : CharacterChestTypeRegistry.defaultFor(this.bodyTypeId);
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = cosmeticCapeId == null ? "" : cosmeticCapeId;
         this.factionId = factionId == null ? "" : factionId.trim();
@@ -139,16 +139,16 @@ public final class CharacterAppearance {
 
     /**
      * A player who has not made a character yet: a ghost, drawn faint in
-     * the account's own skin with the arm width the skin declares, and no
+     * the account's own skin with the arms the skin declares, and no
      * cape.
      */
     public static CharacterAppearance forAccount(UUID playerId, String accountName,
-                                                 String bodyTypeId) {
+                                                 String armsId) {
         return new CharacterAppearance(CharacterAppearanceKind.ACCOUNT, playerId,
                 accountName, "", CharacterRaceRegistry.HUMAN, "",
                 CharacterSkinRegistry.ACCOUNT_SKIN_ID, false,
                 CharacterCapeCatalog.NONE_ID, "", 0,
-                CharacterBodyTypeRegistry.normalizeOrWide(bodyTypeId),
+                CharacterArmsRegistry.normalizeOrBroad(armsId),
                 CharacterChestTypeRegistry.NONE);
     }
 
@@ -159,10 +159,10 @@ public final class CharacterAppearance {
      */
     public static CharacterAppearance fromRoster(UUID playerId, String accountName,
                                                  CharacterRoster roster,
-                                                 String accountBodyTypeId) {
+                                                 String accountArmsId) {
         RoleplayCharacter active = roster == null ? null : roster.getActiveCharacter();
         return active == null
-                ? forAccount(playerId, accountName, accountBodyTypeId)
+                ? forAccount(playerId, accountName, accountArmsId)
                 : new CharacterAppearance(
                         CharacterAppearanceKind.CHARACTER,
                         playerId,
@@ -170,13 +170,13 @@ public final class CharacterAppearance {
                         accountName,
                         active.getName(),
                         active.getRaceId(),
-                        active.getGenderId(),
+                        active.getBodyTypeId(),
                         active.getSkinId(),
                         active.isMinecraftCapeVisible(),
                         active.getCosmeticCapeId(),
                         active.getFactionId(),
                         active.getAge(),
-                        active.getBodyTypeId(),
+                        active.getArmsId(),
                         active.getChestTypeId());
     }
 
@@ -209,17 +209,17 @@ public final class CharacterAppearance {
         return this.raceId;
     }
 
-    public String getGenderId() {
-        return this.genderId;
+    public String getBodyTypeId() {
+        return this.bodyTypeId;
     }
 
     public String getSkinId() {
         return this.skinId;
     }
 
-    /** Arm width of the body; only bodies that offer a choice read it. */
-    public String getBodyTypeId() {
-        return this.bodyTypeId;
+    /** Arms of the body; only bodies that offer a choice read it. */
+    public String getArmsId() {
+        return this.armsId;
     }
 
     /** Chest shape and size; only bodies with a chest variant read it. */
@@ -289,9 +289,9 @@ public final class CharacterAppearance {
                 && same(this.accountName, other.accountName)
                 && same(this.characterName, other.characterName)
                 && same(this.raceId, other.raceId)
-                && same(this.genderId, other.genderId)
-                && same(this.skinId, other.skinId)
                 && same(this.bodyTypeId, other.bodyTypeId)
+                && same(this.skinId, other.skinId)
+                && same(this.armsId, other.armsId)
                 && same(this.chestTypeId, other.chestTypeId)
                 && this.showMinecraftCape == other.showMinecraftCape
                 && same(this.cosmeticCapeId, other.cosmeticCapeId)

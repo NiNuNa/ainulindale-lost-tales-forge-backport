@@ -69,14 +69,55 @@ public final class LostTalesChatIdentityPacketTest {
         lists.add(Arrays.asList(GREY, RANGERS));
         for (List<UUID> ids : readLists()) {
             for (List<ChatFellowship> fellowships : lists) {
-                ByteBuf wire = Unpooled.buffer();
-                new LostTalesChatIdentitySyncPacket(ids, fellowships).toBytes(wire);
-                LostTalesChatIdentitySyncPacket decoded =
-                        new LostTalesChatIdentitySyncPacket();
-                decoded.fromBytes(wire);
-                assertFalse(decoded.isMalformed());
-                assertEquals(ids, decoded.getCharacterIds());
-                assertEquals(fellowships, decoded.getFellowships());
+                for (List<UUID> account : accountLists()) {
+                    ByteBuf wire = Unpooled.buffer();
+                    new LostTalesChatIdentitySyncPacket(ids, fellowships, account)
+                            .toBytes(wire);
+                    LostTalesChatIdentitySyncPacket decoded =
+                            new LostTalesChatIdentitySyncPacket();
+                    decoded.fromBytes(wire);
+                    assertFalse(decoded.isMalformed());
+                    assertEquals(ids, decoded.getCharacterIds());
+                    assertEquals(fellowships, decoded.getFellowships());
+                    assertEquals(account != null, decoded.isAccountKnown());
+                    assertEquals(account == null ? Collections.<UUID>emptyList()
+                            : account, decoded.getAccountFellowshipIds());
+                }
+            }
+        }
+    }
+
+    /**
+     * The account's fellowships are known or not, each once, within the
+     * bound: an answer saying otherwise never applies, and one is never
+     * built (WIN-18).
+     */
+    @Test
+    public void theAccountsFellowshipsAreKnownDistinctAndBounded() {
+        ByteBuf wire = Unpooled.buffer();
+        new LostTalesChatIdentitySyncPacket(Collections.<UUID>emptyList(),
+                Collections.<ChatFellowship>emptyList(),
+                Collections.singletonList(FELLOWSHIP)).toBytes(wire);
+        // Two counts, then the flag, the count and the one id.
+        assertEquals(1 + 1 + 1 + 1 + 16, wire.readableBytes());
+        assertBadAnswer(wire.copy().setByte(2, 2));
+        assertBadAnswer(wire.copy().setByte(2, 0));
+        assertBadAnswer(wire.copy().setByte(3,
+                LostTalesChatIdentitySyncPacket.MAX_ACCOUNT_FELLOWSHIPS + 1));
+        ByteBuf twice = wire.copy(0, 3).writeByte(2);
+        for (int index = 0; index < 2; index++) {
+            twice.writeLong(FELLOWSHIP.getMostSignificantBits())
+                    .writeLong(FELLOWSHIP.getLeastSignificantBits());
+        }
+        assertBadAnswer(twice);
+        for (List<UUID> refused : Arrays.asList(Arrays.asList(FELLOWSHIP, FELLOWSHIP),
+                manyIds(LostTalesChatIdentitySyncPacket.MAX_ACCOUNT_FELLOWSHIPS + 1))) {
+            try {
+                new LostTalesChatIdentitySyncPacket(Collections.<UUID>emptyList(),
+                        Collections.<ChatFellowship>emptyList(), refused);
+                fail("account fellowships past the rules were accepted");
+            } catch (IllegalArgumentException expected) {
+                // The bound holds locally too.
             }
         }
     }
@@ -97,7 +138,8 @@ public final class LostTalesChatIdentityPacketTest {
         }
         ByteBuf wire = Unpooled.buffer();
         new LostTalesChatIdentitySyncPacket(Collections.singletonList(CHARACTER),
-                Collections.singletonList(GREY)).toBytes(wire);
+                Collections.singletonList(GREY), Collections.singletonList(FELLOWSHIP))
+                .toBytes(wire);
         // The fields before the name, then a length past the bound and
         // that many bytes: a well-formed frame the bound still refuses.
         ByteBuf claimed = wire.copy(0, 38);
@@ -113,7 +155,8 @@ public final class LostTalesChatIdentityPacketTest {
     public void partialInvalidAndTrailingAnswersNeverApply() {
         ByteBuf wire = Unpooled.buffer();
         new LostTalesChatIdentitySyncPacket(Collections.singletonList(CHARACTER),
-                Collections.singletonList(GREY)).toBytes(wire);
+                Collections.singletonList(GREY), Collections.singletonList(FELLOWSHIP))
+                .toBytes(wire);
         for (int length = 0; length < wire.readableBytes(); length++) {
             assertBadAnswer(wire.copy(0, length));
         }
@@ -125,7 +168,7 @@ public final class LostTalesChatIdentityPacketTest {
         assertBadAnswer(wire.copy().writeByte(0));
         ByteBuf empty = Unpooled.buffer();
         new LostTalesChatIdentitySyncPacket(Collections.<UUID>emptyList(),
-                Collections.<ChatFellowship>emptyList()).toBytes(empty);
+                Collections.<ChatFellowship>emptyList(), null).toBytes(empty);
         assertBadAnswer(empty.writeByte(0));
     }
 
@@ -134,6 +177,16 @@ public final class LostTalesChatIdentityPacketTest {
         lists.add(Collections.<UUID>emptyList());
         lists.add(Collections.singletonList(CHARACTER));
         lists.add(manyIds(LostTalesChatIdentityPacket.MAX_READ));
+        return lists;
+    }
+
+    /** The account's fellowships not known, none, one and the most. */
+    private static List<List<UUID>> accountLists() {
+        List<List<UUID>> lists = new ArrayList<List<UUID>>();
+        lists.add(null);
+        lists.add(Collections.<UUID>emptyList());
+        lists.add(Collections.singletonList(FELLOWSHIP));
+        lists.add(manyIds(LostTalesChatIdentitySyncPacket.MAX_ACCOUNT_FELLOWSHIPS));
         return lists;
     }
 
@@ -159,6 +212,8 @@ public final class LostTalesChatIdentityPacketTest {
         assertTrue(decoded.isMalformed());
         assertTrue(decoded.getCharacterIds().isEmpty());
         assertTrue(decoded.getFellowships().isEmpty());
+        assertFalse(decoded.isAccountKnown());
+        assertTrue(decoded.getAccountFellowshipIds().isEmpty());
         assertEquals(0, wire.readableBytes());
     }
 }

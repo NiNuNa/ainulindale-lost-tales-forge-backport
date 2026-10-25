@@ -1,0 +1,22 @@
+{
+  "id": "losttales:morwaith",
+  "helmet": [
+    "lotr:item.helmetMoredain"
+  ],
+  "chestplate": [
+    "lotr:item.bodyMoredain"
+  ],
+  "leggings": [
+    "lotr:item.legsMoredain"
+  ],
+  "boots": [
+    "lotr:item.bootsMoredain"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:polearms"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "id": "losttales:dwarven",
+  "helmet": [
+    "lotr:item.helmetDwarven",
+    "lotr:item.helmetDwarvenSilver",
+    "lotr:item.helmetDwarvenGold",
+    "lotr:item.helmetDwarvenMithril"
+  ],
+  "chestplate": [
+    "lotr:item.bodyDwarven",
+    "lotr:item.bodyDwarvenSilver",
+    "lotr:item.bodyDwarvenGold",
+    "lotr:item.bodyDwarvenMithril"
+  ],
+  "leggings": [
+    "lotr:item.legsDwarven",
+    "lotr:item.legsDwarvenSilver",
+    "lotr:item.legsDwarvenGold",
+    "lotr:item.legsDwarvenMithril"
+  ],
+  "boots": [
+    "lotr:item.bootsDwarven",
+    "lotr:item.bootsDwarvenSilver",
+    "lotr:item.bootsDwarvenGold",
+    "lotr:item.bootsDwarvenMithril"
+  ],
+  "bonus": [
+    {
+      "effect": "fire",
+      "amount": 0.2
+    }
+  ]
+}

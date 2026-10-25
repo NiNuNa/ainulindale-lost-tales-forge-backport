@@ -10,6 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
@@ -104,6 +105,18 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         this.quarantinedEntries.addAll(result.getQuarantineCopy());
         boolean repaired = deduplicateLogicalRecords();
         repaired |= quarantineSharedLinks();
+        if (this.quarantinedEntries.size()
+                > LostTalesMapMarkerNbtCodec.MAX_QUARANTINED) {
+            LostTalesLog.warning("Map marker quarantine would hold %d records, past its %d; preserving the data read-only",
+                    Integer.valueOf(this.quarantinedEntries.size()),
+                    Integer.valueOf(LostTalesMapMarkerNbtCodec.MAX_QUARANTINED));
+            this.records.clear();
+            this.quarantinedEntries.clear();
+            this.seededKeys.clear();
+            this.readOnlyForNewerVersion = true;
+            this.preservedNewerData = (NBTTagCompound)compound.copy();
+            return;
+        }
         repaired |= alignLinkedMarkerPositions();
         rebuildIndexes();
         repaired |= readLotrTravelIds(compound);
@@ -312,6 +325,31 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         this.records.put(record.getId(), record);
         rebuildIndexes();
         markDirty();
+    }
+
+    /**
+     * Takes the character's share off every marker shared with it, each a
+     * revision newer, as its purge does (WAY-03). Shares stand in no
+     * lookup, so none is rebuilt. Answers how many markers it changed.
+     */
+    public synchronized int forgetSharedCharacter(UUID characterId) {
+        ensureWritable();
+        int changed = 0;
+        if (characterId == null) {
+            return changed;
+        }
+        for (Map.Entry<String, LostTalesMapMarkerRecord> entry
+                : this.records.entrySet()) {
+            LostTalesMapMarkerRecord record = entry.getValue();
+            if (record.getSharedCharacterIds().contains(characterId)) {
+                entry.setValue(record.withoutSharedCharacter(characterId));
+                changed++;
+            }
+        }
+        if (changed > 0) {
+            markDirty();
+        }
+        return changed;
     }
 
     public synchronized boolean removeRecord(String markerId) {

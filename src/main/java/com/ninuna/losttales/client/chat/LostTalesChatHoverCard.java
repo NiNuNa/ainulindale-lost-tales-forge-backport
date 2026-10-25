@@ -46,7 +46,7 @@ import java.util.Locale;
  * the left and its value at the row's right end in the aside tone, a
  * status line or a description wrapped as a menu's note, and a heading
  * over a group of rows. A chat line supplies its snapshotted identity;
- * the details — faction, race, gender, age and glances — come from the
+ * the details — faction, race, body type, age and glances — come from the
  * public appearance and profile the server synced for that player, and
  * are only shown when they describe the character the line names. An
  * NPC's head and name carry the same card — the portrait, the name in
@@ -239,7 +239,7 @@ final class LostTalesChatHoverCard {
      * brief card shows the status line, the command a Server line
      * answers, the server's own status, the roles held, the status and an
      * NPC's faction; the {@code full} card goes on to the character's
-     * faction, race, gender, age and glances. {@code width} fixes the
+     * faction, race, body type, age and glances. {@code width} fixes the
      * card's width, a window's; at 0 the card takes the width its rows
      * want, up to {@code maxWidth}.
      */
@@ -326,10 +326,10 @@ final class LostTalesChatHoverCard {
             addDetail(rows, "gui.losttales.character.race",
                     details == null ? "" : ClientCharacterDisplayNames.race(
                             details.getRaceId()));
-            addDetail(rows, "gui.losttales.character.gender",
-                    details == null || details.getGenderId().length() == 0
-                            ? "" : ClientCharacterDisplayNames.gender(
-                                    details.getGenderId()));
+            addDetail(rows, "gui.losttales.character.body_type",
+                    details == null || details.getBodyTypeId().length() == 0
+                            ? "" : ClientCharacterDisplayNames.bodyType(
+                                    details.getBodyTypeId()));
             addDetail(rows, "gui.losttales.character.age",
                     details == null || details.getAge() <= 0
                             ? "" : String.valueOf(details.getAge()));

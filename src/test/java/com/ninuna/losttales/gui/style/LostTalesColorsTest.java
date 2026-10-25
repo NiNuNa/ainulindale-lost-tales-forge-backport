@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.style;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Modifier;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -8,7 +10,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The palette's ramps: a shade lighter is the next step up a colour's own
- * ramp, and every entry stands on one of the six.
+ * ramp, and every entry stands on one of the six. And the palette is read
+ * by name, never through a class of its own.
  */
 public final class LostTalesColorsTest {
 
@@ -86,6 +89,19 @@ public final class LostTalesColorsTest {
         assertEquals(LostTalesColors.rgb(LostTalesColors.SEA_GREEN),
                 LostTalesColors.darkestShade(LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN),
                         LostTalesColors.rgb(LostTalesColors.HARBOR_BLUE)));
+    }
+
+    /**
+     * Colours are read from the palette by name, never through a class
+     * that extends it: it is final and cannot be made (LOOK-03).
+     */
+    @Test
+    public void thePaletteIsReadByNameNeverInherited() {
+        assertTrue(Modifier.isFinal(LostTalesColors.class.getModifiers()));
+        for (Constructor<?> constructor
+                : LostTalesColors.class.getDeclaredConstructors()) {
+            assertTrue(Modifier.isPrivate(constructor.getModifiers()));
+        }
     }
 
     private static double luminance(int color) {

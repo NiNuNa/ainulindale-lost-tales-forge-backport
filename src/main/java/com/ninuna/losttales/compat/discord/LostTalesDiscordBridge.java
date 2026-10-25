@@ -38,6 +38,8 @@ import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatDeliveryMarkPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
+import com.ninuna.losttales.util.LostTalesLangFile;
+import com.ninuna.losttales.util.LostTalesServerLanguage;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import com.ninuna.losttales.util.LostTalesWords;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -227,11 +229,18 @@ public final class LostTalesDiscordBridge {
     /** The bindings read at the last start; empty while the bridge is stopped. */
     private volatile DiscordChannelBindings bindings = DiscordChannelBindings.EMPTY;
     /**
-     * The channels that may cross but whose gate let nobody read them at
-     * the last start, by id: the bindings refused them, so a change to
-     * the gates that opens or closes one restarts the bridge.
+     * The bridgeable channels the bridge could not carry at the last
+     * start, by id: the bindings refused them, so a change to the gates,
+     * or to a server channel's rule, that opens or closes one restarts
+     * the bridge.
      */
     private Set<String> closedAtStart = Collections.emptySet();
+    /**
+     * The language the server wrote in at the last start (LANG-08): the
+     * slash commands Discord shows carry its words, so a change of it
+     * restarts the bridge.
+     */
+    private String languageAtStart = LostTalesServerLanguage.ENGLISH;
     /**
      * The bot's gateway connection, when the config asks for one: it
      * hands Discord messages in as they are sent and hears the slash
@@ -364,6 +373,7 @@ public final class LostTalesDiscordBridge {
      */
     public synchronized void start() {
         this.closedAtStart = closedChannels();
+        this.languageAtStart = LostTalesServerLanguage.inForce();
         boolean enabled = LostTalesConfig.discordEnabled;
         boolean botPresent = LostTalesConfig.discordBotToken.trim().length() > 0;
         DiscordChannelBindings configured = enabled
@@ -561,6 +571,7 @@ public final class LostTalesDiscordBridge {
         }
         this.busySaid.clear();
         this.closedAtStart = Collections.emptySet();
+        this.languageAtStart = LostTalesServerLanguage.ENGLISH;
     }
 
     /**
@@ -589,7 +600,25 @@ public final class LostTalesDiscordBridge {
         return true;
     }
 
-    /** The ids of the channels that may cross whose gate lets nobody read them now. */
+    /**
+     * Starts the bridge again when the server writes in another language
+     * than at the last start, so the slash commands are registered again
+     * in its words; everything else the bridge writes is worded as it is
+     * sent. Answers whether it restarted. Server thread.
+     */
+    public synchronized boolean restartIfLanguageMoved() {
+        if (LostTalesServerLanguage.inForce().equals(this.languageAtStart)) {
+            return false;
+        }
+        start();
+        return true;
+    }
+
+    /**
+     * The ids of the bridgeable channels the bridge may not carry now:
+     * one heard only nearby, or one whose gate lets nobody read it. A
+     * server channel whose rule turns to proximity moves this set too.
+     */
     static Set<String> closedChannels() {
         Set<String> closed = new TreeSet<String>();
         for (ChatChannel channel : ChatChannel.values()) {
@@ -1532,7 +1561,8 @@ public final class LostTalesDiscordBridge {
                 DiscordSlashCommands.linked(LostTalesWords.LANG, gameName,
                         result.link.direction, linkedChannel != null
                                 && DiscordBridgePolicy.isLimitedInGame(linkedChannel.channel)));
-        String where = describeDiscordChannel(LostTalesWords.LANG, channelId);
+        // The Server Log keeps English, whatever the server writes in (DISC-27).
+        String where = describeDiscordChannel(LostTalesLangFile.ENGLISH_WORDS, channelId);
         EntityPlayerMP issuer = result.link.issuer == null ? null
                 : LostTalesServerPlayers.findOnline(result.link.issuer);
         if (issuer != null) {
@@ -1546,7 +1576,9 @@ public final class LostTalesDiscordBridge {
                 ChatConsoleEvent.Severity.NOTICE,
                 result.link.issuerName.length() > 0 ? result.link.issuerName
                         : LostTalesServerBroadcastHook.SERVER_NAME,
-                "linked Discord channel " + where + " to " + gameName);
+                "linked Discord channel " + where + " to "
+                        + gameChannelName(LostTalesLangFile.ENGLISH_WORDS,
+                                result.link.gameKey));
     }
 
     /**
@@ -1574,7 +1606,9 @@ public final class LostTalesDiscordBridge {
                     DiscordSlashCommands.notLinked(LostTalesWords.LANG));
             return;
         }
-        String where = describeDiscordChannel(LostTalesWords.LANG, interaction.channelId);
+        // The Server Log keeps English, whatever the server writes in (DISC-27).
+        String where = describeDiscordChannel(LostTalesLangFile.ENGLISH_WORDS,
+                interaction.channelId);
         List<String> webhooks = DiscordBindingEntries.webhooksRemoved(before, after);
         ServerConfigApplyResult applied = LostTalesServerConfigService.applyOwned(
                 Collections.singletonList(new ServerConfigChange(
@@ -1585,14 +1619,14 @@ public final class LostTalesDiscordBridge {
                     DiscordSlashCommands.linkNotSaved(LostTalesWords.LANG));
             return;
         }
-        String gameName = gameChannelName(LostTalesWords.LANG, owner);
         answerLater(interaction, DiscordSlashCommands.unlinked(LostTalesWords.LANG,
-                gameName));
+                gameChannelName(LostTalesWords.LANG, owner)));
         retireWebhooks(webhooks);
         LostTalesChatService.console(ChatConsoleEvent.Kind.CONFIG,
                 ChatConsoleEvent.Severity.NOTICE,
                 LostTalesServerBroadcastHook.SERVER_NAME, "Discord channel " + where
-                        + " was unlinked from " + gameName + " by "
+                        + " was unlinked from "
+                        + gameChannelName(LostTalesLangFile.ENGLISH_WORDS, owner) + " by "
                         + DiscordMessageSanitizer.inboundName(interaction.userName)
                         + " on Discord");
     }
@@ -1737,13 +1771,12 @@ public final class LostTalesDiscordBridge {
     /**
      * Whether a game channel may be linked now: one that may reach
      * Discord, whose gate lets somebody read it. Asked as a code is
-     * typed and again as its link is saved, since the gates may have
-     * moved since the code was handed out.
+     * typed and again as its link is saved, since the gates, or a
+     * server channel's rule, may have moved since the code was handed out.
      */
     private static boolean mayLink(String key) {
         ChatCodeNames.Named named = ChatCodeNames.parse(key);
-        return named != null && named.channel.isBridgeable()
-                && DiscordBridgePolicy.isOpenToTheBridge(named.channel);
+        return named != null && DiscordBridgePolicy.isOpenToTheBridge(named.channel);
     }
 
     /**
@@ -1771,8 +1804,8 @@ public final class LostTalesDiscordBridge {
     static final String LINKED_IN_GAME_KEY = "chat.losttales.command.discord.linked";
 
     /**
-     * How a Discord channel reads in {@code words}, the server's in the
-     * logs and the Server Log: {@code #general of The Shire}, the parts
+     * How a Discord channel reads in {@code words}, the server's on
+     * Discord and English in the Server Log: {@code #general of The Shire}, the parts
      * Discord has not said left out, the channel's id where nothing is
      * known.
      */
@@ -1813,7 +1846,7 @@ public final class LostTalesDiscordBridge {
 
     /**
      * The name a link's game channel reads by in {@code words}, the
-     * server's on Discord and in the logs: the channel's own
+     * server's on Discord and English in the Server Log: the channel's own
      * ({@code OOC Chat}, {@code Global Chat}), or a faction's chat by its
      * faction ({@code Gondor Chat}). A channel a server defined has no
      * lang line and reads by its display name.
@@ -4561,8 +4594,13 @@ public final class LostTalesDiscordBridge {
                             + "/" + info.channelId + "/" + discordId;
                 }
             }
+            // Discord fades nothing, so a cut quote ends in dots there.
+            String excerpt = next.reply.getExcerpt();
+            if (ChatHistory.quoteIsCut(next.reply.getMessageId())) {
+                excerpt = excerpt + "...";
+            }
             return DiscordMessageSanitizer.replyHeader(
-                    next.reply.getAuthor(), filtered(next.reply.getExcerpt(),
+                    next.reply.getAuthor(), filtered(excerpt,
                             Collections.<ChatNamedPlayer>emptyList()),
                     next.reply.isAction(), jumpUrl);
         }

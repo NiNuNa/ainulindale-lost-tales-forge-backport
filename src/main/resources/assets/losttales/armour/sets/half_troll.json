@@ -1,0 +1,22 @@
+{
+  "id": "losttales:half_troll",
+  "helmet": [
+    "lotr:item.helmetHalfTroll"
+  ],
+  "chestplate": [
+    "lotr:item.bodyHalfTroll"
+  ],
+  "leggings": [
+    "lotr:item.legsHalfTroll"
+  ],
+  "boots": [
+    "lotr:item.bootsHalfTroll"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:heavy_arms"
+    }
+  ]
+}

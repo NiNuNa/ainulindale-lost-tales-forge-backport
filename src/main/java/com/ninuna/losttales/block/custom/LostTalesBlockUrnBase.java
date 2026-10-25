@@ -3,9 +3,13 @@ package com.ninuna.losttales.block.custom;
 import com.ninuna.losttales.block.base.LostTalesBlockDirectionalContainerBase;
 import com.ninuna.losttales.block.collision.LostTalesBlockBounds;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
+import com.ninuna.losttales.block.vessel.VesselContents;
+import com.ninuna.losttales.block.vessel.VesselItems;
+import com.ninuna.losttales.block.vessel.VesselRules;
 import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.sound.ELostTalesBlockSoundType;
 import com.ninuna.losttales.util.LostTalesBlockRotationHelper;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
@@ -21,6 +25,14 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
+/**
+ * A vessel: the amphora and the urn, and the two-block loutrophoros
+ * ({@link LostTalesBlockUrnTall}). It takes one item per right-click and
+ * seals with a clay ball. It gives up what it holds only as
+ * {@link VesselRules} says (CONTENT-09): what a break drops is decided as
+ * the vessel breaks, so harvesting adds nothing, and a vessel item placed
+ * puts back what it carried.
+ */
 public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBase {
     protected static final LostTalesBlockBounds STANDARD_URN_BOUNDS = new LostTalesBlockBounds(0.19F, 0.0F, 0.19F, 0.81F, 1.0F, 0.81F);
     /** What seals a vessel: a clay ball. */
@@ -68,6 +80,20 @@ public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBas
     public void onBlockPlacedBy(World world, int i, int j, int k, EntityLivingBase entity, ItemStack itemStack) {
         world.setBlockMetadataWithNotify(i, j, k, LostTalesBlockRotationHelper.getDirectionalMetadata(entity), 2);
         this.configurePlacedTileEntity(world, i, j, k, entity);
+        this.fillFromItem(world, i, j, k, itemStack);
+    }
+
+    /** Puts back what the placed vessel item carried, checked as the item's NBT is never trusted. */
+    private void fillFromItem(World world, int x, int y, int z, ItemStack itemStack) {
+        if (world.isRemote || itemStack == null
+                || !VesselContents.holdsItems(itemStack.getTagCompound())) {
+            return;
+        }
+        TileEntity tileEntity = world.getTileEntity(x, y, z);
+        if (tileEntity instanceof LostTalesTileEntityUrn) {
+            ((LostTalesTileEntityUrn) tileEntity).fillFrom(VesselContents.read(
+                    itemStack.getTagCompound(), this.getInventorySlots(), VesselItems.GAME));
+        }
     }
 
     @Override
@@ -141,15 +167,50 @@ public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBas
         }
     }
 
+    /** A creative player's break drops no empty vessel; the vessel's lower half remembers who broke it. */
+    @Override
+    public void onBlockHarvested(World world, int x, int y, int z, int meta, EntityPlayer player) {
+        if (!world.isRemote && player != null && player.capabilities.isCreativeMode) {
+            int[] bottom = this.getBottomCoords(world, x, y, z);
+            TileEntity tileEntity = bottom == null ? null
+                    : world.getTileEntity(bottom[0], bottom[1], bottom[2]);
+            if (tileEntity instanceof LostTalesTileEntityUrn) {
+                ((LostTalesTileEntityUrn) tileEntity).markBrokenByCreativePlayer();
+            }
+        }
+        super.onBlockHarvested(world, x, y, z, meta, player);
+    }
+
     @Override
     public void breakBlock(World world, int x, int y, int z, Block block, int meta) {
-        if (!world.isRemote && meta != 4) {
+        if (!world.isRemote && !world.restoringBlockSnapshots && meta != 4) {
             TileEntity tileEntity = world.getTileEntity(x, y, z);
             if (tileEntity instanceof LostTalesTileEntityUrn) {
-                this.dropInventory(world, x, y, z, (LostTalesTileEntityUrn) tileEntity);
+                this.dropOnBreak(world, x, y, z, (LostTalesTileEntityUrn) tileEntity);
             }
         }
         super.breakBlock(world, x, y, z, block, meta);
+    }
+
+    /** Breaking drops nothing beyond what {@link #breakBlock} dropped, whoever asks. */
+    @Override
+    public ArrayList<ItemStack> getDrops(World world, int x, int y, int z, int metadata, int fortune) {
+        return new ArrayList<ItemStack>();
+    }
+
+    private void dropOnBreak(World world, int x, int y, int z, LostTalesTileEntityUrn urn) {
+        VesselRules.Break outcome = VesselRules.onBreak(urn.isSealed(), urn.holdsItems(),
+                urn.isBrokenByCreativePlayer(),
+                world.getGameRules().getGameRuleBooleanValue("doTileDrops"));
+        if (outcome.spills()) {
+            this.dropInventory(world, x, y, z, urn);
+        }
+        if (outcome.dropsEmptyVessel()) {
+            this.dropBlockAsItem(world, x, y, z, new ItemStack(this, 1, 0));
+        }
+        if (outcome == VesselRules.Break.DROP_FILLED) {
+            this.dropBlockAsItem(world, x, y, z, VesselItems.filled(this, urn.writeItems()));
+        }
     }
 
     protected void dropInventory(World world, int x, int y, int z, LostTalesTileEntityUrn urn) {

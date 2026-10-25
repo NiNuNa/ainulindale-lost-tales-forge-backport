@@ -11,7 +11,6 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerReseedService;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData;
-import com.ninuna.losttales.mapmarker.LostTalesWaystoneGenerationState;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
@@ -31,6 +30,7 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.world.WorldServer;
+import net.minecraftforge.common.DimensionManager;
 import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementResult;
 import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementService;
 import com.ninuna.losttales.permission.LostTalesCapability;
@@ -77,7 +77,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         }
 
         if ("list".equalsIgnoreCase(action)) {
-            EntityPlayerMP player = getTargetPlayer(sender, args, 1);
+            EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 1);
             if (player != null) {
                 listMarkers(sender, player);
             }
@@ -85,7 +85,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         }
 
         if ("dynamic".equalsIgnoreCase(action) || "dynamics".equalsIgnoreCase(action) || "runtime".equalsIgnoreCase(action)) {
-            EntityPlayerMP player = getTargetPlayer(sender, args, 1);
+            EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 1);
             if (player != null) {
                 String filter = args.length > 2 ? args[2] : "";
                 listDynamicMarkers(sender, player, filter);
@@ -94,7 +94,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         }
 
         if ("untrack".equalsIgnoreCase(action)) {
-            EntityPlayerMP player = getTargetPlayer(sender, args, 1);
+            EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 1);
             if (player != null) {
                 untrackMarker(sender, player);
             }
@@ -128,7 +128,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         }
 
         String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(args[1]);
-        EntityPlayerMP player = getTargetPlayer(sender, args, 2);
+        EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 2);
         if (player == null) {
             return;
         }
@@ -301,6 +301,13 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         }
     }
 
+    /**
+     * Marks a generated waystone that failed, or was never tried, to be
+     * built again (WAY-18). The mark is its record's generation state, so
+     * it outlasts a restart: the waystone is built the next time its chunk
+     * loads, or in the sweep round a player near it, and at once where its
+     * chunk is loaded now. No chunk and no world is loaded for it.
+     */
     private void retryWaystoneGeneration(
             ICommandSender sender, String markerId) {
         MinecraftServer server = MinecraftServer.getServer();
@@ -327,34 +334,26 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "unknown", markerId);
             return;
         }
-        if (!record.hasWaystone()
-                || record.isLinked()
-                || (record.getGenerationState()
-                        != LostTalesWaystoneGenerationState
-                                .FAILED_OR_BLOCKED
-                    && record.getGenerationState()
-                        != LostTalesWaystoneGenerationState
-                                .NOT_ATTEMPTED)) {
+        LostTalesMapMarkerRecord retry =
+                LostTalesWaystonePlacementService.markForRetry(record);
+        if (retry == null) {
             say(sender, EnumChatFormatting.YELLOW, SAY + "retry.not_waiting", markerId);
             return;
         }
-        WorldServer world = server.worldServerForDimension(
-                record.getDimensionId());
-        if (world == null) {
-            say(sender, EnumChatFormatting.RED, SAY + "retry.dimension",
-                    Integer.valueOf(record.getDimensionId()));
-            return;
+        if (retry != record) {
+            data.saveRecord(retry);
         }
+        // Only a world and a chunk already loaded: the generation handler
+        // builds it when they load.
+        WorldServer world = DimensionManager.getWorld(
+                record.getDimensionId());
         int chunkX = floor(record.getX()) >> 4;
         int chunkZ = floor(record.getZ()) >> 4;
-        if (!world.getChunkProvider().chunkExists(chunkX, chunkZ)) {
-            say(sender, EnumChatFormatting.YELLOW, SAY + "retry.chunk");
+        if (world == null
+                || !world.getChunkProvider().chunkExists(chunkX, chunkZ)) {
+            say(sender, EnumChatFormatting.GREEN, SAY + "retry.marked", markerId);
             return;
         }
-        LostTalesMapMarkerRecord retry =
-                record.withGenerationState(
-                        LostTalesWaystoneGenerationState.NOT_ATTEMPTED);
-        data.saveRecord(retry);
         LostTalesWaystonePlacementResult result =
                 LostTalesWaystonePlacementService.attempt(world, retry);
         LostTalesWaystonePlacementResult.Status status = result.getStatus();
@@ -386,9 +385,9 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         }
 
         // The marker files and the waystone houses, as they are on disk
-        // now: the bundled ones and the server's own.
-        int leftOut = LostTalesMapMarkerCatalog.reloadFromClasspath().size()
-                + LostTalesMapMarkerFiles.loadServer().size();
+        // now: the bundled ones and the server's own, as reload markers
+        // reads them.
+        int leftOut = LostTalesMapMarkerFiles.reload().size();
         Collection<LostTalesMapMarkerDefinition> definitions;
         if ("all".equalsIgnoreCase(requestedId)) {
             definitions = LostTalesMapMarkerCatalog.getMarkers();
@@ -500,23 +499,6 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         if (leftOut > 0) {
             say(sender, EnumChatFormatting.YELLOW, SAY + "reseed.left_out",
                     Integer.valueOf(leftOut));
-        }
-    }
-
-    private EntityPlayerMP getTargetPlayer(ICommandSender sender, String[] args, int playerArgIndex) {
-        try {
-            if (args.length > playerArgIndex) {
-                return getPlayer(sender, args[playerArgIndex]);
-            }
-            if (sender instanceof EntityPlayerMP) {
-                return (EntityPlayerMP) sender;
-            }
-            say(sender, EnumChatFormatting.RED, PLAYER_REQUIRED);
-            return null;
-        } catch (Exception e) {
-            String playerName = args.length > playerArgIndex ? args[playerArgIndex] : "";
-            say(sender, EnumChatFormatting.RED, PLAYER_UNKNOWN, playerName);
-            return null;
         }
     }
 

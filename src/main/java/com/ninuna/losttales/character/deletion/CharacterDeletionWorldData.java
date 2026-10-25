@@ -3,6 +3,7 @@ package com.ninuna.losttales.character.deletion;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.storage.CharacterNbtCodec;
 import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.storage.WorldClock;
 import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -221,11 +222,23 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
      */
     public List<CharacterDeletionTombstone> getExpired(UUID ownerId, long now,
                                                       int limit) {
+        return getExpired(ownerId, now, limit, WorldClock.NONE);
+    }
+
+    /**
+     * The same, leaving out every tombstone whose retention ended inside
+     * a stretch the world's clock holds (DATA-09): those wait for an
+     * operator, and do not take the place of one that may go.
+     */
+    public List<CharacterDeletionTombstone> getExpired(UUID ownerId, long now,
+                                                      int limit,
+                                                      WorldClock.Hold hold) {
         ArrayList<CharacterDeletionTombstone> due =
                 new ArrayList<CharacterDeletionTombstone>();
         for (CharacterDeletionTombstone tombstone : this.tombstones.values()) {
             if ((ownerId == null || ownerId.equals(tombstone.getOwnerId()))
-                    && tombstone.isPurgeAllowed(now)) {
+                    && tombstone.isPurgeAllowed(now)
+                    && !hold.holds(tombstone.getPurgeAfter())) {
                 due.add(tombstone);
             }
         }
@@ -233,6 +246,17 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
         return due.size() <= Math.max(0, limit) ? due
                 : new ArrayList<CharacterDeletionTombstone>(
                         due.subList(0, Math.max(0, limit)));
+    }
+
+    /** How many tombstones past their retention the world's clock holds back. */
+    public int countHeld(long now, WorldClock.Hold hold) {
+        int held = 0;
+        for (CharacterDeletionTombstone tombstone : this.tombstones.values()) {
+            if (tombstone.isPurgeAllowed(now) && hold.holds(tombstone.getPurgeAfter())) {
+                held++;
+            }
+        }
+        return held;
     }
 
     /** Orders tombstones soonest purged first, then by character id. */

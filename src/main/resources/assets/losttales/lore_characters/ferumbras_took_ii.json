@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:ferumbras_took_ii",
   "name": "Ferumbras Took II",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:hobbit",
-    "genderId": "losttales:male",
-    "modelId": "lotr:hobbit",
-    "skinId": "losttales:hobbit_shire_male_2"
-  }
+  "race": "losttales:hobbit",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:hobbit_shire_masculine_2",
+  "faction": "lotr:hobbit"
 }

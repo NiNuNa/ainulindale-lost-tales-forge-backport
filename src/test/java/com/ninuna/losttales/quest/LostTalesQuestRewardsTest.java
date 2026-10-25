@@ -111,6 +111,55 @@ public final class LostTalesQuestRewardsTest {
         assertOne(json, "names a 'pick', which only the quest's own");
     }
 
+    /**
+     * A starter reward reads as the item names itself, its quest's title
+     * from the lang line, and stands in every line a quest's rewards are
+     * said in (QUEST-43); a server quest's without a line by its id.
+     */
+    @Test
+    public void aStarterRewardIsNamedAsTheItemIs() {
+        Map<String, String> rewards = rewards("experience", "20",
+                LostTalesQuestRewards.STARTER, "losttales:path/survivalist/stone_and_shelter");
+        assertEquals(Arrays.asList("20 experience",
+                "Quest Starter: Path of the Survivalist: Stone and Shelter"),
+                LostTalesQuestRewardText.phrases(rewards));
+        assertEquals("Quest Starter: myserver:chain/two",
+                LostTalesQuestRewardText.summary(rewards(
+                        LostTalesQuestRewards.STARTER, "myserver:chain/two")));
+        assertEquals("a value that is no quest id names nothing", "",
+                LostTalesQuestRewardText.summary(rewards(
+                        LostTalesQuestRewards.STARTER, "stone_and_shelter")));
+    }
+
+    /** A reward waiting for room reads as the rewards read (QUEST-44). */
+    @Test
+    public void aWaitingRewardIsNamedAsTheRewardsAre() {
+        assertEquals("Quest Starter: The Cheese Cache",
+                LostTalesQuestRewardText.waitingPhrase(
+                        com.ninuna.losttales.quest.player.WaitingReward.starter(
+                                "losttales:tutorial/cheese_cache", 1)));
+        assertEquals("2x Quest Starter: The Cheese Cache",
+                LostTalesQuestRewardText.waitingPhrase(
+                        com.ninuna.losttales.quest.player.WaitingReward.starter(
+                                "losttales:tutorial/cheese_cache", 2)));
+        assertEquals("3x Pipe weed", LostTalesQuestRewardText.waitingPhrase(
+                com.ninuna.losttales.quest.player.WaitingReward.item(
+                        "gonemod:pipe_weed", 0, 3)));
+    }
+
+    /** A relic piece goes by its own name and its relic set's (CONTENT-11). */
+    @Test
+    public void aRelicPieceIsNamedWithItsSet() {
+        com.ninuna.losttales.armour.Armour.loadBundled();
+        assertEquals("Strider's Hood (Strider's Garb)", LostTalesQuestRewardText.waitingPhrase(
+                com.ninuna.losttales.quest.player.WaitingReward.relic(
+                        "lotr:item.helmetRanger", "losttales:striders_garb", 1)));
+        assertEquals("a relic set no one knows leaves the item alone", "Item.helmetRanger",
+                LostTalesQuestRewardText.waitingPhrase(
+                        com.ninuna.losttales.quest.player.WaitingReward.relic(
+                                "lotr:item.helmetRanger", "losttales:unknown", 1)));
+    }
+
     private static void assertOne(String json, String about) {
         List<String> found = warnings(json);
         assertEquals(found.toString(), 1, found.size());

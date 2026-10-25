@@ -1,75 +1,49 @@
 package com.ninuna.losttales.accessory;
 
-import net.minecraft.item.ItemStack;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
 
-import java.util.Locale;
-
-/** Immutable accessory compatibility and effect metadata. */
+/**
+ * One accessory as its file writes it (ACC-01): its id, the slot it goes
+ * in, the item it is, by the item's registry name, and its effects.
+ */
 public final class AccessoryDefinition {
 
     private final String id;
     private final AccessorySlotType slotType;
-    private final AccessoryStackMatcher matcher;
-    private final String serverEffectId;
-    private final String ownerVisualEffectId;
-    private final String publicEffectId;
+    private final String itemId;
+    private final Set<AccessoryEffect> effects;
 
-    public AccessoryDefinition(String id,
-                               AccessorySlotType slotType,
-                               AccessoryStackMatcher matcher,
-                               String serverEffectId,
-                               String ownerVisualEffectId,
-                               String publicEffectId) {
-        this.id = requireId(id);
-        if (slotType == null) {
-            throw new IllegalArgumentException("slotType must not be null");
-        }
-        if (matcher == null) {
-            throw new IllegalArgumentException("matcher must not be null");
-        }
+    public AccessoryDefinition(String id, AccessorySlotType slotType, String itemId,
+                               Set<AccessoryEffect> effects) {
+        this.id = id == null ? "" : id;
         this.slotType = slotType;
-        this.matcher = matcher;
-        this.serverEffectId = normalizeOptionalId(serverEffectId);
-        this.ownerVisualEffectId = normalizeOptionalId(ownerVisualEffectId);
-        this.publicEffectId = normalizeOptionalId(publicEffectId);
+        this.itemId = itemId == null ? "" : itemId;
+        this.effects = effects == null || effects.isEmpty()
+                ? Collections.<AccessoryEffect>emptySet()
+                : Collections.unmodifiableSet(EnumSet.copyOf(effects));
     }
 
     public String getId() {
         return this.id;
     }
 
+    /** The slot it goes in; null where its file named none the code has. */
     public AccessorySlotType getSlotType() {
         return this.slotType;
     }
 
-    public String getServerEffectId() {
-        return this.serverEffectId;
+    /** The item's registry name, as the game has it: {@code lotr:item.goldRing}. */
+    public String getItemId() {
+        return this.itemId;
     }
 
-    public String getOwnerVisualEffectId() {
-        return this.ownerVisualEffectId;
+    public Set<AccessoryEffect> getEffects() {
+        return this.effects;
     }
 
-    public String getPublicEffectId() {
-        return this.publicEffectId;
-    }
-
-    public boolean matches(ItemStack stack) {
-        return stack != null && stack.getItem() != null
-                && this.matcher.matches(stack);
-    }
-
-    private static String requireId(String value) {
-        String id = normalizeOptionalId(value);
-        if (id.length() == 0 || id.length() > 128
-                || id.indexOf(':') <= 0 || id.endsWith(":")) {
-            throw new IllegalArgumentException("invalid accessory id " + value);
-        }
-        return id;
-    }
-
-    private static String normalizeOptionalId(String value) {
-        return value == null ? ""
-                : value.trim().toLowerCase(Locale.ENGLISH);
+    public boolean has(AccessoryEffect effect) {
+        return this.effects.contains(effect);
     }
 }

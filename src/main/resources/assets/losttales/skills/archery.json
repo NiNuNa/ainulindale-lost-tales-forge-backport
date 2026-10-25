@@ -5,12 +5,12 @@
   "counts": [
     {
       "act": "hit",
-      "weapons": ["bow", "crossbow"],
+      "weapons": ["bow", "crossbow", "sling", "blowgun"],
       "per": 1.0
     },
     {
       "act": "kill",
-      "weapons": ["bow", "crossbow"],
+      "weapons": ["bow", "crossbow", "sling", "blowgun"],
       "per": 0.5
     }
   ],

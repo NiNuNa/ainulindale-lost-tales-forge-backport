@@ -1,7 +1,7 @@
 package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.skin.AccountSkinProfile;
 import com.ninuna.losttales.character.skin.ProfileTexturesDecoder;
 import com.ninuna.losttales.character.storage.CharacterStorage;
@@ -20,7 +20,7 @@ import java.util.UUID;
 /**
  * Synchronizes only the public fields required to render and describe the
  * identity a player is playing: the active character, or the account
- * itself with the arm width its profile skin declares.
+ * itself with the arms its profile skin declares.
  */
 public final class CharacterAppearanceSyncManager {
 
@@ -49,7 +49,7 @@ public final class CharacterAppearanceSyncManager {
                 CharacterRoster roster = data.getRoster(player.getUniqueID());
                 CharacterAppearance appearance = CharacterAppearance.fromRoster(
                         player.getUniqueID(), accountName(player), roster,
-                        accountBodyType(player));
+                        accountArms(player));
                 if (appearance.isPresent()) {
                     appearances.add(appearance);
                 }
@@ -75,7 +75,7 @@ public final class CharacterAppearanceSyncManager {
         CharacterRoster roster = data.getRoster(target.getUniqueID());
         CharacterAppearance appearance = CharacterAppearance.fromRoster(
                 target.getUniqueID(), accountName(target), roster,
-                accountBodyType(target));
+                accountArms(target));
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new CharacterAppearanceSyncPacket(
                         false, Collections.singletonList(appearance)), recipient);
@@ -93,7 +93,7 @@ public final class CharacterAppearanceSyncManager {
         player.refreshDisplayName();
         CharacterAppearance appearance = CharacterAppearance.fromRoster(
                 player.getUniqueID(), accountName(player), roster,
-                accountBodyType(player));
+                accountArms(player));
         LostTalesNetworkHandler.CHANNEL.sendToAll(
                 new CharacterAppearanceSyncPacket(
                         false, Collections.singletonList(appearance)));
@@ -110,14 +110,14 @@ public final class CharacterAppearanceSyncManager {
     }
 
     /**
-     * The arm width the account's profile skin declares. An offline-mode
+     * The arms the account's profile skin declares. An offline-mode
      * profile carries no textures and reads as the wide body.
      */
-    private static String accountBodyType(EntityPlayerMP player) {
+    private static String accountArms(EntityPlayerMP player) {
         AccountSkinProfile profile = ProfileTexturesDecoder.decode(
                 player.getGameProfile());
         return profile != null && profile.isSlim()
-                ? CharacterBodyTypeRegistry.SLIM : CharacterBodyTypeRegistry.WIDE;
+                ? CharacterArmsRegistry.SLENDER : CharacterArmsRegistry.BROAD;
     }
 
     /** The authenticated account name, never the roleplay identity. */

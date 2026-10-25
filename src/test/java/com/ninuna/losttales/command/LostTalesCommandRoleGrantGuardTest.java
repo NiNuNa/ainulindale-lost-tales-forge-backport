@@ -42,13 +42,32 @@ public final class LostTalesCommandRoleGrantGuardTest {
                 new LinkedHashSet<String>(Arrays.asList(permissionId)), null);
     }
 
-    /** An operator holds every capability by level, so nothing is withheld from them. */
+    /**
+     * An operator of level 3 holds every built-in capability by level, so
+     * nothing is withheld from them.
+     */
     @Test
-    public void anOperatorMayWriteAnyGrant() {
+    public void anAdministratorMayWriteAnyGrant() {
         assertNull(LostTalesCommandRole.withheldGrant(
-                FakeCommandSender.operator("Ops"),
+                FakeCommandSender.administrator("Admin"),
                 granting(LostTalesCapability.CHAT_MODERATE,
                         LostTalesCapability.SERVER_CONFIG)));
+    }
+
+    /**
+     * An operator of level 2 does not hold the server's settings (DATA-07),
+     * so a role granting them is withheld from them too.
+     */
+    @Test
+    public void anOperatorIsWithheldTheServersSettings() {
+        assertNull(LostTalesCommandRole.withheldGrant(
+                FakeCommandSender.operator("Ops"),
+                granting(LostTalesCapability.CHAT_MODERATE)));
+        assertEquals(LostTalesCapability.SERVER_CONFIG.getId(),
+                LostTalesCommandRole.withheldGrant(
+                        FakeCommandSender.operator("Ops"),
+                        granting(LostTalesCapability.CHAT_MODERATE,
+                                LostTalesCapability.SERVER_CONFIG)));
     }
 
     /**
@@ -65,9 +84,9 @@ public final class LostTalesCommandRoleGrantGuardTest {
                 LostTalesCommandRole.withheldGrant(
                         FakeCommandSender.player("Someone"),
                         grantingPermission("keeper")));
-        assertNull("an operator holds what the permission reaches",
+        assertNull("an administrator holds what the permission reaches",
                 LostTalesCommandRole.withheldGrant(
-                        FakeCommandSender.operator("Ops"),
+                        FakeCommandSender.administrator("Admin"),
                         grantingPermission("keeper")));
     }
 

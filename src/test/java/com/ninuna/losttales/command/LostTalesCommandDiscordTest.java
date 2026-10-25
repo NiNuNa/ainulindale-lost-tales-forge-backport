@@ -1,7 +1,12 @@
 package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatChannelDescriptor;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.chat.ChatChannelScope;
+import com.ninuna.losttales.chat.ChatPresentationMode;
+import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.compat.discord.DiscordBridgeDirection;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.util.EnglishWords;
@@ -18,13 +23,15 @@ import static org.junit.Assert.assertNull;
 
 /**
  * The link command hands out a code only for a channel a link can carry:
- * never a private one, nor one whose gate lets nobody read it.
+ * never a private one, one heard nearby, nor one whose gate lets nobody
+ * read it. With no direction named, the channel's kind picks one.
  */
 public final class LostTalesCommandDiscordTest {
 
     @After
     public void tearDown() {
         ChatChannelGates.install(ChatChannelGates.defaults());
+        ChatChannel.resetToBuiltIn();
     }
 
     @Test
@@ -54,6 +61,54 @@ public final class LostTalesCommandDiscordTest {
                 + " so nothing would cross.", EnglishWords.INSTANCE.format(refusal, "ooc"));
         assertNull("another channel is left alone",
                 LostTalesCommandDiscord.linkRefusal("global"));
+    }
+
+    /**
+     * Proximity, and a server's channel heard nearby however its config
+     * marks it, can never be linked, and the answer says why (DISC-03).
+     */
+    @Test
+    public void aChannelHeardNearbyIsRefusedAndSaysWhy() {
+        String refusal = LostTalesCommandDiscord.linkRefusal("proximity");
+        assertEquals(LostTalesCommandDiscord.SAY + "refused.nearby", refusal);
+        assertEquals("Cannot link proximity: it is heard only nearby, and nobody on"
+                + " Discord stands near anyone.",
+                EnglishWords.INSTANCE.format(refusal, "proximity"));
+        ChatChannel.installDefined(Collections.singletonList(new ChatChannelDescriptor(
+                "tavern", "Tavern", ChatPresentationMode.IN_CHARACTER,
+                ChatRecipientRule.PROXIMITY, ChatChannelAccess.NONE, 0xFFFFFF, true,
+                ChatChannelScope.NONE)), null);
+        assertEquals(LostTalesCommandDiscord.SAY + "refused.nearby",
+                LostTalesCommandDiscord.linkRefusal("tavern"));
+    }
+
+    /**
+     * With no direction named, an in-character channel links one way and
+     * an out-of-character one both ways; a named direction stands either
+     * way (DISC-29).
+     */
+    @Test
+    public void aLinkWithNoDirectionFollowsTheChannelsKind() {
+        assertEquals(DiscordBridgeDirection.GAME_TO_DISCORD,
+                LostTalesCommandDiscord.linkDirection(ChatChannel.GLOBAL, null));
+        assertEquals(DiscordBridgeDirection.GAME_TO_DISCORD,
+                LostTalesCommandDiscord.linkDirection(ChatChannel.FACTION, null));
+        assertEquals(DiscordBridgeDirection.BIDIRECTIONAL,
+                LostTalesCommandDiscord.linkDirection(ChatChannel.OOC, null));
+        assertEquals(DiscordBridgeDirection.BIDIRECTIONAL,
+                LostTalesCommandDiscord.linkDirection(ChatChannel.OPERATOR, null));
+        assertEquals(DiscordBridgeDirection.BIDIRECTIONAL,
+                LostTalesCommandDiscord.linkDirection(ChatChannel.GLOBAL, "bidirectional"));
+        assertEquals(DiscordBridgeDirection.GAME_TO_DISCORD,
+                LostTalesCommandDiscord.linkDirection(ChatChannel.OOC, "GAME_TO_DISCORD"));
+        assertEquals(DiscordBridgeDirection.DISCORD_TO_GAME,
+                LostTalesCommandDiscord.linkDirection(ChatChannel.GLOBAL, "discord-to-game"));
+        assertNull(LostTalesCommandDiscord.linkDirection(ChatChannel.GLOBAL, "DISABLED"));
+        assertNull(LostTalesCommandDiscord.linkDirection(ChatChannel.GLOBAL, "sideways"));
+        assertEquals("Global Chat is in character, so Discord members' messages stay out"
+                + " of it. To let them in, ask for a code with BIDIRECTIONAL after the"
+                + " channel.", EnglishWords.INSTANCE.format(
+                        LostTalesCommandDiscord.SAY + "one_way", "Global Chat"));
     }
 
     /** The answers read in the English lang file's words. */

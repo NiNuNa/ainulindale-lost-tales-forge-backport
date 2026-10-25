@@ -56,6 +56,12 @@ import net.minecraft.util.IChatComponent;
  * of each line. A view whose history cannot be read falls back to the
  * shared list, where every message keeps its header.</p>
  *
+ * <p>A conversation may open with a notice standing over its oldest
+ * line: a whisper's word that the server keeps a log of whispers
+ * (CHAT-85). Like a day's rule it is nobody's line, a row of its own
+ * with a blank row under it, and it stays the topmost row as older lines
+ * are laid in under it.</p>
+ *
  * <p>Results are cached per view and rebuilt only when the width, the
  * colour setting, the drawn state or the history itself changes, and a
  * rebuild costs only the messages whose layout it has not already seen:
@@ -98,6 +104,8 @@ public final class ChatWindowLines {
      * message's row by every walk over the list.
      */
     private static final String DATE_DIVIDER_PREFIX = "losttales-chat-day:";
+    /** What a conversation's notice row is known by: its lang key rides the click event, as a day's label does. */
+    private static final String NOTICE_PREFIX = "losttales-chat-notice:";
 
     /** Whether the row is a blank between two runs rather than a message's. */
     static boolean isSpacer(ChatLine line) {
@@ -137,13 +145,71 @@ public final class ChatWindowLines {
         return dateDividerLabel(line) != null;
     }
 
+    /** A row standing over a conversation's oldest line with the words {@code key} names. */
+    static IChatComponent notice(String key) {
+        ChatComponentText marker = new ChatComponentText("");
+        marker.setChatStyle(marker.getChatStyle().setChatClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                        NOTICE_PREFIX + (key == null ? "" : key))));
+        return marker;
+    }
+
+    /** The lang key of the words on a notice row, or null when the row is not one. */
+    static String noticeKey(ChatLine line) {
+        IChatComponent component = line == null ? null : line.func_151461_a();
+        if (component == null || component == SPACER
+                || component.getChatStyle() == null) {
+            return null;
+        }
+        ClickEvent event = component.getChatStyle().getChatClickEvent();
+        String value = event == null ? null : event.getValue();
+        if (event == null || event.getAction() != ClickEvent.Action.SUGGEST_COMMAND
+                || value == null || !value.startsWith(NOTICE_PREFIX)) {
+            return null;
+        }
+        return value.substring(NOTICE_PREFIX.length());
+    }
+
+    static boolean isNotice(ChatLine line) {
+        return noticeKey(line) != null;
+    }
+
     /**
-     * Whether the row stands for no message: a blank between two runs
-     * or a day's rule. What the pointer, the clipboard and a scroll
-     * hold pass over.
+     * Whether the row stands for no message: a blank between two runs,
+     * a day's rule or a conversation's notice. What the pointer, the
+     * clipboard and a scroll hold pass over.
      */
     static boolean isFiller(ChatLine line) {
-        return isSpacer(line) || isDateDivider(line);
+        return isSpacer(line) || isDateDivider(line) || isNotice(line);
+    }
+
+    /**
+     * The rows with a notice standing over the oldest of them, a blank
+     * row between, newest first as the rows are: {@code rows} as they are
+     * for no notice, or when there is no row for it to stand over.
+     */
+    static List<ChatLine> withNotice(List<ChatLine> rows, String key) {
+        if (key == null || rows == null || rows.isEmpty()) {
+            return rows;
+        }
+        int clock = rows.get(rows.size() - 1).getUpdatedCounter();
+        List<ChatLine> noticed = new ArrayList<ChatLine>(rows.size() + 2);
+        noticed.addAll(rows);
+        noticed.add(new ChatLine(clock, SPACER, 0));
+        noticed.add(new ChatLine(clock, notice(key), 0));
+        return noticed;
+    }
+
+    /**
+     * The notice a view opens with, or null: a whisper with a player,
+     * while the server keeps a log of whispers, says so over its oldest
+     * line (CHAT-85). The feed, which shows the last few seconds, has
+     * none.
+     */
+    static String noticeFor(ChatLineFilter filter, boolean fading) {
+        ConversationPage only = fading || filter == null ? null : filter.only();
+        return only != null && only.showsWhisperLog()
+                ? ConversationPage.WHISPERS_LOGGED_KEY : null;
     }
 
     /**
@@ -490,13 +556,16 @@ public final class ChatWindowLines {
         // window is laid out again when the day turns.
         long day = chatOpen ? ChatTimestampFormatter.dayKey(
                 System.currentTimeMillis()) : 0L;
+        // A whisper's notice comes and goes with the server's word on its
+        // log of whispers.
+        String notice = noticeFor(filter, fading);
         Cached cached = CACHE.get(viewId);
         if (cached == null || !cached.describes(width, colours, chatOpen,
                 displayScale, fading, filter, speakerScale, messageScale,
-                quoteScale, day)) {
+                quoteScale, day, notice)) {
             cached = new Cached(width, colours, chatOpen, displayScale,
                     fading, filter, speakerScale, messageScale, quoteScale,
-                    day);
+                    day, notice);
             CACHE.put(viewId, cached);
         }
         cached.refresh(minecraft.fontRenderer, messages, filter,
@@ -732,6 +801,8 @@ public final class ChatWindowLines {
         private final float quoteScale;
         /** The day the stamps behind the names were written against. */
         private final long day;
+        /** The lang key of the notice over the oldest line, or null for none. */
+        private final String notice;
         /** The history this layout describes; unchanged means reusable. */
         private long signature = Long.MIN_VALUE;
         /** The message the unread divider stood over when last laid out. */
@@ -744,7 +815,7 @@ public final class ChatWindowLines {
         Cached(int wrapWidth, boolean colours, boolean chatOpen,
                int displayScale, boolean fading, ChatLineFilter filter,
                float speakerScale, float messageScale,
-               float quoteScale, long day) {
+               float quoteScale, long day, String notice) {
             this.wrapWidth = wrapWidth;
             this.colours = colours;
             this.chatOpen = chatOpen;
@@ -755,12 +826,14 @@ public final class ChatWindowLines {
             this.messageScale = messageScale;
             this.quoteScale = quoteScale;
             this.day = day;
+            this.notice = notice;
         }
 
         boolean describes(int wrapWidth, boolean colours, boolean chatOpen,
                           int displayScale, boolean fading,
                           ChatLineFilter filter, float speakerScale,
-                          float messageScale, float quoteScale, long day) {
+                          float messageScale, float quoteScale, long day,
+                          String notice) {
             return this.wrapWidth == wrapWidth && this.colours == colours
                     && this.chatOpen == chatOpen
                     && this.displayScale == displayScale
@@ -769,7 +842,9 @@ public final class ChatWindowLines {
                     && this.speakerScale == speakerScale
                     && this.messageScale == messageScale
                     && this.quoteScale == quoteScale
-                    && this.day == day;
+                    && this.day == day
+                    && (this.notice == null ? notice == null
+                            : this.notice.equals(notice));
         }
 
         /**
@@ -855,8 +930,8 @@ public final class ChatWindowLines {
                 pieces.add(piece);
             }
             this.wrapped = kept;
-            this.lines = Collections.unmodifiableList(
-                    assemble(pieces, days, spacers, this.fading));
+            this.lines = Collections.unmodifiableList(withNotice(
+                    assemble(pieces, days, spacers, this.fading), this.notice));
         }
 
         /**

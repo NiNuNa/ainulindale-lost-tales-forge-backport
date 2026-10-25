@@ -110,6 +110,41 @@ public final class PageKeys {
         return every;
     }
 
+    /**
+     * Whether {@code areas} hold a shortcut done with {@code key} alone, held
+     * with nothing: a page's own letter, as the missive board's T. A key
+     * among a shortcut's alternatives counts; one held with another does
+     * not.
+     */
+    public static boolean answersKey(List<Area> areas, int key) {
+        if (areas == null || key <= 0) {
+            return false;
+        }
+        for (Area area : areas) {
+            for (Shortcut shortcut : area.shortcuts) {
+                if (alone(shortcut.parts, key)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether {@code parts} name {@code key} with no key held with it. */
+    private static boolean alone(Object[] parts, int key) {
+        boolean named = false;
+        for (Object part : parts) {
+            if (part == PLUS || part instanceof Integer
+                    && ((Integer)part).intValue() == COMMAND) {
+                return false;
+            }
+            if (part instanceof Integer && ((Integer)part).intValue() == key) {
+                named = true;
+            }
+        }
+        return named;
+    }
+
     /** A shortcut named by {@code labelKey}, done with {@code parts}. */
     public static Shortcut shortcut(String labelKey, Object... parts) {
         return new Shortcut(labelKey, parts == null ? new Object[0] : parts);

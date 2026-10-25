@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.fellowship.ClientFellowshipDisplayNames;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.quest.ClientQuestNews;
 import com.ninuna.losttales.client.window.MenuWindow;
@@ -262,7 +263,9 @@ public final class ChatInbox {
         for (FellowshipInvitationSnapshot invitation : waiting) {
             String label = StatCollector.translateToLocalFormatted(
                     "gui.losttales.inbox.invitation",
-                    invitation.getInvitingCharacterName(),
+                    ClientFellowshipDisplayNames.named(
+                            invitation.getInvitingCharacterName(),
+                            invitation.getInvitingAccountName()),
                     invitation.getFellowshipName());
             if (holds(label, words)) {
                 rows.add(new MenuWindow.Entry(INVITATION

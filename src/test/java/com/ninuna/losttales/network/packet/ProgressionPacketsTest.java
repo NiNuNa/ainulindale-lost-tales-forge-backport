@@ -48,6 +48,22 @@ public final class ProgressionPacketsTest {
     }
 
     @Test
+    public void anArmourSkillsWeightTravels() {
+        SkillDefinition heavy = new SkillDefinition("losttales:heavy_armour",
+                "minecraft:iron_chestplate", 6, "", "", Collections.<SkillCount>emptyList(),
+                Collections.<PerkDefinition>emptyList(),
+                com.ninuna.losttales.armour.ArmourWeight.HEAVY);
+        ProgressionCatalogPacket read = new ProgressionCatalogPacket();
+        read.fromBytes(bytes(new ProgressionCatalogPacket(java.util.Arrays.asList(heavy, skill()),
+                Collections.<DeedSummary>emptyList())));
+        assertFalse(read.isMalformed());
+        assertEquals(com.ninuna.losttales.armour.ArmourWeight.HEAVY,
+                read.getSkills().get(0).getWeight());
+        assertEquals("a skill of no weight travels as none", null,
+                read.getSkills().get(1).getWeight());
+    }
+
+    @Test
     public void theStateReadsBackWhole() {
         ProgressionState state = new ProgressionState();
         state.setSkill("losttales:archery", new SkillStanding(31, 12.5D));

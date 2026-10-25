@@ -72,8 +72,7 @@ public final class AccessoryInventory implements IInventory {
     public boolean restoreValidated(ItemStack stack) {
         if (stack == null || stack.stackSize != 1
                 || !isLifecycleOperational()
-                || !AccessoryCompatibilityRegistry.getInstance()
-                .isCompatible(AccessorySlotType.RING, stack)) {
+                || !registry().isCompatible(AccessorySlotType.RING, stack)) {
             return false;
         }
         this.ring = stack.copy();
@@ -85,8 +84,7 @@ public final class AccessoryInventory implements IInventory {
     public void replaceValidated(ItemStack stack) {
         if (stack != null && (stack.stackSize != 1
                 || !isLifecycleOperational()
-                || !AccessoryCompatibilityRegistry.getInstance()
-                .isCompatible(AccessorySlotType.RING, stack))) {
+                || !registry().isCompatible(AccessorySlotType.RING, stack))) {
             throw new IllegalArgumentException("invalid accessory stack");
         }
         this.ring = stack == null ? null : stack.copy();
@@ -96,7 +94,7 @@ public final class AccessoryInventory implements IInventory {
     /** Applies an authoritative owner snapshot without treating it as a local edit. */
     public boolean applyServerSnapshot(ItemStack stack) {
         if (stack != null && (stack.stackSize != 1
-                || !AccessoryCompatibilityRegistry.getInstance()
+                || !AccessoryCompatibilityRegistry.client()
                 .isCompatible(AccessorySlotType.RING, stack))) {
             return false;
         }
@@ -141,8 +139,12 @@ public final class AccessoryInventory implements IInventory {
     public boolean isItemValidForSlot(int slot, ItemStack stack) {
         return slot == RING_SLOT
                 && isLifecycleOperational()
-                && AccessoryCompatibilityRegistry.getInstance().isCompatible(
-                AccessorySlotType.RING, stack);
+                && registry().isCompatible(AccessorySlotType.RING, stack);
+    }
+
+    /** What the owner's side takes: the server's list, or on a client the one its server sent. */
+    private AccessoryCompatibilityRegistry registry() {
+        return AccessoryCompatibilityRegistry.of(this.owner.worldObj);
     }
 
     /** Refuse server-authoritative insertion if the loss-safe death hook failed. */

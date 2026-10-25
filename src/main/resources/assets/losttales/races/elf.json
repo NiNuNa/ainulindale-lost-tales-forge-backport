@@ -2,7 +2,7 @@
   "id": "losttales:elf",
   "body": "elf",
   "values_from": "lotr:high_elf",
-  "sexes": ["losttales:male", "losttales:female"],
+  "body_types": ["losttales:masculine", "losttales:feminine"],
   "size": {"width": 0.6, "height": 1.8},
   "health": 20,
   "speed": 1.0,
@@ -10,19 +10,19 @@
   "faction_categories": ["elf"],
   "factions": [],
   "skins": [
-    {"group": "elf_high", "sex": "losttales:male", "texture": "lotr:mob/elf/highElf_male", "count": 18},
-    {"group": "elf_high", "sex": "losttales:female", "texture": "lotr:mob/elf/highElf_female", "count": 11},
-    {"group": "elf_galadhrim", "sex": "losttales:male", "texture": "lotr:mob/elf/galadhrim_male", "count": 4},
-    {"group": "elf_galadhrim", "sex": "losttales:female", "texture": "lotr:mob/elf/galadhrim_female", "count": 3},
-    {"group": "elf_wood", "sex": "losttales:male", "texture": "lotr:mob/elf/woodElf_male", "count": 4},
-    {"group": "elf_wood", "sex": "losttales:female", "texture": "lotr:mob/elf/woodElf_female", "count": 3},
-    {"group": "elf_dorwinion", "sex": "losttales:male", "texture": "lotr:mob/elf/dorwinion_male", "count": 3},
-    {"group": "elf_dorwinion", "sex": "losttales:female", "texture": "lotr:mob/elf/dorwinion_female", "count": 3}
+    {"group": "elf_high", "body_type": "losttales:masculine", "texture": "lotr:mob/elf/highElf_male", "count": 18},
+    {"group": "elf_high", "body_type": "losttales:feminine", "texture": "lotr:mob/elf/highElf_female", "count": 11},
+    {"group": "elf_galadhrim", "body_type": "losttales:masculine", "texture": "lotr:mob/elf/galadhrim_male", "count": 4},
+    {"group": "elf_galadhrim", "body_type": "losttales:feminine", "texture": "lotr:mob/elf/galadhrim_female", "count": 3},
+    {"group": "elf_wood", "body_type": "losttales:masculine", "texture": "lotr:mob/elf/woodElf_male", "count": 4},
+    {"group": "elf_wood", "body_type": "losttales:feminine", "texture": "lotr:mob/elf/woodElf_female", "count": 3},
+    {"group": "elf_dorwinion", "body_type": "losttales:masculine", "texture": "lotr:mob/elf/dorwinion_male", "count": 3},
+    {"group": "elf_dorwinion", "body_type": "losttales:feminine", "texture": "lotr:mob/elf/dorwinion_female", "count": 3}
   ],
   "skills": {
     "losttales:archery": 10,
     "losttales:blades": 5,
     "losttales:lore": 5,
-    "losttales:riding": 5
+    "losttales:light_armour": 5
   }
 }

@@ -13,9 +13,12 @@ import net.minecraft.world.World;
  * markDirty, revision checks, or spatial-index rebuilding.
  *
  * <p>A record keeps only words a player or an operator gave it. A waystone
- * its placer has not named keeps an empty name and is called after them
- * ({@link LostTalesMapMarkerNamedAfter}); an empty category or description
- * is drawn with the words for its kind, in each player's language.</p>
+ * its placer has not named keeps an empty name and is called after the
+ * placing character, kept by its id ({@link LostTalesMapMarkerNamedAfter},
+ * WAY-01), which every map is sent by the character's name as it stands
+ * ({@link #toDefinition(LostTalesMapMarkerNamedAfter.Names)}); an empty
+ * category or description is drawn with the words for its kind, in each
+ * player's language.</p>
  *
  * <p>A placed waystone belongs to the character that placed it
  * ({@link #getOwnerCharacterId}), never to its account (WAY-08). Its
@@ -85,7 +88,7 @@ public final class LostTalesMapMarkerRecord {
         }
         this.source = builder.source == null
                 ? LostTalesMapMarkerSource.QUEST_DYNAMIC : builder.source;
-        if (!LostTalesMapMarkerNamedAfter.isValid(builder.namedAfter)) {
+        if (!LostTalesMapMarkerNamedAfter.isKept(builder.namedAfter)) {
             throw new IllegalArgumentException("marker is named after nothing it can be");
         }
         this.namedAfter = builder.namedAfter == null ? "" : builder.namedAfter;
@@ -223,23 +226,23 @@ public final class LostTalesMapMarkerRecord {
     }
 
     /**
-     * A waystone a character just placed: unnamed, called after
-     * {@code placerName} ({@code Nils's Waystone}), owned by that character
-     * ({@code ownerCharacterId}), with no category or description of its
-     * own, until its owner gives it some. Its icon is the shack, one of the
-     * icons its page offers.
+     * A waystone a character just placed: unnamed, called after the
+     * character that placed it ({@code Nils's Waystone}), which owns it,
+     * with no category or description of its own, until its owner gives it
+     * some. Its icon is the shack, one of the icons its page offers.
      */
     public static LostTalesMapMarkerRecord createPlayerMarker(
-            String id, String placerName, UUID ownerCharacterId,
+            String id, UUID placerCharacterId,
             int dimensionId, double x, double y, double z,
             UUID linkToken) {
-        if (ownerCharacterId == null) {
+        if (placerCharacterId == null) {
             throw new IllegalArgumentException(
                     "player marker owner must not be null");
         }
         return builder(id, LostTalesMapMarkerSource.PLAYER_CREATED)
                 .name("")
-                .namedAfter(LostTalesMapMarkerNamedAfter.player(placerName))
+                .namedAfter(LostTalesMapMarkerNamedAfter.character(
+                        placerCharacterId))
                 .iconName("shack")
                 .colorName("white")
                 .categoryName("")
@@ -249,7 +252,7 @@ public final class LostTalesMapMarkerRecord {
                 .radii(128.0D, 8.0D)
                 .discovery(true, true, false)
                 .waystone(true, "losttales:player_placed")
-                .ownerCharacterId(ownerCharacterId)
+                .ownerCharacterId(placerCharacterId)
                 .visibility(LostTalesMapMarkerVisibility.PRIVATE)
                 .generationState(LostTalesWaystoneGenerationState.PLACED)
                 .link(dimensionId, (int)Math.floor(x), (int)Math.floor(y),
@@ -293,7 +296,22 @@ public final class LostTalesMapMarkerRecord {
                 && this.linkedZ == z;
     }
 
+    /**
+     * The marker as the server's own code reads it, called after what the
+     * record keeps. What a player's game is sent goes through
+     * {@link #toDefinition(LostTalesMapMarkerNamedAfter.Names)}.
+     */
     public LostTalesMapMarkerDefinition toDefinition() {
+        return toDefinition((LostTalesMapMarkerNamedAfter.Names)null);
+    }
+
+    /**
+     * The marker as a player's game is sent it: an unnamed waystone called
+     * after its placing character by the name {@code placers} gives it
+     * ({@link LostTalesMapMarkerNamedAfter#shown}).
+     */
+    public LostTalesMapMarkerDefinition toDefinition(
+            LostTalesMapMarkerNamedAfter.Names placers) {
         return new LostTalesMapMarkerDefinition(
                 this.id, this.name, this.iconName, this.colorName,
                 this.categoryName, this.description,
@@ -303,7 +321,8 @@ public final class LostTalesMapMarkerRecord {
                 this.hiddenUntilDiscovered, this.discoverable,
                 this.requiresRegionUnlock, this.source,
                 this.hasWaystone, this.waystoneStructureType,
-                this.priority, this.namedAfter);
+                this.priority,
+                LostTalesMapMarkerNamedAfter.shown(this.namedAfter, placers));
     }
 
     /**
@@ -400,8 +419,29 @@ public final class LostTalesMapMarkerRecord {
     public LostTalesMapMarkerSource getSource() { return this.source; }
     /** The name a player or operator gave it; empty for one called after its placer. */
     public String getName() { return this.name; }
-    /** What it is called after while its name is empty ({@link LostTalesMapMarkerNamedAfter}). */
+    /**
+     * What it is called after while its name is empty, as the record keeps
+     * it: nothing, or the placing character by its id
+     * ({@link LostTalesMapMarkerNamedAfter#character}).
+     */
     public String getNamedAfter() { return this.namedAfter; }
+
+    /** Whether it is called after that character (WAY-01). */
+    public boolean isCalledAfter(UUID characterId) {
+        return characterId != null && characterId.equals(
+                LostTalesMapMarkerNamedAfter.characterId(this.namedAfter));
+    }
+
+    /** The record without the share it gives the character, a newer revision; the record itself where it gives none. */
+    public LostTalesMapMarkerRecord withoutSharedCharacter(UUID characterId) {
+        if (characterId == null
+                || !this.sharedCharacterIds.contains(characterId)) {
+            return this;
+        }
+        Set<UUID> shared = new LinkedHashSet<UUID>(this.sharedCharacterIds);
+        shared.remove(characterId);
+        return withSharedCharacters(shared);
+    }
     public String getIconName() { return this.iconName; }
     public String getColorName() { return this.colorName; }
     public String getCategoryName() { return this.categoryName; }

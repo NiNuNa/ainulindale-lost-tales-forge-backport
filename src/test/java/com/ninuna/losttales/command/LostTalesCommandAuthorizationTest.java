@@ -94,7 +94,7 @@ public final class LostTalesCommandAuthorizationTest {
      */
     @Test
     public void anUnknownSubCommandIsAnsweredWithWhatTheSenderMayRun() {
-        FakeCommandSender operator = FakeCommandSender.operator("Ops");
+        FakeCommandSender operator = FakeCommandSender.administrator("Ops");
         new LostTalesCommandRoot().processCommand(operator, new String[] {"%s%n"});
         List<String> told = operator.told();
         assertEquals("Unknown Lost Tales sub-command: %s%n", told.get(0));
@@ -116,7 +116,6 @@ public final class LostTalesCommandAuthorizationTest {
      */
     @Test
     public void everySubCommandAsksTheSameQuestion() {
-        FakeCommandSender operator = FakeCommandSender.operator("Ops");
         FakeCommandSender player = FakeCommandSender.player("Someone");
         for (ELostTalesSubCommand subCommand : ELostTalesSubCommand.values()) {
             net.minecraft.command.CommandBase command = subCommand.getCommand();
@@ -125,7 +124,9 @@ public final class LostTalesCommandAuthorizationTest {
             }
             LostTalesCapability capability =
                     ((LostTalesCommandBase)command).getCapability();
-            assertTrue(subCommand.name() + " must open for an operator",
+            FakeCommandSender operator = new FakeCommandSender("Ops",
+                    command.getRequiredPermissionLevel());
+            assertTrue(subCommand.name() + " must open for an operator of its level",
                     command.canCommandSenderUseCommand(operator));
             assertFalse(subCommand.name() + " must refuse a plain player",
                     command.canCommandSenderUseCommand(player));
@@ -134,6 +135,27 @@ public final class LostTalesCommandAuthorizationTest {
                         capability.getRequiredOpLevel(),
                         command.getRequiredPermissionLevel());
             }
+        }
+    }
+
+    /**
+     * The server's settings, its Discord links, its clock and the roles
+     * need an operator of level 3 (DATA-07); one of level 2 runs every
+     * other sub-command, and the root still opens for them.
+     */
+    @Test
+    public void theServersSettingsAndTheRolesNeedLevelThree() {
+        Set<ELostTalesSubCommand> administration = new HashSet<ELostTalesSubCommand>(
+                Arrays.asList(ELostTalesSubCommand.CONFIG, ELostTalesSubCommand.DISCORD,
+                        ELostTalesSubCommand.ROLE, ELostTalesSubCommand.CLOCK));
+        FakeCommandSender operator = FakeCommandSender.operator("Ops");
+        FakeCommandSender administrator = FakeCommandSender.administrator("Admin");
+        assertTrue(new LostTalesCommandRoot().canCommandSenderUseCommand(operator));
+        for (ELostTalesSubCommand subCommand : ELostTalesSubCommand.values()) {
+            net.minecraft.command.CommandBase command = subCommand.getCommand();
+            assertEquals(subCommand.name(), !administration.contains(subCommand),
+                    command.canCommandSenderUseCommand(operator));
+            assertTrue(subCommand.name(), command.canCommandSenderUseCommand(administrator));
         }
     }
 }

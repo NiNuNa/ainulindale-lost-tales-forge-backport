@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:glorfindel",
   "name": "Glorfindel",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:elf",
-    "genderId": "losttales:male",
-    "modelId": "lotr:elf",
-    "skinId": "losttales:elf_high_male_5"
-  }
+  "race": "losttales:elf",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:elf_high_masculine_5",
+  "faction": "lotr:high_elf"
 }

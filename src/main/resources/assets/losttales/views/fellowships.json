@@ -1,5 +1,7 @@
 {
   "view": "fellowships",
   "locked": true,
+  "place": "middle",
+  "stage": false,
   "pages": ["fellowship", "map", "set:fellowship_chats"]
 }

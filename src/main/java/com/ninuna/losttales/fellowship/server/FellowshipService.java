@@ -25,6 +25,8 @@ import com.ninuna.losttales.fellowship.storage.FellowshipMarkWorldData;
 import com.ninuna.losttales.fellowship.storage.FellowshipInvitationWorldData;
 import com.ninuna.losttales.fellowship.storage.FellowshipStorage;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
+import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.permission.LostTalesPermissions;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -53,7 +55,8 @@ import java.util.UUID;
  * against, and a fellowship changed since refuses it. A character may be in
  * several fellowships, and one account has one character in a fellowship at
  * most. LOTR's own rules for fellowships hold: its size setting, its switch
- * for making them, and how many one character may lead.</p>
+ * for making them, which staff may pass (FEL-30), and how many one
+ * character may lead (FEL-08).</p>
  */
 public final class FellowshipService {
 
@@ -62,12 +65,6 @@ public final class FellowshipService {
 
     private final FellowshipInvitationCoordinator invitationCoordinator =
             new FellowshipInvitationCoordinator(this);
-    private final LeadLimits leadLimits = new LeadLimits() {
-        @Override
-        public int of(FellowshipMember member) {
-            return leadLimitOf(member);
-        }
-    };
 
     private FellowshipService() {}
 
@@ -77,9 +74,10 @@ public final class FellowshipService {
 
     /**
      * A new fellowship, with the character played as its leader. Refused
-     * while the server lets no one make fellowships, while the character is
-     * in as many as it can be or leads as many as LOTR lets it, and for a
-     * name that is missing, not allowed, or one of its fellowships has.
+     * while LOTR lets no one make fellowships and the player is no staff,
+     * while the character is in as many as it can be or leads as many as
+     * LOTR lets it, and for a name that is missing, not allowed, or one of
+     * its fellowships has.
      */
     public synchronized FellowshipOperationResult createFellowship(EntityPlayerMP player,
                                                                    String requestedName) {
@@ -158,8 +156,7 @@ public final class FellowshipService {
             return FellowshipOperationResult.failure(
                     FellowshipErrorId.LEADER_MUST_HAND_OVER, fellowship);
         }
-        invitationData.removeInvitationsSentBy(fellowship.getFellowshipId(),
-                leavingIdentityId);
+        takeBackInvitationsOf(invitationData, fellowship, leavingIdentityId);
         if (fellowship.getMemberCount() == 1) {
             invitationData.removeInvitationsForFellowship(fellowship.getFellowshipId());
             context.fellowshipData.removeFellowship(fellowship.getFellowshipId());
@@ -207,8 +204,7 @@ public final class FellowshipService {
             return FellowshipOperationResult.failure(
                     FellowshipErrorId.INVITATION_STORAGE_READ_ONLY, fellowship);
         }
-        invitationData.removeInvitationsSentBy(fellowship.getFellowshipId(),
-                targetIdentityId);
+        takeBackInvitationsOf(invitationData, fellowship, targetIdentityId);
         fellowship.removeMember(targetIdentityId);
         context.fellowshipData.saveFellowship(fellowship);
         return FellowshipOperationResult.success(true, fellowship, target);
@@ -240,7 +236,8 @@ public final class FellowshipService {
 
     /**
      * The leader makes another member the leader. Refused while that
-     * member's character leads as many fellowships as LOTR lets it. The old
+     * member's character leads as many fellowships as LOTR lets it, counted
+     * in its own LOTR state whether it is played or not (FEL-08). The old
      * leader is no guide, so the invitations it sent are taken back.
      */
     public synchronized FellowshipOperationResult transferLeadership(
@@ -269,7 +266,7 @@ public final class FellowshipService {
                     FellowshipErrorId.INVALID_TARGET, fellowship);
         }
         if (countLed(context.fellowshipData.getFellowshipsForIdentity(targetIdentityId),
-                targetIdentityId) >= leadLimitOf(target)) {
+                targetIdentityId) >= leadLimitOf(player.worldObj, target)) {
             return FellowshipOperationResult.failure(
                     FellowshipErrorId.LEAD_LIMIT_REACHED, fellowship);
         }
@@ -279,16 +276,17 @@ public final class FellowshipService {
             return FellowshipOperationResult.failure(
                     FellowshipErrorId.INVITATION_STORAGE_READ_ONLY, fellowship);
         }
-        if (!fellowship.transferLeadership(targetIdentityId)) {
+        if (!handOver(fellowship, invitationData, context.gameplayId(), targetIdentityId)) {
             return FellowshipOperationResult.success(false, fellowship, target);
         }
-        invitationData.removeInvitationsSentBy(fellowship.getFellowshipId(),
-                context.gameplayId());
         context.fellowshipData.saveFellowship(fellowship);
         return FellowshipOperationResult.success(true, fellowship, target);
     }
 
-    /** The leader makes a member a guide, or no guide. */
+    /**
+     * The leader makes a member a guide, or no guide. A guide made a plain
+     * member takes back the invitations they sent at once (FEL-33).
+     */
     public synchronized FellowshipOperationResult setGuide(
             EntityPlayerMP player, UUID fellowshipId, long expectedFellowshipRevision,
             UUID targetIdentityId, boolean guide) {
@@ -310,11 +308,59 @@ public final class FellowshipService {
             return FellowshipOperationResult.failure(
                     FellowshipErrorId.INVALID_TARGET, fellowship);
         }
-        if (!fellowship.setGuide(targetIdentityId, guide)) {
+        FellowshipInvitationWorldData invitationData = null;
+        if (!guide) {
+            invitationData = this.invitationCoordinator.getWritableData(player.worldObj);
+            if (invitationData == null) {
+                return FellowshipOperationResult.failure(
+                        FellowshipErrorId.INVITATION_STORAGE_READ_ONLY, fellowship);
+            }
+        }
+        if (!changeGuide(fellowship, invitationData, targetIdentityId, guide)) {
             return FellowshipOperationResult.success(false, fellowship, target);
         }
         context.fellowshipData.saveFellowship(fellowship);
         return FellowshipOperationResult.success(true, fellowship, target);
+    }
+
+    /**
+     * Hands the lead on from {@code from} to {@code to}; the old leader is
+     * no guide, so the invitations it sent are taken back. Whether the lead
+     * changed.
+     */
+    static boolean handOver(Fellowship fellowship, FellowshipInvitationWorldData invitations,
+                            UUID from, UUID to) {
+        if (!fellowship.transferLeadership(to)) {
+            return false;
+        }
+        takeBackInvitationsOf(invitations, fellowship, from);
+        return true;
+    }
+
+    /**
+     * Makes a member a guide, or no guide; one made a plain member takes
+     * back the invitations they sent, so {@code invitations} must be
+     * writable then. Whether anything changed.
+     */
+    static boolean changeGuide(Fellowship fellowship, FellowshipInvitationWorldData invitations,
+                               UUID member, boolean guide) {
+        if (!fellowship.setGuide(member, guide)) {
+            return false;
+        }
+        if (!guide) {
+            takeBackInvitationsOf(invitations, fellowship, member);
+        }
+        return true;
+    }
+
+    /**
+     * A member who may invite no more for a fellowship takes back the
+     * invitations they sent for it at once: one who leaves or is removed,
+     * a leader handing on the lead, a guide made a plain member.
+     */
+    private static void takeBackInvitationsOf(FellowshipInvitationWorldData invitations,
+                                              Fellowship fellowship, UUID member) {
+        invitations.removeInvitationsSentBy(fellowship.getFellowshipId(), member);
     }
 
     /** A member picks the colour they wear in a fellowship. */
@@ -697,19 +743,34 @@ public final class FellowshipService {
     }
 
     /**
-     * Why an identity may not make a fellowship now: the server lets no one,
-     * or it is in as many as it can be, or leads as many as LOTR lets it.
-     * NONE when it may.
+     * Why an identity may not make a fellowship now: LOTR lets no one and
+     * the player holds no {@code fellowship.admin} (FEL-30), or it is in as
+     * many as it can be, or leads as many as LOTR lets it. NONE when it
+     * may.
      */
     static FellowshipErrorId createRefusal(EntityPlayerMP player, UUID identityId,
                                            List<Fellowship> joined) {
-        if (!LotrFellowshipRules.creationEnabled()) {
+        boolean mayMake = LotrFellowshipRules.creationEnabled()
+                || LostTalesPermissions.has(player, LostTalesCapability.FELLOWSHIP_ADMIN);
+        return createRefusal(mayMake, joined.size(), countLed(joined, identityId),
+                mayMake ? LotrFellowshipRules.leadLimit(player)
+                        : LotrFellowshipRules.LEAST_LEAD_LIMIT);
+    }
+
+    /**
+     * The rule itself, once the facts are known: whether the player may make
+     * one at all, how many fellowships the character is in, how many it
+     * leads and how many it may lead.
+     */
+    static FellowshipErrorId createRefusal(boolean mayMake, int joined, int led,
+                                           int leadLimit) {
+        if (!mayMake) {
             return FellowshipErrorId.CREATION_DISABLED;
         }
-        if (joined.size() >= Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY) {
+        if (joined >= Fellowship.MAX_FELLOWSHIPS_PER_IDENTITY) {
             return FellowshipErrorId.TOO_MANY_FELLOWSHIPS;
         }
-        if (countLed(joined, identityId) >= LotrFellowshipRules.leadLimit(player)) {
+        if (led >= leadLimit) {
             return FellowshipErrorId.LEAD_LIMIT_REACHED;
         }
         return FellowshipErrorId.NONE;
@@ -726,11 +787,12 @@ public final class FellowshipService {
     }
 
     /**
-     * How many fellowships a member's character may lead. LOTR counts the
-     * achievements of the character its account plays, so a character not
-     * played now may lead the one fellowship every character may.
+     * How many fellowships a member's character may lead, as LOTR counts
+     * it from the achievements in the character's own LOTR state (FEL-08):
+     * its account's live data while the account plays it, else the state
+     * saved with it as it was last played.
      */
-    private int leadLimitOf(FellowshipMember member) {
+    private int leadLimitOf(World world, FellowshipMember member) {
         EntityPlayerMP player = LostTalesServerPlayers.findOnline(member.getOwnerId());
         if (player != null) {
             ActiveIdentityContext active = resolveActiveIdentity(player);
@@ -738,13 +800,23 @@ public final class FellowshipService {
                 return LotrFellowshipRules.leadLimit(player);
             }
         }
-        return LotrFellowshipRules.LEAST_LEAD_LIMIT;
+        return FellowshipLeadLimits.savedLimitOf(world, member);
+    }
+
+    /** How many fellowships each member's character in {@code world} may lead. */
+    private LeadLimits leadLimitsIn(final World world) {
+        return new LeadLimits() {
+            @Override
+            public int of(FellowshipMember member) {
+                return leadLimitOf(world, member);
+            }
+        };
     }
 
     /**
      * Who leads once the leader's character is deleted: the first joined of
-     * the others who lead fewer fellowships than they may, else the first
-     * joined of them. The limit only orders the choice, because a
+     * the others who lead fewer fellowships than they may, each counted as
+     * {@link #transferLeadership} counts it, else the first joined of them. The limit only orders the choice, because a
      * fellowship must not end when nobody in it may lead one more. Null
      * while nobody else is in it.
      */
@@ -1051,7 +1123,7 @@ public final class FellowshipService {
             }
             if (fellowship.isLeader(characterId)) {
                 fellowship.transferLeadership(successorOf(fellowshipData, fellowship,
-                        characterId, this.leadLimits));
+                        characterId, leadLimitsIn(world)));
             }
             if (keepPlaces) {
                 fellowship.refreshMemberIdentity(characterId, FellowshipMember.UNHELD,

@@ -53,6 +53,8 @@ public final class LostTalesLangLinesTest {
             "item.losttales.tooltip.set.heavy",
             "item.losttales.tooltip.set.light",
             "item.losttales.tooltip.set.empty",
+            "item.losttales.tooltip.vessel.item",
+            "item.losttales.tooltip.vessel.more",
             LostTalesClientQuickLootCache.CONTAINER_KEY,
             LostTalesClientQuickLootCache.SEALED_KEY,
             LostTalesClientMobAggroCache.ENEMY_KEY,

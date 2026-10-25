@@ -1,0 +1,21 @@
+{
+  "id": "losttales:dorwinion_elven",
+  "helmet": [
+    "lotr:item.helmetDorwinionElf"
+  ],
+  "chestplate": [
+    "lotr:item.bodyDorwinionElf"
+  ],
+  "leggings": [
+    "lotr:item.legsDorwinionElf"
+  ],
+  "boots": [
+    "lotr:item.bootsDorwinionElf"
+  ],
+  "bonus": [
+    {
+      "effect": "speed",
+      "amount": 0.05
+    }
+  ]
+}

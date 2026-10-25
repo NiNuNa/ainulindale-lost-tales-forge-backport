@@ -3,9 +3,9 @@ package com.ninuna.losttales.character.storage;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBody;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import net.minecraft.nbt.NBTTagCompound;
@@ -22,7 +22,7 @@ import static org.junit.Assert.fail;
 
 /**
  * A character record carries no level and no experience and keeps the
- * pledge LOTR last reported, the faction's start, the title, the arm width
+ * pledge LOTR last reported, the faction's start, the title, the arms
  * and the chest as written. A record of another version or another shape
  * is refused whole; nothing is filled in or put right.
  */
@@ -86,11 +86,11 @@ public final class CharacterRecordCodecTest {
     @Test
     public void theChosenArmWidthAndChestRoundTrip() {
         RoleplayCharacter chosen = RoleplayCharacter.builder(character(""))
-                .bodyType(CharacterBodyTypeRegistry.SLIM)
+                .arms(CharacterArmsRegistry.SLENDER)
                 .chestType(CharacterChestTypeRegistry.CLASSIC).build();
         RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(
                 CharacterNbtCodec.writeCharacterRecord(chosen), OWNER);
-        assertEquals(CharacterBodyTypeRegistry.SLIM, loaded.getBodyTypeId());
+        assertEquals(CharacterArmsRegistry.SLENDER, loaded.getArmsId());
         assertEquals(CharacterChestTypeRegistry.CLASSIC, loaded.getChestTypeId());
     }
 
@@ -104,15 +104,15 @@ public final class CharacterRecordCodecTest {
                         .getSkinId());
     }
 
-    /** A record without an arm width or a chest, or with one this build does not know, is refused, never given the sex's. */
+    /** A record without arms or a chest, or with one this build does not know, is refused, never given the body type's. */
     @Test
     public void aMissingOrUnknownArmWidthOrChestIsRefused() {
         NBTTagCompound noBody = CharacterNbtCodec.writeCharacterRecord(character(""));
-        noBody.removeTag("BodyTypeId");
-        assertRefused(noBody, "missing_body_type");
+        noBody.removeTag("ArmsId");
+        assertRefused(noBody, "missing_arms");
         NBTTagCompound unknownBody = CharacterNbtCodec.writeCharacterRecord(character(""));
-        unknownBody.setString("BodyTypeId", "losttales:huge");
-        assertRefused(unknownBody, "unknown_body_type");
+        unknownBody.setString("ArmsId", "losttales:huge");
+        assertRefused(unknownBody, "unknown_arms");
         NBTTagCompound noChest = CharacterNbtCodec.writeCharacterRecord(character(""));
         noChest.removeTag("ChestTypeId");
         assertRefused(noChest, "missing_chest_type");
@@ -123,19 +123,19 @@ public final class CharacterRecordCodecTest {
 
     /**
      * What a race offers is asked where a character is made or changed, not
-     * of its record: races are data a server may change (CHAR-38). A sex the
+     * of its record: races are data a server may change (CHAR-38). A body type the
      * game does not have, and a body none of the six is, are refused.
      */
     @Test
-    public void aSexTheRaceNoLongerOffersIsKeptAndAnUnknownOneRefused() {
+    public void aBodyTypeTheRaceNoLongerOffersIsKeptAndAnUnknownOneRefused() {
         NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(character(""));
-        record.setString("GenderId", CharacterGenderRegistry.NON_BINARY);
-        assertEquals(CharacterGenderRegistry.NON_BINARY,
-                CharacterNbtCodec.readCharacterRecord(record, OWNER).getGenderId());
+        record.setString("BodyTypeId", CharacterBodyTypeRegistry.NEUTRAL);
+        assertEquals(CharacterBodyTypeRegistry.NEUTRAL,
+                CharacterNbtCodec.readCharacterRecord(record, OWNER).getBodyTypeId());
 
         NBTTagCompound unknown = CharacterNbtCodec.writeCharacterRecord(character(""));
-        unknown.setString("GenderId", "losttales:shapeshifter");
-        assertRefused(unknown, "unknown_sex");
+        unknown.setString("BodyTypeId", "losttales:shapeshifter");
+        assertRefused(unknown, "unknown_body_type");
 
         NBTTagCompound noBody = CharacterNbtCodec.writeCharacterRecord(character(""));
         noBody.setString("Body", "giant");
@@ -243,8 +243,8 @@ public final class CharacterRecordCodecTest {
     private static RoleplayCharacter character(String pledgedFactionId) {
         return RoleplayCharacter.builder(CHARACTER, OWNER)
                 .slot(0).name("Aldric").race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
-                .skin("losttales:human_gondor_male_0").age(30)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
+                .skin("losttales:human_gondor_masculine_0").age(30)
                 .startingFaction("lotr:gondor")
                 .pledgedFaction(pledgedFactionId)
                 .createdAt(1L)

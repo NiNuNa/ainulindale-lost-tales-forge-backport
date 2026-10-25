@@ -8,8 +8,8 @@ import java.util.Map;
 
 /**
  * Stable chest type identifiers: the shape and size of the feminine chest a
- * character is drawn with, or none. Like the arm width it is a choice of
- * its own, stored next to sex; sex only picks the default.
+ * character is drawn with, or none. Like the arms it is a choice of
+ * its own, stored next to the body type; the body type only picks the first one.
  */
 public final class CharacterChestTypeRegistry {
 
@@ -64,10 +64,10 @@ public final class CharacterChestTypeRegistry {
         return DEFINITIONS.values();
     }
 
-    /** The chest a creator pre-selects for a sex: rounded medium for female, none otherwise. */
-    public static String defaultFor(String genderId) {
-        return CharacterGenderRegistry.FEMALE.equals(
-                LostTalesIdentifiers.normalize(genderId)) ? ROUNDED_MEDIUM : NONE;
+    /** The chest a creator pre-selects for a body type: rounded medium for feminine, none otherwise. */
+    public static String defaultFor(String bodyTypeId) {
+        return CharacterBodyTypeRegistry.FEMININE.equals(
+                LostTalesIdentifiers.normalize(bodyTypeId)) ? ROUNDED_MEDIUM : NONE;
     }
 
     /** A registered identifier, or none for anything unknown. */

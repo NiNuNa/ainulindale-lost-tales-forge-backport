@@ -51,7 +51,7 @@ public final class WindowViewTest {
         register(PAGE, Items.book, PageCategory.QUEST_JOURNAL);
         register(OTHER, Items.compass, PageCategory.MAP);
         if (WindowPages.byId(WORLD) == null) {
-            WindowPages.registerWorldPage(WORLD, "gui.test.view.world",
+            WindowPages.registerGamePage(WORLD, "gui.test.view.world",
                     new ItemStack(Items.compass), PageCategory.MAP, EMPTY);
         }
         register(MAP, Items.map, PageCategory.MAP);
@@ -282,7 +282,8 @@ public final class WindowViewTest {
                 windowIn(view(PageCategory.FELLOWSHIPS), tab(MAP)));
         assertEquals(1, windowsIn(view(PageCategory.FELLOWSHIPS)));
         assertTrue(WindowLayout.buildView(view(PageCategory.PROFILE)));
-        assertEquals(Window.ScreenFill.NONE,
+        assertEquals("the Profile view's window stands on the left third",
+                Window.ScreenFill.LEFT_THIRD,
                 WindowLayout.windowOf(tab(CHARACTERS)).getFill());
     }
 

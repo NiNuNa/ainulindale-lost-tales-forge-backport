@@ -14,7 +14,8 @@ import java.util.UUID;
  * What the server lets the identity a player plays see of the fellowships:
  * the ones it is in, the one it travels with, whether it may make another,
  * the invitations to it, and the invitations sent by the fellowships it
- * leads or guides, each with its fellowship's name.
+ * leads or guides, each with its fellowship's name and the names of the
+ * accounts it names.
  */
 public final class FellowshipInvitationState {
 
@@ -27,6 +28,7 @@ public final class FellowshipInvitationState {
     private final List<FellowshipInvitation> incomingInvitations;
     private final List<FellowshipInvitation> outgoingInvitations;
     private final Map<UUID, String> fellowshipNames;
+    private final Map<UUID, String> accountNames;
 
     private FellowshipInvitationState(boolean successful, FellowshipErrorId errorId,
                                       UUID activeIdentityId, List<Fellowship> fellowships,
@@ -34,7 +36,8 @@ public final class FellowshipInvitationState {
                                       FellowshipErrorId createRefusal,
                                       List<FellowshipInvitation> incomingInvitations,
                                       List<FellowshipInvitation> outgoingInvitations,
-                                      Map<UUID, String> fellowshipNames) {
+                                      Map<UUID, String> fellowshipNames,
+                                      Map<UUID, String> accountNames) {
         this.successful = successful;
         this.errorId = errorId == null ? FellowshipErrorId.INTERNAL_ERROR : errorId;
         this.activeIdentityId = activeIdentityId;
@@ -48,6 +51,9 @@ public final class FellowshipInvitationState {
         this.fellowshipNames = fellowshipNames == null || fellowshipNames.isEmpty()
                 ? Collections.<UUID, String>emptyMap()
                 : Collections.unmodifiableMap(new HashMap<UUID, String>(fellowshipNames));
+        this.accountNames = accountNames == null || accountNames.isEmpty()
+                ? Collections.<UUID, String>emptyMap()
+                : Collections.unmodifiableMap(new HashMap<UUID, String>(accountNames));
     }
 
     public static FellowshipInvitationState success(
@@ -55,10 +61,11 @@ public final class FellowshipInvitationState {
             UUID travellingFellowshipId, FellowshipErrorId createRefusal,
             List<FellowshipInvitation> incomingInvitations,
             List<FellowshipInvitation> outgoingInvitations,
-            Map<UUID, String> fellowshipNames) {
+            Map<UUID, String> fellowshipNames,
+            Map<UUID, String> accountNames) {
         return new FellowshipInvitationState(true, FellowshipErrorId.NONE,
                 activeIdentityId, fellowships, travellingFellowshipId, createRefusal,
-                incomingInvitations, outgoingInvitations, fellowshipNames);
+                incomingInvitations, outgoingInvitations, fellowshipNames, accountNames);
     }
 
     public static FellowshipInvitationState failure(FellowshipErrorId errorId) {
@@ -66,7 +73,7 @@ public final class FellowshipInvitationState {
             errorId = FellowshipErrorId.INTERNAL_ERROR;
         }
         return new FellowshipInvitationState(false, errorId, null, null, null, null,
-                null, null, null);
+                null, null, null, null);
     }
 
     public boolean isSuccessful() {
@@ -107,6 +114,12 @@ public final class FellowshipInvitationState {
     /** The name of a fellowship an invitation here names; null for none. */
     public String getFellowshipName(UUID fellowshipId) {
         return fellowshipId == null ? null : this.fellowshipNames.get(fellowshipId);
+    }
+
+    /** The name of an account an invitation here names; empty where the server knows none. */
+    public String getAccountName(UUID accountId) {
+        String name = accountId == null ? null : this.accountNames.get(accountId);
+        return name == null ? "" : name;
     }
 
     private static List<FellowshipInvitation> immutableCopy(

@@ -1,6 +1,8 @@
 package com.ninuna.losttales.mapmarker;
 
+import com.ninuna.losttales.storage.NbtQuarantine;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import org.junit.Test;
 import net.minecraft.nbt.NBTTagCompound;
@@ -153,13 +155,14 @@ public final class LostTalesMapMarkerWorldDataTest {
                 "lotr:waypoint:HOBBITON").getName());
         NBTTagCompound repaired = new NBTTagCompound();
         restored.writeToNBT(repaired);
-        NBTTagList quarantine = repaired.getTagList(
-                "Quarantine", Constants.NBT.TAG_COMPOUND);
-        assertEquals(1, quarantine.tagCount());
-        assertTrue(quarantine.getCompoundTagAt(0).hasKey(
+        List<NBTTagCompound> quarantine = quarantineOf(repaired);
+        assertEquals(1, quarantine.size());
+        assertEquals("duplicate_logical_marker_id",
+                quarantine.get(0).getString("Reason"));
+        assertTrue(quarantine.get(0).hasKey(
                 "OriginalData", Constants.NBT.TAG_COMPOUND));
         assertEquals("lotr:waypoint:HOBBITON",
-                quarantine.getCompoundTagAt(0)
+                quarantine.get(0)
                         .getCompoundTag("OriginalData")
                         .getString("Id"));
     }
@@ -332,14 +335,156 @@ public final class LostTalesMapMarkerWorldDataTest {
                 .withGenerationState(LostTalesWaystoneGenerationState.PLACED));
         NBTTagCompound saved = new NBTTagCompound();
         restored.writeToNBT(saved);
-        NBTTagList quarantine = saved.getTagList(
-                "Quarantine", Constants.NBT.TAG_COMPOUND);
+        List<NBTTagCompound> quarantine = quarantineOf(saved);
         assertEquals("every save keeps the one entry", 1,
-                quarantine.tagCount());
+                quarantine.size());
         assertEquals("duplicate_waystone_link",
-                quarantine.getCompoundTagAt(0).getString("Reason"));
-        assertEquals("losttales:first_link", quarantine.getCompoundTagAt(0)
+                quarantine.get(0).getString("Reason"));
+        assertEquals("losttales:first_link", quarantine.get(0)
                 .getCompoundTag("OriginalData").getString("Id"));
+    }
+
+    /**
+     * A quarantine of more records than the bound is kept whole: the
+     * store reads only and writes every record back as it was (DATA-10).
+     */
+    @Test
+    public void moreThanTheBoundInQuarantineIsKeptWholeAndReadOnly() {
+        NBTTagCompound serialized = saveWith(
+                Collections.singleton(LostTalesMapMarkerRecord.fromDefinition(
+                        definition("losttales:kept"))),
+                asideEntries(LostTalesMapMarkerNbtCodec.MAX_QUARANTINED + 904));
+
+        LostTalesMapMarkerWorldData restored =
+                new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+
+        assertTrue(restored.isReadOnlyForNewerVersion());
+        assertTrue(restored.getRecords().isEmpty());
+        assertFalse(restored.seedDefinitions(Collections.singleton(
+                definition("losttales:must-not-be-seeded"))));
+        NBTTagCompound written = new NBTTagCompound();
+        restored.writeToNBT(written);
+        assertTrue("written back as it was saved", serialized.equals(written));
+        assertEquals(5000, quarantineOf(written).size());
+    }
+
+    /** A quarantine at its bound loads and is written back whole, nothing trimmed. */
+    @Test
+    public void aQuarantineAtTheBoundIsWrittenBackWhole() {
+        List<NBTTagCompound> aside =
+                asideEntries(LostTalesMapMarkerNbtCodec.MAX_QUARANTINED);
+        NBTTagCompound serialized = saveWith(
+                Collections.singleton(LostTalesMapMarkerRecord.fromDefinition(
+                        definition("losttales:kept"))), aside);
+
+        LostTalesMapMarkerWorldData restored =
+                new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+
+        assertFalse(restored.isReadOnlyForNewerVersion());
+        assertNotNull(restored.getRecord("losttales:kept"));
+        NBTTagCompound written = new NBTTagCompound();
+        restored.writeToNBT(written);
+        assertEquals(aside, quarantineOf(written));
+    }
+
+    /**
+     * What the store sets aside as it loads counts toward the bound: a
+     * full quarantine takes no duplicate more, and the store is kept as
+     * it was saved, read-only.
+     */
+    @Test
+    public void whatTheStoreSetsAsideAsItLoadsCountsTowardTheBound() {
+        LostTalesMapMarkerRecord oldRecord =
+                LostTalesMapMarkerRecord.fromDefinition(
+                        definition("lotr:waypoint:HOBBITON"));
+        LostTalesMapMarkerRecord newRecord =
+                LostTalesMapMarkerRecord.fromDefinition(
+                        definition("LOTR:WAYPOINT:hobbiton"))
+                        .toBuilder().revision(5L).build();
+        NBTTagCompound serialized = saveWith(
+                java.util.Arrays.asList(oldRecord, newRecord),
+                asideEntries(LostTalesMapMarkerNbtCodec.MAX_QUARANTINED));
+
+        LostTalesMapMarkerWorldData restored =
+                new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+
+        assertTrue(restored.isReadOnlyForNewerVersion());
+        assertTrue(restored.getRecords().isEmpty());
+        assertNull(restored.getRecord("lotr:waypoint:hobbiton"));
+        NBTTagCompound written = new NBTTagCompound();
+        restored.writeToNBT(written);
+        assertTrue("both records and the whole quarantine are kept",
+                serialized.equals(written));
+
+        UUID token = UUID.randomUUID();
+        NBTTagCompound shared = saveWith(java.util.Arrays.asList(
+                LostTalesMapMarkerRecord.fromDefinition(
+                        definition("losttales:first_link"))
+                        .withLink(0, 200, 70, -300, token),
+                LostTalesMapMarkerRecord.fromDefinition(
+                        definition("losttales:second_link"))
+                        .withLink(0, 200, 70, -300, token)),
+                asideEntries(LostTalesMapMarkerNbtCodec.MAX_QUARANTINED));
+        LostTalesMapMarkerWorldData linked =
+                new LostTalesMapMarkerWorldData("linked");
+        linked.readFromNBT(shared);
+        assertTrue(linked.isReadOnlyForNewerVersion());
+        NBTTagCompound linkedWritten = new NBTTagCompound();
+        linked.writeToNBT(linkedWritten);
+        assertTrue(shared.equals(linkedWritten));
+    }
+
+    /** A quarantine this build cannot read keeps the store as it was saved, read-only. */
+    @Test
+    public void anUnreadableQuarantineKeepsTheStoreReadOnly() {
+        NBTTagCompound serialized = saveWith(
+                Collections.singleton(LostTalesMapMarkerRecord.fromDefinition(
+                        definition("losttales:kept"))),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagList bare = new NBTTagList();
+        bare.appendTag(asideEntries(1).get(0));
+        serialized.setTag("Quarantine", bare);
+
+        LostTalesMapMarkerWorldData restored =
+                new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+
+        assertTrue(restored.isReadOnlyForNewerVersion());
+        assertTrue(restored.getRecords().isEmpty());
+        NBTTagCompound written = new NBTTagCompound();
+        restored.writeToNBT(written);
+        assertTrue(serialized.equals(written));
+    }
+
+    /** A save as the store writes it, with the records and the quarantine given. */
+    private static NBTTagCompound saveWith(
+            java.util.Collection<LostTalesMapMarkerRecord> records,
+            List<NBTTagCompound> quarantine) {
+        NBTTagCompound serialized = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(serialized, records, quarantine);
+        serialized.setTag("SeededMarkers", new NBTTagList());
+        return serialized;
+    }
+
+    private static List<NBTTagCompound> asideEntries(int count) {
+        List<NBTTagCompound> entries = new java.util.ArrayList<NBTTagCompound>();
+        for (int index = 0; index < count; index++) {
+            NBTTagCompound original = new NBTTagCompound();
+            original.setString("Id", "losttales:aside/" + index);
+            entries.add(NbtQuarantine.entry("missing_required_fields",
+                    LostTalesMapMarkerNbtCodec.MARKER_INDEX, index, original));
+        }
+        return entries;
+    }
+
+    private static List<NBTTagCompound> quarantineOf(NBTTagCompound saved) {
+        NbtQuarantine.Read read = NbtQuarantine.read(saved);
+        assertTrue("the quarantine is written in the shared layout",
+                read.isSupported());
+        return read.getEntries();
     }
 
     /**
@@ -406,7 +551,7 @@ public final class LostTalesMapMarkerWorldDataTest {
         data.seedDefinitions(java.util.Arrays.asList(
                 definition("losttales:near", 64.0D, 8.0D, 0.0D),
                 definition("losttales:town", 64.0D, 200.0D, 5000.0D),
-                definition("losttales:wide", 64.0D, 1024.0D, -20000.0D),
+                definition("losttales:broad", 64.0D, 1024.0D, -20000.0D),
                 definition("losttales:huge", 64.0D, 50000.0D, 40000.0D)));
 
         assertEquals(ids("losttales:near"),
@@ -420,7 +565,7 @@ public final class LostTalesMapMarkerWorldDataTest {
                 ids(data.getDiscoveryCandidates(0, 32.0D, 5000.0D + 199.0D, 1.0D)));
         assertEquals(ids(),
                 ids(data.getDiscoveryCandidates(0, 32.0D, 5000.0D + 201.0D, 1.0D)));
-        assertEquals(ids("losttales:wide"),
+        assertEquals(ids("losttales:broad"),
                 ids(data.getDiscoveryCandidates(0, 32.0D,
                         -20000.0D - 1023.0D, 1.0D)));
         assertEquals(ids(), ids(data.getDiscoveryCandidates(0, 32.0D,

@@ -69,7 +69,7 @@ public final class PerkRuntime {
         public long lastStandReady = Long.MIN_VALUE;
         /** Fractions of a tick Wayfarer has gathered toward the next. */
         public double travelCarry;
-        /** Tools, weapons and armour a use may have worn this tick, with the chance it costs nothing. */
+        /** Tools and weapons a use may have worn this tick, with the chance it costs nothing. */
         public final List<Wear> wear = new ArrayList<Wear>();
         /** Whether a thrown spear marked to take no wear may come back to this player. */
         public boolean spearsMarked;

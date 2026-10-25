@@ -1,0 +1,22 @@
+{
+  "id": "losttales:orocarni_light_captain",
+  "helmet": [
+    "losttales:orocarni_helmet_light_captain"
+  ],
+  "chestplate": [
+    "losttales:orocarni_armor_light_captain"
+  ],
+  "leggings": [
+    "losttales:orocarni_leggings_light_captain"
+  ],
+  "boots": [
+    "losttales:orocarni_boots_light_captain"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:heavy_arms"
+    }
+  ]
+}

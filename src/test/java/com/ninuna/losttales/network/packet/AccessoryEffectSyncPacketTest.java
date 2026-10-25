@@ -31,8 +31,29 @@ public final class AccessoryEffectSyncPacketTest {
         assertEquals("", decoded.getDefinitionId());
     }
 
+    /**
+     * The accessory named is looked up as it is used, in the list the
+     * server sent ahead of it (ACC-01), so a name the client does not hold
+     * yet still decodes.
+     */
     @Test
-    public void unknownDefinitionIsRejected() {
+    public void aDefinitionIsLookedUpAsItIsUsed() {
+        AccessoryEffectSyncPacket decoded = decode("myserver:signet");
+
+        assertFalse(decoded.isMalformed());
+        assertEquals("myserver:signet", decoded.getDefinitionId());
+    }
+
+    @Test
+    public void anOverlongDefinitionIsRejected() {
+        StringBuilder name = new StringBuilder("a:");
+        while (name.length() <= AccessoryEffectSyncPacket.MAX_DEFINITION_ID_BYTES) {
+            name.append('x');
+        }
+        assertTrue(decode(name.toString()).isMalformed());
+    }
+
+    private static AccessoryEffectSyncPacket decode(String definitionId) {
         UUID playerId = UUID.randomUUID();
         ByteBuf buffer = Unpooled.buffer();
         buffer.writeByte(1);
@@ -40,12 +61,11 @@ public final class AccessoryEffectSyncPacketTest {
         buffer.writeLong(playerId.getLeastSignificantBits());
         buffer.writeInt(42);
         buffer.writeLong(1L);
-        ByteBufUtils.writeUTF8String(buffer, "unknown:ring");
+        ByteBufUtils.writeUTF8String(buffer, definitionId);
 
         AccessoryEffectSyncPacket decoded =
                 new AccessoryEffectSyncPacket();
         decoded.fromBytes(buffer);
-
-        assertTrue(decoded.isMalformed());
+        return decoded;
     }
 }

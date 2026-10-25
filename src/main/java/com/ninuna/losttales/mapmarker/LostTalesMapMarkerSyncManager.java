@@ -18,11 +18,14 @@ import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.World;
 
 /**
  * Sends each player the markers they may see, as one snapshot; a marker
  * hidden until discovered only once the character played discovered it
- * ({@link #select}).
+ * ({@link #select}). An unnamed waystone goes called after its placing
+ * character by the name it has now (WAY-01), so a rename or a purge sends
+ * its viewers their markers again ({@link #placerChanged}).
  *
  * <p>A change only marks who needs a fresh snapshot; every
  * {@link #FLUSH_TICKS} the marked players are sent one each, so however
@@ -90,7 +93,8 @@ public final class LostTalesMapMarkerSyncManager {
             PENDING.remove(player.getUniqueID());
         }
         List<LostTalesMapMarkerDefinition> visible = select(
-                records, viewer, discoveries);
+                records, viewer, discoveries,
+                LostTalesWaystonePlacers.of(player.worldObj));
         try {
             OUTBOX.queue(player.getUniqueID(),
                     LostTalesMapMarkerSnapshotPacket.split(
@@ -105,16 +109,26 @@ public final class LostTalesMapMarkerSyncManager {
         LostTalesWaystoneSettingsService.checkSight(player, data);
     }
 
-    /**
-     * What a snapshot holds for {@code viewer}: every marker it may see,
-     * but a marker hidden until discovered only once the character played
-     * has discovered it (WAY-11). A manager is sent every marker it may
-     * see, discovered or not.
-     */
+    /** The same, every waystone called after its placer as the record keeps it. */
     static List<LostTalesMapMarkerDefinition> select(
             Collection<LostTalesMapMarkerRecord> records,
             LostTalesMapMarkerVisibilityPolicy.Viewer viewer,
             Discoveries discovered) {
+        return select(records, viewer, discovered, null);
+    }
+
+    /**
+     * What a snapshot holds for {@code viewer}: every marker it may see,
+     * but a marker hidden until discovered only once the character played
+     * has discovered it (WAY-11). A manager is sent every marker it may
+     * see, discovered or not. An unnamed waystone goes called after its
+     * placing character by the name {@code placers} gives it.
+     */
+    static List<LostTalesMapMarkerDefinition> select(
+            Collection<LostTalesMapMarkerRecord> records,
+            LostTalesMapMarkerVisibilityPolicy.Viewer viewer,
+            Discoveries discovered,
+            LostTalesMapMarkerNamedAfter.Names placers) {
         ArrayList<LostTalesMapMarkerDefinition> visible =
                 new ArrayList<LostTalesMapMarkerDefinition>();
         if (records == null || viewer == null) {
@@ -129,7 +143,7 @@ public final class LostTalesMapMarkerSyncManager {
                         || !discovered.has(record.getId()))) {
                 continue;
             }
-            visible.add(record.toDefinition());
+            visible.add(record.toDefinition(placers));
         }
         return visible;
     }
@@ -201,6 +215,38 @@ public final class LostTalesMapMarkerSyncManager {
             if (LostTalesMapMarkerVisibilityPolicy.canView(before, viewer)
                     || LostTalesMapMarkerVisibilityPolicy.canView(after, viewer)) {
                 mark(player);
+            }
+        }
+    }
+
+    /**
+     * The character's name changed, or the character was purged: the
+     * players who may see a waystone called after it are sent a fresh
+     * snapshot within a second, which names it as it stands now (WAY-01).
+     */
+    public static void placerChanged(World world, UUID characterId) {
+        if (world == null || world.isRemote || characterId == null) {
+            return;
+        }
+        List<LostTalesMapMarkerRecord> calledAfter =
+                new ArrayList<LostTalesMapMarkerRecord>();
+        for (LostTalesMapMarkerRecord record
+                : LostTalesMapMarkerStorage.get(world).getRecords()) {
+            if (record.isCalledAfter(characterId)) {
+                calledAfter.add(record);
+            }
+        }
+        if (calledAfter.isEmpty()) {
+            return;
+        }
+        for (EntityPlayerMP player : onlinePlayers()) {
+            LostTalesMapMarkerVisibilityPolicy.Viewer viewer =
+                    LostTalesMapMarkerVisibilityPolicy.Viewer.of(player);
+            for (LostTalesMapMarkerRecord record : calledAfter) {
+                if (LostTalesMapMarkerVisibilityPolicy.canView(record, viewer)) {
+                    mark(player);
+                    break;
+                }
             }
         }
     }

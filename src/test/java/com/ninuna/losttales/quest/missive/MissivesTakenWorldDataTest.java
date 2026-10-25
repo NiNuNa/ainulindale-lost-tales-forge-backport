@@ -52,15 +52,47 @@ public final class MissivesTakenWorldDataTest {
         assertTrue(data.wasTaken(B));
     }
 
+    /** Past its bound the record refuses a new missive and forgets none it holds. */
     @Test
-    public void theRecordHoldsItsBoundTheOldestGoingFirst() {
+    public void theRecordRefusesPastItsBound() {
         MissivesTakenWorldData data = data();
-        for (int index = 0; index <= MissivesTakenWorldData.MAX_ENTRIES; index++) {
-            data.take("losttales:missive/generated/" + index, index, index, 0L);
+        for (int index = 0; index < MissivesTakenWorldData.MAX_ENTRIES; index++) {
+            assertTrue(data.take("losttales:missive/generated/" + index, index,
+                    index, 0L));
         }
+        assertFalse("a full record takes no more", data.take(
+                "losttales:missive/generated/full", 1L, 1L, 0L));
         assertEquals(MissivesTakenWorldData.MAX_ENTRIES, data.size());
-        assertFalse(data.wasTaken("losttales:missive/generated/0"));
-        assertTrue(data.wasTaken("losttales:missive/generated/1"));
+        assertTrue("the oldest is still remembered",
+                data.wasTaken("losttales:missive/generated/0"));
+        assertFalse(data.wasTaken("losttales:missive/generated/full"));
+    }
+
+    /**
+     * A letter keeps its first posting's days wherever it is pinned
+     * (QUEST-34), so the record keeps each missive for the longest days a
+     * notice may stand from then, whatever the setting is now, and for
+     * good while notices never expire.
+     */
+    @Test
+    public void theRecordLastsAsLongAsACopyCouldStand() {
+        long keep = MissivesTaken.keepTicks(true);
+        assertEquals(MissivesTaken.LONGEST_NOTICE_DAYS * 24000L, keep);
+        assertEquals(0L, MissivesTaken.keepTicks(false));
+
+        MissivesTakenWorldData data = data();
+        data.take(A, 100L, 100L, keep);
+        data.take(B, keep, keep, keep);
+        assertTrue("posted at 100, a copy could still stand", data.wasTaken(A));
+        data.take("losttales:missive/generated/c", keep + 100L, keep + 100L, keep);
+        assertFalse("past the longest days a notice may stand", data.wasTaken(A));
+        assertTrue(data.wasTaken(B));
+
+        MissivesTakenWorldData forGood = data();
+        forGood.take(A, 100L, 100L, MissivesTaken.keepTicks(false));
+        forGood.take(B, 100L, 100L * keep, MissivesTaken.keepTicks(false));
+        assertTrue("notices that never expire are remembered for good",
+                forGood.wasTaken(A));
     }
 
     /** Data of another version is kept as it was, and no missive is taken meanwhile. */

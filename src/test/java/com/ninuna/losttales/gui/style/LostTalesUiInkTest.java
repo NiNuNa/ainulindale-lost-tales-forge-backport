@@ -2,13 +2,14 @@ package com.ninuna.losttales.gui.style;
 
 import org.junit.Test;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 /**
  * The one centring rule: something that can stand in the middle of its
  * box does; something an odd number of pixels short of it counts its
  * shadow, a pixel down and right, as part of its shape, which stands its
- * ink half a pixel up or left.
+ * ink half a pixel up or left. And the diamond mark's shape.
  */
 public final class LostTalesUiInkTest {
 
@@ -43,5 +44,35 @@ public final class LostTalesUiInkTest {
         // An even remainder stands in the middle.
         assertEquals(1.0F, LostTalesUiInk.centredStart(5.0F, 3.0F, 2.0F),
                 0.0001F);
+    }
+
+    /**
+     * The diamond mark: seven rows, one, three, five, five, five, three and
+     * one wide, about its middle column, as wide as its constant says and
+     * as high.
+     */
+    @Test
+    public void theDiamondIsSevenRowsFiveWide() {
+        int[] widths = new int[LostTalesUiInk.DIAMOND_HEIGHT];
+        int widest = 0;
+        for (int row = 0; row < LostTalesUiInk.DIAMOND_HEIGHT; row++) {
+            widths[row] = LostTalesUiInk.diamondReach(row) * 2 + 1;
+            widest = Math.max(widest, widths[row]);
+        }
+        assertArrayEquals(new int[] {1, 3, 5, 5, 5, 3, 1}, widths);
+        assertEquals(LostTalesUiInk.DIAMOND_WIDTH, widest);
+        assertEquals(-1, LostTalesUiInk.diamondReach(-1));
+        assertEquals(-1, LostTalesUiInk.diamondReach(
+                LostTalesUiInk.DIAMOND_HEIGHT));
+    }
+
+    /** The diamond stands its middle row in the middle of its seven, the odd pixel none. */
+    @Test
+    public void theDiamondsMiddleRowIsItsMiddle() {
+        assertEquals(3, LostTalesUiInk.DIAMOND_HEIGHT / 2);
+        assertEquals(LostTalesUiInk.diamondReach(0),
+                LostTalesUiInk.diamondReach(LostTalesUiInk.DIAMOND_HEIGHT - 1));
+        assertEquals(LostTalesUiInk.diamondReach(1),
+                LostTalesUiInk.diamondReach(LostTalesUiInk.DIAMOND_HEIGHT - 2));
     }
 }

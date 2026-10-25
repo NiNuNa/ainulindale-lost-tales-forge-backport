@@ -45,9 +45,9 @@ public final class CharacterSkinRegistry {
         return id == null ? null : current().byId.get(LostTalesIdentifiers.normalize(id));
     }
 
-    /** The skins a race offers a sex, the account skin first; a stand-in offers its race's. */
+    /** The skins a race offers a body type, the account skin first; a stand-in offers its race's. */
     public static List<CharacterSkinDefinition> getCompatibleSkins(
-            String raceId, String genderId) {
+            String raceId, String bodyTypeId) {
         String skinRace = skinRaceOf(raceId);
         List<CharacterSkinDefinition> raceSkins = current().byRace.get(skinRace);
         if (raceSkins == null || raceSkins.isEmpty()) {
@@ -56,25 +56,25 @@ public final class CharacterSkinRegistry {
         ArrayList<CharacterSkinDefinition> compatible =
                 new ArrayList<CharacterSkinDefinition>();
         for (CharacterSkinDefinition definition : raceSkins) {
-            if (definition.isCompatibleWith(skinRace, genderId)) {
+            if (definition.isCompatibleWith(skinRace, bodyTypeId)) {
                 compatible.add(definition);
             }
         }
         return Collections.unmodifiableList(compatible);
     }
 
-    public static boolean isCompatible(String skinId, String raceId, String genderId) {
+    public static boolean isCompatible(String skinId, String raceId, String bodyTypeId) {
         CharacterSkinDefinition definition = get(skinId);
-        return definition != null && definition.isCompatibleWith(skinRaceOf(raceId), genderId);
+        return definition != null && definition.isCompatibleWith(skinRaceOf(raceId), bodyTypeId);
     }
 
     /**
      * One of the race's catalogue skins, picked by {@code seed}, so the same
      * seed always gets the same skin. The account skin is never picked.
      */
-    public static String getDefaultSkinId(String raceId, String genderId, UUID seed) {
+    public static String getDefaultSkinId(String raceId, String bodyTypeId, UUID seed) {
         ArrayList<CharacterSkinDefinition> skins = new ArrayList<CharacterSkinDefinition>();
-        for (CharacterSkinDefinition definition : getCompatibleSkins(raceId, genderId)) {
+        for (CharacterSkinDefinition definition : getCompatibleSkins(raceId, bodyTypeId)) {
             if (!definition.isAccountSkin()) {
                 skins.add(definition);
             }
@@ -157,12 +157,12 @@ public final class CharacterSkinRegistry {
         int colon = race.getId().indexOf(':');
         String namespace = colon < 0 ? OWN_NAMESPACE : race.getId().substring(0, colon);
         for (CharacterRaceSkins entry : race.getSkins()) {
-            String sex = entry.getSexId();
-            String sexSuffix = sex.length() == 0 ? "" : "_" + pathOf(sex);
+            String bodyType = entry.getBodyTypeId();
+            String bodyTypeSuffix = bodyType.length() == 0 ? "" : "_" + pathOf(bodyType);
             for (int index = 0; index < entry.getCount(); index++) {
                 skins.add(new CharacterSkinDefinition(
-                        namespace + ":" + entry.getGroup() + sexSuffix + "_" + index,
-                        race.getId(), sex, entry.getGroup(), entry.getName(), index,
+                        namespace + ":" + entry.getGroup() + bodyTypeSuffix + "_" + index,
+                        race.getId(), bodyType, entry.getGroup(), entry.getName(), index,
                         entry.getTexture() + "/" + index + ".png", body.getModelId(),
                         model.getLayout(), false));
             }

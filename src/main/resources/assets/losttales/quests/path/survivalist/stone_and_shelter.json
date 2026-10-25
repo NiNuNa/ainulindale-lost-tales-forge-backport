@@ -48,6 +48,7 @@
   "rewards": {
     "experience": "25",
     "items": "minecraft:coal*6,minecraft:bread*1",
-    "skills": "losttales:mining*30"
+    "skills": "losttales:mining*30",
+    "starter": "losttales:path/survivalist/food_for_the_road"
   }
 }

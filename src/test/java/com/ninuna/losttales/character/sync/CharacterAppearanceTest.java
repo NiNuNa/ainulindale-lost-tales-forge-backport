@@ -2,9 +2,9 @@ package com.ninuna.losttales.character.sync;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterRoster;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import org.junit.Test;
@@ -28,7 +28,7 @@ public final class CharacterAppearanceTest {
     @Test
     public void theAccountIsPresentButHasNoCharacter() {
         CharacterAppearance account = CharacterAppearance.forAccount(
-                PLAYER, "Steve", CharacterBodyTypeRegistry.SLIM);
+                PLAYER, "Steve", CharacterArmsRegistry.SLENDER);
         assertEquals(CharacterAppearanceKind.ACCOUNT, account.getKind());
         assertTrue(account.isPresent());
         assertTrue(account.isAccount());
@@ -37,16 +37,16 @@ public final class CharacterAppearanceTest {
         assertEquals("", account.getCharacterName());
         assertEquals(CharacterRaceRegistry.HUMAN, account.getRaceId());
         assertEquals(CharacterSkinRegistry.ACCOUNT_SKIN_ID, account.getSkinId());
-        assertEquals(CharacterBodyTypeRegistry.SLIM, account.getBodyTypeId());
+        assertEquals(CharacterArmsRegistry.SLENDER, account.getArmsId());
         assertEquals(CharacterChestTypeRegistry.NONE, account.getChestTypeId());
         assertFalse(account.isMinecraftCapeVisible());
         assertEquals(CharacterCapeCatalog.NONE_ID, account.getCosmeticCapeId());
     }
 
     @Test
-    public void anUnknownArmWidthOnTheAccountReadsAsWide() {
-        assertEquals(CharacterBodyTypeRegistry.WIDE, CharacterAppearance.forAccount(
-                PLAYER, "Steve", "losttales:huge").getBodyTypeId());
+    public void unknownArmsOnTheAccountReadAsBroad() {
+        assertEquals(CharacterArmsRegistry.BROAD, CharacterAppearance.forAccount(
+                PLAYER, "Steve", "losttales:huge").getArmsId());
     }
 
     @Test
@@ -57,8 +57,8 @@ public final class CharacterAppearanceTest {
         assertFalse(removed.hasCharacter());
         assertFalse(removed.isAccount());
         CharacterAppearance character = new CharacterAppearance(PLAYER,
-                CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE,
-                "losttales:human_bree_male_0", "", "");
+                CharacterRaceRegistry.HUMAN, CharacterBodyTypeRegistry.MASCULINE,
+                "losttales:human_bree_masculine_0", "", "");
         assertEquals(CharacterAppearanceKind.CHARACTER, character.getKind());
         assertTrue(character.hasCharacter());
     }
@@ -67,13 +67,13 @@ public final class CharacterAppearanceTest {
     public void aRosterPlayingNoCharacterIsAGhost() {
         CharacterRoster roster = new CharacterRoster(PLAYER);
         CharacterAppearance account = CharacterAppearance.fromRoster(
-                PLAYER, "Steve", roster, CharacterBodyTypeRegistry.SLIM);
+                PLAYER, "Steve", roster, CharacterArmsRegistry.SLENDER);
         assertTrue(account.isAccount());
-        assertEquals(CharacterBodyTypeRegistry.SLIM, account.getBodyTypeId());
+        assertEquals(CharacterArmsRegistry.SLENDER, account.getArmsId());
         assertFalse(account.isMinecraftCapeVisible());
         assertEquals(CharacterCapeCatalog.NONE_ID, account.getCosmeticCapeId());
         // No roster written yet: a ghost all the same.
         assertTrue(CharacterAppearance.fromRoster(PLAYER, "Steve", null,
-                CharacterBodyTypeRegistry.WIDE).isAccount());
+                CharacterArmsRegistry.BROAD).isAccount());
     }
 }

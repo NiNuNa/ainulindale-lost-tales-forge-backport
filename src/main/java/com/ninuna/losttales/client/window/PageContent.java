@@ -99,6 +99,15 @@ public abstract class PageContent {
         sayRefused(words);
     }
     /**
+     * The words the page's tab reads while it says what it is doing, as the
+     * Character Editor reads *New Character* or *Change Look*; empty for
+     * the name it was registered under.
+     */
+    public String tabTitle() {
+        return "";
+    }
+
+    /**
      * The colour the page's tab wears, as a channel's tab wears its
      * channel's: its accent, its glow and its lit name. Ivory for a page
      * with no tone of its own.

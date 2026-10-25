@@ -1,7 +1,5 @@
 package com.ninuna.losttales.item.armor;
 
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.material.ELostTalesItemMaterial;
@@ -10,48 +8,25 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.List;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
 
+/**
+ * The mod's own armour. Its weight comes from the armour weight files as
+ * every make's does, and so does its slowdown (CONTENT-06); the piece
+ * itself changes no attribute.
+ */
 public class LostTalesItemArmorBase extends ItemArmor {
     private final String armorTextureName;
     private final ELostTalesItemMaterial material;
     private final ELostTalesItem.Type itemType;
-
-    private AttributeModifier knockBack;
-    private AttributeModifier moveSpeed;
 
     public LostTalesItemArmorBase(ELostTalesItemMaterial material, ELostTalesItem.Type itemType, int slotType, String armorTextureName) {
         super((itemType.equals(ELostTalesItem.Type.ARMOR_LIGHT)) ? material.getMaterial().getLightArmorMaterial() : material.getMaterial().getHeavyArmorMaterial(), 0, slotType);
         this.material = material;
         this.itemType = itemType;
         this.armorTextureName = armorTextureName;
-        this.setAttributeModifier();
-    }
-
-    private void setAttributeModifier() {
-        if (this.itemType == ELostTalesItem.Type.ARMOR_HEAVY) {
-            if (this.armorType == 0 || this.armorType == 3) {
-                this.knockBack = new AttributeModifier("Knockback Modifier", 0.05, 1);
-                this.moveSpeed = new AttributeModifier("Movespeed Modifier", -0.025, 1);
-            } else {
-                this.knockBack = new AttributeModifier("Knockback Modifier", 0.075, 1);
-                this.moveSpeed = new AttributeModifier("Movespeed Modifier", -0.05, 1);
-            }
-        }
-    }
-
-    @Override
-    public Multimap getItemAttributeModifiers() {
-        Multimap multimap = HashMultimap.create();
-        if (this.itemType == ELostTalesItem.Type.ARMOR_HEAVY) {
-            multimap.put(SharedMonsterAttributes.knockbackResistance.getAttributeUnlocalizedName(), this.knockBack);
-            multimap.put(SharedMonsterAttributes.movementSpeed.getAttributeUnlocalizedName(), this.moveSpeed);
-        }
-        return multimap;
     }
 
     @Override

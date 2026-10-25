@@ -75,13 +75,13 @@ public final class ClientCharacterAppearanceCache {
                         "",
                         active.getName(),
                         active.getRaceId(),
-                        active.getGenderId(),
+                        active.getBodyTypeId(),
                         active.getSkinId(),
                         active.isMinecraftCapeVisible(),
                         active.getCosmeticCapeId(),
                         active.getFactionId(),
                         active.getAge(),
-                        active.getBodyTypeId(),
+                        active.getArmsId(),
                         active.getChestTypeId());
             }
         }

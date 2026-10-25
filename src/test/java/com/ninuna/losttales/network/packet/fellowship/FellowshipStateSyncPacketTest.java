@@ -30,6 +30,7 @@ import static org.junit.Assert.assertTrue;
  * fellowship of the character whole (its name, icon, switches, guides,
  * and each member's presence) and every mark the character sees. A
  * fellowship is offered nobody an account of whose is already in it.
+ * Every invitation carries the accounts behind its characters (FEL-31).
  */
 public final class FellowshipStateSyncPacketTest {
 
@@ -94,23 +95,26 @@ public final class FellowshipStateSyncPacketTest {
         assertEquals(strangerOwner, offered.get(0).getOwnerId());
     }
 
-    /**
-     * An offer that names no account went to a reader not shown accounts:
-     * leaving the friend's other character out would say whose it is, so
-     * it is offered and the server's neutral refusal answers it.
-     */
+    /** A member whose account plays no character reads as a ghost, with no other name (FEL-32). */
     @Test
-    public void aReaderNotShownAccountsIsOfferedEveryCharacter() {
-        List<FellowshipInviteTargetSnapshot> targets =
-                new ArrayList<FellowshipInviteTargetSnapshot>();
-        targets.add(new FellowshipInviteTargetSnapshot(FRIEND_OWNER,
-                UUID.fromString("20000000-0000-0000-0000-000000000005"),
-                "", "Beren"));
-        FellowshipStateSnapshot snapshot = roundTrip(state(4, targets));
-        List<FellowshipInviteTargetSnapshot> offered =
-                snapshot.getInviteTargets(snapshot.getTravellingFellowship());
-        assertEquals(1, offered.size());
-        assertEquals("Beren", offered.get(0).getCharacterName());
+    public void aGhostMemberTravelsAsAGhost() {
+        List<FellowshipMemberSnapshot> members = new ArrayList<FellowshipMemberSnapshot>();
+        members.add(new FellowshipMemberSnapshot(LEADER, OWNER, "Aldric",
+                FellowshipColor.GREEN, FellowshipMemberPresence.HERE, ""));
+        members.add(new FellowshipMemberSnapshot(FRIEND, FRIEND_OWNER, "Beleg",
+                FellowshipColor.ORANGE, FellowshipMemberPresence.GHOST, "Hurin"));
+        FellowshipSnapshot fellowship = new FellowshipSnapshot(FELLOWSHIP, LEADER,
+                "The Grey Company", null, EnumSet.noneOf(FellowshipSwitch.class),
+                Collections.<UUID>emptyList(), 4L, null, members);
+        FellowshipStateSnapshot decoded = roundTrip(new FellowshipStateSnapshot(OWNER, 2L,
+                FellowshipErrorId.NONE, 4, LEADER, Collections.singletonList(fellowship),
+                FELLOWSHIP, Collections.<FellowshipMark>emptyList(), FellowshipErrorId.NONE,
+                Collections.<FellowshipInvitationSnapshot>emptyList(),
+                Collections.<FellowshipInvitationSnapshot>emptyList(), false, false,
+                Collections.<FellowshipInviteTargetSnapshot>emptyList(), false));
+        FellowshipMemberSnapshot friend = decoded.getTravellingFellowship().getMember(FRIEND);
+        assertEquals(FellowshipMemberPresence.GHOST, friend.getPresence());
+        assertEquals("", friend.getElsewhereName());
     }
 
     @Test
@@ -174,7 +178,7 @@ public final class FellowshipStateSyncPacketTest {
         UUID invitationId = new UUID(11L, 11L);
         UUID target = UUID.fromString("20000000-0000-0000-0000-000000000009");
         sent.add(new FellowshipInvitationSnapshot(invitationId, FELLOWSHIP, "The Grey Company",
-                LEADER, OWNER, "Aldric", target, "Hurin", 86400000L));
+                LEADER, OWNER, "Aldric", "Steve", target, "Hurin", "", 86400000L));
         FellowshipStateSnapshot decoded = roundTrip(state(10,
                 Collections.<FellowshipInviteTargetSnapshot>emptyList(), sent));
         assertEquals(1, decoded.getOutgoingInvitations().size());
@@ -182,8 +186,11 @@ public final class FellowshipStateSyncPacketTest {
         assertEquals(invitationId, invitation.getInvitationId());
         assertEquals(OWNER, invitation.getInvitingOwnerId());
         assertEquals("Aldric", invitation.getInvitingCharacterName());
+        assertEquals("Steve", invitation.getInvitingAccountName());
         assertEquals(target, invitation.getTargetIdentityId());
         assertEquals("Hurin", invitation.getTargetCharacterName());
+        assertEquals("the server knew no name for Hurin's account", "",
+                invitation.getTargetAccountName());
         assertEquals(86400000L, invitation.getExpiresAt());
     }
 

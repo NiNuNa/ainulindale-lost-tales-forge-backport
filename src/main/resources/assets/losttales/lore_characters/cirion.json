@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:cirion",
   "name": "Cirion, Lord of Lebennin",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_gondor_male_3"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_gondor_masculine_3",
+  "faction": "lotr:gondor"
 }

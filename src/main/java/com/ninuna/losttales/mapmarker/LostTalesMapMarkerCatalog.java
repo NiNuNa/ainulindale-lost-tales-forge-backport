@@ -101,8 +101,7 @@ public final class LostTalesMapMarkerCatalog {
     /**
      * Reads a server's own files from {@code folder}, each marker checked
      * against {@code houses}, the houses that loaded; answers why each file
-     * left out was left out. Called as the server starts and on
-     * {@code /losttales mapmarker reseed}.
+     * left out was left out. Called as the server starts.
      */
     public static synchronized List<String> loadServerFiles(File folder, Set<String> houses) {
         ensureLoaded();
@@ -122,6 +121,69 @@ public final class LostTalesMapMarkerCatalog {
         serverRead = true;
         merge();
         return problems;
+    }
+
+    /** What a read of every marker file found, bundled and a server's own, not yet in place. */
+    public static final class Read {
+        private final Map<String, LostTalesMapMarkerDefinition> bundled;
+        private final Map<String, LostTalesMapMarkerDefinition> server;
+        private final List<String> problems;
+
+        private Read(Map<String, LostTalesMapMarkerDefinition> bundled,
+                     Map<String, LostTalesMapMarkerDefinition> server, List<String> problems) {
+            this.bundled = bundled;
+            this.server = server;
+            this.problems = Collections.unmodifiableList(problems);
+        }
+
+        /** Why each file left out was left out, the bundled files' first. */
+        public List<String> getProblems() {
+            return this.problems;
+        }
+    }
+
+    /**
+     * Reads the bundled files and a server's own from {@code folder}, each
+     * marker checked against {@code houses}, without putting them in place
+     * ({@link #put}); every file left out is logged.
+     */
+    public static Read read(File folder, Set<String> houses) {
+        List<String> problems = new ArrayList<String>();
+        List<String> bundledSaid = new ArrayList<String>();
+        Map<String, LostTalesMapMarkerDefinition> bundled =
+                new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
+        for (LostTalesMapMarkerDefinition marker
+                : readBundled(LostTalesMapMarkerFiles.CLASSPATH, bundledSaid)) {
+            bundled.put(marker.getId(), marker);
+        }
+        for (String problem : bundledSaid) {
+            LostTalesLog.warning("Bundled map marker file left out: %s", problem);
+            problems.add(problem);
+        }
+        DataFiles.Result<LostTalesMapMarkerFiles.MarkerFile> files = DataFiles.readFolder(
+                folder, LostTalesMapMarkerFiles.server(
+                        houses == null ? Collections.<String>emptySet() : houses,
+                        bundled.keySet()));
+        List<String> said = new ArrayList<String>(files.problems);
+        Map<String, LostTalesMapMarkerDefinition> own =
+                LostTalesMapMarkerFiles.join(files.values, said);
+        for (String problem : said) {
+            LostTalesLog.warning("Server map marker file left out: %s", problem);
+            problems.add("Server map marker file: " + problem);
+        }
+        return new Read(bundled, own, problems);
+    }
+
+    /** Puts what {@link #read} found in place, bundled and the server's own at once. */
+    public static synchronized void put(Read read) {
+        bundledById = Collections.unmodifiableMap(
+                new LinkedHashMap<String, LostTalesMapMarkerDefinition>(read.bundled));
+        bundledSorted = sorted(bundledById.values());
+        serverById = Collections.unmodifiableMap(
+                new LinkedHashMap<String, LostTalesMapMarkerDefinition>(read.server));
+        loaded = true;
+        serverRead = true;
+        merge();
     }
 
     /** Forgets a server's own markers as it stops; the bundled ones stay. */

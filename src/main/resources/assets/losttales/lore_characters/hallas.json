@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:hallas",
   "name": "Hallas, Lord of Pinnath Gelin",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_gondor_male_5"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_gondor_masculine_5",
+  "faction": "lotr:gondor"
 }

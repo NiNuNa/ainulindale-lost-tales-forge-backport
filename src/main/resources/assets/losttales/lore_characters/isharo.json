@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:isharo",
   "name": "Isharo",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_haradrim_male_0"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_haradrim_masculine_0",
+  "faction": "lotr:near_harad"
 }

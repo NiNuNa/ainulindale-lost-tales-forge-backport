@@ -33,12 +33,14 @@ import net.minecraftforge.common.util.Constants;
 /**
  * The quest log of the character being played, kept with the player
  * ({@link IExtendedEntityProperties}) and copied across death: running
- * quests, the History, tracked quests, discovered and placed markers, and
- * the missives the player took. A character switch swaps the whole log.
+ * quests, the History, tracked quests, discovered and placed markers, the
+ * missives the player took, and the rewards waiting for room
+ * ({@link WaitingRewards}). A character switch swaps the whole log.
  *
- * <p>A missive's quest is kept while it runs and while it stands among
- * the latest {@link #MAX_ENDED_MISSIVES} ended ones, then forgotten with
- * its History line, so the log never outgrows what it can save or send.</p>
+ * <p>A missive's quest is kept while it runs, while it stands among the
+ * latest {@link #MAX_ENDED_MISSIVES} ended ones and while its rewards
+ * wait, then forgotten with its History line, so the log never outgrows
+ * what it can save or send.</p>
  */
 public final class LostTalesQuestPlayerData implements IExtendedEntityProperties {
     public static final String PROPERTY_ID = "LostTalesQuestData";
@@ -68,10 +70,21 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private String pinnedMapMarkerId = "";
     /** Whether this character was given its starter items (QUEST-29). */
     private boolean startersGiven;
-    /** The quests whose rumours this character heard (QUEST-20), oldest first. */
-    private final Set<String> heardRumours = new LinkedHashSet<String>();
+    /**
+     * The quests whose rumours this character heard (QUEST-20), oldest
+     * first, each with the marker of the place it points to; empty for
+     * none.
+     */
+    private final Map<String, String> heardRumours = new LinkedHashMap<String, String>();
     /** The most rumours a log keeps; the oldest goes first. */
     public static final int MAX_RUMOURS = 256;
+    /** Where the log keeps its {@link WaitingRewards}. */
+    static final String TAG_WAITING_REWARDS = "WaitingRewards";
+    /** The rewards that found no room, each under its quest (QUEST-44). */
+    private final WaitingRewards waitingRewards = new WaitingRewards();
+    /** Waiting rewards that could not be read, kept whole as they were. */
+    private final java.util.List<NBTTagCompound> waitingQuarantine =
+            new ArrayList<NBTTagCompound>();
     /**
      * The quests whose stage ended on a hand-over still to be made, on
      * the player's next tick. Never saved: a stage still full asks again.
@@ -211,12 +224,19 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         data.setString("PinnedMapMarkerId", this.pinnedMapMarkerId == null ? "" : this.pinnedMapMarkerId);
         data.setBoolean("StartersGiven", this.startersGiven);
         NBTTagList rumourList = new NBTTagList();
-        for (String questId : this.heardRumours) {
+        for (Map.Entry<String, String> rumour : this.heardRumours.entrySet()) {
             NBTTagCompound rumourTag = new NBTTagCompound();
-            rumourTag.setString("QuestId", questId);
+            rumourTag.setString("QuestId", rumour.getKey());
+            if (rumour.getValue().length() > 0) {
+                rumourTag.setString("Marker", rumour.getValue());
+            }
             rumourList.appendTag(rumourTag);
         }
         data.setTag("HeardRumours", rumourList);
+        if (!this.waitingRewards.isEmpty() || !this.waitingQuarantine.isEmpty()) {
+            data.setTag(TAG_WAITING_REWARDS, WaitingRewardsNbtCodec.write(
+                    this.waitingRewards, this.waitingQuarantine));
+        }
 
         compound.setTag(PROPERTY_ID, data);
     }
@@ -241,6 +261,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.pinnedMapMarkerId = "";
         this.startersGiven = false;
         this.heardRumours.clear();
+        this.waitingRewards.clear();
+        this.waitingQuarantine.clear();
         this.readOnly = false;
         this.preservedReadOnlyData = null;
 
@@ -274,6 +296,20 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                     logWarnings);
             return;
         }
+        WaitingRewardsNbtCodec.ReadResult waiting = WaitingRewardsNbtCodec.read(
+                data.hasKey(TAG_WAITING_REWARDS, Constants.NBT.TAG_COMPOUND)
+                        ? data.getCompoundTag(TAG_WAITING_REWARDS) : null);
+        if (data.hasKey(TAG_WAITING_REWARDS)
+                && !data.hasKey(TAG_WAITING_REWARDS, Constants.NBT.TAG_COMPOUND)
+                || !waiting.isReadable()) {
+            enterReadOnlyMode(originalData,
+                    "Quest data holds waiting rewards this build cannot read"
+                            + " and will be preserved without modification",
+                    logWarnings);
+            return;
+        }
+        this.waitingRewards.copyFrom(waiting.getRewards());
+        this.waitingQuarantine.addAll(waiting.getQuarantined());
         NBTTagList activeList = data.getTagList("ActiveQuests", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < activeList.tagCount(); i++) {
             LostTalesQuestProgress progress = LostTalesQuestProgress.readFromNBT(activeList.getCompoundTagAt(i));
@@ -352,29 +388,52 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.startersGiven = data.getBoolean("StartersGiven");
         NBTTagList rumourList = data.getTagList("HeardRumours", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < rumourList.tagCount(); i++) {
-            this.heardRumours.add(rumourList.getCompoundTagAt(i).getString("QuestId"));
+            NBTTagCompound rumourTag = rumourList.getCompoundTagAt(i);
+            this.heardRumours.put(rumourTag.getString("QuestId"),
+                    LostTalesQuestMarkerHelper.normalizeMarkerId(
+                            rumourTag.getString("Marker")));
         }
         pruneInvalidReferences();
     }
 
     /** The quests whose rumours this character heard, oldest first (QUEST-20). */
     public Set<String> getHeardRumours() {
-        return Collections.unmodifiableSet(new LinkedHashSet<String>(this.heardRumours));
+        return Collections.unmodifiableSet(
+                new LinkedHashSet<String>(this.heardRumours.keySet()));
     }
 
     /**
-     * Keeps that this character heard the quest's rumour; past
-     * {@link #MAX_RUMOURS} the oldest goes. Answers whether it is new.
+     * The marker of the place each rumour heard points to, by quest,
+     * oldest first; empty for a rumour that names none (QUEST-20).
      */
+    public Map<String, String> getRumourMarkers() {
+        return Collections.unmodifiableMap(
+                new LinkedHashMap<String, String>(this.heardRumours));
+    }
+
+    /** Keeps that this character heard the quest's rumour, pointing nowhere. */
     public boolean hearRumour(String questId) {
+        return hearRumour(questId, "");
+    }
+
+    /**
+     * Keeps that this character heard the quest's rumour, with the marker
+     * of the place it points to; nothing of that place is discovered
+     * (QUEST-20). Past {@link #MAX_RUMOURS} the oldest goes; a marker id
+     * past {@link #MAX_IDENTIFIER_CHARACTERS} points nowhere. Answers
+     * whether the rumour is new.
+     */
+    public boolean hearRumour(String questId, String markerId) {
         if (!isWritable() || !LostTalesQuestIds.fits(questId) || questId.length() == 0
-                || this.heardRumours.contains(questId)) {
+                || this.heardRumours.containsKey(questId)) {
             return false;
         }
         while (this.heardRumours.size() >= MAX_RUMOURS) {
-            this.heardRumours.remove(this.heardRumours.iterator().next());
+            this.heardRumours.remove(this.heardRumours.keySet().iterator().next());
         }
-        this.heardRumours.add(questId);
+        String marker = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+        this.heardRumours.put(questId,
+                marker.length() > MAX_IDENTIFIER_CHARACTERS ? "" : marker);
         return true;
     }
 
@@ -389,6 +448,56 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         this.startersGiven = true;
+        return true;
+    }
+
+    /** Every quest's rewards waiting for room (QUEST-44), in order: a copy. */
+    public Map<String, java.util.List<WaitingReward>> getWaitingRewards() {
+        return this.waitingRewards.all();
+    }
+
+    /** What waits under the quest; empty for nothing. */
+    public java.util.List<WaitingReward> getWaitingRewards(String questId) {
+        return this.waitingRewards.get(questId);
+    }
+
+    /**
+     * Keeps the rewards waiting under the quest, each beside one of its
+     * kind. Answers what could not be kept: everything while the log is
+     * read-only, the rest past a bound of {@link WaitingRewards}.
+     */
+    public java.util.List<WaitingReward> addWaitingRewards(String questId,
+            Collection<WaitingReward> rewards) {
+        java.util.List<WaitingReward> unkept = new ArrayList<WaitingReward>();
+        if (rewards == null) {
+            return unkept;
+        }
+        for (WaitingReward reward : rewards) {
+            if (reward == null) {
+                continue;
+            }
+            int left = isWritable() ? this.waitingRewards.add(questId, reward)
+                    : reward.getCount();
+            if (left > 0) {
+                unkept.add(reward.withCount(left));
+            }
+        }
+        return unkept;
+    }
+
+    /**
+     * Puts what is left of the quest's waiting rewards after a collection
+     * in their place; nothing left takes the quest off the list. Answers
+     * whether the log took it: never while it is read-only.
+     */
+    public boolean replaceWaitingRewards(String questId,
+            Collection<WaitingReward> remaining) {
+        if (!isWritable()) {
+            return false;
+        }
+        this.waitingRewards.replace(questId, remaining == null
+                ? java.util.Collections.<WaitingReward>emptyList()
+                : new ArrayList<WaitingReward>(remaining));
         return true;
     }
 
@@ -540,12 +649,13 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return due;
     }
 
-    /** Every quest the log names: running, in the History, tracked, and heard of. */
+    /** Every quest the log names: running, in the History, tracked, heard of, and with rewards waiting. */
     public Set<String> getQuestIdsInLog() {
         Set<String> named = new LinkedHashSet<String>(this.activeQuests.keySet());
         named.addAll(this.questHistory.keySet());
         named.addAll(this.pinnedQuestIds);
-        named.addAll(this.heardRumours);
+        named.addAll(this.heardRumours.keySet());
+        named.addAll(this.waitingRewards.questIds());
         return named;
     }
 
@@ -588,20 +698,27 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     /**
      * Forgets the missives the log no longer keeps: one neither running
      * nor in the History, and the oldest ended ones past
-     * {@link #MAX_ENDED_MISSIVES}, each with its History line. Called as a
-     * quest ends and as the player logs in; answers whether any went.
+     * {@link #MAX_ENDED_MISSIVES}, each with its History line. A missive
+     * whose rewards wait for room stays until they are collected. Called
+     * as a quest ends and as the player logs in; answers whether any went.
      */
     public boolean forgetEndedMissives() {
         return forgetEndedMissivesPast(MAX_ENDED_MISSIVES);
     }
 
-    /** How many ended missives the log keeps now. */
+    /** How many ended missives the log may forget now. */
     private int countEndedMissives() {
-        int ended = 0;
+        return endedMissives().size();
+    }
+
+    /** The ended missives the log may forget, oldest first: none whose rewards wait. */
+    private java.util.List<String> endedMissives() {
+        ArrayList<String> ended = new ArrayList<String>();
         for (String questId : this.questHistory.keySet()) {
             if (this.dynamicQuestDefinitions.containsKey(questId)
-                    && !this.activeQuests.containsKey(questId)) {
-                ended++;
+                    && !this.activeQuests.containsKey(questId)
+                    && !this.waitingRewards.has(questId)) {
+                ended.add(questId);
             }
         }
         return ended;
@@ -615,7 +732,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         ArrayList<String> unheld = new ArrayList<String>();
         for (String questId : this.dynamicQuestDefinitions.keySet()) {
             if (!this.activeQuests.containsKey(questId)
-                    && !this.questHistory.containsKey(questId)) {
+                    && !this.questHistory.containsKey(questId)
+                    && !this.waitingRewards.has(questId)) {
                 unheld.add(questId);
             }
         }
@@ -623,13 +741,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             this.dynamicQuestDefinitions.remove(questId);
             changed = true;
         }
-        ArrayList<String> ended = new ArrayList<String>();
-        for (String questId : this.questHistory.keySet()) {
-            if (this.dynamicQuestDefinitions.containsKey(questId)
-                    && !this.activeQuests.containsKey(questId)) {
-                ended.add(questId);
-            }
-        }
+        java.util.List<String> ended = endedMissives();
         for (int index = 0; index < ended.size() - keep; index++) {
             String questId = ended.get(index);
             this.questHistory.remove(questId);
@@ -1029,6 +1141,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.pinnedMapMarkerId = "";
         this.startersGiven = false;
         this.heardRumours.clear();
+        this.waitingRewards.clear();
+        this.waitingQuarantine.clear();
         this.readOnly = false;
         this.preservedReadOnlyData = null;
         if (oldData == null) {
@@ -1062,7 +1176,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
         }
         this.startersGiven = oldData.startersGiven;
-        this.heardRumours.addAll(oldData.heardRumours);
+        this.heardRumours.putAll(oldData.heardRumours);
+        this.waitingRewards.copyFrom(oldData.waitingRewards);
+        for (NBTTagCompound aside : oldData.waitingQuarantine) {
+            this.waitingQuarantine.add((NBTTagCompound) aside.copy());
+        }
         String copiedPinnedMarkerId =
                 findDiscoveredMarkerId(oldData.pinnedMapMarkerId);
         this.pinnedMapMarkerId = copiedPinnedMarkerId == null
@@ -1320,7 +1438,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 data, "PinnedMapMarkerId", MAX_IDENTIFIER_CHARACTERS)
                 || !NbtTags.hasCompoundListWithinLimit(
                 data, "HeardRumours", MAX_RUMOURS)
-                || !hasQuestIdList(data, "HeardRumours")) {
+                || !hasQuestIdList(data, "HeardRumours")
+                || !hasRumourMarkers(data)) {
             return false;
         }
 
@@ -1390,6 +1509,19 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         for (int i = 0; i < list.tagCount(); i++) {
             if (!LostTalesQuestIds.fits(
                     list.getCompoundTagAt(i).getString("QuestId"))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Whether each rumour's place, where it names one, is a marker id within the bound (QUEST-20). */
+    private static boolean hasRumourMarkers(NBTTagCompound data) {
+        NBTTagList rumours = data.getTagList(
+                "HeardRumours", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < rumours.tagCount(); i++) {
+            if (!hasReasonableOptionalString(rumours.getCompoundTagAt(i),
+                    "Marker", MAX_IDENTIFIER_CHARACTERS)) {
                 return false;
             }
         }

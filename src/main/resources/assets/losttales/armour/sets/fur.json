@@ -1,0 +1,22 @@
+{
+  "id": "losttales:fur",
+  "helmet": [
+    "lotr:item.helmetWarg"
+  ],
+  "chestplate": [
+    "lotr:item.bodyWarg"
+  ],
+  "leggings": [
+    "lotr:item.legsWarg"
+  ],
+  "boots": [
+    "lotr:item.bootsWarg"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:husbandry"
+    }
+  ]
+}

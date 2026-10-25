@@ -1,0 +1,21 @@
+{
+  "id": "losttales:gulfen",
+  "helmet": [
+    "lotr:item.helmetGulfHarad"
+  ],
+  "chestplate": [
+    "lotr:item.bodyGulfHarad"
+  ],
+  "leggings": [
+    "lotr:item.legsGulfHarad"
+  ],
+  "boots": [
+    "lotr:item.bootsGulfHarad"
+  ],
+  "bonus": [
+    {
+      "effect": "arrows",
+      "amount": 0.2
+    }
+  ]
+}

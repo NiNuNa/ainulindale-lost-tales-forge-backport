@@ -9,9 +9,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The Characters page keeps its roster and its profile side by side where
- * the page is wide enough, and lets them take turns where it is not; the
- * figure stands beside the words in a wide profile and above them in a
- * narrow one, where it scrolls with them.
+ * the page is wide enough, and lets them take turns where it is not.
  */
 public final class CharactersLayoutTest {
     private static final int MARGIN_X = CharactersLayout.MARGIN_X;
@@ -50,30 +48,5 @@ public final class CharactersLayoutTest {
                 out.profile().width, 1.0E-9D);
         CharactersLayout folded = new CharactersLayout(narrow, 240, false);
         assertEquals(narrow - 2 * MARGIN_X, folded.profile().width, 1.0E-9D);
-    }
-
-    @Test
-    public void theFigureStandsBesideTheWordsWhereTheProfileHasRoom() {
-        CharactersLayout wide = new CharactersLayout(480, 240, false);
-        assertTrue(wide.figureBeside());
-        LostTalesUiHitBox figure = wide.figure(40);
-        assertEquals("the figure stands still as the words scroll", MARGIN_Y,
-                figure.top, 1.0E-9D);
-        assertEquals(CharactersLayout.FIGURE_WIDTH, figure.width, 1.0E-9D);
-        assertEquals(figure.right() + CharactersLayout.GUTTER,
-                wide.words().left, 1.0E-9D);
-        assertEquals(0, wide.wordsOffset());
-    }
-
-    @Test
-    public void inANarrowProfileTheFigureStandsAboveTheWordsAndScrolls() {
-        CharactersLayout narrow = new CharactersLayout(250, 240, false);
-        assertFalse(narrow.figureBeside());
-        LostTalesUiHitBox figure = narrow.figure(30);
-        assertEquals(MARGIN_Y - 30, figure.top, 1.0E-9D);
-        assertEquals(CharactersLayout.FIGURE_HEIGHT, figure.height, 1.0E-9D);
-        assertEquals(narrow.profile().width, narrow.words().width, 1.0E-9D);
-        assertEquals(CharactersLayout.FIGURE_HEIGHT + CharactersLayout.GUTTER,
-                narrow.wordsOffset());
     }
 }

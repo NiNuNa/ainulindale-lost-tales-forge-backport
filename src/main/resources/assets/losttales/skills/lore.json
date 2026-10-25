@@ -1,7 +1,7 @@
 {
   "id": "losttales:lore",
   "icon": "minecraft:book",
-  "order": 11,
+  "order": 12,
   "counts": [
     {
       "act": "quest",
@@ -12,6 +12,7 @@
       "worth": {
         "region": 25,
         "waypoint": 15,
+        "waystone": 15,
         "marker": 10
       }
     }

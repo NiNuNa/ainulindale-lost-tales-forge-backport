@@ -5,7 +5,7 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.registry.CharacterFactionCategory;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterFactionResolver;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinDefinition;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
@@ -50,7 +50,7 @@ public final class CharacterUnconventionalCreationValidationTest {
     public void unconventionalModeDoesNotBypassSkinModelCompatibility() {
         String hobbitSkin = CharacterSkinRegistry.getCompatibleSkins(
                 CharacterRaceRegistry.HOBBIT,
-                CharacterGenderRegistry.MALE).get(0).getId();
+                CharacterBodyTypeRegistry.MASCULINE).get(0).getId();
 
         CharacterCreationValidationResult result = validate(
                 request(hobbitSkin, SHIRE_WAYPOINT, true));
@@ -128,7 +128,7 @@ public final class CharacterUnconventionalCreationValidationTest {
                 0,
                 "Adventurer",
                 CharacterRaceRegistry.HUMAN,
-                CharacterGenderRegistry.MALE,
+                CharacterBodyTypeRegistry.MASCULINE,
                 skinId,
                 25,
                 ORC_FACTION,
@@ -144,7 +144,7 @@ public final class CharacterUnconventionalCreationValidationTest {
     private static String humanSkin() {
         CharacterSkinDefinition skin = CharacterSkinRegistry.getCompatibleSkins(
                 CharacterRaceRegistry.HUMAN,
-                CharacterGenderRegistry.MALE).get(0);
+                CharacterBodyTypeRegistry.MASCULINE).get(0);
         return skin.getId();
     }
 

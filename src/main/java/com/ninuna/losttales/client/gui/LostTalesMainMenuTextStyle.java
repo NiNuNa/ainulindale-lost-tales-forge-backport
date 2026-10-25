@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.gui;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import java.util.regex.Pattern;
@@ -38,11 +38,11 @@ public final class LostTalesMainMenuTextStyle {
         int alpha = (color & 0xFC000000) == 0 ? 255 : color >>> 24;
         int shadowAlpha = Math.round(alpha * LostTalesColors.SHADOW_OPACITY);
         if (shadowAlpha >= 4) {
-            LostTalesSkyrimUiStyle.beginContent();
+            LostTalesUiInk.beginContent();
             font.drawString(label, x + 1, y + 1,
                     LostTalesColors.withAlpha(LostTalesColors.HUD_SHADOW, shadowAlpha));
         }
-        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiInk.beginContent();
         font.drawString(label, x, y,
                 LostTalesColors.withAlpha(textColor(color), alpha));
     }

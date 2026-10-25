@@ -1,5 +1,6 @@
 package com.ninuna.losttales.progression;
 
+import com.ninuna.losttales.armour.ArmourWeight;
 import com.ninuna.losttales.data.DataFiles;
 import com.ninuna.losttales.progression.skill.SkillDefinition;
 import java.io.File;
@@ -67,6 +68,25 @@ public final class SkillFilesTest {
     public void aNumberAnEffectDoesNotReadLeavesTheFileOut() {
         assertLeftOut(GOOD.replace("\"amount\": 0.1", "\"amount\": 0.1, \"params\": {\"seconds\": 3}"),
                 "does not read");
+    }
+
+    @Test
+    public void anArmourSkillNamesItsWeightAndCountsArmour() {
+        String armour = "{\"id\": \"losttales:light_armour\", \"weight\": \"light\","
+                + " \"counts\": [{\"act\": \"armour\", \"per\": 1.0}]}";
+        DataFiles.Result<SkillDefinition> read = read(armour);
+        assertEquals(Arrays.<String>asList(), read.problems);
+        assertEquals(ArmourWeight.LIGHT, read.values.get(0).getWeight());
+        assertLeftOut(armour.replace("\"light\",", "\"neither\","), "light or heavy");
+        assertLeftOut(armour.replace("\"weight\": \"light\",", ""),
+                "only a skill with a weight");
+    }
+
+    @Test
+    public void aBlockNamesTheWeaponsItIsDoneWith() {
+        assertEquals(Arrays.<String>asList(), read(GOOD.replace("\"hit\"", "\"block\"")).problems);
+        assertLeftOut(GOOD.replace("{\"act\": \"hit\", \"weapons\": [\"bow\"]}",
+                "{\"act\": \"block\"}"), "names no weapons");
     }
 
     @Test

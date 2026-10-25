@@ -1,0 +1,68 @@
+{
+  "id": "losttales:heavy_armour",
+  "icon": "minecraft:iron_chestplate",
+  "order": 6,
+  "weight": "heavy",
+  "counts": [
+    {
+      "act": "armour",
+      "per": 1.0
+    }
+  ],
+  "perks": [
+    {
+      "id": "juggernaut",
+      "levels": [10, 30, 50],
+      "effect": "weight_protection",
+      "amount": 0.05
+    },
+    {
+      "id": "conditioning",
+      "levels": [20, 60],
+      "effect": "conditioning",
+      "amount": 0.5
+    },
+    {
+      "id": "well_fitted",
+      "levels": [30],
+      "effect": "protection",
+      "amount": 0.1
+    },
+    {
+      "id": "tower_of_strength",
+      "levels": [40],
+      "effect": "knockback",
+      "amount": 0.3
+    },
+    {
+      "id": "matching_set",
+      "levels": [50],
+      "effect": "matching_set",
+      "amount": 0.1
+    },
+    {
+      "id": "cushioned",
+      "levels": [70],
+      "effect": "fall_damage",
+      "amount": 0.5
+    },
+    {
+      "id": "standing_firm",
+      "levels": [80],
+      "effect": "standing_firm",
+      "amount": 0.1,
+      "needs": "tower_of_strength"
+    },
+    {
+      "id": "last_stand",
+      "levels": [100],
+      "effect": "last_stand",
+      "amount": 0.3,
+      "params": {
+        "health": 0.25,
+        "seconds": 5,
+        "cooldown": 60
+      }
+    }
+  ]
+}

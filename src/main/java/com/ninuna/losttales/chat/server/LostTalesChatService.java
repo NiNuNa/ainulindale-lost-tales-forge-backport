@@ -49,6 +49,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
+import com.ninuna.losttales.mapmarker.LostTalesWaystonePlacers;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
@@ -69,6 +70,8 @@ import com.ninuna.losttales.util.LostTalesWords;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.ChatNarrator;
+import com.ninuna.losttales.chat.ChatUnseenVoice;
+import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -335,9 +338,11 @@ public final class LostTalesChatService {
             }
             reply = forward.reference;
         } else if (replyToMessageId != ChatMessageIds.NONE) {
+            // A line heard nearby may be answered where it was said; its
+            // quote then reaches only those who heard it (deliver).
             reply = ChatHistory.quoteFor(replyToMessageId, reader, channel,
                     replyScope);
-            if (reply.exists() && !ChatHistory.mayShowTo(replyToMessageId,
+            if (reply.exists() && !ChatHistory.mayQuoteIn(replyToMessageId,
                     channel, replyScope, reader, partner)) {
                 reply = ChatReplyReference.NONE;
             }
@@ -394,6 +399,11 @@ public final class LostTalesChatService {
                 // here, but not in the world (CHAT-05); the Narrator is
                 // nobody's body.
                 .withNotInWorld(!narrator && notPlayed(sender, worn))
+                // Said nearby while the One Ring conceals the speaker: an
+                // unseen voice to every reader but the speaker and staff
+                // (CHAT-84).
+                .withUnseen(ChatUnseenVoice.applies(channel,
+                        AccessoryEffectService.isConcealed(sender), narrator))
                 // Which conversation of a scoped channel this is: the
                 // faction it was spoken to, or the fellowship it was spoken
                 // in. The client files it under that conversation's tab
@@ -456,8 +466,14 @@ public final class LostTalesChatService {
                     packet.withoutEcho(), accountName, identityName)
                     .withConversation(whisperCharacterId, wornId)
                     .narratedForOthers();
-            LostTalesNetworkHandler.CHANNEL.sendTo(packet, sender);
-            LostTalesNetworkHandler.CHANNEL.sendTo(partnerCopy, whisperTarget);
+            // A forward of an unseen voice's line names the voice to
+            // whichever of the two may not know who spoke.
+            LostTalesNetworkHandler.CHANNEL.sendTo(ChatReaderView.forReader(
+                    packet, sender.getUniqueID(), moderates(sender), true),
+                    sender);
+            LostTalesNetworkHandler.CHANNEL.sendTo(ChatReaderView.forReader(
+                    partnerCopy, whisperTarget.getUniqueID(),
+                    moderates(whisperTarget), true), whisperTarget);
             List<UUID> pair = Arrays.asList(sender.getUniqueID(),
                     whisperTarget.getUniqueID());
             ChatHistory.record(packet.getMessageId(),
@@ -1629,7 +1645,13 @@ public final class LostTalesChatService {
                 Fellowship.joinings(ChatIdentitySelection.fellowships(player),
                         ChatIdentitySelection.playedId(player)),
                 readableChannels(player),
-                ChatIdentitySelection.identityIds(player));
+                ChatIdentitySelection.identityIds(player))
+                .moderating(moderates(player));
+    }
+
+    /** Whether a player holds {@code chat.moderate}: staff read an unseen voice as its speaker. */
+    private static boolean moderates(EntityPlayerMP player) {
+        return LostTalesPermissions.has(player, LostTalesCapability.CHAT_MODERATE);
     }
 
     /**
@@ -2019,7 +2041,10 @@ public final class LostTalesChatService {
                                 LostTalesDiscordBridge.getInstance().links(),
                                 readerOf(player, roles)))
                         .withDiscordStatuses(LostTalesDiscordBridge.getInstance()
-                                .followsMemberStatuses()),
+                                .followsMemberStatuses())
+                        // The audit log keeps whispers too, and a player
+                        // is told so where they whisper (CHAT-85).
+                        .withWhispersLogged(LostTalesConfig.chatAuditLogEnabled),
                 player);
         ChatIdentitySelection.sendState(player);
     }
@@ -2362,7 +2387,12 @@ public final class LostTalesChatService {
      * one, is the only recipient to get the line under their own private
      * name for it; everyone else gets it without, and a Narrator line
      * signed by the Narrator alone ({@link
-     * LostTalesChatMessagePacket#narratedForOthers}). The history is written
+     * LostTalesChatMessagePacket#narratedForOthers}). Each reader is sent
+     * the line as they may read it ({@link ChatReaderView}): a reply's
+     * quote of a line heard nearby only if they heard that line, and an
+     * unseen voice named only to its speaker and to staff. The history
+     * keeps the line unmasked, and the readers the quote went to.
+     * The history is written
      * from the list the message actually went to, so a reply to it is
      * checked against who was sent it rather than against who would be
      * sent one now; {@code fellowship} and {@code factionId} are the
@@ -2375,13 +2405,27 @@ public final class LostTalesChatService {
                                 UUID authorId, String identityName) {
         LostTalesChatMessagePacket shared = packet.withoutEcho()
                 .narratedForOthers();
+        ChatReplyReference quote = packet.getReply();
+        boolean nearbyQuote = ChatHistory.quotesNearby(quote);
+        boolean unseen = packet.isUnseen() || quote.isUnseen();
+        Set<UUID> quoteReaders = nearbyQuote ? new HashSet<UUID>() : null;
         for (EntityPlayerMP recipient : routing.recipients) {
-            LostTalesNetworkHandler.CHANNEL.sendTo(
-                    sender != null && recipient == sender ? packet : shared,
-                    recipient);
+            LostTalesChatMessagePacket copy =
+                    sender != null && recipient == sender ? packet : shared;
+            if (nearbyQuote || unseen) {
+                boolean heard = !nearbyQuote || ChatHistory.showsQuoteTo(
+                        quote, requesterFor(recipient));
+                if (heard && quoteReaders != null) {
+                    quoteReaders.add(recipient.getUniqueID());
+                }
+                copy = ChatReaderView.forReader(copy, recipient.getUniqueID(),
+                        unseen && moderates(recipient), heard);
+            }
+            LostTalesNetworkHandler.CHANNEL.sendTo(copy, recipient);
         }
         ChatHistory.record(packet.getMessageId(), authorId, identityName,
-                packet.withoutEcho(), shared, routing.recipientIds(), routing.audience);
+                packet.withoutEcho(), shared, routing.recipientIds(), routing.audience,
+                quoteReaders);
     }
 
     /** The channels the player may read right now. */
@@ -2627,7 +2671,8 @@ public final class LostTalesChatService {
                 return null;
             }
             return ChatShowcase.marker(tokenIndex, record.getId(),
-                    record.getName(), record.getNamedAfter(),
+                    record.getName(), LostTalesWaystonePlacers.shown(
+                            sender.worldObj, record.getNamedAfter()),
                     record.getIconName(), record.getColorName(),
                     record.getDimensionId(), record.getX(), record.getZ());
         } catch (RuntimeException exception) {

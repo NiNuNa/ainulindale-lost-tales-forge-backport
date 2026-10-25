@@ -9,9 +9,12 @@ import java.util.Map;
 /**
  * The parts of a reward block beyond experience and items (QUEST-33):
  * {@code alignment} with LOTR factions ({@code lotr:gondor*50}, a comma
- * list), {@code coins} (a whole number, LOTR's coins by value) and a
+ * list), {@code coins} (a whole number, LOTR's coins by value), a
  * {@code pick} of up to {@link #MAX_PICKS} items of which the player takes
- * one at the hand-in. Every quest's optional objectives pay their own
+ * one at the hand-in, a {@code starter}, another quest's sealed starter
+ * (QUEST-43), and {@code relic} pieces (CONTENT-11): a relic set's id for
+ * all four, or the id and a slot after a slash for one, parted by commas.
+ * Every quest's optional objectives pay their own
  * {@code reward.*}; {@link #withOptionals} lays them beside the quest's so
  * every place shows every reward before the quest is taken.
  */
@@ -21,6 +24,10 @@ public final class LostTalesQuestRewards {
     public static final String PICK = "pick";
     /** Skill experience (PROG-04, QUEST-19): {@code skill*amount}, parted by commas. */
     public static final String SKILLS = "skills";
+    /** Another quest's sealed starter (QUEST-43): one quest id, {@code namespace:path}. */
+    public static final String STARTER = "starter";
+    /** Relic pieces (CONTENT-11): {@code set} or {@code set/slot}, parted by commas. */
+    public static final String RELIC = "relic";
     /** The most experience one skill gains from one reward. */
     public static final int MAX_SKILL_EXPERIENCE = 100000;
     /** The most items a pick offers. */
@@ -121,6 +128,49 @@ public final class LostTalesQuestRewards {
             }
         }
         return skills;
+    }
+
+    /**
+     * The quest whose starter a reward block pays (QUEST-43); empty for
+     * none, or for a value that is no quest id ({@link #isStarterId}),
+     * which the checker names.
+     */
+    public static List<String> relics(Map<String, String> rewards) {
+        List<String> relics = new ArrayList<String>();
+        for (String part : LostTalesQuestParams.value(rewards, RELIC).split(",")) {
+            if (part.trim().length() > 0) {
+                relics.add(part.trim());
+            }
+        }
+        return relics;
+    }
+
+    public static String starter(Map<String, String> rewards) {
+        String written = LostTalesQuestParams.value(rewards, STARTER);
+        return isStarterId(written) ? written : "";
+    }
+
+    /**
+     * Whether {@code id} is shaped as a quest id a starter may name: a
+     * namespace, a colon and a path, within the quest-id bound, with no
+     * comma and no space. Whether such a quest exists is asked as the
+     * reward is paid.
+     */
+    public static boolean isStarterId(String id) {
+        if (!LostTalesQuestIds.fits(id)) {
+            return false;
+        }
+        int colon = id.indexOf(':');
+        if (colon <= 0 || colon == id.length() - 1) {
+            return false;
+        }
+        for (int index = 0; index < id.length(); index++) {
+            char c = id.charAt(index);
+            if (c == ',' || Character.isWhitespace(c)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** The coins a reward block pays: 0 for none, at most {@link #MAX_COINS}. */

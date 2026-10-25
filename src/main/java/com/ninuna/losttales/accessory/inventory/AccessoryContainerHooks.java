@@ -1,6 +1,9 @@
 package com.ninuna.losttales.accessory.inventory;
 
 import com.ninuna.losttales.accessory.player.AccessoryInventory;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.inventory.ContainerPlayer;
 import net.minecraft.inventory.Slot;
 
 import java.util.List;
@@ -9,6 +12,17 @@ import java.util.List;
 public final class AccessoryContainerHooks {
 
     private AccessoryContainerHooks() {}
+
+    /**
+     * The player's container with the ring slot, built where the player's
+     * constructor built vanilla's. Should it fail, the coremod's guard
+     * builds vanilla's instead (DATA-08).
+     */
+    public static ContainerPlayer playerContainer(InventoryPlayer inventory,
+                                                  boolean localWorld,
+                                                  EntityPlayer player) {
+        return new LostTalesContainerPlayer(inventory, localWorld, player);
+    }
 
     /** Keeps creative pick-block's hotbar calculation on vanilla slots 36-44. */
     public static int resolveVanillaInventorySlotCount(List slots) {

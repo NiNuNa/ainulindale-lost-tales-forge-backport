@@ -1,7 +1,7 @@
 package com.ninuna.losttales.character.identity;
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import org.junit.Test;
@@ -85,7 +85,7 @@ public final class PlayableIdentityDisplayNameTest {
                 .slot(0)
                 .name(name)
                 .race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
                 .skin(CharacterSkinRegistry.ACCOUNT_SKIN_ID)
                 .startingFaction("lotr:gondor")
                 .build();

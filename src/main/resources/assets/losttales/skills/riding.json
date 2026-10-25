@@ -1,7 +1,7 @@
 {
   "id": "losttales:riding",
   "icon": "minecraft:saddle",
-  "order": 6,
+  "order": 7,
   "counts": [
     {
       "act": "ride",

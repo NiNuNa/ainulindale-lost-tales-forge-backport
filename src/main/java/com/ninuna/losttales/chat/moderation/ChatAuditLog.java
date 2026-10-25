@@ -2,6 +2,7 @@ package com.ninuna.losttales.chat.moderation;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.storage.WorldClock;
 import cpw.mods.fml.common.FMLLog;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -230,6 +231,15 @@ public final class ChatAuditLog {
      */
     static boolean isExpiredFileName(String fileName, long nowMillis,
                                      int retentionDays) {
+        return isExpiredFileName(fileName, nowMillis, retentionDays, WorldClock.NONE);
+    }
+
+    /**
+     * The same, keeping a file whose retention ended inside a stretch the
+     * world's clock holds (DATA-09): it waits for an operator.
+     */
+    static boolean isExpiredFileName(String fileName, long nowMillis,
+                                     int retentionDays, WorldClock.Hold hold) {
         if (fileName == null || !fileName.startsWith(FILE_PREFIX)
                 || !fileName.endsWith(FILE_SUFFIX)) {
             return false;
@@ -245,7 +255,8 @@ public final class ChatAuditLog {
             return false;
         }
         long keepDays = Math.max(1, retentionDays);
-        return parsed.getTime() < nowMillis - keepDays * DAY_MILLIS;
+        long expiresAt = parsed.getTime() + keepDays * DAY_MILLIS;
+        return expiresAt < nowMillis && !hold.holds(expiresAt);
     }
 
     private static Writer writerFor(long nowMillis) throws IOException {
@@ -264,16 +275,22 @@ public final class ChatAuditLog {
         return writer;
     }
 
+    /** Removes the files past their retention now, as an accepted clock lets it (DATA-09). */
+    public static synchronized void pruneExpired() {
+        pruneExpiredFiles(System.currentTimeMillis());
+    }
+
     private static void pruneExpiredFiles(long nowMillis) {
         File dir = directory;
         File[] files = dir == null ? null : dir.listFiles();
         if (files == null) {
             return;
         }
+        WorldClock.Hold hold = WorldClock.hold();
         for (File file : files) {
             if (file != null && file.isFile() && isExpiredFileName(
                     file.getName(), nowMillis,
-                    LostTalesConfig.chatAuditRetentionDays)
+                    LostTalesConfig.chatAuditRetentionDays, hold)
                     && !file.delete()) {
                 FMLLog.warning(
                         "[%s] Could not delete expired chat audit file %s",

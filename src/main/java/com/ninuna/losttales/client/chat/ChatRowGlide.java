@@ -52,7 +52,9 @@ public final class ChatRowGlide {
     private static final int KIND_DAY = 4;
     /** A long message's Read more or Show less. */
     private static final int KIND_FOLD = 5;
-    private static final int KINDS = 6;
+    /** A conversation's notice over its oldest line. */
+    private static final int KIND_NOTICE = 6;
+    private static final int KINDS = 7;
     /** Nearer its place than this, in pixels of stack, a row has arrived. */
     private static final float ARRIVED = 0.01F;
 
@@ -287,6 +289,12 @@ public final class ChatRowGlide {
             String day = ChatWindowLines.dateDividerLabel(line);
             if (day != null) {
                 keys[index] = new Key(0, 0, KIND_DAY, 0, day);
+                inMessage = false;
+                continue;
+            }
+            String notice = ChatWindowLines.noticeKey(line);
+            if (notice != null) {
+                keys[index] = new Key(0, 0, KIND_NOTICE, 0, notice);
                 inMessage = false;
                 continue;
             }

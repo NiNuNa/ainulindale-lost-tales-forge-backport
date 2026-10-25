@@ -3,7 +3,6 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
@@ -181,7 +180,7 @@ public final class WindowStyle {
         }
         int steps = weights.length - 1;
         float span = curveRight - curveLeft;
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(true);
         if (left < curveLeft) {
             profiledQuad(tessellator, left, Math.min(right, curveLeft), top,
                     bottom, rgb, alpha * weights[0], alpha * weights[0]);
@@ -206,7 +205,7 @@ public final class WindowStyle {
                     bottom, rgb, alpha * weights[steps],
                     alpha * weights[steps]);
         }
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        LostTalesUiInk.endQuads(tessellator, true);
     }
 
     /** One quad of a profiled fill, its left and right edges at their own opacity. */
@@ -409,7 +408,7 @@ public final class WindowStyle {
     /** One quad added to the framebuffer at its own alpha, leaving the framebuffer's alpha as it is. */
     private static void flatQuad(float left, float top, float right,
                                  float bottom, int alpha, int rgb) {
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(true);
         OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE,
                 GL11.GL_ZERO, GL11.GL_ONE);
         // The GUI pass culls back faces: the backdrops' own winding.
@@ -418,7 +417,7 @@ public final class WindowStyle {
         tessellator.addVertex(right, top, 0.0D);
         tessellator.addVertex(left, top, 0.0D);
         tessellator.addVertex(left, bottom, 0.0D);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        LostTalesUiInk.endQuads(tessellator, true);
     }
 
     /** A popup with no row lit. */

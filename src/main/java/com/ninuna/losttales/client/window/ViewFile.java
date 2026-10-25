@@ -16,13 +16,19 @@ import java.util.Set;
  * {@code view}, a category's view by its id or {@code custom} for a new
  * custom view; {@code pages}, what the window holds in order, each a page
  * by its id, {@code set:} and a set of pages a system gives, or
- * {@code category} for every page of the view's category; and
- * {@code locked}, whether the window opens locked.
+ * {@code category} for every page of the view's category;
+ * {@code locked}, whether the window opens locked; {@code place}, where it
+ * stands: {@code middle} (two thirds of the screen, in its middle) or a
+ * part of the screen by its name ({@code left_third}); and {@code stage},
+ * whether the camera turns round to face the character while the view is
+ * shown (WIN-50).
  *
  * <pre>
  * {
  *   "view": "quest_journal",
  *   "locked": true,
+ *   "place": "middle",
+ *   "stage": false,
  *   "pages": ["journal", "map"]
  * }
  * </pre>
@@ -36,8 +42,11 @@ final class ViewFile {
     static final String SET_PREFIX = "set:";
     /** The most entries a window opens with. */
     static final int MAX_PAGES = 32;
+    /** The place of a window at the default place: two thirds of the screen, in its middle. */
+    static final String MIDDLE = "middle";
 
-    static final Set<String> KEYS = JsonReading.keys("view", "pages", "locked");
+    static final Set<String> KEYS = JsonReading.keys("view", "pages", "locked",
+            "place", "stage");
 
     /** What an entry names. */
     enum Kind {
@@ -104,8 +113,8 @@ final class ViewFile {
         /** Whether a page is registered under {@code id}. */
         boolean isPage(String id);
 
-        /** Whether the page under {@code id} opens only from a thing in the world. */
-        boolean opensFromWorld(String id);
+        /** Whether the page under {@code id} opens only as the game opens it. */
+        boolean opensByGame(String id);
 
         /** Whether a system gives a set of pages under {@code name}. */
         boolean isSet(String name);
@@ -114,12 +123,24 @@ final class ViewFile {
     final String view;
     final List<Entry> pages;
     final boolean locked;
+    /** The place as written: {@code middle} or a part's name. */
+    final String place;
+    final boolean stage;
 
-    ViewFile(String view, List<Entry> pages, boolean locked) {
+    ViewFile(String view, List<Entry> pages, boolean locked, String place,
+             boolean stage) {
         this.view = view == null ? "" : view;
         this.pages = Collections.unmodifiableList(new ArrayList<Entry>(
                 pages == null ? Collections.<Entry>emptyList() : pages));
         this.locked = locked;
+        this.place = place == null ? "" : place;
+        this.stage = stage;
+    }
+
+    /** The part of the screen the window fills; none for the middle, or a place no part has. */
+    Window.ScreenFill fill() {
+        Window.ScreenFill part = Window.ScreenFill.part(this.place);
+        return part == null ? Window.ScreenFill.NONE : part;
     }
 
     /** The category whose view the file is; null for a custom view or none. */
@@ -160,6 +181,14 @@ final class ViewFile {
             where.say("does not say whether the window is locked");
         }
         boolean locked = where.bool(object, "locked", false);
+        String place = where.string(object, "place", "");
+        if (place.length() == 0) {
+            where.say("does not say where the window stands");
+        }
+        if (!object.has("stage")) {
+            where.say("does not say whether the view is a stage");
+        }
+        boolean stage = where.bool(object, "stage", false);
         if (!object.has("pages")) {
             where.say("lists no pages");
         }
@@ -167,7 +196,7 @@ final class ViewFile {
         for (String written : where.strings(object, "pages")) {
             pages.add(entryOf(written));
         }
-        return new ViewFile(view, pages, locked);
+        return new ViewFile(view, pages, locked, place, stage);
     }
 
     /** An entry as written: {@code category}, {@code set:} and a set's name, else a page's id. */
@@ -191,6 +220,12 @@ final class ViewFile {
                 && (category == null || !category.isView())) {
             warnings.add("names the view " + file.view + ", which is no view;"
                     + " a view is a category's or " + CUSTOM);
+        }
+        if (file.place.length() > 0 && !MIDDLE.equals(file.place)
+                && Window.ScreenFill.part(file.place) == null) {
+            warnings.add("names the place " + file.place + ", which is no"
+                    + " place; a place is " + MIDDLE + " or a part of the"
+                    + " screen, such as left_third");
         }
         if (file.pages.isEmpty()) {
             warnings.add("lists no page");
@@ -222,9 +257,9 @@ final class ViewFile {
                     if (!known.isPage(entry.name)) {
                         warnings.add("lists the page " + entry.name
                                 + ", which is no page");
-                    } else if (known.opensFromWorld(entry.name)) {
+                    } else if (known.opensByGame(entry.name)) {
                         warnings.add("lists the page " + entry.name
-                                + ", which opens only from a thing in the world");
+                                + ", which only the game opens");
                     }
                     break;
             }

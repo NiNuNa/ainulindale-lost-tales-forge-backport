@@ -1,0 +1,22 @@
+{
+  "id": "losttales:ithildhrim_light",
+  "helmet": [
+    "losttales:moon_elf_helmet_light"
+  ],
+  "chestplate": [
+    "losttales:moon_elf_armor_light"
+  ],
+  "leggings": [
+    "losttales:moon_elf_leggings_light"
+  ],
+  "boots": [
+    "losttales:moon_elf_boots_light"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:lore"
+    }
+  ]
+}

@@ -16,7 +16,12 @@ import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraftforge.event.terraingen.PopulateChunkEvent;
 import net.minecraftforge.event.world.ChunkEvent;
 
-/** Lazy backfill for existing chunks plus post-population placement for new ones. */
+/**
+ * Lazy backfill for existing chunks plus post-population placement for new
+ * ones. A marker {@code retry} marked waits as not attempted, saved with
+ * its record, and is built here as its chunk loads, as one never tried is
+ * (WAY-18).
+ */
 public final class LostTalesWaystoneGenerationHandler
         implements IWorldGenerator {
     private static final int PLAYER_RETRY_INTERVAL_TICKS = 20;

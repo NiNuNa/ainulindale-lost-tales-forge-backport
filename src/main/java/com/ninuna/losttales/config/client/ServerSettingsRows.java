@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.window.NumberStepper;
 import com.ninuna.losttales.client.window.PageRows;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.config.LostTalesConfigWords;
+import com.ninuna.losttales.config.NextStartOptions;
 import com.ninuna.losttales.config.server.ServerConfigChangeValidator;
 import com.ninuna.losttales.config.server.ServerConfigEntry;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
@@ -21,7 +22,8 @@ import net.minecraft.util.StatCollector;
  * typed line, a secret that says only whether it is set — and each list
  * last in its category, its lines as a group with Add a Line under them.
  * A setting whose change waits shows its new value in the accent, a list its
- * name and its new lines. Every setting is named, explained in its row's
+ * name and its new lines; one only the next start puts in force says so
+ * after its name. Every setting is named, explained in its row's
  * tip and given its words by the lang file, in the player's language
  * ({@link LostTalesConfigWords}). Numbers and lines are typed in Settings'
  * own value window and kept by the page ({@link Settings.Store#NONE}).
@@ -145,16 +147,36 @@ final class ServerSettingsRows {
                 : ServerSettingNames.name(key);
     }
 
+    /**
+     * A setting's name on its row, marked {@code (Next Start)} where only
+     * the next start puts it in force (DATA-12), as a pick marks its
+     * shipped value {@code (Default)}.
+     */
     private static String settingName(ServerConfigEntry entry) {
-        return settingName(entry.getCategory(), entry.getKey());
+        String name = settingName(entry.getCategory(), entry.getKey());
+        return waitsForNextStart(entry)
+                ? StatCollector.translateToLocalFormatted(LANG + "next_start", name) : name;
     }
 
-    /** What a setting does, its tip line in the player's language; none where the lang file has none. */
+    /**
+     * What a setting does, its tip line in the player's language, and for
+     * a setting the next start puts in force a sentence saying so; none
+     * where the lang file has none.
+     */
     static String settingTip(ServerConfigEntry entry) {
         String langKey = LostTalesConfigWords.tipKey(entry.getCategory(),
                 entry.getKey());
-        return StatCollector.canTranslate(langKey)
+        String tip = StatCollector.canTranslate(langKey)
                 ? StatCollector.translateToLocal(langKey) : "";
+        if (!waitsForNextStart(entry)) {
+            return tip;
+        }
+        String waits = word("next_start.tip");
+        return tip.length() == 0 ? waits : tip + " " + waits;
+    }
+
+    private static boolean waitsForNextStart(ServerConfigEntry entry) {
+        return NextStartOptions.waitsForNextStart(entry.getCategory(), entry.getKey());
     }
 
     /** One of a few-word setting's words in the player's language, else as the file writes it. */

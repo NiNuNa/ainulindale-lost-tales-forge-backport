@@ -156,15 +156,43 @@ public final class LostTalesQuestDefinition {
 
     /**
      * Whether a player whose last run of this quest ended as
-     * {@code history} may take it now: never taken, yes; finished, only a
-     * repeatable quest; failed or abandoned, only a restartable one. The
-     * one rule the server starts by and a conversation offers by.
+     * {@code history} may take it again at all: never taken, yes;
+     * finished, only a repeatable quest; failed or abandoned, only a
+     * restartable one. The server starts and offers by
+     * {@link #mayTakeAgain(LostTalesQuestHistoryEntry, long)}, which adds a
+     * repeatable quest's wait.
      */
     public boolean mayTakeAgain(LostTalesQuestHistoryEntry history) {
         if (history == null) {
             return true;
         }
         return history.isCompleted() ? this.repeatable : this.restartable;
+    }
+
+    /**
+     * Whether the player may take it at world time {@code now}: as
+     * {@link #mayTakeAgain(LostTalesQuestHistoryEntry)} says, and a
+     * repeatable quest last completed only once its wait is past
+     * ({@link #takenAgainAt}, QUEST-45).
+     */
+    public boolean mayTakeAgain(LostTalesQuestHistoryEntry history, long now) {
+        return mayTakeAgain(history) && now >= takenAgainAt(history);
+    }
+
+    /**
+     * When a repeatable quest may be taken again after the completion its
+     * History line records: that completion's world time and its
+     * {@code repeatAfter} (QUEST-45). 0 for a quest that does not wait:
+     * never taken, last failed or abandoned, not repeatable, or with no
+     * wait.
+     */
+    public long takenAgainAt(LostTalesQuestHistoryEntry history) {
+        long wait = LostTalesQuestRules.repeatAfterTicks(this);
+        if (history == null || !history.isCompleted() || !this.repeatable
+                || wait <= 0L) {
+            return 0L;
+        }
+        return history.getWorldTime() + wait;
     }
 
     public String getStartMode() {

@@ -7,6 +7,7 @@ import com.ninuna.losttales.client.progression.SkillsPage;
 import com.ninuna.losttales.config.client.ServerSettingsPage;
 import com.ninuna.losttales.data.DataFiles;
 import com.ninuna.losttales.gui.hud.placement.HudPlacementPage;
+import com.ninuna.losttales.gui.screen.character.CharacterEditorPage;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.gui.screen.fellowship.FellowshipPage;
 import com.ninuna.losttales.gui.screen.missive.MissiveBoardPage;
@@ -30,10 +31,11 @@ public final class ViewFileFixtures {
             SkillsPage.PAGE_ID, ClientSettingsPage.PAGE_ID,
             MotionLabPage.PAGE_ID, HudPlacementPage.PAGE_ID,
             ServerSettingsPage.PAGE_ID));
-    /** Every page the client registers that opens from a thing in the world. */
-    static final Set<String> WORLD_PAGES = new HashSet<String>(Arrays.asList(
+    /** Every page the client registers that only the game opens. */
+    static final Set<String> GAME_PAGES = new HashSet<String>(Arrays.asList(
             WaystonePage.PAGE_ID, MissiveBoardPage.PAGE_ID,
-            MissiveLetterPage.PAGE_ID, ResetStatuePage.PAGE_ID));
+            MissiveLetterPage.PAGE_ID, ResetStatuePage.PAGE_ID,
+            CharacterEditorPage.PAGE_ID));
     /** The sets the chat gives. */
     static final Set<String> SETS = new HashSet<String>(Arrays.asList(
             ViewDefaults.CHAT, ViewDefaults.FELLOWSHIP_CHATS));
@@ -42,12 +44,12 @@ public final class ViewFileFixtures {
     static final ViewFile.Known GAME_IDS = new ViewFile.Known() {
         @Override
         public boolean isPage(String id) {
-            return PAGES.contains(id) || WORLD_PAGES.contains(id);
+            return PAGES.contains(id) || GAME_PAGES.contains(id);
         }
 
         @Override
-        public boolean opensFromWorld(String id) {
-            return WORLD_PAGES.contains(id);
+        public boolean opensByGame(String id) {
+            return GAME_PAGES.contains(id);
         }
 
         @Override

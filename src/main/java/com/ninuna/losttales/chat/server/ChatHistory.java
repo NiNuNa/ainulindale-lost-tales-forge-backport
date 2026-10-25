@@ -5,6 +5,7 @@ import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatReplyReference;
@@ -56,6 +57,12 @@ import java.util.UUID;
  * fellowship's — counts only while one is still in it ({@link #canRead}),
  * and a fellowship's only while the character played joined before the
  * line was said.</p>
+ *
+ * <p>What a reader is shown of a line is theirs too
+ * ({@link ChatReaderView}): a reply's quote of a line heard nearby only
+ * if they heard it, which the entry keeps as the readers it showed the
+ * quote to, and a line an unseen voice said with its speaker only if
+ * they are the speaker or staff.</p>
  *
  * <p>Bounded per channel — per faction and per fellowship on the channels
  * that hold several, per conversation for whispers, and per account for
@@ -215,6 +222,23 @@ public final class ChatHistory {
                                            LostTalesChatMessagePacket forOthers,
                                            Collection<UUID> recipients,
                                            Audience audience) {
+        record(messageId, authorId, author, forSender, forOthers, recipients,
+                audience, null);
+    }
+
+    /**
+     * As above, for a reply whose quote went to {@code quoteReaders}
+     * alone: a quote of a line heard nearby, which only those who heard
+     * that line are shown (CHAT-43). Null shows the quote to everyone the
+     * line reaches.
+     */
+    public static synchronized void record(long messageId, UUID authorId,
+                                           String author,
+                                           LostTalesChatMessagePacket forSender,
+                                           LostTalesChatMessagePacket forOthers,
+                                           Collection<UUID> recipients,
+                                           Audience audience,
+                                           Collection<UUID> quoteReaders) {
         if (!ChatMessageIds.isServerId(messageId) || author == null
                 || author.trim().length() == 0 || forOthers == null
                 || forOthers.getChannel() == null) {
@@ -234,7 +258,8 @@ public final class ChatHistory {
                 ChatReplyReference.excerptOf(forOthers.getMessage()), seenBy,
                 channelId, forSender == null ? forOthers : forSender,
                 forOthers, audience == null ? Audience.nobody() : audience,
-                forOthers.getTimestampMillis()));
+                forOthers.getTimestampMillis(), new ChatReactions(),
+                accountsOf(quoteReaders)));
         if (replaced != null) {
             count(budgetKeyOf(replaced), -1);
         }
@@ -242,6 +267,20 @@ public final class ChatHistory {
         count(budgetKeyOf(kept), 1);
         trim(budgetKeyOf(kept));
         changed();
+    }
+
+    /** The accounts named, without a null among them; null for null. */
+    private static Set<UUID> accountsOf(Collection<UUID> accounts) {
+        if (accounts == null) {
+            return null;
+        }
+        Set<UUID> kept = new HashSet<UUID>();
+        for (UUID account : accounts) {
+            if (account != null) {
+                kept.add(account);
+            }
+        }
+        return Collections.unmodifiableSet(kept);
     }
 
     /**
@@ -277,13 +316,95 @@ public final class ChatHistory {
 
     /**
      * The quote of a kept line: its author, its excerpt and the colour
-     * its name was drawn in, wearing its head, and read as the sentence
-     * it is when the line is an action.
+     * its name was drawn in, wearing its head, read as the sentence it is
+     * when the line is an action, and marked when an unseen voice said
+     * it, so each reader is shown it as the line itself
+     * ({@link ChatReaderView}).
      */
     private static ChatReplyReference quoteOf(long messageId, Entry entry) {
         return withHead(ChatReplyReference.of(messageId, entry.author,
                 entry.excerpt, entry.forOthers.getNameColor()), entry)
-                .asAction(entry.forOthers.isAction());
+                .asAction(entry.forOthers.isAction())
+                .asUnseen(entry.forOthers.isUnseen());
+    }
+
+    /**
+     * Whether a reply quoting {@code messageId} may stand in
+     * {@code channel}'s conversation {@code scopeValue}: back where the
+     * line was said, a line heard nearby too, whose quote then goes only
+     * to the readers who heard it ({@link #showsQuoteTo}); anywhere else
+     * as {@link #mayShowTo} allows.
+     */
+    public static synchronized boolean mayQuoteIn(long messageId,
+                                                  ChatChannel channel,
+                                                  String scopeValue,
+                                                  Requester sender,
+                                                  Requester partner) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry != null && channel != null && sender != null
+                && heardNearby(entry)
+                && entry.channelId.equals(channel.getId())
+                && sameScope(entry, scopeValue)) {
+            return canRead(entry, sender);
+        }
+        return mayShowTo(messageId, channel, scopeValue, sender, partner);
+    }
+
+    /**
+     * Whether {@code reader} is shown the quote a reply carries: always,
+     * but for a quote of a line heard nearby, which only the readers who
+     * heard it are shown (CHAT-43), and none once that line is no longer
+     * kept. A forward's quote, a quote of a line no longer kept and a
+     * client's own are shown to every reader.
+     */
+    public static synchronized boolean showsQuoteTo(ChatReplyReference quote,
+                                                    Requester reader) {
+        if (quote == null || !quote.isAnchored() || quote.isForward()) {
+            return true;
+        }
+        Entry entry = ENTRIES.get(Long.valueOf(quote.getMessageId()));
+        if (entry == null) {
+            return false;
+        }
+        return !heardNearby(entry) || canRead(entry, reader);
+    }
+
+    /**
+     * Whether a reply's quote names a kept line heard nearby: one whose
+     * readers each have to be asked whether they heard it
+     * ({@link #showsQuoteTo}).
+     */
+    public static synchronized boolean quotesNearby(ChatReplyReference quote) {
+        if (quote == null || !quote.isAnchored() || quote.isForward()) {
+            return false;
+        }
+        Entry entry = ENTRIES.get(Long.valueOf(quote.getMessageId()));
+        return entry != null && heardNearby(entry);
+    }
+
+    /** Whether a kept line was said to those near its speaker, and heard by them alone. */
+    private static boolean heardNearby(Entry entry) {
+        ChatChannel source = ChatChannel.fromId(entry.channelId);
+        return source != null
+                && source.getRecipientRule() == ChatRecipientRule.PROXIMITY;
+    }
+
+    /** Whether a kept line was said in the conversation {@code scopeValue} names. */
+    private static boolean sameScope(Entry entry, String scopeValue) {
+        String scope = entry.forOthers.getScopeValue();
+        return (scope == null ? "" : scope)
+                .equals(scopeValue == null ? "" : scopeValue);
+    }
+
+    /**
+     * Whether a quote of the kept line {@code messageId} is cut: its words
+     * run past the first letters a quote keeps (CHAT-86). False for a line
+     * the history does not hold.
+     */
+    public static synchronized boolean quoteIsCut(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry != null && !ChatMessageValidator.oneLine(
+                entry.forOthers.getMessage()).trim().equals(entry.excerpt);
     }
 
     /**
@@ -412,6 +533,9 @@ public final class ChatHistory {
         if (!reference.exists()) {
             return null;
         }
+        // A forward of an unseen voice's line names the voice to the
+        // readers who may not know who spoke, as the line does.
+        reference = reference.asUnseen(entry.forOthers.isUnseen());
         return new Forwardable(messageId, entry.forOthers.getMessage(),
                 entry.forOthers.isAction(),
                 forwardedShowcases(entry.forOthers.getShowcases()),
@@ -606,7 +730,8 @@ public final class ChatHistory {
         ENTRIES.put(Long.valueOf(messageId), new Entry(entry.authorId,
                 entry.author, ChatReplyReference.excerptOf(message),
                 entry.seenBy, entry.channelId, forSender, forOthers,
-                entry.audience, entry.timestampMillis, entry.reactions));
+                entry.audience, entry.timestampMillis, entry.reactions,
+                entry.quoteReaders));
         changed();
         return Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
     }
@@ -648,7 +773,7 @@ public final class ChatHistory {
         ENTRIES.put(Long.valueOf(messageId), new Entry(entry.authorId,
                 entry.author, entry.excerpt, entry.seenBy, entry.channelId,
                 forSender, forOthers, entry.audience, entry.timestampMillis,
-                entry.reactions));
+                entry.reactions, entry.quoteReaders));
         changed();
     }
 
@@ -923,7 +1048,10 @@ public final class ChatHistory {
      */
     private static LostTalesChatMessagePacket shownTo(Requester requester,
                                                       Entry entry) {
-        LostTalesChatMessagePacket line = copyFor(requester, entry);
+        LostTalesChatMessagePacket line = ChatReaderView.forReader(
+                copyFor(requester, entry), requester.accountId,
+                requester.moderates, entry.quoteReaders == null
+                        || entry.quoteReaders.contains(requester.accountId));
         if (requester.accountId != null
                 && entry.seenBy.add(requester.accountId)) {
             changed();
@@ -1328,6 +1456,11 @@ public final class ChatHistory {
          * theirs: what a reaction of theirs may have been made as.
          */
         final Set<UUID> identityIds;
+        /**
+         * Whether the player holds {@code chat.moderate}: staff read an
+         * unseen voice's lines as its speaker's (CHAT-84).
+         */
+        final boolean moderates;
 
         public Requester(UUID accountId, Map<String, Long> ownedFactions,
                          Map<UUID, Long> fellowships, Collection<ChatChannel> readable,
@@ -1364,6 +1497,22 @@ public final class ChatHistory {
                 }
             }
             this.readableChannels = Collections.unmodifiableSet(ids);
+            this.moderates = false;
+        }
+
+        private Requester(Requester player, boolean moderates) {
+            this.accountId = player.accountId;
+            this.ownedFactions = player.ownedFactions;
+            this.fellowships = player.fellowships;
+            this.readableChannels = player.readableChannels;
+            this.identityIds = player.identityIds;
+            this.moderates = moderates;
+        }
+
+        /** The same player, holding {@code chat.moderate} or not. */
+        public Requester moderating(boolean moderates) {
+            return moderates == this.moderates ? this
+                    : new Requester(this, moderates);
         }
 
         /** When the earliest character in that faction was made; null for none. */
@@ -1567,19 +1716,28 @@ public final class ChatHistory {
         final long timestampMillis;
         /** Who reacted to the line, and with what; empty for none. */
         final ChatReactions reactions;
+        /**
+         * For a reply quoting a line heard nearby, the accounts it showed
+         * the quote to: those who heard that line (CHAT-43). Null for a
+         * line whose quote, if any, every reader is shown.
+         */
+        final Set<UUID> quoteReaders;
 
         Entry(UUID authorId, String author, String excerpt, Set<UUID> seenBy,
               String channelId, LostTalesChatMessagePacket forSender,
               LostTalesChatMessagePacket forOthers, Audience audience,
               long timestampMillis) {
             this(authorId, author, excerpt, seenBy, channelId, forSender,
-                    forOthers, audience, timestampMillis, new ChatReactions());
+                    forOthers, audience, timestampMillis, new ChatReactions(),
+                    null);
         }
 
         Entry(UUID authorId, String author, String excerpt, Set<UUID> seenBy,
               String channelId, LostTalesChatMessagePacket forSender,
               LostTalesChatMessagePacket forOthers, Audience audience,
-              long timestampMillis, ChatReactions reactions) {
+              long timestampMillis, ChatReactions reactions,
+              Set<UUID> quoteReaders) {
+            this.quoteReaders = quoteReaders;
             this.reactions = reactions == null ? new ChatReactions() : reactions;
             this.authorId = authorId;
             this.author = author;

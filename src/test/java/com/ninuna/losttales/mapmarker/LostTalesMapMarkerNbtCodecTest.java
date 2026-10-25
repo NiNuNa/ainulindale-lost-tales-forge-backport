@@ -1,8 +1,11 @@
 package com.ninuna.losttales.mapmarker;
 
+import com.ninuna.losttales.storage.NbtQuarantine;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -28,7 +31,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 "30000000-0000-0000-0000-000000000003");
         LostTalesMapMarkerRecord marker =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/test", "Aldric", owner,
+                        "losttales:player/test", owner,
                         100, 10, 65, 20, token).toBuilder()
                         .visibility(LostTalesMapMarkerVisibility.SHARED)
                         .sharedCharacterIds(new LinkedHashSet<UUID>(
@@ -55,7 +58,9 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 decoded.getOwnerCharacterId());
         assertEquals("an unnamed waystone keeps no words", "",
                 decoded.getName());
-        assertEquals("player:Aldric", decoded.getNamedAfter());
+        assertEquals("it is called after the placing character, by its id",
+                LostTalesMapMarkerNamedAfter.character(owner),
+                decoded.getNamedAfter());
         assertEquals("", decoded.getCategoryName());
         assertEquals("", decoded.getDescription());
         assertEquals(token, decoded.getLinkToken());
@@ -75,7 +80,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 "10000000-0000-0000-0000-000000000009");
         LostTalesMapMarkerRecord marker =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/owner", "Aldric", owner,
+                        "losttales:player/owner", owner,
                         100, 10, 65, 20, UUID.randomUUID())
                         .withOwner(UUID.fromString(
                                 "10000000-0000-0000-0000-00000000000a"));
@@ -92,7 +97,8 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 LostTalesMapMarkerNbtCodec.read(encoded).getRecords()
                         .get(marker.getId()).getOwnerCharacterId());
         assertEquals("handed over, it keeps whom it is called after",
-                "player:Aldric", marker.getNamedAfter());
+                LostTalesMapMarkerNamedAfter.character(owner),
+                marker.getNamedAfter());
     }
 
     /** Access is saved public or not; shared is read back from the shares alone (WAY-14). */
@@ -100,7 +106,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
     public void sharedIsReadBackFromTheShares() {
         LostTalesMapMarkerRecord marker =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/access", "Aldric",
+                        "losttales:player/access",
                         UUID.randomUUID(), 100, 10, 65, 20,
                         UUID.randomUUID()).toBuilder()
                         .visibility(LostTalesMapMarkerVisibility.SHARED)
@@ -127,7 +133,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 "30000000-0000-0000-0000-000000000003");
         LostTalesMapMarkerRecord oldRecord =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/test", "Aldric", owner,
+                        "losttales:player/test", owner,
                         0, 1, 64, 1, token);
         LostTalesMapMarkerRecord newRecord = oldRecord.toBuilder()
                 .name("New")
@@ -145,6 +151,157 @@ public final class LostTalesMapMarkerNbtCodecTest {
                 .get(oldRecord.getId()).getName());
         assertEquals(1, result.getQuarantineCopy().size());
         assertTrue(result.wasRepaired());
+        NBTTagCompound aside = result.getQuarantineCopy().get(0);
+        assertEquals("duplicate_marker_id", aside.getString("Reason"));
+        assertEquals("the record set aside keeps its own place", 0,
+                aside.getInteger(LostTalesMapMarkerNbtCodec.MARKER_INDEX));
+        assertEquals("and is kept as it was saved",
+                encoded.getTagList("Markers", Constants.NBT.TAG_COMPOUND)
+                        .getCompoundTagAt(0),
+                aside.getCompoundTag("OriginalData"));
+    }
+
+    /** The quarantine is written as every store writes it: a version and its entries (DATA-10). */
+    @Test
+    public void theQuarantineIsWrittenInTheSharedLayout() {
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(encoded,
+                Collections.singleton(preset("losttales:kept")),
+                Arrays.asList(asideEntry(0), null, asideEntry(1)));
+
+        assertTrue(encoded.hasKey("Quarantine", Constants.NBT.TAG_COMPOUND));
+        NBTTagCompound quarantine = encoded.getCompoundTag("Quarantine");
+        assertEquals(NbtQuarantine.CURRENT_DATA_VERSION,
+                quarantine.getInteger("DataVersion"));
+        assertEquals(2, quarantine.getTagList("Entries",
+                Constants.NBT.TAG_COMPOUND).tagCount());
+
+        LostTalesMapMarkerNbtCodec.ReadResult result =
+                LostTalesMapMarkerNbtCodec.read(encoded);
+        assertFalse(result.isReadOnly());
+        assertFalse(result.wasRepaired());
+        assertEquals(Arrays.asList(asideEntry(0), asideEntry(1)),
+                result.getQuarantineCopy());
+    }
+
+    /** A full quarantine is read and written back whole: nothing is trimmed (DATA-10). */
+    @Test
+    public void aQuarantineAtItsBoundIsReadAndWrittenBackWhole() {
+        List<NBTTagCompound> aside = asideEntries(
+                LostTalesMapMarkerNbtCodec.MAX_QUARANTINED);
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(encoded,
+                Collections.singleton(preset("losttales:kept")), aside);
+
+        LostTalesMapMarkerNbtCodec.ReadResult result =
+                LostTalesMapMarkerNbtCodec.read(encoded);
+
+        assertFalse(result.isReadOnly());
+        assertEquals(aside, result.getQuarantineCopy());
+        NBTTagCompound again = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(again, result.getRecords().values(),
+                result.getQuarantineCopy());
+        assertTrue("written back as it was read", encoded.equals(again));
+    }
+
+    /**
+     * A save whose quarantine would hold more than the bound, as stored or
+     * with what this read sets aside, is kept whole and reads only.
+     */
+    @Test
+    public void aQuarantinePastItsBoundKeepsTheStoreWholeAndReadOnly() {
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(encoded,
+                Collections.singleton(preset("losttales:kept")),
+                asideEntries(LostTalesMapMarkerNbtCodec.MAX_QUARANTINED + 904));
+
+        LostTalesMapMarkerNbtCodec.ReadResult result =
+                LostTalesMapMarkerNbtCodec.read(encoded);
+
+        assertTrue(result.isReadOnly());
+        assertTrue(result.getRecords().isEmpty());
+        assertTrue("every one of 5,000 records is kept",
+                encoded.equals(result.getOriginalCopy()));
+        assertEquals(5000, result.getOriginalCopy().getCompoundTag("Quarantine")
+                .getTagList("Entries", Constants.NBT.TAG_COMPOUND).tagCount());
+
+        NBTTagCompound full = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(full, Arrays.asList(
+                preset("losttales:broken"), preset("losttales:whole")),
+                asideEntries(LostTalesMapMarkerNbtCodec.MAX_QUARANTINED));
+        full.getTagList("Markers", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).removeTag("Priority");
+        LostTalesMapMarkerNbtCodec.ReadResult closed =
+                LostTalesMapMarkerNbtCodec.read(full);
+        assertTrue("a full quarantine takes no record more",
+                closed.isReadOnly());
+        assertTrue(full.equals(closed.getOriginalCopy()));
+    }
+
+    /** A quarantine this build cannot read keeps the store as it is, read-only. */
+    @Test
+    public void anUnreadableQuarantineKeepsTheStoreReadOnly() {
+        NBTTagCompound bareList = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(bareList,
+                Collections.singleton(preset("losttales:kept")),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagList entries = new NBTTagList();
+        entries.appendTag(asideEntry(0));
+        bareList.setTag("Quarantine", entries);
+
+        NBTTagCompound missing = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(missing,
+                Collections.singleton(preset("losttales:kept")),
+                Collections.<NBTTagCompound>emptyList());
+        missing.removeTag("Quarantine");
+
+        NBTTagCompound newer = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(newer,
+                Collections.singleton(preset("losttales:kept")),
+                Collections.singletonList(asideEntry(0)));
+        newer.getCompoundTag("Quarantine").setInteger("DataVersion",
+                NbtQuarantine.CURRENT_DATA_VERSION + 1);
+
+        for (NBTTagCompound encoded : Arrays.asList(bareList, missing, newer)) {
+            LostTalesMapMarkerNbtCodec.ReadResult result =
+                    LostTalesMapMarkerNbtCodec.read(encoded);
+            assertTrue(result.isReadOnly());
+            assertTrue(result.getRecords().isEmpty());
+            assertTrue(encoded.equals(result.getOriginalCopy()));
+        }
+        assertEquals(NbtQuarantine.CURRENT_DATA_VERSION + 1,
+                LostTalesMapMarkerNbtCodec.read(newer).getUnsupportedVersion());
+    }
+
+    /** A list of records that holds anything but records is kept, never read as empty. */
+    @Test
+    public void aListOfAnythingButRecordsKeepsTheStoreReadOnly() {
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(encoded,
+                Collections.<LostTalesMapMarkerRecord>emptyList(),
+                Collections.<NBTTagCompound>emptyList());
+        encoded.setTag("Markers", names("losttales:not_a_record"));
+
+        LostTalesMapMarkerNbtCodec.ReadResult result =
+                LostTalesMapMarkerNbtCodec.read(encoded);
+
+        assertTrue(result.isReadOnly());
+        assertTrue(encoded.equals(result.getOriginalCopy()));
+    }
+
+    private static NBTTagCompound asideEntry(int index) {
+        NBTTagCompound original = new NBTTagCompound();
+        original.setString("Id", "losttales:aside/" + index);
+        return NbtQuarantine.entry("missing_required_fields",
+                LostTalesMapMarkerNbtCodec.MARKER_INDEX, index, original);
+    }
+
+    private static List<NBTTagCompound> asideEntries(int count) {
+        List<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
+        for (int index = 0; index < count; index++) {
+            entries.add(asideEntry(index));
+        }
+        return entries;
     }
 
     @Test

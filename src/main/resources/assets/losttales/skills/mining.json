@@ -1,7 +1,7 @@
 {
   "id": "losttales:mining",
   "icon": "minecraft:iron_pickaxe",
-  "order": 10,
+  "order": 11,
   "counts": [
     {
       "act": "mine",

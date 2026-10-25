@@ -1,0 +1,21 @@
+{
+  "id": "losttales:nomad",
+  "helmet": [
+    "lotr:item.helmetNomad"
+  ],
+  "chestplate": [
+    "lotr:item.bodyNomad"
+  ],
+  "leggings": [
+    "lotr:item.legsNomad"
+  ],
+  "boots": [
+    "lotr:item.bootsNomad"
+  ],
+  "bonus": [
+    {
+      "effect": "fire",
+      "amount": 0.2
+    }
+  ]
+}

@@ -463,7 +463,7 @@ public final class WorldQuests {
                 continue;
             }
             if (podium) {
-                LostTalesQuestRewardHelper.grantRewardBlock(player,
+                LostTalesQuestRewardHelper.grantRewardBlock(player, quest,
                         LostTalesQuestRules.podiumRewards(quest));
             } else {
                 LostTalesQuestRewardHelper.grantRewards(player, quest, null, -1);

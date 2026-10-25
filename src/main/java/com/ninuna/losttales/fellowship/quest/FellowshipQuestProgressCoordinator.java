@@ -8,8 +8,10 @@ import com.ninuna.losttales.fellowship.server.FellowshipService;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -163,6 +165,28 @@ public final class FellowshipQuestProgressCoordinator {
                     && fellowshipId.equals(travelledWith.of(member.getIdentityId()))) {
                 sharing.add(member);
             }
+        }
+        return sharing;
+    }
+
+    /**
+     * The characters the player's kills and arrivals count for, and theirs
+     * for the player (FEL-28): the members of the fellowship the
+     * character played travels with who travel with it too. Empty while it
+     * travels with none. The journal stands these members as they are and
+     * dims the others (QUEST-25).
+     */
+    public static Set<UUID> sharingCreditWith(EntityPlayerMP player) {
+        Set<UUID> sharing = new HashSet<UUID>();
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return sharing;
+        }
+        Fellowship fellowship = FellowshipService.getInstance()
+                .getTravellingFellowshipForActiveIdentity(player);
+        for (FellowshipMember member : sharingCredit(fellowship,
+                RoleplayCharacterIdentityHook.resolveGameplayId(player),
+                travelledWith(player.worldObj))) {
+            sharing.add(member.getIdentityId());
         }
         return sharing;
     }

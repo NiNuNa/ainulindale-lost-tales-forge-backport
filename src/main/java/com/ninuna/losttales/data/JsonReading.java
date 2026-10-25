@@ -174,6 +174,31 @@ public final class JsonReading {
         return values;
     }
 
+    /** A block of names, each a text; a name of another kind is said and left out. */
+    public Map<String, String> texts(JsonObject object, String key) {
+        Map<String, String> values = new LinkedHashMap<String, String>();
+        JsonElement element = object.get(key);
+        if (element == null || element.isJsonNull()) {
+            return values;
+        }
+        if (!element.isJsonObject()) {
+            say("writes '" + key + "' as something other than a block of names");
+            return values;
+        }
+        for (Map.Entry<String, JsonElement> entry
+                : element.getAsJsonObject().entrySet()) {
+            JsonElement value = entry.getValue();
+            if (value == null || !value.isJsonPrimitive()
+                    || !value.getAsJsonPrimitive().isString()) {
+                say("writes '" + key + "." + entry.getKey()
+                        + "' as something other than a text");
+                continue;
+            }
+            values.put(entry.getKey(), value.getAsString());
+        }
+        return values;
+    }
+
     /** The objects of a list; anything else in it is said and left out. */
     public List<JsonObject> objects(JsonObject object, String key) {
         List<JsonObject> values = new ArrayList<JsonObject>();

@@ -18,9 +18,9 @@ import java.util.Map;
 /**
  * The races the game plays with (CHAR-38): the bundled six, read from their
  * files as the mod loads, until a list takes their place. On the logical
- * server that is the server's own list, read as it starts
- * ({@code character.server.CharacterRaceCatalog}); on a client, the list the server sent as
- * it joined. Both go back to the bundled six as the server stops and as the
+ * server that is the server's own list, read as it starts and on
+ * {@code /losttales reload races} ({@code character.server.CharacterRaceCatalog});
+ * on a client, the list the server sent as it joined or after that reload. Both go back to the bundled six as the server stops and as the
  * client leaves.
  */
 public final class CharacterRaceRegistry {

@@ -36,7 +36,6 @@ import com.ninuna.losttales.client.window.WindowHover;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowScreen;
-import com.ninuna.losttales.client.window.WindowSearch;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowView;
 import com.ninuna.losttales.client.window.WindowPage;
@@ -105,6 +104,8 @@ public final class ChatScreenPart extends ScreenPart {
     /** The Console, which the command key opens the chat on. */
     private static final ConversationPage CONSOLE =
             ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
+    /** What the command key types into the Console's field. */
+    private static final String COMMAND_START = "/";
 
     /** Set once a message or command has gone out; the draft is then spent. */
     private boolean sent;
@@ -242,25 +243,8 @@ public final class ChatScreenPart extends ScreenPart {
         if (forPage != null || !this.screen.isOpenedForChat()) {
             return;
         }
-        View view = WindowView.current();
-        ConversationPage front;
-        if (this.screen.isOpenedForCommand()) {
-            ConversationPage console = ChatLayout.openConsoles(CONSOLE);
-            front = ClientChatChannelState.isSelectable(console) ? console : null;
-        } else {
-            front = ChatLayout.waitingInOwnWindow();
-            ConversationPage last = ClientChatChannelState.lastUsed();
-            if (front == null && last != null) {
-                front = ConversationPage.from(WindowLayout.lastUsedIn(last, view));
-            }
-            if (front == null) {
-                front = ChatLayout.frontIn(view);
-            }
-            if (front == null && last != null) {
-                front = ConversationPage.from(WindowLayout.openInView(
-                        ConversationPage.row(last), view));
-            }
-        }
+        ConversationPage front = keyFront(this.screen.isOpenedForCommand(),
+                WindowView.current());
         if (front == null) {
             return;
         }
@@ -270,6 +254,56 @@ public final class ChatScreenPart extends ScreenPart {
         if (window != null) {
             WindowLayout.raise(window.getId());
         }
+    }
+
+    /**
+     * The chat's key or the command key on the open screen, swapped to its
+     * view already: the same conversation comes forward as when the key
+     * opens the screen, with the keys, and the command key types {@code /}
+     * into the Console's field, in place of what was there.
+     */
+    @Override
+    public boolean chatKey(boolean command) {
+        ConversationPage front = keyFront(command, WindowView.current());
+        if (front == null) {
+            return false;
+        }
+        this.screen.jumpToTab(front);
+        if (command && front.equals(ClientChatChannelState.getSelected())) {
+            this.inputField.setText(COMMAND_START);
+            this.inputField.setCursorPositionEnd();
+            ClientChatChannelState.setDraft(COMMAND_START);
+            this.completion.refreshAfterTyping();
+        }
+        return true;
+    }
+
+    /**
+     * The conversation the chat's key brings forward in {@code view}: one
+     * waiting unread in the window that collected it, else the one last
+     * used, where the view holds it or opened there again, else the one in
+     * front of the view's window last in front. The command key's is the
+     * Console, opened in the Consoles view again where it was closed. Null
+     * for none.
+     */
+    private static ConversationPage keyFront(boolean command, View view) {
+        if (command) {
+            ConversationPage console = ChatLayout.openConsoles(CONSOLE);
+            return ClientChatChannelState.isSelectable(console) ? console : null;
+        }
+        ConversationPage front = ChatLayout.waitingInOwnWindow();
+        ConversationPage last = ClientChatChannelState.lastUsed();
+        if (front == null && last != null) {
+            front = ConversationPage.from(WindowLayout.lastUsedIn(last, view));
+        }
+        if (front == null) {
+            front = ChatLayout.frontIn(view);
+        }
+        if (front == null && last != null) {
+            front = ConversationPage.from(WindowLayout.openInView(
+                    ConversationPage.row(last), view));
+        }
+        return front;
     }
 
     @Override
@@ -522,12 +556,10 @@ public final class ChatScreenPart extends ScreenPart {
                         : String.valueOf(unread));
     }
 
-    /** Walks to the next match down, or the previous one up, in the window typed in, and lands on it. */
+    /** Walks to the next match down, or the previous one up, in the window's conversation, and lands on it. */
     @Override
-    public boolean walkSearch(boolean forward) {
-        Window typed = WindowLayout.windowOf(
-                ClientChatChannelState.getSelected());
-        ChatFrame frame = typed == null ? null : ChatFrame.of(typed);
+    public boolean walkSearch(Window window, boolean forward) {
+        ChatFrame frame = ChatFrame.of(window);
         if (frame != null) {
             landSearch(frame, ChatSearch.walk(forward, this.mc, frame));
         }
@@ -1258,8 +1290,15 @@ public final class ChatScreenPart extends ScreenPart {
     @Override
     public boolean drawWindow(Window window,
                               LostTalesGuiAnimationSample shown) {
-        LostTalesChatOverlayRenderer.drawWindowForScreen(this.mc, window,
-                this.screen.width, this.screen.height, shown);
+        // The lines lit are what the words of the copy in front of this
+        // window found.
+        ChatSearch.drawingIn(window.getId());
+        try {
+            LostTalesChatOverlayRenderer.drawWindowForScreen(this.mc, window,
+                    this.screen.width, this.screen.height, shown);
+        } finally {
+            ChatSearch.drawingIn(null);
+        }
         return true;
     }
 
@@ -1284,13 +1323,14 @@ public final class ChatScreenPart extends ScreenPart {
         }
     }
 
-    /** A search over the window reads its lines, and lands on a new match. */
+    /**
+     * The words the copy in front of the window keeps in its well read its
+     * lines, and land on a new match.
+     */
     @Override
     public void searchWindow(Window window, WindowFrame frame) {
-        if (WindowSearch.isOpenOn(window.getId())) {
-            landSearch((ChatFrame)frame, ChatSearch.scan(this.mc,
-                    (ChatFrame)frame));
-        }
+        landSearch((ChatFrame)frame, ChatSearch.scan(this.mc,
+                (ChatFrame)frame));
     }
 
     /**

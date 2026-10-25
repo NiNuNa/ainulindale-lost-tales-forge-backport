@@ -366,11 +366,8 @@ public final class FellowshipStateSnapshot {
 
     /**
      * The players one fellowship may invite: those the server offers, but
-     * its members, those it invited already, and, where the offer names
-     * its account, the accounts one of whose characters is a member. A
-     * reader not shown accounts is offered those too, since leaving them
-     * out would say whose characters they are; the server's refusal then
-     * says no more.
+     * its members, those it invited already, and the accounts one of whose
+     * characters is a member.
      */
     public List<FellowshipInviteTargetSnapshot> getInviteTargets(FellowshipSnapshot fellowship) {
         List<FellowshipInviteTargetSnapshot> result =
@@ -380,8 +377,7 @@ public final class FellowshipStateSnapshot {
         }
         for (FellowshipInviteTargetSnapshot target : this.inviteTargets) {
             if (!fellowship.containsMember(target.getIdentityId())
-                    && !(target.getPlayerName().length() > 0
-                            && fellowship.hasMemberOwnedBy(target.getOwnerId()))
+                    && !fellowship.hasMemberOwnedBy(target.getOwnerId())
                     && !invited(fellowship, target)) {
                 result.add(target);
             }
@@ -482,7 +478,9 @@ public final class FellowshipStateSnapshot {
             }
             String name = state.getFellowshipName(invitation.getFellowshipId());
             if (name != null) {
-                result.add(FellowshipInvitationSnapshot.fromInvitation(invitation, name));
+                result.add(FellowshipInvitationSnapshot.fromInvitation(invitation, name,
+                        state.getAccountName(invitation.getInvitingOwnerId()),
+                        state.getAccountName(invitation.getTargetOwnerId())));
             }
         }
         return result;

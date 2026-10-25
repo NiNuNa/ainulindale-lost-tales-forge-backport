@@ -1,5 +1,7 @@
 {
   "view": "custom",
   "locked": false,
+  "place": "middle",
+  "stage": false,
   "pages": ["new_page"]
 }

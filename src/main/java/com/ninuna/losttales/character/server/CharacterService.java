@@ -184,8 +184,8 @@ public final class CharacterService {
         CharacterAppearanceValidationResult appearance =
                 CharacterValidator.validateAppearance(roster, characterId,
                         newName, current.getRaceId(),
-                        current.getGenderId(), current.getSkinId(),
-                        current.getBodyTypeId(), current.getChestTypeId(),
+                        current.getBodyTypeId(), current.getSkinId(),
+                        current.getArmsId(), current.getChestTypeId(),
                         current.getProfile().section(CharacterProfile.Section.HISTORY),
                         current.getAge());
         if (!appearance.isValid()) {
@@ -374,14 +374,14 @@ public final class CharacterService {
     }
 
     /**
-     * A character's look — its skin, arm width and chest — which its player
+     * A character's look — its skin, arms and chest — which its player
      * may change at any time, as Save in Change Look sends it; name, race,
-     * sex and faction stay. A lore character keeps the look its story
+     * body type and faction stay. A lore character keeps the look its story
      * gives it.
      */
     public synchronized CharacterOperationResult updateLook(
             EntityPlayerMP player, long expectedRosterRevision, UUID characterId,
-            String skinId, String bodyTypeId, String chestTypeId) {
+            String skinId, String armsId, String chestTypeId) {
         CharacterValidationResult playerValidation = validateServerPlayer(player);
         if (!playerValidation.isValid()) {
             return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
@@ -417,7 +417,7 @@ public final class CharacterService {
         }
         RoleplayCharacter current = roster.getCharacter(characterId);
         CharacterAppearanceValidationResult validation =
-                CharacterValidator.validateLook(current, skinId, bodyTypeId,
+                CharacterValidator.validateLook(current, skinId, armsId,
                         chestTypeId);
         if (!validation.isValid()) {
             return CharacterOperationResult.failure(validation.getErrorId(),
@@ -425,13 +425,13 @@ public final class CharacterService {
         }
         ValidatedCharacterAppearance look = validation.getAppearance();
         if (look.getSkinId().equals(current.getSkinId())
-                && look.getBodyTypeId().equals(current.getBodyTypeId())
+                && look.getArmsId().equals(current.getArmsId())
                 && look.getChestTypeId().equals(current.getChestTypeId())) {
             return CharacterOperationResult.success(false, roster, current);
         }
         RoleplayCharacter updated = RoleplayCharacter.builder(current)
                 .skin(look.getSkinId())
-                .bodyType(look.getBodyTypeId())
+                .arms(look.getArmsId())
                 .chestType(look.getChestTypeId())
                 .build();
         if (!roster.replaceCharacter(updated)) {
@@ -549,7 +549,7 @@ public final class CharacterService {
                     .slot(creation.getSlotIndex())
                     .name(creation.getName())
                     .race(creation.getRaceId())
-                    .gender(creation.getGenderId())
+                    .bodyType(creation.getBodyTypeId())
                     .skin(creation.getSkinId())
                     .age(creation.getAge())
                     .startingFaction(creation.getStartingFactionId())
@@ -559,7 +559,7 @@ public final class CharacterService {
                     .profile(CharacterProfile.EMPTY.withSection(
                             CharacterProfile.Section.HISTORY,
                             creation.getHistory()))
-                    .bodyType(creation.getBodyTypeId())
+                    .arms(creation.getArmsId())
                     .chestType(creation.getChestTypeId())
                     .build();
         }

@@ -20,7 +20,7 @@ public final class CharacterAppearanceSyncPacketTest {
         UUID playerId = UUID.randomUUID();
         CharacterAppearance appearance = new CharacterAppearance(
                 playerId, "Steve123", "Aragorn", "losttales:human",
-                "losttales:male", "losttales:human_ranger_male_2",
+                "losttales:masculine", "losttales:human_ranger_masculine_2",
                 true, "", "lotr:gondor", 87,
                 "", "");
         ByteBuf buffer = Unpooled.buffer();
@@ -53,7 +53,7 @@ public final class CharacterAppearanceSyncPacketTest {
         CharacterAppearance appearance = new CharacterAppearance(
                 CharacterAppearanceKind.CHARACTER, playerId, characterId,
                 "Steve123", "Aragorn", "losttales:human",
-                "losttales:male", "losttales:human_ranger_male_2",
+                "losttales:masculine", "losttales:human_ranger_masculine_2",
                 true, "", "lotr:gondor", 87, "", "");
         ByteBuf buffer = Unpooled.buffer();
         new CharacterAppearanceSyncPacket(false, Collections.singletonList(appearance))
@@ -93,8 +93,8 @@ public final class CharacterAppearanceSyncPacketTest {
         ByteBuf buffer = Unpooled.buffer();
         new CharacterAppearanceSyncPacket(false, Collections.singletonList(
                 new CharacterAppearance(UUID.randomUUID(), "Steve", "Amdir",
-                        "losttales:elf", "losttales:male",
-                        "losttales:elf_high_male_0", true, "",
+                        "losttales:elf", "losttales:masculine",
+                        "losttales:elf_high_masculine_0", true, "",
                         "lotr:high_elf", 2000, "", "")))
                 .toBytes(buffer);
         ByteBuf truncated = buffer.slice(0, buffer.readableBytes() - 6);
@@ -111,7 +111,7 @@ public final class CharacterAppearanceSyncPacketTest {
     public void anAgeBelowZeroIsNotKnown() {
         CharacterAppearance appearance = new CharacterAppearance(
                 UUID.randomUUID(), "Steve", "Amdir", "losttales:elf",
-                "losttales:male", "losttales:elf_high_male_0", true, "",
+                "losttales:masculine", "losttales:elf_high_masculine_0", true, "",
                 "lotr:high_elf", -1, "", "");
         assertEquals(0, appearance.getAge());
     }

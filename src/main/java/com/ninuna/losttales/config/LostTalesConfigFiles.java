@@ -14,9 +14,9 @@ import java.io.File;
  *             windows/&lt;account uuid&gt;.txt, views/ (the player's own view files),
  *             hud_layouts/ (the player's own HUD layouts)
  *   server/   server.cfg, roles.cfg, channels.cfg
- *   lore_characters/   content both sides read; not configuration
  *   quests/, skills/, deeds/, races/, capes/, kits/, missives/, map_markers/,
- *   structures/        the server's own content files (MOD-17), read as it starts
+ *   structures/, lore_characters/
+ *                      the server's own content files (MOD-17), read as it starts
  * </pre>
  *
  * <p>The client folder holds what one installation decides for itself

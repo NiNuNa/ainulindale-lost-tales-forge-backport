@@ -29,10 +29,12 @@ public final class LostTalesQuestDefinitionJsonParser {
             "rewards", "interaction", "markers", "journalLog", "dialogue",
             "world", "stages", LostTalesQuestRules.RETURN_TO,
             LostTalesQuestRules.TIME_LIMIT, LostTalesQuestRules.FAIL_ON,
+            LostTalesQuestRules.REPEAT_AFTER,
             LostTalesQuestRules.PODIUM, LostTalesQuestRules.RUMOUR);
     /** The rules a quest's top level may write: texts kept in its rules. */
     private static final String[] QUEST_RULES = { LostTalesQuestRules.RETURN_TO,
-            LostTalesQuestRules.TIME_LIMIT, LostTalesQuestRules.FAIL_ON };
+            LostTalesQuestRules.TIME_LIMIT, LostTalesQuestRules.FAIL_ON,
+            LostTalesQuestRules.REPEAT_AFTER };
     /** The keys a stage may hold. */
     static final Set<String> STAGE_KEYS = keys("id", "objectives",
             LostTalesQuestRules.TIME_LIMIT, LostTalesQuestRules.NEXT,

@@ -1,7 +1,10 @@
 package com.ninuna.losttales.gui.style;
 
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
+import org.lwjgl.opengl.GL11;
 
 /**
  * The ink every Lost Tales control is drawn with, wherever it stands.
@@ -9,9 +12,12 @@ import net.minecraft.client.renderer.Tessellator;
  * <p>The chat settled these rules first and they are not the chat's:
  * one ivory for words, one plum-black shadow a pixel down and right at
  * two thirds of what it follows, one surface tone that lights toward
- * the secondary colour ({@link LostTalesUiTheme}), and one way of laying a flat colour over a rectangle. A
- * screen that wants to look like the rest of the mod draws from here
- * rather than choosing again.</p>
+ * the secondary colour ({@link LostTalesUiTheme}), and one way of laying a flat colour over a rectangle
+ * or a diamond. It also keeps the drawing state those need: blending for
+ * content after a panel ({@link #beginContent}) and runs of untextured
+ * quads ({@link #beginQuads}, {@link #endQuads}). A screen that wants to
+ * look like the rest of the mod draws from here rather than choosing
+ * again.</p>
  *
  * <p>Colours are alpha-free RGB: a control that animates its own
  * opacity puts the alpha on with {@link #argb} as it draws, so a tone
@@ -45,6 +51,13 @@ public final class LostTalesUiInk {
 
     /** Rows the font's capitals stand, from their top to their baseline. */
     public static final int CAP_HEIGHT = 7;
+
+    /** The diamond mark's rows; its middle row is the one it is placed by. */
+    public static final int DIAMOND_HEIGHT = 7;
+    /** The diamond mark's width at its widest rows. */
+    public static final int DIAMOND_WIDTH = 5;
+    /** How far each of the diamond's rows reaches either side of its middle column, top to bottom. */
+    private static final int[] DIAMOND_REACH = {0, 1, 2, 2, 2, 1, 0};
 
     private LostTalesUiInk() {}
 
@@ -130,21 +143,105 @@ public final class LostTalesUiInk {
         if (alpha <= 0 || right <= left || bottom <= top) {
             return;
         }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(false);
+        Tessellator tessellator = beginQuads(false);
         tessellator.setColorRGBA_I(argb & 0xFFFFFF, alpha);
         tessellator.addVertex(left, bottom, 0.0D);
         tessellator.addVertex(right, bottom, 0.0D);
         tessellator.addVertex(right, top, 0.0D);
         tessellator.addVertex(left, top, 0.0D);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, false);
+        endQuads(tessellator, false);
     }
 
     /**
-     * Puts blending back the way content needs it after any
-     * {@code drawRect}; see {@link LostTalesSkyrimUiStyle#beginContent}.
+     * How far row {@code row} of the diamond mark, counted from its top,
+     * reaches either side of its middle column: nothing at its tip rows,
+     * two at its widest. Minus one for a row the diamond does not have.
+     */
+    public static int diamondReach(int row) {
+        return row < 0 || row >= DIAMOND_REACH.length ? -1
+                : DIAMOND_REACH[row];
+    }
+
+    /**
+     * The diamond mark, {@link #DIAMOND_WIDTH} wide and
+     * {@link #DIAMOND_HEIGHT} high, its middle pixel at {@code centreX},
+     * {@code centreY}, in one flat colour. Each row is laid once, so a
+     * diamond drawn at part strength is even all over. Puts the drawing
+     * state back the way it was found.
+     */
+    public static void fillDiamond(int centreX, int centreY, int argb) {
+        int alpha = argb >>> 24;
+        if (alpha <= 0) {
+            return;
+        }
+        int top = centreY - DIAMOND_HEIGHT / 2;
+        Tessellator tessellator = beginQuads(false);
+        tessellator.setColorRGBA_I(argb & 0xFFFFFF, alpha);
+        for (int row = 0; row < DIAMOND_HEIGHT; row++) {
+            int reach = diamondReach(row);
+            int y = top + row;
+            tessellator.addVertex(centreX - reach, y + 1, 0.0D);
+            tessellator.addVertex(centreX + reach + 1, y + 1, 0.0D);
+            tessellator.addVertex(centreX + reach + 1, y, 0.0D);
+            tessellator.addVertex(centreX - reach, y, 0.0D);
+        }
+        endQuads(tessellator, false);
+    }
+
+    /**
+     * Puts blending back the way content needs it.
+     *
+     * <p>{@link Gui#drawRect} disables {@code GL_BLEND} when it finishes,
+     * and every panel, rule and row is built from it. Text or a sprite
+     * drawn afterwards would land fully opaque, which turns a translucent
+     * shadow into a solid one. Anything drawn after a panel calls this
+     * first, once for each run of text, icons or sprites.</p>
      */
     public static void beginContent() {
-        LostTalesSkyrimUiStyle.beginContent();
+        GL11.glEnable(GL11.GL_BLEND);
+        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+    }
+
+    /**
+     * Begins a run of untextured quads and answers the tessellator they
+     * are added to.
+     *
+     * <p>Rules, panels, fades and backdrops are all built from these.
+     * {@link #endQuads} puts back everything the run changed, the draw
+     * colour included, so a coloured quad never tints what is drawn
+     * next.</p>
+     *
+     * @param smooth whether the run shades between its vertices. A single
+     *               flat quad does not, and asking for it would be two
+     *               state changes for nothing.
+     */
+    public static Tessellator beginQuads(boolean smooth) {
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
+        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+        if (smooth) {
+            GL11.glShadeModel(GL11.GL_SMOOTH);
+        }
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        return tessellator;
+    }
+
+    /** Draws a run begun by {@link #beginQuads} and puts the state back. */
+    public static void endQuads(Tessellator tessellator, boolean smooth) {
+        if (tessellator != null) {
+            tessellator.draw();
+        }
+        if (smooth) {
+            GL11.glShadeModel(GL11.GL_FLAT);
+        }
+        GL11.glDisable(GL11.GL_BLEND);
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     /** Text in an explicit colour with the shared shadow treatment. */

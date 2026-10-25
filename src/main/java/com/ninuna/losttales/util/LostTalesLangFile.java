@@ -12,9 +12,10 @@ import java.util.Map;
 /**
  * The mod's English lang file, read from its own resources: each line
  * {@code key=words}, a line starting with {@code #} a comment. What needs
- * words in English whatever the game's language, before the game has
- * loaded its lang files: the config files' comments, written at the first
- * load. The game shows a player every other line in their own language.
+ * words in English whatever the game's or the server's language: the
+ * config files' comments, written at the first load before the game has
+ * loaded its lang files, and the channel names in the Server Log. The game
+ * shows a player every other line in their own language.
  */
 public final class LostTalesLangFile {
     /** Where the English lines are, among the mod's resources. */

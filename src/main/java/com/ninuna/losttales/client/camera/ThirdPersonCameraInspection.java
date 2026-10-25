@@ -11,8 +11,9 @@ import org.lwjgl.opengl.GL11;
  * the world: stood in front of it, orbiting it as the player drags,
  * framing it where the screen asks.
  *
- * <p>The creator uses it in place of a drawn model. Skyrim does the same:
- * there is no doll in a box, the camera simply steps round to face you.
+ * <p>A stage view uses it in place of a drawn model ({@code Stage}).
+ * Skyrim does the same: there is no doll in a box, the camera simply
+ * steps round to face you.
  * While a screen holds the camera, the perspective is third person
  * whatever it was before, the orbit is the screen's rather than the
  * player's look direction, and the character is placed at a chosen point

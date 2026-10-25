@@ -1,12 +1,16 @@
 package com.ninuna.losttales.quest.world;
 
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
 import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -69,17 +73,11 @@ public final class WorldQuestSchedules {
             return;
         }
         Store store = store(server);
-        if (store == null || !store.isUsable()) {
+        if (store == null) {
             return;
         }
-        TimeZone zone = TimeZone.getDefault();
-        for (WorldQuestSchedule schedule : schedules) {
-            long due = schedule.latestDue(nowMillis, zone);
-            if (!WorldQuestSchedule.isToday(due, nowMillis, zone)
-                    || due <= store.lastStart(schedule.getLine())) {
-                continue;
-            }
-            store.started(schedule.getLine(), due);
+        for (WorldQuestSchedule schedule : due(schedules, store, nowMillis,
+                TimeZone.getDefault())) {
             WorldQuests.StartResult result = WorldQuests.start(server,
                     schedule.getQuestId());
             if (result != WorldQuests.StartResult.STARTED
@@ -88,6 +86,33 @@ public final class WorldQuestSchedules {
                         + " its quest: %s", schedule.getLine(), result);
             }
         }
+    }
+
+    /**
+     * The schedules whose quest starts now: each whose time has come
+     * today and was not kept yet, kept in the record before its quest
+     * starts. None while the record cannot be read, and none whose line
+     * the record has no room for, since its quest would start again after
+     * a restart.
+     */
+    static List<WorldQuestSchedule> due(List<WorldQuestSchedule> schedules,
+                                        Store store, long nowMillis,
+                                        TimeZone zone) {
+        List<WorldQuestSchedule> due = new ArrayList<WorldQuestSchedule>();
+        if (!store.isUsable()) {
+            return due;
+        }
+        for (WorldQuestSchedule schedule : schedules) {
+            long at = schedule.latestDue(nowMillis, zone);
+            if (!WorldQuestSchedule.isToday(at, nowMillis, zone)
+                    || at <= store.lastStart(schedule.getLine())) {
+                continue;
+            }
+            if (store.started(schedule.getLine(), at)) {
+                due.add(schedule);
+            }
+        }
+        return due;
     }
 
     private static Store store(MinecraftServer server) {
@@ -106,21 +131,35 @@ public final class WorldQuestSchedules {
 
     /**
      * When each schedule last started its quest, by its line, in real
-     * milliseconds. Data of another version is kept as it was and no
-     * schedule starts anything, rather than one starting twice.
+     * milliseconds. An entry that cannot be read, or the earlier of two
+     * for one line, is set aside in the quarantine, never dropped
+     * (DATA-10). Data of another version, a quarantine this build cannot
+     * read, or one that would hold more than {@link NbtQuarantine#MAX_ENTRIES}
+     * is kept as it was and no schedule starts anything, rather than one
+     * starting twice. A line is never forgotten: once the record holds
+     * {@link #MAX_ENTRIES} lines, a line it does not hold yet starts nothing.
      */
     public static final class Store extends WorldSavedData {
         public static final String DATA_NAME = "losttales_world_quest_schedule";
-        static final int DATA_VERSION = 1;
-        /** The most schedules remembered; as many as a settings list holds sensibly. */
+        static final int DATA_VERSION = 2;
+        /** The most schedule lines remembered; as many as a settings list holds sensibly. */
         static final int MAX_ENTRIES = 256;
+        /** The longest line remembered. */
+        static final int MAX_LINE_LENGTH = 512;
         static final String TAG_VERSION = "DataVersion";
         static final String TAG_STARTS = "Starts";
         static final String TAG_LINE = "Line";
         static final String TAG_AT = "At";
+        /** Where an entry set aside stood in the list of starts. */
+        static final String TAG_START_INDEX = "StartIndex";
 
         private final Map<String, Long> starts = new LinkedHashMap<String, Long>();
+        private final List<NBTTagCompound> quarantined = new ArrayList<NBTTagCompound>();
+        /** The lines refused since the record was read, so each is logged once. */
+        private final Set<String> refused = new HashSet<String>();
         private NBTTagCompound preserved;
+        /** Why the record is kept as it was, for the log. */
+        private String preservedBecause;
         private boolean warned;
 
         public Store(String name) {
@@ -130,21 +169,81 @@ public final class WorldQuestSchedules {
         @Override
         public synchronized void readFromNBT(NBTTagCompound compound) {
             this.starts.clear();
+            this.quarantined.clear();
+            this.refused.clear();
             this.preserved = null;
-            if (compound.getInteger(TAG_VERSION) != DATA_VERSION
-                    || !NbtTags.hasCompoundListWithinLimit(compound, TAG_STARTS, MAX_ENTRIES)) {
-                this.preserved = (NBTTagCompound) compound.copy();
+            this.preservedBecause = null;
+            this.warned = false;
+            if (compound.getInteger(TAG_VERSION) != DATA_VERSION) {
+                preserve(compound, "it is of version "
+                        + compound.getInteger(TAG_VERSION));
                 return;
             }
+            if (!NbtTags.hasCompoundListWithinLimit(compound, TAG_STARTS, MAX_ENTRIES)) {
+                preserve(compound, "its starts are no list of at most "
+                        + MAX_ENTRIES + " entries");
+                return;
+            }
+            NbtQuarantine.Read stored = NbtQuarantine.read(compound);
+            if (!stored.isSupported()) {
+                preserve(compound, "its quarantine cannot be read");
+                return;
+            }
+            List<NBTTagCompound> aside = new ArrayList<NBTTagCompound>(stored.getEntries());
+            Map<String, Integer> indexByLine = new HashMap<String, Integer>();
             NBTTagList list = compound.getTagList(TAG_STARTS, Constants.NBT.TAG_COMPOUND);
             for (int index = 0; index < list.tagCount(); index++) {
                 NBTTagCompound entry = list.getCompoundTagAt(index);
-                String line = entry.getString(TAG_LINE);
-                if (line.length() > 0 && line.length() <= 512
-                        && entry.hasKey(TAG_AT, Constants.NBT.TAG_LONG)) {
-                    this.starts.put(line, Long.valueOf(entry.getLong(TAG_AT)));
+                String problem = problem(entry);
+                if (problem.length() > 0) {
+                    aside.add(NbtQuarantine.entry(problem, TAG_START_INDEX, index, entry));
+                    continue;
                 }
+                String line = entry.getString(TAG_LINE);
+                long at = entry.getLong(TAG_AT);
+                Long earlier = this.starts.get(line);
+                if (earlier == null) {
+                    this.starts.put(line, Long.valueOf(at));
+                    indexByLine.put(line, Integer.valueOf(index));
+                    continue;
+                }
+                // The later time stays; on a tie, the one read first.
+                int setAside = index;
+                if (at > earlier.longValue()) {
+                    setAside = indexByLine.get(line).intValue();
+                    this.starts.put(line, Long.valueOf(at));
+                    indexByLine.put(line, Integer.valueOf(index));
+                }
+                aside.add(NbtQuarantine.entry("duplicate_line", TAG_START_INDEX,
+                        setAside, list.getCompoundTagAt(setAside)));
             }
+            if (aside.size() > NbtQuarantine.MAX_ENTRIES) {
+                this.starts.clear();
+                preserve(compound, "its quarantine would hold " + aside.size()
+                        + " entries, past its " + NbtQuarantine.MAX_ENTRIES);
+                return;
+            }
+            this.quarantined.addAll(aside);
+            if (aside.size() > stored.getEntries().size()) {
+                markDirty();
+            }
+        }
+
+        /** Why a saved start cannot be read, as its quarantine reason; empty for one that can. */
+        private static String problem(NBTTagCompound entry) {
+            if (!entry.hasKey(TAG_LINE, Constants.NBT.TAG_STRING)) {
+                return "missing_line";
+            }
+            String line = entry.getString(TAG_LINE);
+            if (line.length() == 0 || line.length() > MAX_LINE_LENGTH) {
+                return "unreadable_line";
+            }
+            return entry.hasKey(TAG_AT, Constants.NBT.TAG_LONG) ? "" : "missing_time";
+        }
+
+        private void preserve(NBTTagCompound compound, String because) {
+            this.preserved = (NBTTagCompound) compound.copy();
+            this.preservedBecause = because;
         }
 
         @Override
@@ -162,13 +261,16 @@ public final class WorldQuestSchedules {
                 list.appendTag(tag);
             }
             compound.setTag(TAG_STARTS, list);
+            NbtQuarantine.write(compound, this.quarantined);
         }
 
+        /** Whether schedules may start quests; a record kept as it was is logged once. */
         synchronized boolean isUsable() {
             if (this.preserved != null && !this.warned) {
                 this.warned = true;
                 LostTalesLog.warning("The world quest schedules' record cannot be"
-                        + " read; no schedule starts a quest until it can");
+                        + " read, since %s; no schedule starts a quest until it can",
+                        this.preservedBecause);
             }
             return this.preserved == null;
         }
@@ -179,17 +281,36 @@ public final class WorldQuestSchedules {
             return at == null ? 0L : at.longValue();
         }
 
-        /** Keeps that the schedule started its quest for the time {@code at}. */
-        synchronized void started(String line, long at) {
-            if (line == null || line.length() == 0 || line.length() > 512) {
-                return;
+        /**
+         * Keeps that the schedule started its quest for the time
+         * {@code at}. False, and its quest is not to start, when the record
+         * cannot keep the line: one it does not hold yet while it holds
+         * {@link #MAX_ENTRIES}, or one longer than {@link #MAX_LINE_LENGTH}.
+         * Each line refused is logged once.
+         */
+        synchronized boolean started(String line, long at) {
+            if (this.preserved != null || line == null || line.length() == 0) {
+                return false;
             }
-            this.starts.remove(line);
-            while (this.starts.size() >= MAX_ENTRIES) {
-                this.starts.remove(this.starts.keySet().iterator().next());
+            if (line.length() > MAX_LINE_LENGTH) {
+                refuse(line, "it is longer than " + MAX_LINE_LENGTH + " characters");
+                return false;
+            }
+            if (!this.starts.containsKey(line) && this.starts.size() >= MAX_ENTRIES) {
+                refuse(line, "the record holds its " + MAX_ENTRIES
+                        + " schedules and forgets none");
+                return false;
             }
             this.starts.put(line, Long.valueOf(at));
             markDirty();
+            return true;
+        }
+
+        private void refuse(String line, String because) {
+            if (this.refused.add(line)) {
+                LostTalesLog.warning("The world quest schedule '%s' starts nothing,"
+                        + " since %s", line, because);
+            }
         }
     }
 }

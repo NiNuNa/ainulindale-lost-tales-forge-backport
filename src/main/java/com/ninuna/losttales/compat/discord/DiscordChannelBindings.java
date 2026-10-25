@@ -2,7 +2,6 @@ package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatCodeNames;
-import com.ninuna.losttales.chat.ChatRecipientRule;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,7 +47,8 @@ import java.util.regex.Pattern;
  * asks for something it cannot have is trimmed to what it can, with one
  * warning each, and an entry for a private channel is refused outright:
  * the channel's own word on whether it may be bridged is final. So is an
- * entry for a channel whose gate lets nobody read it, by the gates in
+ * entry for a channel heard only nearby, whatever its word (DISC-03), and
+ * one for a channel whose gate lets nobody read it, by the gates in
  * force as the bridge starts; a change to the gates restarts it. A fresh
  * file holds no link: links are made with a pairing code
  * ({@link DiscordLinkCodes}).
@@ -204,6 +204,12 @@ public final class DiscordChannelBindings {
                     + " channel refused: that channel is private and never leaves the game");
             return null;
         }
+        if (DiscordBridgePolicy.isHeardNearby(channel)) {
+            warn(warnings, "Discord binding for the " + channel.getDisplayName()
+                    + " channel refused: that channel is heard only nearby and never"
+                    + " leaves the game");
+            return null;
+        }
         if (!DiscordBridgePolicy.isOpenToTheBridge(channel)) {
             warn(warnings, "Discord binding for the " + channel.getDisplayName()
                     + " channel refused: its gate in channels.cfg lets nobody read it,"
@@ -291,19 +297,10 @@ public final class DiscordChannelBindings {
                 posters.put(binding.getWebhookUrl(), key);
                 posters.put(binding.getWebhookUrl() + "\nid", id);
             }
-            if (direction.readsFromDiscord()) {
-                String why = null;
-                if (!botTokenPresent) {
-                    why = "needs the bot token to read";
-                } else if (binding.getChannel().getRecipientRule()
-                        == ChatRecipientRule.PROXIMITY) {
-                    why = "is the proximity channel, which has no place on Discord to read from";
-                }
-                if (why != null) {
-                    warn(warnings, "Discord binding '" + id + "' " + why
-                            + "; reading is off");
-                    direction = direction.withoutReads();
-                }
+            if (direction.readsFromDiscord() && !botTokenPresent) {
+                warn(warnings, "Discord binding '" + id + "' needs the bot token to read;"
+                        + " reading is off");
+                direction = direction.withoutReads();
             }
             String discordChannel = binding.getDiscordChannelId();
             if (direction.readsFromDiscord() || direction.sendsToDiscord()) {

@@ -10,6 +10,7 @@ import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorld
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
+import com.ninuna.losttales.character.registry.CharacterFactionResolver;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.server.CharacterOperationResult;
@@ -34,7 +35,6 @@ import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -278,9 +278,14 @@ public final class LoreCharacterTransferCoordinator {
         }
     }
 
-    /** Completes all durable operations, including operations for offline owners. */
+    /**
+     * Completes all durable operations, including operations for offline
+     * owners. A claim needs its figure, so nothing is done until the lore
+     * files are read as the server starts, after its races.
+     */
     public synchronized void recoverAll(World world) {
         if (world == null || world.isRemote) return;
+        if (!LoreCharacterRegistry.isLoaded()) return;
         Stores stores;
         try {
             stores = Stores.open(world);
@@ -504,7 +509,7 @@ public final class LoreCharacterTransferCoordinator {
         return CharacterErrorId.NONE;
     }
 
-    /** The figure as first claimed; null when no starting faction the server allows fits it. */
+    /** The figure as first claimed; null while it cannot start in its file's faction. */
     private static RoleplayCharacter createInitialCharacter(
             LoreCharacterDefinition definition,
             UUID characterId,
@@ -512,13 +517,15 @@ public final class LoreCharacterTransferCoordinator {
             int slotIndex) {
         LoreCharacterDefinition.Appearance appearance =
                 definition.getAppearance();
-        String faction = chooseFaction(appearance);
+        String faction = startingFaction(definition,
+                LotrCharacterAdapter.getInstance(),
+                CharacterRaceRegistry.get(appearance.getRaceId()));
         if (faction == null) return null;
         String waypoint = LotrCharacterAdapter.getInstance()
                 .resolveStartingWaypointId(faction, "", false);
         return RoleplayCharacter.builder(characterId, ownerId)
                 .slot(slotIndex).name(definition.getName())
-                .race(appearance.getRaceId()).gender(appearance.getGenderId())
+                .race(appearance.getRaceId()).bodyType(appearance.getBodyTypeId())
                 .skin(appearance.getSkinId()).age(definition.getAge())
                 .startingFaction(faction)
                 .createdAt(System.currentTimeMillis())
@@ -527,40 +534,19 @@ public final class LoreCharacterTransferCoordinator {
                 .build();
     }
 
-    private static String chooseFaction(
-            LoreCharacterDefinition.Appearance appearance) {
-        if (appearance == null) return null;
-        CharacterRaceDefinition race = CharacterRaceRegistry.get(
-                appearance.getRaceId());
-        if (race == null) return null;
-        LotrCharacterAdapter adapter = LotrCharacterAdapter.getInstance();
-        List<String> ids = adapter.getPlayableFactionIds();
-        String hint = factionHint(appearance);
-        String fallback = null;
-        for (String id : ids) {
-            CharacterFactionDefinition faction = adapter.resolve(id);
-            if (faction == null || !race.isCompatibleWith(faction)) continue;
-            if (fallback == null) fallback = id;
-            String compact = id.toLowerCase(Locale.ROOT)
-                    .replace("_", "").replace("-", "");
-            if (hint.length() > 0 && compact.contains(hint)) return id;
-        }
-        return fallback;
-    }
-
-    private static String factionHint(
-            LoreCharacterDefinition.Appearance appearance) {
-        String skin = appearance.getSkinId().toLowerCase(Locale.ROOT);
-        String race = appearance.getRaceId();
-        if (skin.contains("rohan")) return "rohan";
-        if (skin.contains("gondor")) return "gondor";
-        if (skin.contains("bree")) return "bree";
-        if (CharacterRaceRegistry.HOBBIT.equals(race)) return "hobbit";
-        if (CharacterRaceRegistry.ELF.equals(race)) return "highelf";
-        if (CharacterRaceRegistry.DWARF.equals(race)) return "durinsfolk";
-        if (CharacterRaceRegistry.ORC.equals(race)
-                || CharacterRaceRegistry.URUK.equals(race)) return "mordor";
-        return "bree";
+    /**
+     * The faction the figure's file names (CHAR-44), as LOTR writes it,
+     * while its race may start there and the server's allow and deny lists
+     * let it; null otherwise. Nothing else is tried.
+     */
+    static String startingFaction(LoreCharacterDefinition definition,
+                                  CharacterFactionResolver factions,
+                                  CharacterRaceDefinition race) {
+        if (definition == null || factions == null || race == null) return null;
+        CharacterFactionDefinition faction = factions.resolve(
+                definition.getFactionId());
+        return faction != null && race.isCompatibleWith(faction)
+                ? faction.getId() : null;
     }
 
     /**

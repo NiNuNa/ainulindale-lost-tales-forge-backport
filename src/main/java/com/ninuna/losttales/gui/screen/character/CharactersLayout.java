@@ -10,10 +10,8 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
  * <p>The page is the roster, a panel the tool strip's left button folds
  * away, beside the profile of the character picked in it, split by one
  * rule. A page too narrow for both shows one of them over the whole body:
- * the roster while it is out, else the profile. The profile is one
- * column; in a room wide enough the figure stands at its left and the
- * words scroll beside it, else the figure stands at the column's top and
- * scrolls with the words.</p>
+ * the roster while it is out, else the profile, one column of words. The
+ * character itself stands on the stage beside the window.</p>
  *
  * <p>Free of Minecraft: the geometry is arithmetic, and a test can ask it
  * every question the page does.</p>
@@ -29,9 +27,6 @@ public final class CharactersLayout {
     public static final int ROSTER_MAX_WIDTH = 170;
     /** The narrowest profile the words still read in. */
     public static final int PROFILE_MIN_WIDTH = 150;
-    /** The figure's box beside the words, and its height above them in a narrow room. */
-    public static final int FIGURE_WIDTH = 110;
-    public static final int FIGURE_HEIGHT = 120;
     /** The narrowest page the roster and the profile both fit on. */
     public static final int MIN_SPLIT_WIDTH =
             2 * MARGIN_X + ROSTER_MIN_WIDTH + 2 * GUTTER + 1 + PROFILE_MIN_WIDTH;
@@ -109,47 +104,5 @@ public final class CharactersLayout {
         return new LostTalesUiHitBox(left, MARGIN_Y,
                 Math.max(0, this.pageWidth - MARGIN_X - left),
                 Math.max(0, this.pageHeight - 2 * MARGIN_Y));
-    }
-
-    /** Whether the figure stands at the profile's left, the words beside it. */
-    public boolean figureBeside() {
-        return profile().width >= FIGURE_WIDTH + GUTTER + PROFILE_MIN_WIDTH;
-    }
-
-    /**
-     * The figure's box: at the profile's left the profile's height, or at
-     * its top the profile's width, {@code scroll} pixels up with the words.
-     */
-    public LostTalesUiHitBox figure(int scroll) {
-        LostTalesUiHitBox profile = profile();
-        if (profile.width <= 0) {
-            return none();
-        }
-        if (figureBeside()) {
-            return new LostTalesUiHitBox(profile.left, profile.top,
-                    FIGURE_WIDTH, profile.height);
-        }
-        return new LostTalesUiHitBox(profile.left, profile.top - scroll,
-                profile.width, FIGURE_HEIGHT);
-    }
-
-    /**
-     * The words' column: beside the figure, or the whole profile with the
-     * figure the first thing in it; the words start at its top plus
-     * {@link #wordsOffset}.
-     */
-    public LostTalesUiHitBox words() {
-        LostTalesUiHitBox profile = profile();
-        if (profile.width <= 0 || !figureBeside()) {
-            return profile;
-        }
-        int left = (int)profile.left + FIGURE_WIDTH + GUTTER;
-        return new LostTalesUiHitBox(left, profile.top,
-                Math.max(0, (int)profile.right() - left), profile.height);
-    }
-
-    /** How far down the words' column the words start: under the figure where it stands on top. */
-    public int wordsOffset() {
-        return figureBeside() ? 0 : FIGURE_HEIGHT + GUTTER;
     }
 }

@@ -1,0 +1,22 @@
+{
+  "id": "losttales:uruk",
+  "helmet": [
+    "lotr:item.helmetUruk",
+    "lotr:item.helmetUrukBerserker"
+  ],
+  "chestplate": [
+    "lotr:item.bodyUruk"
+  ],
+  "leggings": [
+    "lotr:item.legsUruk"
+  ],
+  "boots": [
+    "lotr:item.bootsUruk"
+  ],
+  "bonus": [
+    {
+      "effect": "knockback",
+      "amount": 0.1
+    }
+  ]
+}

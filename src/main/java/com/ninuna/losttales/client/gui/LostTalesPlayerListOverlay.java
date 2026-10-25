@@ -7,7 +7,6 @@ import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.client.chat.ChatPresenceMark;
 import com.ninuna.losttales.client.chat.ClientChatPresence;
 import com.ninuna.losttales.client.chat.LostTalesChatVisualStyle;
@@ -122,7 +121,7 @@ public final class LostTalesPlayerListOverlay extends Gui {
             boolean ghost = isGhost(appearance);
             float strength = ghost ? GHOST_OPACITY : 1.0F;
             int textAlpha = Math.round(255 * strength);
-            LostTalesSkyrimUiStyle.beginContent();
+            LostTalesUiInk.beginContent();
             boolean known = appearance != null
                     && appearance.getPlayerId() != null;
             if (known) {
@@ -149,7 +148,7 @@ public final class LostTalesPlayerListOverlay extends Gui {
             ScorePlayerTeam team = scoreboard.getPlayersTeam(player.name);
             String shown = ScorePlayerTeam.formatPlayerName(team,
                     shownNameOf(appearance, player.name));
-            LostTalesSkyrimUiStyle.beginContent();
+            LostTalesUiInk.beginContent();
             font.drawStringWithShadow(shown, nameX, y,
                     textAlpha << 24 | LostTalesColors.TEXT_BRIGHT & 0xFFFFFF);
             if (ghost) {
@@ -173,7 +172,7 @@ public final class LostTalesPlayerListOverlay extends Gui {
                             LostTalesColors.GOLD);
                 }
             }
-            LostTalesSkyrimUiStyle.beginContent();
+            LostTalesUiInk.beginContent();
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             minecraft.getTextureManager().bindTexture(Gui.icons);
             DRAWER.zLevel += 100.0F;

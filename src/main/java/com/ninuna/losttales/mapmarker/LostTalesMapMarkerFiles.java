@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.data.DataFiles;
 import com.ninuna.losttales.data.JsonReading;
+import com.ninuna.losttales.world.waystone.LostTalesWaystoneHousePlacer;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneStructureRegistry;
 import java.io.File;
 import java.io.InputStream;
@@ -86,14 +87,33 @@ public final class LostTalesMapMarkerFiles {
     /**
      * Reads a server's own waystone houses, then its own marker files,
      * each marker checked against every house that loaded; answers why
-     * each file left out was left out. Called as the server starts and on
-     * {@code /losttales mapmarker reseed}.
+     * each file left out was left out. Called as the server starts.
      */
     public static List<String> loadServer() {
         List<String> problems = new ArrayList<String>(
                 LostTalesWaystoneStructureRegistry.loadServerHouses(folder(HOUSES_FOLDER)));
         problems.addAll(LostTalesMapMarkerCatalog.loadServerFiles(folder(FOLDER),
                 LostTalesWaystoneStructureRegistry.houseIds()));
+        return problems;
+    }
+
+    /**
+     * Reads the marker files again, bundled and the server's own, and the
+     * server's own waystone houses, each marker checked against every house
+     * that loaded, and puts houses and markers in place together once all
+     * are read: a read that fails leaves them as they were. Answers why each
+     * file left out was left out. Called on {@code /losttales reload
+     * markers} and {@code mapmarker reseed}.
+     */
+    public static List<String> reload() {
+        List<String> problems = new ArrayList<String>();
+        Map<String, LostTalesWaystoneHousePlacer> houses =
+                LostTalesWaystoneStructureRegistry.readServerHouses(folder(HOUSES_FOLDER), problems);
+        LostTalesMapMarkerCatalog.Read markers = LostTalesMapMarkerCatalog.read(folder(FOLDER),
+                LostTalesWaystoneStructureRegistry.houseIdsWith(houses));
+        problems.addAll(markers.getProblems());
+        LostTalesWaystoneStructureRegistry.putServerHouses(houses);
+        LostTalesMapMarkerCatalog.put(markers);
         return problems;
     }
 

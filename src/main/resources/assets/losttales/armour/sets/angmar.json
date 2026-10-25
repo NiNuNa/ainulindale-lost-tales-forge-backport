@@ -1,0 +1,21 @@
+{
+  "id": "losttales:angmar",
+  "helmet": [
+    "lotr:item.helmetAngmar"
+  ],
+  "chestplate": [
+    "lotr:item.bodyAngmar"
+  ],
+  "leggings": [
+    "lotr:item.legsAngmar"
+  ],
+  "boots": [
+    "lotr:item.bootsAngmar"
+  ],
+  "bonus": [
+    {
+      "effect": "knockback",
+      "amount": 0.1
+    }
+  ]
+}

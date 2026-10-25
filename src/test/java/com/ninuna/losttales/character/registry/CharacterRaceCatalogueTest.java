@@ -38,8 +38,8 @@ public final class CharacterRaceCatalogueTest {
         assertEquals(CharacterErrorId.INVALID_RACE,
                 CharacterValidator.validateAppearance(new CharacterRoster(OWNER), null,
                         "Bogdal", "losttales:half_troll",
-                        CharacterGenderRegistry.NON_BINARY, "losttales:half_troll_0",
-                        CharacterBodyTypeRegistry.WIDE,
+                        CharacterBodyTypeRegistry.NEUTRAL, "losttales:half_troll_0",
+                        CharacterArmsRegistry.BROAD,
                         CharacterChestTypeRegistry.CLASSIC, "", 25).getErrorId());
     }
 }

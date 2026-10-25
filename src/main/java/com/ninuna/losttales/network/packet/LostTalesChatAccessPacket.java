@@ -108,7 +108,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
             + 2 + ChatProfanityWords.MAX_WORDS
                     * (ChatProfanityWords.MAX_ENTRY_BYTES + 2)
             + 1 + ChatCommandText.MAX_LISTED_NAMES * (MAX_PRIVATE_COMMAND_BYTES + 2)
-            + 1 + MAX_DISCORD_LINKS * (MAX_DISCORD_LINK_BYTES + 2) + 1;
+            + 1 + MAX_DISCORD_LINKS * (MAX_DISCORD_LINK_BYTES + 2) + 1
+            + 1;
     /**
      * Every channel this build knows, by id: what a payload written
      * without a channel answer reads as, and what a client falls back to.
@@ -188,6 +189,11 @@ public final class LostTalesChatAccessPacket implements IMessage {
      * status: only then does a Discord member wear one.
      */
     private boolean discordStatuses;
+    /**
+     * Whether the server keeps a log of whispers, its audit log being on:
+     * what a whisper's help and the faint line at its top say (CHAT-85).
+     */
+    private boolean whispersLogged;
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -499,6 +505,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 links.add(key);
             }
             boolean statuses = buffer.readBoolean();
+            boolean logged = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             int knownMask = known.knownMask();
             List<RoleHolder> stated = new ArrayList<RoleHolder>(holderCount);
@@ -538,6 +545,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.privateCommands = Collections.unmodifiableList(commands);
             this.discordLinks = Collections.unmodifiableList(links);
             this.discordStatuses = statuses;
+            this.whispersLogged = logged;
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.roleMask = 0;
@@ -558,6 +566,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.privateCommands = Collections.emptyList();
             this.discordLinks = Collections.emptyList();
             this.discordStatuses = false;
+            this.whispersLogged = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -750,14 +759,15 @@ public final class LostTalesChatAccessPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer, name,
                     MAX_PRIVATE_COMMAND_BYTES);
         }
-        // Last, the channels linked to Discord, and whether Discord
-        // members wear their status.
+        // Then the channels linked to Discord, and whether Discord
+        // members wear their status; last, whether whispers are logged.
         buffer.writeByte(this.discordLinks.size());
         for (String key : this.discordLinks) {
             LostTalesPacketCodec.writeUtf8String(buffer, key,
                     MAX_DISCORD_LINK_BYTES);
         }
         buffer.writeBoolean(this.discordStatuses);
+        buffer.writeBoolean(this.whispersLogged);
     }
 
     /**
@@ -812,6 +822,15 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     /** Whether Discord members wear their Discord status on this server. */
     public boolean showsDiscordStatuses() { return this.discordStatuses; }
+
+    /** The same statement saying whether the server keeps a log of whispers. */
+    public LostTalesChatAccessPacket withWhispersLogged(boolean logged) {
+        this.whispersLogged = logged;
+        return this;
+    }
+
+    /** Whether the server keeps a log of whispers (CHAT-85). */
+    public boolean logsWhispers() { return this.whispersLogged; }
 
     /** A link key: a code name, lower case letters, digits and underscores. */
     static boolean isLinkKey(String key) {

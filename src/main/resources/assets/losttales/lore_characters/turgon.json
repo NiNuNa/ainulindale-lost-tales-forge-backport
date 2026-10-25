@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:turgon",
   "name": "Turgon",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:elf",
-    "genderId": "losttales:male",
-    "modelId": "lotr:elf",
-    "skinId": "losttales:elf_high_male_7"
-  }
+  "race": "losttales:elf",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:elf_high_masculine_7",
+  "faction": "lotr:high_elf"
 }

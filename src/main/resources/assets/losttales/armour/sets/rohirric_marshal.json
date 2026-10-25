@@ -1,0 +1,22 @@
+{
+  "id": "losttales:rohirric_marshal",
+  "helmet": [
+    "lotr:item.helmetRohanMarshal"
+  ],
+  "chestplate": [
+    "lotr:item.bodyRohanMarshal"
+  ],
+  "leggings": [
+    "lotr:item.legsRohanMarshal"
+  ],
+  "boots": [
+    "lotr:item.bootsRohanMarshal"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:blades"
+    }
+  ]
+}

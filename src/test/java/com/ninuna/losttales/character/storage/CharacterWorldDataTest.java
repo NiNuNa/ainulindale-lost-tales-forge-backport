@@ -2,9 +2,9 @@ package com.ninuna.losttales.character.storage;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.storage.NbtQuarantine;
@@ -292,7 +292,7 @@ public final class CharacterWorldDataTest {
         NBTTagCompound characterTag = firstCharacterOf(saved);
         characterTag.setString("RaceId", "myserver:beorning");
         characterTag.setString("SkinId", CharacterSkinRegistry.getDefaultSkinId(
-                CharacterRaceRegistry.ELF, CharacterGenderRegistry.MALE, CHARACTER_A));
+                CharacterRaceRegistry.ELF, CharacterBodyTypeRegistry.MASCULINE, CHARACTER_A));
 
         CharacterWorldData loaded = load(saved);
 
@@ -310,14 +310,14 @@ public final class CharacterWorldDataTest {
         assertQuarantined(saved, "malformed_race");
     }
 
-    /** A record without its arm width or its chest is not one this build writes. */
+    /** A record without its arms or its chest is not one this build writes. */
     @Test
     public void aMissingBodyOrChestTypeIsQuarantined() {
         NBTTagCompound withoutBody = savedRosters();
-        assertEquals(CharacterBodyTypeRegistry.WIDE,
-                firstCharacterOf(withoutBody).getString("BodyTypeId"));
-        firstCharacterOf(withoutBody).removeTag("BodyTypeId");
-        assertQuarantined(withoutBody, "missing_body_type");
+        assertEquals(CharacterArmsRegistry.BROAD,
+                firstCharacterOf(withoutBody).getString("ArmsId"));
+        firstCharacterOf(withoutBody).removeTag("ArmsId");
+        assertQuarantined(withoutBody, "missing_arms");
 
         NBTTagCompound unknownChest = savedRosters();
         firstCharacterOf(unknownChest).setString("ChestTypeId", "losttales:huge");
@@ -432,21 +432,21 @@ public final class CharacterWorldDataTest {
     private static RoleplayCharacter character(UUID ownerId, UUID characterId,
                                                int slotIndex, String name) {
         return character(ownerId, characterId, slotIndex, name,
-                CharacterBodyTypeRegistry.WIDE, CharacterChestTypeRegistry.NONE);
+                CharacterArmsRegistry.BROAD, CharacterChestTypeRegistry.NONE);
     }
 
     private static RoleplayCharacter character(UUID ownerId, UUID characterId,
                                                int slotIndex, String name,
-                                               String bodyTypeId, String chestTypeId) {
+                                               String armsId, String chestTypeId) {
         return RoleplayCharacter.builder(characterId, ownerId)
                 .slot(slotIndex).name(name)
                 .race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
                 .skin(CharacterSkinRegistry.getDefaultSkinId(
                         CharacterRaceRegistry.HUMAN,
-                        CharacterGenderRegistry.MALE, characterId))
+                        CharacterBodyTypeRegistry.MASCULINE, characterId))
                 .age(30).startingFaction("lotr:bree").createdAt(1000L)
-                .bodyType(bodyTypeId).chestType(chestTypeId)
+                .arms(armsId).chestType(chestTypeId)
                 .build();
     }
 

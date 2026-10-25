@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.compat.lotr.LotrClientCustomWaypoints;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
@@ -311,6 +312,12 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         return this.page != null;
     }
 
+    /** Where this map was left: its page copy's own view, else the map screen's (MAP-12). */
+    private LostTalesMapViewMemory viewMemory() {
+        return this.page != null ? this.page.viewMemory()
+                : LostTalesMapViewMemory.screen();
+    }
+
     /** The map stands pinned on the screen while playing, or on the window screen again. */
     void setFollowing(boolean following) {
         this.following = following;
@@ -473,9 +480,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         if (this.places == null) {
-            this.places = LostTalesMapSearchPrompt.places(
-                    LostTalesClientMapMarkerStore.getMapMarkers(
-                            ClientFellowshipMarks.getMapMarkers()));
+            this.places = findablePlaces();
         }
         this.placesFound = LostTalesMapSearchPrompt.filter(this.places,
                 typed);
@@ -696,7 +701,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      * is a different view of the map with a camera of its own.</p>
      */
     private void restoreRememberedView() {
-        if (!LostTalesMapViewMemory.isHeld()
+        LostTalesMapViewMemory memory = viewMemory();
+        if (!memory.isHeld()
                 || !LostTalesLotrMapLayout.isFullscreenLayoutActive(this)) {
             return;
         }
@@ -704,10 +710,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                 LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
         if (LostTalesMapCameraFocus.captureCamera(this, camera)) {
             float posX = LostTalesLotrMapRotation.clampToMapImage(
-                    LostTalesMapViewMemory.getPosX(),
+                    memory.getPosX(),
                     LostTalesLotrMapRotation.mapImageWidth());
             float posY = LostTalesLotrMapRotation.clampToMapImage(
-                    LostTalesMapViewMemory.getPosY(),
+                    memory.getPosY(),
                     LostTalesLotrMapRotation.mapImageHeight());
             camera[0] = posX;
             camera[1] = posY;
@@ -719,7 +725,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             camera[5] = 0.0F;
             LostTalesMapCameraFocus.restoreCamera(this, camera);
         }
-        applyFocusZoom(LostTalesMapViewMemory.getZoomExp());
+        applyFocusZoom(memory.getZoomExp());
         if (this.smoothZoomInitialized && ensureSmoothZoomReflection()) {
             try {
                 syncNativeZoomPower();
@@ -732,13 +738,13 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             setupZoomVariables(1.0F);
         }
         this.rotationInput = LostTalesLotrMapRotation.releasedInput(
-                LostTalesMapViewMemory.getRotationInput());
+                memory.getRotationInput());
         this.mapRotationTargetDegrees =
                 LostTalesLotrMapRotation.degreesForInput(this.rotationInput);
         this.mapRotationDegrees = this.mapRotationTargetDegrees;
         this.leanInput = Math.max(0.0F,
                 LostTalesLotrMapRotation.releasedInput(
-                        LostTalesMapViewMemory.getLeanInput()));
+                        memory.getLeanInput()));
         this.mapLeanTarget =
                 LostTalesLotrMapRotation.leanForInput(this.leanInput);
         this.mapLean = this.mapLeanTarget;
@@ -1395,8 +1401,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
 
     /**
      * Composites every map icon after LOTR's unrelated place and region text.
-     * The order is the existing relevance ladder: enemies, ordinary/native
-     * markers, then players. Hover emphasis remains the final icon artwork.
+     * The order is the relevance ladder: enemies, rumours' places,
+     * ordinary/native markers, then players. Hover emphasis remains the
+     * final icon artwork.
      */
     private void renderFinalMapIconsOnce(
             int mouseX, int mouseY, boolean drawLabels,
@@ -1407,6 +1414,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         this.finalMapIconsRendered = true;
         LostTalesLotrMapMarkerIconOverlay.renderTransientEnemyMarkers(
                 this, mouseX, mouseY, drawLabels);
+        LostTalesLotrMapMarkerIconOverlay.renderRumourPlaces(this, drawLabels);
         renderWaypointsWithSharedFade(this.clickableNativeWaypoints, 0,
                 mouseX, mouseY, drawLabels, includeHidden);
         LostTalesLotrMapMarkerIconOverlay.renderPreparedGroupedMarkers(
@@ -1642,11 +1650,22 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         if (this.mc == null || this.mc.fontRenderer == null) {
             return;
         }
-        this.searchPrompt = LostTalesMapSearchPrompt.open(
-                LostTalesClientMapMarkerStore.getMapMarkers(
-                        ClientFellowshipMarks.getMapMarkers()));
+        this.searchPrompt = LostTalesMapSearchPrompt.open(findablePlaces());
         this.mapLegendOpen = false;
         LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
+    }
+
+    /**
+     * What Find Location finds: the markers the map shows, the
+     * fellowships' marks, and LOTR's waypoints of the player's own and
+     * shared with them (MAP-13).
+     */
+    private List<LostTalesMapSearchPrompt.Entry> findablePlaces() {
+        return LostTalesMapSearchPrompt.places(
+                LostTalesClientMapMarkerStore.getMapMarkers(
+                        ClientFellowshipMarks.getMapMarkers()),
+                LotrClientCustomWaypoints.read(this.mc),
+                LotrClientCustomWaypoints.showsHiddenShared());
     }
 
     private void clearSearchPrompt() {
@@ -3084,7 +3103,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     }
 
     /**
-     * Hands the view to {@link LostTalesMapViewMemory} on the way out.
+     * Hands the view to its {@link LostTalesMapViewMemory} on the way out.
      *
      * <p>The camera is taken as it stands rather than as any movement in
      * flight meant it to end up, because what is being remembered is what the
@@ -3101,7 +3120,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         if (!LostTalesMapCameraFocus.captureCamera(this, camera)) {
             return;
         }
-        LostTalesMapViewMemory.remember(camera[2], camera[3],
+        viewMemory().remember(camera[2], camera[3],
                 this.smoothZoomCurrent,
                 LostTalesLotrMapRotation.releasedInput(this.rotationInput),
                 LostTalesLotrMapRotation.releasedInput(this.leanInput));

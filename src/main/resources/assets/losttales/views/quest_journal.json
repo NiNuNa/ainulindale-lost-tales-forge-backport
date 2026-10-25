@@ -1,5 +1,7 @@
 {
   "view": "quest_journal",
   "locked": true,
+  "place": "middle",
+  "stage": false,
   "pages": ["journal", "map"]
 }

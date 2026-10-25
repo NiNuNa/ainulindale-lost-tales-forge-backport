@@ -45,6 +45,19 @@ public final class LostTalesQuestActionPacketTest {
         assertTrue(refused.isMalformed());
     }
 
+    /** Collect names the quest whose waiting rewards it asks for (QUEST-44); without one it is malformed. */
+    @Test
+    public void aCollectNamesItsQuest() {
+        LostTalesQuestActionPacket decoded = roundTrip(
+                LostTalesQuestActionPacket.ACTION_COLLECT,
+                "losttales:tutorial/cheese_cache");
+        assertFalse(decoded.isMalformed());
+        assertEquals(LostTalesQuestActionPacket.ACTION_COLLECT, decoded.getAction());
+        assertEquals("losttales:tutorial/cheese_cache", decoded.getQuestId());
+        assertTrue(roundTrip(LostTalesQuestActionPacket.ACTION_COLLECT, "")
+                .isMalformed());
+    }
+
     @Test
     public void anActionThatNeedsAQuestIsRefusedWithoutOne() {
         assertTrue(roundTrip(LostTalesQuestActionPacket.ACTION_CLEAR, "")

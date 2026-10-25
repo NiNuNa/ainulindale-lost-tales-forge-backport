@@ -9,6 +9,7 @@ import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import com.ninuna.losttales.fellowship.sync.FellowshipInvitationNotice;
 import com.ninuna.losttales.fellowship.sync.FellowshipOperationType;
+import com.ninuna.losttales.quest.QuestFellows;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -117,6 +118,9 @@ public final class FellowshipNetworkRequestHandler {
                 case SET_TRAVELLING:
                     finish(player, requestId, operationType, before,
                             service.setTravelling(player, fellowshipId, revision));
+                    // Who shares the player's quest credit goes with it,
+                    // and the journals dim by that (QUEST-25).
+                    QuestFellows.refreshAround(player);
                     return;
                 case SET_GO_HERE_MARKER:
                     finishGoHere(player, requestId, operationType, expectedActiveIdentityId,

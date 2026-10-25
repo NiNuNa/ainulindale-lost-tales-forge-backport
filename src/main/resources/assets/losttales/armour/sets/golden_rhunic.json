@@ -1,0 +1,23 @@
+{
+  "id": "losttales:golden_rhunic",
+  "helmet": [
+    "lotr:item.helmetRhunGold",
+    "lotr:item.helmetRhunWarlord"
+  ],
+  "chestplate": [
+    "lotr:item.bodyRhunGold"
+  ],
+  "leggings": [
+    "lotr:item.legsRhunGold"
+  ],
+  "boots": [
+    "lotr:item.bootsRhunGold"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:riding"
+    }
+  ]
+}

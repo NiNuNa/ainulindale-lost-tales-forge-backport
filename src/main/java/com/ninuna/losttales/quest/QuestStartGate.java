@@ -62,6 +62,8 @@ public final class QuestStartGate {
         ALREADY_ACTIVE,
         ALREADY_COMPLETED,
         RESTART_NOT_ALLOWED,
+        /** A repeatable quest whose wait after its last completion is not past (QUEST-45). */
+        TOO_SOON,
         START_NOT_ALLOWED,
         /** What the start came with proves nothing: no giver in sight, no seal, no card. */
         UNPROVEN,
@@ -101,7 +103,8 @@ public final class QuestStartGate {
         boolean proven = quest != null && proves(player, quest, proof, giver);
         QuestStartRules.Verdict verdict = QuestStartRules.judge(quest, data,
                 way, proven, LostTalesConfig.allowQuestItemStarts,
-                LostTalesConfig.allowQuestInteractionStarts);
+                LostTalesConfig.allowQuestInteractionStarts,
+                player.worldObj.getTotalWorldTime());
         switch (verdict) {
             case UNKNOWN_QUEST:
                 say(player, "chat.losttales.quest.unknown", id);
@@ -197,9 +200,11 @@ public final class QuestStartGate {
      * The touched creature tells a rumour it knows (QUEST-20): of a quest
      * whose rumour names its kind, that the player could take now and has
      * not heard of yet, one at a time, or as many as Rumour-hound lets
-     * the player hear at once (PROG-06). The log keeps each, its marker is
-     * revealed, and the player's game says it in the creature's voice.
-     * Answers whether one was told.
+     * the player hear at once (PROG-06). The log keeps each with the
+     * marker its file names, the place it points to; nothing of that place
+     * is discovered, no LOTR region opened, until the player goes there.
+     * The player's game says it in the creature's voice. Answers whether
+     * one was told.
      */
     static boolean tellRumour(EntityPlayerMP player, Entity teller) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
@@ -214,15 +219,13 @@ public final class QuestStartGate {
             if (rumour.isEmpty() || quest.isWorldQuest()
                     || !LostTalesQuestObjectiveMatcher.matchesEntity(teller, rumour, player)
                     || data.getHeardRumours().contains(id) || data.isQuestActive(id)
-                    || !quest.mayTakeAgain(data.getQuestHistoryEntry(id))
+                    || !quest.mayTakeAgain(data.getQuestHistoryEntry(id),
+                            player.worldObj.getTotalWorldTime())
                     || LostTalesConfig.enableQuestPrerequisites
                     && LostTalesQuestPrerequisiteHelper.refusalOf(quest, player, data) != null
-                    || !data.hearRumour(id)) {
+                    || !data.hearRumour(id,
+                            LostTalesQuestParams.value(rumour, "marker"))) {
                 continue;
-            }
-            String marker = LostTalesQuestParams.value(rumour, "marker");
-            if (marker.length() > 0) {
-                LostTalesQuestManager.revealMapMarker(player, marker);
             }
             ServerQuestSync.reveal(player, Collections.singleton(id));
             LostTalesNetworkHandler.CHANNEL.sendTo(new LostTalesQuestOfferPacket(
@@ -282,7 +285,8 @@ public final class QuestStartGate {
         return QuestStartRules.judge(quest, data,
                 QuestStartProof.Way.CONVERSATION, true,
                 LostTalesConfig.allowQuestItemStarts,
-                LostTalesConfig.allowQuestInteractionStarts)
+                LostTalesConfig.allowQuestInteractionStarts,
+                player.worldObj == null ? 0L : player.worldObj.getTotalWorldTime())
                 == QuestStartRules.Verdict.ADMIT
                 && (!LostTalesConfig.enableQuestPrerequisites
                         || LostTalesQuestPrerequisiteHelper.refusalOf(
@@ -395,7 +399,8 @@ public final class QuestStartGate {
     private static boolean ends(StartResult result) {
         return result == StartResult.STARTED
                 || result == StartResult.ALREADY_ACTIVE
-                || result == StartResult.ALREADY_COMPLETED;
+                || result == StartResult.ALREADY_COMPLETED
+                || result == StartResult.TOO_SOON;
     }
 
     /** The quest a creature's data names first, then every quest a creature's kind may start. */
@@ -537,6 +542,17 @@ public final class QuestStartGate {
             say(player, "chat.losttales.quest.already_completed",
                     LostTalesQuestWords.titleComponent(quest));
             return StartResult.ALREADY_COMPLETED;
+        }
+        if (verdict == QuestStartRules.Verdict.TOO_SOON) {
+            // Why and when, each reader's game wording the time (QUEST-45).
+            LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+            long left = quest.takenAgainAt(data == null ? null
+                    : data.getQuestHistoryEntry(quest.getId()))
+                    - player.worldObj.getTotalWorldTime();
+            say(player, "chat.losttales.quest.repeat_wait",
+                    LostTalesQuestWords.titleComponent(quest),
+                    LostTalesQuestTimeText.duration(left).component());
+            return StartResult.TOO_SOON;
         }
         say(player, "chat.losttales.quest.not_restartable",
                 LostTalesQuestWords.titleComponent(quest));

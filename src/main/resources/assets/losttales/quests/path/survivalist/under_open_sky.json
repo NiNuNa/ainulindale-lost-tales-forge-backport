@@ -38,6 +38,7 @@
   ],
   "rewards": {
     "experience": "35",
-    "items": "minecraft:leather*3,minecraft:feather*4"
+    "items": "minecraft:leather*3,minecraft:feather*4",
+    "starter": "losttales:path/survivalist/night_watch"
   }
 }

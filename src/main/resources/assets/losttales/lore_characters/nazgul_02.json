@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:nazgul_02",
   "name": "Nazgûl II",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_harnedor_male_3"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_harnedor_masculine_3",
+  "faction": "lotr:near_harad"
 }

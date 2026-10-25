@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:fenriel",
   "name": "Fenriel, Lord of Ithilien",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_gondor_male_4"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_gondor_masculine_4",
+  "faction": "lotr:gondor"
 }

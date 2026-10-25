@@ -2,7 +2,6 @@ package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatCodeNames;
-import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.compat.discord.DiscordBindingEntries;
 import com.ninuna.losttales.compat.discord.DiscordBridgePolicy;
 import com.ninuna.losttales.compat.discord.DiscordBridgeDirection;
@@ -114,7 +113,10 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
     /**
      * Hands out a code for linking a Discord channel to a game channel,
      * to the one who asked alone: whoever types it into a Discord
-     * channel with {@code /link} links that channel.
+     * channel with {@code /link} links that channel. With no direction
+     * named, the link carries the way its channel's kind does
+     * ({@link DiscordBridgePolicy#defaultDirection}), and an in-character
+     * channel's answer says how to let Discord members in.
      */
     private void link(ICommandSender sender, String[] args) {
         if (args.length < 2) {
@@ -129,16 +131,12 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             return;
         }
         ChatCodeNames.Named named = ChatCodeNames.parse(key);
-        DiscordBridgeDirection direction = args.length > 2
-                ? DiscordBridgeDirection.parse(args[2]) : DiscordBridgeDirection.BIDIRECTIONAL;
-        if (direction == null || direction == DiscordBridgeDirection.DISABLED) {
+        boolean directionTyped = args.length > 2;
+        DiscordBridgeDirection direction = linkDirection(named.channel,
+                directionTyped ? args[2] : null);
+        if (direction == null) {
             say(sender, EnumChatFormatting.RED, SAY + "unknown_direction", args[2]);
             return;
-        }
-        if (named.channel.getRecipientRule() == ChatRecipientRule.PROXIMITY
-                && direction.readsFromDiscord()) {
-            // Nobody on Discord stands near anyone.
-            direction = DiscordBridgeDirection.GAME_TO_DISCORD;
         }
         LostTalesDiscordBridge.Pairing pairing = LostTalesDiscordBridge.getInstance().pairing();
         if (pairing != LostTalesDiscordBridge.Pairing.READY) {
@@ -152,6 +150,10 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
         say(sender, EnumChatFormatting.GREEN, SAY + "code", code,
                 LostTalesDiscordBridge.gameChannelComponent(key), describe(direction),
                 String.valueOf(DiscordLinkCodes.LIFETIME_MILLIS / 60000L));
+        if (!directionTyped && !direction.readsFromDiscord()) {
+            say(sender, EnumChatFormatting.GRAY, SAY + "one_way",
+                    LostTalesDiscordBridge.gameChannelComponent(key));
+        }
         if (DiscordBridgePolicy.isLimitedInGame(named.channel)) {
             say(sender, EnumChatFormatting.YELLOW, SAY + "limited",
                     LostTalesDiscordBridge.gameChannelComponent(key));
@@ -159,16 +161,34 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
     }
 
     /**
+     * The way a link of {@code channel} carries: the direction
+     * {@code typed} names, or, with none typed, the one its kind takes
+     * (DISC-29). Null for a typed word that names no direction a link
+     * can have.
+     */
+    static DiscordBridgeDirection linkDirection(ChatChannel channel, String typed) {
+        if (typed == null) {
+            return DiscordBridgePolicy.defaultDirection(channel);
+        }
+        DiscordBridgeDirection direction = DiscordBridgeDirection.parse(typed);
+        return direction == DiscordBridgeDirection.DISABLED ? null : direction;
+    }
+
+    /**
      * Why the game channel {@code typed} names cannot be linked, as the
      * lang key of the answer, which names what was typed; null when it
-     * can. A private channel never leaves the game, and a channel whose
-     * gate lets nobody read it would carry nothing.
+     * can. A private channel and one heard only nearby never leave the
+     * game (DISC-03), and a channel whose gate lets nobody read it would
+     * carry nothing.
      */
     static String linkRefusal(String typed) {
         String key = typed == null ? "" : typed.toLowerCase(Locale.ROOT);
         ChatCodeNames.Named named = ChatCodeNames.parse(key);
         if (named == null || !named.channel.isBridgeable()) {
             return SAY + "refused.channel";
+        }
+        if (DiscordBridgePolicy.isHeardNearby(named.channel)) {
+            return SAY + "refused.nearby";
         }
         if (!DiscordBridgePolicy.isOpenToTheBridge(named.channel)) {
             return SAY + "refused.gate";
@@ -261,7 +281,7 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
                 || "unlink".equalsIgnoreCase(args[0]))) {
             List<String> keys = new ArrayList<String>();
             for (ChatChannel channel : ChatChannel.values()) {
-                if (channel.isBridgeable() && channel != ChatChannel.FACTION) {
+                if (DiscordBridgePolicy.mayCross(channel) && channel != ChatChannel.FACTION) {
                     keys.add(channel.getId());
                 }
             }

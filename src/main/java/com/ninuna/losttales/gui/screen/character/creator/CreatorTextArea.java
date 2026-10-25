@@ -1,21 +1,18 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
 import com.ninuna.losttales.client.window.MenuWindow;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTextArea;
-import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.input.Keyboard;
 
 /**
- * A row with several lines of text to type, for a profile's longer texts:
- * its name above, a box of lines below that wraps the words and scrolls
- * by whole lines, and the counter at the row's corner. In a window's rows
- * the name is a row of its own with the count at its right end, and the
- * lines stand under it as a field does, at a note's pitch over a hairline.
- * Shift+Return starts a paragraph; Return itself is left to the screen,
- * as a line's field leaves it, so it saves the form from any row.
+ * Several lines of text to type, for a profile's longer texts: the name
+ * at the left of a row of its own with the count at its right end, and
+ * under it the lines, standing as a field does, at a note's pitch over a
+ * hairline; they wrap the words and scroll by whole lines. Shift+Return
+ * starts a paragraph; Return itself is left to the screen, as a line's
+ * field leaves it, so it saves the form from any row.
  */
 public final class CreatorTextArea extends CreatorControl {
 
@@ -38,11 +35,7 @@ public final class CreatorTextArea extends CreatorControl {
         return this.area.getText();
     }
 
-    private int boxHeight() {
-        return this.lines * LostTalesUiTextArea.LINE_HEIGHT + 6;
-    }
-
-    /** In a window's rows, the lines' room: a note's clear room above and under them. */
+    /** The lines' room: a note's clear room above and under them. */
     private int linesHeight() {
         return 2 * MenuWindow.NOTE_PADDING
                 + this.lines * LostTalesUiTextArea.LINE_HEIGHT;
@@ -50,13 +43,18 @@ public final class CreatorTextArea extends CreatorControl {
 
     @Override
     public int height() {
-        return inRows() ? CreatorRows.height() + linesHeight() + 1
-                : LABEL_HEIGHT + boxHeight() + 6;
+        return CreatorRows.height() + linesHeight() + 1;
     }
 
     @Override
     public boolean canFocus() {
         return true;
+    }
+
+    /** Typed in while it holds the focus. */
+    @Override
+    public boolean holdsKeys() {
+        return isFocused();
     }
 
     @Override
@@ -69,30 +67,13 @@ public final class CreatorTextArea extends CreatorControl {
         return this.area.getText().length() + "/" + this.limit;
     }
 
+    /**
+     * The name at the left of a row of its own, the count at its right
+     * end; under it the lines, each centred on a note's line, and the
+     * hairline under them.
+     */
     @Override
     public void draw(int mouseX, int mouseY) {
-        if (inRows()) {
-            drawRows();
-            return;
-        }
-        FontRenderer font = this.context.getFont();
-        drawLabel(this.label);
-        CreatorWidgets.drawFieldBox(this.x, valueTop(), this.width,
-                boxHeight(), isFocused());
-        this.area.place(this.x + 4, valueTop() + 4, this.width - 8,
-                this.lines * LostTalesUiTextArea.LINE_HEIGHT);
-        this.area.draw(null, 255);
-        font.drawStringWithShadow(counter(),
-                this.x + this.width - font.getStringWidth(counter()),
-                this.y + 1, LostTalesSkyrimUiStyle.TEXT_DIM);
-    }
-
-    /**
-     * As a window's rows: the name at the left of a row of its own, the
-     * count at its right end; under it the lines, each centred on a
-     * note's line, and the hairline under them.
-     */
-    private void drawRows() {
         int right = this.x + this.width;
         int countLeft = CreatorRows.drawValue(this.context, counter(), this.x,
                 right, this.y, false);
@@ -118,11 +99,10 @@ public final class CreatorTextArea extends CreatorControl {
         return true;
     }
 
-    /** The wheel scrolls the lines; in a window's rows only while they move, so the form scrolls past their ends. */
+    /** The wheel scrolls the lines, and is taken only while they move, so the form scrolls past their ends. */
     @Override
     public boolean mouseWheel(int notches) {
-        boolean moved = this.area.scrollBy(-notches);
-        return moved || !inRows();
+        return this.area.scrollBy(-notches);
     }
 
     @Override

@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.accessory;
 
-import com.ninuna.losttales.accessory.AccessoryBootstrap;
 import com.ninuna.losttales.accessory.AccessoryDefinition;
+import com.ninuna.losttales.accessory.AccessoryEffect;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import net.minecraft.client.Minecraft;
@@ -136,9 +136,7 @@ public final class WraithWorldVisualEffect {
         }
         AccessoryDefinition definition = ClientAccessoryEffectCache
                 .getDefinition(minecraft.thePlayer);
-        return definition != null
-                && AccessoryBootstrap.WRAITH_WORLD_VISUAL_EFFECT_ID.equals(
-                definition.getOwnerVisualEffectId());
+        return definition != null && definition.has(AccessoryEffect.WRAITH_WORLD);
     }
 
     private static float interpolatedIntensity(float partialTicks) {

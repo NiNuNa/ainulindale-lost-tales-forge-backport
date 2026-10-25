@@ -7,11 +7,17 @@ public final class LostTalesWindowDefaults {
 
     private LostTalesWindowDefaults() {}
 
-    /** Runs before Minecraft records both its current and restored window size. */
-    public static int[] resolve(int width, int height) {
-        if (width == 854 && height == 480) {
-            return new int[] {WIDTH, HEIGHT};
-        }
-        return new int[] {width, height};
+    /** The startup width; runs before Minecraft records its current and restored size. */
+    public static int width(int width, int height) {
+        return isLegacyDefault(width, height) ? WIDTH : width;
+    }
+
+    /** The startup height, worked out from the same pair as {@link #width}. */
+    public static int height(int width, int height) {
+        return isLegacyDefault(width, height) ? HEIGHT : height;
+    }
+
+    private static boolean isLegacyDefault(int width, int height) {
+        return width == 854 && height == 480;
     }
 }

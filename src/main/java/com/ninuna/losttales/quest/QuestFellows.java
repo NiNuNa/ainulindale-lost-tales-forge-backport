@@ -3,6 +3,7 @@ package com.ninuna.losttales.quest;
 import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
+import com.ninuna.losttales.fellowship.quest.FellowshipQuestProgressCoordinator;
 import com.ninuna.losttales.fellowship.server.FellowshipService;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesQuestFellowsPacket;
@@ -24,8 +25,10 @@ import net.minecraft.server.MinecraftServer;
  * Tells each player how the members of their fellowships stand in the
  * quests they run too (QUEST-25): the members playing now, as the
  * character in the fellowship, at the player's stage with their counts or
- * past it. Sent whenever a quest log changes, to its player and to
- * everyone it is shown to, and only when what they were sent changes.
+ * past it, and whether each shares the player's credit, travelling with
+ * the same fellowship (FEL-28). Sent whenever a quest log changes, or the
+ * fellowship a player travels with, to its player and to everyone it is
+ * shown to, and only when what they were sent changes.
  *
  * <p>What each player was last sent, and whose logs it came from, is kept
  * by account until they leave: static state, cleared with the server's
@@ -39,14 +42,19 @@ public final class QuestFellows {
 
     private QuestFellows() {}
 
-    /** A member playing now: the character's name and its quest log. */
+    /**
+     * A member playing now: the character's name, its quest log, and
+     * whether it travels with the fellowship the player travels with.
+     */
     static final class Fellow {
         final String name;
         final LostTalesQuestPlayerData data;
+        final boolean travelling;
 
-        Fellow(String name, LostTalesQuestPlayerData data) {
+        Fellow(String name, LostTalesQuestPlayerData data, boolean travelling) {
             this.name = name;
             this.data = data;
+            this.travelling = travelling;
         }
     }
 
@@ -63,8 +71,8 @@ public final class QuestFellows {
     /**
      * Where each fellow stands in the quests {@code own} runs: at the same
      * stage, their counts; past it on their own path, done; anywhere else,
-     * not shown. In the order the log and the fellows come, at most
-     * {@link #MAX_COUNTS}.
+     * not shown. Each says whether the fellow travels with the player. In
+     * the order the log and the fellows come, at most {@link #MAX_COUNTS}.
      */
     static List<QuestFellowCount> countsFor(LostTalesQuestPlayerData own,
                                             List<Fellow> fellows) {
@@ -82,10 +90,10 @@ public final class QuestFellows {
                 QuestFellowCount count;
                 if (mine.getStageId().equals(theirs.getStageId())) {
                     count = new QuestFellowCount(mine.getQuestId(), fellow.name,
-                            false, theirs.getObjectiveProgress());
+                            false, fellow.travelling, theirs.getObjectiveProgress());
                 } else if (theirs.getStagePath().contains(mine.getStageId())) {
                     count = new QuestFellowCount(mine.getQuestId(), fellow.name,
-                            true, null);
+                            true, fellow.travelling, null);
                 } else {
                     continue;
                 }
@@ -147,7 +155,7 @@ public final class QuestFellows {
         for (Online fellow : fellows.values()) {
             LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(fellow.player);
             if (data != null) {
-                each.add(new Fellow(fellow.name, data));
+                each.add(new Fellow(fellow.name, data, fellow.travelling));
             }
         }
         List<QuestFellowCount> counts = countsFor(
@@ -187,21 +195,27 @@ public final class QuestFellows {
         return online;
     }
 
-    /** A member playing now, under the character's name in the fellowship. */
+    /**
+     * A member playing now, under the character's name in the fellowship,
+     * and whether it shares the player's credit.
+     */
     private static final class Online {
         final EntityPlayerMP player;
         final String name;
+        final boolean travelling;
 
-        Online(EntityPlayerMP player, String name) {
+        Online(EntityPlayerMP player, String name, boolean travelling) {
             this.player = player;
             this.name = name;
+            this.travelling = travelling;
         }
     }
 
     /**
      * The members of the fellowships of the character the player plays,
      * playing as that member now, by account; never the player's own
-     * account.
+     * account. Each knows whether it travels with the fellowship the
+     * player travels with, as kills and arrivals are shared (FEL-28).
      */
     private static Map<UUID, Online> fellowsOf(EntityPlayerMP player) {
         Map<UUID, Online> fellows = new LinkedHashMap<UUID, Online>();
@@ -210,6 +224,8 @@ public final class QuestFellows {
         if (fellowships == null || fellowships.isEmpty()) {
             return fellows;
         }
+        Set<UUID> travelling = FellowshipQuestProgressCoordinator
+                .sharingCreditWith(player);
         Map<UUID, EntityPlayerMP> online = new HashMap<UUID, EntityPlayerMP>();
         for (EntityPlayerMP other : onlinePlayers()) {
             online.put(other.getUniqueID(), other);
@@ -226,7 +242,8 @@ public final class QuestFellows {
                 }
                 if (!fellows.containsKey(other.getUniqueID())) {
                     fellows.put(other.getUniqueID(),
-                            new Online(other, member.getCharacterName()));
+                            new Online(other, member.getCharacterName(),
+                                    travelling.contains(member.getIdentityId())));
                 }
             }
         }

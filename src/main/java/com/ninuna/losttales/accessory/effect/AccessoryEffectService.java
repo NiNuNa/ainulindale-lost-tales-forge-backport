@@ -1,8 +1,8 @@
 package com.ninuna.losttales.accessory.effect;
 
-import com.ninuna.losttales.accessory.AccessoryBootstrap;
 import com.ninuna.losttales.accessory.AccessoryCompatibilityRegistry;
 import com.ninuna.losttales.accessory.AccessoryDefinition;
+import com.ninuna.losttales.accessory.AccessoryEffect;
 import com.ninuna.losttales.accessory.AccessorySlotType;
 import com.ninuna.losttales.accessory.player.AccessoryInventory;
 import com.ninuna.losttales.accessory.player.AccessoryInventorySyncManager;
@@ -163,7 +163,7 @@ public final class AccessoryEffectService {
             return null;
         }
         AccessoryDefinition definition = stack.stackSize == 1
-                ? AccessoryCompatibilityRegistry.getInstance().find(
+                ? AccessoryCompatibilityRegistry.server().find(
                 AccessorySlotType.RING, stack) : null;
         if (definition == null && removeInvalid) {
             rejectInvalidStack(player, data, inventory);
@@ -198,16 +198,11 @@ public final class AccessoryEffectService {
     }
 
     private static boolean hasPublishedEffect(AccessoryDefinition definition) {
-        return definition != null
-                && (definition.getServerEffectId().length() > 0
-                || definition.getOwnerVisualEffectId().length() > 0
-                || definition.getPublicEffectId().length() > 0);
+        return definition != null && !definition.getEffects().isEmpty();
     }
 
     private static boolean isConcealing(AccessoryDefinition definition) {
-        return definition != null
-                && AccessoryBootstrap.CONCEALED_PUBLIC_EFFECT_ID.equals(
-                definition.getPublicEffectId());
+        return definition != null && definition.has(AccessoryEffect.CONCEALMENT);
     }
 
     private static void clearTargetingEntities(EntityPlayer player) {

@@ -2,8 +2,8 @@ package com.ninuna.losttales.client.camera;
 
 import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
-import com.ninuna.losttales.gameplay.item.ThirdPersonItemUsePolicy;
-import com.ninuna.losttales.gameplay.projectile.ThirdPersonProjectileItemPolicy;
+import com.ninuna.losttales.thirdperson.ThirdPersonItemUsePolicy;
+import com.ninuna.losttales.thirdperson.ThirdPersonProjectileItemPolicy;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.item.ItemStack;
 

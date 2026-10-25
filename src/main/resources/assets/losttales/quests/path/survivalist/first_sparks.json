@@ -44,6 +44,7 @@
   ],
   "rewards": {
     "experience": "20",
-    "items": "minecraft:apple*2,minecraft:torch*4"
+    "items": "minecraft:apple*2,minecraft:torch*4",
+    "starter": "losttales:path/survivalist/stone_and_shelter"
   }
 }

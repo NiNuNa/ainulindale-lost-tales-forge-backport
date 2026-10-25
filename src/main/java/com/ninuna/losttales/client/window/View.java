@@ -8,7 +8,7 @@ import net.minecraft.util.StatCollector;
 /**
  * One view of the window screen: the windows the screen shows, one view
  * at a time. A category's view (Chat, Consoles, Map, Quest Journal,
- * Fellowships, Profile, Settings) opens with the window
+ * Fellowships, Profile, Skills, Settings) opens with the window
  * {@link ViewDefaults} lays out for it and has the category's key. A
  * custom view is the player's: numbered 1 to {@link Views#MAX_CUSTOM},
  * opening with a New Page, with a name of its own and the key of its
@@ -102,6 +102,8 @@ public final class View {
                 return LostTalesKeyBindings.getFellowshipKeyBinding();
             case PROFILE:
                 return LostTalesKeyBindings.getCharactersKeyBinding();
+            case SKILLS:
+                return LostTalesKeyBindings.getSkillsKeyBinding();
             default:
                 return null;
         }

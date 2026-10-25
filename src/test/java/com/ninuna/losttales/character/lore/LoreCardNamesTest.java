@@ -56,7 +56,7 @@ public final class LoreCardNamesTest {
     private static Map<String, String> loreNames() throws Exception {
         Map<String, String> names = new HashMap<String, String>();
         JsonArray files = read("/assets/losttales/lore_characters/index.json")
-                .getAsJsonArray("files");
+                .getAsJsonArray("characters");
         for (JsonElement file : files) {
             JsonObject character = read("/assets/losttales/" + file.getAsString());
             String id = character.get("id").getAsString();

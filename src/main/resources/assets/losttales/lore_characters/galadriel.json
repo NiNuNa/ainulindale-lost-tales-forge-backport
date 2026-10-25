@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:galadriel",
   "name": "Galadriel",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:elf",
-    "genderId": "losttales:female",
-    "modelId": "lotr:elf",
-    "skinId": "losttales:elf_high_female_0"
-  }
+  "race": "losttales:elf",
+  "body_type": "losttales:feminine",
+  "skin": "losttales:elf_high_feminine_0",
+  "faction": "lotr:lothlorien"
 }

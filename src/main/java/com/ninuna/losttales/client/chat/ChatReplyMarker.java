@@ -21,6 +21,11 @@ import net.minecraft.util.IChatComponent;
  */
 final class ChatReplyMarker {
     private static final String PREFIX = "losttales-chat-reply:";
+    /**
+     * What a quote row cut at the end of its room carries: where its room
+     * ends and where its words do, in the row's own pixels.
+     */
+    private static final String CUT_PREFIX = "losttales-chat-quote-cut:";
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     /** What the quote's opening run carries where a head would carry a sender. */
     private static final String BUBBLE = "bubble";
@@ -41,6 +46,54 @@ final class ChatReplyMarker {
     static final int OPEN_INDENT = 10;
 
     private ChatReplyMarker() {}
+
+    /**
+     * A run of nothing saying the quote row is cut at the end of its room
+     * (CHAT-86): its room ends {@code roomRight} pixels from the row's
+     * start and its words {@code wordsRight}, past that, where they fade
+     * out as a cut name does.
+     */
+    static ChatComponentText cutAt(int roomRight, int wordsRight) {
+        ChatComponentText marker = new ChatComponentText("");
+        marker.setChatStyle(marker.getChatStyle().setChatClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, CUT_PREFIX
+                        + Math.max(0, roomRight) + ':'
+                        + Math.max(0, wordsRight))));
+        return marker;
+    }
+
+    /**
+     * Where a cut quote row's room ends and where its words do, in the
+     * row's own pixels, or null for a row not cut.
+     */
+    static int[] cutOf(IChatComponent row) {
+        if (row == null) {
+            return null;
+        }
+        for (Object value : row) {
+            if (!(value instanceof IChatComponent)) {
+                continue;
+            }
+            IChatComponent part = (IChatComponent)value;
+            ClickEvent event = part.getChatStyle() == null ? null
+                    : part.getChatStyle().getChatClickEvent();
+            String payload = event == null
+                    || event.getAction() != ClickEvent.Action.SUGGEST_COMMAND
+                    ? null : event.getValue();
+            if (payload == null || !payload.startsWith(CUT_PREFIX)) {
+                continue;
+            }
+            String[] edges = payload.substring(CUT_PREFIX.length()).split(":");
+            try {
+                int room = Integer.parseInt(edges[0]);
+                int words = Integer.parseInt(edges[1]);
+                return words > room ? new int[] {room, words} : null;
+            } catch (RuntimeException unreadable) {
+                return null;
+            }
+        }
+        return null;
+    }
 
     /** Marks a run of the quote, in its colour, for {@code messageId}. */
     static ChatComponentText apply(ChatComponentText component, int color,

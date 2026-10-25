@@ -8,8 +8,6 @@ import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.quest.QuestStartGate;
 import com.ninuna.losttales.quest.QuestStarters;
 import com.ninuna.losttales.quest.QuestStartProof;
-import com.ninuna.losttales.quest.ServerQuestFiles;
-import com.ninuna.losttales.quest.ServerQuestSync;
 import com.ninuna.losttales.quest.world.WorldQuestRules;
 import com.ninuna.losttales.quest.world.WorldQuestRun;
 import com.ninuna.losttales.quest.world.WorldQuests;
@@ -31,8 +29,8 @@ import net.minecraft.util.StatCollector;
 /**
  * The quest admin command: what the server knows and each player holds,
  * starting, finishing and resetting a player's quests, starter items and
- * markers, reading the server's own quest files again, and starting and
- * stopping world quests. Every answer is a line of the lang file,
+ * markers, and starting and stopping world quests; the quest files are read
+ * again by {@code /losttales reload quests}. Every answer is a line of the lang file,
  * {@code chat.losttales.command.quest.*} and the quest lines it shares
  * with the game ({@code chat.losttales.quest.*}), in the chat's own white;
  * a player missing or not online is refused in red, as every command does.
@@ -42,7 +40,6 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     static final String SAY = "chat.losttales.command.quest.";
     /** The colour every answer is in. */
     private static final EnumChatFormatting WHITE = EnumChatFormatting.WHITE;
-    private static final EnumChatFormatting GRAY = EnumChatFormatting.GRAY;
 
     private final String commandPath;
 
@@ -53,7 +50,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return commandPrefix() + " <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|reload|world> [id] [player]";
+        return commandPrefix() + " <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|world> [id] [player]";
     }
 
     @Override
@@ -75,7 +72,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         }
 
         if ("list".equalsIgnoreCase(action)) {
-            EntityPlayerMP player = getTargetPlayer(sender, args, 1);
+            EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 1);
             if (player != null) {
                 sendPlayerQuests(sender, player);
             }
@@ -83,7 +80,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         }
 
         if ("scan".equalsIgnoreCase(action)) {
-            EntityPlayerMP player = getTargetPlayer(sender, args, 1);
+            EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 1);
             if (player != null) {
                 say(sender, WHITE, LostTalesQuestManager.refreshGatherProgressFromInventory(player)
                         ? SAY + "scan.done" : SAY + "scan.nothing",
@@ -94,14 +91,14 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
         if ("unpin".equalsIgnoreCase(action)) {
             if (args.length >= 2 && LostTalesQuestRegistry.getQuest(args[1]) != null) {
-                EntityPlayerMP player = getTargetPlayer(sender, args, 2);
+                EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 2);
                 if (player != null) {
                     say(sender, WHITE, LostTalesQuestManager.unpinQuest(player, args[1])
                             ? SAY + "unpin.done" : SAY + "unpin.nothing", args[1],
                             player.getCommandSenderName());
                 }
             } else {
-                EntityPlayerMP player = getTargetPlayer(sender, args, 1);
+                EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 1);
                 if (player != null) {
                     say(sender, WHITE, LostTalesQuestManager.unpinQuest(player)
                             ? SAY + "unpin_all.done" : SAY + "unpin_all.nothing",
@@ -116,11 +113,6 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             return;
         }
 
-        if ("reload".equalsIgnoreCase(action)) {
-            reloadServerQuests(sender);
-            return;
-        }
-
         if ("world".equalsIgnoreCase(action)) {
             worldQuest(sender, args);
             return;
@@ -132,7 +124,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         }
 
         String questId = args[1];
-        EntityPlayerMP player = getTargetPlayer(sender, args, 2);
+        EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 2);
         if (player == null) {
             return;
         }
@@ -255,7 +247,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             return;
         }
 
-        EntityPlayerMP player = getTargetPlayer(sender, args, 2);
+        EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 2);
         if (player == null) {
             return;
         }
@@ -281,50 +273,6 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             say(sender, WHITE, SAY + "starter.note", quest.getStartMode());
         }
     }
-
-    private EntityPlayerMP getTargetPlayer(ICommandSender sender, String[] args, int playerArgIndex) {
-        try {
-            if (args.length > playerArgIndex) {
-                return getPlayer(sender, args[playerArgIndex]);
-            }
-            if (sender instanceof EntityPlayerMP) {
-                return (EntityPlayerMP) sender;
-            }
-            say(sender, EnumChatFormatting.RED, PLAYER_REQUIRED);
-            return null;
-        } catch (Exception e) {
-            String playerName = args.length > playerArgIndex ? args[playerArgIndex] : "";
-            say(sender, EnumChatFormatting.RED, PLAYER_UNKNOWN, playerName);
-            return null;
-        }
-    }
-
-    /**
-     * Reads the server's own quest files again; each player online is sent
-     * afresh the ones their client holds or their log names. Every reason
-     * a file was left out is said, a warning each (QUEST-04), up to
-     * {@link #MAX_RELOAD_LINES}; the server's log keeps them all.
-     */
-    private void reloadServerQuests(ICommandSender sender) {
-        ServerQuestFiles.Result result = LostTalesQuestRegistry.loadServerQuests();
-        ServerQuestSync.resendAfterReload(MinecraftServer.getServer());
-        say(sender, WHITE, result.problems.isEmpty()
-                        ? "chat.losttales.quest.reload.done"
-                        : "chat.losttales.quest.reload.left_out",
-                Integer.valueOf(result.quests.size()));
-        int shown = Math.min(MAX_RELOAD_LINES, result.problems.size());
-        for (int index = 0; index < shown; index++) {
-            say(sender, GRAY, "chat.losttales.quest.reload.problem",
-                    result.problems.get(index));
-        }
-        if (result.problems.size() > shown) {
-            say(sender, GRAY, "chat.losttales.quest.reload.more",
-                    Integer.valueOf(result.problems.size() - shown));
-        }
-    }
-
-    /** The most reasons a reload says in the chat; the log keeps the rest. */
-    private static final int MAX_RELOAD_LINES = 64;
 
     /** {@code world start|stop <id>} and {@code world list}. */
     private void worldQuest(ICommandSender sender, String[] args) {
@@ -424,7 +372,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     @Override
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "defs", "list", "scan", "starter", "start", "complete", "reset", "abandon", "pin", "unpin", "revealmarkers", "reload", "world");
+            return getListOfStringsMatchingLastWord(args, "defs", "list", "scan", "starter", "start", "complete", "reset", "abandon", "pin", "unpin", "revealmarkers", "world");
         }
         if (args.length == 2 && "world".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, "start", "stop", "list");

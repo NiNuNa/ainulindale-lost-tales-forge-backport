@@ -18,7 +18,7 @@ import java.util.UUID;
  * Client request to change one owned character's look: its skin, arm
  * width and chest, as Save in Change Look sends them. The wire only bounds
  * the ids; the server holds them to the creator's checks for the
- * character's own race and sex.
+ * character's own race and body type.
  */
 public final class CharacterLookUpdateRequestPacket implements IMessage {
 
@@ -28,7 +28,7 @@ public final class CharacterLookUpdateRequestPacket implements IMessage {
     private long expectedRosterRevision;
     private UUID characterId;
     private String skinId = "";
-    private String bodyTypeId = "";
+    private String armsId = "";
     private String chestTypeId = "";
     private boolean malformed;
 
@@ -37,18 +37,18 @@ public final class CharacterLookUpdateRequestPacket implements IMessage {
     public CharacterLookUpdateRequestPacket(int requestId,
                                             long expectedRosterRevision,
                                             UUID characterId, String skinId,
-                                            String bodyTypeId,
+                                            String armsId,
                                             String chestTypeId) {
         if (expectedRosterRevision < 0L || characterId == null
                 || NIL_UUID.equals(characterId)
-                || !fits(skinId) || !fits(bodyTypeId) || !fits(chestTypeId)) {
+                || !fits(skinId) || !fits(armsId) || !fits(chestTypeId)) {
             throw new IllegalArgumentException("invalid look update request");
         }
         this.requestId = requestId;
         this.expectedRosterRevision = expectedRosterRevision;
         this.characterId = characterId;
         this.skinId = skinId;
-        this.bodyTypeId = bodyTypeId;
+        this.armsId = armsId;
         this.chestTypeId = chestTypeId;
     }
 
@@ -66,7 +66,7 @@ public final class CharacterLookUpdateRequestPacket implements IMessage {
             this.characterId = LostTalesPacketCodec.readUuid(buffer);
             this.skinId = LostTalesPacketCodec.readUtf8String(buffer,
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            this.bodyTypeId = LostTalesPacketCodec.readUtf8String(buffer,
+            this.armsId = LostTalesPacketCodec.readUtf8String(buffer,
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.chestTypeId = LostTalesPacketCodec.readUtf8String(buffer,
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -81,7 +81,7 @@ public final class CharacterLookUpdateRequestPacket implements IMessage {
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.skinId = "";
-            this.bodyTypeId = "";
+            this.armsId = "";
             this.chestTypeId = "";
         }
     }
@@ -93,7 +93,7 @@ public final class CharacterLookUpdateRequestPacket implements IMessage {
         LostTalesPacketCodec.writeUuid(buffer, this.characterId);
         LostTalesPacketCodec.writeUtf8String(buffer, this.skinId,
                 CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-        LostTalesPacketCodec.writeUtf8String(buffer, this.bodyTypeId,
+        LostTalesPacketCodec.writeUtf8String(buffer, this.armsId,
                 CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, this.chestTypeId,
                 CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -107,8 +107,8 @@ public final class CharacterLookUpdateRequestPacket implements IMessage {
         return this.skinId;
     }
 
-    public String getBodyTypeId() {
-        return this.bodyTypeId;
+    public String getArmsId() {
+        return this.armsId;
     }
 
     public String getChestTypeId() {
@@ -132,7 +132,7 @@ public final class CharacterLookUpdateRequestPacket implements IMessage {
             final long expectedRosterRevision = message.expectedRosterRevision;
             final UUID characterId = message.characterId;
             final String skinId = message.skinId;
-            final String bodyTypeId = message.bodyTypeId;
+            final String armsId = message.armsId;
             final String chestTypeId = message.chestTypeId;
             CharacterServerPacketDispatcher.submit(
                     player,
@@ -146,7 +146,7 @@ public final class CharacterLookUpdateRequestPacket implements IMessage {
                             CharacterNetworkRequestHandler.handleLookUpdateRequest(
                                     livePlayer, requestId,
                                     expectedRosterRevision, characterId,
-                                    skinId, bodyTypeId, chestTypeId);
+                                    skinId, armsId, chestTypeId);
                         }
                     }
             );

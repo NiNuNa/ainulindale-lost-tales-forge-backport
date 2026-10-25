@@ -1,0 +1,23 @@
+{
+  "id": "losttales:coast_southron",
+  "helmet": [
+    "lotr:item.helmetNearHarad",
+    "lotr:item.helmetNearHaradWarlord"
+  ],
+  "chestplate": [
+    "lotr:item.bodyNearHarad"
+  ],
+  "leggings": [
+    "lotr:item.legsNearHarad"
+  ],
+  "boots": [
+    "lotr:item.bootsNearHarad"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:blades"
+    }
+  ]
+}

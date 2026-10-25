@@ -1,5 +1,7 @@
 {
   "view": "consoles",
   "locked": true,
+  "place": "middle",
+  "stage": false,
   "pages": ["category"]
 }

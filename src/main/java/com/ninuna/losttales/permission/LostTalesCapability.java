@@ -27,8 +27,14 @@ public final class LostTalesCapability {
 
     private static final Map<String, LostTalesCapability> BY_ID =
             new LinkedHashMap<String, LostTalesCapability>();
-    /** The level vanilla gives an operator; what every built-in capability asks. */
+    /** The level vanilla gives an operator; what every built-in capability asks but two. */
     private static final int OPERATOR = 2;
+    /**
+     * The level that holds the server's own settings and the roles
+     * (DATA-07): an operator of level 2 does not rewrite the server's
+     * settings, its Discord token or who holds which power.
+     */
+    private static final int SERVER_ADMINISTRATOR = 3;
 
     /* ---- Chat ---- */
 
@@ -49,23 +55,41 @@ public final class LostTalesCapability {
     /* ---- The server's own settings ---- */
 
     /** Create, restyle, delete and assign the config roles and permissions. */
-    public static final LostTalesCapability ROLES_MANAGE = register("roles.manage", OPERATOR);
-    /** Read and change every server-side config category, in game and by command. */
-    public static final LostTalesCapability SERVER_CONFIG = register("server.config", OPERATOR);
+    public static final LostTalesCapability ROLES_MANAGE =
+            register("roles.manage", SERVER_ADMINISTRATOR);
+    /**
+     * Read and change every server-side config category, in game and by
+     * command; read every kind of content again at once
+     * ({@code /losttales reload all}).
+     */
+    public static final LostTalesCapability SERVER_CONFIG =
+            register("server.config", SERVER_ADMINISTRATOR);
 
     /* ---- Administration of characters, quests, fellowships, markers and the HUD ---- */
 
-    /** Inspect, restore and purge the roleplay characters of any account. */
+    /**
+     * Inspect, restore and purge the roleplay characters of any account;
+     * read the race, cape, starting kit and lore character files again
+     * ({@code /losttales reload}).
+     */
     public static final LostTalesCapability CHARACTER_ADMIN =
             register("character.admin", OPERATOR);
-    /** Grant, revoke and inspect quest progress. */
+    /**
+     * Grant, revoke and inspect quest progress; read the quest files and
+     * the missive templates again ({@code /losttales reload}).
+     */
     public static final LostTalesCapability QUEST_ADMIN = register("quest.admin", OPERATOR);
-    /** Check and repair the fellowship stores, and clear the combat markers (/losttales fellowship). */
+    /**
+     * Check and repair the fellowship stores, and clear the combat markers
+     * (/losttales fellowship); make a fellowship on the page while LOTR's
+     * fellowship creation is off (FEL-30).
+     */
     public static final LostTalesCapability FELLOWSHIP_ADMIN = register("fellowship.admin", OPERATOR);
     /**
      * Inspect players' map markers, discover, forget, track or untrack
-     * them, and place failed waystones again (/losttales mapmarker); see,
-     * edit, break, make public and hand over any waystone.
+     * them, and place failed waystones again (/losttales mapmarker); read
+     * the marker files again (/losttales reload markers); see, edit,
+     * break, make public and hand over any waystone.
      */
     public static final LostTalesCapability MAPMARKER_MANAGE =
             register("mapmarker.manage", OPERATOR);
@@ -73,9 +97,9 @@ public final class LostTalesCapability {
     public static final LostTalesCapability STRUCTURES_BAN =
             register("structures.ban", OPERATOR);
     /**
-     * Read the skill, race and deed files again, see and give skill
-     * experience (/losttales skills), and place and break the statues
-     * that reset a skill's perks (PROG-12).
+     * Read the skill and deed files again (/losttales reload skills), see
+     * and give skill experience (/losttales skills), and place and break
+     * the statues that reset a skill's perks (PROG-12).
      */
     public static final LostTalesCapability PROGRESSION_ADMIN =
             register("progression.admin", OPERATOR);

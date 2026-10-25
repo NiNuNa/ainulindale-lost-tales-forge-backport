@@ -49,8 +49,10 @@ public final class LostTalesClassTransformerTest {
             byte[] result = transformer.transform(name, name, writer.toByteArray());
             ClassNode patched = new ClassNode();
             new ClassReader(result).accept(patched, 0);
+            GuardedCalls.unguard(patched);
             MethodNode init = findMethod(patched, "<init>");
-            assertEquals(1, countCalls(init, hookOwner, "resolve"));
+            assertEquals(1, countCalls(init, hookOwner, "width"));
+            assertEquals(1, countCalls(init, hookOwner, "height"));
             boolean resolved = false;
             int dimensionStores = 0;
             for (AbstractInsnNode instruction = init.instructions.getFirst();
@@ -58,7 +60,7 @@ public final class LostTalesClassTransformerTest {
                 if (instruction instanceof MethodInsnNode
                         && hookOwner.equals(((MethodInsnNode) instruction).owner)) {
                     resolved = true;
-                    assertEquals("(II)[I", ((MethodInsnNode) instruction).desc);
+                    assertEquals("(II)I", ((MethodInsnNode) instruction).desc);
                 }
                 if (instruction instanceof FieldInsnNode && instruction.getOpcode() == Opcodes.PUTFIELD) {
                     String field = ((FieldInsnNode) instruction).name;
@@ -103,6 +105,7 @@ public final class LostTalesClassTransformerTest {
         byte[] transformed = transformer.transform(name, name, original);
         ClassNode result = new ClassNode();
         new ClassReader(transformed).accept(result, 0);
+        GuardedCalls.unguard(result);
         MethodNode drawTracker = findMethod(result, "drawTracker");
         assertEquals(1, countCalls(drawTracker, hookOwner,
                 "shouldRenderNativeTracker"));
@@ -152,6 +155,7 @@ public final class LostTalesClassTransformerTest {
                     writer.toByteArray());
             ClassNode result = new ClassNode();
             new ClassReader(transformed).accept(result, 0);
+            GuardedCalls.unguard(result);
             assertTrue(containsStaticHook(result, drawing.name, hookOwner, "drawString"));
             MethodNode patched = findMethod(result, drawing.name);
             assertEquals(expectedCalls, countCalls(patched, hookOwner, "drawString")
@@ -243,9 +247,6 @@ public final class LostTalesClassTransformerTest {
     private static final String CLIENT_IDENTITY_HOOK_OWNER =
             "com/ninuna/losttales/client/character/"
                     + "ClientRoleplayCharacterIdentityHook";
-    private static final String ACCESSORY_CONTAINER_CLASS =
-            "com/ninuna/losttales/accessory/inventory/"
-                    + "LostTalesContainerPlayer";
     private static final String ACCESSORY_CONTAINER_HOOK_OWNER =
             "com/ninuna/losttales/accessory/inventory/"
                     + "AccessoryContainerHooks";
@@ -339,6 +340,7 @@ public final class LostTalesClassTransformerTest {
         byte[] twice = transformer.transform(binaryName, binaryName, once);
         ClassNode node = new ClassNode();
         new ClassReader(twice).accept(node, 0);
+        GuardedCalls.unguard(node);
         return node;
     }
 
@@ -453,6 +455,7 @@ public final class LostTalesClassTransformerTest {
             byte[] result = transformer.transform(name, name, writer.toByteArray());
             ClassNode patched = new ClassNode();
             new ClassReader(result).accept(patched, 0);
+            GuardedCalls.unguard(patched);
             MethodNode limit = findMethod(patched, getter);
             assertEquals(1, countCalls(limit,
                     MENU_FRAMERATE_HOOK_OWNER, "menuFramerateLimit"));
@@ -1226,12 +1229,19 @@ public final class LostTalesClassTransformerTest {
                 "shouldRenderLotrMiniQuests"));
     }
 
+    /**
+     * The player's constructor asks the hook for its container instead of
+     * building vanilla's; only the hook's guard builds vanilla's, should
+     * the hook fail.
+     */
     @Test
     public void entityPlayerUsesAccessoryAwareContainer() throws Exception {
         ClassNode transformed = transform(
                 "net.minecraft.entity.player.EntityPlayer");
-        assertTrue(containsConstructedType(
-                transformed, ACCESSORY_CONTAINER_CLASS));
+        assertTrue(containsStaticHook(transformed, "<init>",
+                ACCESSORY_CONTAINER_HOOK_OWNER, "playerContainer"));
+        assertFalse(containsConstructedType(
+                transformed, "net/minecraft/inventory/ContainerPlayer"));
     }
 
     /**
@@ -1248,8 +1258,10 @@ public final class LostTalesClassTransformerTest {
                 syntheticPlayer(false, 0));
         ClassNode patched = new ClassNode();
         new ClassReader(result).accept(patched, 0);
+        GuardedCalls.unguard(patched);
         assertTrue(containsConstructedType(patched, "net/minecraft/inventory/ContainerPlayer"));
-        assertFalse(containsConstructedType(patched, ACCESSORY_CONTAINER_CLASS));
+        assertFalse(containsStaticHook(patched, "<init>", ACCESSORY_CONTAINER_HOOK_OWNER,
+                "playerContainer"));
         assertEquals(null, System.getProperty(
                 LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY));
         assertEquals("true", System.getProperty(
@@ -1261,7 +1273,10 @@ public final class LostTalesClassTransformerTest {
         ClassNode whole = new ClassNode();
         new ClassReader(new LostTalesClassTransformer().transform(name, name,
                 syntheticPlayer(true, 0))).accept(whole, 0);
-        assertTrue(containsConstructedType(whole, ACCESSORY_CONTAINER_CLASS));
+        GuardedCalls.unguard(whole);
+        assertTrue(containsStaticHook(whole, "<init>", ACCESSORY_CONTAINER_HOOK_OWNER,
+                "playerContainer"));
+        assertFalse(containsConstructedType(whole, "net/minecraft/inventory/ContainerPlayer"));
         assertEquals("true", System.getProperty(
                 LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY));
         System.clearProperty(LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY);
@@ -1496,6 +1511,7 @@ public final class LostTalesClassTransformerTest {
                 binaryName, binaryName, original);
         ClassNode node = new ClassNode();
         new ClassReader(bytes).accept(node, 0);
+        GuardedCalls.unguard(node);
         return node;
     }
 

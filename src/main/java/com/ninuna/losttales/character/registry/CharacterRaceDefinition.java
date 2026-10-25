@@ -13,7 +13,7 @@ import java.util.Set;
 /**
  * One playable race as its race file writes it (CHAR-38): its id and
  * words, the body it stands on, its size, health, speed and attack, its
- * sexes, starting factions, skins and starting skills. The code keeps the
+ * body types, starting factions, skins and starting skills. The code keeps the
  * rules: the eyes stand at {@link #STANDING_EYE_HEIGHT_RATIO} of the
  * height, and the body decides how the race is drawn at its height.
  *
@@ -34,7 +34,7 @@ public final class CharacterRaceDefinition {
     private final String lotrRaceAssociation;
     private final Set<CharacterFactionCategory> allowedFactionCategories;
     private final Set<String> allowedFactionIds;
-    private final Set<String> allowedGenderIds;
+    private final Set<String> allowedBodyTypeIds;
     private final float width;
     private final float height;
     private final double maxHealth;
@@ -51,7 +51,7 @@ public final class CharacterRaceDefinition {
             String lotrRaceAssociation,
             Set<CharacterFactionCategory> allowedFactionCategories,
             Set<String> allowedFactionIds,
-            Set<String> allowedGenderIds,
+            Set<String> allowedBodyTypeIds,
             float width,
             float height,
             double maxHealth,
@@ -67,7 +67,7 @@ public final class CharacterRaceDefinition {
                 ? "" : lotrRaceAssociation;
         this.allowedFactionCategories = immutableCategories(allowedFactionCategories);
         this.allowedFactionIds = immutableIdentifiers(allowedFactionIds);
-        this.allowedGenderIds = immutableIdentifiers(allowedGenderIds);
+        this.allowedBodyTypeIds = immutableIdentifiers(allowedBodyTypeIds);
         this.width = width;
         this.height = height;
         this.maxHealth = maxHealth;
@@ -89,7 +89,7 @@ public final class CharacterRaceDefinition {
      */
     public static CharacterRaceDefinition standIn(String id, CharacterRaceDefinition own) {
         return new CharacterRaceDefinition(id, "", own.body, own.lotrRaceAssociation,
-                own.allowedFactionCategories, own.allowedFactionIds, own.allowedGenderIds,
+                own.allowedFactionCategories, own.allowedFactionIds, own.allowedBodyTypeIds,
                 own.width, own.height, own.maxHealth, own.movementSpeedMultiplier,
                 own.attackDamage, Collections.<CharacterRaceSkins>emptyList(),
                 Collections.<String, Integer>emptyMap(), own.id);
@@ -121,13 +121,13 @@ public final class CharacterRaceDefinition {
         return this.allowedFactionIds;
     }
 
-    public Set<String> getAllowedGenderIds() {
-        return this.allowedGenderIds;
+    public Set<String> getAllowedBodyTypeIds() {
+        return this.allowedBodyTypeIds;
     }
 
-    public boolean isGenderAllowed(String genderId) {
-        return this.allowedGenderIds.contains(
-                LostTalesIdentifiers.normalize(genderId));
+    public boolean isBodyTypeAllowed(String bodyTypeId) {
+        return this.allowedBodyTypeIds.contains(
+                LostTalesIdentifiers.normalize(bodyTypeId));
     }
 
     public float getWidth() {

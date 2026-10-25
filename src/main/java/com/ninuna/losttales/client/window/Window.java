@@ -239,6 +239,16 @@ public final class Window {
             return (int)Math.floor(share * size + 1.0E-6D);
         }
 
+        /** The named part of that id, {@code left_third}; null for any other. */
+        public static ScreenFill part(String id) {
+            for (ScreenFill fill : NAMED) {
+                if (fill != NONE && fill.id.equals(id)) {
+                    return fill;
+                }
+            }
+            return null;
+        }
+
         /** The part of that name, a free part as written, or none. */
         public static ScreenFill fromId(String id) {
             if (id == null) {

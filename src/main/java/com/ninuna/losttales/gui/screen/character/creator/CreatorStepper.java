@@ -3,27 +3,23 @@ package com.ninuna.losttales.gui.screen.character.creator;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
-import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import net.minecraft.client.gui.FontRenderer;
 import org.lwjgl.input.Keyboard;
 
 /**
- * A row that steps through a short list: its name above, the chosen
- * option between two arrows below; in a window's rows, as a number's row
- * in Settings, its name at the left and the option between a menu's
- * stepper chevrons at the right end. The arrows, the wheel over the row
- * and the left and right keys while it holds the focus all step it, and
- * the list wraps at either end.
+ * A row that steps through a short list, as a number's row in Settings:
+ * its name at the left and the chosen option between a menu's stepper
+ * chevrons at the right end. The chevrons, the wheel over the row and the
+ * left and right keys while it holds the focus all step it, and the list
+ * wraps at either end.
  */
 public final class CreatorStepper extends CreatorControl {
 
     private final String label;
     private final CreatorChoice choice;
     /**
-     * The two arrows, each keeping its own beat: the box stands still
-     * and the chevron inside it moves, so stepping reads as a press
-     * rather than as a colour change.
+     * The two chevrons, each keeping its own beat, so stepping reads as a
+     * press rather than as a colour change.
      */
     private final LostTalesUiButtonMotion leftMotion =
             new LostTalesUiButtonMotion(
@@ -41,7 +37,7 @@ public final class CreatorStepper extends CreatorControl {
 
     @Override
     public int height() {
-        return inRows() ? CreatorRows.height() : ROW_HEIGHT;
+        return CreatorRows.height();
     }
 
     @Override
@@ -53,56 +49,14 @@ public final class CreatorStepper extends CreatorControl {
         return !this.choice.isFixed() && this.choice.count() > 1;
     }
 
-    private int rightArrowX() {
-        return this.x + this.width - CreatorWidgets.ARROW_BOX;
-    }
-
+    /**
+     * Lit under the pointer and while it holds the keys, its name at the
+     * left in ivory, the option at the right end between the chevrons, in
+     * the room the widest option takes; the chevrons stand flat while the
+     * option cannot be stepped.
+     */
     @Override
     public void draw(int mouseX, int mouseY) {
-        if (inRows()) {
-            drawRow(mouseX, mouseY);
-            return;
-        }
-        FontRenderer font = this.context.getFont();
-        drawLabel(this.label);
-        int top = valueTop();
-        boolean steps = canStep();
-        int arrow = steps ? arrowAt(mouseX, mouseY) : 0;
-        boolean overLeft = arrow < 0;
-        boolean overRight = arrow > 0;
-        CreatorWidgets.drawArrowBox(font, this.x, top, false, steps, overLeft,
-                this.leftMotion);
-        CreatorWidgets.drawArrowBox(font, rightArrowX(), top, true, steps,
-                overRight, this.rightMotion);
-        if (isFocused()) {
-            LostTalesSkyrimUiStyle.drawSelectionBrackets(
-                    this.x + CreatorWidgets.ARROW_BOX + 2, top,
-                    this.width - CreatorWidgets.ARROW_BOX * 2 - 4,
-                    CreatorWidgets.ARROW_BOX, 3, LostTalesSkyrimUiStyle.GOLD);
-            LostTalesSkyrimUiStyle.beginContent();
-        }
-        String value = currentLabel();
-        int room = this.width - CreatorWidgets.ARROW_BOX * 2 - 8;
-        int shown = (int)LostTalesUiCutName.shownWidth(
-                font.getStringWidth(value), room);
-        int color = this.choice.isFixed() || this.choice.count() == 0
-                ? LostTalesSkyrimUiStyle.TEXT_MUTED
-                : LostTalesSkyrimUiStyle.TEXT_BRIGHT;
-        // An option too long for the box fills it and fades into its end
-        // (LOOK-37).
-        LostTalesUiCutName.drawShadowed(font, value,
-                this.x + (this.width - shown) / 2,
-                top + (CreatorWidgets.ARROW_BOX - font.FONT_HEIGHT) / 2 + 1,
-                room, color);
-    }
-
-    /**
-     * As a window's row: lit under the pointer and while it holds the
-     * keys, its name at the left in ivory, the option at the right end
-     * between the chevrons, in the room the widest option takes; the
-     * chevrons stand flat while the option cannot be stepped.
-     */
-    private void drawRow(int mouseX, int mouseY) {
         FontRenderer font = this.context.getFont();
         if (contains(mouseX, mouseY) || isFocused()) {
             CreatorRows.light(this.context, this.y, this.y + height());
@@ -123,9 +77,9 @@ public final class CreatorStepper extends CreatorControl {
     }
 
     /**
-     * In a window's rows, the room the option takes between the chevrons:
-     * the widest it can read, so the chevrons stand still as it steps, and
-     * no wider than the row leaves them.
+     * The room the option takes between the chevrons: the widest it can
+     * read, so the chevrons stand still as it steps, and no wider than the
+     * row leaves them.
      */
     private int valueRoom(FontRenderer font) {
         int widest = font.getStringWidth(currentLabel());
@@ -162,30 +116,18 @@ public final class CreatorStepper extends CreatorControl {
         return true;
     }
 
-    /** -1 over the left arrow, 1 over the right one, 0 anywhere else. */
+    /** -1 over the left chevron, 1 over the right one, 0 anywhere else. */
     private int arrowAt(int mouseX, int mouseY) {
-        if (inRows()) {
-            String part = contains(mouseX, mouseY)
-                    ? MenuWindow.stepperPartAt(mouseX, mouseY,
-                            this.x + this.width, this.y, height(),
-                            valueRoom(this.context.getFont()))
-                    : null;
-            return MenuWindow.PART_LESS.equals(part) ? -1
-                    : MenuWindow.PART_MORE.equals(part) ? 1 : 0;
-        }
-        int top = valueTop();
-        if (CreatorWidgets.within(mouseX, mouseY, this.x, top,
-                CreatorWidgets.ARROW_BOX, CreatorWidgets.ARROW_BOX)) {
-            return -1;
-        }
-        if (CreatorWidgets.within(mouseX, mouseY, rightArrowX(), top,
-                CreatorWidgets.ARROW_BOX, CreatorWidgets.ARROW_BOX)) {
-            return 1;
-        }
-        return 0;
+        String part = contains(mouseX, mouseY)
+                ? MenuWindow.stepperPartAt(mouseX, mouseY,
+                        this.x + this.width, this.y, height(),
+                        valueRoom(this.context.getFont()))
+                : null;
+        return MenuWindow.PART_LESS.equals(part) ? -1
+                : MenuWindow.PART_MORE.equals(part) ? 1 : 0;
     }
 
-    /** Only the arrows act; the rest of the row takes the focus and nothing more. */
+    /** Only the chevrons act; the rest of the row takes the focus and nothing more. */
     @Override
     public boolean isPointerOverAction(int mouseX, int mouseY) {
         return canStep() && arrowAt(mouseX, mouseY) != 0;

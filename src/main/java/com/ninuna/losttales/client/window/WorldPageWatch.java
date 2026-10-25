@@ -75,7 +75,7 @@ public final class WorldPageWatch {
         @Override
         public void tick() {
             for (WindowPages.Page page : WindowPages.all()) {
-                if (!page.opensFromWorld()) {
+                if (!page.opensByGame()) {
                     continue;
                 }
                 OtherPage tab = page.tab();

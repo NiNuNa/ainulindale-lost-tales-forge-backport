@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.quest;
 
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
+import com.ninuna.losttales.quest.player.WaitingReward;
+import com.ninuna.losttales.quest.QuestRumourPlace;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
@@ -8,6 +10,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 /** Client-side cache of the quest state most recently synced by the server. */
@@ -117,8 +120,35 @@ public final class LostTalesClientQuestProgressStore {
         return Collections.unmodifiableSet(new LinkedHashSet<String>(HEARD_RUMOURS));
     }
 
+    /** Where the rumours heard point, by quest, as the server last said (QUEST-20). */
+    private static final Map<String, QuestRumourPlace> RUMOUR_PLACES =
+            new LinkedHashMap<String, QuestRumourPlace>();
+
+    public static synchronized void setRumourPlaces(Collection<QuestRumourPlace> places) {
+        RUMOUR_PLACES.clear();
+        if (places != null) {
+            for (QuestRumourPlace place : places) {
+                if (place != null && place.isValid()) {
+                    RUMOUR_PLACES.put(place.getQuestId(), place);
+                }
+            }
+        }
+    }
+
+    /** Where the quest's rumour points; null for nowhere. */
+    public static synchronized QuestRumourPlace getRumourPlace(String questId) {
+        return questId == null ? null : RUMOUR_PLACES.get(questId);
+    }
+
+    /** Where every rumour heard points, in the order they were heard. */
+    public static synchronized List<QuestRumourPlace> getRumourPlaces() {
+        return Collections.unmodifiableList(
+                new ArrayList<QuestRumourPlace>(RUMOUR_PLACES.values()));
+    }
+
     public static synchronized void clear() {
         HEARD_RUMOURS.clear();
+        RUMOUR_PLACES.clear();
         ACTIVE_QUESTS.clear();
         QUEST_HISTORY.clear();
         DISCOVERED_MARKERS.clear();
@@ -126,6 +156,32 @@ public final class LostTalesClientQuestProgressStore {
         PINNED_QUESTS.clear();
         pinnedMapMarkerId = "";
         receivedSync = false;
+        WAITING_REWARDS.clear();
+    }
+
+    /** The rewards waiting for room, each quest's, as the server last said (QUEST-44). */
+    private static final Map<String, List<WaitingReward>> WAITING_REWARDS =
+            new LinkedHashMap<String, List<WaitingReward>>();
+
+    public static synchronized void setWaitingRewards(
+            Map<String, List<WaitingReward>> rewards) {
+        WAITING_REWARDS.clear();
+        if (rewards != null) {
+            for (Map.Entry<String, List<WaitingReward>> entry : rewards.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null
+                        && !entry.getValue().isEmpty()) {
+                    WAITING_REWARDS.put(entry.getKey(), Collections.unmodifiableList(
+                            new ArrayList<WaitingReward>(entry.getValue())));
+                }
+            }
+        }
+    }
+
+    /** What waits under the quest; empty for nothing. */
+    public static synchronized List<WaitingReward> getWaitingRewards(String questId) {
+        List<WaitingReward> waiting = questId == null ? null
+                : WAITING_REWARDS.get(questId);
+        return waiting == null ? Collections.<WaitingReward>emptyList() : waiting;
     }
 
     public static synchronized Collection<LostTalesQuestProgress> getActiveQuests() {

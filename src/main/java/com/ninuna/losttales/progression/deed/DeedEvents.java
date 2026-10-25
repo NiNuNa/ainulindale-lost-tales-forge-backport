@@ -1,5 +1,6 @@
 package com.ninuna.losttales.progression.deed;
 
+import com.ninuna.losttales.progression.count.CountEvents;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
@@ -21,8 +22,9 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 /**
  * Feeds the deeds (PROG-11): who struck a creature, so a deed done
  * together finds its companions as it falls; the places a player
- * reaches, looked at every two seconds; and the deeds a character's state
- * already meets, checked again as a player joins or switches character.
+ * reaches, looked at every two seconds, and with them the LOTR waypoints
+ * Lore counts (PROG-01); and the deeds a character's state already meets,
+ * checked again as a player joins or switches character.
  */
 public final class DeedEvents {
     private static final int LOOK_TICKS = 40;
@@ -108,6 +110,7 @@ public final class DeedEvents {
         }
         if ((player.ticksExisted + player.getEntityId()) % LOOK_TICKS == 0) {
             DeedService.lookAround(player);
+            CountEvents.lookForWaypoints(player);
         }
     }
 }

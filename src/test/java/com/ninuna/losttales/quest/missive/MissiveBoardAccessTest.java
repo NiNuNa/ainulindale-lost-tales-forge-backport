@@ -7,6 +7,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * A missive board's page reaches the board only as quick loot reaches a
@@ -119,5 +120,26 @@ public final class MissiveBoardAccessTest {
         gone.stands = false;
         assertEquals("chat.losttales.missive.board_gone",
                 MissiveBoardService.refusal(gone));
+    }
+
+    /**
+     * Pin Letter refuses a letter whose missive was taken or whose first
+     * posting's days are past (QUEST-34), in the words taking uses; a
+     * record that cannot be read refuses it in words of pinning.
+     */
+    @Test
+    public void pinLetterRefusesWhatTakingWould() {
+        assertNull(MissiveBoardService.pinRefusal(null));
+        assertEquals(MissiveBoardStateReason.TAKEN_BEFORE,
+                MissiveBoardService.pinRefusal(MissiveBoardStateReason.TAKEN_BEFORE));
+        assertEquals(MissiveBoardStateReason.EXPIRED,
+                MissiveBoardService.pinRefusal(MissiveBoardStateReason.EXPIRED));
+        assertEquals(MissiveBoardStateReason.CANNOT_PIN,
+                MissiveBoardService.pinRefusal(MissiveBoardStateReason.NOT_NOW));
+        assertTrue(MissiveBoardStateReason.CANNOT_PIN.isRefusal());
+        assertTrue(MissiveBoardStateReason.CANNOT_PIN.isSaidInChat());
+        assertEquals(MissiveBoardStateReason.CANNOT_PIN,
+                MissiveBoardStateReason.fromNetworkId(
+                        MissiveBoardStateReason.CANNOT_PIN.getNetworkId()));
     }
 }

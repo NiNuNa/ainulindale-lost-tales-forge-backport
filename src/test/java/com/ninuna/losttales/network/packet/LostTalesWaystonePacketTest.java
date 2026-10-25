@@ -113,7 +113,7 @@ public final class LostTalesWaystonePacketTest {
     public void statePacketRoundTripsAuthorityFlags() {
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/state", "Aldric",
+                        "losttales:player/state",
                         UUID.randomUUID(), 0, 4, 65, 9,
                         UUID.randomUUID()).toBuilder()
                         .sharedCharacterIds(Collections.singleton(
@@ -124,7 +124,7 @@ public final class LostTalesWaystonePacketTest {
                         .build();
         LostTalesWaystoneStatePacket original =
                 new LostTalesWaystoneStatePacket(
-                        0, 4, 65, 9, record, "Aldric",
+                        0, 4, 65, 9, record, "player:Aldric", "Aldric",
                         true, false, LostTalesWaystoneStateReason.OPENED);
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
@@ -161,11 +161,12 @@ public final class LostTalesWaystonePacketTest {
         }
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/lore", placer.toString(),
+                        "losttales:player/lore",
                         UUID.randomUUID(), 0, 4, 65, 9, UUID.randomUUID());
 
         LostTalesWaystoneStatePacket decoded = roundTrip(
-                new LostTalesWaystoneStatePacket(0, 4, 65, 9, record, "",
+                new LostTalesWaystoneStatePacket(0, 4, 65, 9, record,
+                        "player:" + placer, "",
                         true, false, LostTalesWaystoneStateReason.OPENED));
 
         assertFalse(decoded.isMalformed());
@@ -290,11 +291,11 @@ public final class LostTalesWaystonePacketTest {
             LostTalesWaystoneStateReason reason) {
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/reason", "Aldric",
+                        "losttales:player/reason",
                         UUID.randomUUID(), 0, 4, 65, 9,
                         UUID.randomUUID());
         return new LostTalesWaystoneStatePacket(0, 4, 65, 9, record,
-                "", true, false, reason);
+                "player:Aldric", "", true, false, reason);
     }
 
     private static LostTalesWaystoneStatePacket roundTrip(

@@ -5,7 +5,7 @@ import com.ninuna.losttales.character.lore.sync.LoreCharacterSummary;
 import com.ninuna.losttales.character.cape.CharacterCapeDefinition;
 import com.ninuna.losttales.character.registry.CharacterBodyModelDefinition;
 import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeDefinition;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
@@ -46,19 +46,19 @@ public final class ClientCharacterDisplayNames {
         return Collections.unmodifiableList(ids);
     }
 
-    public static List<String> getCompatibleGenderIds(String raceId) {
+    public static List<String> getCompatibleBodyTypeIds(String raceId) {
         CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
         if (race == null) {
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(
-                new ArrayList<String>(race.getAllowedGenderIds()));
+                new ArrayList<String>(race.getAllowedBodyTypeIds()));
     }
 
-    public static List<String> getCompatibleSkinIds(String raceId, String genderId) {
+    public static List<String> getCompatibleSkinIds(String raceId, String bodyTypeId) {
         ArrayList<String> ids = new ArrayList<String>();
         for (CharacterSkinDefinition definition
-                : CharacterSkinRegistry.getCompatibleSkins(raceId, genderId)) {
+                : CharacterSkinRegistry.getCompatibleSkins(raceId, bodyTypeId)) {
             ids.add(definition.getId());
         }
         return Collections.unmodifiableList(ids);
@@ -131,8 +131,8 @@ public final class ClientCharacterDisplayNames {
         return translatedIdentifier("gui.losttales.character.race.", id, "losttales:");
     }
 
-    public static String gender(String id) {
-        return translatedIdentifier("gui.losttales.character.gender.", id, "losttales:");
+    public static String bodyType(String id) {
+        return translatedIdentifier("gui.losttales.character.body_type.", id, "losttales:");
     }
 
     public static String skin(String id) {
@@ -155,21 +155,21 @@ public final class ClientCharacterDisplayNames {
                 group, Integer.valueOf(definition.getVariantIndex() + 1));
     }
 
-    public static List<String> getBodyTypeIds() {
+    public static List<String> getArmsIds() {
         return Collections.unmodifiableList(
-                new ArrayList<String>(CharacterBodyTypeRegistry.getAll()));
+                new ArrayList<String>(CharacterArmsRegistry.getAll()));
     }
 
-    /** True when the skin's body offers an arm width choice. */
-    public static boolean hasBodyTypeChoice(String skinId) {
+    /** True when the skin's body offers a choice of arms. */
+    public static boolean hasArmsChoice(String skinId) {
         CharacterSkinDefinition definition = CharacterSkinRegistry.get(skinId);
         CharacterBodyModelDefinition model = definition == null
                 ? null : CharacterBodyModelRegistry.get(definition.getModelId());
-        return model != null && model.supportsBodyTypes();
+        return model != null && model.supportsArms();
     }
 
-    public static String bodyType(String id) {
-        return translatedIdentifier("gui.losttales.character.body.", id, "losttales:");
+    public static String arms(String id) {
+        return translatedIdentifier("gui.losttales.character.arms.", id, "losttales:");
     }
 
     public static List<String> getChestTypeIds() {

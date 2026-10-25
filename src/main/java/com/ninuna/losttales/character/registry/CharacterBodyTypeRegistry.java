@@ -2,25 +2,27 @@ package com.ninuna.losttales.character.registry;
 
 import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Stable body type identifiers: the arm width of a body model that supports
- * both. Body type is a choice of its own, stored next to sex rather than
- * derived from it; sex only picks the default.
+ * Stable body type identifiers accepted by character creation (CHAR-08). A
+ * body type picks a body and its skins and says nothing of who the character
+ * is.
  */
 public final class CharacterBodyTypeRegistry {
 
-    /** Four-pixel arms, Minecraft's classic proportions. */
-    public static final String WIDE = "losttales:wide";
-    /** Three-pixel arms. */
-    public static final String SLIM = "losttales:slim";
+    public static final String FEMININE = "losttales:feminine";
+    public static final String MASCULINE = "losttales:masculine";
+    public static final String NEUTRAL = "losttales:neutral";
 
     private static final Set<String> IDENTIFIERS = Collections.unmodifiableSet(
-            new LinkedHashSet<String>(Arrays.asList(WIDE, SLIM)));
+            new LinkedHashSet<String>(Arrays.asList(
+                    FEMININE,
+                    MASCULINE,
+                    NEUTRAL
+            )));
 
     private CharacterBodyTypeRegistry() {}
 
@@ -28,19 +30,12 @@ public final class CharacterBodyTypeRegistry {
         return IDENTIFIERS.contains(LostTalesIdentifiers.normalize(id));
     }
 
-    public static Collection<String> getAll() {
-        return IDENTIFIERS;
-    }
-
-    /** The body type a creator pre-selects for a sex: slim for female, wide otherwise. */
-    public static String defaultFor(String genderId) {
-        return CharacterGenderRegistry.FEMALE.equals(
-                LostTalesIdentifiers.normalize(genderId)) ? SLIM : WIDE;
-    }
-
-    /** A registered identifier, or wide for anything unknown. */
-    public static String normalizeOrWide(String id) {
-        String normalized = LostTalesIdentifiers.normalize(id);
-        return IDENTIFIERS.contains(normalized) ? normalized : WIDE;
+    /**
+     * Maps a body type to LOTR Legacy's two catalogues of pictures. A race
+     * with one body for all draws it from the masculine catalogue, while the
+     * character keeps and shows neutral.
+     */
+    public static String appearanceBodyType(String id) {
+        return FEMININE.equals(LostTalesIdentifiers.normalize(id)) ? FEMININE : MASCULINE;
     }
 }

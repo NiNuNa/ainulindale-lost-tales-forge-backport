@@ -657,20 +657,37 @@ public final class ConversationPage extends WindowPage {
     }
 
     /**
-     * A conversation's help: who reads it and who you speak as there, the
-     * chat's guide, and the chat's keys.
+     * A conversation's help: who reads it, whether the server keeps a log
+     * of it (a whisper's, CHAT-85), who you speak as there, the chat's
+     * guide, and the chat's keys.
      */
     @Override
     public PageHelp help() {
         List<String> guide = new ArrayList<String>();
         guide.add(StatCollector.translateToLocalFormatted(readersKey(),
                 title()));
+        if (showsWhisperLog()) {
+            guide.add(StatCollector.translateToLocal(WHISPERS_LOGGED_KEY));
+        }
         String speaking = speakingKey();
         if (speaking != null) {
             guide.add(StatCollector.translateToLocal(speaking));
         }
         guide.addAll(PageHelp.paragraphs("gui.losttales.help.chat"));
         return new PageHelp(guide, ChatShortcuts.areas());
+    }
+
+    /** What a whisper says while the server keeps a log of whispers. */
+    static final String WHISPERS_LOGGED_KEY = "gui.losttales.chat.whispers_logged";
+
+    /**
+     * Whether the conversation says the server keeps a log of it: a
+     * whisper with a player, never an NPC's, while the server's audit log
+     * keeps whispers (CHAT-85).
+     */
+    boolean showsWhisperLog() {
+        return isWhisper() && !this.npc
+                && ClientChatChannelState.whispersLogged();
     }
 
     /** The line that says who reads the conversation, by who its lines reach. */
@@ -853,12 +870,12 @@ public final class ConversationPage extends WindowPage {
 
     @Override
     public int searchFound() {
-        return ChatSearch.matchCount();
+        return ChatSearch.matchCount(this);
     }
 
     @Override
     public String searchCount() {
-        return ChatSearch.position() + "/" + ChatSearch.matchCount();
+        return ChatSearch.position(this) + "/" + ChatSearch.matchCount(this);
     }
 
     @Override

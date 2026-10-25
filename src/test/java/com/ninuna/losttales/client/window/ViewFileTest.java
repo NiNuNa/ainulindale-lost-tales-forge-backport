@@ -22,9 +22,9 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The window each view opens with is a view file (WIN-49): the mod's own
- * give the views' windows as they have always opened, every one of them
- * without a warning; a file is read strictly, any warning leaving it out;
- * and a player's own file of a view takes the mod's place.
+ * give each view its window without a warning, the Profile view a stage on
+ * the left third (WIN-50); a file is read strictly, any warning leaving it
+ * out; and a player's own file of a view takes the mod's place.
  */
 public final class ViewFileTest {
 
@@ -42,15 +42,15 @@ public final class ViewFileTest {
     public void everyBundledFileLoadsWithoutAWarning() {
         DataFiles.Result<ViewFile> bundled = ViewFileFixtures.bundled();
         assertEquals(new ArrayList<String>(), bundled.problems);
-        assertEquals(8, bundled.values.size());
+        assertEquals(9, bundled.values.size());
     }
 
     /**
      * Chat with the chat's set; Consoles every console; Map the map; the
      * Quest Journal the journal then the map; Fellowships the Fellowships
-     * page, the map and the fellowship chats; Profile the Characters and
-     * Skills pages; Settings every settings page: each locked. A custom
-     * view's New Page, unlocked.
+     * page, the map and the fellowship chats; Profile the Characters page;
+     * Skills the Skills page; Settings every settings page: each locked. A
+     * custom view's New Page, unlocked.
      */
     @Test
     public void theBundledFilesGiveTheWindowsTheViewsHaveAlwaysOpenedWith() {
@@ -63,10 +63,28 @@ public final class ViewFileTest {
         expect("fellowships", true, ViewFile.Entry.page("fellowship"),
                 ViewFile.Entry.page("map"),
                 ViewFile.Entry.set(ViewDefaults.FELLOWSHIP_CHATS));
-        expect("profile", true, ViewFile.Entry.page("characters"),
-                ViewFile.Entry.page("skills"));
+        expect("profile", true, ViewFile.Entry.page("characters"));
+        expect("skills", true, ViewFile.Entry.page("skills"));
         expect("settings", true, ViewFile.Entry.category());
         expect(ViewFile.CUSTOM, false, ViewFile.Entry.page(NewPage.PAGE_ID));
+    }
+
+    /** The Profile view alone is a stage, its window on the left third; every other stands in the middle. */
+    @Test
+    public void theProfileViewIsAStageOnTheLeftThird() {
+        ViewFileFixtures.useBundled();
+        for (PageCategory category : PageCategory.values()) {
+            if (!category.isView()) {
+                continue;
+            }
+            View view = Views.of(category);
+            boolean profile = category == PageCategory.PROFILE;
+            assertEquals(category.id(), profile, ViewDefaults.isStage(view));
+            assertEquals(category.id(), profile ? Window.ScreenFill.LEFT_THIRD
+                    : Window.ScreenFill.NONE, ViewDefaults.placeOf(view));
+        }
+        assertEquals(ViewFile.MIDDLE, ViewDefaults.fileOf(ViewFile.CUSTOM).place);
+        assertFalse(ViewDefaults.fileOf(ViewFile.CUSTOM).stage);
     }
 
     /** Every view the screen has opens with a window of the mod's files. */
@@ -102,71 +120,102 @@ public final class ViewFileTest {
 
     @Test
     public void aGoodFileRaisesNothing() {
-        assertTrue(problems("{\"view\": \"map\", \"locked\": false,"
+        assertTrue(problems("{\"view\": \"map\", \"locked\": false, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [\"map\", \"journal\"]}").isEmpty());
     }
 
     @Test
     public void aKeyNothingReadsIsAWarning() {
-        assertWarns("{\"view\": \"map\", \"locked\": true, \"pages\": [\"map\"],"
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false, \"pages\": [\"map\"],"
                 + " \"front\": \"map\"}", "nothing reads");
     }
 
     @Test
     public void everyFieldMustBeWritten() {
-        assertWarns("{\"locked\": true, \"pages\": [\"map\"]}", "names no view");
+        assertWarns("{\"locked\": true, \"place\": \"middle\", \"stage\": false, \"pages\": [\"map\"]}", "names no view");
         assertWarns("{\"view\": \"map\", \"pages\": [\"map\"]}",
                 "whether the window is locked");
         assertWarns("{\"view\": \"map\", \"locked\": true}", "lists no pages");
-        assertWarns("{\"view\": \"map\", \"locked\": true, \"pages\": []}",
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false, \"pages\": []}",
                 "lists no page");
+    }
+
+    @Test
+    public void wherePlaceAndStageAreMustBeWritten() {
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"stage\": false,"
+                + " \"pages\": [\"map\"]}", "where the window stands");
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\","
+                + " \"pages\": [\"map\"]}", "whether the view is a stage");
+    }
+
+    @Test
+    public void aPlaceIsTheMiddleOrAPartOfTheScreen() {
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"corner\","
+                + " \"stage\": false, \"pages\": [\"map\"]}", "which is no place");
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"none\","
+                + " \"stage\": false, \"pages\": [\"map\"]}", "which is no place");
+        assertTrue(problems("{\"view\": \"map\", \"locked\": true,"
+                + " \"place\": \"right_half\", \"stage\": true,"
+                + " \"pages\": [\"map\"]}").toString().contains("no place"));
+        List<String> said = new ArrayList<String>();
+        ViewFile third = ViewFile.parse(new StringReader("{\"view\": \"map\","
+                + " \"locked\": true, \"place\": \"left_third\", \"stage\": true,"
+                + " \"pages\": [\"map\"]}"), "test.json", said);
+        assertTrue(said.isEmpty());
+        assertEquals(Window.ScreenFill.LEFT_THIRD, third.fill());
+        assertTrue(third.stage);
+        assertTrue(problems("{\"view\": \"map\", \"locked\": true,"
+                + " \"place\": \"right\", \"stage\": true,"
+                + " \"pages\": [\"map\"]}").isEmpty());
     }
 
     @Test
     public void aFieldOfTheWrongShapeIsAWarning() {
         assertWarns("{\"view\": \"map\", \"locked\": \"yes\", \"pages\": [\"map\"]}",
                 "true or false");
-        assertWarns("{\"view\": \"map\", \"locked\": true, \"pages\": \"map\"}",
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false, \"pages\": \"map\"}",
                 "other than a list");
-        assertWarns("{\"view\": \"map\", \"locked\": true, \"pages\": [3]}",
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false, \"pages\": [3]}",
                 "other than a text");
-        assertWarns("{\"view\": 7, \"locked\": true, \"pages\": [\"map\"]}",
+        assertWarns("{\"view\": 7, \"locked\": true, \"place\": \"middle\", \"stage\": false, \"pages\": [\"map\"]}",
                 "other than a text");
     }
 
     @Test
     public void anUnknownPageSetOrViewIsAWarning() {
-        assertWarns("{\"view\": \"map\", \"locked\": true, \"pages\": [\"atlas\"]}",
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false, \"pages\": [\"atlas\"]}",
                 "which is no page");
-        assertWarns("{\"view\": \"map\", \"locked\": true,"
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [\"set:whispers\"]}", "which no system gives");
-        assertWarns("{\"view\": \"tavern\", \"locked\": true, \"pages\": [\"map\"]}",
+        assertWarns("{\"view\": \"tavern\", \"locked\": true, \"place\": \"middle\", \"stage\": false, \"pages\": [\"map\"]}",
                 "which is no view");
     }
 
     @Test
     public void aCategoryWithNoViewOfItsOwnIsNoView() {
-        assertWarns("{\"view\": \"whispers\", \"locked\": true,"
+        assertWarns("{\"view\": \"whispers\", \"locked\": true, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [\"set:chat\"]}", "which is no view");
-        assertWarns("{\"view\": \"new_page\", \"locked\": false,"
+        assertWarns("{\"view\": \"new_page\", \"locked\": false, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [\"new_page\"]}", "which is no view");
     }
 
     @Test
-    public void aPageThatOpensFromTheWorldIsAWarning() {
-        assertWarns("{\"view\": \"map\", \"locked\": true,"
-                + " \"pages\": [\"waystone\"]}", "opens only from a thing in the world");
+    public void aPageOnlyTheGameOpensIsAWarning() {
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false,"
+                + " \"pages\": [\"waystone\"]}", "which only the game opens");
+        assertWarns("{\"view\": \"profile\", \"locked\": true, \"place\": \"middle\", \"stage\": false,"
+                + " \"pages\": [\"character_editor\"]}", "which only the game opens");
     }
 
     @Test
     public void aCustomViewHasNoCategoryToList() {
-        assertWarns("{\"view\": \"custom\", \"locked\": false,"
+        assertWarns("{\"view\": \"custom\", \"locked\": false, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [\"category\"]}", "no category of its own");
     }
 
     @Test
     public void anEntryListedTwiceIsAWarning() {
-        assertWarns("{\"view\": \"map\", \"locked\": true,"
+        assertWarns("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [\"map\", \"journal\", \"map\"]}", "lists map twice");
     }
 
@@ -177,7 +226,7 @@ public final class ViewFileTest {
             pages.append(index == 0 ? "" : ", ").append("\"page_")
                     .append(index).append('"');
         }
-        List<String> said = problems("{\"view\": \"map\", \"locked\": true,"
+        List<String> said = problems("{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [" + pages + "]}");
         assertTrue(said.toString(), said.toString().contains("at most"));
     }
@@ -186,9 +235,9 @@ public final class ViewFileTest {
     @Test
     public void aFileWithAWarningIsLeftOut() throws IOException {
         File folder = this.temporary.newFolder("views");
-        write(folder, "a.json", "{\"view\": \"map\", \"locked\": true,"
+        write(folder, "a.json", "{\"view\": \"map\", \"locked\": true, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [\"atlas\"]}");
-        write(folder, "b.json", "{\"view\": \"profile\", \"locked\": true,"
+        write(folder, "b.json", "{\"view\": \"profile\", \"locked\": true, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [\"skills\"]}");
         write(folder, "c.json", "not json at all [");
         DataFiles.Result<ViewFile> read = DataFiles.readFolder(folder,
@@ -204,8 +253,8 @@ public final class ViewFileTest {
     public void aPlayersFileTakesTheModsPlace() throws IOException {
         File folder = this.temporary.newFolder("views");
         write(folder, "journal.json", "{\"view\": \"quest_journal\","
-                + " \"locked\": false, \"pages\": [\"map\", \"journal\"]}");
-        write(folder, "mine.json", "{\"view\": \"custom\", \"locked\": true,"
+                + " \"locked\": false, \"place\": \"middle\", \"stage\": false, \"pages\": [\"map\", \"journal\"]}");
+        write(folder, "mine.json", "{\"view\": \"custom\", \"locked\": true, \"place\": \"middle\", \"stage\": false,"
                 + " \"pages\": [\"map\"]}");
         DataFiles.Kind<ViewFile> kind = ViewFiles.kind(ViewFileFixtures.GAME_IDS);
         DataFiles.Result<ViewFile> mine = DataFiles.readFolder(folder, kind);
@@ -223,7 +272,7 @@ public final class ViewFileTest {
     public void aPlayersFileWithAWarningLeavesTheModsInPlace() throws IOException {
         File folder = this.temporary.newFolder("views");
         write(folder, "journal.json", "{\"view\": \"quest_journal\","
-                + " \"locked\": false, \"pages\": [\"atlas\"]}");
+                + " \"locked\": false, \"place\": \"middle\", \"stage\": false, \"pages\": [\"atlas\"]}");
         DataFiles.Kind<ViewFile> kind = ViewFiles.kind(ViewFileFixtures.GAME_IDS);
         DataFiles.Result<ViewFile> mine = DataFiles.readFolder(folder, kind);
         assertEquals(1, mine.problems.size());

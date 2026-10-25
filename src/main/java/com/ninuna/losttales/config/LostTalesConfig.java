@@ -23,6 +23,7 @@ import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
 import com.ninuna.losttales.chat.server.ChatWelcome;
+import com.ninuna.losttales.util.LostTalesServerLanguage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
@@ -103,13 +104,11 @@ public final class LostTalesConfig {
     public static String hudPlacementPreset = HUD_PRESET_DEFAULT;
 
     public static boolean showCompassHud = true;
-    public static boolean linkShowCompassHud = false;
     public static double compassHudOffsetX = HUD_PANEL_UNPLACED;
     public static double compassHudOffsetY = HUD_PANEL_UNPLACED;
     public static int compassHudDisplayRadius = 90;
     public static boolean showStaticCompassMarkers = true;
     public static boolean showLotrWaypointCompassMarkers = true;
-    public static boolean onlyShowUnlockedLotrWaypoints = true;
     public static boolean showHostileCompassMarkers = true;
     public static int hostileCompassMarkerScanRadius = 48;
     public static boolean showHostileMapMarkers = true;
@@ -127,7 +126,6 @@ public final class LostTalesConfig {
     public static boolean fellowshipSharedAggroTracking = true;
 
     public static boolean showFellowshipHud = true;
-    public static boolean linkShowFellowshipHud = false;
     public static double fellowshipHudOffsetX = HUD_PANEL_UNPLACED;
     public static double fellowshipHudOffsetY = HUD_PANEL_UNPLACED;
     public static int fellowshipCompassMarkerFadeRadius = 100;
@@ -140,13 +138,11 @@ public final class LostTalesConfig {
     public static int fellowshipSharedQuestRadius = 32;
 
     public static boolean showQuickLootHud = true;
-    public static boolean linkShowQuickLootHud = false;
     public static int quickLootHudMaxRows = 5;
     public static double quickLootHudOffsetX = HUD_PANEL_UNPLACED;
     public static double quickLootHudOffsetY = HUD_PANEL_UNPLACED;
 
     public static boolean showQuestHud = true;
-    public static boolean linkShowQuestHud = false;
     public static double questHudOffsetX = HUD_PANEL_UNPLACED;
     public static double questHudOffsetY = HUD_PANEL_UNPLACED;
     public static int questHudMaxTrackedQuests = 4;
@@ -277,12 +273,12 @@ public final class LostTalesConfig {
     public static boolean reducedMotion = false;
     /**
      * Developer aid: a local PNG drawn on the local player instead of the
-     * account skin, with a chosen arm width. Empty path disables it.
+     * account skin, with the arms chosen. Empty path disables it.
      */
     public static String devSkinOverridePath = "";
-    /** The override skin's arm widths, as the option names them. */
-    public static final String[] DEV_SKIN_BODY_TYPES = {"wide", "slim"};
-    public static String devSkinOverrideBodyType = DEV_SKIN_BODY_TYPES[0];
+    /** The override skin's arms, as the option names them. */
+    public static final String[] DEV_SKIN_ARMS = {"broad", "slender"};
+    public static String devSkinOverrideArms = DEV_SKIN_ARMS[0];
     /** Draw the jacket, sleeve, and trouser overlays of 64x64 skins. */
     public static boolean showSkinOverlays = true;
     /** Feminine chest physics on/off and bounce strength (0 to 1). */
@@ -318,6 +314,12 @@ public final class LostTalesConfig {
     public static String[] chatWelcomeLines = new String[0];
     /** The address players join by, in the Server's status line and Discord's topics; empty for none. */
     public static String serverAddress = "";
+    /**
+     * The language a dedicated server writes in, one the mod has a lang
+     * file for ({@link LostTalesServerLanguage}, LANG-08); an unknown one
+     * reads as English.
+     */
+    public static String serverLanguage = LostTalesServerLanguage.ENGLISH;
     /** The config-defined permissions a role may grant; see {@code ChatRoleConfig}. */
     public static String[] chatPermissions = new String[0];
     /** The config-defined chat roles; see {@code ChatRoleConfig}. */
@@ -426,6 +428,14 @@ public final class LostTalesConfig {
     public static double statuePriceFactor = 2.0D;
     /** An item a reset also takes, as an item name; empty for none (PROG-12). */
     public static String statueItem = "";
+    /** How much more speed four light pieces give, in percent (PROG-18). */
+    public static double lightSetSpeedPercent = 5.0D;
+    /** The chance four heavy pieces give that a blow does not push, in percent (PROG-18). */
+    public static double heavySetKnockbackPercent = 20.0D;
+    /** How much a heavy helmet or pair of boots slows, in percent (CONTENT-06). */
+    public static double heavyHelmetBootsSlowPercent = 2.5D;
+    /** How much a heavy chestplate or pair of leggings slows, in percent (CONTENT-06). */
+    public static double heavyChestLegsSlowPercent = 5.0D;
 
     public static boolean enableMissiveBoardRecipe = true;
     public static String missiveBoardRecipeCornerIngredient = "ore:plankWood";
@@ -698,12 +708,6 @@ public final class LostTalesConfig {
                     showCompassHud,
                     TIP
             );
-            linkShowCompassHud = config.getBoolean(
-                    "linkShowCompassHud",
-                    CATEGORY_CLIENT,
-                    linkShowCompassHud,
-                    TIP
-            );
             compassHudOffsetX = getHudPercent(
                     config, "compassHudOffsetX",
                     compassHudOffsetX, 0.0D, 100.0D);
@@ -728,12 +732,6 @@ public final class LostTalesConfig {
                     "showLotrWaypointCompassMarkers",
                     CATEGORY_CLIENT,
                     showLotrWaypointCompassMarkers,
-                    TIP
-            );
-            onlyShowUnlockedLotrWaypoints = config.getBoolean(
-                    "onlyShowUnlockedLotrWaypoints",
-                    CATEGORY_CLIENT,
-                    onlyShowUnlockedLotrWaypoints,
                     TIP
             );
             showHostileCompassMarkers = config.getBoolean(
@@ -844,12 +842,6 @@ public final class LostTalesConfig {
                     showFellowshipHud,
                     TIP
             );
-            linkShowFellowshipHud = config.getBoolean(
-                    "linkShowFellowshipHud",
-                    CATEGORY_CLIENT,
-                    linkShowFellowshipHud,
-                    TIP
-            );
             fellowshipHudOffsetX = getHudPercent(
                     config, "fellowshipHudOffsetX",
                     fellowshipHudOffsetX, 0.0D, 100.0D);
@@ -917,12 +909,6 @@ public final class LostTalesConfig {
                     showQuickLootHud,
                     TIP
             );
-            linkShowQuickLootHud = config.getBoolean(
-                    "linkShowQuickLootHud",
-                    CATEGORY_CLIENT,
-                    linkShowQuickLootHud,
-                    TIP
-            );
             quickLootHudOffsetX = getHudPercent(
                     config, "quickLootHudOffsetX",
                     quickLootHudOffsetX,
@@ -943,12 +929,6 @@ public final class LostTalesConfig {
                     "showQuestHud",
                     CATEGORY_CLIENT,
                     showQuestHud,
-                    TIP
-            );
-            linkShowQuestHud = config.getBoolean(
-                    "linkShowQuestHud",
-                    CATEGORY_CLIENT,
-                    linkShowQuestHud,
                     TIP
             );
             questHudOffsetX = getHudPercent(
@@ -1061,6 +1041,12 @@ public final class LostTalesConfig {
                     serverAddress,
                     TIP
             );
+            serverLanguage = LostTalesServerLanguage.resolve(config.getString(
+                    "serverLanguage",
+                    CATEGORY_CHAT,
+                    serverLanguage,
+                    TIP
+            ));
             chatAuditLogEnabled = config.getBoolean(
                     "auditLog",
                     CATEGORY_CHAT,
@@ -1350,12 +1336,12 @@ public final class LostTalesConfig {
                     devSkinOverridePath,
                     TIP
             );
-            devSkinOverrideBodyType = config.getString(
-                    "devSkinOverrideBodyType",
+            devSkinOverrideArms = config.getString(
+                    "devSkinOverrideArms",
                     CATEGORY_CLIENT,
-                    devSkinOverrideBodyType,
+                    devSkinOverrideArms,
                     TIP,
-                    DEV_SKIN_BODY_TYPES
+                    DEV_SKIN_ARMS
             );
             showSkinOverlays = config.getBoolean(
                     "showSkinOverlays",
@@ -1575,6 +1561,18 @@ public final class LostTalesConfig {
                     statuePriceFactor, 1.0D, 10.0D);
             statueItem = config.getString("statueItem",
                     CATEGORY_PROGRESSION, statueItem, TIP);
+            lightSetSpeedPercent = getBoundedDouble(config,
+                    CATEGORY_PROGRESSION, "lightSetSpeedPercent",
+                    lightSetSpeedPercent, 0.0D, 50.0D);
+            heavySetKnockbackPercent = getBoundedDouble(config,
+                    CATEGORY_PROGRESSION, "heavySetKnockbackPercent",
+                    heavySetKnockbackPercent, 0.0D, 100.0D);
+            heavyHelmetBootsSlowPercent = getBoundedDouble(config,
+                    CATEGORY_PROGRESSION, "heavyHelmetBootsSlowPercent",
+                    heavyHelmetBootsSlowPercent, 0.0D, 25.0D);
+            heavyChestLegsSlowPercent = getBoundedDouble(config,
+                    CATEGORY_PROGRESSION, "heavyChestLegsSlowPercent",
+                    heavyChestLegsSlowPercent, 0.0D, 25.0D);
 
             enableMissiveBoardRecipe = config.getBoolean(
                     "enableMissiveBoardRecipe",
@@ -1700,11 +1698,13 @@ public final class LostTalesConfig {
             clampMissiveOptions();
 
             followHudLayout();
-            syncLinkedHudOptions();
             clampHudOffsets();
             if (fromFiles) {
                 writeCurrentValues(config);
                 applyShippedDefinitions(config);
+                // A dedicated server's lines in the language it writes in;
+                // nothing anywhere else.
+                LostTalesServerLanguage.apply(serverLanguage);
             }
         } finally {
             if (fromFiles && config.hasChanged()) {
@@ -1838,25 +1838,10 @@ public final class LostTalesConfig {
         setShowLostTalesHud(!showLostTalesHud);
     }
 
+    /** Shows or hides the HUD; every panel follows it, each keeping its own switch (MAP-15). */
     public static void setShowLostTalesHud(boolean show) {
         showLostTalesHud = show;
-        syncLinkedHudOptions();
         save();
-    }
-
-    public static void syncLinkedHudOptions() {
-        if (linkShowCompassHud) {
-            showCompassHud = showLostTalesHud;
-        }
-        if (linkShowFellowshipHud) {
-            showFellowshipHud = showLostTalesHud;
-        }
-        if (linkShowQuickLootHud) {
-            showQuickLootHud = showLostTalesHud;
-        }
-        if (linkShowQuestHud) {
-            showQuestHud = showLostTalesHud;
-        }
     }
 
     public static boolean applyHudPreset(String preset) {
@@ -2264,6 +2249,8 @@ public final class LostTalesConfig {
                 .set(chatWelcomeLines);
         config.get(CATEGORY_CHAT, "serverAddress", serverAddress)
                 .set(serverAddress);
+        config.get(CATEGORY_CHAT, "serverLanguage", serverLanguage)
+                .set(serverLanguage);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",
                 enableChatEmojis).set(enableChatEmojis);
         config.get(CATEGORY_CLIENT, "convertChatEmoticons",
@@ -2410,13 +2397,11 @@ public final class LostTalesConfig {
             hudPresetProperty.setValidValues(hudPresetValues());
         }
         config.get(CATEGORY_CLIENT, "showCompassHud", showCompassHud).set(showCompassHud);
-        config.get(CATEGORY_CLIENT, "linkShowCompassHud", linkShowCompassHud).set(linkShowCompassHud);
         config.get(CATEGORY_CLIENT, "compassHudOffsetX", compassHudOffsetX).set(compassHudOffsetX);
         config.get(CATEGORY_CLIENT, "compassHudOffsetY", compassHudOffsetY).set(compassHudOffsetY);
         config.get(CATEGORY_CLIENT, "compassHudDisplayRadius", compassHudDisplayRadius).set(compassHudDisplayRadius);
         config.get(CATEGORY_CLIENT, "showStaticCompassMarkers", showStaticCompassMarkers).set(showStaticCompassMarkers);
         config.get(CATEGORY_CLIENT, "showLotrWaypointCompassMarkers", showLotrWaypointCompassMarkers).set(showLotrWaypointCompassMarkers);
-        config.get(CATEGORY_CLIENT, "onlyShowUnlockedLotrWaypoints", onlyShowUnlockedLotrWaypoints).set(onlyShowUnlockedLotrWaypoints);
         config.get(CATEGORY_CLIENT, "showHostileCompassMarkers", showHostileCompassMarkers).set(showHostileCompassMarkers);
         config.get(CATEGORY_CLIENT, "hostileCompassMarkerScanRadius", hostileCompassMarkerScanRadius).set(hostileCompassMarkerScanRadius);
         config.get(CATEGORY_CLIENT, "showHostileMapMarkers", showHostileMapMarkers).set(showHostileMapMarkers);
@@ -2439,7 +2424,6 @@ public final class LostTalesConfig {
         config.get(CATEGORY_COMBAT_MARKERS, "debugLogging", combatMarkerDebugLogging).set(combatMarkerDebugLogging);
         config.get(CATEGORY_COMBAT_MARKERS, "shareWithFellowship", fellowshipSharedAggroTracking).set(fellowshipSharedAggroTracking);
         config.get(CATEGORY_CLIENT, "showFellowshipHud", showFellowshipHud).set(showFellowshipHud);
-        config.get(CATEGORY_CLIENT, "linkShowFellowshipHud", linkShowFellowshipHud).set(linkShowFellowshipHud);
         config.get(CATEGORY_CLIENT, "fellowshipHudOffsetX", fellowshipHudOffsetX).set(fellowshipHudOffsetX);
         config.get(CATEGORY_CLIENT, "fellowshipHudOffsetY", fellowshipHudOffsetY).set(fellowshipHudOffsetY);
         config.get(CATEGORY_FELLOWSHIP, "statusUpdateIntervalTicks", fellowshipStatusUpdateIntervalTicks).set(fellowshipStatusUpdateIntervalTicks);
@@ -2449,12 +2433,10 @@ public final class LostTalesConfig {
         config.get(CATEGORY_FELLOWSHIP, "enableSharedQuestProgress", enableSharedQuestProgress).set(enableSharedQuestProgress);
         config.get(CATEGORY_FELLOWSHIP, "sharedQuestRadius", fellowshipSharedQuestRadius).set(fellowshipSharedQuestRadius);
         config.get(CATEGORY_CLIENT, "showQuickLootHud", showQuickLootHud).set(showQuickLootHud);
-        config.get(CATEGORY_CLIENT, "linkShowQuickLootHud", linkShowQuickLootHud).set(linkShowQuickLootHud);
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetX", quickLootHudOffsetX).set(quickLootHudOffsetX);
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetY", quickLootHudOffsetY).set(quickLootHudOffsetY);
         config.get(CATEGORY_CLIENT, "quickLootHudMaxRows", quickLootHudMaxRows).set(quickLootHudMaxRows);
         config.get(CATEGORY_CLIENT, "showQuestHud", showQuestHud).set(showQuestHud);
-        config.get(CATEGORY_CLIENT, "linkShowQuestHud", linkShowQuestHud).set(linkShowQuestHud);
         config.get(CATEGORY_CLIENT, "questHudOffsetX", questHudOffsetX).set(questHudOffsetX);
         config.get(CATEGORY_CLIENT, "questHudOffsetY", questHudOffsetY).set(questHudOffsetY);
         config.get(CATEGORY_CLIENT, "questHudMaxTrackedQuests", questHudMaxTrackedQuests).set(questHudMaxTrackedQuests);
@@ -2481,10 +2463,10 @@ public final class LostTalesConfig {
                 .set(Float.toString(chestBounce));
         config.get(CATEGORY_CLIENT, "devSkinOverridePath", devSkinOverridePath)
                 .set(devSkinOverridePath);
-        Property bodyTypeProperty = config.get(CATEGORY_CLIENT,
-                "devSkinOverrideBodyType", devSkinOverrideBodyType);
-        bodyTypeProperty.set(devSkinOverrideBodyType);
-        bodyTypeProperty.setValidValues(DEV_SKIN_BODY_TYPES);
+        Property armsProperty = config.get(CATEGORY_CLIENT,
+                "devSkinOverrideArms", devSkinOverrideArms);
+        armsProperty.set(devSkinOverrideArms);
+        armsProperty.setValidValues(DEV_SKIN_ARMS);
         config.get(CATEGORY_QUESTS, "enableQuestPrerequisites", enableQuestPrerequisites).set(enableQuestPrerequisites);
         config.get(CATEGORY_QUESTS, "enableQuestRewards", enableQuestRewards).set(enableQuestRewards);
         config.get(CATEGORY_QUESTS, "allowQuestItemStarts", allowQuestItemStarts).set(allowQuestItemStarts);
@@ -2513,6 +2495,10 @@ public final class LostTalesConfig {
         config.get(CATEGORY_PROGRESSION, "statueFirstPrice", statueFirstPrice).set(statueFirstPrice);
         config.get(CATEGORY_PROGRESSION, "statuePriceFactor", statuePriceFactor).set(statuePriceFactor);
         config.get(CATEGORY_PROGRESSION, "statueItem", statueItem).set(statueItem);
+        config.get(CATEGORY_PROGRESSION, "lightSetSpeedPercent", lightSetSpeedPercent).set(lightSetSpeedPercent);
+        config.get(CATEGORY_PROGRESSION, "heavySetKnockbackPercent", heavySetKnockbackPercent).set(heavySetKnockbackPercent);
+        config.get(CATEGORY_PROGRESSION, "heavyHelmetBootsSlowPercent", heavyHelmetBootsSlowPercent).set(heavyHelmetBootsSlowPercent);
+        config.get(CATEGORY_PROGRESSION, "heavyChestLegsSlowPercent", heavyChestLegsSlowPercent).set(heavyChestLegsSlowPercent);
         config.get(CATEGORY_MISSIVES, "enableMissiveBoardRecipe", enableMissiveBoardRecipe).set(enableMissiveBoardRecipe);
         config.get(CATEGORY_MISSIVES, "missiveBoardRecipeCornerIngredient", missiveBoardRecipeCornerIngredient).set(missiveBoardRecipeCornerIngredient);
         config.get(CATEGORY_MISSIVES, "missiveBoardRecipeEdgeIngredient", missiveBoardRecipeEdgeIngredient).set(missiveBoardRecipeEdgeIngredient);

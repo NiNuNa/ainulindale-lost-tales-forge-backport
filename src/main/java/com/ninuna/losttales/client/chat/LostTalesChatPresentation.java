@@ -726,7 +726,7 @@ public final class LostTalesChatPresentation {
                 updated = entry.packet.withReply(ChatReplyReference.of(
                         messageId, old.getAuthor(), newText,
                         old.getAuthorColor()).withHeadOf(old)
-                        .asAction(old.isAction()));
+                        .asAction(old.isAction()).asUnseen(old.isUnseen()));
             } catch (RuntimeException refused) {
                 continue;
             }
@@ -2170,7 +2170,8 @@ public final class LostTalesChatPresentation {
         // and a click exactly as it does, so the card comes up wherever
         // the pointer is over the sender. Their colour comes from the
         // head marker, which is where every part of the name takes it.
-        String whisper = ChatSenderSpan.suggestionFor(packet.getAccountName());
+        // An unseen voice names nobody, so its name opens no card.
+        String whisper = senderSuggestion(packet);
         root.appendSibling(reply(text("<", nearestFormatting(
                 packet.getNameColor()), false), whisper));
         // Two bold spaces stand in for the head; what the line actually
@@ -2346,7 +2347,7 @@ public final class LostTalesChatPresentation {
         root.appendSibling(ChatLayoutMarker.bodyBreak(ChatNarrator.color(),
                 ChatLineMark.ACTION));
         root.appendSibling(ChatHeadMarker.asAvatar(voicedHead(packet)));
-        String whisper = ChatSenderSpan.suggestionFor(packet.getAccountName());
+        String whisper = senderSuggestion(packet);
         int sentenceStart = root.getSiblings().size();
         root.appendSibling(reply(text(shownName(packet),
                 nearestFormatting(packet.getNameColor()), false), whisper));
@@ -2534,7 +2535,8 @@ public final class LostTalesChatPresentation {
         }
         root.appendSibling(ChatReplyMarker.apply(
                 text("<", nearestFormatting(name), false), name, id));
-        if (senderId != null) {
+        // An unseen voice has no head to wear (CHAT-84).
+        if (senderId != null && !reply.isUnseenVoice()) {
             root.appendSibling(ChatReplyMarker.applyHead(
                     text("  ", EnumChatFormatting.WHITE, true), name, id,
                     senderId, accountLine, npcLine, skinId));
@@ -2619,9 +2621,22 @@ public final class LostTalesChatPresentation {
      */
     private static ChatComponentText reply(ChatComponentText part,
                                            String whisper) {
+        if (whisper == null) {
+            return part;
+        }
         part.setChatStyle(part.getChatStyle().setChatClickEvent(
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, whisper)));
         return part;
+    }
+
+    /**
+     * What a click on a line's sender suggests, which is what opens their
+     * card: a whisper to the account; nothing for an unseen voice, which
+     * names nobody (CHAT-84).
+     */
+    private static String senderSuggestion(LostTalesChatMessagePacket packet) {
+        return packet.isUnseenVoice() ? null
+                : ChatSenderSpan.suggestionFor(packet.getAccountName());
     }
 
     /**

@@ -1,0 +1,22 @@
+{
+  "id": "losttales:rivendell",
+  "helmet": [
+    "lotr:item.helmetRivendell"
+  ],
+  "chestplate": [
+    "lotr:item.bodyRivendell"
+  ],
+  "leggings": [
+    "lotr:item.legsRivendell"
+  ],
+  "boots": [
+    "lotr:item.bootsRivendell"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:lore"
+    }
+  ]
+}

@@ -12,14 +12,19 @@ import net.minecraft.client.gui.FontRenderer;
 import java.util.List;
 
 /**
- * The shapes a control is drawn from when it stands as a window's row, as
- * Settings' rows stand: a menu's row high, its label at the left in
- * ivory and its value at the right end in the aside tone; a field over
- * its hairline; a note at a menu note's pitch; the row under the pointer
- * lit by recolouring the window's surface. The creator's boxed shapes are
- * {@link CreatorWidgets}.
+ * The shapes every control is drawn from, as Settings' rows stand: a
+ * menu's row high, its label at the left in ivory and its value at the
+ * right end in the aside tone; a field over its hairline; a note at a
+ * menu note's pitch; the row under the pointer lit by recolouring the
+ * window's surface.
  */
 public final class CreatorRows {
+
+    /**
+     * A one-line field's own height, from the top of its capitals: the
+     * line a click on its row lands on.
+     */
+    static final int FIELD_LINE = 12;
 
     private CreatorRows() {}
 

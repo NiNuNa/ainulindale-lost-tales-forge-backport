@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.armour.ArmourWeight;
 import com.ninuna.losttales.data.JsonReading;
 import java.io.Reader;
 import java.util.ArrayList;
@@ -20,7 +21,7 @@ import java.util.Set;
  */
 public final class SkillFileParser {
     static final Set<String> SKILL_KEYS = JsonReading.keys("id", "icon", "order",
-            "name", "description", "counts", "perks");
+            "name", "description", "weight", "counts", "perks");
     static final Set<String> COUNT_KEYS = JsonReading.keys("act", "per",
             "weapons", "worth", "ingredients");
     static final Set<String> PERK_KEYS = JsonReading.keys("id", "levels",
@@ -51,6 +52,15 @@ public final class SkillFileParser {
         int order = skill.whole(object, "order", 0);
         String name = skill.string(object, "name", "");
         String description = skill.string(object, "description", "");
+        String weightWord = skill.string(object, "weight", "");
+        ArmourWeight weight = null;
+        if (weightWord.length() > 0) {
+            weight = ArmourWeight.fromWord(weightWord);
+            if (weight == null || !weight.counts()) {
+                skill.say("weighs '" + weightWord + "'; an armour skill is light or heavy");
+                weight = null;
+            }
+        }
         List<SkillCount> counts = new ArrayList<SkillCount>();
         int index = 0;
         for (JsonObject countObject : skill.objects(object, "counts")) {
@@ -60,7 +70,7 @@ public final class SkillFileParser {
         for (JsonObject perkObject : skill.objects(object, "perks")) {
             perks.add(parsePerk(perkObject, skill));
         }
-        return new SkillDefinition(id, icon, order, name, description, counts, perks);
+        return new SkillDefinition(id, icon, order, name, description, counts, perks, weight);
     }
 
     /** {@code skills/archery.json} reads as {@code losttales:archery}. */

@@ -65,6 +65,7 @@ final class ChatLineNbtCodec {
     private static final String TAG_CALLED_ROLES = "CalledRoles";
     private static final String TAG_NOT_IN_WORLD = "NotInWorld";
     private static final String TAG_TYPED = "Typed";
+    private static final String TAG_UNSEEN = "Unseen";
 
     private static final String TAG_REPLY_KIND = "Kind";
     private static final String TAG_REPLY_AUTHOR = "Author";
@@ -159,6 +160,7 @@ final class ChatLineNbtCodec {
         tag.setTag(TAG_CALLED_ROLES, writeStrings(line.getMentionedRoles()));
         tag.setBoolean(TAG_NOT_IN_WORLD, line.isNotInWorld());
         tag.setString(TAG_TYPED, line.getTyped());
+        tag.setBoolean(TAG_UNSEEN, line.isUnseen());
         return tag;
     }
 
@@ -217,7 +219,8 @@ final class ChatLineNbtCodec {
                     .withTabId(string(tag, TAG_TAB))
                     .withMentionedRoles(knownRoles(strings(tag, TAG_CALLED_ROLES)))
                     .withNotInWorld(flag(tag, TAG_NOT_IN_WORLD))
-                    .withTyped(string(tag, TAG_TYPED));
+                    .withTyped(string(tag, TAG_TYPED))
+                    .withUnseen(flag(tag, TAG_UNSEEN));
             return readsOnTheWire(line) ? line : null;
         } catch (RuntimeException unreadable) {
             return null;
@@ -258,6 +261,7 @@ final class ChatLineNbtCodec {
         tag.setInteger(TAG_REPLY_COLOR, reply.getAuthorColor());
         tag.setBoolean(TAG_REPLY_ACTION, reply.isAction());
         tag.setString(TAG_REPLY_LINK, reply.getForwardedFrom());
+        tag.setBoolean(TAG_UNSEEN, reply.isUnseen());
         if (reply.hasHead()) {
             NbtTags.writeUuid(tag, TAG_SENDER, reply.getSenderId());
             tag.setBoolean(TAG_ACCOUNT_LINE, reply.isAccountLine());
@@ -297,8 +301,9 @@ final class ChatLineNbtCodec {
             throw new IllegalArgumentException("a quote of nothing");
         }
         UUID head = NbtTags.readUuid(tag, TAG_SENDER);
-        return head == null ? reply
-                : reply.withHead(head, flag(tag, TAG_ACCOUNT_LINE), string(tag, TAG_SKIN));
+        return (head == null ? reply : reply.withHead(head,
+                flag(tag, TAG_ACCOUNT_LINE), string(tag, TAG_SKIN)))
+                .asUnseen(flag(tag, TAG_UNSEEN));
     }
 
     private static NBTTagCompound writeShowcase(ChatShowcase showcase) {

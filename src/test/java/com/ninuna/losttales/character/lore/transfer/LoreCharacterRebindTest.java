@@ -4,7 +4,7 @@ import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.lore.LoreCharacterDefinition;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import org.junit.Test;
 
@@ -48,7 +48,7 @@ public final class LoreCharacterRebindTest {
         assertEquals(500L, claimed.getCreationTimestamp());
         assertEquals("lotr:dale", claimed.getPledgedFactionId());
         assertEquals("losttales:ranger", claimed.getCosmeticCapeId());
-        assertEquals("losttales:hobbit_shire_male_0", claimed.getSkinId());
+        assertEquals("losttales:hobbit_shire_masculine_0", claimed.getSkinId());
     }
 
     @Test
@@ -63,16 +63,16 @@ public final class LoreCharacterRebindTest {
     private static LoreCharacterDefinition definition() {
         return new LoreCharacterDefinition("losttales:frodo", "Frodo Baggins", "The Ring-bearer.", 50,
                 new LoreCharacterDefinition.Appearance(CharacterRaceRegistry.HOBBIT,
-                        CharacterGenderRegistry.MALE, "lotr:hobbit",
-                        "losttales:hobbit_shire_male_0"),
-                FILE_PROFILE);
+                        CharacterBodyTypeRegistry.MASCULINE,
+                        "losttales:hobbit_shire_masculine_0"),
+                "lotr:hobbit", FILE_PROFILE);
     }
 
     private static RoleplayCharacter lived() {
         return RoleplayCharacter.builder(CHARACTER, LAST_HOLDER)
                 .slot(4).name("Frodo Baggins").race(CharacterRaceRegistry.HOBBIT)
-                .gender(CharacterGenderRegistry.MALE)
-                .skin("losttales:hobbit_shire_male_0").age(33)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
+                .skin("losttales:hobbit_shire_masculine_0").age(33)
                 .startingFaction("lotr:hobbit").pledgedFaction("lotr:dale")
                 .cosmeticCape("losttales:ranger")
                 .profile(CharacterProfile.EMPTY.withSection(

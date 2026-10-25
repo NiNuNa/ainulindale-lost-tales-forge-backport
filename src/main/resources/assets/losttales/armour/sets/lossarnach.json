@@ -1,0 +1,22 @@
+{
+  "id": "losttales:lossarnach",
+  "helmet": [
+    "lotr:item.helmetLossarnach"
+  ],
+  "chestplate": [
+    "lotr:item.bodyLossarnach"
+  ],
+  "leggings": [
+    "lotr:item.legsLossarnach"
+  ],
+  "boots": [
+    "lotr:item.bootsLossarnach"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:heavy_arms"
+    }
+  ]
+}

@@ -1,7 +1,6 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
-import com.ninuna.losttales.accessory.AccessoryCompatibilityRegistry;
 import cpw.mods.fml.common.network.ByteBufUtils;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -101,18 +100,18 @@ public final class AccessoryEffectSyncPacket implements IMessage {
         return this.malformed;
     }
 
+    /**
+     * Whether the state is whole. The accessory it names is looked up as
+     * it is used, in the list the server sent ahead of it (ACC-01); one
+     * the client does not know does nothing.
+     */
     private static boolean isValid(
             UUID playerId, int entityId, long sequence,
             String definitionId) {
-        if (playerId == null || entityId < 0 || sequence <= 0L
-                || definitionId == null
-                || definitionId.getBytes(StandardCharsets.UTF_8).length
-                > MAX_DEFINITION_ID_BYTES) {
-            return false;
-        }
-        return definitionId.length() == 0
-                || AccessoryCompatibilityRegistry.getInstance()
-                .getDefinition(definitionId) != null;
+        return playerId != null && entityId >= 0 && sequence > 0L
+                && definitionId != null
+                && definitionId.getBytes(StandardCharsets.UTF_8).length
+                <= MAX_DEFINITION_ID_BYTES;
     }
 
     public static final class Handler implements IMessageHandler<

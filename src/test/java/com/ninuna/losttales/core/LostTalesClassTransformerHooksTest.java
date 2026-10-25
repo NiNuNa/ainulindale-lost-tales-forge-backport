@@ -173,7 +173,7 @@ public final class LostTalesClassTransformerHooksTest {
     }
 
     /** The class names {@code transform} dispatches on, as its bytecode holds them. */
-    private static Set<String> dispatchedTargets() throws IOException {
+    static Set<String> dispatchedTargets() throws IOException {
         byte[] bytes = readResource(
                 LostTalesClassTransformer.class.getName().replace('.', '/') + ".class");
         ClassNode transformer = new ClassNode();
@@ -209,7 +209,7 @@ public final class LostTalesClassTransformerHooksTest {
                 && Character.isUpperCase(value.charAt(dot + 1));
     }
 
-    private static byte[] readResource(String path) throws IOException {
+    static byte[] readResource(String path) throws IOException {
         InputStream input = LostTalesClassTransformerHooksTest.class
                 .getClassLoader().getResourceAsStream(path);
         if (input == null) {

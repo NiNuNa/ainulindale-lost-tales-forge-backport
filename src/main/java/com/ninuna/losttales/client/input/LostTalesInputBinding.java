@@ -48,9 +48,12 @@ public final class LostTalesInputBinding {
     }
 
     /**
-     * The key's short name, as a key icon writes it, in the game's
-     * language: the keys with a name of their own from the lang file,
-     * every other key by LWJGL's name for it ({@code F5}, {@code A}).
+     * The key's short name, as a key hint writes it on its blank key and
+     * a sentence names it, in the game's language (MAP-17): letters,
+     * digits and the function keys as they are ({@code A}, {@code 5},
+     * {@code F5}), every other key by its lang line ({@link #namedKey},
+     * the number pad's as {@code Num} and the key), and a key nobody
+     * named by LWJGL's name.
      */
     public static String getFallbackLabel(Type type, int keyCode) {
         if (type == null) {
@@ -77,6 +80,10 @@ public final class LostTalesInputBinding {
         String named = namedKey(keyCode);
         if (named != null) {
             return word(named);
+        }
+        String numpad = numpadKey(keyCode);
+        if (numpad != null) {
+            return word("numpad", numpad);
         }
         String name = Keyboard.getKeyName(keyCode);
         return name == null || name.length() == 0
@@ -124,6 +131,99 @@ public final class LostTalesInputBinding {
                 return "escape";
             case Keyboard.KEY_SPACE:
                 return "space";
+            case Keyboard.KEY_TAB:
+                return "tab";
+            case Keyboard.KEY_DELETE:
+                return "delete";
+            case Keyboard.KEY_INSERT:
+                return "insert";
+            case Keyboard.KEY_UP:
+                return "up";
+            case Keyboard.KEY_DOWN:
+                return "down";
+            case Keyboard.KEY_LEFT:
+                return "left";
+            case Keyboard.KEY_RIGHT:
+                return "right";
+            case Keyboard.KEY_MINUS:
+                return "minus";
+            case Keyboard.KEY_EQUALS:
+                return "equals";
+            case Keyboard.KEY_LBRACKET:
+                return "left_bracket";
+            case Keyboard.KEY_RBRACKET:
+                return "right_bracket";
+            case Keyboard.KEY_SEMICOLON:
+                return "semicolon";
+            case Keyboard.KEY_APOSTROPHE:
+                return "apostrophe";
+            case Keyboard.KEY_GRAVE:
+                return "grave";
+            case Keyboard.KEY_BACKSLASH:
+                return "backslash";
+            case Keyboard.KEY_COMMA:
+                return "comma";
+            case Keyboard.KEY_PERIOD:
+                return "period";
+            case Keyboard.KEY_SLASH:
+                return "slash";
+            case Keyboard.KEY_NUMLOCK:
+                return "num_lock";
+            case Keyboard.KEY_SCROLL:
+                return "scroll_lock";
+            case Keyboard.KEY_SYSRQ:
+                return "print_screen";
+            case Keyboard.KEY_PAUSE:
+                return "pause";
+            case Keyboard.KEY_APPS:
+                return "apps";
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * What a number pad key's name writes after {@code Num}: its digit
+     * or sign, the Enter key's name for its Enter; null for any other key.
+     */
+    static String numpadKey(int keyCode) {
+        switch (keyCode) {
+            case Keyboard.KEY_NUMPAD0:
+                return "0";
+            case Keyboard.KEY_NUMPAD1:
+                return "1";
+            case Keyboard.KEY_NUMPAD2:
+                return "2";
+            case Keyboard.KEY_NUMPAD3:
+                return "3";
+            case Keyboard.KEY_NUMPAD4:
+                return "4";
+            case Keyboard.KEY_NUMPAD5:
+                return "5";
+            case Keyboard.KEY_NUMPAD6:
+                return "6";
+            case Keyboard.KEY_NUMPAD7:
+                return "7";
+            case Keyboard.KEY_NUMPAD8:
+                return "8";
+            case Keyboard.KEY_NUMPAD9:
+                return "9";
+            case Keyboard.KEY_ADD:
+                return "+";
+            case Keyboard.KEY_SUBTRACT:
+                return "-";
+            case Keyboard.KEY_MULTIPLY:
+                return "*";
+            case Keyboard.KEY_DIVIDE:
+                return "/";
+            case Keyboard.KEY_DECIMAL:
+                return ".";
+            case Keyboard.KEY_NUMPADEQUALS:
+                return "=";
+            case Keyboard.KEY_NUMPADCOMMA:
+                return ",";
+            case Keyboard.KEY_NUMPADENTER:
+                return word("enter");
             default:
                 return null;
         }

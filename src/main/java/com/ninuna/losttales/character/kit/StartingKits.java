@@ -1,5 +1,7 @@
 package com.ninuna.losttales.character.kit;
 
+import com.ninuna.losttales.armour.Armour;
+import com.ninuna.losttales.armour.Relics;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
@@ -20,7 +22,9 @@ import net.minecraft.nbt.NBTTagCompound;
 /**
  * The starting kits the logical server knows (CHAR-40): the bundled race
  * kits, with a server's own in place of those of the same id and its new
- * ones after. Read as the server starts; cleared as it stops.
+ * ones after. Read as the server starts and on
+ * {@code /losttales reload kits}, against the races in place then; cleared
+ * as it stops.
  *
  * <p>A character is given every kit that fits it in its first saved
  * state, which is made once, as the character is first stored: a switch
@@ -59,6 +63,11 @@ public final class StartingKits {
         public boolean wornThrough(String itemId, int damage) {
             Item item = item(itemId);
             return item != null && item.isDamageable() && damage >= item.getMaxDamage();
+        }
+
+        @Override
+        public boolean relicTakes(String relicId, String itemId) {
+            return Relics.takes(Armour.serverCatalogue(), relicId, itemId);
         }
     };
 
@@ -178,7 +187,10 @@ public final class StartingKits {
         try {
             List<ItemStack> stacks = new ArrayList<ItemStack>();
             for (KitItem slot : packed.slots) {
-                stacks.add(new ItemStack(item(slot.getItemId()), slot.getCount(), slot.getDamage()));
+                ItemStack stack = new ItemStack(item(slot.getItemId()), slot.getCount(),
+                        slot.getDamage());
+                Relics.mark(stack, slot.getRelic());
+                stacks.add(stack);
             }
             NBTTagCompound state = component.createDefault(stacks);
             component.validate(state);

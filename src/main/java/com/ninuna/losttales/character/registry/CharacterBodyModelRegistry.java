@@ -11,8 +11,8 @@ import java.util.Map;
  *
  * Skins name the model that draws them, so the model a player renders with
  * follows the chosen skin rather than the race directly. The LOTR identifiers
- * are the ones lore character definitions already use for {@code modelId};
- * every body behind them is Lost Tales geometry that reads LOTR's layouts.
+ * name the bodies; every body behind them is Lost Tales geometry that reads
+ * LOTR's layouts.
  */
 public final class CharacterBodyModelRegistry {
 

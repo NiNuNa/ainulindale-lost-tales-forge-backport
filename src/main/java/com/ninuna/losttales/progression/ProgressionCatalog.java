@@ -20,7 +20,7 @@ import java.util.Map;
  * Every skill and deed the logical server knows: the bundled files, with a
  * server's own in place of those of the same id and its new ones after
  * (PROG-01, PROG-11). Read as the server starts and again on
- * {@code /losttales skills reload}; cleared as it stops. The races' starts
+ * {@code /losttales reload skills}; cleared as it stops. The races' starts
  * are in their race files (PROG-05, CHAR-38).
  */
 public final class ProgressionCatalog {

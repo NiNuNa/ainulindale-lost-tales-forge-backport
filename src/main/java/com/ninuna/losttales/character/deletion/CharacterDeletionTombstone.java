@@ -64,6 +64,11 @@ public final class CharacterDeletionTombstone {
         return copyCharacter(this.character);
     }
 
+    /** The deleted character's name, as it went. */
+    public String getCharacterName() {
+        return this.character.getName();
+    }
+
     public long getStateGeneration() {
         return this.stateGeneration;
     }

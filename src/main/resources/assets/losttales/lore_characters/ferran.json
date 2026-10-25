@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:ferran",
   "name": "Ferran",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_bree_male_3"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_bree_masculine_3",
+  "faction": "lotr:bree"
 }

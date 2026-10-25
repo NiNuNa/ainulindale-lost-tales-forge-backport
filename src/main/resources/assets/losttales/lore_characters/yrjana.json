@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:yrjana",
   "name": "Yrjana",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:female",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_easterling_female_0"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:feminine",
+  "skin": "losttales:human_easterling_feminine_0",
+  "faction": "lotr:rhudel"
 }

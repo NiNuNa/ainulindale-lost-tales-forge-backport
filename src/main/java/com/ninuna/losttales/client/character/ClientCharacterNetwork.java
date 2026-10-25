@@ -130,11 +130,11 @@ public final class ClientCharacterNetwork {
         });
     }
 
-    /** A new look for one character: its skin, arm width and chest. */
+    /** A new look for one character: its skin, arms and chest. */
     public static int updateLook(final long expectedRosterRevision,
                                  final UUID characterId,
                                  final String skinId,
-                                 final String bodyTypeId,
+                                 final String armsId,
                                  final String chestTypeId) {
         if (expectedRosterRevision < 0L || characterId == null) {
             throw new IllegalArgumentException("revision and character must be valid");
@@ -149,7 +149,7 @@ public final class ClientCharacterNetwork {
                                 expectedRosterRevision,
                                 characterId,
                                 skinId,
-                                bodyTypeId,
+                                armsId,
                                 chestTypeId));
             }
         });

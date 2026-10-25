@@ -1,10 +1,12 @@
 package com.ninuna.losttales.block.tileentity;
 
 import com.ninuna.losttales.block.ELostTalesBlock;
+import com.ninuna.losttales.block.vessel.VesselItems;
+import com.ninuna.losttales.block.vessel.VesselRules;
 import com.ninuna.losttales.util.LostTalesBlockRotationHelper;
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.IInventory;
+import net.minecraft.inventory.ISidedInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -23,9 +25,11 @@ import software.bernie.geckolib3.core.manager.AnimationFactory;
 /**
  * A vessel's contents: the amphora's, the urn's and the loutrophoros's. It
  * holds items one at a time, can be sealed, and plays its fill and full
- * animations on both sides.
+ * animations on both sides. It gives up what it holds only as
+ * {@link VesselRules} says (CONTENT-09): no hopper or pipe takes from it,
+ * though one may fill it while it is unsealed.
  */
-public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IAnimatable {
+public class LostTalesTileEntityUrn extends TileEntity implements ISidedInventory, IAnimatable {
     private static final int CLIENT_EVENT_FILL = 0;
     private static final int CLIENT_EVENT_FULL = 1;
 
@@ -36,6 +40,8 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
     private boolean hasStoredRotation;
     private int desiredSlots = 2;
     private String queuedAnimation;
+    /** Set as a creative player breaks it, so it drops no empty vessel; never saved. */
+    private boolean brokenByCreativePlayer;
 
     @Override
     public void registerControllers(AnimationData data) {
@@ -95,7 +101,8 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
     }
 
     public boolean insertOne(ItemStack stack) {
-        if (stack == null || stack.stackSize <= 0 || this.sealed) return false;
+        if (stack == null || stack.stackSize <= 0 || this.sealed
+                || VesselItems.isFilledVessel(stack)) return false;
 
         for (int i = 0; i < this.inventory.length; i++) {
             ItemStack existing = this.inventory[i];
@@ -125,6 +132,58 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
 
     public boolean isSealed() {
         return this.sealed;
+    }
+
+    /** Whether it holds anything. */
+    public boolean holdsItems() {
+        for (ItemStack stack : this.inventory) {
+            if (stack != null && stack.stackSize > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void markBrokenByCreativePlayer() {
+        this.brokenByCreativePlayer = true;
+    }
+
+    public boolean isBrokenByCreativePlayer() {
+        return this.brokenByCreativePlayer;
+    }
+
+    /** What it holds, as it saves it: each item with its slot. */
+    public NBTTagList writeItems() {
+        NBTTagList list = new NBTTagList();
+        for (int i = 0; i < this.inventory.length; i++) {
+            ItemStack stack = this.inventory[i];
+            if (stack != null) {
+                NBTTagCompound itemTag = new NBTTagCompound();
+                itemTag.setByte("Slot", (byte) i);
+                stack.writeToNBT(itemTag);
+                list.appendTag(itemTag);
+            }
+        }
+        return list;
+    }
+
+    /** Takes what a vessel item held, already checked ({@code VesselContents.read}), in place of what it holds. */
+    public void fillFrom(NBTTagList items) {
+        this.readItems(items);
+        this.markDirtyAndSync();
+    }
+
+    private void readItems(NBTTagList list) {
+        for (int i = 0; i < this.inventory.length; i++) {
+            this.inventory[i] = null;
+        }
+        for (int i = 0; list != null && i < list.tagCount(); i++) {
+            NBTTagCompound itemTag = list.getCompoundTagAt(i);
+            int slot = itemTag.getByte("Slot") & 255;
+            if (slot >= 0 && slot < this.inventory.length) {
+                this.inventory[slot] = ItemStack.loadItemStackFromNBT(itemTag);
+            }
+        }
     }
 
     public void setRotation(float rotation) {
@@ -224,7 +283,26 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
 
     @Override
     public boolean isItemValidForSlot(int slot, ItemStack stack) {
-        return !this.sealed;
+        return !this.sealed && !VesselItems.isFilledVessel(stack);
+    }
+
+    @Override
+    public int[] getAccessibleSlotsFromSide(int side) {
+        int[] slots = new int[this.inventory.length];
+        for (int i = 0; i < slots.length; i++) {
+            slots[i] = i;
+        }
+        return slots;
+    }
+
+    @Override
+    public boolean canInsertItem(int slot, ItemStack stack, int side) {
+        return this.isItemValidForSlot(slot, stack);
+    }
+
+    @Override
+    public boolean canExtractItem(int slot, ItemStack stack, int side) {
+        return VesselRules.givesUp(VesselRules.Way.HOPPER, this.sealed);
     }
 
     @Override
@@ -236,17 +314,7 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
         this.desiredSlots = nbt.hasKey("slots") ? nbt.getInteger("slots") : this.desiredSlots;
         this.setInventorySize(this.desiredSlots);
 
-        NBTTagList list = nbt.getTagList("Items", 10);
-        for (int i = 0; i < this.inventory.length; i++) {
-            this.inventory[i] = null;
-        }
-        for (int i = 0; i < list.tagCount(); i++) {
-            NBTTagCompound itemTag = list.getCompoundTagAt(i);
-            int slot = itemTag.getByte("Slot") & 255;
-            if (slot >= 0 && slot < this.inventory.length) {
-                this.inventory[slot] = ItemStack.loadItemStackFromNBT(itemTag);
-            }
-        }
+        this.readItems(nbt.getTagList("Items", 10));
     }
 
     @Override
@@ -257,18 +325,7 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
             nbt.setFloat("rotation", this.rotation);
         }
         nbt.setInteger("slots", this.desiredSlots);
-
-        NBTTagList list = new NBTTagList();
-        for (int i = 0; i < this.inventory.length; i++) {
-            ItemStack stack = this.inventory[i];
-            if (stack != null) {
-                NBTTagCompound itemTag = new NBTTagCompound();
-                itemTag.setByte("Slot", (byte) i);
-                stack.writeToNBT(itemTag);
-                list.appendTag(itemTag);
-            }
-        }
-        nbt.setTag("Items", list);
+        nbt.setTag("Items", this.writeItems());
     }
 
     @Override

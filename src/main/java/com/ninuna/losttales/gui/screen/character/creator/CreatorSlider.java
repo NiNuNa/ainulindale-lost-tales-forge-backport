@@ -3,31 +3,24 @@ package com.ninuna.losttales.gui.screen.character.creator;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
-import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.input.Keyboard;
 
 /**
- * The age slider: a bent track from one year to the oldest the slider
- * reaches, a readout with the exact number beside it, and a way to type
- * an age the track cannot land on.
+ * The age slider, one row: its name at the left, the track a hairline
+ * after it with an ivory thumb, bent from one year to the oldest the
+ * track reaches, and the number at the right end, which a click opens for
+ * typing an age the track cannot land on.
  *
  * <p>Dragging the thumb, or clicking the track, sets the age at that
  * point; the wheel over the row and the left and right keys while it holds
- * the focus nudge it a year, or ten with shift held. Clicking the readout
- * opens it for typing, and enter or clicking away closes it again — a
- * typed number past the slider's reach is kept as typed, up to what the
- * server accepts.</p>
- *
- * <p>In a window's rows it is one row: its name at the left, the track a
- * hairline after it with an ivory thumb, and the number at the right end,
- * which a click opens for typing in its place.</p>
+ * the focus nudge it a year, or ten with shift held. Enter or clicking
+ * away closes the typing again — a typed number past the slider's reach
+ * is kept as typed, up to what the server accepts.</p>
  */
 public final class CreatorSlider extends CreatorControl {
 
@@ -39,44 +32,41 @@ public final class CreatorSlider extends CreatorControl {
         int typedMax();
     }
 
-    private static final int TRACK_HEIGHT = 4;
-    private static final int THUMB_WIDTH = 5;
-    private static final int THUMB_HEIGHT = 12;
-    private static final int READOUT_WIDTH = 40;
-    private static final int READOUT_GAP = 6;
-    private static final int TICKS = 6;
-    /** In a window's rows, the thumb's width; it stands the capitals' height. */
-    private static final int ROW_THUMB_WIDTH = 3;
-    /** In a window's rows, how far the knee's mark reaches above and under the track. */
-    private static final int ROW_KNEE_REACH = 1;
+    /** The thumb's width; it stands the capitals' height. */
+    private static final int THUMB_WIDTH = 3;
+    /** How far the knee's mark reaches above and under the track. */
+    private static final int KNEE_REACH = 1;
 
     private final String label;
     private final IntValue value;
-    private final String endLabel;
     private final LostTalesUiTextField typing;
     private boolean dragging;
     private boolean typingOpen;
 
     public CreatorSlider(CreatorContext context, String label,
-                         IntValue value, String endLabel) {
+                         IntValue value) {
         super(context);
         this.label = label;
         this.value = value;
-        this.endLabel = endLabel;
-        this.typing = new LostTalesUiTextField(context.getFont(), 0, 0,
-                READOUT_WIDTH - 6, CreatorWidgets.FIELD_HEIGHT - 4);
+        this.typing = new LostTalesUiTextField(context.getFont(), 0, 0, 10,
+                CreatorRows.FIELD_LINE);
         this.typing.setMaxStringLength(6);
     }
 
     @Override
     public int height() {
-        return inRows() ? CreatorRows.height()
-                : LABEL_HEIGHT + CreatorWidgets.FIELD_HEIGHT + 6;
+        return CreatorRows.height();
     }
 
     @Override
     public boolean canFocus() {
         return true;
+    }
+
+    /** Typed in while its number is open for typing. */
+    @Override
+    public boolean holdsKeys() {
+        return isFocused() && this.typingOpen;
     }
 
     @Override
@@ -96,126 +86,43 @@ public final class CreatorSlider extends CreatorControl {
         return this.x + this.width - readoutWidth();
     }
 
-    /** The readout's room; in a window's rows the widest number it may read, with the caret's room. */
+    /** The number's room: the widest number it may read, with the caret's room. */
     private int readoutWidth() {
-        if (!inRows()) {
-            return READOUT_WIDTH;
-        }
         return this.context.getFont().getStringWidth(String.valueOf(
                 Math.max(this.value.typedMax(), Math.max(1, this.value.get()))))
                 + LostTalesUiCaret.WIDTH;
     }
 
     private int trackLeft() {
-        return inRows() ? rowTrackStart() + ROW_THUMB_WIDTH / 2
-                : this.x + THUMB_WIDTH / 2;
+        return trackRoomStart() + THUMB_WIDTH / 2;
     }
 
     private int trackRight() {
-        return inRows() ? rowTrackEnd() - ROW_THUMB_WIDTH / 2 - 1
-                : readoutX() - READOUT_GAP - THUMB_WIDTH / 2;
+        return trackRoomEnd() - THUMB_WIDTH / 2 - 1;
     }
 
-    /** In a window's rows, where the track's room starts: past the name. */
-    private int rowTrackStart() {
+    /** Where the track's room starts: past the name. */
+    private int trackRoomStart() {
         return Math.min(this.x + this.width, this.x
                 + this.context.getFont().getStringWidth(this.label)
                 + MenuWindow.VALUE_GAP);
     }
 
-    /** In a window's rows, where the track's room ends: short of the number. */
-    private int rowTrackEnd() {
+    /** Where the track's room ends: short of the number. */
+    private int trackRoomEnd() {
         return readoutX() - MenuWindow.VALUE_GAP;
     }
 
-    private int trackY() {
-        return valueTop() + (CreatorWidgets.FIELD_HEIGHT - TRACK_HEIGHT) / 2;
-    }
-
+    /**
+     * Lit under the pointer, while it holds the keys and while the thumb
+     * is dragged; the name at the left in ivory; the track a hairline in
+     * the aside tone, honey up to the thumb, the knee marked in sand, and
+     * the thumb in ivory the capitals' height; the number at the right
+     * end in the aside tone, ivory under the pointer, or the field
+     * standing in for it.
+     */
     @Override
     public void draw(int mouseX, int mouseY) {
-        if (inRows()) {
-            drawRow(mouseX, mouseY);
-            return;
-        }
-        FontRenderer font = this.context.getFont();
-        drawLabel(this.label);
-        int left = trackLeft();
-        int right = trackRight();
-        int trackY = trackY();
-        int age = AgeSliderScale.clamp(this.value.get());
-        float position = AgeSliderScale.positionOf(age);
-        int thumbX = left + Math.round((right - left) * position);
-
-        // The track, filled up to the thumb.
-        Gui.drawRect(left, trackY, right, trackY + TRACK_HEIGHT,
-                LostTalesSkyrimUiStyle.withAlpha(
-                        LostTalesSkyrimUiStyle.PLUM_BLACK, 0xA0));
-        Gui.drawRect(left, trackY, thumbX, trackY + TRACK_HEIGHT,
-                LostTalesSkyrimUiStyle.withAlpha(
-                        LostTalesSkyrimUiStyle.GOLD, 0x90));
-        CreatorWidgets.drawFrame(left - 1, trackY - 1, right - left + 2,
-                TRACK_HEIGHT + 2, LostTalesSkyrimUiStyle.BORDER_DIM);
-        // Ticks below the track, with the knee marked where the track bends.
-        for (int tick = 0; tick <= TICKS; tick++) {
-            int tickX = left + (right - left) * tick / TICKS;
-            Gui.drawRect(tickX, trackY + TRACK_HEIGHT + 2, tickX + 1,
-                    trackY + TRACK_HEIGHT + 4, LostTalesSkyrimUiStyle.BORDER_DIM);
-        }
-        int kneeX = left + Math.round((right - left) * AgeSliderScale.KNEE_POSITION);
-        Gui.drawRect(kneeX, trackY + TRACK_HEIGHT + 2, kneeX + 1,
-                trackY + TRACK_HEIGHT + 5, LostTalesSkyrimUiStyle.GOLD_DARK);
-        // The thumb.
-        boolean overThumb = this.dragging || CreatorWidgets.within(mouseX, mouseY,
-                thumbX - THUMB_WIDTH / 2 - 1, valueTop(), THUMB_WIDTH + 2,
-                CreatorWidgets.FIELD_HEIGHT);
-        int thumbTop = trackY + TRACK_HEIGHT / 2 - THUMB_HEIGHT / 2;
-        Gui.drawRect(thumbX - THUMB_WIDTH / 2, thumbTop,
-                thumbX - THUMB_WIDTH / 2 + THUMB_WIDTH, thumbTop + THUMB_HEIGHT,
-                overThumb || isFocused()
-                        ? LostTalesSkyrimUiStyle.GOLD
-                        : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
-        Gui.drawRect(thumbX - THUMB_WIDTH / 2 + 1, thumbTop + 1,
-                thumbX - THUMB_WIDTH / 2 + THUMB_WIDTH - 1,
-                thumbTop + THUMB_HEIGHT - 1,
-                LostTalesSkyrimUiStyle.withAlpha(
-                        LostTalesSkyrimUiStyle.PLUM_BLACK, 0x60));
-        LostTalesSkyrimUiStyle.beginContent();
-        // The far end of the track reads as "and older".
-        // Words too long for their room fade into its end (LOOK-37).
-        int endWidth = (int)LostTalesUiCutName.shownWidth(
-                font.getStringWidth(this.endLabel), 30);
-        LostTalesUiCutName.drawShadowed(font, this.endLabel,
-                right - endWidth + 2, trackY + TRACK_HEIGHT + 6, 30,
-                LostTalesSkyrimUiStyle.TEXT_DIM);
-
-        // The readout, or the field standing in for it.
-        int readoutX = readoutX();
-        CreatorWidgets.drawFieldBox(readoutX, valueTop(), READOUT_WIDTH,
-                CreatorWidgets.FIELD_HEIGHT, this.typingOpen);
-        if (this.typingOpen) {
-            this.typing.xPosition = readoutX + 4;
-            this.typing.yPosition = valueTop() + (CreatorWidgets.FIELD_HEIGHT
-                    - font.FONT_HEIGHT) / 2 + 1;
-            this.typing.drawTextBox();
-        } else {
-            String number = String.valueOf(Math.max(1, this.value.get()));
-            font.drawStringWithShadow(number,
-                    readoutX + (READOUT_WIDTH - font.getStringWidth(number)) / 2,
-                    valueTop() + (CreatorWidgets.FIELD_HEIGHT - font.FONT_HEIGHT) / 2 + 1,
-                    LostTalesSkyrimUiStyle.TEXT_BRIGHT);
-        }
-    }
-
-    /**
-     * As a window's row: lit under the pointer, while it holds the keys
-     * and while the thumb is dragged; the name at the left in ivory; the
-     * track a hairline in the aside tone, honey up to the thumb, the knee
-     * marked in sand, and the thumb in ivory the capitals' height; the
-     * number at the right end in the aside tone, ivory under the pointer,
-     * or the field standing in for it.
-     */
-    private void drawRow(int mouseX, int mouseY) {
         FontRenderer font = this.context.getFont();
         int alpha = this.context.alpha();
         if (contains(mouseX, mouseY) || isFocused() || this.dragging) {
@@ -239,12 +146,12 @@ public final class CreatorSlider extends CreatorControl {
                             LostTalesColors.HONEY), alpha));
             int kneeX = left + Math.round((right - left)
                     * AgeSliderScale.KNEE_POSITION);
-            LostTalesUiInk.fillRect(kneeX, lineY - ROW_KNEE_REACH, kneeX + 1,
-                    lineY + 1 + ROW_KNEE_REACH, LostTalesUiInk.argb(
+            LostTalesUiInk.fillRect(kneeX, lineY - KNEE_REACH, kneeX + 1,
+                    lineY + 1 + KNEE_REACH, LostTalesUiInk.argb(
                             LostTalesColors.rgb(LostTalesColors.SAND), alpha));
-            int thumbLeft = thumbX - ROW_THUMB_WIDTH / 2;
+            int thumbLeft = thumbX - THUMB_WIDTH / 2;
             LostTalesUiInk.fillRect(thumbLeft, textTop,
-                    thumbLeft + ROW_THUMB_WIDTH,
+                    thumbLeft + THUMB_WIDTH,
                     textTop + LostTalesUiInk.CAP_HEIGHT,
                     LostTalesUiInk.argb(LostTalesUiInk.IVORY, alpha));
         }
@@ -278,27 +185,14 @@ public final class CreatorSlider extends CreatorControl {
     }
 
     private boolean isOverReadout(int mouseX, int mouseY) {
-        if (inRows()) {
-            return CreatorWidgets.within(mouseX, mouseY, readoutX(), this.y,
-                    readoutWidth(), height());
-        }
-        return CreatorWidgets.within(mouseX, mouseY, readoutX(), valueTop(),
-                READOUT_WIDTH, CreatorWidgets.FIELD_HEIGHT);
+        return within(mouseX, mouseY, readoutX(), this.y, readoutWidth(),
+                height());
     }
 
-    /**
-     * The band left of the readout, where a click or a drag sets the age;
-     * in a window's rows, the track's room between the name and the number.
-     */
+    /** The track's room between the name and the number, where a click or a drag sets the age. */
     private boolean isOverTrack(int mouseX, int mouseY) {
-        if (inRows()) {
-            return contains(mouseX, mouseY) && mouseX >= rowTrackStart()
-                    && mouseX < rowTrackEnd();
-        }
-        return contains(mouseX, mouseY)
-                && mouseY >= valueTop()
-                && mouseY < valueTop() + CreatorWidgets.FIELD_HEIGHT
-                && mouseX < readoutX();
+        return contains(mouseX, mouseY) && mouseX >= trackRoomStart()
+                && mouseX < trackRoomEnd();
     }
 
     /**

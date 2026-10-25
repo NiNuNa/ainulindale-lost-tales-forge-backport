@@ -45,7 +45,7 @@ public final class LostTalesMapMarkerSnapshotSelectionTest {
         List<LostTalesMapMarkerRecord> records = Arrays.asList(
                 publicMarker("losttales:hidden", true),
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/private", "Aragorn", OWNER,
+                        "losttales:player/private", OWNER,
                         0, 1.0D, 64.0D, 1.0D, UUID.randomUUID()));
         assertEquals(2, LostTalesMapMarkerSyncManager.select(records,
                 LostTalesMapMarkerVisibilityPolicy.Viewer.of(null, true, null),
@@ -57,7 +57,7 @@ public final class LostTalesMapMarkerSnapshotSelectionTest {
     public void aPrivateWaystoneReachesItsOwnerOnceFound() {
         LostTalesMapMarkerRecord placed =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/bree", "Aragorn", OWNER,
+                        "losttales:player/bree", OWNER,
                         0, 1.0D, 64.0D, 1.0D, UUID.randomUUID());
         List<LostTalesMapMarkerRecord> records =
                 Collections.singletonList(placed);
@@ -84,7 +84,7 @@ public final class LostTalesMapMarkerSnapshotSelectionTest {
         UUID faramir = UUID.randomUUID();
         LostTalesMapMarkerRecord handed =
                 LostTalesMapMarkerRecord.createPlayerMarker(
-                        "losttales:player/bree", "Aragorn", OWNER,
+                        "losttales:player/bree", OWNER,
                         0, 1.0D, 64.0D, 1.0D, UUID.randomUUID())
                         .withOwner(faramir);
         LostTalesMapMarkerRecord notOwned = publicMarker("losttales:open", true);

@@ -3,6 +3,7 @@ package com.ninuna.losttales.character.kit;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.ninuna.losttales.armour.ArmourFiles;
 import com.ninuna.losttales.data.DataFiles;
 import com.ninuna.losttales.data.JsonReading;
 import java.io.Reader;
@@ -33,7 +34,7 @@ public final class StartingKitFiles {
     private static final Pattern RACE_OR_FACTION = Pattern.compile("[a-z0-9_]+:[a-z0-9_]+");
     private static final Pattern ITEM_ID = Pattern.compile("[A-Za-z0-9_]+:[A-Za-z0-9_.\\-]+");
     static final Set<String> KEYS = JsonReading.keys("id", "race", "faction", "items");
-    static final Set<String> ITEM_KEYS = JsonReading.keys("item", "count", "damage");
+    static final Set<String> ITEM_KEYS = JsonReading.keys("item", "count", "damage", "relic");
 
     /** What the game has, for the checks a kit's names need. */
     public interface Game {
@@ -49,6 +50,9 @@ public final class StartingKitFiles {
 
         /** Whether the item wears and is worn through at that damage. */
         boolean wornThrough(String itemId, int damage);
+
+        /** Whether a relic set of that id takes the item (CONTENT-11). */
+        boolean relicTakes(String relicId, String itemId);
     }
 
     private StartingKitFiles() {}
@@ -95,7 +99,7 @@ public final class StartingKitFiles {
             JsonReading at = where.in("item " + (++index));
             at.unknownKeys(entry, ITEM_KEYS);
             items.add(new KitItem(at.string(entry, "item", ""), at.whole(entry, "count", 0),
-                    at.whole(entry, "damage", 0)));
+                    at.whole(entry, "damage", 0), at.string(entry, "relic", "")));
         }
         return new StartingKit(id, race, faction, items);
     }
@@ -128,6 +132,11 @@ public final class StartingKitFiles {
             if (game.wornThrough(item.getItemId(), item.getDamage())) {
                 warnings.add("gives " + item.getItemId() + " at damage " + item.getDamage()
                         + ", which wears it through");
+            }
+            if (item.getRelic().length() > 0 && ArmourFiles.isId(item.getRelic())
+                    && !game.relicTakes(item.getRelic(), item.getItemId())) {
+                warnings.add("marks " + item.getItemId() + " as the relic " + item.getRelic()
+                        + ", which no relic set of that id takes");
             }
         }
         return warnings;
@@ -172,6 +181,10 @@ public final class StartingKitFiles {
             if (item.getDamage() < 0 || item.getDamage() > MAX_DAMAGE) {
                 warnings.add("gives " + item.getItemId() + " at damage " + item.getDamage()
                         + "; a damage runs from 0 to " + MAX_DAMAGE);
+            }
+            if (item.getRelic().length() > 0 && !ArmourFiles.isId(item.getRelic())) {
+                warnings.add("marks " + item.getItemId() + " as the relic '" + item.getRelic()
+                        + "', which is no relic set's id");
             }
         }
         return warnings;

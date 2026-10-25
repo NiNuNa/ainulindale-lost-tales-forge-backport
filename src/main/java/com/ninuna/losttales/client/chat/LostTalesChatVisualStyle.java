@@ -10,7 +10,6 @@ import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
@@ -507,50 +506,35 @@ public final class LostTalesChatVisualStyle {
         }
         switch (formatting) {
             case BLACK:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.PLUM_BLACK);
+                return LostTalesColors.rgb(LostTalesColors.PLUM_BLACK);
             case DARK_BLUE:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.INDIGO);
+                return LostTalesColors.rgb(LostTalesColors.INDIGO);
             case DARK_GREEN:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.SEA_GREEN);
+                return LostTalesColors.rgb(LostTalesColors.SEA_GREEN);
             case DARK_AQUA:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.TEAL);
+                return LostTalesColors.rgb(LostTalesColors.TEAL);
             case DARK_RED:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.RUST);
+                return LostTalesColors.rgb(LostTalesColors.RUST);
             case DARK_PURPLE:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.MULBERRY);
+                return LostTalesColors.rgb(LostTalesColors.MULBERRY);
             case GOLD:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.APRICOT);
+                return LostTalesColors.rgb(LostTalesColors.APRICOT);
             case GRAY:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.ROSE_GRAY);
+                return LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
             case DARK_GRAY:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.MAUVE);
+                return LostTalesColors.rgb(LostTalesColors.MAUVE);
             case BLUE:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.STEEL_BLUE);
+                return LostTalesColors.rgb(LostTalesColors.STEEL_BLUE);
             case GREEN:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.MEADOW_GREEN);
+                return LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN);
             case AQUA:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.SEAFOAM);
+                return LostTalesColors.rgb(LostTalesColors.SEAFOAM);
             case RED:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.SALMON);
+                return LostTalesColors.rgb(LostTalesColors.SALMON);
             case LIGHT_PURPLE:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.ORCHID);
+                return LostTalesColors.rgb(LostTalesColors.ORCHID);
             case YELLOW:
-                return LostTalesSkyrimUiStyle.rgb(
-                        LostTalesSkyrimUiStyle.HONEY);
+                return LostTalesColors.rgb(LostTalesColors.HONEY);
             default:
                 return LostTalesUiInk.IVORY;
         }

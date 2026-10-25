@@ -1,0 +1,21 @@
+{
+  "id": "losttales:golden_taurethrim",
+  "helmet": [
+    "lotr:item.helmetTauredainGold"
+  ],
+  "chestplate": [
+    "lotr:item.bodyTauredainGold"
+  ],
+  "leggings": [
+    "lotr:item.legsTauredainGold"
+  ],
+  "boots": [
+    "lotr:item.bootsTauredainGold"
+  ],
+  "bonus": [
+    {
+      "effect": "protection",
+      "amount": 0.05
+    }
+  ]
+}

@@ -31,15 +31,15 @@ public final class CharacterBodyModelRegistryTest {
     }
 
     @Test
-    public void chestVariantsExistExactlyForGenderedRaces() {
+    public void chestVariantsExistExactlyForRacesWithBodyTypes() {
         for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
             CharacterBodyModelDefinition model = CharacterBodyModelRegistry.get(
                     CharacterBodyModelRegistry.getDefaultModelId(race.getId()));
             assertEquals(race.getId() + " chest variant",
-                    race.isGenderAllowed(CharacterGenderRegistry.MALE)
-                            && race.isGenderAllowed(CharacterGenderRegistry.FEMALE),
+                    race.isBodyTypeAllowed(CharacterBodyTypeRegistry.MASCULINE)
+                            && race.isBodyTypeAllowed(CharacterBodyTypeRegistry.FEMININE),
                     model.hasChestVariant());
-            assertTrue(race.getId() + " body types", model.supportsBodyTypes());
+            assertTrue(race.getId() + " body types", model.supportsArms());
         }
     }
 
@@ -52,7 +52,7 @@ public final class CharacterBodyModelRegistryTest {
             boolean classicLayout = CharacterBodyModelRegistry.LOTR_ORC.equals(id)
                     || CharacterBodyModelRegistry.LOTR_URUK.equals(id);
             boolean player = CharacterBodyModelRegistry.LOSTTALES_PLAYER.equals(id);
-            assertTrue(id, model.supportsBodyTypes());
+            assertTrue(id, model.supportsArms());
             assertEquals(id, !offsetShoulders, model.hasVanillaArmPivots());
             CharacterSkinLayout expected = player
                     ? CharacterSkinLayout.MINECRAFT_64X64

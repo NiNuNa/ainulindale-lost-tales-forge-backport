@@ -2,19 +2,17 @@ package com.ninuna.losttales.gui.screen.character.creator;
 
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import net.minecraft.client.gui.FontRenderer;
 import org.lwjgl.input.Keyboard;
 
 /**
- * A row with a line of text to type: its name above, the field below, a
- * counter at the field's corner when the text is bounded tightly enough
- * to be worth watching. In a window's rows it is one row over a hairline:
- * its name at the left, the count beside it while the field holds the
- * keys, and the text ending at the row's right end. Enter is left to the
- * screen, so it submits the form from any field.
+ * A row with a line of text to type, over a hairline: its name at the
+ * left, the count beside it while the field holds the keys when the text
+ * is bounded tightly enough to be worth watching, and the text ending at
+ * the row's right end. Enter is left to the screen, so it submits the
+ * form from any field.
  */
 public final class CreatorTextControl extends CreatorControl {
 
@@ -30,7 +28,7 @@ public final class CreatorTextControl extends CreatorControl {
         this.maxLength = maxLength;
         this.showCounter = showCounter;
         this.field = new LostTalesUiTextField(context.getFont(), 0, 0, 10,
-                CreatorWidgets.FIELD_HEIGHT - 4);
+                CreatorRows.FIELD_LINE);
         this.field.setCanLoseFocus(false);
         this.field.setFocused(false);
         this.field.setMaxStringLength(maxLength);
@@ -48,13 +46,18 @@ public final class CreatorTextControl extends CreatorControl {
 
     @Override
     public int height() {
-        return inRows() ? CreatorRows.fieldHeight()
-                : LABEL_HEIGHT + CreatorWidgets.FIELD_HEIGHT + 6;
+        return CreatorRows.fieldHeight();
     }
 
     @Override
     public boolean canFocus() {
         return true;
+    }
+
+    /** Typed in while it holds the focus. */
+    @Override
+    public boolean holdsKeys() {
+        return isFocused();
     }
 
     @Override
@@ -75,28 +78,6 @@ public final class CreatorTextControl extends CreatorControl {
         return this.field.getText().length() + "/" + this.maxLength;
     }
 
-    @Override
-    public void draw(int mouseX, int mouseY) {
-        if (inRows()) {
-            drawRow(mouseX, mouseY);
-            return;
-        }
-        FontRenderer font = this.context.getFont();
-        drawLabel(this.label);
-        CreatorWidgets.drawFieldBox(this.x, valueTop(), this.width,
-                CreatorWidgets.FIELD_HEIGHT, isFocused());
-        this.field.xPosition = this.x + 4;
-        this.field.yPosition = valueTop()
-                + (CreatorWidgets.FIELD_HEIGHT - font.FONT_HEIGHT) / 2 + 1;
-        this.field.width = this.width - 8;
-        this.field.drawTextBox();
-        if (this.showCounter && this.maxLength > 0) {
-            font.drawStringWithShadow(counter(),
-                    this.x + this.width - font.getStringWidth(counter()),
-                    this.y + 1, LostTalesSkyrimUiStyle.TEXT_DIM);
-        }
-    }
-
     /** Whether the row shows the count: while the field holds the keys. */
     private boolean showsCount() {
         return this.showCounter && this.maxLength > 0 && isFocused();
@@ -113,12 +94,13 @@ public final class CreatorTextControl extends CreatorControl {
     }
 
     /**
-     * As a window's row: lit under the pointer, the name at the left in
-     * ivory, the count after it in the aside tone while the field holds
-     * the keys, the field's text ending at the row's right end, and the
-     * hairline under it all.
+     * Lit under the pointer, the name at the left in ivory, the count
+     * after it in the aside tone while the field holds the keys, the
+     * field's text ending at the row's right end, and the hairline under
+     * it all.
      */
-    private void drawRow(int mouseX, int mouseY) {
+    @Override
+    public void draw(int mouseX, int mouseY) {
         FontRenderer font = this.context.getFont();
         int rowBottom = this.y + CreatorRows.height();
         int right = this.x + this.width;
@@ -145,9 +127,7 @@ public final class CreatorTextControl extends CreatorControl {
         }
         // The field's own click handling places the cursor once focused.
         this.field.setFocused(true);
-        if (!inRows()) {
-            this.field.mouseClicked(mouseX, mouseY, button);
-        } else if (mouseX >= this.field.xPosition) {
+        if (mouseX >= this.field.xPosition) {
             // On the text's part of the row; the field answers on its
             // line, whatever height of the row the press landed on.
             this.field.mouseClicked(mouseX, Math.max(this.field.yPosition,

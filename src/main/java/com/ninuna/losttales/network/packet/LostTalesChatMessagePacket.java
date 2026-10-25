@@ -15,6 +15,7 @@ import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.chat.ChatNarrator;
 import com.ninuna.losttales.chat.ChatTypedText;
+import com.ninuna.losttales.chat.ChatUnseenVoice;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -166,7 +167,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
             // Whether the character it wears was not in the world.
             + 1
             // What its author typed for it, on the author's copy alone.
-            + 5 + ChatTypedText.MAX_UTF8_BYTES;
+            + 5 + ChatTypedText.MAX_UTF8_BYTES
+            // Whether an unseen voice said it, and whether its quote is
+            // of a line one said.
+            + 1 + 1;
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_IDENTITY_BYTES = 256;
     private static final int MAX_ACCOUNT_NAME_BYTES = 64;
@@ -328,6 +332,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * the echo name is, so they can edit the line after a relog too.
      */
     private String typed = "";
+    /**
+     * Whether the line was said by an unseen voice: heard nearby while the
+     * One Ring concealed its speaker (CHAT-84). The speaker's own copy
+     * and the one kept carry the speaker; a reader who may not know who
+     * spoke is sent the masked copy ({@link #unseenForOthers}).
+     */
+    private boolean unseen;
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -586,6 +597,19 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.notInWorld = buffer.readBoolean();
             this.typed = LostTalesPacketCodec.readUtf8String(buffer,
                     ChatTypedText.MAX_UTF8_BYTES);
+            // Whether an unseen voice said it, then whether its quote is
+            // of such a line; only a quote naming its message may be.
+            this.unseen = buffer.readBoolean();
+            if (isUnseenVoice() && !this.unseen) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "the unseen voice on a line nobody hid");
+            }
+            boolean quotedUnseen = buffer.readBoolean();
+            if (quotedUnseen && !this.reply.isAnchored()) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "an unseen voice's quote of nothing");
+            }
+            this.reply = this.reply.asUnseen(quotedUnseen);
             LostTalesPacketCodec.requireFinished(buffer);
             validate(false);
         } catch (RuntimeException exception) {
@@ -607,6 +631,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.mentionedRoles = Collections.emptyList();
             this.notInWorld = false;
             this.typed = "";
+            this.unseen = false;
             this.messageId = ChatMessageIds.NONE;
             this.reply = ChatReplyReference.NONE;
             this.partnerIdentity = "";
@@ -887,6 +912,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
         buffer.writeBoolean(this.notInWorld);
         LostTalesPacketCodec.writeUtf8String(buffer, this.typed,
                 ChatTypedText.MAX_UTF8_BYTES);
+        buffer.writeBoolean(this.unseen);
+        buffer.writeBoolean(this.reply.isAnchored() && this.reply.isUnseen());
     }
 
     /** A presence flag and a UUID, 17 bytes whether the id is there or not. */
@@ -967,6 +994,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 // else, and names no character behind it.
                 || (ChatNarrator.SENDER_ID.equals(this.senderId)
                         && (!isNarrator() || this.accountLine
+                                || this.identityCharacterId != null))
+                // The unseen voice's id signs its masked lines and nothing
+                // else, wears its mark, and names nobody behind it.
+                || (ChatUnseenVoice.SENDER_ID.equals(this.senderId)
+                        != ChatUnseenVoice.isUnseenSkin(this.skinId))
+                || (ChatUnseenVoice.SENDER_ID.equals(this.senderId)
+                        && (this.accountLine
                                 || this.identityCharacterId != null))
                 || !LostTalesPacketCodec.isUtf8WithinLimit(this.tabId,
                         MAX_TAB_ID_BYTES)
@@ -1089,6 +1123,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         copy.notInWorld = this.notInWorld
                 && !copy.accountLine && copy.identityCharacterId != null;
         copy.typed = this.typed;
+        copy.unseen = this.unseen;
         return copy;
     }
 
@@ -1165,6 +1200,48 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /** Whether the character the line wears was not in the world when it was said. */
     public boolean isNotInWorld() { return this.notInWorld; }
+
+    /**
+     * The same line said, or not, by an unseen voice (CHAT-84). Only a
+     * player's line may be one: the Server's, the Client's, a Discord
+     * member's and the Narrator's never are, whatever they are handed.
+     */
+    public LostTalesChatMessagePacket withUnseen(boolean unseen) {
+        LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
+        copy.unseen = unseen && !isSystemSender(this.senderId)
+                && !isDiscordSender(this.senderId) && !isNarrator();
+        return copy;
+    }
+
+    /** Whether an unseen voice said the line, masked or not. */
+    public boolean isUnseen() { return this.unseen; }
+
+    /** Whether the line is masked: signed by the unseen voice, naming nobody. */
+    public boolean isUnseenVoice() {
+        return ChatUnseenVoice.SENDER_ID.equals(this.senderId);
+    }
+
+    /**
+     * The same line as a reader who may not know who spoke is sent it:
+     * signed by the unseen voice in the quiet colour, with its mark for a
+     * skin, and no account, no account id, no title, no faction, no roles
+     * and no character behind it; the words, the quote and the
+     * conversation as they are. Any line not said by an unseen voice, and
+     * one masked already, is returned as it is.
+     */
+    public LostTalesChatMessagePacket unseenForOthers() {
+        if (!this.unseen || isUnseenVoice()) {
+            return this;
+        }
+        return carrying(new LostTalesChatMessagePacket(getChannel(),
+                ChatUnseenVoice.SENDER_ID, ChatUnseenVoice.NAME,
+                ChatUnseenVoice.NAME, "", this.titleColor,
+                ChatUnseenVoice.color(), this.message, this.timestampMillis,
+                ChatUnseenVoice.SKIN_ID, this.showcases, "", this.partner, 0,
+                false, this.messageId, this.reply, this.partnerIdentity,
+                this.echoNonce, null, this.ownCharacterId,
+                this.partnerCharacterId, this.scopeValue));
+    }
 
     /**
      * The same line keeping what its author typed for it

@@ -38,8 +38,8 @@ public final class ClientConfigChoicesTest {
             assertArrayEquals(LostTalesColors.paletteNames(),
                     client.get(colour).getValidValues());
         }
-        assertArrayEquals(new String[] {"wide", "slim"},
-                client.get("devSkinOverrideBodyType").getValidValues());
+        assertArrayEquals(new String[] {"broad", "slender"},
+                client.get("devSkinOverrideArms").getValidValues());
         // A sound can be any sound, so it keeps its box.
         String[] anySound = client.get("chatPingSound").getValidValues();
         assertTrue(anySound == null || anySound.length == 0);

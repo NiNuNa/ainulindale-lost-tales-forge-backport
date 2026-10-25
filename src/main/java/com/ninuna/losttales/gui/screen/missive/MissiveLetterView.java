@@ -10,12 +10,11 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
-import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.item.LostTalesItemMissiveLetter;
@@ -33,26 +32,24 @@ import org.lwjgl.opengl.GL11;
 
 /**
  * A missive's letter as both missive pages show it — the board's picked
- * notice and a letter in hand — on a sheet edged in the parchment's own
- * tan: its title in parchment, who issued it, its words, the work it
- * asks under a heading, the reward in meadow green and the time limit in
- * salmon. The sheet scrolls where the letter is longer than it, gliding
- * as the journal's columns do, with a scrollbar only then.
+ * notice and a letter in hand — on the window's own surface in the
+ * window's ink, with no edge of its own (LOOK-22): its title in
+ * parchment, who issued it, a separator, its words, the work it asks
+ * under the lists' heading, the reward in meadow green and the time
+ * limit in salmon. The letter scrolls where it is longer than its box,
+ * gliding as the journal's columns do, with the lists' scroll edge only
+ * then.
  */
 final class MissiveLetterView {
-    /** Clear pixels between the sheet's edge and the words. */
-    static final int PADDING = 6;
     /** One line of the letter. */
     static final int LINE_HEIGHT = 10;
-    /** A heading's line, a little taller than a line of words. */
-    static final int HEADING_HEIGHT = 14;
     /** The clear space between the letter's parts. */
     static final int GAP = 5;
     /** How far a line of an objective stands in from its dash. */
     private static final String DASH = "- ";
 
     /** What a line of the letter is, for how it is drawn. */
-    private enum Kind { TITLE, ASIDE, TEXT, HEADING, REWARD, TIME, RULE, GAP }
+    enum Kind { TITLE, ASIDE, TEXT, HEADING, REWARD, TIME, RULE, GAP }
 
     private static final class Line {
         final Kind kind;
@@ -66,9 +63,26 @@ final class MissiveLetterView {
         }
 
         int height() {
-            return this.kind == Kind.HEADING ? HEADING_HEIGHT
-                    : this.kind == Kind.GAP || this.kind == Kind.RULE ? GAP
-                    : LINE_HEIGHT;
+            return lineHeight(this.kind, MenuWindow.rowHeight());
+        }
+    }
+
+    /**
+     * How tall a line of {@code kind} stands where a menu's row is
+     * {@code rowHeight}: a heading a row, as every list's; a separator its
+     * hairline's room, as a menu's; a gap the space between the letter's
+     * parts; words a line.
+     */
+    static int lineHeight(Kind kind, int rowHeight) {
+        switch (kind) {
+            case HEADING:
+                return rowHeight;
+            case RULE:
+                return WindowLists.SEPARATOR_HEIGHT;
+            case GAP:
+                return GAP;
+            default:
+                return LINE_HEIGHT;
         }
     }
 
@@ -76,6 +90,7 @@ final class MissiveLetterView {
     private LostTalesMissiveData builtFor;
     private String builtEmpty;
     private int builtWidth = -1;
+    private int builtRowHeight = -1;
     private int contentHeight;
     private int scroll;
     private double shownScroll;
@@ -88,13 +103,12 @@ final class MissiveLetterView {
     }
 
     /**
-     * Draws the sheet in {@code box} at {@code alpha}, with
-     * {@code missive}'s letter on it, or {@code empty}'s words where there
-     * is no letter to show.
+     * Draws {@code missive}'s letter in {@code box} at {@code alpha}, or
+     * {@code empty}'s words where there is no letter to show.
      */
     void draw(Minecraft minecraft, LostTalesUiHitBox box,
               LostTalesMissiveData missive, String empty, int alpha) {
-        if (box.width <= PADDING * 2 + 2 || box.height <= PADDING * 2 + 2) {
+        if (!fits(box)) {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
@@ -107,7 +121,6 @@ final class MissiveLetterView {
         this.scroll = Math.max(0, Math.min(this.scroll, maxScroll(inner)));
         this.shownScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
                 this.shownScroll, this.scroll, seconds);
-        drawEdge(box, alpha);
         boolean clipped = LostTalesUiClip.beginLocal(minecraft,
                 (float)inner.left, (float)inner.top, (float)inner.right(),
                 (float)inner.bottom());
@@ -133,15 +146,14 @@ final class MissiveLetterView {
     }
 
     /**
-     * Draws a running world quest's notice on the sheet (QUEST-36): what
+     * Draws a running world quest's notice as a letter (QUEST-36): what
      * it asks of the whole server with its counts so far, what it pays,
      * its podium, and the time it has left.
      */
     void drawWorld(Minecraft minecraft, LostTalesUiHitBox box,
                    LostTalesQuestDefinition quest, WorldQuestView view,
                    long ticksLeft, int alpha) {
-        if (box.width <= PADDING * 2 + 2 || box.height <= PADDING * 2 + 2
-                || quest == null || view == null) {
+        if (!fits(box) || quest == null || view == null) {
             draw(minecraft, box, null, StatCollector.translateToLocal(
                     "gui.losttales.missive_letter.invalid"), alpha);
             return;
@@ -169,7 +181,6 @@ final class MissiveLetterView {
         this.scroll = Math.max(0, Math.min(this.scroll, maxScroll(inner)));
         this.shownScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
                 this.shownScroll, this.scroll, seconds);
-        drawEdge(box, alpha);
         boolean clipped = LostTalesUiClip.beginLocal(minecraft,
                 (float)inner.left, (float)inner.top, (float)inner.right(),
                 (float)inner.bottom());
@@ -240,7 +251,7 @@ final class MissiveLetterView {
                 LostTalesQuestTimeText.shortForm(Math.max(0L, ticksLeft))), width, 0);
     }
 
-    /** The wheel over the sheet scrolls it; answers whether there was anything to scroll. */
+    /** The wheel over the letter scrolls it; answers whether there was anything to scroll. */
     boolean scroll(LostTalesUiHitBox box, int lines) {
         LostTalesUiHitBox inner = inner(box);
         if (lines == 0 || maxScroll(inner) <= 0) {
@@ -251,7 +262,7 @@ final class MissiveLetterView {
         return true;
     }
 
-    /** A page key: the sheet's height less a line, up or down. */
+    /** A page key: the letter's height less a line, up or down. */
     void page(LostTalesUiHitBox box, int direction) {
         LostTalesUiHitBox inner = inner(box);
         int page = Math.max(LINE_HEIGHT, (int)inner.height - LINE_HEIGHT);
@@ -259,12 +270,23 @@ final class MissiveLetterView {
                 this.scroll + (direction < 0 ? -page : page)));
     }
 
-    private static LostTalesUiHitBox inner(LostTalesUiHitBox box) {
-        return new LostTalesUiHitBox(Math.floor(box.left) + PADDING,
-                Math.floor(box.top) + PADDING,
-                Math.max(0.0D, Math.floor(box.width) - PADDING * 2
+    /** Whether {@code box} has room for a line of the letter beside the scrollbar's. */
+    static boolean fits(LostTalesUiHitBox box) {
+        return box.width > WindowLists.SCROLLBAR_ROOM + 2
+                && box.height > LINE_HEIGHT;
+    }
+
+    /**
+     * Where the letter's words stand and are cut: the whole box, its
+     * whole pixels, but for the scrollbar's room at its right. The letter
+     * has no edge, so nothing else stands between the box and the words.
+     */
+    static LostTalesUiHitBox inner(LostTalesUiHitBox box) {
+        return new LostTalesUiHitBox(Math.floor(box.left),
+                Math.floor(box.top),
+                Math.max(0.0D, Math.floor(box.width)
                         - WindowLists.SCROLLBAR_ROOM),
-                Math.max(0.0D, Math.floor(box.height) - PADDING * 2));
+                Math.max(0.0D, Math.floor(box.height)));
     }
 
     private int maxScroll(LostTalesUiHitBox inner) {
@@ -274,16 +296,19 @@ final class MissiveLetterView {
     /* ---- The lines ---- */
 
     /**
-     * Lays the letter out in lines as wide as the sheet, again only when
-     * the letter or the width changed. Another letter reads from its top;
-     * the same letter sent again keeps its place.
+     * Lays the letter out in lines as wide as its box, again only when
+     * the letter, the width or the menus' row changed. Another letter
+     * reads from its top; the same letter sent again keeps its place.
      */
     private void build(FontRenderer font, LostTalesMissiveData missive,
                        String empty, int width) {
+        int rowHeight = MenuWindow.rowHeight();
         if (missive == this.builtFor && width == this.builtWidth
+                && rowHeight == this.builtRowHeight
                 && (missive != null || String.valueOf(empty).equals(this.builtEmpty))) {
             return;
         }
+        this.builtRowHeight = rowHeight;
         boolean sameLetter = missive != null && this.builtFor != null
                 && missive.getQuestId().equals(this.builtFor.getQuestId());
         if (!sameLetter && missive != this.builtFor) {
@@ -377,34 +402,19 @@ final class MissiveLetterView {
                 LostTalesUiInk.CAP_HEIGHT);
         switch (line.kind) {
             case RULE:
-                LostTalesUiInk.fillRect(left, y + GAP / 2, right,
-                        y + GAP / 2 + 1, faded(LostTalesColors.BORDER_DIM, alpha));
+                WindowLists.drawSeparator(left, right, y, alpha);
                 return;
             case GAP:
                 return;
             case HEADING:
-                drawHeading(font, line.text, left, right, textTop, alpha);
+                // Every list's heading: sand over a full hairline, fading
+                // into the letter's end where it is too long (LOOK-24).
+                WindowLists.drawHeading(font, line.text, left, left, right, y,
+                        line.height(), false, alpha);
                 return;
             default:
                 LostTalesUiInk.drawText(font, line.text, left + line.indent,
                         textTop, rgbOf(line.kind), alpha);
-        }
-    }
-
-    /**
-     * A heading: its words in capitals, fading into the letter's edge
-     * where they are too long for it (LOOK-37), and a rule filling what
-     * they leave, as the Motion Lab's.
-     */
-    private static void drawHeading(FontRenderer font, String words, int left,
-                                    int right, int textTop, int alpha) {
-        String name = LostTalesSkyrimUiStyle.uppercase(words);
-        LostTalesUiCutName.drawText(font, name, left, textTop, right - left,
-                LostTalesColors.rgb(LostTalesColors.TEXT), alpha);
-        int ruleLeft = left + font.getStringWidth(name) + 5;
-        if (ruleLeft < right) {
-            LostTalesUiInk.fillRect(ruleLeft, textTop + 3, right, textTop + 4,
-                    faded(LostTalesColors.BORDER_DIM, alpha));
         }
     }
 
@@ -423,28 +433,28 @@ final class MissiveLetterView {
         }
     }
 
-    /** The sheet's edge: a one-pixel ring in the parchment's tan, so the letter reads as a sheet on the page. */
-    private static void drawEdge(LostTalesUiHitBox box, int alpha) {
-        float left = (float)Math.floor(box.left);
-        float top = (float)Math.floor(box.top);
-        float right = left + (float)Math.floor(box.width);
-        float bottom = top + (float)Math.floor(box.height);
-        int edge = faded(LostTalesColors.withAlpha(LostTalesColors.TAN, 0xC0),
-                alpha);
-        LostTalesUiInk.fillRect(left, top, right, top + 1, edge);
-        LostTalesUiInk.fillRect(left, bottom - 1, right, bottom, edge);
-        LostTalesUiInk.fillRect(left, top + 1, left + 1, bottom - 1, edge);
-        LostTalesUiInk.fillRect(right - 1, top + 1, right, bottom - 1, edge);
+    /**
+     * Where the accent fades hang from where more of the letter waits:
+     * a menu's padding above and under its box, where a list's edge stands
+     * round the band its rows show in. On the board's page that is the
+     * page's own top and foot, where the notices' fades hang too.
+     */
+    static double fadeEdgeTop(LostTalesUiHitBox box) {
+        return Math.floor(box.top) - MenuWindow.PADDING_Y;
     }
 
-    /** Where more of the letter waits, as every list in the windows says it, inside the sheet's right edge. */
+    /** See {@link #fadeEdgeTop}. */
+    static double fadeEdgeBottom(LostTalesUiHitBox box) {
+        return Math.floor(box.top) + Math.floor(box.height)
+                + MenuWindow.PADDING_Y;
+    }
+
+    /** Where more of the letter waits, as every list in the windows says it: its fades and a scrollbar at its right. */
     private void drawScrollbar(LostTalesUiHitBox box, LostTalesUiHitBox inner,
                                int alpha) {
-        // The fades hang from just inside the sheet's own edge.
-        double top = Math.floor(box.top);
-        WindowLists.drawScroll(Math.floor(box.left) + 1, top + 1,
-                Math.floor(box.left) + Math.floor(box.width) - 1,
-                top + Math.floor(box.height) - 1, inner.top, inner.bottom(),
+        WindowLists.drawScroll(Math.floor(box.left), fadeEdgeTop(box),
+                Math.floor(box.left) + Math.floor(box.width),
+                fadeEdgeBottom(box), inner.top, inner.bottom(),
                 this.shownScroll, maxScroll(inner), alpha);
     }
 

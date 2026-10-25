@@ -31,9 +31,14 @@ final class FakeCommandSender implements ICommandSender {
         return new FakeCommandSender(name, 0);
     }
 
-    /** An operator at the level the capabilities name. */
+    /** An operator at the level most capabilities name. */
     static FakeCommandSender operator(String name) {
         return new FakeCommandSender(name, 2);
+    }
+
+    /** An operator at the level the server's settings and the roles name. */
+    static FakeCommandSender administrator(String name) {
+        return new FakeCommandSender(name, 3);
     }
 
     /** The lines the sender was told, as sent. */

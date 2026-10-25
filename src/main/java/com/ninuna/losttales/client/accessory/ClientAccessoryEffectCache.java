@@ -1,8 +1,8 @@
 package com.ninuna.losttales.client.accessory;
 
-import com.ninuna.losttales.accessory.AccessoryBootstrap;
 import com.ninuna.losttales.accessory.AccessoryCompatibilityRegistry;
 import com.ninuna.losttales.accessory.AccessoryDefinition;
+import com.ninuna.losttales.accessory.AccessoryEffect;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
 import net.minecraft.entity.player.EntityPlayer;
 
@@ -42,15 +42,23 @@ public final class ClientAccessoryEffectCache {
                 || state.definitionId.length() == 0) {
             return null;
         }
-        return AccessoryCompatibilityRegistry.getInstance()
+        return AccessoryCompatibilityRegistry.client()
                 .getDefinition(state.definitionId);
     }
 
-    public static boolean isConcealed(EntityPlayer player) {
+    /** Whether the player wears an accessory that conceals them. */
+    public static boolean wearsConcealment(EntityPlayer player) {
         AccessoryDefinition definition = getDefinition(player);
-        return definition != null
-                && AccessoryBootstrap.CONCEALED_PUBLIC_EFFECT_ID.equals(
-                definition.getPublicEffectId());
+        return definition != null && definition.has(AccessoryEffect.CONCEALMENT);
+    }
+
+    /**
+     * Whether the game treats the player as concealed: they wear
+     * concealment, and their own shade is not being drawn for them now
+     * (ACC-02).
+     */
+    public static boolean isConcealed(EntityPlayer player) {
+        return wearsConcealment(player) && !ConcealedShade.isDrawing(player);
     }
 
     public static synchronized void clear() {

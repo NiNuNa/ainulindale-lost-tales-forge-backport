@@ -1,0 +1,22 @@
+{
+  "id": "losttales:gundabad_uruk",
+  "helmet": [
+    "lotr:item.helmetGundabadUruk"
+  ],
+  "chestplate": [
+    "lotr:item.bodyGundabadUruk"
+  ],
+  "leggings": [
+    "lotr:item.legsGundabadUruk"
+  ],
+  "boots": [
+    "lotr:item.bootsGundabadUruk"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:mining"
+    }
+  ]
+}

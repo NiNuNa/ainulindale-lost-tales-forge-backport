@@ -16,7 +16,7 @@ public final class CharacterSkinDefinition {
 
     private final String id;
     private final String raceId;
-    private final String genderId;
+    private final String bodyTypeId;
     private final String displayGroupId;
     private final String displayGroupName;
     private final int variantIndex;
@@ -25,7 +25,7 @@ public final class CharacterSkinDefinition {
     private final CharacterSkinLayout layout;
     private final boolean accountSkin;
 
-    CharacterSkinDefinition(String id, String raceId, String genderId,
+    CharacterSkinDefinition(String id, String raceId, String bodyTypeId,
                             String displayGroupId, String displayGroupName,
                             int variantIndex, String textureLocation, String modelId,
                             CharacterSkinLayout layout, boolean accountSkin) {
@@ -36,7 +36,7 @@ public final class CharacterSkinDefinition {
         }
         this.id = id;
         this.raceId = raceId;
-        this.genderId = genderId == null ? "" : genderId;
+        this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
         this.displayGroupId = displayGroupId;
         this.displayGroupName = displayGroupName == null ? "" : displayGroupName;
         this.variantIndex = variantIndex;
@@ -86,12 +86,12 @@ public final class CharacterSkinDefinition {
         return this.accountSkin;
     }
 
-    public boolean isCompatibleWith(String raceId, String genderId) {
+    public boolean isCompatibleWith(String raceId, String bodyTypeId) {
         if (!this.raceId.equals(LostTalesIdentifiers.normalize(raceId))) {
             return false;
         }
-        return this.genderId.length() == 0
-                || this.genderId.equals(CharacterGenderRegistry.appearanceGender(genderId));
+        return this.bodyTypeId.length() == 0
+                || this.bodyTypeId.equals(CharacterBodyTypeRegistry.appearanceBodyType(bodyTypeId));
     }
 
     private static boolean isBlank(String value) {

@@ -1,13 +1,15 @@
 package com.ninuna.losttales.config.server;
 
+import com.ninuna.losttales.config.NextStartOptions;
 import com.ninuna.losttales.util.LostTalesWords;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * What became of an operator's changes: what was set, what was refused and
- * why, what restarted. Every word in it is a lang key under {@link #WORDS},
+ * What became of an operator's changes: what was set, of that what waits
+ * for the next start, what was refused and why, what restarted. Every word
+ * in it is a lang key under {@link #WORDS},
  * with its arguments, so the command and the Server Settings page each
  * show it in their reader's language.
  */
@@ -80,8 +82,33 @@ public final class ServerConfigApplyResult {
         return new ServerConfigApplyResult(null, null, null, message);
     }
 
+    /** Every option written to the file, as {@code category.key}: in force now or at the next start. */
     public List<String> getApplied() {
         return this.applied;
+    }
+
+    /** The options written that are in force now. */
+    public List<String> getAppliedNow() {
+        return split(false);
+    }
+
+    /**
+     * The options written that only the next start puts in force
+     * ({@link NextStartOptions}): an answer names them as waiting, never
+     * as applied.
+     */
+    public List<String> getWaiting() {
+        return split(true);
+    }
+
+    private List<String> split(boolean waiting) {
+        List<String> names = new ArrayList<String>();
+        for (String name : this.applied) {
+            if (NextStartOptions.waitsForNextStart(name) == waiting) {
+                names.add(name);
+            }
+        }
+        return names;
     }
 
     public List<Refusal> getRefused() {

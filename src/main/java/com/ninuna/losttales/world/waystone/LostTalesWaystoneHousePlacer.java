@@ -78,6 +78,11 @@ public final class LostTalesWaystoneHousePlacer
         return this.house.getArrival();
     }
 
+    /** The house this places, as its files wrote it; the Odane house is built from it too (CONTENT-10). */
+    public LostTalesWaystoneHouse getHouse() {
+        return this.house;
+    }
+
     /** Whether the game has a block of that name, as a house's file names it. */
     static boolean hasBlock(String name) {
         return name != null && name.length() > 0 && !name.matches("[0-9]+")

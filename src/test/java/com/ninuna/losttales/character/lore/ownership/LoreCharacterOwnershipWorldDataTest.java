@@ -2,9 +2,12 @@ package com.ninuna.losttales.character.lore.ownership;
 
 import com.ninuna.losttales.character.lore.LoreCharacterDefinition;
 import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
+import com.ninuna.losttales.character.lore.LoreTestGame;
+import com.ninuna.losttales.progression.ProgressionFiles;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -33,7 +36,12 @@ public final class LoreCharacterOwnershipWorldDataTest {
 
     @Before
     public void loadDefinitions() {
-        LoreCharacterRegistry.load(null);
+        load(null);
+    }
+
+    @After
+    public void forgetDefinitions() {
+        LoreCharacterRegistry.clear();
     }
 
     @Test
@@ -117,7 +125,7 @@ public final class LoreCharacterOwnershipWorldDataTest {
 
     @Test
     public void incompleteOrUnknownDefinitionsCannotBeClaimed() throws Exception {
-        LoreCharacterRegistry.load(createIncompleteDefinition());
+        load(createIncompleteDefinition());
         LoreCharacterOwnershipWorldData data = createData();
         UUID owner = uuid("90000000-0000-0000-0000-000000000009");
 
@@ -142,10 +150,7 @@ public final class LoreCharacterOwnershipWorldDataTest {
      */
     @Test
     public void oneBrokenFileLeavesTheOthersClaimable() throws Exception {
-        File configRoot = this.temporaryFolder.newFolder("broken_config");
-        File directory = new File(
-                configRoot, LoreCharacterRegistry.EXTERNAL_DIRECTORY);
-        assertTrue(directory.mkdirs());
+        File directory = this.temporaryFolder.newFolder("broken_lore");
         Writer writer = new OutputStreamWriter(new FileOutputStream(
                 new File(directory, "broken.json")), StandardCharsets.UTF_8);
         try {
@@ -153,7 +158,7 @@ public final class LoreCharacterOwnershipWorldDataTest {
         } finally {
             writer.close();
         }
-        LoreCharacterRegistry.load(configRoot);
+        load(directory);
         assertFalse(LoreCharacterRegistry.getLoadErrors().isEmpty());
 
         LoreCharacterOwnershipResult claimed = createData().tryClaim(GANDALF,
@@ -164,25 +169,24 @@ public final class LoreCharacterOwnershipWorldDataTest {
     }
 
     private File createIncompleteDefinition() throws Exception {
-        File configRoot = this.temporaryFolder.newFolder("incomplete_config");
-        File directory = new File(
-                configRoot, LoreCharacterRegistry.EXTERNAL_DIRECTORY);
-        assertTrue(directory.mkdirs());
+        File directory = this.temporaryFolder.newFolder("incomplete_lore");
         File definition = new File(directory, "unfinished.json");
         Writer writer = new OutputStreamWriter(
                 new FileOutputStream(definition), StandardCharsets.UTF_8);
         try {
             writer.write("{\n"
-                    + "  \"dataVersion\": 1,\n"
                     + "  \"id\": \"myserver:unfinished\",\n"
                     + "  \"name\": \"Unfinished\",\n"
-                    + "  \"description\": \"\",\n"
-                    + "  \"appearance\": null\n"
+                    + "  \"faction\": \"lotr:gondor\"\n"
                     + "}\n");
         } finally {
             writer.close();
         }
-        return configRoot;
+        return directory;
+    }
+
+    private static void load(File folder) {
+        LoreCharacterRegistry.load(ProgressionFiles.CLASSPATH, folder, new LoreTestGame());
     }
 
     @Test

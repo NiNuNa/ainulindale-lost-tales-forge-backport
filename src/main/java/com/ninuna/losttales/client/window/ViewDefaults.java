@@ -10,9 +10,10 @@ import java.util.Map;
 /**
  * The window each view opens with: as a new player first sees it, once
  * every window of it has been closed, and after Reset View. What each
- * window holds and whether it opens locked are the view files'
- * ({@link ViewFiles}, WIN-49); the rules are the code's. Every view opens
- * one window at the default place, its pages as tabs, the first in front.
+ * window holds, whether it opens locked, where it stands and whether the
+ * view is a stage are the view files' ({@link ViewFiles}, WIN-49, WIN-50);
+ * the rules are the code's. Every view opens one window at its place, its
+ * pages as tabs, the first in front.
  * A page another view holds already opens here as a copy of its own, and
  * a page the player cannot open now is left out as the window opens. The
  * chat's pages come from the sets it gives ({@link #addPages}).
@@ -28,14 +29,16 @@ public final class ViewDefaults {
         List<? extends WindowPage> pages();
     }
 
-    /** The window a view opens with: its pages, the first in front, and its padlock. */
+    /** The window a view opens with: its pages, the first in front, its padlock and its place. */
     static final class Defaults {
         final Pages pages;
         final boolean locked;
+        final Window.ScreenFill place;
 
-        Defaults(Pages pages, boolean locked) {
+        Defaults(Pages pages, boolean locked, Window.ScreenFill place) {
             this.pages = pages;
             this.locked = locked;
+            this.place = place;
         }
     }
 
@@ -84,12 +87,33 @@ public final class ViewDefaults {
 
     /** The window {@code view} opens with; null for none. */
     static synchronized Defaults of(View view) {
-        if (view == null) {
-            return null;
-        }
-        ViewFile file = files().get(view.isCustom() ? ViewFile.CUSTOM
-                : view.category() == null ? "" : view.category().id());
+        ViewFile file = fileOf(view);
         return file == null ? null : defaultsOf(file);
+    }
+
+    /**
+     * Where {@code view}'s windows stand at their place: the part of the
+     * screen its file names, none for the middle or a view no file names.
+     */
+    static synchronized Window.ScreenFill placeOf(View view) {
+        ViewFile file = fileOf(view);
+        return file == null ? Window.ScreenFill.NONE : file.fill();
+    }
+
+    /**
+     * Whether {@code view} is a stage: while it is shown, the camera turns
+     * round to face the player's character in the part of the screen its
+     * windows leave free (WIN-50).
+     */
+    public static synchronized boolean isStage(View view) {
+        ViewFile file = fileOf(view);
+        return file != null && file.stage;
+    }
+
+    private static ViewFile fileOf(View view) {
+        return view == null ? null : files().get(view.isCustom()
+                ? ViewFile.CUSTOM
+                : view.category() == null ? "" : view.category().id());
     }
 
     /**
@@ -119,7 +143,7 @@ public final class ViewDefaults {
                 }
                 return pages;
             }
-        }, file.locked);
+        }, file.locked, file.fill());
     }
 
     private static Pages pagesOf(ViewFile.Entry entry, PageCategory category) {

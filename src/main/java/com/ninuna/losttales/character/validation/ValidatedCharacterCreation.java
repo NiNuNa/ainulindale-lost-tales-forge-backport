@@ -6,9 +6,9 @@ public final class ValidatedCharacterCreation {
     private final int slotIndex;
     private final String name;
     private final String raceId;
-    private final String genderId;
-    private final String skinId;
     private final String bodyTypeId;
+    private final String skinId;
+    private final String armsId;
     private final String chestTypeId;
     private final String history;
     private final int age;
@@ -18,18 +18,18 @@ public final class ValidatedCharacterCreation {
 
     public ValidatedCharacterCreation(int slotIndex, String name,
                                       String raceId,
-                                      String genderId, String skinId, int age,
+                                      String bodyTypeId, String skinId, int age,
                                       String startingFactionId,
                                       String startingWaypointId,
                                       boolean unconventionalSettings,
-                                      String history, String bodyTypeId,
+                                      String history, String armsId,
                                       String chestTypeId) {
         this.slotIndex = slotIndex;
         this.name = name;
         this.raceId = raceId;
-        this.genderId = genderId;
-        this.skinId = skinId;
         this.bodyTypeId = bodyTypeId;
+        this.skinId = skinId;
+        this.armsId = armsId;
         this.chestTypeId = chestTypeId;
         this.history = history;
         this.age = age;
@@ -41,9 +41,9 @@ public final class ValidatedCharacterCreation {
     public int getSlotIndex() { return this.slotIndex; }
     public String getName() { return this.name; }
     public String getRaceId() { return this.raceId; }
-    public String getGenderId() { return this.genderId; }
-    public String getSkinId() { return this.skinId; }
     public String getBodyTypeId() { return this.bodyTypeId; }
+    public String getSkinId() { return this.skinId; }
+    public String getArmsId() { return this.armsId; }
     public String getChestTypeId() { return this.chestTypeId; }
     public String getHistory() { return this.history; }
     public int getAge() { return this.age; }

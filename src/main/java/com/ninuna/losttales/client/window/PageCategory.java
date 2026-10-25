@@ -10,7 +10,8 @@ import net.minecraft.util.StatCollector;
  *
  * <p>Whispers and the consoles are the channels' subcategories. Whispers
  * stand with the channels, in their view; the consoles have a view of
- * their own, the command key's.</p>
+ * their own, the command key's. The skills are the profile's, with a view
+ * of their own (PROG-17).</p>
  */
 public enum PageCategory {
     /**
@@ -31,6 +32,8 @@ public enum PageCategory {
     FELLOWSHIPS("fellowships", null, true),
     /** The characters you play and their profiles. */
     PROFILE("profile", null, true),
+    /** The played character's skills, perks and deeds: the profile's, with a view of their own. */
+    SKILLS("skills", PROFILE, true),
     /** Client Settings, Server Settings, the HUD Placement page, the Motion Lab. */
     SETTINGS("settings", null, true);
 

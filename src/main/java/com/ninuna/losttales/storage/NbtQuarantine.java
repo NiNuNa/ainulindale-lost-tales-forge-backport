@@ -23,6 +23,13 @@ import net.minecraftforge.common.util.Constants;
 public final class NbtQuarantine {
     /** The version every quarantine is written at. */
     public static final int CURRENT_DATA_VERSION = 1;
+    /**
+     * The most records a quarantine holds, for the stores that take this
+     * bound. A save that would hold more is kept as it is, read-only, and
+     * a store whose quarantine is full closes before it sets another
+     * record aside.
+     */
+    public static final int MAX_ENTRIES = 4096;
 
     private static final String TAG_QUARANTINE = "Quarantine";
     private static final String TAG_DATA_VERSION = "DataVersion";

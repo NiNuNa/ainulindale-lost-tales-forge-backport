@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.storage;
 
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import net.minecraft.nbt.NBTTagCompound;
@@ -137,10 +137,10 @@ public final class CharacterProfileStorageTest {
     private static RoleplayCharacter character(CharacterProfile profile) {
         String skinId = CharacterSkinRegistry.getCompatibleSkins(
                 CharacterRaceRegistry.HUMAN,
-                CharacterGenderRegistry.MALE).get(0).getId();
+                CharacterBodyTypeRegistry.MASCULINE).get(0).getId();
         return RoleplayCharacter.builder(CHARACTER, OWNER)
                 .name("Traveller").race(CharacterRaceRegistry.HUMAN)
-                .gender(CharacterGenderRegistry.MALE).skin(skinId).age(30)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE).skin(skinId).age(30)
                 .startingFaction("lotr:bree").createdAt(1L)
                 .profile(profile)
                 .build();

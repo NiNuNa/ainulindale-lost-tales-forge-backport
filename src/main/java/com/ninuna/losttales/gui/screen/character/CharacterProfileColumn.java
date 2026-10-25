@@ -9,10 +9,11 @@ import com.ninuna.losttales.client.chat.ClientChatProfanity;
 import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.FoldRule;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -30,7 +31,6 @@ import java.util.Collection;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.world.World;
 import org.lwjgl.opengl.GL11;
@@ -40,7 +40,7 @@ import org.lwjgl.opengl.GL11;
  * messenger's profile panel: the name, and under it what the character is
  * — played now, its race, its people — then its glances, About with
  * Appearance, Personality and History, the Facts (age, the six short
- * facts, sex and look), its Race and what the race gives, the Quests of
+ * facts, body type and look), its Race and what the race gives, the Quests of
  * the one played, and the Account behind one of the player's own. Another
  * person's shows what this client knows of them. The profile's words
  * pass the profanity filter as this client has it set, as the chat's do.
@@ -51,7 +51,12 @@ import org.lwjgl.opengl.GL11;
  */
 final class CharacterProfileColumn {
     private static final int LINE = 10;
-    private static final int HEADING = 15;
+    /**
+     * Clear rows between a heading's hairline and the words under it,
+     * which stand at the top of their line: one, as under the journal's
+     * headings.
+     */
+    static final int HEADING_CLEARANCE = 1;
     /** A glance's line stands under its title, clear of the emoji. */
     private static final int GLANCE_INDENT = ChatEmojiIcon.SIZE + 3;
     /** Air above every section but the first. */
@@ -85,7 +90,7 @@ final class CharacterProfileColumn {
         int height() {
             switch (this.kind) {
                 case HEADING:
-                    return HEADING;
+                    return headingHeight(MenuWindow.rowHeight());
                 case GAP:
                     return SECTION_GAP;
                 case NAME:
@@ -96,6 +101,15 @@ final class CharacterProfileColumn {
                     return LINE;
             }
         }
+    }
+
+    /**
+     * How tall a heading's line stands where a menu's row is
+     * {@code rowHeight}: every list's heading, a row high, and the clear
+     * rows under its hairline.
+     */
+    static int headingHeight(int rowHeight) {
+        return rowHeight + HEADING_CLEARANCE;
     }
 
     private final List<Line> lines = new ArrayList<Line>();
@@ -252,7 +266,7 @@ final class CharacterProfileColumn {
         }
     }
 
-    /** The Facts: the age, each short fact given, then the sex and the look where they are known. */
+    /** The Facts: the age, each short fact given, then the body type and the look where they are known. */
     private void addFacts(ProfileSubject subject, CharacterProfile profile) {
         heading("gui.losttales.character.profile.facts");
         if (subject.age > 0) {
@@ -267,17 +281,17 @@ final class CharacterProfileColumn {
                 }
             }
         }
-        if (subject.genderId.length() > 0) {
-            pair("gui.losttales.character.gender",
-                    ClientCharacterDisplayNames.gender(subject.genderId));
+        if (subject.bodyTypeId.length() > 0) {
+            pair("gui.losttales.character.body_type",
+                    ClientCharacterDisplayNames.bodyType(subject.bodyTypeId));
         }
         if (subject.skinId.length() > 0 && subject.raceId.length() > 0) {
             pair("gui.losttales.character.profile.look",
                     ClientCharacterDisplayNames.skin(subject.skinId));
-            if (ClientCharacterDisplayNames.hasBodyTypeChoice(subject.skinId)) {
-                pair("gui.losttales.character.body",
-                        ClientCharacterDisplayNames.bodyType(
-                                subject.bodyTypeId));
+            if (ClientCharacterDisplayNames.hasArmsChoice(subject.skinId)) {
+                pair("gui.losttales.character.arms",
+                        ClientCharacterDisplayNames.arms(
+                                subject.armsId));
             }
             if (ClientCharacterDisplayNames.hasChestChoice(subject.skinId)) {
                 pair("gui.losttales.character.chest",
@@ -389,8 +403,8 @@ final class CharacterProfileColumn {
 
     private void heading(String key) {
         add(Kind.GAP, "", "", 0);
-        add(Kind.HEADING, LostTalesSkyrimUiStyle.uppercase(I18n.format(key)),
-                "", LostTalesColors.rgb(LostTalesColors.TEXT));
+        add(Kind.HEADING, I18n.format(key), "",
+                LostTalesColors.rgb(LostTalesColors.SAND));
     }
 
     private void pair(String labelKey, String value) {
@@ -559,17 +573,13 @@ final class CharacterProfileColumn {
                 LostTalesUiInk.drawText(font, line.text,
                         left + GLANCE_INDENT, y, line.rgb, alpha);
                 break;
-            case HEADING: {
-                int textTop = y + LostTalesUiInk.centredStart(HEADING, 7);
-                LostTalesUiInk.drawText(font, line.text, left, textTop,
-                        line.rgb, alpha);
-                int ruleLeft = left + font.getStringWidth(line.text) + 5;
-                if (ruleLeft < left + width) {
-                    Gui.drawRect(ruleLeft, textTop + 3, left + width,
-                            textTop + 4, LostTalesColors.BORDER_DIM);
-                }
+            case HEADING:
+                // Every list's heading: sand over a full hairline, a row
+                // high, fading into the column's end where it is too long
+                // (LOOK-24).
+                WindowLists.drawHeading(font, line.text, left, left,
+                        left + width, y, MenuWindow.rowHeight(), false, alpha);
                 break;
-            }
             case PAIR:
                 LostTalesUiInk.drawText(font, line.text, left, y,
                         WindowStyle.asideRgb(), alpha);

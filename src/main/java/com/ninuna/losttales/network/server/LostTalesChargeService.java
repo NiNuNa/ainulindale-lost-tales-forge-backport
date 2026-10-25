@@ -2,8 +2,8 @@ package com.ninuna.losttales.network.server;
 
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
-import com.ninuna.losttales.gameplay.projectile.ChargeTierCalculator;
-import com.ninuna.losttales.gameplay.projectile.ThirdPersonChargeItemPolicy;
+import com.ninuna.losttales.thirdperson.ChargeTierCalculator;
+import com.ninuna.losttales.thirdperson.ThirdPersonChargeItemPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import cpw.mods.fml.common.eventhandler.EventPriority;

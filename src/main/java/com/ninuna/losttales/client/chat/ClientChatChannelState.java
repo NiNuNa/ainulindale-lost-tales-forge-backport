@@ -136,6 +136,8 @@ public final class ClientChatChannelState {
     /** The channels linked to Discord, by link key, as the server said. */
     private static final java.util.Set<String> DISCORD_LINKS =
             new java.util.HashSet<String>();
+    /** Whether the server keeps a log of whispers, as it said. */
+    private static boolean whispersLogged;
     /** Server-stated muted senders; filled for operators only. */
     private static final java.util.Set<UUID> MUTED_SENDERS =
             new java.util.HashSet<UUID>();
@@ -803,6 +805,19 @@ public final class ClientChatChannelState {
         return new java.util.ArrayList<String>(PRIVATE_COMMANDS);
     }
 
+    /** What the server says of its log of whispers, with the chat access. */
+    public static synchronized void setWhispersLogged(boolean logged) {
+        whispersLogged = logged;
+    }
+
+    /**
+     * Whether the server keeps a log of whispers: a whisper's help and
+     * the faint line at its top say so (CHAT-85).
+     */
+    public static synchronized boolean whispersLogged() {
+        return whispersLogged;
+    }
+
     public static synchronized void setDiscordLinks(java.util.Collection<String> keys) {
         DISCORD_LINKS.clear();
         if (keys != null) {
@@ -1127,6 +1142,7 @@ public final class ClientChatChannelState {
         SENT_HISTORY.clear();
         DISCORD_LINKS.clear();
         PRIVATE_COMMANDS.clear();
+        whispersLogged = false;
     }
 
     /**

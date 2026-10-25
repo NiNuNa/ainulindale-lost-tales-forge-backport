@@ -49,10 +49,15 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
 
     public LostTalesWaystoneStatePacket() {}
 
+    /**
+     * The record's state, called after {@code namedAfter} as the server
+     * words the record's reference for every reader: its placing character
+     * by its name as it stands (WAY-01).
+     */
     public LostTalesWaystoneStatePacket(
             int dimensionId, int x, int y, int z,
-            LostTalesMapMarkerRecord record, String ownerName,
-            boolean canEdit, boolean managesMarkers,
+            LostTalesMapMarkerRecord record, String namedAfter,
+            String ownerName, boolean canEdit, boolean managesMarkers,
             LostTalesWaystoneStateReason reason) {
         if (record == null) {
             throw new IllegalArgumentException(
@@ -63,7 +68,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         this.y = y;
         this.z = z;
         this.markerId = record.getId();
-        this.namedAfter = record.getNamedAfter();
+        this.namedAfter = namedAfter == null ? "" : namedAfter;
         this.playerPlaced = record.getSource()
                 == LostTalesMapMarkerSource.PLAYER_CREATED;
         this.revision = record.getRevision();

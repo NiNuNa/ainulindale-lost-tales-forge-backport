@@ -131,7 +131,11 @@ public final class LostTalesNetworkHandlerDiscriminatorTest {
             "ProgressionStatePacket CLIENT",
             "ProgressionRequestPacket SERVER",
             "ProgressionStatuePacket CLIENT",
-            "CharacterRaceCatalogPacket CLIENT"
+            "CharacterRaceCatalogPacket CLIENT",
+            "CharacterGearRequestPacket SERVER",
+            "CharacterGearPacket CLIENT",
+            "AccessoryCatalogPacket CLIENT",
+            "ArmourCatalogPacket CLIENT"
     };
 
     /** One registerMessage call, read back off the stack that fed it. */

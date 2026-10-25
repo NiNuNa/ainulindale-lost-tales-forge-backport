@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:bilbo",
   "name": "Bilbo",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:hobbit",
-    "genderId": "losttales:male",
-    "modelId": "lotr:hobbit",
-    "skinId": "losttales:hobbit_shire_male_1"
-  }
+  "race": "losttales:hobbit",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:hobbit_shire_masculine_1",
+  "faction": "lotr:hobbit"
 }

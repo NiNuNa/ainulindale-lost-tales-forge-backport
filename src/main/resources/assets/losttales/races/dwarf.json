@@ -2,7 +2,7 @@
   "id": "losttales:dwarf",
   "body": "dwarf",
   "values_from": "lotr:dwarf",
-  "sexes": ["losttales:male", "losttales:female"],
+  "body_types": ["losttales:masculine", "losttales:feminine"],
   "size": {"width": 0.5, "height": 1.5},
   "health": 20,
   "speed": 0.9,
@@ -10,16 +10,16 @@
   "faction_categories": ["dwarf"],
   "factions": [],
   "skins": [
-    {"group": "dwarf_erebor", "sex": "losttales:male", "texture": "lotr:mob/dwarf/dwarf_male", "count": 3},
-    {"group": "dwarf_erebor", "sex": "losttales:female", "texture": "lotr:mob/dwarf/dwarf_female", "count": 3},
-    {"group": "dwarf_blue_mountains", "sex": "losttales:male", "texture": "lotr:mob/dwarf/blueMountains_male", "count": 3},
-    {"group": "dwarf_blue_mountains", "sex": "losttales:female", "texture": "lotr:mob/dwarf/blueMountains_female", "count": 3},
-    {"group": "dwarf_exiled", "sex": "losttales:male", "texture": "losttales:textures/skins/dwarf/exiled_male", "count": 1}
+    {"group": "dwarf_erebor", "body_type": "losttales:masculine", "texture": "lotr:mob/dwarf/dwarf_male", "count": 3},
+    {"group": "dwarf_erebor", "body_type": "losttales:feminine", "texture": "lotr:mob/dwarf/dwarf_female", "count": 3},
+    {"group": "dwarf_blue_mountains", "body_type": "losttales:masculine", "texture": "lotr:mob/dwarf/blueMountains_male", "count": 3},
+    {"group": "dwarf_blue_mountains", "body_type": "losttales:feminine", "texture": "lotr:mob/dwarf/blueMountains_female", "count": 3},
+    {"group": "dwarf_exiled", "body_type": "losttales:masculine", "texture": "losttales:textures/skins/dwarf/exiled_male", "count": 1}
   ],
   "skills": {
     "losttales:smithing": 10,
     "losttales:mining": 5,
     "losttales:heavy_arms": 5,
-    "losttales:defence": 5
+    "losttales:heavy_armour": 5
   }
 }

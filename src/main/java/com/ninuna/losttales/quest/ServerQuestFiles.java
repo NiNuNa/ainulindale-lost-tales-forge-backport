@@ -22,7 +22,7 @@ import java.util.Set;
  * {@code config/losttales/quests/}, in the same form as the quests bundled
  * with the mod. They
  * are read when the server starts and again on
- * {@code /losttales quest reload}, and a player's game is sent one as it
+ * {@code /losttales reload quests}, and a player's game is sent one as it
  * needs it ({@link ServerQuestSync}), so a server adds quests without a new
  * build of the mod.
  *

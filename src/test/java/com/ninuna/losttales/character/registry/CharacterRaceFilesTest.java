@@ -28,12 +28,12 @@ public final class CharacterRaceFilesTest {
     /** A server's own race on the human body, as its folder would hold it. */
     private static final String BEORNING = "{"
             + "\"id\": \"myserver:beorning\", \"name\": \"Beorning\", \"body\": \"human\","
-            + "\"sexes\": [\"losttales:male\", \"losttales:female\"],"
+            + "\"body_types\": [\"losttales:masculine\", \"losttales:feminine\"],"
             + "\"size\": {\"width\": 0.65, \"height\": 1.9},"
             + "\"health\": 22, \"speed\": 1.0, \"attack\": 3,"
             + "\"faction_categories\": [\"human\"], \"factions\": [\"lotr:dale\"],"
             + "\"skins\": [{\"group\": \"beorning\", \"name\": \"Beorning\","
-            + " \"sex\": \"losttales:male\", \"texture\": \"lotr:mob/bree/bree_male\", \"count\": 4}],"
+            + " \"body_type\": \"losttales:masculine\", \"texture\": \"lotr:mob/bree/bree_male\", \"count\": 4}],"
             + "\"skills\": {\"losttales:husbandry\": 10}"
             + "}";
 
@@ -105,9 +105,9 @@ public final class CharacterRaceFilesTest {
     public void aRaceNobodyCouldStartAsIsAWarning() {
         assertWarns(BEORNING.replace("\"faction_categories\": [\"human\"], \"factions\": [\"lotr:dale\"],",
                 ""), "nobody could start");
-        assertWarns(BEORNING.replace("[\"losttales:male\", \"losttales:female\"]", "[]"),
+        assertWarns(BEORNING.replace("[\"losttales:masculine\", \"losttales:feminine\"]", "[]"),
                 "names no sexes");
-        assertWarns(BEORNING.replace("\"losttales:female\"]", "\"losttales:centaur\"]"),
+        assertWarns(BEORNING.replace("\"losttales:feminine\"]", "\"losttales:centaur\"]"),
                 "which is none the game has");
     }
 
@@ -120,8 +120,8 @@ public final class CharacterRaceFilesTest {
         assertWarns(BEORNING.replace("\"count\": 4", "\"count\": 0"), "pictures");
         assertWarns(BEORNING.replace("\"group\": \"beorning\"", "\"group\": \"account\""),
                 "not 'account'");
-        assertWarns(BEORNING.replace("\"sex\": \"losttales:male\"",
-                "\"sex\": \"losttales:non_binary\""), "no sex the race has");
+        assertWarns(BEORNING.replace("\"body_type\": \"losttales:masculine\"",
+                "\"body_type\": \"losttales:neutral\""), "no sex the race has");
     }
 
     @Test

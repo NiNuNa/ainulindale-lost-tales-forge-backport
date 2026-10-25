@@ -19,6 +19,9 @@ public final class VanillaInventoryStateComponent implements CharacterStateCompo
     private static final String TAG_ITEMS = "Items";
     private static final String TAG_CURRENT_ITEM = "CurrentItem";
     private static final int MAX_SERIALIZED_SLOTS = 40;
+    /** Where the armour stands among the saved slots: boots at 100, the helmet at 103. */
+    private static final int FIRST_ARMOR_SLOT = 100;
+    private static final int ARMOR_SLOTS = 4;
 
     @Override
     public String getId() {
@@ -164,6 +167,30 @@ public final class VanillaInventoryStateComponent implements CharacterStateCompo
             player.playerNetServerHandler.sendPacket(
                     new S09PacketHeldItemChange(player.inventory.currentItem));
         }
+    }
+
+    /**
+     * What a saved inventory wears and holds, for the stage (CHAR-42): the
+     * four armour stacks, boots first, then the stack in the selected
+     * hotbar slot; null where a slot is empty. The state is checked as a
+     * switch checks it first, and the saved life is only read.
+     */
+    public static ItemStack[] wornOf(NBTTagCompound state)
+            throws CharacterStateValidationException {
+        new VanillaInventoryStateComponent().validate(state);
+        ItemStack[] worn = new ItemStack[ARMOR_SLOTS + 1];
+        int held = state.getInteger(TAG_CURRENT_ITEM);
+        NBTTagList items = state.getTagList(TAG_ITEMS, Constants.NBT.TAG_COMPOUND);
+        for (int index = 0; index < items.tagCount(); index++) {
+            NBTTagCompound itemTag = items.getCompoundTagAt(index);
+            int slot = itemTag.getByte("Slot") & 255;
+            if (slot >= FIRST_ARMOR_SLOT && slot < FIRST_ARMOR_SLOT + ARMOR_SLOTS) {
+                worn[slot - FIRST_ARMOR_SLOT] = ItemStack.loadItemStackFromNBT(itemTag);
+            } else if (slot == held) {
+                worn[ARMOR_SLOTS] = ItemStack.loadItemStackFromNBT(itemTag);
+            }
+        }
+        return worn;
     }
 
     private static void clear(ItemStack[] inventory) {

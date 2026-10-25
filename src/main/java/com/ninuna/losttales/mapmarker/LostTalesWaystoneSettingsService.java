@@ -1,6 +1,8 @@
 package com.ninuna.losttales.mapmarker;
 
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
+import com.ninuna.losttales.character.deletion.CharacterDeletionStorage;
+import com.ninuna.losttales.character.deletion.CharacterDeletionWorldData;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -16,6 +18,7 @@ import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -41,11 +44,13 @@ import net.minecraft.world.World;
  * <p>A waystone is shared with characters and with fellowships of ours.
  * A character share holds for that character alone, whoever plays it,
  * never for its account's other characters. A fellowship is named among
- * the fellowships of the sharer's played character (WAY-09). A share whose
- * character or fellowship is gone for good counts for nothing: the page
- * is never sent it, and the next change to the waystone lets it go
- * ({@link #withoutLostShares}). A manager may hand a placed waystone to
- * another character (WAY-08).</p>
+ * the fellowships of the sharer's played character (WAY-09). A deleted
+ * character stands until it is purged: its shares stay, and its purge
+ * takes them off ({@link #characterPurged}, WAY-03). A share whose
+ * character or fellowship is gone for good all the same counts for
+ * nothing: the page is never sent it, and the next change to the waystone
+ * lets it go ({@link #withoutLostShares}). A manager may hand a placed
+ * waystone to another character (WAY-08).</p>
  *
  * <p>Destinations is a request too: the server checks the waystone as it
  * checks every other, opens the player's window to travel from it
@@ -143,14 +148,13 @@ public final class LostTalesWaystoneSettingsService {
                                 player));
                 break;
             case SHARE_CHARACTER:
-                outcome = applyCharacterSharing(
-                        context.world, base,
-                        request.getTargetName(), false);
+                outcome = shareCharacter(base, namedCharacter(
+                        context.world, request.getTargetName()));
                 break;
             case UNSHARE_CHARACTER:
-                outcome = applyCharacterSharing(
-                        context.world, base,
-                        request.getTargetName(), true);
+                outcome = unshareCharacter(base, sharedNamed(
+                        LostTalesWaystonePlacers.of(context.world), base,
+                        request.getTargetName()));
                 break;
             case SHARE_FELLOWSHIP:
                 outcome = shareFellowship(base,
@@ -251,10 +255,10 @@ public final class LostTalesWaystoneSettingsService {
     }
 
     /**
-     * The waystone's state for its page, with the owning character's name
-     * and only the shares that still stand; nothing to a player who may not
-     * see it, who could otherwise read a private waystone through a
-     * request.
+     * The waystone's state for its page, with the owning character's name,
+     * what it is called after as every map reads it (WAY-01), and only the
+     * shares that still stand; nothing to a player who may not see it, who
+     * could otherwise read a private waystone through a request.
      */
     public static void sendState(
             EntityPlayerMP player,
@@ -280,6 +284,8 @@ public final class LostTalesWaystoneSettingsService {
                         tile.xCoord, tile.yCoord, tile.zCoord,
                         withoutLostShares(record,
                                 subjectsOf(player.worldObj)),
+                        LostTalesWaystonePlacers.shown(player.worldObj,
+                                record.getNamedAfter()),
                         ownerName(player.worldObj, record),
                         canEdit, manages, reason),
                 player);
@@ -446,7 +452,7 @@ public final class LostTalesWaystoneSettingsService {
 
     /** Which characters and fellowships still stand, as the shares are kept against. */
     interface Subjects {
-        /** Whether a roster or a lore figure holds the character. */
+        /** Whether a roster, a lore figure or a deletion not yet purged holds the character. */
         boolean hasCharacter(UUID characterId);
 
         /** Whether the fellowship has not ended. */
@@ -455,8 +461,9 @@ public final class LostTalesWaystoneSettingsService {
 
     /**
      * The record without the shares whose character or fellowship is gone
-     * for good: a character no roster and no lore figure holds, purged; a
-     * fellowship that ended. Nobody could see the waystone through them,
+     * for good: a character no roster, no lore figure and no deletion
+     * holds, purged; a fellowship that ended. Nobody could see the
+     * waystone through them,
      * and nobody could name them to unshare them. The revision stays, so a
      * page that read the record still matches it; the record itself is
      * the same where every share stands.
@@ -487,42 +494,59 @@ public final class LostTalesWaystoneSettingsService {
     }
 
     /**
-     * This world's characters, lore figures and fellowships as the shares
-     * are kept against. A store that cannot be read, or reads only
-     * another version's data, holds every subject, so no share is let go
-     * on its word.
+     * This world's characters, lore figures, deleted characters and
+     * fellowships as the shares are kept against. A store that cannot be
+     * read, or reads only another version's data, holds every subject, so
+     * no share is let go on its word.
      */
     private static Subjects subjectsOf(World world) {
         CharacterWorldData characters = null;
         LoreCharacterOwnershipWorldData loreFigures = null;
+        CharacterDeletionWorldData deletions = null;
         FellowshipWorldData fellowshipData = null;
         try {
             characters = CharacterStorage.get(world);
             loreFigures = LoreCharacterOwnershipStorage.get(world);
-            if (characters.isReadOnlyForNewerVersion()
-                    || loreFigures.isReadOnly()) {
-                characters = null;
-            }
+            deletions = CharacterDeletionStorage.get(world);
         } catch (RuntimeException unreadable) {
             characters = null;
         }
         try {
             fellowshipData = FellowshipStorage.get(world);
-            if (fellowshipData.isReadOnlyForNewerVersion()) {
-                fellowshipData = null;
-            }
         } catch (RuntimeException unreadable) {
             fellowshipData = null;
         }
-        final CharacterWorldData rosters = characters;
+        return subjects(characters, loreFigures, deletions, fellowshipData);
+    }
+
+    /**
+     * The subjects these stores hold: a character a roster, a lore figure
+     * or a deletion not yet purged holds (WAY-03), a fellowship that has
+     * not ended. Where a character store is missing or reads only, every
+     * character stands; where the fellowship store is, every fellowship.
+     */
+    static Subjects subjects(CharacterWorldData characters,
+                             LoreCharacterOwnershipWorldData loreFigures,
+                             CharacterDeletionWorldData deletions,
+                             FellowshipWorldData fellowshipData) {
+        boolean everyCharacter = characters == null || loreFigures == null
+                || deletions == null
+                || characters.isReadOnlyForNewerVersion()
+                || loreFigures.isReadOnly()
+                || deletions.isReadOnlyForNewerVersion();
+        final CharacterWorldData rosters = everyCharacter ? null : characters;
         final LoreCharacterOwnershipWorldData lore = loreFigures;
-        final FellowshipWorldData fellowships = fellowshipData;
+        final CharacterDeletionWorldData deleted = deletions;
+        final FellowshipWorldData fellowships = fellowshipData == null
+                || fellowshipData.isReadOnlyForNewerVersion()
+                ? null : fellowshipData;
         return new Subjects() {
             @Override
             public boolean hasCharacter(UUID characterId) {
                 return rosters == null
                         || rosters.containsCharacter(characterId)
-                        || lore.getRecordByCharacterId(characterId) != null;
+                        || lore.getRecordByCharacterId(characterId) != null
+                        || deleted.getTombstone(characterId) != null;
             }
 
             @Override
@@ -533,25 +557,30 @@ public final class LostTalesWaystoneSettingsService {
         };
     }
 
-    private static Outcome applyCharacterSharing(
-            World world,
-            LostTalesMapMarkerRecord record,
-            String characterName, boolean remove) {
-        CharacterWorldData characters;
+    /**
+     * A character purged for good: its shares go from every waystone
+     * (WAY-03), and the waystones called after it read {@code Waystone}
+     * from now on, so whoever may see one is sent their markers again
+     * (WAY-01). A store that reads only keeps the shares, which count for
+     * nothing then. Answers how many waystones lost a share.
+     */
+    public static int characterPurged(World world, UUID characterId) {
+        if (world == null || world.isRemote || characterId == null) {
+            return 0;
+        }
+        int unshared = 0;
         try {
-            characters = CharacterStorage.get(world);
-        } catch (RuntimeException unreadable) {
-            return Outcome.refused(
-                    LostTalesWaystoneStateReason.CHARACTER_NOT_FOUND);
+            LostTalesMapMarkerWorldData data =
+                    LostTalesMapMarkerStorage.get(world);
+            if (!data.isReadOnlyForNewerVersion()) {
+                unshared = data.forgetSharedCharacter(characterId);
+            }
+            LostTalesMapMarkerSyncManager.placerChanged(world, characterId);
+        } catch (RuntimeException exception) {
+            LostTalesLog.warning("The waystone shares of purged character %s were not taken off; they count for nothing and go with the next change to each waystone: %s",
+                    characterId, exception.toString());
         }
-        if (remove) {
-            return unshareCharacter(record,
-                    sharedNamed(characters, record, characterName));
-        }
-        RoleplayCharacter named = CharacterNames.named(
-                characters.getRosters(), characterName);
-        return shareCharacter(record,
-                named == null ? null : named.getCharacterId());
+        return unshared;
     }
 
     /**
@@ -756,16 +785,17 @@ public final class LostTalesWaystoneSettingsService {
     }
 
     /**
-     * The character already shared with that goes by the name, deleted or
-     * not, so one that is no longer played can still be taken off.
+     * The character already shared with that goes by the name, as
+     * {@code names} names each share: one in a roster, one deleted and not
+     * yet purged, a lore figure nobody holds. So one nobody plays now can
+     * still be taken off.
      */
-    private static UUID sharedNamed(CharacterWorldData characters,
-                                    LostTalesMapMarkerRecord record,
-                                    String characterName) {
+    static UUID sharedNamed(LostTalesMapMarkerNamedAfter.Names names,
+                            LostTalesMapMarkerRecord record,
+                            String characterName) {
         for (UUID shared : record.getSharedCharacterIds()) {
-            RoleplayCharacter character = characters.findCharacter(shared);
-            if (character != null
-                    && CharacterNames.same(characterName, character.getName())) {
+            String name = names == null ? null : names.nameOf(shared);
+            if (name != null && CharacterNames.same(characterName, name)) {
                 return shared;
             }
         }

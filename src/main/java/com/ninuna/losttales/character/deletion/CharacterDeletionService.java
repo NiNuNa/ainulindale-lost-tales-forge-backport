@@ -27,6 +27,8 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
 import com.ninuna.losttales.fellowship.server.FellowshipOperationResult;
 import com.ninuna.losttales.fellowship.server.FellowshipService;
+import com.ninuna.losttales.mapmarker.LostTalesWaystoneSettingsService;
+import com.ninuna.losttales.storage.WorldClock;
 import com.ninuna.losttales.util.LostTalesMath;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -46,6 +48,17 @@ import java.util.UUID;
  * from the foot of the roster; after it the server purges it on its own,
  * at server start and at each login of the owner, a bounded number at a
  * time. Administrators restore and purge by command as well.</p>
+ *
+ * <p>A deleted character stands until it is purged: a restore brings back
+ * its saved life, its hired units and the waystone shares it was given,
+ * which only its purge takes off (CHAR-33, WAY-03). What deleting took
+ * from others stays taken: its fellowships, invitations and go-here
+ * mark.</p>
+ *
+ * <p>A retention that ended inside a stretch the world's clock holds, a
+ * jump of the server's clock (DATA-09), is not over yet: the character
+ * stays restorable and is not purged on its own until an operator accepts
+ * the clock. An operator's own purge of it still goes.</p>
  */
 public final class CharacterDeletionService {
 
@@ -240,7 +253,8 @@ public final class CharacterDeletionService {
             if (!tombstone.isCommitted()) {
                 return CharacterDeletionMaintenanceResult.NOT_COMMITTED;
             }
-            if (!isRestorable(tombstone, ownerId, System.currentTimeMillis())) {
+            if (!isRestorable(tombstone, ownerId, System.currentTimeMillis(),
+                    WorldClock.hold())) {
                 return CharacterDeletionMaintenanceResult.RETENTION_OVER;
             }
 
@@ -318,12 +332,17 @@ public final class CharacterDeletionService {
         }
     }
 
+    /**
+     * An operator's purge of one of {@code ownerId}'s deleted characters
+     * past its retention, the player online or not; a stretch the world's
+     * clock holds does not stop it, the purge being an operator's own.
+     */
     public synchronized CharacterDeletionMaintenanceResult purge(
-            EntityPlayerMP target, UUID characterId) {
-        if (!isValidTarget(target, characterId)) {
+            World world, UUID ownerId, UUID characterId) {
+        if (!isValidTarget(world, ownerId, characterId)) {
             return CharacterDeletionMaintenanceResult.NOT_FOUND;
         }
-        return purge(target.worldObj, target.getUniqueID(), characterId, true);
+        return purge(world, ownerId, characterId, true);
     }
 
     /**
@@ -375,8 +394,13 @@ public final class CharacterDeletionService {
             if (flush) {
                 flushCommitted(world, "purge_commit", ownerId, characterId);
             }
-            FMLLog.info("[%s] Permanently purged tombstoned character %s for owner %s",
-                    LostTalesMetaData.MOD_ID, characterId, ownerId);
+            // Its waystone shares stood while it was deleted; they go with
+            // the purge (WAY-03).
+            int unshared = LostTalesWaystoneSettingsService.characterPurged(
+                    world, characterId);
+            FMLLog.info("[%s] Permanently purged tombstoned character %s for owner %s; %d waystone share(s) went with it",
+                    LostTalesMetaData.MOD_ID, characterId, ownerId,
+                    Integer.valueOf(unshared));
             return CharacterDeletionMaintenanceResult.SUCCESS;
         } catch (RuntimeException exception) {
             logFailure("purge", ownerId, characterId, exception);
@@ -386,7 +410,8 @@ public final class CharacterDeletionService {
 
     /**
      * Purges the owner's deleted characters past their retention, at most
-     * {@code limit} of them, soonest due first. Answers how many went.
+     * {@code limit} of them, soonest due first, but for those the world's
+     * clock holds. Answers how many went.
      */
     public synchronized int purgeExpired(World world, UUID ownerId, int limit) {
         if (world == null || world.isRemote || ownerId == null) {
@@ -398,7 +423,7 @@ public final class CharacterDeletionService {
                 return 0;
             }
             return purgeAll(world, data.getExpired(ownerId,
-                    System.currentTimeMillis(), limit), "login");
+                    System.currentTimeMillis(), limit, WorldClock.hold()), "login");
         } catch (RuntimeException exception) {
             logFailure("purge_expired_owner", ownerId, null, exception);
             return 0;
@@ -407,8 +432,9 @@ public final class CharacterDeletionService {
 
     /**
      * Purges every owner's deleted characters past their retention, at most
-     * {@code limit} of them, soonest due first; the rest go at their
-     * owners' logins or the next start. Answers how many went.
+     * {@code limit} of them, soonest due first, but for those the world's
+     * clock holds; the rest go at their owners' logins or the next start.
+     * Answers how many went.
      */
     public synchronized int purgeExpired(World world, int limit) {
         if (world == null || world.isRemote) {
@@ -420,7 +446,7 @@ public final class CharacterDeletionService {
                 return 0;
             }
             return purgeAll(world, data.getExpired(null,
-                    System.currentTimeMillis(), limit), "start");
+                    System.currentTimeMillis(), limit, WorldClock.hold()), "start");
         } catch (RuntimeException exception) {
             logFailure("purge_expired", null, null, exception);
             return 0;
@@ -498,7 +524,7 @@ public final class CharacterDeletionService {
             CharacterDeletionTombstone tombstone =
                     deletionData.getTombstone(characterId);
             if (!isRestorable(tombstone, ownerId,
-                    System.currentTimeMillis())) {
+                    System.currentTimeMillis(), WorldClock.hold())) {
                 return CharacterOperationResult.failure(
                         CharacterErrorId.RESTORE_NOT_FOUND, roster);
             }
@@ -585,11 +611,12 @@ public final class CharacterDeletionService {
                 return Collections.emptyList();
             }
             long now = System.currentTimeMillis();
+            WorldClock.Hold hold = WorldClock.hold();
             List<CharacterDeletionTombstone> kept =
                     new ArrayList<CharacterDeletionTombstone>();
             for (CharacterDeletionTombstone tombstone
                     : data.getTombstones(ownerId)) {
-                if (isRestorable(tombstone, ownerId, now)) {
+                if (isRestorable(tombstone, ownerId, now, hold)) {
                     kept.add(tombstone);
                 }
             }
@@ -617,10 +644,20 @@ public final class CharacterDeletionService {
     /** Whether the owner may still restore it: theirs, committed, and within its retention. */
     static boolean isRestorable(CharacterDeletionTombstone tombstone,
                                 UUID ownerId, long now) {
+        return isRestorable(tombstone, ownerId, now, WorldClock.NONE);
+    }
+
+    /**
+     * The same, with a retention that ended inside a stretch {@code hold}
+     * keeps counted as not over (DATA-09).
+     */
+    static boolean isRestorable(CharacterDeletionTombstone tombstone,
+                                UUID ownerId, long now, WorldClock.Hold hold) {
         return tombstone != null && ownerId != null
                 && ownerId.equals(tombstone.getOwnerId())
                 && tombstone.isCommitted()
-                && !tombstone.isPurgeAllowed(now);
+                && (!tombstone.isPurgeAllowed(now)
+                        || hold.holds(tombstone.getPurgeAfter()));
     }
 
     /**
@@ -657,17 +694,21 @@ public final class CharacterDeletionService {
         return -1;
     }
 
+    /**
+     * Rolls one of {@code ownerId}'s characters not being played back to
+     * its previous saved state generation, the player online or not.
+     */
     public synchronized CharacterDeletionMaintenanceResult rollbackInactive(
-            EntityPlayerMP target, UUID characterId) {
-        if (!isValidTarget(target, characterId)) {
+            World world, UUID ownerId, UUID characterId) {
+        if (!isValidTarget(world, ownerId, characterId)) {
             return CharacterDeletionMaintenanceResult.NOT_FOUND;
         }
         try {
-            CharacterWorldData characterData = CharacterStorage.get(target.worldObj);
+            CharacterWorldData characterData = CharacterStorage.get(world);
             if (characterData.isReadOnlyForNewerVersion()) {
                 return CharacterDeletionMaintenanceResult.STORAGE_READ_ONLY;
             }
-            CharacterRoster roster = characterData.getRoster(target.getUniqueID());
+            CharacterRoster roster = characterData.getRoster(ownerId);
             if (roster == null || roster.getCharacter(characterId) == null) {
                 return CharacterDeletionMaintenanceResult.NOT_FOUND;
             }
@@ -676,13 +717,13 @@ public final class CharacterDeletionService {
             }
             CharacterPlayerStateWorldData playerStateData =
                     CharacterPlayerStateStorage.get(
-                            target.worldObj, target.getUniqueID());
+                            world, ownerId);
             if (playerStateData.isReadOnlyForNewerVersion()
-                    || playerStateData.isOwnerBlocked(target.getUniqueID())) {
+                    || playerStateData.isOwnerBlocked(ownerId)) {
                 return CharacterDeletionMaintenanceResult.PLAYER_STATE_UNAVAILABLE;
             }
             CharacterPlayerStateAccount account = playerStateData.getAccount(
-                    target.getUniqueID());
+                    ownerId);
             CharacterPlayerStateRecord record = account == null ? null
                     : account.getRecord(characterId);
             if (record == null || record.getPrevious() == null) {
@@ -698,20 +739,20 @@ public final class CharacterDeletionService {
             long replacedGeneration = record.getCurrentGeneration();
             record.commit(rollback);
             playerStateData.saveAccount(account);
-            flushCommitted(target.worldObj, "rollback_commit",
-                    target.getUniqueID(), characterId);
+            flushCommitted(world, "rollback_commit",
+                    ownerId, characterId);
             FMLLog.info("[%s] Rolled inactive character %s for owner %s from generation %d into recovery generation %d",
                     LostTalesMetaData.MOD_ID, characterId,
-                    target.getUniqueID(),
+                    ownerId,
                     Long.valueOf(replacedGeneration),
                     Long.valueOf(rollback.getGeneration()));
             return CharacterDeletionMaintenanceResult.SUCCESS;
         } catch (CharacterStateValidationException exception) {
-            logFailure("rollback_validate_state", target.getUniqueID(),
+            logFailure("rollback_validate_state", ownerId,
                     characterId, exception);
             return CharacterDeletionMaintenanceResult.PLAYER_STATE_UNAVAILABLE;
         } catch (RuntimeException exception) {
-            logFailure("rollback", target.getUniqueID(), characterId, exception);
+            logFailure("rollback", ownerId, characterId, exception);
             return CharacterDeletionMaintenanceResult.INTERNAL_ERROR;
         }
     }
@@ -738,10 +779,10 @@ public final class CharacterDeletionService {
                 ? null : data.getTombstone(characterId);
     }
 
-    private static boolean isValidTarget(
-            EntityPlayerMP target, UUID characterId) {
-        return target != null && target.worldObj != null
-                && !target.worldObj.isRemote && characterId != null;
+    private static boolean isValidTarget(World world, UUID ownerId,
+                                         UUID characterId) {
+        return world != null && !world.isRemote && ownerId != null
+                && characterId != null;
     }
 
     private static CharacterErrorId mapFellowshipCleanupError(

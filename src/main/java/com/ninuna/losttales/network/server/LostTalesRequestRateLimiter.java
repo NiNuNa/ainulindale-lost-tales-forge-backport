@@ -93,6 +93,11 @@ public final class LostTalesRequestRateLimiter {
         // minute; a player clicking through a crowd's cards stays inside
         // a dozen in five seconds.
         CHARACTER_PROFILE(12, 5000L),
+        // The stage asks once for what a character of the player's own
+        // wears as it is picked, and again only after the roster changes;
+        // walking a full roster of nine with the arrows stays inside a
+        // dozen in five seconds.
+        CHARACTER_GEAR(12, 5000L),
         // Taking a perk is a click on the Skills page, and a reset at a
         // statue a confirmed choice; ten in five seconds covers a player
         // spending a few points at once.

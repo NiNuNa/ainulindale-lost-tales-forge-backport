@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:thranduil",
   "name": "Thranduil",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:elf",
-    "genderId": "losttales:male",
-    "modelId": "lotr:elf",
-    "skinId": "losttales:elf_wood_male_1"
-  }
+  "race": "losttales:elf",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:elf_wood_masculine_1",
+  "faction": "lotr:wood_elf"
 }

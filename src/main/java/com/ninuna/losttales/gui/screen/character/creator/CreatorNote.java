@@ -1,18 +1,14 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
-import net.minecraft.client.gui.FontRenderer;
 
 import java.util.List;
 
 /**
- * A few lines of muted text: a hint, a caveat, a note on what happens
- * next. In a window's rows it is a menu's note in the aside tone.
+ * A few lines of note in the aside tone, at a menu note's pitch: a hint,
+ * a caveat, a note on what happens next.
  */
 public final class CreatorNote extends CreatorControl {
-
-    private static final int LINE = 10;
 
     private final String text;
 
@@ -38,24 +34,12 @@ public final class CreatorNote extends CreatorControl {
 
     @Override
     public int height() {
-        return inRows() ? CreatorRows.noteHeight(lines().size())
-                : lines().size() * LINE + 4;
+        return CreatorRows.noteHeight(lines().size());
     }
 
     @Override
     public void draw(int mouseX, int mouseY) {
-        if (inRows()) {
-            CreatorRows.drawNote(this.context, lines(), this.x, this.y,
-                    WindowStyle.asideRgb());
-            return;
-        }
-        FontRenderer font = this.context.getFont();
-        LostTalesSkyrimUiStyle.beginContent();
-        int lineY = this.y;
-        for (String line : lines()) {
-            font.drawStringWithShadow(line, this.x, lineY,
-                    LostTalesSkyrimUiStyle.TEXT_MUTED);
-            lineY += LINE;
-        }
+        CreatorRows.drawNote(this.context, lines(), this.x, this.y,
+                WindowStyle.asideRgb());
     }
 }

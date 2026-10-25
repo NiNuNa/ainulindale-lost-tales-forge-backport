@@ -126,7 +126,7 @@ public final class LostTalesMapMarkerVisibilityPolicyTest {
 
     private static LostTalesMapMarkerRecord playerRecord(UUID owner) {
         return LostTalesMapMarkerRecord.createPlayerMarker(
-                "losttales:player/test", "Aldric",
+                "losttales:player/test",
                 owner, 0, 1, 64, 2, UUID.randomUUID());
     }
 }

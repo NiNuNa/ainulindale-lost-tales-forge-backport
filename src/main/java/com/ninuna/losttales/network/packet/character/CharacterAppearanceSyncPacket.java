@@ -66,7 +66,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                         buffer, CharacterPacketCodec.MAX_NAME_BYTES);
                 String raceId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String genderId = LostTalesPacketCodec.readUtf8String(
+                String bodyTypeId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String skinId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -78,7 +78,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                 String factionId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 int age = buffer.readInt();
-                String bodyTypeId = LostTalesPacketCodec.readUtf8String(
+                String armsId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String chestTypeId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -108,8 +108,8 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                 }
                 decoded.add(new CharacterAppearance(kind,
                         playerId, characterId, accountName, characterName, raceId,
-                        genderId, skinId, showMinecraftCape, cosmeticCapeId,
-                        factionId, age, bodyTypeId, chestTypeId));
+                        bodyTypeId, skinId, showMinecraftCape, cosmeticCapeId,
+                        factionId, age, armsId, chestTypeId));
             }
             LostTalesPacketCodec.requireFinished(buffer);
             this.appearances = Collections.unmodifiableList(decoded);
@@ -135,7 +135,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     buffer, appearance.getRaceId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             LostTalesPacketCodec.writeUtf8String(
-                    buffer, appearance.getGenderId(),
+                    buffer, appearance.getBodyTypeId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getSkinId(),
@@ -154,10 +154,10 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     buffer, appearance.getFactionId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeInt(appearance.getAge());
-            // The arm width, which other clients need to pick the body the
+            // The arms, which other clients need to pick the body the
             // character is drawn with, and the chest type.
             LostTalesPacketCodec.writeUtf8String(
-                    buffer, appearance.getBodyTypeId(),
+                    buffer, appearance.getArmsId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getChestTypeId(),

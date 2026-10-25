@@ -7,9 +7,37 @@ import com.ninuna.losttales.mapmarker.LostTalesWaystoneGenerationState;
 import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.world.WorldServer;
 
-/** Resolves registered placers and persists durable failure state. */
+/**
+ * Resolves registered placers and persists durable failure state. A
+ * marker whose waystone waits to be built is {@code NOT_ATTEMPTED}, saved
+ * with its record: the generation handler builds it as its chunk loads.
+ */
 public final class LostTalesWaystonePlacementService {
     private LostTalesWaystonePlacementService() {}
+
+    /**
+     * The record marked to be built again, as {@code retry} marks it
+     * (WAY-18): a generated waystone not yet standing, failed or never
+     * tried, waits as {@code NOT_ATTEMPTED}, a revision newer where it
+     * failed. Null for a record with no waystone, or one standing,
+     * placed by a player or turned off.
+     */
+    public static LostTalesMapMarkerRecord markForRetry(
+            LostTalesMapMarkerRecord record) {
+        if (record == null || !record.hasWaystone() || record.isLinked()) {
+            return null;
+        }
+        if (record.getGenerationState()
+                == LostTalesWaystoneGenerationState.NOT_ATTEMPTED) {
+            return record;
+        }
+        if (record.getGenerationState()
+                != LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED) {
+            return null;
+        }
+        return record.withGenerationState(
+                LostTalesWaystoneGenerationState.NOT_ATTEMPTED);
+    }
 
     public static LostTalesWaystonePlacementResult attempt(
             WorldServer world, LostTalesMapMarkerRecord record) {

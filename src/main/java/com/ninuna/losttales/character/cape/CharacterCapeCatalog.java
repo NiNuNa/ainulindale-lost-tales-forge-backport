@@ -29,7 +29,8 @@ import java.util.regex.Pattern;
  * it. A file names only a picture every player has: one of LOTR's capes by
  * its LOTR name, or one under the mod's own {@code textures/capes/}. The
  * bundled capes are read as the mod loads; the server's list takes their
- * place as it starts, and a client's is the list the server sent.
+ * place as it starts and on {@code /losttales reload races} or
+ * {@code reload capes}, and a client's is the list the server sent.
  */
 public final class CharacterCapeCatalog {
 

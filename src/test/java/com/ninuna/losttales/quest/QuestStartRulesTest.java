@@ -43,7 +43,7 @@ public final class QuestStartRulesTest {
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
         for (Way way : Way.values()) {
             assertEquals(way.name(), Verdict.UNPROVEN, QuestStartRules.judge(
-                    any, data, way, false, true, true));
+                    any, data, way, false, true, true, 0L));
         }
     }
 
@@ -60,7 +60,7 @@ public final class QuestStartRulesTest {
         LostTalesQuestDefinition item = quest(LostTalesQuestDefinition.START_MODE_ITEM, false);
         assertEquals(Verdict.ADMIT, judge(item, data, Way.ITEM));
         assertEquals(Verdict.WRONG_START, QuestStartRules.judge(item, data,
-                Way.ITEM, true, false, true));
+                Way.ITEM, true, false, true, 0L));
         assertEquals(Verdict.WRONG_START, judge(
                 quest(LostTalesQuestDefinition.START_MODE_INTERACTION, false),
                 data, Way.ITEM));
@@ -72,7 +72,7 @@ public final class QuestStartRulesTest {
         LostTalesQuestDefinition touched = quest(LostTalesQuestDefinition.START_MODE_INTERACTION, false);
         assertEquals(Verdict.ADMIT, judge(touched, data, Way.TOUCH));
         assertEquals(Verdict.WRONG_START, QuestStartRules.judge(touched, data,
-                Way.TOUCH, true, true, false));
+                Way.TOUCH, true, true, false, 0L));
         assertEquals(Verdict.WRONG_START, judge(
                 quest(LostTalesQuestDefinition.START_MODE_ITEM, false), data,
                 Way.TOUCH));
@@ -89,7 +89,7 @@ public final class QuestStartRulesTest {
         assertEquals(Verdict.OFFER, judge(offered, data, Way.TOUCH));
         assertEquals(Verdict.WRONG_START, judge(offered, data, Way.ITEM));
         assertEquals(Verdict.WRONG_START, QuestStartRules.judge(offered, data,
-                Way.CONVERSATION, true, true, false));
+                Way.CONVERSATION, true, true, false, 0L));
     }
 
     @Test
@@ -104,9 +104,9 @@ public final class QuestStartRulesTest {
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
         LostTalesQuestDefinition item = quest(LostTalesQuestDefinition.START_MODE_ITEM, false);
         assertEquals(Verdict.ADMIT, QuestStartRules.judge(item, data, Way.CARD,
-                true, true, false));
+                true, true, false, 0L));
         assertEquals(Verdict.WRONG_START, QuestStartRules.judge(item, data,
-                Way.CARD, true, false, true));
+                Way.CARD, true, false, true, 0L));
         assertEquals(Verdict.WRONG_START, judge(
                 quest(LostTalesQuestDefinition.START_MODE_LOCKED, false), data,
                 Way.CARD));
@@ -145,6 +145,61 @@ public final class QuestStartRulesTest {
         assertEquals(Verdict.ADMIT, judge(again, gaveUp, Way.COMMAND));
     }
 
+    /** A repeatable quest done waits its repeatAfter before any way takes it again (QUEST-45). */
+    @Test
+    public void aRepeatableQuestWaitsBeforeItComesBack() {
+        LostTalesQuestDefinition daily = new LostTalesQuestDefinition(ID, "Start",
+                "", true, true, LostTalesQuestDefinition.START_MODE_ANY, null,
+                null, null, null, null, null, null, stages(), false, null,
+                Collections.singletonMap(LostTalesQuestRules.REPEAT_AFTER, "1"));
+        LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
+        assertEquals("never taken, no wait", Verdict.ADMIT,
+                QuestStartRules.judge(daily, data, Way.COMMAND, true, true, true, 0L));
+        data.startQuest(ID, "10", 0L, 0L);
+        data.completeQuest(ID, 100L, Collections.<String>emptySet());
+        assertEquals(24100L, daily.takenAgainAt(data.getQuestHistoryEntry(ID)));
+        for (Way way : new Way[] { Way.COMMAND, Way.TOUCH, Way.ITEM, Way.CARD }) {
+            assertEquals(way.name(), Verdict.TOO_SOON, QuestStartRules.judge(
+                    daily, data, way, true, true, true, 24099L));
+        }
+        assertEquals(Verdict.ADMIT, QuestStartRules.judge(daily, data,
+                Way.COMMAND, true, true, true, 24100L));
+
+        // Given up, it comes back as restartable says, with no wait.
+        data.startQuest(ID, "10", 24100L, 0L);
+        data.abandonQuest(ID, "gui.losttales.quest.reason.abandoned", 24200L);
+        assertEquals(0L, daily.takenAgainAt(data.getQuestHistoryEntry(ID)));
+        assertEquals(Verdict.ADMIT, QuestStartRules.judge(daily, data,
+                Way.COMMAND, true, true, true, 24200L));
+
+        // The count of completions goes on: every completion counts.
+        data.startQuest(ID, "10", 24200L, 0L);
+        data.completeQuest(ID, 30000L, Collections.<String>emptySet());
+        assertEquals(2, data.getQuestHistoryEntry(ID).getCompletions());
+        assertEquals(Verdict.TOO_SOON, QuestStartRules.judge(daily, data,
+                Way.COMMAND, true, true, true, 30000L));
+    }
+
+    /** A quest with no wait, or one that is not repeatable, keeps the plain take-again rule. */
+    @Test
+    public void onlyARepeatableQuestWithAWaitWaits() {
+        LostTalesQuestDefinition again = new LostTalesQuestDefinition(ID, "Start",
+                "", true, true, LostTalesQuestDefinition.START_MODE_ANY, null,
+                null, null, null, null, null, null, stages(), false, null, null);
+        LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
+        data.startQuest(ID, "10", 0L, 0L);
+        data.completeQuest(ID, 100L, Collections.<String>emptySet());
+        assertEquals(0L, again.takenAgainAt(data.getQuestHistoryEntry(ID)));
+        assertEquals(Verdict.ADMIT, QuestStartRules.judge(again, data,
+                Way.COMMAND, true, true, true, 100L));
+        LostTalesQuestDefinition once = new LostTalesQuestDefinition(ID, "Start",
+                "", false, true, LostTalesQuestDefinition.START_MODE_ANY, null,
+                null, null, null, null, null, null, stages(), false, null,
+                Collections.singletonMap(LostTalesQuestRules.REPEAT_AFTER, "1"));
+        assertEquals(Verdict.ALREADY_COMPLETED, QuestStartRules.judge(once, data,
+                Way.COMMAND, true, true, true, 1000000L));
+    }
+
     @Test
     public void theAuthorNeverJoinsTheirOwnCard() {
         assertFalse(QuestStartRules.cardHolds(AUTHOR, AUTHOR, true));
@@ -160,7 +215,7 @@ public final class QuestStartRulesTest {
 
     private static Verdict judge(LostTalesQuestDefinition quest,
                                  LostTalesQuestPlayerData data, Way way) {
-        return QuestStartRules.judge(quest, data, way, true, true, true);
+        return QuestStartRules.judge(quest, data, way, true, true, true, 0L);
     }
 
     private static LostTalesQuestDefinition quest(String startMode,

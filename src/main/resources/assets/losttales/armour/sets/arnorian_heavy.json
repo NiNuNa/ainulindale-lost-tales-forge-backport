@@ -1,0 +1,22 @@
+{
+  "id": "losttales:arnorian_heavy",
+  "helmet": [
+    "losttales:arnorian_helmet_heavy",
+    "losttales:arnorian_helmet_heavy_2"
+  ],
+  "chestplate": [
+    "losttales:arnorian_armor_heavy"
+  ],
+  "leggings": [
+    "losttales:arnorian_leggings_heavy"
+  ],
+  "boots": [
+    "losttales:arnorian_boots_heavy"
+  ],
+  "bonus": [
+    {
+      "effect": "protection",
+      "amount": 0.05
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "losttales:dol_amroth",
+  "helmet": [
+    "lotr:item.helmetDolAmroth"
+  ],
+  "chestplate": [
+    "lotr:item.bodyDolAmroth"
+  ],
+  "leggings": [
+    "lotr:item.legsDolAmroth"
+  ],
+  "boots": [
+    "lotr:item.bootsDolAmroth"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:riding"
+    }
+  ]
+}

@@ -13,7 +13,7 @@ import net.minecraft.util.MathHelper;
 import org.lwjgl.opengl.GL11;
 
 /**
- * Lost Tales' player body: a vanilla biped with a wide or slim arm width, a
+ * Lost Tales' player body: a vanilla biped with broad or slender arms, a
  * skin layout, a chest type, and the race geometry of one {@link PlayerBodyShape}.
  *
  * With Minecraft's 64x64 layout the left arm and left leg get their own
@@ -35,7 +35,7 @@ public final class LostTalesPlayerModel extends ModelBiped {
     private static final float HAT_INFLATION = 0.5F;
     /**
      * Both arm widths hang from the same shoulder height. Java Edition once
-     * placed slim arms half a pixel lower and settled on level arms
+     * placed slender arms half a pixel lower and settled on level arms
      * (MC-275473, fixed in 24w34a); only Bedrock keeps them lower.
      */
     private static final float ARM_PIVOT_Y = 2.0F;
@@ -71,14 +71,14 @@ public final class LostTalesPlayerModel extends ModelBiped {
 
     /**
      * @param inflation    box inflation, 0 for the skin and 1.0 / 0.5 for armor layers
-     * @param slim         three-pixel arms instead of four
+     * @param slender      three-pixel arms instead of four
      * @param shape        race geometry
      * @param layout       the layout of the skin the model reads
      * @param chest        the chest type to draw, or null for none
      * @param armorTexture read an armor texture: classic hat, mirrored left
      *                     limbs, no overlays, chest, ears, or feet
      */
-    public LostTalesPlayerModel(float inflation, boolean slim, PlayerBodyShape shape,
+    public LostTalesPlayerModel(float inflation, boolean slender, PlayerBodyShape shape,
                                 CharacterSkinLayout layout, CharacterChestTypeDefinition chest,
                                 boolean armorTexture) {
         super(inflation, 0.0F, TEXTURE_SIZE, textureHeight(shape, layout, armorTexture));
@@ -89,12 +89,12 @@ public final class LostTalesPlayerModel extends ModelBiped {
         this.bipedArmPivotY = ARM_PIVOT_Y;
         boolean minecraftLayout = !armorTexture
                 && layout == CharacterSkinLayout.MINECRAFT_64X64;
-        int armWidth = slim ? 3 : 4;
+        int armWidth = slender ? 3 : 4;
         boolean drawChest = chest != null && !chest.isNone() && !armorTexture;
         this.chestShape = drawChest ? chest.getShape() : CharacterChestTypeRegistry.Shape.NONE;
         this.chestSize = drawChest ? chest.getSize() : 0.0F;
 
-        if (slim) {
+        if (slender) {
             this.bipedRightArm = new ModelRenderer(this, 40, 16);
             this.bipedRightArm.addBox(-2.0F, -2.0F, -2.0F, armWidth, 12, 4, inflation);
             this.bipedRightArm.setRotationPoint(-5.0F, this.bipedArmPivotY, 0.0F);
@@ -124,7 +124,7 @@ public final class LostTalesPlayerModel extends ModelBiped {
             this.overlays = new ModelRenderer[] {
                     child(this.bipedBody, 16, 32, -4.0F, 0.0F, -2.0F, 8, 12, 4, overlay),
                     child(this.bipedRightArm, 40, 32,
-                            slim ? -2.0F : -3.0F, -2.0F, -2.0F, armWidth, 12, 4, overlay),
+                            slender ? -2.0F : -3.0F, -2.0F, -2.0F, armWidth, 12, 4, overlay),
                     child(this.bipedLeftArm, 48, 48,
                             -1.0F, -2.0F, -2.0F, armWidth, 12, 4, overlay),
                     child(this.bipedRightLeg, 0, 32, -2.0F, 0.0F, -2.0F, 4, 12, 4, overlay),

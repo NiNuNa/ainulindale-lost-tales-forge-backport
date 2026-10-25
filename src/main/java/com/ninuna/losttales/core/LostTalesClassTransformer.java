@@ -10,6 +10,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.FrameNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
@@ -22,13 +23,29 @@ import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Applies narrowly scoped compatibility hooks where public Forge 1.7.10 events
  * do not expose the required camera, debug-box, identity, and LOTR behavior.
+ * Every call a patch injects is wrapped in one catch as its class is written
+ * ({@link HookGuard}, DATA-08), so a fault of the mod's never reaches
+ * vanilla's or LOTR's code.
  */
 public final class LostTalesClassTransformer implements IClassTransformer {
+    /**
+     * What each call the patch being tried on this thread injects answers
+     * should its hook fail ({@link #hookCall}, {@link #redirect}).
+     */
+    private static final ThreadLocal<Map<AbstractInsnNode, HookFallback>> DECLARED =
+            new ThreadLocal<Map<AbstractInsnNode, HookFallback>>() {
+                @Override
+                protected Map<AbstractInsnNode, HookFallback> initialValue() {
+                    return new IdentityHashMap<AbstractInsnNode, HookFallback>();
+                }
+            };
     /**
      * The active flags the patch being tried on this thread has set, each
      * with what it held before ({@link #activate}, {@link #rollBack}).
@@ -344,9 +361,6 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "ClientRoleplayCharacterIdentityHook";
     private static final String MAP_PLAYER_NAME_HOOK_DESC =
             "(Lcom/mojang/authlib/GameProfile;)Ljava/lang/String;";
-    private static final String ACCESSORY_CONTAINER_CLASS =
-            "com/ninuna/losttales/accessory/inventory/"
-                    + "LostTalesContainerPlayer";
     private static final String ACCESSORY_CONTAINER_HOOK_OWNER =
             "com/ninuna/losttales/accessory/inventory/"
                     + "AccessoryContainerHooks";
@@ -665,9 +679,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 LabelNode render = new LabelNode();
                 InsnList guard = new InsnList();
-                guard.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                        LOTR_QUEST_PRESENTATION_HOOK_OWNER,
-                        "shouldRenderNativeTracker", "()Z", false));
+                guard.add(hookCall(LOTR_QUEST_PRESENTATION_HOOK_OWNER,
+                        "shouldRenderNativeTracker", "()Z", HookFallback.TRUE));
                 guard.add(new JumpInsnNode(Opcodes.IFNE, render));
                 guard.add(new InsnNode(Opcodes.RETURN));
                 guard.add(render);
@@ -728,10 +741,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     hook.add(new VarInsnNode(Opcodes.FLOAD, 2));
                     hook.add(new VarInsnNode(Opcodes.ILOAD, 3));
                 }
-                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, LOTR_MAP_SCENE_HOOK_OWNER,
+                hook.add(hookCall(LOTR_MAP_SCENE_HOOK_OWNER,
                         hookName, background
                         ? "(Llotr/client/gui/LOTRGuiRendererMap;Lnet/minecraft/client/gui/GuiScreen;Llotr/client/gui/LOTRGuiMap;FIIIIZ)Z"
-                        : "(Llotr/client/gui/LOTRGuiMap;ZFZ)Z"));
+                        : "(Llotr/client/gui/LOTRGuiMap;ZFZ)Z", HookFallback.FALSE));
                 LabelNode fallback = new LabelNode();
                 hook.add(new JumpInsnNode(Opcodes.IFEQ, fallback));
                 hook.add(new InsnNode(Opcodes.RETURN));
@@ -799,22 +812,20 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         arguments.add(new FieldInsnNode(Opcodes.GETFIELD, buttons.owner, buttons.name, buttons.desc));
                         arguments.add(new InsnNode(lotr ? Opcodes.ICONST_1 : Opcodes.ICONST_0));
                         method.instructions.insertBefore(call, arguments);
-                        call.setOpcode(Opcodes.INVOKESTATIC);
-                        call.owner = MAIN_MENU_TITLE_HOOK_OWNER;
-                        call.name = "drawPiece";
-                        call.desc = "(Lnet/minecraft/client/gui/GuiScreen;IIIIIILjava/util/List;Z)V";
-                        call.itf = false;
+                        redirect(call, MAIN_MENU_TITLE_HOOK_OWNER, "drawPiece",
+                                "(Lnet/minecraft/client/gui/GuiScreen;IIIIIILjava/util/List;Z)V");
                         pieces++;
-                    } else if (lotr && MAIN_MENU_TEXT_HOOK_OWNER.equals(call.owner)
-                            && "drawString".equals(call.name)) {
+                    } else if (lotr && HookGuard.calls(call, MAIN_MENU_TEXT_HOOK_OWNER,
+                            "drawString")) {
                         AbstractInsnNode y = previousCode(previousCode(call));
                         if (y instanceof IntInsnNode && ((IntInsnNode) y).operand == 80) {
                             InsnList arguments = new InsnList();
                             arguments.add(new VarInsnNode(Opcodes.ALOAD, 0));
                             arguments.add(new FieldInsnNode(Opcodes.GETFIELD, buttons.owner, buttons.name, buttons.desc));
                             arguments.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                            arguments.add(new MethodInsnNode(Opcodes.INVOKESTATIC, MAIN_MENU_TITLE_HOOK_OWNER,
-                                    "subtitleY", "(ILjava/util/List;Lnet/minecraft/client/gui/GuiScreen;)I"));
+                            arguments.add(hookCall(MAIN_MENU_TITLE_HOOK_OWNER, "subtitleY",
+                                    "(ILjava/util/List;Lnet/minecraft/client/gui/GuiScreen;)I",
+                                    HookFallback.argument(0)));
                             method.instructions.insert(y, arguments);
                             subtitles++;
                         }
@@ -874,12 +885,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             && !"func_73731_b".equals(call.name)) {
                         continue;
                     }
-                    call.setOpcode(Opcodes.INVOKESTATIC);
-                    call.owner = MAIN_MENU_TEXT_HOOK_OWNER;
-                    call.name = centered ? "drawCenteredString" : "drawString";
-                    call.desc = "(Lnet/minecraft/client/gui/Gui;"
-                            + "Lnet/minecraft/client/gui/FontRenderer;Ljava/lang/String;III)V";
-                    call.itf = false;
+                    redirect(call, MAIN_MENU_TEXT_HOOK_OWNER,
+                            centered ? "drawCenteredString" : "drawString",
+                            "(Lnet/minecraft/client/gui/Gui;"
+                                    + "Lnet/minecraft/client/gui/FontRenderer;Ljava/lang/String;III)V");
                     patched = true;
                 }
                 if (patched) {
@@ -898,10 +907,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     }
 
     /**
-     * Makes the player's constructor build the accessory-aware container:
-     * its {@code NEW} and its constructor call are changed together, or
-     * neither is, since one without the other fails verification. Answers
-     * whether the constructor builds it now.
+     * Makes the player's constructor build the accessory-aware container
+     * through {@code AccessoryContainerHooks.playerContainer}: vanilla's
+     * {@code NEW} and {@code DUP} go, its constructor call becomes the
+     * hook's, and the frames that held the unbuilt container lose it. All
+     * of it or none: an allocation without its matching call stays
+     * vanilla. Should the hook fail, its guard builds vanilla's container.
+     * Answers whether the constructor builds it now.
      */
     static boolean patchPlayerContainer(MethodNode constructor) {
         String vanilla = "net/minecraft/inventory/ContainerPlayer";
@@ -913,19 +925,21 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         int constructions = 0;
         for (AbstractInsnNode instruction = constructor.instructions.getFirst();
              instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode && HookGuard.calls(
+                    (MethodInsnNode)instruction, ACCESSORY_CONTAINER_HOOK_OWNER,
+                    "playerContainer")) {
+                return true;
+            }
             if (instruction instanceof TypeInsnNode
                     && instruction.getOpcode() == Opcodes.NEW
-                    && (vanilla.equals(((TypeInsnNode)instruction).desc)
-                    || ACCESSORY_CONTAINER_CLASS.equals(((TypeInsnNode)instruction).desc))) {
+                    && vanilla.equals(((TypeInsnNode)instruction).desc)) {
                 allocation = (TypeInsnNode)instruction;
                 allocations++;
             } else if (instruction instanceof MethodInsnNode
                     && instruction.getOpcode() == Opcodes.INVOKESPECIAL
                     && "<init>".equals(((MethodInsnNode)instruction).name)
                     && desc.equals(((MethodInsnNode)instruction).desc)
-                    && (vanilla.equals(((MethodInsnNode)instruction).owner)
-                    || ACCESSORY_CONTAINER_CLASS.equals(
-                            ((MethodInsnNode)instruction).owner))) {
+                    && vanilla.equals(((MethodInsnNode)instruction).owner)) {
                 construction = (MethodInsnNode)instruction;
                 constructions++;
             }
@@ -933,9 +947,59 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         if (allocations != 1 || constructions != 1) {
             return false;
         }
-        allocation.desc = ACCESSORY_CONTAINER_CLASS;
-        construction.owner = ACCESSORY_CONTAINER_CLASS;
+        AbstractInsnNode duplicate = nextCode(allocation);
+        if (duplicate == null || duplicate.getOpcode() != Opcodes.DUP) {
+            return false;
+        }
+        List<LabelNode> unbuilt = labelsBefore(allocation);
+        constructor.instructions.remove(duplicate);
+        constructor.instructions.remove(allocation);
+        constructor.instructions.set(construction, hookCall(
+                ACCESSORY_CONTAINER_HOOK_OWNER, "playerContainer",
+                "(Lnet/minecraft/entity/player/InventoryPlayer;"
+                        + "ZLnet/minecraft/entity/player/EntityPlayer;)"
+                        + "Lnet/minecraft/inventory/ContainerPlayer;",
+                HookFallback.construct(vanilla, desc)));
+        forgetUnbuilt(constructor, unbuilt);
         return true;
+    }
+
+    /** The labels that stand right before an instruction: what a frame names it by. */
+    private static List<LabelNode> labelsBefore(AbstractInsnNode instruction) {
+        List<LabelNode> labels = new ArrayList<LabelNode>();
+        for (AbstractInsnNode cursor = instruction.getPrevious();
+             cursor != null && cursor.getOpcode() < 0; cursor = cursor.getPrevious()) {
+            if (cursor instanceof LabelNode) {
+                labels.add((LabelNode)cursor);
+            }
+        }
+        return labels;
+    }
+
+    /**
+     * Takes an allocation that is gone out of every frame's stack: a frame
+     * names an object not yet built by the label of its {@code NEW}.
+     */
+    private static void forgetUnbuilt(MethodNode method, List<LabelNode> unbuilt) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof FrameNode)) {
+                continue;
+            }
+            FrameNode frame = (FrameNode)instruction;
+            if (frame.stack == null) {
+                continue;
+            }
+            // The list a frame is read with cannot be changed in place.
+            List<Object> stack = new ArrayList<Object>(frame.stack);
+            if (!stack.removeAll(unbuilt)) {
+                continue;
+            }
+            frame.stack = stack;
+            if (frame.type == Opcodes.F_SAME1 && frame.stack.isEmpty()) {
+                frame.type = Opcodes.F_SAME;
+            }
+        }
     }
 
     /** Installs the player container and the Forge drop-capture transaction hook. */
@@ -984,12 +1048,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         }
                         InsnList hook = new InsnList();
                         hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                        hook.add(new MethodInsnNode(
-                                Opcodes.INVOKESTATIC,
+                        hook.add(hookCall(
                                 ACCESSORY_DEATH_HOOK_OWNER,
                                 "captureAccessoryDrop",
                                 "(Lnet/minecraft/entity/player/EntityPlayer;)V",
-                                false));
+                                HookFallback.NOTHING));
                         method.instructions.insertBefore(playerLoad, hook);
                         deathPatched = true;
                         break;
@@ -1153,12 +1216,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         LabelNode vanilla = new LabelNode();
         InsnList guard = new InsnList();
         guard.add(new VarInsnNode(Opcodes.ALOAD, entityLocal));
-        guard.add(new MethodInsnNode(
-                Opcodes.INVOKESTATIC,
+        guard.add(hookCall(
                 ACCESSORY_CONCEALMENT_HOOK_OWNER,
                 "isConcealed",
                 "(Lnet/minecraft/entity/Entity;)Z",
-                false));
+                HookFallback.FALSE));
         guard.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
         guard.add(new org.objectweb.asm.tree.InsnNode(Opcodes.ICONST_0));
         guard.add(new org.objectweb.asm.tree.InsnNode(Opcodes.IRETURN));
@@ -1171,12 +1233,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         LabelNode vanilla = new LabelNode();
         InsnList guard = new InsnList();
         guard.add(new VarInsnNode(Opcodes.ALOAD, entityLocal));
-        guard.add(new MethodInsnNode(
-                Opcodes.INVOKESTATIC,
+        guard.add(hookCall(
                 ACCESSORY_CONCEALMENT_HOOK_OWNER,
                 "isConcealed",
                 "(Lnet/minecraft/entity/Entity;)Z",
-                false));
+                HookFallback.FALSE));
         guard.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
         guard.add(new org.objectweb.asm.tree.InsnNode(Opcodes.ICONST_1));
         guard.add(new org.objectweb.asm.tree.InsnNode(Opcodes.IRETURN));
@@ -1197,24 +1258,26 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (!"<init>".equals(method.name) || !descriptor.equals(method.desc)) {
                     continue;
                 }
-                if (containsHook(method, WINDOW_DEFAULTS_HOOK_OWNER, "resolve")) {
+                if (containsHook(method, WINDOW_DEFAULTS_HOOK_OWNER, "width")) {
                     activate(WINDOW_DEFAULTS_ACTIVE_PROPERTY);
                     return basicClass;
                 }
                 // Rewrite only the dimension arguments. Vanilla stores these in
                 // displayWidth/Height and tempDisplayWidth/Height for F11 restore.
                 // Its subsequent options.txt overrides still take precedence.
+                // Both are worked out from the pair as given: the height waits
+                // on the stack while the width is stored. A hook that fails
+                // keeps the size it was handed.
                 InsnList hook = new InsnList();
                 hook.add(new VarInsnNode(Opcodes.ILOAD, 2));
                 hook.add(new VarInsnNode(Opcodes.ILOAD, 3));
-                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                        WINDOW_DEFAULTS_HOOK_OWNER, "resolve", "(II)[I"));
-                hook.add(new InsnNode(Opcodes.DUP));
-                hook.add(new InsnNode(Opcodes.ICONST_0));
-                hook.add(new InsnNode(Opcodes.IALOAD));
+                hook.add(hookCall(WINDOW_DEFAULTS_HOOK_OWNER, "height", "(II)I",
+                        HookFallback.argument(1)));
+                hook.add(new VarInsnNode(Opcodes.ILOAD, 2));
+                hook.add(new VarInsnNode(Opcodes.ILOAD, 3));
+                hook.add(hookCall(WINDOW_DEFAULTS_HOOK_OWNER, "width", "(II)I",
+                        HookFallback.argument(0)));
                 hook.add(new VarInsnNode(Opcodes.ISTORE, 2));
-                hook.add(new InsnNode(Opcodes.ICONST_1));
-                hook.add(new InsnNode(Opcodes.IALOAD));
                 hook.add(new VarInsnNode(Opcodes.ISTORE, 3));
                 method.instructions.insert(hook);
                 byte[] transformed = write(owner);
@@ -1259,15 +1322,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             && "java/util/List".equals(call.owner)
                             && "size".equals(call.name)
                             && "()I".equals(call.desc)) {
-                        call.setOpcode(Opcodes.INVOKESTATIC);
-                        call.owner = ACCESSORY_CONTAINER_HOOK_OWNER;
-                        call.name = "resolveVanillaInventorySlotCount";
-                        call.desc = "(Ljava/util/List;)I";
-                        // MethodInsnNode retains the original interface-owner
-                        // flag when only its opcode is changed. Leaving it set
-                        // writes an InterfaceMethodref for this class method,
-                        // which Java 8 rejects during Minecraft verification.
-                        call.itf = false;
+                        // The redirect clears the interface-owner flag the
+                        // list's call carried: left set, it writes an
+                        // InterfaceMethodref for a class method, which Java 8
+                        // rejects during Minecraft verification.
+                        redirect(call, ACCESSORY_CONTAINER_HOOK_OWNER,
+                                "resolveVanillaInventorySlotCount", "(Ljava/util/List;)I");
                         activate(ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY);
                         info("Patched creative pick-block hotbar indexing");
                         return write(owner);
@@ -1318,13 +1378,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         playerField,
                         "Lnet/minecraft/entity/player/EntityPlayerMP;"));
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                hook.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                hook.add(hookCall(
                         ACCESSORY_CREATIVE_HOOK_OWNER,
                         "handle",
                         "(Lnet/minecraft/entity/player/EntityPlayerMP;"
                                 + "Lnet/minecraft/network/play/client/"
-                                + "C10PacketCreativeInventoryAction;)Z"));
+                                + "C10PacketCreativeInventoryAction;)Z",
+                        HookFallback.FALSE));
                 hook.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
                 hook.add(new org.objectweb.asm.tree.InsnNode(
                         Opcodes.RETURN));
@@ -1401,11 +1461,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     }
                     InsnList hook = new InsnList();
                     hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    hook.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
+                    hook.add(hookCall(
                             ROLEPLAY_IDENTITY_HOOK_OWNER,
                             "resolveDeathMessage",
-                            DEATH_MESSAGE_HOOK_DESC));
+                            DEATH_MESSAGE_HOOK_DESC,
+                            HookFallback.argument(0)));
                     method.instructions.insert(invocation, hook);
                     activate(DEATH_MESSAGE_ACTIVE_PROPERTY);
                     info("Patched player death messages with roleplay names");
@@ -1472,10 +1532,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                     .equals(invocation.desc)) {
                                 continue;
                             }
-                            invocation.setOpcode(Opcodes.INVOKESTATIC);
-                            invocation.owner = CLIENT_IDENTITY_HOOK_OWNER;
-                            invocation.name = "resolveMapPlayerName";
-                            invocation.desc = MAP_PLAYER_NAME_HOOK_DESC;
+                            redirect(invocation, CLIENT_IDENTITY_HOOK_OWNER,
+                                    "resolveMapPlayerName", MAP_PLAYER_NAME_HOOK_DESC);
                             playerNameHookPresent = true;
                             changed = true;
                             info("Patched LOTR map player tooltips with "
@@ -1687,11 +1745,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         LabelNode renderNativePlayers = new LabelNode();
         InsnList hook = new InsnList();
         hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        hook.add(new MethodInsnNode(
-                Opcodes.INVOKESTATIC,
+        hook.add(hookCall(
                 LOTR_MAP_MARKER_HOOK_OWNER,
                 "shouldSuppressNativePlayerRendering",
-                "(Llotr/client/gui/LOTRGuiMap;)Z"));
+                "(Llotr/client/gui/LOTRGuiMap;)Z",
+                HookFallback.FALSE));
         hook.add(new JumpInsnNode(
                 Opcodes.IFEQ, renderNativePlayers));
         hook.add(new InsnNode(Opcodes.RETURN));
@@ -1719,8 +1777,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     || !"(IIII)V".equals(call.desc)) {
                 continue;
             }
-            call.owner = LOTR_MAP_LAYOUT_HOOK_OWNER;
-            call.name = "lotrScissor";
+            redirect(call, LOTR_MAP_LAYOUT_HOOK_OWNER, "lotrScissor", call.desc);
             info("Patched the LOTR map scissor to follow its window");
             return true;
         }
@@ -1794,11 +1851,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         || "field_71462_r".equals(field.name))
                         && "Lnet/minecraft/client/gui/GuiScreen;"
                         .equals(field.desc)) {
-                    method.instructions.set(instruction, new MethodInsnNode(
-                            Opcodes.INVOKESTATIC, LOTR_MAP_PAGE_HOOK_OWNER,
-                            "screenOf",
+                    method.instructions.set(instruction, hookCall(
+                            LOTR_MAP_PAGE_HOOK_OWNER, "screenOf",
                             "(Lnet/minecraft/client/Minecraft;)"
-                                    + "Lnet/minecraft/client/gui/GuiScreen;"));
+                                    + "Lnet/minecraft/client/gui/GuiScreen;",
+                            HookFallback.original(field)));
                     redirected = true;
                 }
             }
@@ -1830,11 +1887,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             addStaticIntField(hook, LOTR_GUI_MAP, "mapXMax_W");
             addStaticIntField(hook, LOTR_GUI_MAP, "mapYMin_W");
             addStaticIntField(hook, LOTR_GUI_MAP, "mapYMax_W");
-            hook.add(new MethodInsnNode(
-                    Opcodes.INVOKESTATIC,
+            hook.add(hookCall(
                     LOTR_MAP_EDGE_FILL_HOOK_OWNER,
                     "fillClippedMapBackground",
-                    "(ZIIIIIIII)V"));
+                    "(ZIIIIIIII)V", HookFallback.NOTHING));
             method.instructions.insertBefore(call, hook);
             info("Patched clipped LOTR map previews with ocean padding");
             return true;
@@ -1871,8 +1927,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     || !"(DDDD)V".equals(call.desc)) {
                 continue;
             }
-            call.owner = LOTR_MAP_COMPASS_HOOK_OWNER;
-            call.name = "drawMapCompass";
+            redirect(call, LOTR_MAP_COMPASS_HOOK_OWNER, "drawMapCompass", call.desc);
             info("Patched the LOTR map compass onto the Lost Tales strip");
             return true;
         }
@@ -1896,10 +1951,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             AbstractInsnNode next = instruction.getNext();
             if (instruction.getOpcode() == Opcodes.RETURN) {
                 method.instructions.insertBefore(instruction,
-                        new MethodInsnNode(
-                                Opcodes.INVOKESTATIC,
-                                LOTR_MAP_ROTATION_HOOK_OWNER,
-                                "endSheetPass", "()V"));
+                        hookCall(LOTR_MAP_ROTATION_HOOK_OWNER,
+                                "endSheetPass", "()V", HookFallback.NOTHING));
                 injected = true;
             }
             instruction = next;
@@ -1907,11 +1960,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         if (injected) {
             InsnList hook = new InsnList();
             hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-            hook.add(new MethodInsnNode(
-                    Opcodes.INVOKESTATIC,
+            hook.add(hookCall(
                     LOTR_MAP_ROTATION_HOOK_OWNER,
                     "beginSheetPass",
-                    "(Llotr/client/gui/LOTRGuiMap;)V"));
+                    "(Llotr/client/gui/LOTRGuiMap;)V", HookFallback.NOTHING));
             method.instructions.insert(hook);
             info("Patched LOTR map labels to turn with the map sheet");
         }
@@ -1942,10 +1994,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     || !"(Ljava/lang/String;III)I".equals(call.desc)) {
                 continue;
             }
-            call.setOpcode(Opcodes.INVOKESTATIC);
-            call.owner = LOTR_MAP_LABEL_STYLE_HOOK_OWNER;
-            call.name = "drawMapLabel";
-            call.desc = MAP_LABEL_DRAW_HOOK_DESC;
+            redirect(call, LOTR_MAP_LABEL_STYLE_HOOK_OWNER, "drawMapLabel",
+                    MAP_LABEL_DRAW_HOOK_DESC);
             injected = true;
         }
         if (injected) {
@@ -1964,10 +2014,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             ((LdcInsnNode)instruction).cst)) {
                 continue;
             }
-            method.instructions.insert(instruction, new MethodInsnNode(
-                    Opcodes.INVOKESTATIC,
+            method.instructions.insert(instruction, hookCall(
                     LOTR_MAP_LABEL_STYLE_HOOK_OWNER,
-                    "restyleMapSubtitle", "(I)I"));
+                    "restyleMapSubtitle", "(I)I", HookFallback.argument(0)));
             injected = true;
         }
         if (injected) {
@@ -1984,11 +2033,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             if (instruction.getOpcode() == Opcodes.ARETURN) {
                 InsnList hook = new InsnList();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                hook.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                hook.add(hookCall(
                         LOTR_MAP_ROTATION_HOOK_OWNER,
                         "rotate",
-                        "([FLlotr/client/gui/LOTRGuiMap;)[F"));
+                        "([FLlotr/client/gui/LOTRGuiMap;)[F",
+                        HookFallback.argument(0)));
                 method.instructions.insertBefore(instruction, hook);
                 injected = true;
             }
@@ -2008,11 +2057,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             if (instruction.getOpcode() == Opcodes.RETURN) {
                 InsnList hook = new InsnList();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                hook.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                hook.add(hookCall(
                         LOTR_MAP_LAYOUT_HOOK_OWNER,
                         "applyFullscreenBounds",
-                        "(Llotr/client/gui/LOTRGuiMap;)V"));
+                        "(Llotr/client/gui/LOTRGuiMap;)V", HookFallback.NOTHING));
                 method.instructions.insertBefore(instruction, hook);
                 injected = true;
             }
@@ -2028,11 +2076,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         LabelNode renderFrame = new LabelNode();
         InsnList hook = new InsnList();
         hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        hook.add(new MethodInsnNode(
-                Opcodes.INVOKESTATIC,
+        hook.add(hookCall(
                 LOTR_MAP_LAYOUT_HOOK_OWNER,
                 "shouldSuppressMapFrame",
-                "(Llotr/client/gui/LOTRGuiMap;)Z"));
+                "(Llotr/client/gui/LOTRGuiMap;)Z", HookFallback.FALSE));
         hook.add(new JumpInsnNode(Opcodes.IFEQ, renderFrame));
         hook.add(new InsnNode(Opcodes.RETURN));
         hook.add(renderFrame);
@@ -2054,11 +2101,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         if (!beginPresent) {
             InsnList begin = new InsnList();
             begin.add(new VarInsnNode(Opcodes.ALOAD, 0));
-            begin.add(new MethodInsnNode(
-                    Opcodes.INVOKESTATIC,
+            begin.add(hookCall(
                     LOTR_MAP_LAYOUT_HOOK_OWNER,
                     "beginFullscreenSubtitles",
-                    "(Llotr/client/gui/LOTRGuiMap;)V"));
+                    "(Llotr/client/gui/LOTRGuiMap;)V", HookFallback.NOTHING));
             method.instructions.insert(begin);
             beginPresent = true;
         }
@@ -2067,11 +2113,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             // the filtered lines rather than only the first use of them.
             InsnList filter = new InsnList();
             filter.add(new VarInsnNode(Opcodes.ALOAD, 1));
-            filter.add(new MethodInsnNode(
-                    Opcodes.INVOKESTATIC,
+            filter.add(hookCall(
                     LOTR_MAP_LAYOUT_HOOK_OWNER,
                     "filterFullscreenSubtitles",
-                    "([Ljava/lang/String;)[Ljava/lang/String;"));
+                    "([Ljava/lang/String;)[Ljava/lang/String;",
+                    HookFallback.argument(0)));
             filter.add(new VarInsnNode(Opcodes.ASTORE, 1));
             method.instructions.insert(filter);
             filterPresent = true;
@@ -2084,11 +2130,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (instruction.getOpcode() == Opcodes.RETURN) {
                     method.instructions.insertBefore(
                             instruction,
-                            new MethodInsnNode(
-                                    Opcodes.INVOKESTATIC,
-                                    LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            hookCall(LOTR_MAP_LAYOUT_HOOK_OWNER,
                                     "endFullscreenSubtitles",
-                                    "()V"));
+                                    "()V", HookFallback.NOTHING));
                     foundReturn = true;
                 }
                 instruction = next;
@@ -2111,11 +2155,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         if (!beginPresent) {
             InsnList begin = new InsnList();
             begin.add(new VarInsnNode(Opcodes.ALOAD, 0));
-            begin.add(new MethodInsnNode(
-                    Opcodes.INVOKESTATIC,
+            begin.add(hookCall(
                     LOTR_MAP_LAYOUT_HOOK_OWNER,
                     "beginMapTooltip",
-                    "(Llotr/client/gui/LOTRGuiMap;)V"));
+                    "(Llotr/client/gui/LOTRGuiMap;)V", HookFallback.NOTHING));
             method.instructions.insert(begin);
             beginPresent = true;
         }
@@ -2127,11 +2170,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (instruction.getOpcode() == Opcodes.RETURN) {
                     method.instructions.insertBefore(
                             instruction,
-                            new MethodInsnNode(
-                                    Opcodes.INVOKESTATIC,
-                                    LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            hookCall(LOTR_MAP_LAYOUT_HOOK_OWNER,
                                     "endMapTooltip",
-                                    "()V"));
+                                    "()V", HookFallback.NOTHING));
                     foundReturn = true;
                 }
                 instruction = next;
@@ -2148,11 +2189,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         LabelNode renderMiniQuests = new LabelNode();
         InsnList hook = new InsnList();
         hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        hook.add(new MethodInsnNode(
-                Opcodes.INVOKESTATIC,
+        hook.add(hookCall(
                 LOTR_MAP_LEGEND_HOOK_OWNER,
                 "shouldRenderLotrMiniQuests",
-                "(Llotr/client/gui/LOTRGuiMap;)Z"));
+                "(Llotr/client/gui/LOTRGuiMap;)Z", HookFallback.TRUE));
         hook.add(new JumpInsnNode(Opcodes.IFNE, renderMiniQuests));
         hook.add(new InsnNode(Opcodes.RETURN));
         hook.add(renderMiniQuests);
@@ -2201,13 +2241,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             .equals(call.desc)) {
                         continue;
                     }
-                    call.setOpcode(Opcodes.INVOKESTATIC);
-                    call.owner = ACCESSORY_LOTR_MAP_HOOK_OWNER;
-                    call.name = "addPlayerLocationIfVisible";
-                    call.desc = "(Llotr/common/network/"
-                            + "LOTRPacketUpdatePlayerLocations;"
-                            + "Lcom/mojang/authlib/GameProfile;DD)V";
-                    call.itf = false;
+                    redirect(call, ACCESSORY_LOTR_MAP_HOOK_OWNER,
+                            "addPlayerLocationIfVisible",
+                            "(Llotr/common/network/"
+                                    + "LOTRPacketUpdatePlayerLocations;"
+                                    + "Lcom/mojang/authlib/GameProfile;DD)V");
                     activate(ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY);
                     info("Patched LOTR map locations for accessory concealment");
                     return write(owner);
@@ -2314,9 +2352,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         continue;
                     }
                     MethodInsnNode call = (MethodInsnNode)instruction;
-                    if (call.getOpcode() == Opcodes.INVOKESTATIC
-                            && ROLEPLAY_IDENTITY_HOOK_OWNER.equals(call.owner)
-                            && "resolveGameplayId".equals(call.name)) {
+                    if (HookGuard.calls(call, ROLEPLAY_IDENTITY_HOOK_OWNER,
+                            "resolveGameplayId")) {
                         activateLotrBountyTransformer();
                         return basicClass;
                     }
@@ -2324,10 +2361,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             && "net/minecraft/entity/player/EntityPlayer"
                             .equals(call.owner)
                             && "()Ljava/util/UUID;".equals(call.desc)) {
-                        call.setOpcode(Opcodes.INVOKESTATIC);
-                        call.owner = ROLEPLAY_IDENTITY_HOOK_OWNER;
-                        call.name = "resolveGameplayId";
-                        call.desc = GAMEPLAY_ID_HOOK_DESC;
+                        redirect(call, ROLEPLAY_IDENTITY_HOOK_OWNER,
+                                "resolveGameplayId", GAMEPLAY_ID_HOOK_DESC);
                         activateLotrBountyTransformer();
                         info("Bound LOTR faction bounties "
                                 + "to active roleplay-character UUIDs");
@@ -2374,11 +2409,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         "lotr/common/fac/LOTRFactionBounties$PlayerData",
                         "playerID",
                         "Ljava/util/UUID;"));
-                method.instructions.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                // LOTR's own lookup may ask Mojang; a hook that fails names
+                // nobody rather than send the server thread out.
+                method.instructions.add(hookCall(
                         ROLEPLAY_IDENTITY_HOOK_OWNER,
                         "resolveGameplayName",
-                        GAMEPLAY_NAME_HOOK_DESC));
+                        GAMEPLAY_NAME_HOOK_DESC, HookFallback.constant("")));
                 method.instructions.add(new org.objectweb.asm.tree.InsnNode(
                         Opcodes.ARETURN));
                 activateLotrBountyTransformer();
@@ -2416,9 +2452,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         continue;
                     }
                     MethodInsnNode call = (MethodInsnNode)instruction;
-                    if (call.getOpcode() == Opcodes.INVOKESTATIC
-                            && ROLEPLAY_IDENTITY_HOOK_OWNER.equals(call.owner)
-                            && "resolveRoleplayName".equals(call.name)) {
+                    if (HookGuard.calls(call, ROLEPLAY_IDENTITY_HOOK_OWNER,
+                            "resolveRoleplayName")) {
                         activate(LOTR_SPEECH_ACTIVE_PROPERTY);
                         return basicClass;
                     }
@@ -2428,10 +2463,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             && "()Ljava/lang/String;".equals(call.desc)
                             && ("getCommandSenderName".equals(call.name)
                             || "func_70005_c_".equals(call.name))) {
-                        call.setOpcode(Opcodes.INVOKESTATIC);
-                        call.owner = ROLEPLAY_IDENTITY_HOOK_OWNER;
-                        call.name = "resolveRoleplayName";
-                        call.desc = ROLEPLAY_NAME_HOOK_DESC;
+                        redirect(call, ROLEPLAY_IDENTITY_HOOK_OWNER,
+                                "resolveRoleplayName", ROLEPLAY_NAME_HOOK_DESC);
                         activate(LOTR_SPEECH_ACTIVE_PROPERTY);
                         info("Patched LOTR NPC speech to "
                                 + "use active roleplay-character names");
@@ -2479,9 +2512,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         continue;
                     }
                     MethodInsnNode call = (MethodInsnNode)instruction;
-                    if (call.getOpcode() == Opcodes.INVOKESTATIC
-                            && NPC_CHAT_HOOK_OWNER.equals(call.owner)
-                            && "addNpcChatMessage".equals(call.name)) {
+                    if (HookGuard.calls(call, NPC_CHAT_HOOK_OWNER,
+                            "addNpcChatMessage")) {
                         activate(NPC_CHAT_ACTIVE_PROPERTY);
                         return basicClass;
                     }
@@ -2508,10 +2540,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 method.instructions.insertBefore(
                         chatCall,
                         new VarInsnNode(Opcodes.ALOAD, npcLocal));
-                chatCall.setOpcode(Opcodes.INVOKESTATIC);
-                chatCall.owner = NPC_CHAT_HOOK_OWNER;
-                chatCall.name = "addNpcChatMessage";
-                chatCall.desc = NPC_CHAT_HOOK_DESC;
+                redirect(chatCall, NPC_CHAT_HOOK_OWNER, "addNpcChatMessage",
+                        NPC_CHAT_HOOK_DESC);
                 insertImmersiveSpeechHook(method, npcLocal);
                 activate(NPC_CHAT_ACTIVE_PROPERTY);
                 info("Patched LOTR NPC speech chat lines into the "
@@ -2581,9 +2611,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 // at slot four, raised in place before its first use.
                 InsnList lift = new InsnList();
                 lift.add(new VarInsnNode(Opcodes.DLOAD, 4));
-                lift.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                        NAMEPLATE_HOOK_OWNER, "liftAlignment",
-                        ALIGNMENT_LIFT_DESC, false));
+                lift.add(hookCall(NAMEPLATE_HOOK_OWNER, "liftAlignment",
+                        ALIGNMENT_LIFT_DESC, HookFallback.argument(0)));
                 lift.add(new VarInsnNode(Opcodes.DSTORE, 4));
                 method.instructions.insert(lift);
                 activate(ALIGNMENT_LIFT_ACTIVE_PROPERTY);
@@ -2623,9 +2652,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 LabelNode carryOn = new LabelNode();
                 InsnList guard = new InsnList();
                 guard.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                guard.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                        NAMEPLATE_HOOK_OWNER, "hidesNameplate",
-                        NAMEPLATE_HOOK_DESC, false));
+                guard.add(hookCall(NAMEPLATE_HOOK_OWNER, "hidesNameplate",
+                        NAMEPLATE_HOOK_DESC, HookFallback.FALSE));
                 guard.add(new JumpInsnNode(Opcodes.IFEQ, carryOn));
                 guard.add(new InsnNode(Opcodes.RETURN));
                 guard.add(carryOn);
@@ -2662,15 +2690,15 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             || !NPC_SPEECH_RENDER_DESC.equals(call.desc)) {
                         continue;
                     }
-                    if (NPC_CHAT_HOOK_OWNER.equals(call.owner)
-                            && "renderNpcSpeeches".equals(call.name)) {
+                    if (HookGuard.calls(call, NPC_CHAT_HOOK_OWNER,
+                            "renderNpcSpeeches")) {
                         activate(NPC_SPEECH_RENDER_ACTIVE_PROPERTY);
                         return basicClass;
                     }
                     if (LOTR_NPC_RENDERING.equals(call.owner)
                             && "renderAllNPCSpeeches".equals(call.name)) {
-                        call.owner = NPC_CHAT_HOOK_OWNER;
-                        call.name = "renderNpcSpeeches";
+                        redirect(call, NPC_CHAT_HOOK_OWNER, "renderNpcSpeeches",
+                                call.desc);
                         activate(NPC_SPEECH_RENDER_ACTIVE_PROPERTY);
                         info("Patched LOTR NPC floating speech into the "
                                 + "Lost Tales chat style");
@@ -2718,9 +2746,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             added.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
                     speechAccessor.owner, speechAccessor.name,
                     speechAccessor.desc, false));
-            added.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                    NPC_CHAT_HOOK_OWNER, "addImmersiveSpeech",
-                    NPC_IMMERSIVE_HOOK_DESC, false));
+            added.add(hookCall(NPC_CHAT_HOOK_OWNER, "addImmersiveSpeech",
+                    NPC_IMMERSIVE_HOOK_DESC, HookFallback.NOTHING));
             method.instructions.insert(call, added);
             return;
         }
@@ -2785,8 +2812,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (targetCall == null) {
                     continue;
                 }
-                if (targetCall.getOpcode() == Opcodes.INVOKESTATIC
-                        && FAST_TRAVEL_HOOK_OWNER.equals(targetCall.owner)) {
+                if (HookGuard.calls(targetCall, FAST_TRAVEL_HOOK_OWNER,
+                        "setTargetIfAllowed")) {
                     activate(FAST_TRAVEL_ACTIVE_PROPERTY);
                     return basicClass;
                 }
@@ -2799,10 +2826,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 method.instructions.insertBefore(
                         targetCall,
                         new VarInsnNode(Opcodes.ALOAD, playerLocal));
-                targetCall.setOpcode(Opcodes.INVOKESTATIC);
-                targetCall.owner = FAST_TRAVEL_HOOK_OWNER;
-                targetCall.name = "setTargetIfAllowed";
-                targetCall.desc = FAST_TRAVEL_HOOK_DESC;
+                redirect(targetCall, FAST_TRAVEL_HOOK_OWNER, "setTargetIfAllowed",
+                        FAST_TRAVEL_HOOK_DESC);
                 activate(FAST_TRAVEL_ACTIVE_PROPERTY);
                 info("Patched LOTR fast travel for "
                         + "character-specific marker discovery");
@@ -2848,11 +2873,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         Opcodes.ALOAD, viewEntityLocal));
                 raceOffsetHook.add(new VarInsnNode(
                         Opcodes.FLOAD, offsetStore.var));
-                raceOffsetHook.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                raceOffsetHook.add(hookCall(
                         CAMERA_HOOK_OWNER,
                         "resolveCameraOffset",
-                        CAMERA_HOOK_DESC));
+                        CAMERA_HOOK_DESC, HookFallback.argument(1)));
                 raceOffsetHook.add(new VarInsnNode(
                         Opcodes.FSTORE, offsetStore.var));
                 cameraMethod.instructions.insert(
@@ -2876,11 +2900,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     distanceHook.add(new VarInsnNode(
                             Opcodes.DLOAD, distanceStore.var));
                     distanceHook.add(new VarInsnNode(Opcodes.FLOAD, 1));
-                    distanceHook.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
+                    distanceHook.add(hookCall(
                             THIRD_PERSON_CAMERA_HOOK_OWNER,
                             "resolveDistance",
-                            CAMERA_DISTANCE_HOOK_DESC));
+                            CAMERA_DISTANCE_HOOK_DESC, HookFallback.argument(1)));
                     distanceHook.add(new VarInsnNode(
                             Opcodes.DSTORE, distanceStore.var));
                     cameraMethod.instructions.insert(
@@ -2904,11 +2927,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 Opcodes.FLOAD, 1));
                         offsetHook.add(new VarInsnNode(
                                 Opcodes.DLOAD, distanceStore.var));
-                        offsetHook.add(new MethodInsnNode(
-                                Opcodes.INVOKESTATIC,
+                        offsetHook.add(hookCall(
                                 THIRD_PERSON_CAMERA_HOOK_OWNER,
                                 "applyCameraOffset",
-                                CAMERA_OFFSET_HOOK_DESC));
+                                CAMERA_OFFSET_HOOK_DESC, HookFallback.NOTHING));
                         cameraMethod.instructions.insertBefore(
                                 distanceTranslation, offsetHook);
                         changed = true;
@@ -3005,10 +3027,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             || "func_73863_a".equals(call.name))) {
                         continue;
                     }
-                    call.setOpcode(Opcodes.INVOKESTATIC);
-                    call.owner = GUI_ANIMATION_HOOK_OWNER;
-                    call.name = "drawScreen";
-                    call.desc = "(Lnet/minecraft/client/gui/GuiScreen;IIF)V";
+                    redirect(call, GUI_ANIMATION_HOOK_OWNER, "drawScreen",
+                            "(Lnet/minecraft/client/gui/GuiScreen;IIF)V");
                     activateGuiAnimationPart(
                             GUI_ANIMATION_DRAW_ACTIVE_PROPERTY);
                     info("Patched GUI draw coordinates for animated screens");
@@ -3075,19 +3095,19 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 InsnList hook = new InsnList();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 hook.add(new VarInsnNode(Opcodes.ILOAD, olderStore));
-                hook.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                hook.add(hookCall(
                         GUI_ANIMATION_HOOK_OWNER,
                         "inverseMouseX",
-                        "(Lnet/minecraft/client/gui/GuiScreen;I)I"));
+                        "(Lnet/minecraft/client/gui/GuiScreen;I)I",
+                        HookFallback.argument(1)));
                 hook.add(new VarInsnNode(Opcodes.ISTORE, olderStore));
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 hook.add(new VarInsnNode(Opcodes.ILOAD, newerStore));
-                hook.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                hook.add(hookCall(
                         GUI_ANIMATION_HOOK_OWNER,
                         "inverseMouseY",
-                        "(Lnet/minecraft/client/gui/GuiScreen;I)I"));
+                        "(Lnet/minecraft/client/gui/GuiScreen;I)I",
+                        HookFallback.argument(1)));
                 hook.add(new VarInsnNode(Opcodes.ISTORE, newerStore));
                 method.instructions.insertBefore(buttonCall, hook);
                 activateGuiAnimationPart(
@@ -3127,11 +3147,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 InsnList begin = new InsnList();
                 begin.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                begin.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                begin.add(hookCall(
                         GUI_ANIMATION_HOOK_OWNER,
                         "beginVanillaBackground",
-                        "(Lnet/minecraft/client/gui/GuiScreen;)V"));
+                        "(Lnet/minecraft/client/gui/GuiScreen;)V",
+                        HookFallback.NOTHING));
                 method.instructions.insert(begin);
                 for (AbstractInsnNode instruction =
                      method.instructions.getFirst(); instruction != null;
@@ -3140,10 +3160,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         continue;
                     }
                     method.instructions.insertBefore(
-                            instruction, new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
+                            instruction, hookCall(
                             GUI_ANIMATION_HOOK_OWNER,
-                            "endVanillaBackground", "()V"));
+                            "endVanillaBackground", "()V", HookFallback.NOTHING));
                 }
                 activateGuiAnimationPart(
                         GUI_ANIMATION_BACKGROUND_ACTIVE_PROPERTY);
@@ -3191,21 +3210,21 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 LabelNode vanilla = new LabelNode();
                 InsnList head = new InsnList();
                 head.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                head.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                head.add(hookCall(
                         CHAT_HIT_HOOK_OWNER,
                         "isActive",
-                        "(Lnet/minecraft/client/gui/GuiNewChat;)Z"));
+                        "(Lnet/minecraft/client/gui/GuiNewChat;)Z",
+                        HookFallback.FALSE));
                 head.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
                 head.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 head.add(new VarInsnNode(Opcodes.ILOAD, 1));
                 head.add(new VarInsnNode(Opcodes.ILOAD, 2));
-                head.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                head.add(hookCall(
                         CHAT_HIT_HOOK_OWNER,
                         "componentAt",
                         "(Lnet/minecraft/client/gui/GuiNewChat;II)"
-                                + "Lnet/minecraft/util/IChatComponent;"));
+                                + "Lnet/minecraft/util/IChatComponent;",
+                        HookFallback.NULL));
                 head.add(new InsnNode(Opcodes.ARETURN));
                 head.add(vanilla);
                 method.instructions.insert(head);
@@ -3269,13 +3288,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
                 hook.add(new VarInsnNode(Opcodes.ALOAD, lines.var));
-                hook.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                hook.add(hookCall(
                         CHAT_WRAP_HOOK_OWNER,
                         "wrap",
                         "(Lnet/minecraft/client/gui/GuiNewChat;"
                                 + "Lnet/minecraft/util/IChatComponent;"
-                                + "Ljava/util/ArrayList;)Ljava/util/ArrayList;"));
+                                + "Ljava/util/ArrayList;)Ljava/util/ArrayList;",
+                        HookFallback.argument(2)));
                 hook.add(new VarInsnNode(Opcodes.ASTORE, lines.var));
                 method.instructions.insertBefore(receiver, hook);
                 activate(CHAT_WRAP_ACTIVE_PROPERTY);
@@ -3329,9 +3348,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             || !"(Ljava/lang/String;)V".equals(call.desc)) {
                         continue;
                     }
-                    method.instructions.insertBefore(call, new MethodInsnNode(
-                            Opcodes.INVOKESTATIC, CHAT_LOG_HOOK_OWNER, "logged",
-                            "(Ljava/lang/String;)Ljava/lang/String;"));
+                    method.instructions.insertBefore(call, hookCall(
+                            CHAT_LOG_HOOK_OWNER, "logged",
+                            "(Ljava/lang/String;)Ljava/lang/String;",
+                            HookFallback.argument(0)));
                     patched++;
                 }
                 if (patched != 1) {
@@ -3401,10 +3421,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     // The refresh flag is the method's fourth argument.
                     method.instructions.insertBefore(call,
                             new VarInsnNode(Opcodes.ILOAD, 4));
-                    MethodInsnNode hook = new MethodInsnNode(
-                            Opcodes.INVOKESTATIC, CHAT_HISTORY_HOOK_OWNER,
+                    MethodInsnNode hook = hookCall(CHAT_HISTORY_HOOK_OWNER,
                             "deleteUnlessRefreshing",
-                            "(Lnet/minecraft/client/gui/GuiNewChat;IZ)V");
+                            "(Lnet/minecraft/client/gui/GuiNewChat;IZ)V",
+                            HookFallback.original(call));
                     method.instructions.set(call, hook);
                     instruction = hook;
                     replaced++;
@@ -3461,9 +3481,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     if (instruction.getOpcode() == Opcodes.BIPUSH
                             && ((IntInsnNode)instruction).operand
                                     == VANILLA_CHAT_HISTORY) {
-                        MethodInsnNode hook = new MethodInsnNode(
-                                Opcodes.INVOKESTATIC,
-                                CHAT_HISTORY_HOOK_OWNER, "capacity", "()I");
+                        MethodInsnNode hook = hookCall(
+                                CHAT_HISTORY_HOOK_OWNER, "capacity", "()I",
+                                HookFallback.constant(Integer.valueOf(VANILLA_CHAT_HISTORY)));
                         method.instructions.set(instruction, hook);
                         instruction = hook;
                         replaced++;
@@ -3523,10 +3543,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     if (instruction.getOpcode() == Opcodes.BIPUSH
                             && ((IntInsnNode)instruction).operand
                                     == VANILLA_MENU_FRAMERATE) {
-                        MethodInsnNode hook = new MethodInsnNode(
-                                Opcodes.INVOKESTATIC,
+                        MethodInsnNode hook = hookCall(
                                 MENU_FRAMERATE_HOOK_OWNER,
-                                "menuFramerateLimit", "()I");
+                                "menuFramerateLimit", "()I",
+                                HookFallback.constant(Integer.valueOf(VANILLA_MENU_FRAMERATE)));
                         method.instructions.set(instruction, hook);
                         instruction = hook;
                         replaced++;
@@ -3606,12 +3626,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 method.instructions.insertBefore(
                         travel, new InsnNode(Opcodes.DUP2));
-                method.instructions.insert(travel, new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                method.instructions.insert(travel, hookCall(
                         FAST_TRAVEL_ARRIVAL_HOOK_OWNER,
                         "onArrived",
                         "(Llotr/common/LOTRPlayerData;"
-                                + "Llotr/common/world/map/LOTRAbstractWaypoint;)V"));
+                                + "Llotr/common/world/map/LOTRAbstractWaypoint;)V",
+                        HookFallback.NOTHING));
                 activate(LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY);
                 info("Patched LOTR fast travel completion to report arrivals");
                 return write(owner);
@@ -3659,10 +3679,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     InsnList call = new InsnList();
                     call.add(new VarInsnNode(Opcodes.ALOAD, 0));
                     call.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    call.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                            LOTR_HIRED_UNIT_HOOK_OWNER, "onHired",
+                    call.add(hookCall(LOTR_HIRED_UNIT_HOOK_OWNER, "onHired",
                             "(Llotr/common/entity/npc/LOTRHiredNPCInfo;"
-                                    + "Lnet/minecraft/entity/player/EntityPlayer;)V"));
+                                    + "Lnet/minecraft/entity/player/EntityPlayer;)V",
+                            HookFallback.NOTHING));
                     method.instructions.insertBefore(instruction, call);
                     patched++;
                 }
@@ -3716,9 +3736,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     }
                     InsnList call = new InsnList();
                     call.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    call.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                            LOTR_SHARED_WAYPOINT_NAME_HOOK_OWNER, "name",
-                            "(Llotr/common/world/map/LOTRCustomWaypoint;)V"));
+                    call.add(hookCall(LOTR_SHARED_WAYPOINT_NAME_HOOK_OWNER, "name",
+                            "(Llotr/common/world/map/LOTRCustomWaypoint;)V",
+                            HookFallback.NOTHING));
                     method.instructions.insertBefore(instruction, call);
                     patched++;
                 }
@@ -3776,9 +3796,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     if (instruction.getOpcode() != Opcodes.ARETURN) {
                         continue;
                     }
-                    method.instructions.insertBefore(instruction, new MethodInsnNode(
-                            Opcodes.INVOKESTATIC, LOTR_FELLOWSHIP_HOOK_OWNER, "refuse",
-                            "(" + LOTR_FELLOWSHIP_DESC + ")" + LOTR_FELLOWSHIP_DESC));
+                    method.instructions.insertBefore(instruction, hookCall(
+                            LOTR_FELLOWSHIP_HOOK_OWNER, "refuse",
+                            "(" + LOTR_FELLOWSHIP_DESC + ")" + LOTR_FELLOWSHIP_DESC,
+                            HookFallback.argument(0)));
                     patched++;
                 }
                 if (patched > 0) {
@@ -3821,8 +3842,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 LabelNode go = new LabelNode();
                 InsnList refusal = new InsnList();
-                refusal.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                        LOTR_FELLOWSHIP_HOOK_OWNER, "refusesCreation", "()Z"));
+                refusal.add(hookCall(LOTR_FELLOWSHIP_HOOK_OWNER, "refusesCreation", "()Z",
+                        HookFallback.FALSE));
                 refusal.add(new JumpInsnNode(Opcodes.IFEQ, go));
                 refusal.add(new InsnNode(Opcodes.ACONST_NULL));
                 refusal.add(new InsnNode(Opcodes.ARETURN));
@@ -3924,7 +3945,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     /**
      * Hands every call of {@code LOTRPlayerData.name(desc)} in the method to
      * the static {@code hookOwner.hookName}, which takes the player data
-     * first and the call's arguments after it. Whether there was one.
+     * first and the call's arguments after it; should the hook fail, the
+     * call is made as it was. Whether there was one.
      */
     private static boolean redirectPlayerDataCall(MethodNode method, String name,
                                                   String desc, String hookOwner,
@@ -3939,8 +3961,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
                     && "lotr/common/LOTRPlayerData".equals(call.owner)
                     && name.equals(call.name) && desc.equals(call.desc)) {
-                MethodInsnNode hook = new MethodInsnNode(Opcodes.INVOKESTATIC, hookOwner,
-                        hookName, "(Llotr/common/LOTRPlayerData;" + desc.substring(1), false);
+                MethodInsnNode hook = hookCall(hookOwner, hookName,
+                        "(Llotr/common/LOTRPlayerData;" + desc.substring(1),
+                        HookFallback.original(call));
                 method.instructions.set(call, hook);
                 instruction = hook;
                 redirected = true;
@@ -3992,11 +4015,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     decorate.add(new FieldInsnNode(Opcodes.GETFIELD,
                             owner.name, "theEntity",
                             "Llotr/common/entity/npc/LOTREntityNPC;"));
-                    decorate.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                            LOTR_TRADER_NOTICE_HOOK_OWNER, "decorate",
+                    decorate.add(hookCall(LOTR_TRADER_NOTICE_HOOK_OWNER, "decorate",
                             "(Lnet/minecraft/util/IChatComponent;"
                                     + "Llotr/common/entity/npc/LOTREntityNPC;)"
-                                    + "Lnet/minecraft/util/IChatComponent;"));
+                                    + "Lnet/minecraft/util/IChatComponent;",
+                            HookFallback.argument(0)));
                     method.instructions.insertBefore(call, decorate);
                     patched++;
                 }
@@ -4061,12 +4084,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
                 hook.add(new VarInsnNode(Opcodes.ILOAD, 2));
                 hook.add(new VarInsnNode(Opcodes.ILOAD, 3));
-                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                        LOTR_ACHIEVEMENT_HOVER_HOOK_OWNER, hookName,
+                hook.add(hookCall(LOTR_ACHIEVEMENT_HOVER_HOOK_OWNER, hookName,
                         lines ? "(Lnet/minecraft/client/gui/GuiScreen;"
                                 + "Ljava/util/List;II)Z"
                                 : "(Lnet/minecraft/client/gui/GuiScreen;"
-                                + "Ljava/lang/String;II)Z"));
+                                + "Ljava/lang/String;II)Z", HookFallback.FALSE));
                 hook.add(new JumpInsnNode(Opcodes.IFEQ, drawByLotr));
                 hook.add(new InsnNode(Opcodes.RETURN));
                 hook.add(drawByLotr);
@@ -4116,11 +4138,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 InsnList hook = new InsnList();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                        SERVER_BROADCAST_HOOK_OWNER, "onPlayerLine",
+                hook.add(hookCall(SERVER_BROADCAST_HOOK_OWNER, "onPlayerLine",
                         "(Lnet/minecraft/entity/player/EntityPlayerMP;"
                                 + "Lnet/minecraft/util/IChatComponent;)"
-                                + "Lnet/minecraft/util/IChatComponent;"));
+                                + "Lnet/minecraft/util/IChatComponent;",
+                        HookFallback.argument(1)));
                 hook.add(new VarInsnNode(Opcodes.ASTORE, 1));
                 LabelNode send = new LabelNode();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
@@ -4179,10 +4201,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 // sends nothing.
                 InsnList hook = new InsnList();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                        SERVER_BROADCAST_HOOK_OWNER, "onBroadcast",
+                hook.add(hookCall(SERVER_BROADCAST_HOOK_OWNER, "onBroadcast",
                         "(Lnet/minecraft/util/IChatComponent;)"
-                                + "Lnet/minecraft/util/IChatComponent;"));
+                                + "Lnet/minecraft/util/IChatComponent;",
+                        HookFallback.argument(0)));
                 hook.add(new VarInsnNode(Opcodes.ASTORE, 1));
                 LabelNode send = new LabelNode();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
@@ -4285,23 +4307,22 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 // interface unit the screen was handed.
                 head.add(new VarInsnNode(Opcodes.ILOAD, 2));
                 head.add(new VarInsnNode(Opcodes.ILOAD, 3));
-                head.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                head.add(hookCall(
                         TOOLTIP_SMOOTHING_OWNER,
                         "begin",
-                        "(II)V"));
+                        "(II)V", HookFallback.NOTHING));
                 head.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 head.add(new VarInsnNode(Opcodes.ALOAD, 1));
                 head.add(new VarInsnNode(Opcodes.ILOAD, 2));
                 head.add(new VarInsnNode(Opcodes.ILOAD, 3));
                 head.add(new VarInsnNode(Opcodes.ALOAD, 4));
-                head.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
+                head.add(hookCall(
                         TOOLTIP_HOOK_OWNER,
                         "drawHoveringText",
                         "(Lnet/minecraft/client/gui/GuiScreen;"
                                 + "Ljava/util/List;II"
-                                + "Lnet/minecraft/client/gui/FontRenderer;)Z"));
+                                + "Lnet/minecraft/client/gui/FontRenderer;)Z",
+                        HookFallback.FALSE));
                 head.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
                 head.add(new InsnNode(Opcodes.RETURN));
                 head.add(vanilla);
@@ -4332,9 +4353,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         while (node != null) {
             AbstractInsnNode next = node.getNext();
             if (node.getOpcode() == Opcodes.RETURN) {
-                method.instructions.insertBefore(node, new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
-                        TOOLTIP_SMOOTHING_OWNER, "end", "()V"));
+                method.instructions.insertBefore(node, hookCall(
+                        TOOLTIP_SMOOTHING_OWNER, "end", "()V", HookFallback.NOTHING));
             }
             node = next;
         }
@@ -4360,13 +4380,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         InsnList intent = new InsnList();
                         intent.add(new VarInsnNode(Opcodes.ALOAD, 0));
                         intent.add(new VarInsnNode(Opcodes.ILOAD, 4));
-                        intent.add(new MethodInsnNode(
-                                Opcodes.INVOKESTATIC,
+                        intent.add(hookCall(
                                 SMOOTH_INVENTORY_HOOK_OWNER,
                                 "recordTransferIntent",
                                 "(Lnet/minecraft/client/gui/inventory/"
                                         + "GuiContainer;I)V",
-                                false));
+                                HookFallback.NOTHING));
                         method.instructions.insert(intent);
                     }
                     intentPatched = containsHook(method,
@@ -4380,13 +4399,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             SMOOTH_INVENTORY_HOOK_OWNER, "beginFrame")) {
                         InsnList begin = new InsnList();
                         begin.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                        begin.add(new MethodInsnNode(
-                                Opcodes.INVOKESTATIC,
+                        begin.add(hookCall(
                                 SMOOTH_INVENTORY_HOOK_OWNER,
                                 "beginFrame",
                                 "(Lnet/minecraft/client/gui/inventory/"
                                         + "GuiContainer;)V",
-                                false));
+                                HookFallback.NOTHING));
                         method.instructions.insert(begin);
                     }
                     framePatched = containsHook(method,
@@ -4413,10 +4431,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 .equals(call.desc)) {
                             method.instructions.insertBefore(call,
                                     containerAndSlotLoads());
-                            call.setOpcode(Opcodes.INVOKESTATIC);
-                            call.owner = SMOOTH_INVENTORY_HOOK_OWNER;
-                            call.name = "renderItemAndEffectIntoGUI";
-                            call.desc = "(Lnet/minecraft/client/renderer/"
+                            redirect(call, SMOOTH_INVENTORY_HOOK_OWNER,
+                                    "renderItemAndEffectIntoGUI",
+                                    "(Lnet/minecraft/client/renderer/"
                                     + "entity/RenderItem;"
                                     + "Lnet/minecraft/client/gui/FontRenderer;"
                                     + "Lnet/minecraft/client/renderer/texture/"
@@ -4424,8 +4441,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                     + "Lnet/minecraft/item/ItemStack;II"
                                     + "Lnet/minecraft/client/gui/inventory/"
                                     + "GuiContainer;"
-                                    + "Lnet/minecraft/inventory/Slot;)V";
-                            call.itf = false;
+                                    + "Lnet/minecraft/inventory/Slot;)V");
                             iconPatched = true;
                         } else if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
                                 && "net/minecraft/client/renderer/entity/"
@@ -4438,10 +4454,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 .equals(call.desc)) {
                             method.instructions.insertBefore(call,
                                     containerAndSlotLoads());
-                            call.setOpcode(Opcodes.INVOKESTATIC);
-                            call.owner = SMOOTH_INVENTORY_HOOK_OWNER;
-                            call.name = "renderItemOverlayIntoGUI";
-                            call.desc = "(Lnet/minecraft/client/renderer/"
+                            redirect(call, SMOOTH_INVENTORY_HOOK_OWNER,
+                                    "renderItemOverlayIntoGUI",
+                                    "(Lnet/minecraft/client/renderer/"
                                     + "entity/RenderItem;"
                                     + "Lnet/minecraft/client/gui/FontRenderer;"
                                     + "Lnet/minecraft/client/renderer/texture/"
@@ -4450,8 +4465,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                     + "Ljava/lang/String;"
                                     + "Lnet/minecraft/client/gui/inventory/"
                                     + "GuiContainer;"
-                                    + "Lnet/minecraft/inventory/Slot;)V";
-                            call.itf = false;
+                                    + "Lnet/minecraft/inventory/Slot;)V");
                             overlayPatched = true;
                         }
                     }
@@ -4497,11 +4511,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             InsnList hook = new InsnList();
             hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
             hook.add(new VarInsnNode(Opcodes.DLOAD, 4));
-            hook.add(new MethodInsnNode(
-                    Opcodes.INVOKESTATIC,
+            hook.add(hookCall(
                     DEBUG_HOOK_OWNER,
                     "resolveRenderY",
-                    DEBUG_HOOK_DESC));
+                    DEBUG_HOOK_DESC, HookFallback.argument(1)));
             hook.add(new VarInsnNode(Opcodes.DSTORE, 4));
             method.instructions.insert(hook);
 
@@ -4546,8 +4559,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 for (AbstractInsnNode limit : limits) {
                     InsnList hook = new InsnList();
                     hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
-                            "alignmentGain", "(FLnet/minecraft/entity/player/EntityPlayer;)F"));
+                    hook.add(hookCall(PERK_HOOK_OWNER, "alignmentGain",
+                            "(FLnet/minecraft/entity/player/EntityPlayer;)F",
+                            HookFallback.argument(0)));
                     method.instructions.insert(limit, hook);
                 }
                 activate(PERK_ALIGNMENT_ACTIVE_PROPERTY);
@@ -4595,8 +4609,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 for (AbstractInsnNode time : times) {
                     InsnList hook = new InsnList();
                     hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
-                            "attackTime", "(ILnet/minecraft/network/NetHandlerPlayServer;)I"));
+                    hook.add(hookCall(PERK_HOOK_OWNER, "attackTime",
+                            "(ILnet/minecraft/network/NetHandlerPlayServer;)I",
+                            HookFallback.argument(0)));
                     method.instructions.insert(time, hook);
                 }
                 activate(PERK_ATTACK_SERVER_ACTIVE_PROPERTY);
@@ -4635,8 +4650,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     return basicClass;
                 }
                 for (AbstractInsnNode time : times) {
-                    method.instructions.insert(time, new MethodInsnNode(Opcodes.INVOKESTATIC,
-                            CLIENT_PERK_HOOK_OWNER, "attackTime", "(I)I"));
+                    method.instructions.insert(time, hookCall(
+                            CLIENT_PERK_HOOK_OWNER, "attackTime", "(I)I",
+                            HookFallback.argument(0)));
                 }
                 activate(PERK_ATTACK_CLIENT_ACTIVE_PROPERTY);
                 info("Patched LOTR's client attack timer for Daggerwork");
@@ -4684,9 +4700,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     InsnList hook = new InsnList();
                     hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
                     hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
+                    hook.add(hookCall(PERK_HOOK_OWNER,
                             "tradeCost", "(ILnet/minecraft/entity/player/EntityPlayer;"
-                                    + "Lnet/minecraft/inventory/Slot;)I"));
+                                    + "Lnet/minecraft/inventory/Slot;)I",
+                            HookFallback.argument(0)));
                     method.instructions.insert(cost, hook);
                 }
                 if (!costs.isEmpty()) {
@@ -4739,16 +4756,18 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             "lotr/common/inventory/LOTRSlotTrade", "cost", "()I")) {
                         InsnList hook = new InsnList();
                         hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                        hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, CLIENT_PERK_HOOK_OWNER,
-                                "shownTradeCost", "(ILnet/minecraft/inventory/Slot;)I"));
+                        hook.add(hookCall(CLIENT_PERK_HOOK_OWNER,
+                                "shownTradeCost", "(ILnet/minecraft/inventory/Slot;)I",
+                                HookFallback.argument(0)));
                         method.instructions.insert(cost, hook);
                         prices = true;
                     }
                 }
                 for (AbstractInsnNode read : fieldReads(method,
                         "lotr/common/entity/npc/LOTRTradeSellResult", "totalSellValue")) {
-                    method.instructions.insert(read, new MethodInsnNode(Opcodes.INVOKESTATIC,
-                            CLIENT_PERK_HOOK_OWNER, "shownSellValue", "(I)I"));
+                    method.instructions.insert(read, hookCall(
+                            CLIENT_PERK_HOOK_OWNER, "shownSellValue", "(I)I",
+                            HookFallback.argument(0)));
                     sales = true;
                 }
             }
@@ -4793,8 +4812,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 for (AbstractInsnNode read : reads) {
                     InsnList hook = new InsnList();
                     hook.add(new VarInsnNode(Opcodes.ALOAD, player));
-                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
-                            "sellValue", "(ILnet/minecraft/entity/player/EntityPlayer;)I"));
+                    hook.add(hookCall(PERK_HOOK_OWNER,
+                            "sellValue", "(ILnet/minecraft/entity/player/EntityPlayer;)I",
+                            HookFallback.argument(0)));
                     method.instructions.insert(read, hook);
                 }
                 activate(PERK_SELL_ACTIVE_PROPERTY);
@@ -4842,8 +4862,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 for (AbstractInsnNode end : returns) {
                     InsnList hook = new InsnList();
                     hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
-                            "anvilOutput", "(Llotr/common/inventory/LOTRContainerAnvil;)V"));
+                    hook.add(hookCall(PERK_HOOK_OWNER,
+                            "anvilOutput", "(Llotr/common/inventory/LOTRContainerAnvil;)V",
+                            HookFallback.NOTHING));
                     method.instructions.insertBefore(end, hook);
                 }
                 activate(PERK_ANVIL_ACTIVE_PROPERTY);
@@ -4879,9 +4900,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 InsnList hook = new InsnList();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 2));
-                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, PERK_HOOK_OWNER,
+                hook.add(hookCall(PERK_HOOK_OWNER,
                         "anvilTaken", "(Lnet/minecraft/entity/player/EntityPlayer;"
-                                + "Lnet/minecraft/item/ItemStack;)V"));
+                                + "Lnet/minecraft/item/ItemStack;)V",
+                        HookFallback.NOTHING));
                 method.instructions.insert(hook);
                 activate(PERK_ANVIL_TAKE_ACTIVE_PROPERTY);
                 info("Patched LOTR's anvil output slot to count repairs");
@@ -4935,6 +4957,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
      */
     private static ClassNode read(byte[] bytes) {
         ACTIVATED.get().clear();
+        DECLARED.get().clear();
         ClassNode node = new ClassNode();
         new ClassReader(bytes).accept(node, 0);
         return node;
@@ -4967,7 +4990,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         activated.clear();
     }
 
+    /**
+     * Writes the patched class, every call into the mod first wrapped in
+     * its guard ({@link HookGuard}); a call that declared no fallback fails
+     * the patch, and the class stays as it was.
+     */
     private static byte[] write(ClassNode node) {
+        HookGuard.guard(node, DECLARED.get());
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         node.accept(writer);
         return writer.toByteArray();
@@ -5215,10 +5244,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             InsnList hook = new InsnList();
             hook.add(new VarInsnNode(Opcodes.ILOAD, 2));
-            hook.add(new MethodInsnNode(
-                    Opcodes.INVOKESTATIC,
+            hook.add(hookCall(
                     THIRD_PERSON_CAMERA_HOOK_OWNER,
-                    "resolveFov", CAMERA_FOV_HOOK_DESC));
+                    "resolveFov", CAMERA_FOV_HOOK_DESC, HookFallback.argument(0)));
             method.instructions.insertBefore(instruction, hook);
             changed = true;
         }
@@ -5234,10 +5262,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             InsnList hook = new InsnList();
             hook.add(new VarInsnNode(Opcodes.FLOAD, 1));
-            hook.add(new MethodInsnNode(
-                    Opcodes.INVOKESTATIC,
+            hook.add(hookCall(
                     TARGETING_HOOK_OWNER,
-                    "resolveMouseOver", TARGETING_HOOK_DESC));
+                    "resolveMouseOver", TARGETING_HOOK_DESC, HookFallback.NOTHING));
             method.instructions.insertBefore(instruction, hook);
             changed = true;
         }
@@ -5256,20 +5283,18 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         InsnList hook = new InsnList();
         hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
         hook.add(new VarInsnNode(Opcodes.ALOAD, 2));
-        hook.add(new MethodInsnNode(
-                Opcodes.INVOKESTATIC,
+        hook.add(hookCall(
                 ENTITY_ACTION_HOOK_OWNER,
                 "shouldHandleEntityAttack",
-                ENTITY_ACTION_PREDICATE_DESC));
+                ENTITY_ACTION_PREDICATE_DESC, HookFallback.FALSE));
         hook.add(new JumpInsnNode(Opcodes.IFEQ, vanillaPath));
         hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
         hook.add(new VarInsnNode(Opcodes.ALOAD, 2));
-        hook.add(new MethodInsnNode(
-                Opcodes.INVOKESTATIC,
+        hook.add(hookCall(
                 ENTITY_ACTION_HOOK_OWNER,
                 "handleAttack",
                 "(Lnet/minecraft/entity/player/EntityPlayer;"
-                        + "Lnet/minecraft/entity/Entity;)V"));
+                        + "Lnet/minecraft/entity/Entity;)V", HookFallback.NOTHING));
         hook.add(new org.objectweb.asm.tree.InsnNode(
                 Opcodes.RETURN));
         hook.add(vanillaPath);
@@ -5289,20 +5314,18 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         InsnList hook = new InsnList();
         hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
         hook.add(new VarInsnNode(Opcodes.ALOAD, 2));
-        hook.add(new MethodInsnNode(
-                Opcodes.INVOKESTATIC,
+        hook.add(hookCall(
                 ENTITY_ACTION_HOOK_OWNER,
                 "shouldHandleEntityInteraction",
-                ENTITY_ACTION_PREDICATE_DESC));
+                ENTITY_ACTION_PREDICATE_DESC, HookFallback.FALSE));
         hook.add(new JumpInsnNode(Opcodes.IFEQ, vanillaPath));
         hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
         hook.add(new VarInsnNode(Opcodes.ALOAD, 2));
-        hook.add(new MethodInsnNode(
-                Opcodes.INVOKESTATIC,
+        hook.add(hookCall(
                 ENTITY_ACTION_HOOK_OWNER,
                 "handleInteraction",
                 "(Lnet/minecraft/entity/player/EntityPlayer;"
-                        + "Lnet/minecraft/entity/Entity;)Z"));
+                        + "Lnet/minecraft/entity/Entity;)Z", HookFallback.FALSE));
         hook.add(new org.objectweb.asm.tree.InsnNode(Opcodes.IRETURN));
         hook.add(vanillaPath);
         method.instructions.insert(syncCall, hook);
@@ -5325,10 +5348,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     || "func_147297_a".equals(call.name))) {
                 continue;
             }
-            call.setOpcode(Opcodes.INVOKESTATIC);
-            call.owner = BLOCK_ACTION_HOOK_OWNER;
-            call.name = "sendBlockActionOrVanilla";
-            call.desc = BLOCK_ACTION_SEND_DESC;
+            redirect(call, BLOCK_ACTION_HOOK_OWNER, "sendBlockActionOrVanilla",
+                    BLOCK_ACTION_SEND_DESC);
             return true;
         }
         warn("Could not locate PlayerControllerMP block packet send; "
@@ -5364,20 +5385,46 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         return mcpName.equals(mapped) || srgName.equals(mapped);
     }
 
+    /** Whether the method calls the hook, straight or through its guard. */
     private static boolean containsHook(
             MethodNode method, String owner, String name) {
         for (AbstractInsnNode instruction = method.instructions.getFirst();
              instruction != null; instruction = instruction.getNext()) {
-            if (!(instruction instanceof MethodInsnNode)) {
-                continue;
-            }
-            MethodInsnNode call = (MethodInsnNode)instruction;
-            if (call.getOpcode() == Opcodes.INVOKESTATIC
-                    && owner.equals(call.owner) && name.equals(call.name)) {
+            if (instruction instanceof MethodInsnNode
+                    && HookGuard.calls((MethodInsnNode)instruction, owner, name)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * A call to the hook {@code owner.name}; as the class is written it is
+     * wrapped in one catch (DATA-08), and should the hook fail, the call
+     * answers {@code fallback}.
+     */
+    private static MethodInsnNode hookCall(String owner, String name, String desc,
+                                           HookFallback fallback) {
+        MethodInsnNode call = new MethodInsnNode(Opcodes.INVOKESTATIC, owner, name,
+                desc, false);
+        DECLARED.get().put(call, fallback);
+        return call;
+    }
+
+    /**
+     * Turns {@code call} into a call to the hook {@code owner.name}, which
+     * takes the call's receiver and arguments first; should the hook fail,
+     * the call is made as it was.
+     */
+    private static void redirect(MethodInsnNode call, String owner, String name,
+                                 String desc) {
+        HookFallback original = HookFallback.original(call);
+        call.setOpcode(Opcodes.INVOKESTATIC);
+        call.owner = owner;
+        call.name = name;
+        call.desc = desc;
+        call.itf = false;
+        DECLARED.get().put(call, original);
     }
 
     private static MethodInsnNode findLotrFastTravelTargetCall(
@@ -5395,9 +5442,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     .equals(call.desc)) {
                 return call;
             }
-            if (call.getOpcode() == Opcodes.INVOKESTATIC
-                    && FAST_TRAVEL_HOOK_OWNER.equals(call.owner)
-                    && "setTargetIfAllowed".equals(call.name)) {
+            if (HookGuard.calls(call, FAST_TRAVEL_HOOK_OWNER, "setTargetIfAllowed")) {
                 return call;
             }
         }

@@ -88,6 +88,50 @@ public final class BundledQuestDefinitionTest {
                 objective.getParam("entity", "").length() > 0);
     }
 
+    /**
+     * Each quest of the Survivalist's Path pays the next one's sealed
+     * starter, in the index's order, and the last pays none (QUEST-43):
+     * the chain goes on by playing. Every starter a bundled quest pays
+     * names a bundled quest that starts by its starter.
+     */
+    @Test
+    public void thePathPaysEachNextQuestsStarter() {
+        List<LostTalesQuestDefinition> path = new ArrayList<LostTalesQuestDefinition>();
+        Set<String> ids = new HashSet<String>();
+        for (String file : index()) {
+            LostTalesQuestDefinition quest = parse(file);
+            ids.add(quest.getId());
+            if (file.startsWith("quests/path/survivalist/")) {
+                path.add(quest);
+            }
+        }
+        assertEquals("the Path's seven quests", 7, path.size());
+        for (int index = 0; index < path.size(); index++) {
+            String next = index + 1 < path.size() ? path.get(index + 1).getId() : "";
+            assertEquals(path.get(index).getId() + " pays the next one's starter",
+                    next, LostTalesQuestRewards.starter(path.get(index).getRewards()));
+        }
+        for (String file : index()) {
+            String starter = LostTalesQuestRewards.starter(parse(file).getRewards());
+            if (starter.length() > 0) {
+                assertTrue(file + " pays the starter of a bundled quest", ids.contains(starter));
+                assertTrue(starter + " starts by its starter",
+                        parse(file.substring(0, file.indexOf("quests/") + 7)
+                                + starter.substring(starter.indexOf(':') + 1) + ".json")
+                                .canStartFromItem());
+            }
+        }
+    }
+
+    /** The Cheese Cache waits one in-game day before it can be taken again (QUEST-45). */
+    @Test
+    public void theCheeseCacheWaitsADay() {
+        LostTalesQuestDefinition quest = parse("quests/tutorial/cheese_cache.json");
+        assertTrue(quest.isRepeatable());
+        assertEquals(LostTalesQuestRules.TICKS_PER_DAY,
+                LostTalesQuestRules.repeatAfterTicks(quest));
+    }
+
     private static List<String> index() {
         Reader reader = open("quests/index.json");
         assertNotNull("quests/index.json is missing from the jar", reader);

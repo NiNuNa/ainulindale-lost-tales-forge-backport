@@ -6,6 +6,7 @@
     "views/quest_journal.json",
     "views/fellowships.json",
     "views/profile.json",
+    "views/skills.json",
     "views/settings.json",
     "views/custom.json"
   ]

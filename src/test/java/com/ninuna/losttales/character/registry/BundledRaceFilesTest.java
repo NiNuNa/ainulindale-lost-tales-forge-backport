@@ -4,6 +4,7 @@ import com.ninuna.losttales.data.DataFiles;
 import com.ninuna.losttales.util.LostTalesLangFile;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
@@ -15,7 +16,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * The six race files shipped in the jar (CHAR-38) load with no warning and
  * hold what the races were before they were files: their bodies, sizes,
- * values, sexes, starting factions and skins. Their words are the lang
+ * values, body types, starting factions and skins. Their words are the lang
  * file's, never their own.
  */
 public final class BundledRaceFilesTest {
@@ -60,25 +61,47 @@ public final class BundledRaceFilesTest {
                 new ArrayList<String>(hobbit.getAllowedFactionIds()));
         for (String orc : Arrays.asList(CharacterRaceRegistry.ORC, CharacterRaceRegistry.URUK)) {
             CharacterRaceDefinition race = CharacterRaceRegistry.get(orc);
-            assertEquals(Arrays.asList(CharacterGenderRegistry.NON_BINARY),
-                    new ArrayList<String>(race.getAllowedGenderIds()));
+            assertEquals(Arrays.asList(CharacterBodyTypeRegistry.NEUTRAL),
+                    new ArrayList<String>(race.getAllowedBodyTypeIds()));
             assertTrue(race.getAllowedFactionCategories().contains(CharacterFactionCategory.ORC));
+        }
+    }
+
+    /**
+     * Orcs and Uruks may start among the half-trolls, who are no race of
+     * their own (CHAR-09); LOTR types the faction as men, so Humans may too.
+     */
+    @Test
+    public void orcsAndUruksMayStartInTheHalfTrollFaction() {
+        CharacterFactionDefinition halfTrolls = new CharacterFactionDefinition("lotr:half_troll",
+                true, Collections.singleton(CharacterFactionCategory.HUMAN));
+        for (String orc : Arrays.asList(CharacterRaceRegistry.ORC, CharacterRaceRegistry.URUK)) {
+            CharacterRaceDefinition race = CharacterRaceRegistry.get(orc);
+            assertEquals(Arrays.asList("lotr:half_troll"),
+                    new ArrayList<String>(race.getAllowedFactionIds()));
+            assertTrue(orc, race.isCompatibleWith(halfTrolls));
+        }
+        assertTrue(CharacterRaceRegistry.get(CharacterRaceRegistry.HUMAN)
+                .isCompatibleWith(halfTrolls));
+        for (String other : Arrays.asList(CharacterRaceRegistry.ELF,
+                CharacterRaceRegistry.DWARF, CharacterRaceRegistry.HOBBIT)) {
+            assertFalse(other, CharacterRaceRegistry.get(other).isCompatibleWith(halfTrolls));
         }
     }
 
     /** The skins the races offer, by count, as the registry registered them. */
     @Test
     public void theSkinsAreThoseTheRacesOffered() {
-        assertSkins(CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE, 1 + 30 + 3 + 4
+        assertSkins(CharacterRaceRegistry.HUMAN, CharacterBodyTypeRegistry.MASCULINE, 1 + 30 + 3 + 4
                 + 4 + 10 + 3 + 5 + 5 + 5 + 5 + 4 + 5 + 5 + 6 + 4);
-        assertSkins(CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.FEMALE, 1 + 9 + 2 + 4
+        assertSkins(CharacterRaceRegistry.HUMAN, CharacterBodyTypeRegistry.FEMININE, 1 + 9 + 2 + 4
                 + 3 + 14 + 4 + 4 + 3 + 3 + 3 + 3 + 3 + 5 + 7 + 3);
-        assertSkins(CharacterRaceRegistry.DWARF, CharacterGenderRegistry.MALE, 1 + 3 + 3 + 1);
-        assertSkins(CharacterRaceRegistry.HOBBIT, CharacterGenderRegistry.FEMALE, 1 + 13);
-        assertSkins(CharacterRaceRegistry.ORC, CharacterGenderRegistry.NON_BINARY, 1 + 8);
-        assertSkins(CharacterRaceRegistry.URUK, CharacterGenderRegistry.NON_BINARY, 1 + 3 + 3);
+        assertSkins(CharacterRaceRegistry.DWARF, CharacterBodyTypeRegistry.MASCULINE, 1 + 3 + 3 + 1);
+        assertSkins(CharacterRaceRegistry.HOBBIT, CharacterBodyTypeRegistry.FEMININE, 1 + 13);
+        assertSkins(CharacterRaceRegistry.ORC, CharacterBodyTypeRegistry.NEUTRAL, 1 + 8);
+        assertSkins(CharacterRaceRegistry.URUK, CharacterBodyTypeRegistry.NEUTRAL, 1 + 3 + 3);
         assertEquals("losttales:textures/skins/dwarf/exiled_male/0.png",
-                CharacterSkinRegistry.get("losttales:dwarf_exiled_male_0").getTextureLocation());
+                CharacterSkinRegistry.get("losttales:dwarf_exiled_masculine_0").getTextureLocation());
         assertEquals("lotr:mob/orc/urukHai/2.png",
                 CharacterSkinRegistry.get("losttales:uruk_hai_2").getTextureLocation());
     }
@@ -116,10 +139,10 @@ public final class BundledRaceFilesTest {
         assertEquals(id, offset, race.getGuiPreviewVerticalOffset());
     }
 
-    private static void assertSkins(String raceId, String sexId, int count) {
+    private static void assertSkins(String raceId, String bodyTypeId, int count) {
         List<CharacterSkinDefinition> skins =
-                CharacterSkinRegistry.getCompatibleSkins(raceId, sexId);
-        assertEquals(raceId + " " + sexId, count, skins.size());
+                CharacterSkinRegistry.getCompatibleSkins(raceId, bodyTypeId);
+        assertEquals(raceId + " " + bodyTypeId, count, skins.size());
         assertTrue(skins.get(0).isAccountSkin());
     }
 }

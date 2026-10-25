@@ -113,7 +113,7 @@ enum PlayerBodyShape {
         return this.bodyPivotY;
     }
 
-    /** The arm height: the biped's own (wide or slim) plus the drop, or the override. */
+    /** The arm height: the biped's own (broad or slender) plus the drop, or the override. */
     float armPivotY(float bipedArmPivotY) {
         return Float.isNaN(this.armPivotOverride)
                 ? bipedArmPivotY + this.armDrop : this.armPivotOverride;

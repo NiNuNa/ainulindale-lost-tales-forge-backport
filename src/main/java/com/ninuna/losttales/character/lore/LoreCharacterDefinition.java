@@ -3,20 +3,17 @@ package com.ninuna.losttales.character.lore;
 import com.ninuna.losttales.character.model.CharacterProfile;
 
 /**
- * Minimal immutable identity, an optional validated visual appearance,
- * and the profile the character is claimed with.
+ * A lore character as its file writes it ({@link LoreCharacterFiles}): its
+ * id and name, the faction it starts in, an optional look, and the profile
+ * it is claimed with.
  */
 public final class LoreCharacterDefinition {
 
-    public static final int CURRENT_DATA_VERSION = 1;
     /** The age of a lore character whose file gives none. */
     public static final int DEFAULT_AGE = 18;
     /** A description, in characters. */
     public static final int MAX_DESCRIPTION_LENGTH = 512;
-    /**
-     * An id, and each id of its appearance, in characters: the lore list
-     * every player is sent takes no longer.
-     */
+    /** An id, in characters: the lore list every player is sent takes no longer. */
     public static final int MAX_ID_LENGTH = 128;
     /** A name, in characters. */
     public static final int MAX_NAME_LENGTH = 64;
@@ -28,17 +25,19 @@ public final class LoreCharacterDefinition {
     private final String description;
     private final int age;
     private final Appearance appearance;
+    private final String factionId;
     private final CharacterProfile profile;
 
     public LoreCharacterDefinition(String id, String name,
                                    String description, int age,
-                                   Appearance appearance,
+                                   Appearance appearance, String factionId,
                                    CharacterProfile profile) {
         this.id = id == null ? "" : id;
         this.name = name == null ? "" : name;
         this.description = description == null ? "" : description;
         this.age = age;
         this.appearance = appearance;
+        this.factionId = factionId == null ? "" : factionId;
         this.profile = profile == null ? CharacterProfile.EMPTY : profile;
     }
 
@@ -58,12 +57,18 @@ public final class LoreCharacterDefinition {
         return this.age;
     }
 
+    /** Whether the file gives a look; one without is listed but cannot be claimed. */
     public boolean hasAppearance() {
         return this.appearance != null;
     }
 
     public Appearance getAppearance() {
         return this.appearance;
+    }
+
+    /** The faction the character starts in at its first claim (CHAR-44). */
+    public String getFactionId() {
+        return this.factionId;
     }
 
     /**
@@ -75,20 +80,15 @@ public final class LoreCharacterDefinition {
         return this.profile;
     }
 
-    /** Fixed visual selection authored by the server, never by a client. */
+    /** The race, body type and skin the file fixes; a player never chooses them. */
     public static final class Appearance {
-        public static final String RACE_DEFAULT_MODEL = "losttales:race_default";
-
         private final String raceId;
-        private final String genderId;
-        private final String modelId;
+        private final String bodyTypeId;
         private final String skinId;
 
-        public Appearance(String raceId, String genderId,
-                          String modelId, String skinId) {
+        public Appearance(String raceId, String bodyTypeId, String skinId) {
             this.raceId = raceId == null ? "" : raceId;
-            this.genderId = genderId == null ? "" : genderId;
-            this.modelId = modelId == null ? "" : modelId;
+            this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
             this.skinId = skinId == null ? "" : skinId;
         }
 
@@ -96,12 +96,8 @@ public final class LoreCharacterDefinition {
             return this.raceId;
         }
 
-        public String getGenderId() {
-            return this.genderId;
-        }
-
-        public String getModelId() {
-            return this.modelId;
+        public String getBodyTypeId() {
+            return this.bodyTypeId;
         }
 
         public String getSkinId() {

@@ -13,8 +13,17 @@ public enum SkillAct {
     HIT(Measure.PER, 1.0D, true),
     /** A foe slain with the weapons the count names; {@code per} a point of the foe's health. */
     KILL(Measure.PER, 0.5D, true),
-    /** Damage your armour and blocking took from a foe; {@code per} a point. */
-    GUARD(Measure.PER, 1.0D, false),
+    /**
+     * Damage a block kept from a foe's blow, with the weapons the count
+     * names; {@code per} a point.
+     */
+    BLOCK(Measure.PER, 1.0D, true),
+    /**
+     * Damage armour kept from a foe's blow, the share of the skill's
+     * weight by the armour points its pieces give (PROG-17); {@code per} a
+     * point. Only a skill with a weight counts it.
+     */
+    ARMOUR(Measure.PER, 1.0D, false),
     /** Distance ridden on a mount; {@code per} a block. */
     RIDE(Measure.PER, 0.1D, false),
     /** A mount fed while hurt; {@code per} a point of health it got back. */
@@ -37,7 +46,10 @@ public enum SkillAct {
     MINE(Measure.TABLE, 0.0D, false),
     /** A quest completed, by its size; {@code per} an objective it holds. */
     QUEST(Measure.PER, 10.0D, false),
-    /** A region, waypoint or map marker found for the first time, by its kind. */
+    /**
+     * Found for the first time, by its kind: a LOTR region or waypoint, or
+     * one of the mod's map markers or waystones.
+     */
     DISCOVER(Measure.TABLE, 0.0D, false);
 
     /** How an act's worth is read. */

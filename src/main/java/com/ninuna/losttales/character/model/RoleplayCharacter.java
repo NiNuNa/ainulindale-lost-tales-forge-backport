@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.model;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.registry.CharacterBody;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
@@ -25,9 +25,9 @@ public class RoleplayCharacter {
     private final int slotIndex;
     private final String name;
     private final String raceId;
-    private final String genderId;
-    private final String skinId;
     private final String bodyTypeId;
+    private final String skinId;
+    private final String armsId;
     private final String chestTypeId;
     private final CharacterProfile profile;
     private final int age;
@@ -60,7 +60,7 @@ public class RoleplayCharacter {
         }
         return new Builder(source.characterId, source.ownerId)
                 .slot(source.slotIndex).name(source.name).race(source.raceId)
-                .gender(source.genderId).skin(source.skinId).age(source.age)
+                .bodyType(source.bodyTypeId).skin(source.skinId).age(source.age)
                 .startingFaction(source.startingFactionId)
                 .pledgedFaction(source.pledgedFactionId)
                 .factionSince(source.factionSince)
@@ -72,7 +72,7 @@ public class RoleplayCharacter {
                 .startingWaypoint(source.startingWaypointId)
                 .unconventionalSettings(source.unconventionalSettings)
                 .profile(source.profile)
-                .bodyType(source.bodyTypeId)
+                .arms(source.armsId)
                 .chestType(source.chestTypeId);
     }
 
@@ -82,14 +82,14 @@ public class RoleplayCharacter {
         this.slotIndex = builder.slotIndex;
         this.name = builder.name;
         this.raceId = builder.raceId;
-        this.genderId = builder.genderId;
+        this.bodyTypeId = builder.bodyTypeId;
         this.skinId = builder.skinId;
-        this.bodyTypeId = CharacterBodyTypeRegistry.contains(builder.bodyTypeId)
-                ? LostTalesIdentifiers.normalize(builder.bodyTypeId)
-                : CharacterBodyTypeRegistry.defaultFor(builder.genderId);
+        this.armsId = CharacterArmsRegistry.contains(builder.armsId)
+                ? LostTalesIdentifiers.normalize(builder.armsId)
+                : CharacterArmsRegistry.defaultFor(builder.bodyTypeId);
         this.chestTypeId = CharacterChestTypeRegistry.contains(builder.chestTypeId)
                 ? LostTalesIdentifiers.normalize(builder.chestTypeId)
-                : CharacterChestTypeRegistry.defaultFor(builder.genderId);
+                : CharacterChestTypeRegistry.defaultFor(builder.bodyTypeId);
         this.profile = builder.profile;
         this.age = builder.age;
         this.startingFactionId = builder.startingFactionId;
@@ -115,7 +115,7 @@ public class RoleplayCharacter {
 
     /**
      * Every field a character holds, with the default a character made
-     * without it gets: the body and chest types follow the sex, the capes
+     * without it gets: the arms and chest follow the body type, the capes
      * are the catalogue's defaults, and there is no pledge and no title.
      */
     public static final class Builder {
@@ -124,7 +124,7 @@ public class RoleplayCharacter {
         private int slotIndex;
         private String name = "";
         private String raceId = "";
-        private String genderId = "";
+        private String bodyTypeId = "";
         private String skinId = "";
         private int age;
         private String startingFactionId = "";
@@ -138,7 +138,7 @@ public class RoleplayCharacter {
         private String startingWaypointId = "";
         private boolean unconventionalSettings;
         private CharacterProfile profile = CharacterProfile.EMPTY;
-        private String bodyTypeId;
+        private String armsId;
         private String chestTypeId;
 
         private Builder(UUID characterId, UUID ownerId) {
@@ -176,8 +176,8 @@ public class RoleplayCharacter {
             return this;
         }
 
-        public Builder gender(String genderId) {
-            this.genderId = genderId == null ? "" : genderId;
+        public Builder bodyType(String bodyTypeId) {
+            this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
             return this;
         }
 
@@ -255,13 +255,13 @@ public class RoleplayCharacter {
             return this;
         }
 
-        /** Null, or an id the registry does not hold, is the sex's default. */
-        public Builder bodyType(String bodyTypeId) {
-            this.bodyTypeId = bodyTypeId;
+        /** Null, or an id the registry does not hold, is the body type's default. */
+        public Builder arms(String armsId) {
+            this.armsId = armsId;
             return this;
         }
 
-        /** Null, or an id the registry does not hold, is the sex's default. */
+        /** Null, or an id the registry does not hold, is the body type's default. */
         public Builder chestType(String chestTypeId) {
             this.chestTypeId = chestTypeId;
             return this;
@@ -292,20 +292,20 @@ public class RoleplayCharacter {
         return this.raceId;
     }
 
-    public String getGenderId() {
-        return this.genderId;
+    public String getBodyTypeId() {
+        return this.bodyTypeId;
     }
 
     public String getSkinId() {
         return this.skinId;
     }
 
-    /** Arm width of the body, one of {@link CharacterBodyTypeRegistry}; stored apart from sex. */
-    public String getBodyTypeId() {
-        return this.bodyTypeId;
+    /** Arms of the body, one of {@link CharacterArmsRegistry}; stored apart from the body type. */
+    public String getArmsId() {
+        return this.armsId;
     }
 
-    /** Chest shape and size, one of {@link CharacterChestTypeRegistry}; stored apart from sex. */
+    /** Chest shape and size, one of {@link CharacterChestTypeRegistry}; stored apart from the body type. */
     public String getChestTypeId() {
         return this.chestTypeId;
     }

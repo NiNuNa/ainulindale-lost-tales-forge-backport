@@ -9,10 +9,28 @@ import net.minecraft.world.storage.MapStorage;
 /**
  * Whether a missive may still be taken in a world, and the record that it
  * was ({@link MissivesTakenWorldData}, QUEST-34): once only, by anyone, and
- * only while its notice could still stand on a board. Server only.
+ * only while its notice could still stand on a board, its days counted
+ * from its first posting wherever its letter goes up again. Server only.
  */
 public final class MissivesTaken {
+    /**
+     * The most days a notice may stand, the top of
+     * {@code missiveBoardNoticeExpirationDays}: the record keeps a missive
+     * taken this long from its first posting, so no setting the server may
+     * choose brings a copy of its letter back.
+     */
+    static final int LONGEST_NOTICE_DAYS = 30;
+
     private MissivesTaken() {}
+
+    /**
+     * How long the world remembers a missive taken, from its first
+     * posting: as long as a notice could stand under any setting while
+     * notices expire; for good (0) while they never do.
+     */
+    static long keepTicks(boolean noticesExpire) {
+        return noticesExpire ? LONGEST_NOTICE_DAYS * 24000L : 0L;
+    }
 
     /**
      * Why the missive cannot be taken in this world now, or null where it
@@ -41,12 +59,26 @@ public final class MissivesTaken {
                 ? MissiveBoardStateReason.TAKEN_BEFORE : null;
     }
 
-    /** Records the missive as taken; answers whether the world now remembers it. */
+    /**
+     * Records the missive as taken; answers whether the world now
+     * remembers it: not while the record is read-only or full.
+     */
     public static boolean record(World world, LostTalesMissiveData missive) {
         MissivesTakenWorldData data = of(world);
-        return data != null && missive != null && data.take(missive.getQuestId(),
+        if (data == null || missive == null) {
+            return false;
+        }
+        boolean taken = data.take(missive.getQuestId(),
                 missive.getGenerationWorldTime(), world.getTotalWorldTime(),
-                LostTalesConfig.getMissiveBoardNoticeExpirationTicks());
+                keepTicks(LostTalesConfig.expireMissiveBoardNotices));
+        if (!taken && data.isUsable()
+                && data.size() >= MissivesTakenWorldData.MAX_ENTRIES
+                && data.firstRefusal()) {
+            LostTalesLog.warning("The record of missives taken in this world holds"
+                    + " %s already; no missive can be accepted until older ones"
+                    + " are forgotten", Integer.valueOf(MissivesTakenWorldData.MAX_ENTRIES));
+        }
+        return taken;
     }
 
     /** The overworld's record, made on first use; null off the server. */

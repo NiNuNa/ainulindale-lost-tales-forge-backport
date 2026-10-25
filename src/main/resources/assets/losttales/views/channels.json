@@ -1,5 +1,7 @@
 {
   "view": "channels",
   "locked": true,
+  "place": "middle",
+  "stage": false,
   "pages": ["set:chat"]
 }

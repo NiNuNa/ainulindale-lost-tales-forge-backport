@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:nizar",
   "name": "Nizar, Slave Master",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_haradrim_male_3"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_haradrim_masculine_3",
+  "faction": "lotr:near_harad"
 }

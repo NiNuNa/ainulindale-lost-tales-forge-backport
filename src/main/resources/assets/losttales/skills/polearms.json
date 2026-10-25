@@ -12,6 +12,11 @@
       "act": "kill",
       "weapons": ["spear", "polearm", "pike", "lance"],
       "per": 0.5
+    },
+    {
+      "act": "block",
+      "weapons": ["spear", "polearm", "pike", "lance"],
+      "per": 1.0
     }
   ],
   "perks": [

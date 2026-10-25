@@ -16,8 +16,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * No name the interface draws is cut with dots (LOOK-37): a cut name
- * fades into its end through {@link LostTalesUiCutName}. The style layer
- * keeps no dotted cut, and no source under the client's and the GUI's
+ * fades into its end through {@link LostTalesUiCutName}. No piece of the
+ * style layer keeps a dotted cut, and no source under the client's and the GUI's
  * packages writes dots into what it draws, but for the few
  * {@link #ALLOWED} words that are not names, each with its reason; an
  * allowance that no longer matches fails too.
@@ -33,6 +33,10 @@ public final class LostTalesCutNamesTest {
             "com/ninuna/losttales/client", "com/ninuna/losttales/gui"};
     /** Fewer files than this means the walk found the wrong place. */
     private static final int FEWEST_EXPECTED = 200;
+    /** The style layer's package, the shared pieces every screen draws with. */
+    private static final String STYLE_PACKAGE = "com/ninuna/losttales/gui/style";
+    /** Fewer pieces than this means the style walk found the wrong place. */
+    private static final int FEWEST_STYLE_PIECES = 20;
 
     /** Files that write dots into words that are not names, and why. */
     private static final String[][] ALLOWED = {
@@ -43,14 +47,32 @@ public final class LostTalesCutNamesTest {
             {"MotionCodec.java", "a log line, never drawn"},
     };
 
+    /** No piece of the style layer, any class under {@code gui/style}, keeps a method that cuts words. */
     @Test
-    public void theStyleLayerKeepsNoDottedCut() {
-        for (Method method : LostTalesSkyrimUiStyle.class.getDeclaredMethods()) {
-            assertTrue("LostTalesSkyrimUiStyle." + method.getName()
-                            + " cuts words; a cut name fades through"
-                            + " LostTalesUiCutName",
-                    !method.getName().toLowerCase().contains("trim"));
+    public void theStyleLayerKeepsNoDottedCut() throws IOException,
+            ClassNotFoundException {
+        File style = new File(sourceRoot(), STYLE_PACKAGE);
+        File[] sources = style.listFiles();
+        assertTrue("no sources under " + style, sources != null);
+        int classes = 0;
+        for (File source : sources) {
+            String name = source.getName();
+            if (!name.endsWith(".java")) {
+                continue;
+            }
+            Class<?> piece = Class.forName(STYLE_PACKAGE.replace('/', '.') + "."
+                            + name.substring(0, name.length() - ".java".length()),
+                    false, getClass().getClassLoader());
+            classes++;
+            for (Method method : piece.getDeclaredMethods()) {
+                assertTrue(piece.getSimpleName() + "." + method.getName()
+                                + " cuts words; a cut name fades through"
+                                + " LostTalesUiCutName",
+                        !method.getName().toLowerCase().contains("trim"));
+            }
         }
+        assertTrue("found only " + classes + " classes under " + style,
+                classes >= FEWEST_STYLE_PIECES);
     }
 
     @Test

@@ -1,0 +1,21 @@
+{
+  "id": "losttales:morwaith_chieftain",
+  "helmet": [
+    "lotr:item.helmetMoredainLion"
+  ],
+  "chestplate": [
+    "lotr:item.bodyMoredainLion"
+  ],
+  "leggings": [
+    "lotr:item.legsMoredainLion"
+  ],
+  "boots": [
+    "lotr:item.bootsMoredainLion"
+  ],
+  "bonus": [
+    {
+      "effect": "knockback",
+      "amount": 0.1
+    }
+  ]
+}

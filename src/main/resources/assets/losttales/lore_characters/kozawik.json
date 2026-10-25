@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:kozawik",
   "name": "Kozawik",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_moredain_male_1"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_moredain_masculine_1",
+  "faction": "lotr:morwaith"
 }

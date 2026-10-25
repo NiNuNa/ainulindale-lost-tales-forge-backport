@@ -32,13 +32,15 @@ import com.ninuna.losttales.client.window.ClientSettingsPage;
 import com.ninuna.losttales.client.window.NewPage;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageCategory;
+import com.ninuna.losttales.client.window.Stage;
 import com.ninuna.losttales.client.window.ViewFiles;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.gui.screen.character.CharacterSubWindows;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
-import com.ninuna.losttales.gui.screen.character.FirstCharacterCreator;
+import com.ninuna.losttales.gui.screen.character.CharacterEditorPage;
+import com.ninuna.losttales.gui.screen.character.FirstVisit;
 import com.ninuna.losttales.gui.screen.fellowship.FellowshipPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.gui.screen.missive.MissiveBoardPage;
@@ -130,6 +132,7 @@ import com.ninuna.losttales.network.packet.character.CharacterOperationResultPac
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
+import com.ninuna.losttales.network.packet.character.CharacterGearPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipOperationResultPacket;
 import com.ninuna.losttales.network.packet.fellowship.FellowshipStateSyncPacket;
@@ -161,6 +164,7 @@ import com.ninuna.losttales.network.packet.ProgressionCatalogPacket;
 import com.ninuna.losttales.network.packet.ProgressionStatePacket;
 import com.ninuna.losttales.network.packet.ProgressionStatuePacket;
 import com.ninuna.losttales.progression.perk.PerkIndex;
+import com.ninuna.losttales.client.armour.ArmourTooltipEvents;
 import com.ninuna.losttales.client.progression.PerkClientEvents;
 import com.ninuna.losttales.client.progression.ResetStatuePage;
 import com.ninuna.losttales.client.progression.SkillsPage;
@@ -215,10 +219,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(keyBindings);
         FMLCommonHandler.instance().bus().register(clientEventHandler);
         FMLCommonHandler.instance().bus().register(characterClientTaskQueue);
-        FMLCommonHandler.instance().bus().register(new FirstCharacterCreator());
+        FirstVisit.install();
         FMLCommonHandler.instance().bus().register(guiAnimationHandler);
         MinecraftForge.EVENT_BUS.register(new LostTalesMainMenuHandler());
         MinecraftForge.EVENT_BUS.register(new PerkClientEvents());
+        MinecraftForge.EVENT_BUS.register(new ArmourTooltipEvents());
         ELostTalesMapLabels.initAndRegisterMapLabels();
 
         GeoArmorRenderer.registerArmorRenderer(LostTalesItemArmor3D.class, new LostTalesItemRendererArmor3D());
@@ -283,9 +288,22 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     }
                 });
         CharacterSubWindows.install();
+        // The Character Editor opens only as a character is made or its
+        // look changes, over the Profile view's window (CHAR-41); the view
+        // is a stage, whose part of the screen comes before the chat's so
+        // the wheel over the bare world reaches it first.
+        WindowPages.registerGamePage(CharacterEditorPage.PAGE_ID,
+                "gui.losttales.page.character_editor", CharacterEditorPage.ICON,
+                PageCategory.PROFILE, new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new CharacterEditorPage();
+                    }
+                });
+        Stage.install();
         WindowPages.register(SkillsPage.PAGE_ID, "gui.losttales.page.skills",
                 SkillsPage.ICON, LostTalesKeyBindings.getSkillsKeyBinding(),
-                PageCategory.PROFILE, new WindowPages.Factory() {
+                PageCategory.SKILLS, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new SkillsPage();
@@ -329,7 +347,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         // offered under the +, and gone as the player leaves the world.
         // It travels on the map, and stands with it; a missive board and
         // a letter hand out quests, and stand with the journal.
-        WindowPages.registerWorldPage(WaystonePage.PAGE_ID,
+        WindowPages.registerGamePage(WaystonePage.PAGE_ID,
                 "gui.losttales.page.waystone", WaystonePage.ICON,
                 PageCategory.MAP, new WindowPages.Factory() {
                     @Override
@@ -337,7 +355,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                         return new WaystonePage();
                     }
                 });
-        WindowPages.registerWorldPage(MissiveBoardPage.PAGE_ID,
+        WindowPages.registerGamePage(MissiveBoardPage.PAGE_ID,
                 "gui.losttales.page.missive_board", MissiveBoardPage.ICON,
                 PageCategory.QUEST_JOURNAL, new WindowPages.Factory() {
                     @Override
@@ -345,7 +363,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                         return new MissiveBoardPage();
                     }
                 });
-        WindowPages.registerWorldPage(MissiveLetterPage.PAGE_ID,
+        WindowPages.registerGamePage(MissiveLetterPage.PAGE_ID,
                 "gui.losttales.page.missive_letter", MissiveLetterPage.ICON,
                 PageCategory.QUEST_JOURNAL, new WindowPages.Factory() {
                     @Override
@@ -355,9 +373,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 });
         // A reset statue's page opens only from the statue and stands
         // with the character's skills.
-        WindowPages.registerWorldPage(ResetStatuePage.PAGE_ID,
+        WindowPages.registerGamePage(ResetStatuePage.PAGE_ID,
                 "gui.losttales.page.reset_statue", ResetStatuePage.ICON,
-                PageCategory.PROFILE, new WindowPages.Factory() {
+                PageCategory.SKILLS, new WindowPages.Factory() {
                     @Override
                     public PageContent create() {
                         return new ResetStatuePage();
@@ -499,6 +517,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             }
             LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getQuestHistory(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
             LostTalesClientQuestProgressStore.setHeardRumours(packet.getHeardRumours());
+            LostTalesClientQuestProgressStore.setWaitingRewards(packet.getWaitingRewards());
+            LostTalesClientQuestProgressStore.setRumourPlaces(packet.getRumourPlaces());
         }
     }
 
@@ -629,6 +649,23 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     @Override
+    public void handleAccessoryCatalog(
+            com.ninuna.losttales.network.packet.AccessoryCatalogPacket packet) {
+        if (packet != null && !packet.isMalformed()) {
+            com.ninuna.losttales.accessory.Accessories.useOnClient(packet.getDefinitions());
+        }
+    }
+
+    @Override
+    public void handleArmourCatalog(
+            com.ninuna.losttales.network.packet.ArmourCatalogPacket packet) {
+        if (packet != null && !packet.isMalformed()) {
+            com.ninuna.losttales.armour.Armour.useOnClient(packet.getCatalogue(),
+                    packet.getSettings());
+        }
+    }
+
+    @Override
     public void scheduleClientTask(Runnable task) {
         CharacterClientTaskQueue.enqueue(task);
     }
@@ -650,6 +687,14 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleCharacterProfile(CharacterProfilePacket packet) {
         ClientCharacterProfileCache.accept(packet);
+    }
+
+    @Override
+    public void handleCharacterGear(CharacterGearPacket packet) {
+        if (packet != null && !packet.isMalformed()) {
+            com.ninuna.losttales.client.character.ClientCharacterGearCache
+                    .accept(packet.getCharacterId(), packet.getGear());
+        }
     }
 
     @Override
@@ -862,6 +907,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ClientChatChannelState.setDiscordLinks(packet.getDiscordLinks());
             com.ninuna.losttales.client.chat.ClientChatPresence.setDiscordStatuses(
                     packet.showsDiscordStatuses());
+            ClientChatChannelState.setWhispersLogged(packet.logsWhispers());
             // The words the server adds to the profanity list, over the
             // bundled ones, for as long as this server is the place.
             ChatProfanityCatalog.installServerWords(packet.getProfanityWords());

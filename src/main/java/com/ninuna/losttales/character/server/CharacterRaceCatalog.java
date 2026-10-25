@@ -28,18 +28,23 @@ import net.minecraft.world.World;
 
 /**
  * The races and capes a server plays with (CHAR-38, CHAR-39), read as it
- * starts, after the skills: the bundled files with the server's own in
- * {@code config/losttales/races/} and {@code capes/} in place of those of
- * the same id and its new ones after. A race a character still names but
- * no file has any more stands in as its body's own race, as the character
- * remembers the body. Every player's game is sent the lists as it joins
- * ({@link CharacterRaceCatalogSync}).
+ * starts, after the skills, and again on {@code /losttales reload races}
+ * (both) and {@code reload capes} (the capes alone, DATA-11): the bundled
+ * files with the server's own in {@code config/losttales/races/} and
+ * {@code capes/} in place of those of the same id and its new ones after.
+ * A race a character still names but no file has any more stands in as its
+ * body's own race, as the character remembers the body. Every player's game
+ * is sent the lists as it joins ({@link CharacterRaceCatalogSync}).
  */
 public final class CharacterRaceCatalog {
 
     private CharacterRaceCatalog() {}
 
-    /** Reads both lists again and puts them in place; answers why each file left out was left out. */
+    /**
+     * Reads both lists again and puts them in place together, once both
+     * are read: a read that fails leaves both as they were. Answers why
+     * each file left out was left out.
+     */
     public static synchronized List<String> load(World world) {
         List<String> problems = new ArrayList<String>();
         CharacterFactionResolver factions = LotrCharacterAdapter.getInstance();
@@ -47,9 +52,25 @@ public final class CharacterRaceCatalog {
                 ProgressionCatalog.skillsById().keySet(),
                 ProgressionFiles.folder(CharacterRaceFiles.FOLDER), factions, problems);
         races.addAll(standIns(world, races, problems));
+        List<CharacterCapeDefinition> capes = readCapes(races,
+                ProgressionFiles.folder(CharacterCapeCatalog.FOLDER), factions, problems);
         CharacterRaceRegistry.set(races);
-        CharacterCapeCatalog.set(readCapes(races,
-                ProgressionFiles.folder(CharacterCapeCatalog.FOLDER), factions, problems));
+        CharacterCapeCatalog.set(capes);
+        return problems;
+    }
+
+    /**
+     * Reads the cape files alone again, against the races in place, and
+     * puts them in place once read; answers why each file left out was
+     * left out.
+     */
+    public static synchronized List<String> loadCapes() {
+        List<String> problems = new ArrayList<String>();
+        List<CharacterCapeDefinition> capes = readCapes(
+                new ArrayList<CharacterRaceDefinition>(CharacterRaceRegistry.getAll()),
+                ProgressionFiles.folder(CharacterCapeCatalog.FOLDER),
+                LotrCharacterAdapter.getInstance(), problems);
+        CharacterCapeCatalog.set(capes);
         return problems;
     }
 

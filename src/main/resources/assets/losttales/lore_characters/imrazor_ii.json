@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:imrazor_ii",
   "name": "Imrazôr II, Prince of Dol Amroth",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:human",
-    "genderId": "losttales:male",
-    "modelId": "lotr:human",
-    "skinId": "losttales:human_gondor_male_7"
-  }
+  "race": "losttales:human",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:human_gondor_masculine_7",
+  "faction": "lotr:gondor"
 }

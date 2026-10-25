@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.moderation.ChatMuteDurations;
 import com.ninuna.losttales.chat.moderation.ChatMuteEntry;
 import com.ninuna.losttales.chat.moderation.ChatMuteStorage;
 import com.ninuna.losttales.chat.moderation.ChatMuteWorldData;
+import com.ninuna.losttales.character.server.KnownAccounts;
 import com.ninuna.losttales.chat.server.ChatAbsentReader;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
@@ -25,10 +26,12 @@ import net.minecraft.world.World;
  * Chat moderation for whoever holds {@code chat.moderate}: mute an
  * account, lift a mute, list what is in force. Mutes are account-keyed,
  * so no character switch or rename slips one, and they persist with the
- * world. Muting needs the player
- * online — you mute whoever is talking — while unmuting also works by
- * the stored name after they leave. Both are only for someone who holds
- * every capability the account holds ({@link #withheldPower}).
+ * world. The person is named as every command names one
+ * ({@link LostTalesCommandSubject}, DATA-05): an account or a character
+ * this world has seen, here or away, a character standing for the
+ * account that owns it; or a Discord member as {@code discord:<name>}.
+ * Both are only for someone who holds every capability the account holds
+ * ({@link #withheldPower}).
  */
 public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
 
@@ -93,21 +96,35 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             usage(sender, "/losttales chat mute <player> [30s|15m|2h|7d] [reason]");
             return;
         }
-        EntityPlayerMP target = LostTalesServerPlayers.findOnline(args[1]);
-        DiscordMember member = target == null
-                ? DiscordMember.parse(args[1]) : null;
-        if (target == null && member == null) {
-            say(sender, EnumChatFormatting.RED, SAY + "mute.not_online", args[1]);
-            return;
+        DiscordMember member = DiscordMember.parse(args[1]);
+        LostTalesCommandSubject subject = null;
+        if (member == null) {
+            if (args[1].trim().regionMatches(true, 0, DiscordMember.PREFIX, 0,
+                    DiscordMember.PREFIX.length())) {
+                say(sender, EnumChatFormatting.RED, LostTalesCommandSubject.UNKNOWN, args[1]);
+                return;
+            }
+            subject = LostTalesCommandSubject.account(sender, args[1]);
+            if (subject == null) {
+                return;
+            }
         }
-        if (target != null && target == sender) {
+        EntityPlayerMP target = subject == null ? null : subject.online();
+        UUID account = subject == null ? member.senderId : subject.owner;
+        String accountName = subject == null ? member.label
+                : accountName(account, target);
+        if (sender instanceof EntityPlayerMP
+                && account.equals(((EntityPlayerMP)sender).getUniqueID())) {
             say(sender, EnumChatFormatting.RED, SAY + "mute.self");
             return;
         }
-        String withheld = target == null ? null : withheldPower(sender, target);
+        // An account whose player is away is asked of the server's own lists.
+        String withheld = subject == null ? null : target != null
+                ? withheldPower(sender, target)
+                : withheldPower(sender, ChatAbsentReader.of(account, accountName));
         if (withheld != null) {
             say(sender, EnumChatFormatting.RED, SAY + "mute.withheld",
-                    target.getCommandSenderName(), withheld);
+                    accountName, withheld);
             return;
         }
         long now = System.currentTimeMillis();
@@ -121,9 +138,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             }
         }
         String reason = LostTalesCommandSubject.joinFrom(args, reasonFrom);
-        ChatMuteEntry entry = new ChatMuteEntry(
-                target != null ? target.getUniqueID() : member.senderId,
-                target != null ? target.getCommandSenderName() : member.label,
+        ChatMuteEntry entry = new ChatMuteEntry(account, accountName,
                 sender == null ? "" : sender.getCommandSenderName(),
                 reason, now, expiresAt);
         if (!mutes.mute(entry)) {
@@ -190,13 +205,24 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             usage(sender, "/losttales chat unmute <player>");
             return;
         }
-        EntityPlayerMP online = LostTalesServerPlayers.findOnline(args[1]);
-        DiscordMember member = online == null
-                ? DiscordMember.parse(args[1]) : null;
-        ChatMuteEntry stored = online != null
-                ? mutes.find(online.getUniqueID())
-                : member != null ? mutes.find(member.senderId)
-                        : mutes.findByName(args[1]);
+        DiscordMember member = DiscordMember.parse(args[1]);
+        ChatMuteEntry stored;
+        if (member != null) {
+            stored = mutes.find(member.senderId);
+        } else {
+            LostTalesCommandSubject subject = LostTalesCommandSubject.resolve(sender, args[1]);
+            stored = subject.problem == null ? mutes.find(subject.owner) : null;
+            if (stored == null && subject.problem != null) {
+                // The mute list is the server's own memory of the accounts
+                // it holds: a name it keeps still finds its mute.
+                stored = mutes.findByName(args[1]);
+                if (stored == null) {
+                    say(sender, EnumChatFormatting.RED, subject.problem,
+                            subject.problemArguments);
+                    return;
+                }
+            }
+        }
         if (stored == null && member != null) {
             // Muted under a name the member has since changed, or by id
             // and now named: the stored label still finds it.
@@ -206,6 +232,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "unmute.not_muted", args[1]);
             return;
         }
+        EntityPlayerMP online = LostTalesServerPlayers.findOnline(stored.getAccountId());
         if (sender instanceof EntityPlayerMP && stored.getAccountId().equals(
                 ((EntityPlayerMP)sender).getUniqueID())) {
             // As nobody mutes themselves, nobody lifts their own mute.
@@ -234,6 +261,13 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             online.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.unmuted"));
         }
+    }
+
+    /** The account's name: its player's here, else the one the server knows it by, else its id. */
+    private static String accountName(UUID account, EntityPlayerMP online) {
+        String name = online != null ? online.getCommandSenderName()
+                : KnownAccounts.nameOf(account);
+        return name.length() > 0 ? name : account.toString();
     }
 
     private void list(ICommandSender sender, ChatMuteWorldData mutes) {

@@ -51,6 +51,11 @@ public final class StartingKitFilesTest {
         }
 
         @Override
+        public boolean relicTakes(String relicId, String itemId) {
+            return "losttales:striders_garb".equals(relicId);
+        }
+
+        @Override
         public boolean wornThrough(String itemId, int damage) {
             return "lotr:item.hobbitPipe".equals(itemId) && damage >= 100;
         }
@@ -109,6 +114,21 @@ public final class StartingKitFilesTest {
         assertSaid("one stack of it holds 1", kit("{\"item\": \"lotr:item.hobbitPipe\", \"count\": 2}"));
         assertSaid("wears it through",
                 kit("{\"item\": \"lotr:item.hobbitPipe\", \"count\": 1, \"damage\": 100}"));
+    }
+
+    /** A kit may hand out a relic piece, marked with a relic set that takes it (CONTENT-11). */
+    @Test
+    public void aKitMarksARelicPieceASetTakes() {
+        String relic = kit("{\"item\": \"lotr:item.hobbitPipe\", \"count\": 1,"
+                + " \"relic\": \"losttales:striders_garb\"}");
+        assertEquals(new ArrayList<String>(), warnings(relic));
+        assertSaid("no relic set's id", relic.replace("losttales:striders_garb", "Strider"));
+        assertSaid("no relic set of that id takes",
+                relic.replace("losttales:striders_garb", "losttales:unknown"));
+        KitItem marked = new KitItem("lotr:item.hobbitPipe", 1, 0, "losttales:striders_garb");
+        assertTrue("a relic piece stacks with no unmarked one",
+                !marked.stacksWith(new KitItem("lotr:item.hobbitPipe", 1, 0)));
+        assertEquals("losttales:striders_garb", marked.withCount(1).getRelic());
     }
 
     @Test

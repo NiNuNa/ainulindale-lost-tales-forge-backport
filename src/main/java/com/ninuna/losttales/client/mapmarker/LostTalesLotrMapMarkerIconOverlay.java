@@ -8,11 +8,13 @@ import com.ninuna.losttales.client.character.ClientRoleplayCharacterIdentityHook
 import com.ninuna.losttales.client.fellowship.ClientFellowshipMarks;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
+import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
+import com.ninuna.losttales.quest.QuestRumourPlace;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
@@ -20,7 +22,8 @@ import com.ninuna.losttales.fellowship.sync.FellowshipTrackedMemberSnapshot;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import com.ninuna.losttales.fellowship.sync.FellowshipTrackingSnapshot;
 import cpw.mods.fml.common.FMLLog;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiBracketPanel;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -89,6 +92,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     /** Localized "+X more" summary for members the fan cannot show. */
     private static final String GROUP_MORE_LANG_KEY =
             "map.losttales.marker.group_more";
+    /** The name over a rumour's pin: the quest the rumour leads to (QUEST-20). */
+    private static final String RUMOUR_LANG_KEY = "gui.losttales.map.rumour";
     /**
      * Marker IDs for the client-only view of a LOTR custom waypoint. LOTR
      * owns the waypoint itself; these only identify the icon drawn for it.
@@ -106,10 +111,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      * shadow, so marker text reads as one set wherever it is drawn instead of
      * being white here and ivory on the HUD.
      */
-    private static final int LABEL_COLOR = LostTalesSkyrimUiStyle.rgb(
-            LostTalesSkyrimUiStyle.HUD_LABEL);
+    private static final int LABEL_COLOR = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
     private static final int LABEL_SHADOW_COLOR =
-            LostTalesSkyrimUiStyle.rgb(LostTalesSkyrimUiStyle.HUD_SHADOW);
+            LostTalesColors.rgb(LostTalesColors.HUD_SHADOW);
     /** Labels sit slightly back from the icons so the map stays readable. */
     private static final float LABEL_OPACITY = 0.8F;
     /**
@@ -119,9 +123,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      * flat black and the other tinted.
      */
     private static final float[] SHADOW_TINT = {
-            ((LostTalesSkyrimUiStyle.HUD_SHADOW >> 16) & 0xFF) / 255.0F,
-            ((LostTalesSkyrimUiStyle.HUD_SHADOW >> 8) & 0xFF) / 255.0F,
-            (LostTalesSkyrimUiStyle.HUD_SHADOW & 0xFF) / 255.0F
+            ((LostTalesColors.HUD_SHADOW >> 16) & 0xFF) / 255.0F,
+            ((LostTalesColors.HUD_SHADOW >> 8) & 0xFF) / 255.0F,
+            (LostTalesColors.HUD_SHADOW & 0xFF) / 255.0F
     };
     private static final float[] WHITE_TINT = { 1.0F, 1.0F, 1.0F };
     /**
@@ -2236,6 +2240,84 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     /**
+     * Pins the places the rumours heard point to (QUEST-20): the quest mark
+     * in the dim tone the journal marks a rumour with, the quest it leads to
+     * named over it, taking no pointer. Drawn under every marker, so a
+     * place shown as its own question mark covers the pin while the name
+     * stands over it. The map's Quests switch hides them with the quest
+     * markers; the names show where the markers' do.
+     */
+    public static void renderRumourPlaces(LOTRGuiMap gui, boolean drawLabels) {
+        if (!LostTalesMapLegendRegistry.isCategoryEnabled(
+                LostTalesMapLegendRegistry.QUESTS)) {
+            return;
+        }
+        RenderContext context = createRenderContext(gui);
+        if (context == null
+                || !LostTalesMapZoomFade.isDrawable(context.alpha)) {
+            return;
+        }
+        List<ClientQuestCatalog.RumourPin> pins = ClientQuestCatalog.rumourPins();
+        if (pins.isEmpty()) {
+            return;
+        }
+
+        beginIconRender();
+        float[] tint = toMapTint(new float[] {
+                LostTalesColors.redF(LostTalesColors.TEXT_DIM),
+                LostTalesColors.greenF(LostTalesColors.TEXT_DIM),
+                LostTalesColors.blueF(LostTalesColors.TEXT_DIM) });
+        float labelLift = artAbove(LostTalesCompassMarkerIcon.QUEST,
+                ICON_DRAW_SIZE) + LostTalesMapMarkerRenderedGeometry.LABEL_GAP;
+        try {
+            for (ClientQuestCatalog.RumourPin pin : pins) {
+                QuestRumourPlace place = pin.getPlace();
+                if (place.getDimensionId() != LOTRDimension.MIDDLE_EARTH.dimensionID) {
+                    continue;
+                }
+                ScreenPosition position = transformWorldCoords(
+                        context, place.getX(), place.getZ());
+                if (position == null || !iconOverlapsMap(
+                        position.x, position.y,
+                        ICON_HOVER_DRAW_SIZE, context)) {
+                    continue;
+                }
+                drawIconWithShadow(context.minecraft,
+                        position.x, position.y, ICON_DRAW_SIZE,
+                        LostTalesCompassMarkerIcon.QUEST,
+                        tint[0], tint[1], tint[2], context.alpha);
+                if (!drawLabels) {
+                    continue;
+                }
+                // Over a place's own question mark, the name stands a line
+                // above that mark's "?".
+                float lift = showsOwnMark(place.getMarkerId())
+                        ? labelLift + context.fontRenderer.FONT_HEIGHT
+                                * context.labelAlpha
+                                + LostTalesMapMarkerRenderedGeometry.LABEL_GAP
+                        : labelLift;
+                drawNameLabel(context, StatCollector.translateToLocalFormatted(
+                                RUMOUR_LANG_KEY, pin.getTitle()),
+                        position.x, position.y - lift,
+                        context.labelAlpha);
+            }
+        } catch (Throwable ignored) {
+            // A rumour's pin is visual-only; never break the LOTR map.
+        } finally {
+            endIconRender();
+        }
+    }
+
+    /** Whether the map shows the marker itself, as the question mark of a place not found. */
+    private static boolean showsOwnMark(String markerId) {
+        LostTalesMapMarkerData marker =
+                LostTalesClientMapMarkerStore.getSharedMarker(markerId);
+        return marker != null
+                && LostTalesClientMapMarkerVisibility.isUndiscoveredRegionVisible(marker)
+                && LostTalesMapLegendRegistry.isMarkerVisible(marker);
+    }
+
+    /**
      * Returns the marker under the mouse, preferring a requested marker ID
      * when several icons overlap at the same map location.
      */
@@ -2540,10 +2622,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             return;
         }
         try {
-            LostTalesSkyrimUiStyle.drawSelectionBrackets(
+            LostTalesUiBracketPanel.drawBrackets(
                     frame[0], frame[1], frame[2], frame[3],
                     SELECTED_FRAME_ARM,
-                    LostTalesSkyrimUiStyle.BORDER);
+                    LostTalesColors.BORDER);
         } catch (Throwable ignored) {
             // A selection frame is decoration; never take the map down for it.
         }

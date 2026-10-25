@@ -12,6 +12,7 @@ import com.ninuna.losttales.progression.ProgressionPlayerData;
 import com.ninuna.losttales.progression.ProgressionService;
 import com.ninuna.losttales.progression.ProgressionState;
 import com.ninuna.losttales.progression.SkillStanding;
+import com.ninuna.losttales.progression.count.CountEvents;
 import com.ninuna.losttales.progression.count.Things;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestRewards;
@@ -28,34 +29,52 @@ import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IChatComponent;
 
 /**
- * How a character earns its deeds (PROG-11): by the creatures it slays,
- * the quests it finishes and the world quests it helps win, the places
- * it reaches and the levels its skills and itself reach. A deed done
- * together counts for every companion in a fellowship who took part. An
- * earned deed gives its alignment and, bundled, its LOTR achievement,
- * which LOTR announces; a server's own deed the server announces itself.
+ * How a character earns its deeds (PROG-11): by the foes it slays, the
+ * quests it finishes and the world quests it helps win, the places it
+ * reaches and the levels its skills and itself reach. A kill counts only a
+ * creature that fights back, judged as the combat skills judge it; every
+ * completion of a quest counts. A deed done together counts for every
+ * companion in a fellowship who took part. An earned deed gives its
+ * alignment and, bundled, its LOTR achievement, which LOTR announces; a
+ * server's own deed the server announces itself.
  */
 public final class DeedService {
     /** What any creature is, for a kill deed. */
     public static final String ANY_CREATURE = "*";
 
+    /** What one finished quest does to a deed. */
+    enum QuestStep {
+        /** Nothing: the deed asks for no such quest. */
+        NONE,
+        /** One more counted: every completion, a repeatable quest's each time. */
+        COUNT,
+        /** The deed's listed quests are looked up in the History again. */
+        LISTED
+    }
+
     private DeedService() {}
 
-    /** A creature slain: the killer counts it, and so do the companions who struck it too. */
+    /**
+     * A creature slain: the killer counts it, and so do the companions
+     * who struck it too, each only where it fought back against them
+     * ({@link CountEvents#isFoe}), so a named chicken is no named foe.
+     */
     public static void creatureSlain(EntityPlayerMP killer, EntityLivingBase target,
                                      Collection<EntityPlayerMP> strikers) {
+        if (killer == null || target == null || !CountEvents.isFoe(killer, target)) {
+            return;
+        }
         String name = Things.nameOf(target);
         boolean named = target instanceof EntityLiving && ((EntityLiving) target).hasCustomNameTag();
         for (DeedDefinition deed : ProgressionCatalog.deeds()) {
-            if (deed.getKind() != DeedDefinition.Kind.KILL || deed.isNamed() && !named
-                    || !deed.getCreatures().isEmpty() && !deed.getCreatures().contains(name)
-                    && !deed.getCreatures().contains(ANY_CREATURE)) {
+            if (!countsKill(deed, name, named, true)) {
                 continue;
             }
             count(killer, deed, 1L);
             if (deed.isTogether() && strikers != null) {
                 for (EntityPlayerMP striker : strikers) {
-                    if (striker != killer && FellowshipCompanions.areCompanions(killer, striker)) {
+                    if (striker != killer && FellowshipCompanions.areCompanions(killer, striker)
+                            && countsKill(deed, name, named, CountEvents.isFoe(striker, target))) {
                         count(striker, deed, 1L);
                     }
                 }
@@ -63,20 +82,52 @@ public final class DeedService {
         }
     }
 
+    /**
+     * Whether a kill deed counts a slain creature: a foe that fought back,
+     * of the creatures it lists or any, bearing a name where it asks for one.
+     */
+    static boolean countsKill(DeedDefinition deed, String creature, boolean named,
+                              boolean foe) {
+        return foe && deed.getKind() == DeedDefinition.Kind.KILL
+                && (!deed.isNamed() || named)
+                && (deed.getCreatures().isEmpty() || deed.getCreatures().contains(creature)
+                        || deed.getCreatures().contains(ANY_CREATURE));
+    }
+
     /** A quest finished, and for a world quest, one the player helped win. */
     public static void questFinished(EntityPlayerMP player, LostTalesQuestDefinition quest) {
         for (DeedDefinition deed : ProgressionCatalog.deeds()) {
-            if (deed.getKind() == DeedDefinition.Kind.QUESTS) {
-                if (deed.getQuests().isEmpty()) {
+            switch (questStep(deed, quest.getId(), quest.isWorldQuest())) {
+                case COUNT:
                     count(player, deed, 1L);
-                } else if (deed.getQuests().contains(quest.getId())) {
+                    break;
+                case LISTED:
                     evaluateQuests(player, deed);
-                }
-            } else if (deed.getKind() == DeedDefinition.Kind.WORLD_QUEST && quest.isWorldQuest()
-                    && (deed.getQuests().isEmpty() || deed.getQuests().contains(quest.getId()))) {
-                count(player, deed, 1L);
+                    break;
+                default:
+                    break;
             }
         }
+    }
+
+    /**
+     * What a finished quest does to a deed: a deed of any quests counts
+     * every completion, the same quest's again each time it is done; a deed
+     * of listed quests looks them up in the History; a world quest deed
+     * counts each world quest the player helped win, of those it lists or any.
+     */
+    static QuestStep questStep(DeedDefinition deed, String questId, boolean worldQuest) {
+        if (deed.getKind() == DeedDefinition.Kind.QUESTS) {
+            if (deed.getQuests().isEmpty()) {
+                return QuestStep.COUNT;
+            }
+            return deed.getQuests().contains(questId) ? QuestStep.LISTED : QuestStep.NONE;
+        }
+        if (deed.getKind() == DeedDefinition.Kind.WORLD_QUEST && worldQuest
+                && (deed.getQuests().isEmpty() || deed.getQuests().contains(questId))) {
+            return QuestStep.COUNT;
+        }
+        return QuestStep.NONE;
     }
 
     /**

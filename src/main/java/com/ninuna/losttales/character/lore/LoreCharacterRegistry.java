@@ -1,308 +1,178 @@
 package com.ninuna.losttales.character.lore;
 
-import com.ninuna.losttales.character.validation.CharacterNames;
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.character.validation.CharacterNames;
+import com.ninuna.losttales.data.DataFiles;
+import com.ninuna.losttales.progression.ProgressionFiles;
 import com.ninuna.losttales.util.LostTalesIdentifiers;
+import com.ninuna.losttales.util.LostTalesLog;
 import cpw.mods.fml.common.FMLLog;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
- * Server-authoritative registry of unique lore-character identities.
+ * The lore characters the logical server knows (CHAR-43): the bundled
+ * files, with a server's own in {@code config/losttales/lore_characters/}
+ * in place of those of the same id and its new ones after, read through
+ * {@link DataFiles} as the server starts, after its races, and on
+ * {@code /losttales reload lore}, against the races in place then; cleared
+ * as it stops. Before the server starts it holds none.
  *
- * Bundled files and server-local additions use the same minimal format. Files
- * are loaded once during startup, and no later source may replace an identity
- * that was already registered by stable ID or normalized display name.
+ * <p>No two hold one name, as {@link CharacterNames#key} compares names: a
+ * server's file whose name another figure has is left out, and so is a
+ * later bundled one.</p>
  */
 public final class LoreCharacterRegistry {
 
-    public static final String CLASSPATH_INDEX = "lore_characters/index.json";
-    public static final String EXTERNAL_DIRECTORY = "losttales/lore_characters";
-    public static final int MAX_EXTERNAL_FILES = 256;
-    public static final long MAX_EXTERNAL_FILE_BYTES = 32L * 1024L;
-
-    private static final Map<String, LoreCharacterDefinition> DEFINITIONS_BY_ID =
-            new LinkedHashMap<String, LoreCharacterDefinition>();
-    private static final Map<String, LoreCharacterDefinition> DEFINITIONS_BY_NAME =
-            new LinkedHashMap<String, LoreCharacterDefinition>();
-    private static List<LoreCharacterDefinition> sortedDefinitions =
-            Collections.emptyList();
-    private static List<String> loadErrors = Collections.emptyList();
-    private static File externalDirectory;
+    private static Map<String, LoreCharacterDefinition> byId =
+            Collections.<String, LoreCharacterDefinition>emptyMap();
+    private static Map<String, LoreCharacterDefinition> byName =
+            Collections.<String, LoreCharacterDefinition>emptyMap();
+    private static List<LoreCharacterDefinition> sorted =
+            Collections.<LoreCharacterDefinition>emptyList();
+    private static List<String> problems = Collections.<String>emptyList();
     private static boolean loaded;
 
     private LoreCharacterRegistry() {}
 
-    public static synchronized void load(File modConfigurationDirectory) {
-        Map<String, LoreCharacterDefinition> byId =
-                new LinkedHashMap<String, LoreCharacterDefinition>();
-        Map<String, LoreCharacterDefinition> byName =
-                new LinkedHashMap<String, LoreCharacterDefinition>();
-        Map<String, String> idSources = new LinkedHashMap<String, String>();
-        Map<String, String> nameSources = new LinkedHashMap<String, String>();
-        List<String> errors = new ArrayList<String>();
-
-        int bundledCount = loadBundled(
-                byId, byName, idSources, nameSources, errors);
-        externalDirectory = resolveExternalDirectory(modConfigurationDirectory);
-        int externalCount = loadExternal(
-                externalDirectory, byId, byName,
-                idSources, nameSources, errors);
-
-        DEFINITIONS_BY_ID.clear();
-        DEFINITIONS_BY_ID.putAll(byId);
-        DEFINITIONS_BY_NAME.clear();
-        DEFINITIONS_BY_NAME.putAll(byName);
-        rebuildSortedDefinitions();
-        loadErrors = Collections.unmodifiableList(new ArrayList<String>(errors));
-        loaded = true;
-
-        logInfo("[%s] Registered %d unique lore characters (%d bundled, %d server-local, %d rejected files)",
-                LostTalesMetaData.MOD_ID,
-                Integer.valueOf(DEFINITIONS_BY_ID.size()),
-                Integer.valueOf(bundledCount),
-                Integer.valueOf(externalCount),
-                Integer.valueOf(errors.size()));
-        for (String error : errors) {
-            logWarning("[%s] Lore character JSON rejected: %s",
-                    LostTalesMetaData.MOD_ID, error);
-        }
+    /**
+     * Reads the bundled files and the server's own again, against the
+     * server's races and LOTR's factions; answers why each file left out
+     * was left out.
+     */
+    public static synchronized List<String> load() {
+        return load(ProgressionFiles.folder(LoreCharacterFiles.FOLDER));
     }
 
-    public static synchronized void ensureLoaded() {
-        if (!loaded) {
-            load(null);
+    /** The bundled files and those in {@code folder}, none for null, against the running game. */
+    public static synchronized List<String> load(File folder) {
+        return load(ProgressionFiles.CLASSPATH, folder, LoreCharacterFiles.GAME);
+    }
+
+    /** The bundled files {@code bundledSource} holds and those in {@code folder}, against {@code game}. */
+    public static synchronized List<String> load(DataFiles.Source bundledSource, File folder,
+                                                 LoreCharacterFiles.Game game) {
+        DataFiles.Kind<LoreCharacterDefinition> kind = LoreCharacterFiles.kind(game);
+        DataFiles.Result<LoreCharacterDefinition> bundled = DataFiles.readBundled(
+                bundledSource, LoreCharacterFiles.INDEX, LoreCharacterFiles.LIST_KEY, kind);
+        DataFiles.Result<LoreCharacterDefinition> server = folder == null
+                ? new DataFiles.Result<LoreCharacterDefinition>(
+                        new ArrayList<LoreCharacterDefinition>(), new ArrayList<String>())
+                : DataFiles.readFolder(folder, kind);
+        List<String> found = new ArrayList<String>();
+        note(found, "Bundled lore character", bundled.problems);
+        note(found, "Server lore character", server.problems);
+
+        List<String> clashes = new ArrayList<String>();
+        Map<String, String> names = new LinkedHashMap<String, String>();
+        List<LoreCharacterDefinition> bundledKept = new ArrayList<LoreCharacterDefinition>();
+        for (LoreCharacterDefinition definition : bundled.values) {
+            if (takeName(names, definition, clashes)) {
+                bundledKept.add(definition);
+            }
         }
+        note(found, "Bundled lore character", clashes);
+        clashes.clear();
+        List<LoreCharacterDefinition> serverKept = new ArrayList<LoreCharacterDefinition>();
+        for (LoreCharacterDefinition definition : server.values) {
+            if (takeName(names, definition, clashes)) {
+                serverKept.add(definition);
+            }
+        }
+        note(found, "Server lore character", clashes);
+
+        Map<String, LoreCharacterDefinition> ids =
+                new LinkedHashMap<String, LoreCharacterDefinition>();
+        Map<String, LoreCharacterDefinition> keys =
+                new LinkedHashMap<String, LoreCharacterDefinition>();
+        for (LoreCharacterDefinition definition
+                : DataFiles.merge(bundledKept, serverKept, kind)) {
+            ids.put(definition.getId(), definition);
+            keys.put(normalizeName(definition.getName()), definition);
+        }
+        byId = Collections.unmodifiableMap(ids);
+        byName = Collections.unmodifiableMap(keys);
+        sorted = sortedByName(ids.values());
+        problems = Collections.unmodifiableList(found);
+        loaded = true;
+        logInfo("[%s] %d lore characters, %d of them the server's own; %d warnings left files out",
+                LostTalesMetaData.MOD_ID, Integer.valueOf(ids.size()),
+                Integer.valueOf(serverKept.size()), Integer.valueOf(found.size()));
+        return problems;
+    }
+
+    /** Forgets every figure, as the server stops. */
+    public static synchronized void clear() {
+        byId = Collections.<String, LoreCharacterDefinition>emptyMap();
+        byName = Collections.<String, LoreCharacterDefinition>emptyMap();
+        sorted = Collections.<LoreCharacterDefinition>emptyList();
+        problems = Collections.<String>emptyList();
+        loaded = false;
+    }
+
+    /** Whether the files have been read since the server started. */
+    public static synchronized boolean isLoaded() {
+        return loaded;
     }
 
     public static synchronized LoreCharacterDefinition get(String id) {
-        ensureLoaded();
-        return DEFINITIONS_BY_ID.get(LostTalesIdentifiers.normalize(id));
+        return byId.get(LostTalesIdentifiers.normalize(id));
     }
 
     public static synchronized LoreCharacterDefinition getByName(String name) {
-        ensureLoaded();
-        return DEFINITIONS_BY_NAME.get(normalizeName(name));
+        return byName.get(normalizeName(name));
     }
 
+    /** Every figure, by name. */
     public static synchronized Collection<LoreCharacterDefinition> getAll() {
-        ensureLoaded();
-        return sortedDefinitions;
+        return sorted;
     }
 
+    /** Why each file left out at the last read was left out. */
     public static synchronized List<String> getLoadErrors() {
-        ensureLoaded();
-        return loadErrors;
-    }
-
-    private static int loadBundled(
-            Map<String, LoreCharacterDefinition> byId,
-            Map<String, LoreCharacterDefinition> byName,
-            Map<String, String> idSources,
-            Map<String, String> nameSources,
-            List<String> errors) {
-        Reader indexReader = null;
-        List<String> files = Collections.emptyList();
-        try {
-            indexReader = openClasspathReader(CLASSPATH_INDEX);
-            if (indexReader == null) {
-                errors.add("missing bundled index assets/"
-                        + LostTalesMetaData.MOD_ID + "/" + CLASSPATH_INDEX);
-                return 0;
-            }
-            files = LoreCharacterDefinitionJsonParser.parseIndex(indexReader);
-        } catch (RuntimeException e) {
-            errors.add("bundled index: " + safeMessage(e));
-            return 0;
-        } catch (IOException e) {
-            errors.add("bundled index: " + safeMessage(e));
-            return 0;
-        } finally {
-            LostTalesCloseables.closeQuietly(indexReader);
-        }
-
-        int registered = 0;
-        for (String file : files) {
-            Reader reader = null;
-            String source = "bundled:" + file;
-            try {
-                reader = openClasspathReader(file);
-                if (reader == null) {
-                    errors.add("missing bundled file " + file);
-                    continue;
-                }
-                LoreCharacterDefinitionJsonParser.ParseResult result =
-                        LoreCharacterDefinitionJsonParser.parseDefinition(
-                                reader, source);
-                errors.addAll(result.getErrors());
-                if (result.isValid() && registerUnique(
-                        result.getDefinition(), source,
-                        byId, byName, idSources, nameSources, errors)) {
-                    registered++;
-                }
-            } catch (RuntimeException e) {
-                errors.add(source + ": " + safeMessage(e));
-            } finally {
-                LostTalesCloseables.closeQuietly(reader);
-            }
-        }
-        return registered;
-    }
-
-    private static int loadExternal(
-            File directory,
-            Map<String, LoreCharacterDefinition> byId,
-            Map<String, LoreCharacterDefinition> byName,
-            Map<String, String> idSources,
-            Map<String, String> nameSources,
-            List<String> errors) {
-        if (directory == null) {
-            return 0;
-        }
-        if (!directory.exists() && !directory.mkdirs()) {
-            errors.add("cannot create external directory " + directory.getPath());
-            return 0;
-        }
-        if (!directory.isDirectory()) {
-            errors.add("external path is not a directory: " + directory.getPath());
-            return 0;
-        }
-
-        File[] candidates = directory.listFiles();
-        if (candidates == null) {
-            errors.add("cannot list external directory " + directory.getPath());
-            return 0;
-        }
-        List<File> files = new ArrayList<File>();
-        for (File candidate : candidates) {
-            if (candidate != null && candidate.isFile()
-                    && candidate.getName().toLowerCase(Locale.ROOT).endsWith(".json")) {
-                files.add(candidate);
-            }
-        }
-        Collections.sort(files, new Comparator<File>() {
-            @Override
-            public int compare(File left, File right) {
-                return left.getName().compareToIgnoreCase(right.getName());
-            }
-        });
-        if (files.size() > MAX_EXTERNAL_FILES) {
-            errors.add("external directory contains " + files.size()
-                    + " JSON files; only the first " + MAX_EXTERNAL_FILES
-                    + " sorted files are considered");
-            files = new ArrayList<File>(files.subList(0, MAX_EXTERNAL_FILES));
-        }
-
-        int registered = 0;
-        for (File file : files) {
-            String source = "config:" + file.getName();
-            if (!isDirectChild(directory, file)) {
-                errors.add(source + " escapes the lore-character directory");
-                continue;
-            }
-            if (file.length() < 0L || file.length() > MAX_EXTERNAL_FILE_BYTES) {
-                errors.add(source + " exceeds " + MAX_EXTERNAL_FILE_BYTES + " bytes");
-                continue;
-            }
-            Reader reader = null;
-            try {
-                reader = new InputStreamReader(
-                        new FileInputStream(file), StandardCharsets.UTF_8);
-                LoreCharacterDefinitionJsonParser.ParseResult result =
-                        LoreCharacterDefinitionJsonParser.parseDefinition(
-                                reader, source);
-                errors.addAll(result.getErrors());
-                if (result.isValid() && registerUnique(
-                        result.getDefinition(), source,
-                        byId, byName, idSources, nameSources, errors)) {
-                    registered++;
-                }
-            } catch (FileNotFoundException e) {
-                errors.add(source + ": " + safeMessage(e));
-            } finally {
-                LostTalesCloseables.closeQuietly(reader);
-            }
-        }
-        return registered;
-    }
-
-    private static boolean registerUnique(
-            LoreCharacterDefinition definition,
-            String source,
-            Map<String, LoreCharacterDefinition> byId,
-            Map<String, LoreCharacterDefinition> byName,
-            Map<String, String> idSources,
-            Map<String, String> nameSources,
-            List<String> errors) {
-        String id = definition.getId();
-        if (byId.containsKey(id)) {
-            errors.add(source + " duplicates id " + id
-                    + " already registered by " + idSources.get(id));
-            return false;
-        }
-        String normalizedName = normalizeName(definition.getName());
-        if (normalizedName.length() == 0) {
-            errors.add(source + " has a display name without letters or numbers");
-            return false;
-        }
-        if (byName.containsKey(normalizedName)) {
-            errors.add(source + " duplicates display name " + definition.getName()
-                    + " already registered by " + nameSources.get(normalizedName));
-            return false;
-        }
-
-        byId.put(id, definition);
-        byName.put(normalizedName, definition);
-        idSources.put(id, source);
-        nameSources.put(normalizedName, source);
-        return true;
+        return problems;
     }
 
     static String normalizeName(String name) {
         return CharacterNames.key(name);
     }
 
-    private static File resolveExternalDirectory(File modConfigurationDirectory) {
-        return modConfigurationDirectory == null ? null
-                : new File(modConfigurationDirectory, EXTERNAL_DIRECTORY);
-    }
-
-    private static Reader openClasspathReader(String file) {
-        String path = "assets/" + LostTalesMetaData.MOD_ID + "/" + file;
-        InputStream stream = LoreCharacterRegistry.class.getClassLoader()
-                .getResourceAsStream(path);
-        return stream == null ? null
-                : new InputStreamReader(stream, StandardCharsets.UTF_8);
-    }
-
-    private static boolean isDirectChild(File directory, File file) {
-        try {
-            return directory.getCanonicalFile().equals(
-                    file.getCanonicalFile().getParentFile());
-        } catch (IOException ignored) {
+    /**
+     * Gives {@code definition} its name unless another figure holds it;
+     * a server's figure of a bundled id lets go of the bundled one's name.
+     */
+    private static boolean takeName(Map<String, String> names,
+                                    LoreCharacterDefinition definition,
+                                    List<String> clashes) {
+        String key = normalizeName(definition.getName());
+        String holder = names.get(key);
+        if (holder != null && !holder.equals(definition.getId())) {
+            clashes.add(definition.getId() + ": its name " + definition.getName()
+                    + " is the lore character " + holder + "'s");
             return false;
         }
+        Iterator<Map.Entry<String, String>> held = names.entrySet().iterator();
+        while (held.hasNext()) {
+            if (held.next().getValue().equals(definition.getId())) {
+                held.remove();
+            }
+        }
+        names.put(key, definition.getId());
+        return true;
     }
 
-    private static void rebuildSortedDefinitions() {
+    private static List<LoreCharacterDefinition> sortedByName(
+            Collection<LoreCharacterDefinition> definitions) {
         List<LoreCharacterDefinition> values =
-                new ArrayList<LoreCharacterDefinition>(DEFINITIONS_BY_ID.values());
+                new ArrayList<LoreCharacterDefinition>(definitions);
         Collections.sort(values, new Comparator<LoreCharacterDefinition>() {
             @Override
             public int compare(LoreCharacterDefinition left,
@@ -312,24 +182,21 @@ public final class LoreCharacterRegistry {
                         : left.getId().compareToIgnoreCase(right.getId());
             }
         });
-        sortedDefinitions = Collections.unmodifiableList(values);
+        return Collections.unmodifiableList(values);
     }
 
-    private static String safeMessage(Throwable throwable) {
-        String message = throwable == null ? null : throwable.getMessage();
-        return message == null || message.length() == 0
-                ? throwable.getClass().getSimpleName() : message;
+    private static void note(List<String> problems, String what, List<String> found) {
+        for (String problem : found) {
+            problems.add(problem);
+            LostTalesLog.warning("%s left out: %s", what, problem);
+        }
     }
 
     private static void logInfo(String format, Object... arguments) {
         try {
             FMLLog.info(format, arguments);
-        } catch (RuntimeException ignored) {}
-    }
-
-    private static void logWarning(String format, Object... arguments) {
-        try {
-            FMLLog.warning(format, arguments);
-        } catch (RuntimeException ignored) {}
+        } catch (RuntimeException unavailable) {
+            // FML's logger is not set up outside a running game.
+        }
     }
 }

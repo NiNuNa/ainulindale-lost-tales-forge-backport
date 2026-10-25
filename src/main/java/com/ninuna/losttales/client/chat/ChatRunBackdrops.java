@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.Tessellator;
@@ -330,12 +329,12 @@ final class ChatRunBackdrops {
         if (right - left < 2.0F || bottom - top < 2.0F || alpha <= 0) {
             return;
         }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(false);
+        Tessellator tessellator = LostTalesUiInk.beginQuads(false);
         tessellator.setColorRGBA_I(rgb & 0xFFFFFF, alpha);
         quad(tessellator, left + 1.0F, top, right - 1.0F, bottom);
         quad(tessellator, left, top + 1.0F, left + 1.0F, bottom - 1.0F);
         quad(tessellator, right - 1.0F, top + 1.0F, right, bottom - 1.0F);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, false);
+        LostTalesUiInk.endQuads(tessellator, false);
     }
 
     private static void quad(Tessellator tessellator, float left, float top,

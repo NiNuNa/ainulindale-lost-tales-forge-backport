@@ -37,7 +37,7 @@ public final class CharacterRaceCatalogPacket implements IMessage {
     private static final int MAX_ID_BYTES = 128;
     private static final int MAX_WORD_BYTES = 4 * 32;
     private static final int MAX_TEXTURE_BYTES = 256;
-    private static final int MAX_SEXES = 3;
+    private static final int MAX_BODY_TYPES = 3;
 
     private final List<CharacterRaceDefinition> races = new ArrayList<CharacterRaceDefinition>();
     private final List<CharacterCapeDefinition> capes = new ArrayList<CharacterCapeDefinition>();
@@ -145,7 +145,7 @@ public final class CharacterRaceCatalogPacket implements IMessage {
         }
         buf.writeByte(categories);
         writeStrings(buf, race.getAllowedFactionIds(), MAX_ID_BYTES);
-        writeStrings(buf, race.getAllowedGenderIds(), MAX_ID_BYTES);
+        writeStrings(buf, race.getAllowedBodyTypeIds(), MAX_ID_BYTES);
         buf.writeFloat(race.getWidth());
         buf.writeFloat(race.getHeight());
         buf.writeDouble(race.getMaxHealth());
@@ -155,7 +155,7 @@ public final class CharacterRaceCatalogPacket implements IMessage {
         for (CharacterRaceSkins skins : race.getSkins()) {
             LostTalesPacketCodec.writeUtf8String(buf, skins.getGroup(), MAX_ID_BYTES);
             LostTalesPacketCodec.writeUtf8String(buf, skins.getName(), MAX_WORD_BYTES);
-            LostTalesPacketCodec.writeUtf8String(buf, skins.getSexId(), MAX_ID_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buf, skins.getBodyTypeId(), MAX_ID_BYTES);
             LostTalesPacketCodec.writeUtf8String(buf, skins.getTexture(), MAX_TEXTURE_BYTES);
             buf.writeByte(skins.getCount());
         }
@@ -188,7 +188,7 @@ public final class CharacterRaceCatalogPacket implements IMessage {
             throw new LostTalesPacketCodec.DecodeException("no such faction category");
         }
         Set<String> factions = readStrings(buf, CharacterRaceFiles.MAX_FACTIONS, MAX_ID_BYTES);
-        Set<String> sexes = readStrings(buf, MAX_SEXES, MAX_ID_BYTES);
+        Set<String> bodyTypes = readStrings(buf, MAX_BODY_TYPES, MAX_ID_BYTES);
         float width = buf.readFloat();
         float height = buf.readFloat();
         double health = buf.readDouble();
@@ -215,7 +215,7 @@ public final class CharacterRaceCatalogPacket implements IMessage {
         String standInFor = LostTalesPacketCodec.readUtf8String(buf, MAX_ID_BYTES);
         CharacterBody body = CharacterBody.values()[bodyIndex];
         return new CharacterRaceDefinition(id, name, body, valuesFrom, categories, factions,
-                sexes, width, height, health, speed, attack, skins, skills, standInFor);
+                bodyTypes, width, height, health, speed, attack, skins, skills, standInFor);
     }
 
     private static void writeCape(ByteBuf buf, CharacterCapeDefinition cape) {

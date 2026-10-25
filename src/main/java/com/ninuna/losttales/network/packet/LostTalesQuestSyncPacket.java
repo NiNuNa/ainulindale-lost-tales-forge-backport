@@ -6,7 +6,10 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNamedAfter;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestIds;
+import com.ninuna.losttales.quest.QuestRumourPlace;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
+import com.ninuna.losttales.quest.player.WaitingReward;
+import com.ninuna.losttales.quest.player.WaitingRewards;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -23,8 +26,10 @@ import java.util.Map;
 import java.util.Set;
 /**
  * A player's whole quest log: running quests and their counts, the
- * History, tracked quests, discovered and placed markers, and the
- * missives' quests. It is sent when anything but a running quest's counts
+ * History, tracked quests, discovered and placed markers, the missives'
+ * quests, the rumours heard with the places they point to, and the
+ * rewards waiting for room. It is sent when anything but a running
+ * quest's counts
  * changes; counts alone travel as {@link LostTalesQuestProgressPacket}.
  */
 public class LostTalesQuestSyncPacket implements IMessage {
@@ -47,9 +52,15 @@ public class LostTalesQuestSyncPacket implements IMessage {
     private final List<LostTalesQuestDefinition> dynamicQuestDefinitions = new ArrayList<LostTalesQuestDefinition>();
     private String pinnedMapMarkerId = "";
     private final Set<String> heardRumours = new LinkedHashSet<String>();
+    /** Where those rumours point, by quest, each a quest among them (QUEST-20). */
+    private final Map<String, QuestRumourPlace> rumourPlaces =
+            new LinkedHashMap<String, QuestRumourPlace>();
     /** Whether the log is another character's, taken in place of the one held without news. */
     private boolean replaces;
     private boolean malformed;
+    /** The rewards waiting for room, each quest's in order (QUEST-44). */
+    private final Map<String, List<WaitingReward>> waitingRewards =
+            new LinkedHashMap<String, List<WaitingReward>>();
 
     public LostTalesQuestSyncPacket() {}
 
@@ -108,10 +119,52 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 data.getDiscoveredMarkerIds(), data.getPinnedMapMarkerId(),
                 data.getDynamicMapMarkers(),
                 data.getDynamicQuestDefinitions());
-        return packet.withHeardRumours(data.getHeardRumours());
+        return packet.withHeardRumours(data.getHeardRumours())
+                .withWaitingRewards(data.getWaitingRewards());
     }
 
-    /** The same log with the rumours its character heard (QUEST-20). */
+    /**
+     * The same log with the rewards waiting for room (QUEST-44), each
+     * quest's as many as a log keeps; a reward that could not be kept is
+     * left out.
+     */
+    public LostTalesQuestSyncPacket withWaitingRewards(
+            Map<String, List<WaitingReward>> rewards) {
+        this.waitingRewards.clear();
+        if (rewards == null) {
+            return this;
+        }
+        for (Map.Entry<String, List<WaitingReward>> entry : rewards.entrySet()) {
+            if (this.waitingRewards.size() >= WaitingRewards.MAX_QUESTS
+                    || !LostTalesQuestIds.fits(entry.getKey())
+                    || entry.getValue() == null) {
+                continue;
+            }
+            List<WaitingReward> kept = new ArrayList<WaitingReward>();
+            for (WaitingReward reward : entry.getValue()) {
+                if (reward != null && reward.isValid()
+                        && kept.size() < WaitingRewards.MAX_KINDS_EACH) {
+                    kept.add(reward);
+                }
+            }
+            if (!kept.isEmpty()) {
+                this.waitingRewards.put(entry.getKey(),
+                        Collections.unmodifiableList(kept));
+            }
+        }
+        return this;
+    }
+
+    /** The rewards waiting for room, each quest's in order. */
+    public Map<String, List<WaitingReward>> getWaitingRewards() {
+        return Collections.unmodifiableMap(
+                new LinkedHashMap<String, List<WaitingReward>>(this.waitingRewards));
+    }
+
+    /**
+     * The same log with the rumours its character heard (QUEST-20); a
+     * place kept for a rumour no longer among them goes.
+     */
     public LostTalesQuestSyncPacket withHeardRumours(Collection<String> rumours) {
         this.heardRumours.clear();
         if (rumours != null) {
@@ -122,12 +175,38 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 }
             }
         }
+        this.rumourPlaces.keySet().retainAll(this.heardRumours);
         return this;
     }
 
     /** The quests whose rumours the character heard. */
     public Set<String> getHeardRumours() {
         return Collections.unmodifiableSet(new LinkedHashSet<String>(this.heardRumours));
+    }
+
+    /**
+     * The same log with the places its rumours point to (QUEST-20): each a
+     * rumour the log holds, valid, one for each quest; others are left out.
+     */
+    public LostTalesQuestSyncPacket withRumourPlaces(
+            Collection<QuestRumourPlace> places) {
+        this.rumourPlaces.clear();
+        if (places != null) {
+            for (QuestRumourPlace place : places) {
+                if (place != null && place.isValid()
+                        && this.heardRumours.contains(place.getQuestId())
+                        && !this.rumourPlaces.containsKey(place.getQuestId())) {
+                    this.rumourPlaces.put(place.getQuestId(), place);
+                }
+            }
+        }
+        return this;
+    }
+
+    /** Where the rumours heard point, in the order they were heard. */
+    public List<QuestRumourPlace> getRumourPlaces() {
+        return Collections.unmodifiableList(
+                new ArrayList<QuestRumourPlace>(this.rumourPlaces.values()));
     }
 
     /**
@@ -255,6 +334,25 @@ public class LostTalesQuestSyncPacket implements IMessage {
             }
             readIdentifierSet(buf, this.heardRumours, "heard rumour",
                     LostTalesQuestPlayerData.MAX_RUMOURS);
+            int placeCount = LostTalesPacketCodec.readCount(buf,
+                    LostTalesQuestPlayerData.MAX_RUMOURS, "rumour place");
+            for (int i = 0; i < placeCount; i++) {
+                QuestRumourPlace place = new QuestRumourPlace(
+                        readIdentifier(buf), readIdentifier(buf),
+                        readName(buf), LostTalesPacketCodec.readUtf8String(buf,
+                                LostTalesMapMarkerNamedAfter.MAX_LENGTH),
+                        buf.readInt(), buf.readDouble(), buf.readDouble());
+                if (!place.isValid()
+                        || !this.heardRumours.contains(place.getQuestId())
+                        || this.rumourPlaces.containsKey(place.getQuestId())
+                        || !LostTalesMapMarkerNamedAfter.isValid(
+                                place.getNamedAfter())) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid rumour place");
+                }
+                this.rumourPlaces.put(place.getQuestId(), place);
+            }
+            readWaitingRewards(buf, this.waitingRewards);
             this.replaces = buf.readBoolean();
             LostTalesPacketCodec.requireFinished(buf);
         } catch (RuntimeException exception) {
@@ -333,6 +431,19 @@ public class LostTalesQuestSyncPacket implements IMessage {
         }
         writeIdentifierSet(buf, this.heardRumours, "heard rumour",
                 LostTalesQuestPlayerData.MAX_RUMOURS);
+        LostTalesPacketCodec.writeCount(buf, this.rumourPlaces.size(),
+                LostTalesQuestPlayerData.MAX_RUMOURS, "rumour place");
+        for (QuestRumourPlace place : this.rumourPlaces.values()) {
+            writeIdentifier(buf, place.getQuestId());
+            writeIdentifier(buf, place.getMarkerId());
+            writeName(buf, place.getName());
+            LostTalesPacketCodec.writeUtf8String(buf, place.getNamedAfter(),
+                    LostTalesMapMarkerNamedAfter.MAX_LENGTH);
+            buf.writeInt(place.getDimensionId());
+            buf.writeDouble(place.getX());
+            buf.writeDouble(place.getZ());
+        }
+        writeWaitingRewards(buf, this.waitingRewards);
         buf.writeBoolean(this.replaces);
         if (buf.writerIndex() - startIndex > MAX_PACKET_BYTES) {
             throw new IllegalStateException(
@@ -451,7 +562,9 @@ public class LostTalesQuestSyncPacket implements IMessage {
         return new LostTalesQuestSyncPacket(uncounted, this.questHistory,
                 this.pinnedQuestIds, this.discoveredMarkerIds,
                 this.pinnedMapMarkerId, this.dynamicMapMarkers,
-                this.dynamicQuestDefinitions).withHeardRumours(this.heardRumours);
+                this.dynamicQuestDefinitions).withHeardRumours(this.heardRumours)
+                .withRumourPlaces(this.rumourPlaces.values())
+                .withWaitingRewards(this.waitingRewards);
     }
 
     public List<LostTalesQuestProgress> getActiveQuests() {
@@ -494,7 +607,9 @@ public class LostTalesQuestSyncPacket implements IMessage {
 
     private void clearState() {
         this.replaces = false;
+        this.waitingRewards.clear();
         this.heardRumours.clear();
+        this.rumourPlaces.clear();
         this.activeQuests.clear();
         this.questHistory.clear();
         this.discoveredMarkerIds.clear();
@@ -502,6 +617,68 @@ public class LostTalesQuestSyncPacket implements IMessage {
         this.dynamicMapMarkers.clear();
         this.dynamicQuestDefinitions.clear();
         this.pinnedMapMarkerId = "";
+    }
+
+    /**
+     * The rewards waiting for room, as {@link #writeWaitingRewards} wrote
+     * them: each quest once, at least one reward each, every reward valid
+     * and of a kind its quest names once; throws on anything else.
+     */
+    private static void readWaitingRewards(ByteBuf buf,
+            Map<String, List<WaitingReward>> target) {
+        int questCount = LostTalesPacketCodec.readCount(buf,
+                WaitingRewards.MAX_QUESTS, "waiting quest");
+        for (int i = 0; i < questCount; i++) {
+            String questId = readIdentifier(buf);
+            int kinds = LostTalesPacketCodec.readCount(buf,
+                    WaitingRewards.MAX_KINDS_EACH, "waiting reward");
+            if (questId.length() == 0 || target.containsKey(questId) || kinds == 0) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid waiting rewards");
+            }
+            List<WaitingReward> rewards = new ArrayList<WaitingReward>();
+            for (int j = 0; j < kinds; j++) {
+                boolean starter = buf.readBoolean();
+                String id = readIdentifier(buf);
+                int meta = buf.readInt();
+                int count = buf.readInt();
+                String relic = readIdentifier(buf);
+                WaitingReward reward = starter ? WaitingReward.starter(id, count)
+                        : relic.length() > 0 ? WaitingReward.relic(id, relic, count)
+                        : WaitingReward.item(id, meta, count);
+                if (!reward.isValid() || starter && (meta != 0 || relic.length() > 0)
+                        || relic.length() > 0 && meta != 0) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid waiting reward");
+                }
+                for (WaitingReward before : rewards) {
+                    if (before.isSameKind(reward)) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "waiting reward named twice");
+                    }
+                }
+                rewards.add(reward);
+            }
+            target.put(questId, Collections.unmodifiableList(rewards));
+        }
+    }
+
+    private static void writeWaitingRewards(ByteBuf buf,
+            Map<String, List<WaitingReward>> rewards) {
+        LostTalesPacketCodec.writeCount(buf, rewards.size(),
+                WaitingRewards.MAX_QUESTS, "waiting quest");
+        for (Map.Entry<String, List<WaitingReward>> entry : rewards.entrySet()) {
+            writeIdentifier(buf, entry.getKey());
+            LostTalesPacketCodec.writeCount(buf, entry.getValue().size(),
+                    WaitingRewards.MAX_KINDS_EACH, "waiting reward");
+            for (WaitingReward reward : entry.getValue()) {
+                buf.writeBoolean(reward.isStarter());
+                writeIdentifier(buf, reward.getId());
+                buf.writeInt(reward.getMeta());
+                buf.writeInt(reward.getCount());
+                writeIdentifier(buf, reward.getRelic());
+            }
+        }
     }
 
     private static void readIdentifierSet(ByteBuf buf, Set<String> target,

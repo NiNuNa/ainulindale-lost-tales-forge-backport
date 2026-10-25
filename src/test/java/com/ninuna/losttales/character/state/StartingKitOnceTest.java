@@ -5,7 +5,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -61,8 +61,8 @@ public final class StartingKitOnceTest {
     private static RoleplayCharacter character(UUID id, int slot, String name) {
         return RoleplayCharacter.builder(id, OWNER)
                 .slot(slot).name(name).race(CharacterRaceRegistry.HOBBIT)
-                .gender(CharacterGenderRegistry.MALE)
-                .skin("losttales:hobbit_shire_male_0").age(50)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
+                .skin("losttales:hobbit_shire_masculine_0").age(50)
                 .startingFaction("lotr:hobbit")
                 .createdAt(1L)
                 .build();

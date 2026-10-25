@@ -1,0 +1,24 @@
+{
+  "id": "losttales:orocarni_light",
+  "helmet": [
+    "losttales:orocarni_helmet_light",
+    "losttales:orocarni_helmet_light_2",
+    "losttales:orocarni_helmet_light_3"
+  ],
+  "chestplate": [
+    "losttales:orocarni_armor_light"
+  ],
+  "leggings": [
+    "losttales:orocarni_leggings_light"
+  ],
+  "boots": [
+    "losttales:orocarni_boots_light"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:mining"
+    }
+  ]
+}

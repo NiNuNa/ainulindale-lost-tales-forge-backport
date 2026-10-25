@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.state;
 
 import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.storage.WorldClock;
 import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -55,6 +56,24 @@ public final class CharacterLastSeenWorldDataTest {
         loaded.readFromNBT(saved);
         assertTrue(loaded.seenWithin(recent, 30 * DAY, now));
         assertFalse(loaded.seenWithin(longGone, Long.MAX_VALUE, now));
+    }
+
+    /** A time whose ninety days ended inside a jump of the clock is kept (DATA-09). */
+    @Test
+    public void aTimeTheClocksJumpWouldForgetIsKept() {
+        final long now = 1000L * DAY;
+        WorldClock.Hold jump = new WorldClock.Hold() {
+            @Override
+            public boolean holds(long dueAt) {
+                return dueAt > now - 5L * DAY && dueAt <= now;
+            }
+        };
+        long forget = CharacterLastSeenWorldData.FORGET_AFTER_MILLIS;
+        assertTrue(CharacterLastSeenWorldData.forgotten(now - forget - 10L * DAY, now, jump));
+        assertFalse(CharacterLastSeenWorldData.forgotten(now - forget - DAY, now, jump));
+        assertTrue(CharacterLastSeenWorldData.forgotten(now - forget - DAY, now,
+                WorldClock.NONE));
+        assertFalse(CharacterLastSeenWorldData.forgotten(now - DAY, now, WorldClock.NONE));
     }
 
     @Test

@@ -50,6 +50,17 @@ public abstract class ScreenPart {
     /** Once per opening, after the first {@link #init}. */
     public void opened() {}
 
+    /**
+     * The chat's key, or with {@code command} the command key, pressed on
+     * the open screen where no field is typed in, the screen swapped to
+     * Chat Channels or Consoles already: the part brings forward the page
+     * the key opens the screen with, as {@link #opening} does. False for a
+     * part with none.
+     */
+    public boolean chatKey(boolean command) {
+        return false;
+    }
+
     /** Every tick while the screen is open. */
     public void tick() {}
 
@@ -165,8 +176,12 @@ public abstract class ScreenPart {
         return null;
     }
 
-    /** The tool strip's chevrons, Return and Shift+Return in its well over what the part shows. */
-    public boolean walkSearch(boolean forward) {
+    /**
+     * The tool strip's chevrons, Return and Shift+Return in its well, over
+     * what the part shows in {@code window}: a step through what the words
+     * of the copy in front there found.
+     */
+    public boolean walkSearch(Window window, boolean forward) {
         return false;
     }
 

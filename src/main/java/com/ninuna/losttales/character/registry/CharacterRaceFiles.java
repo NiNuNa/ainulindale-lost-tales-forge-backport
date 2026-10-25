@@ -64,9 +64,9 @@ public final class CharacterRaceFiles {
     private static final Pattern FACTION_ID = Pattern.compile("[a-z0-9_]+:[a-z0-9_.]+");
     private static final Pattern TEXTURE = Pattern.compile("[a-z0-9_]+:[A-Za-z0-9_./\\-]+");
     static final Set<String> KEYS = JsonReading.keys("id", "name", "body", "values_from",
-            "sexes", "size", "health", "speed", "attack", "faction_categories", "factions",
+            "body_types", "size", "health", "speed", "attack", "faction_categories", "factions",
             "skins", "skills");
-    static final Set<String> SKIN_KEYS = JsonReading.keys("group", "name", "sex",
+    static final Set<String> SKIN_KEYS = JsonReading.keys("group", "name", "body_type",
             "texture", "count");
     static final Set<String> SIZE_KEYS = JsonReading.keys("width", "height");
 
@@ -145,7 +145,7 @@ public final class CharacterRaceFiles {
             }
         }
         Set<String> factions = new LinkedHashSet<String>(where.strings(object, "factions"));
-        Set<String> sexes = new LinkedHashSet<String>(where.strings(object, "sexes"));
+        Set<String> bodyTypes = new LinkedHashSet<String>(where.strings(object, "body_types"));
 
         List<CharacterRaceSkins> skins = new ArrayList<CharacterRaceSkins>();
         int index = 0;
@@ -153,7 +153,7 @@ public final class CharacterRaceFiles {
             JsonReading skin = where.in("skins[" + index++ + "]");
             skin.unknownKeys(entry, SKIN_KEYS);
             skins.add(new CharacterRaceSkins(skin.string(entry, "group", ""),
-                    skin.string(entry, "name", ""), skin.string(entry, "sex", ""),
+                    skin.string(entry, "name", ""), skin.string(entry, "body_type", ""),
                     skin.string(entry, "texture", ""), skin.whole(entry, "count", 0)));
         }
 
@@ -171,7 +171,7 @@ public final class CharacterRaceFiles {
         }
 
         return new CharacterRaceDefinition(id, where.string(object, "name", ""), body,
-                where.string(object, "values_from", ""), categories, factions, sexes,
+                where.string(object, "values_from", ""), categories, factions, bodyTypes,
                 (float) width, (float) height, health, speed, attack, skins, skills, "");
     }
 
@@ -207,12 +207,12 @@ public final class CharacterRaceFiles {
         if (!within(race.getAttackDamage(), 0.0D, MAX_ATTACK)) {
             warnings.add("has attack " + race.getAttackDamage() + "; it is 0 to " + MAX_ATTACK);
         }
-        if (race.getAllowedGenderIds().isEmpty()) {
+        if (race.getAllowedBodyTypeIds().isEmpty()) {
             warnings.add("names no sexes");
         }
-        for (String sex : race.getAllowedGenderIds()) {
-            if (!CharacterGenderRegistry.contains(sex) || !sex.equals(sex.toLowerCase(Locale.ROOT))) {
-                warnings.add("names the sex '" + sex + "', which is none the game has");
+        for (String bodyType : race.getAllowedBodyTypeIds()) {
+            if (!CharacterBodyTypeRegistry.contains(bodyType) || !bodyType.equals(bodyType.toLowerCase(Locale.ROOT))) {
+                warnings.add("names the sex '" + bodyType + "', which is none the game has");
             }
         }
         if (race.getAllowedFactionCategories().isEmpty()
@@ -255,11 +255,11 @@ public final class CharacterRaceFiles {
                 warnings.add(where + " is in the group '" + skins.getGroup()
                         + "'; a group is up to 32 lower-case letters, digits and _, not 'account'");
             }
-            if (skins.getSexId().length() > 0 && !race.isGenderAllowed(skins.getSexId())) {
-                warnings.add(where + " is painted for '" + skins.getSexId()
+            if (skins.getBodyTypeId().length() > 0 && !race.isBodyTypeAllowed(skins.getBodyTypeId())) {
+                warnings.add(where + " is painted for '" + skins.getBodyTypeId()
                         + "', which is no sex the race has");
             }
-            if (!seen.add(skins.getGroup() + "|" + skins.getSexId())) {
+            if (!seen.add(skins.getGroup() + "|" + skins.getBodyTypeId())) {
                 warnings.add(where + " lists the group " + skins.getGroup()
                         + " for the same sex twice");
             }

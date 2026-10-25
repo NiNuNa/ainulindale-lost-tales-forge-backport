@@ -1,7 +1,7 @@
 package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterArmsRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterAppearanceKind;
 import io.netty.buffer.ByteBuf;
@@ -28,7 +28,7 @@ public final class CharacterGhostAndCapePacketTest {
     @Test
     public void theAppearanceSyncCarriesAGhostAsItself() {
         CharacterAppearance ghost = CharacterAppearance.forAccount(OWNER, "Steve",
-                CharacterBodyTypeRegistry.SLIM);
+                CharacterArmsRegistry.SLENDER);
         ByteBuf buffer = Unpooled.buffer();
         new CharacterAppearanceSyncPacket(true, Collections.singletonList(ghost))
                 .toBytes(buffer);
@@ -40,7 +40,7 @@ public final class CharacterGhostAndCapePacketTest {
         assertEquals(CharacterAppearanceKind.ACCOUNT, read.getKind());
         assertTrue(read.isAccount());
         assertEquals("Steve", read.getAccountName());
-        assertEquals(CharacterBodyTypeRegistry.SLIM, read.getBodyTypeId());
+        assertEquals(CharacterArmsRegistry.SLENDER, read.getArmsId());
         assertFalse(read.isMinecraftCapeVisible());
         assertEquals(CharacterCapeCatalog.NONE_ID, read.getCosmeticCapeId());
     }

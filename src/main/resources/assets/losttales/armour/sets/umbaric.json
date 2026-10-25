@@ -1,0 +1,22 @@
+{
+  "id": "losttales:umbaric",
+  "helmet": [
+    "lotr:item.helmetUmbar"
+  ],
+  "chestplate": [
+    "lotr:item.bodyUmbar"
+  ],
+  "leggings": [
+    "lotr:item.legsUmbar"
+  ],
+  "boots": [
+    "lotr:item.bootsUmbar"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:blades"
+    }
+  ]
+}

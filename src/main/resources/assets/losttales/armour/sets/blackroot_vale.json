@@ -1,0 +1,22 @@
+{
+  "id": "losttales:blackroot_vale",
+  "helmet": [
+    "lotr:item.helmetBlackroot"
+  ],
+  "chestplate": [
+    "lotr:item.bodyBlackroot"
+  ],
+  "leggings": [
+    "lotr:item.legsBlackroot"
+  ],
+  "boots": [
+    "lotr:item.bootsBlackroot"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:archery"
+    }
+  ]
+}

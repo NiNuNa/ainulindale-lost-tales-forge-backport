@@ -46,9 +46,9 @@ public final class QuestFellowsTest {
         LostTalesQuestPlayerData elsewhere = new LostTalesQuestPlayerData();
         elsewhere.startQuest("losttales:server/other", "1", 1L, 0L);
         List<QuestFellowCount> counts = QuestFellows.countsFor(own, Arrays.asList(
-                new QuestFellows.Fellow("Tobin", tobin),
-                new QuestFellows.Fellow("Dior", dior),
-                new QuestFellows.Fellow("Nia", elsewhere)));
+                new QuestFellows.Fellow("Tobin", tobin, true),
+                new QuestFellows.Fellow("Dior", dior, false),
+                new QuestFellows.Fellow("Nia", elsewhere, true)));
         assertEquals(2, counts.size());
         assertEquals("Tobin", counts.get(0).getName());
         assertFalse(counts.get(0).isPast());
@@ -57,18 +57,64 @@ public final class QuestFellowsTest {
         assertTrue(counts.get(1).isPast());
 
         assertTrue("a member behind the player is not shown", QuestFellows.countsFor(
-                dior, Collections.singletonList(new QuestFellows.Fellow("Aldric", own)))
+                dior, Collections.singletonList(new QuestFellows.Fellow("Aldric", own, true)))
                 .isEmpty());
         assertTrue(QuestFellows.countsFor(own,
                 Collections.<QuestFellows.Fellow>emptyList()).isEmpty());
     }
 
     @Test
+    public void eachCountSaysWhetherTheMemberTravelsWithThePlayer() {
+        LostTalesQuestPlayerData own = running("1");
+        LostTalesQuestPlayerData tobin = running("1");
+        LostTalesQuestPlayerData dior = running("2");
+        List<QuestFellowCount> counts = QuestFellows.countsFor(own, Arrays.asList(
+                new QuestFellows.Fellow("Tobin", tobin, true),
+                new QuestFellows.Fellow("Dior", dior, false)));
+        assertEquals(2, counts.size());
+        assertTrue("travelling with the player, sharing its credit",
+                counts.get(0).isTravelling());
+        assertFalse("a member of another fellowship of the player's",
+                counts.get(1).isTravelling());
+        assertTrue(counts.get(1).isPast());
+
+        QuestFellowCount sharing = new QuestFellowCount(QUEST, "Tobin", false,
+                true, Collections.singletonMap("wheels", Integer.valueOf(2)));
+        QuestFellowCount apart = new QuestFellowCount(QUEST, "Tobin", false,
+                false, Collections.singletonMap("wheels", Integer.valueOf(2)));
+        assertFalse("a change of company is a change to send", sharing.equals(apart));
+    }
+
+    @Test
+    public void whetherAMemberTravelsWithThePlayerTravelsToo() {
+        List<QuestFellowCount> sent = new ArrayList<QuestFellowCount>();
+        sent.add(new QuestFellowCount(QUEST, "Tobin", false, false,
+                Collections.singletonMap("wheels", Integer.valueOf(1))));
+        sent.add(new QuestFellowCount(QUEST, "Dior", true, true, null));
+        ByteBuf buffer = Unpooled.buffer();
+        new LostTalesQuestFellowsPacket(sent).toBytes(buffer);
+        LostTalesQuestFellowsPacket read = new LostTalesQuestFellowsPacket();
+        read.fromBytes(buffer);
+        assertFalse(read.isMalformed());
+        assertFalse(read.getCounts().get(0).isTravelling());
+        assertTrue(read.getCounts().get(1).isTravelling());
+        assertEquals(sent, read.getCounts());
+
+        ByteBuf extra = Unpooled.buffer();
+        new LostTalesQuestFellowsPacket(sent).toBytes(extra);
+        extra.writeBoolean(true);
+        LostTalesQuestFellowsPacket longer = new LostTalesQuestFellowsPacket();
+        longer.fromBytes(extra);
+        assertTrue("a payload of another shape is malformed", longer.isMalformed());
+        assertTrue(longer.getCounts().isEmpty());
+    }
+
+    @Test
     public void theCountsTravelWholeAndABadListChangesNothing() {
         List<QuestFellowCount> sent = new ArrayList<QuestFellowCount>();
-        sent.add(new QuestFellowCount(QUEST, "Tobin", false,
+        sent.add(new QuestFellowCount(QUEST, "Tobin", false, true,
                 Collections.singletonMap("wheels", Integer.valueOf(2))));
-        sent.add(new QuestFellowCount(QUEST, "Dior", true, null));
+        sent.add(new QuestFellowCount(QUEST, "Dior", true, false, null));
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesQuestFellowsPacket(sent).toBytes(buffer);
         LostTalesQuestFellowsPacket read = new LostTalesQuestFellowsPacket();
@@ -97,7 +143,7 @@ public final class QuestFellowsTest {
         for (int index = 0; index < 100; index++) {
             name.append('a');
         }
-        QuestFellowCount count = new QuestFellowCount(QUEST, name.toString(), true,
+        QuestFellowCount count = new QuestFellowCount(QUEST, name.toString(), true, true,
                 Collections.singletonMap("wheels", Integer.valueOf(9)));
         assertEquals(QuestFellowCount.MAX_NAME_CHARACTERS, count.getName().length());
         assertTrue(count.getCounts().isEmpty());

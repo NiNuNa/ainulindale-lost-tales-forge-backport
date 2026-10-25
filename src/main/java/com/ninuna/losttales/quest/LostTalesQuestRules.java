@@ -15,6 +15,9 @@ import java.util.Map;
  * <li>{@code failOn}: {@code death} (the character dies) and
  * {@code giverKilled} (the one who gave it is killed), parted by commas
  * (QUEST-32).</li>
+ * <li>{@code repeatAfter}: in-game days, 0.05 to {@link #MAX_DAYS}, a
+ * repeatable quest waits after a completion before it can be taken again
+ * (QUEST-45).</li>
  * <li>{@code podium}: a world quest's second reward block, for its three
  * best helpers (QUEST-36), kept as {@code podium.<key>}.</li>
  * <li>{@code rumour}: a lead for the quest (QUEST-20): its {@code line},
@@ -37,6 +40,7 @@ public final class LostTalesQuestRules {
     public static final String FAIL_ON = "failOn";
     public static final String FAIL_DEATH = "death";
     public static final String FAIL_GIVER_KILLED = "giverKilled";
+    public static final String REPEAT_AFTER = "repeatAfter";
     public static final String PODIUM = "podium";
     public static final String RUMOUR = "rumour";
     /** What a rumour's keys are kept under among the rules. */
@@ -85,8 +89,22 @@ public final class LostTalesQuestRules {
      * that is not a number of days within bounds (the checker names it).
      */
     public static long timeLimitTicks(Map<String, String> rules) {
-        Double days = LostTalesQuestParams.parseNumber(
-                LostTalesQuestParams.value(rules, TIME_LIMIT));
+        return daysAsTicks(LostTalesQuestParams.value(rules, TIME_LIMIT));
+    }
+
+    /**
+     * How long a repeatable quest waits after a completion before it can
+     * be taken again, in ticks (QUEST-45); 0 for no wait, or for a value
+     * that is not a number of days within bounds (the checker names it).
+     */
+    public static long repeatAfterTicks(LostTalesQuestDefinition quest) {
+        return quest == null ? 0L : daysAsTicks(
+                LostTalesQuestParams.value(quest.getRules(), REPEAT_AFTER));
+    }
+
+    /** In-game days as written, {@link #MIN_DAYS} to {@link #MAX_DAYS}, in ticks; 0 for anything else. */
+    private static long daysAsTicks(String written) {
+        Double days = LostTalesQuestParams.parseNumber(written);
         if (days == null || days.isNaN() || days.doubleValue() < MIN_DAYS
                 || days.doubleValue() > MAX_DAYS) {
             return 0L;

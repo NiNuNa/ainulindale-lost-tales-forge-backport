@@ -1,0 +1,22 @@
+{
+  "id": "losttales:dorwinion",
+  "helmet": [
+    "lotr:item.helmetDorwinion"
+  ],
+  "chestplate": [
+    "lotr:item.bodyDorwinion"
+  ],
+  "leggings": [
+    "lotr:item.legsDorwinion"
+  ],
+  "boots": [
+    "lotr:item.bootsDorwinion"
+  ],
+  "bonus": [
+    {
+      "effect": "experience",
+      "amount": 0.1,
+      "skill": "losttales:cooking"
+    }
+  ]
+}

@@ -9,7 +9,7 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * The chat's own names in words: each channel's, a faction's chat, and
- * the Server's, the Client's and the Narrator's. They are the lang file's,
+ * the Server's, the Client's, the Narrator's and an unseen voice's. They are the lang file's,
  * so a game passes {@link LostTalesWords#LANG} and reads them in its
  * player's language, and the server passes the same and writes them in
  * its own; a test passes the English lines. A channel a server defined
@@ -27,6 +27,8 @@ public final class ChatNames {
     public static final String CLIENT_KEY = "chat.losttales.client.name";
     /** The Narrator's name. */
     public static final String NARRATOR_KEY = "chat.losttales.narrator";
+    /** What a line reads as while the One Ring conceals its speaker. */
+    public static final String UNSEEN_VOICE_KEY = "chat.losttales.unseen_voice";
     /** A faction's chat, the faction's name its argument ({@code Gondor Chat}). */
     public static final String FACTION_CHAT_KEY = "chat.losttales.channel.faction.of";
 
@@ -81,12 +83,16 @@ public final class ChatNames {
         return words.format(NARRATOR_KEY);
     }
 
+    public static String unseenVoice(LostTalesWords words) {
+        return words.format(UNSEEN_VOICE_KEY);
+    }
+
     /**
      * The name a line's sender is shown by, in {@code words}: the Server,
-     * the Client and the Narrator by theirs, told by the sender's id and,
-     * for the Narrator's own copy of its line, by the Narrator's mark
-     * ({@code skinId}); anyone else by {@code signed}, the name the line
-     * was signed with. A player whose account is called Server is shown
+     * the Client, the Narrator and an unseen voice by theirs, told by the
+     * sender's id and, for the Narrator's own copy of its line, by the
+     * Narrator's mark ({@code skinId}); anyone else by {@code signed}, the
+     * name the line was signed with. A player whose account is called Server is shown
      * by their account.
      */
     public static String sender(LostTalesWords words, UUID senderId,
@@ -100,6 +106,9 @@ public final class ChatNames {
         if (ChatNarrator.SENDER_ID.equals(senderId)
                 || ChatNarrator.isNarratorSkin(skinId)) {
             return narrator(words);
+        }
+        if (ChatUnseenVoice.SENDER_ID.equals(senderId)) {
+            return unseenVoice(words);
         }
         return signed == null ? "" : signed;
     }

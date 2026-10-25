@@ -1,5 +1,6 @@
 package com.ninuna.losttales.accessory.player;
 
+import com.ninuna.losttales.accessory.Accessories;
 import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerChangedDimensionEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
@@ -53,6 +54,17 @@ public final class AccessoryPlayerEventHandler {
         if (event.player.ticksExisted % 20 == 0
                 && AccessoryRecoveryService.recover(event.player)) {
             AccessoryInventorySyncManager.send(event.player);
+        }
+    }
+
+    /**
+     * The server's accessories go before anything else a player is sent at
+     * login: the ring slot's own contents and every effect name one (ACC-01).
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void sendAccessories(PlayerLoggedInEvent event) {
+        if (event != null && event.player instanceof net.minecraft.entity.player.EntityPlayerMP) {
+            Accessories.sendTo((net.minecraft.entity.player.EntityPlayerMP)event.player);
         }
     }
 

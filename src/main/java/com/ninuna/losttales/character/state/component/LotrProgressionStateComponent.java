@@ -100,6 +100,12 @@ public final class LotrProgressionStateComponent implements CharacterStateCompon
         this.adapter.synchronize(player);
     }
 
+    /** The LOTR progression inside a saved component; null for none. */
+    public static NBTTagCompound progressionOf(NBTTagCompound component) {
+        return component == null || !component.hasKey(TAG_PROGRESSION, Constants.NBT.TAG_COMPOUND)
+                ? null : component.getCompoundTag(TAG_PROGRESSION);
+    }
+
     private static NBTTagCompound wrap(NBTTagCompound progression) {
         NBTTagCompound state = new NBTTagCompound();
         state.setInteger(TAG_VERSION, VERSION);

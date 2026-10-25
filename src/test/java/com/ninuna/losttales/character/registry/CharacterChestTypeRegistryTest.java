@@ -10,13 +10,13 @@ import static org.junit.Assert.assertTrue;
 public final class CharacterChestTypeRegistryTest {
 
     @Test
-    public void sexOnlyPicksTheDefault() {
+    public void theBodyTypeOnlyPicksTheDefault() {
         assertEquals(CharacterChestTypeRegistry.ROUNDED_MEDIUM,
-                CharacterChestTypeRegistry.defaultFor(CharacterGenderRegistry.FEMALE));
+                CharacterChestTypeRegistry.defaultFor(CharacterBodyTypeRegistry.FEMININE));
         assertEquals(CharacterChestTypeRegistry.NONE,
-                CharacterChestTypeRegistry.defaultFor(CharacterGenderRegistry.MALE));
+                CharacterChestTypeRegistry.defaultFor(CharacterBodyTypeRegistry.MASCULINE));
         assertEquals(CharacterChestTypeRegistry.NONE,
-                CharacterChestTypeRegistry.defaultFor(CharacterGenderRegistry.NON_BINARY));
+                CharacterChestTypeRegistry.defaultFor(CharacterBodyTypeRegistry.NEUTRAL));
     }
 
     @Test

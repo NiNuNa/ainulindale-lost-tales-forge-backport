@@ -1,12 +1,8 @@
 {
-  "dataVersion": 1,
   "id": "losttales:lome",
   "name": "Lóme",
-  "description": "",
-  "appearance": {
-    "raceId": "losttales:elf",
-    "genderId": "losttales:male",
-    "modelId": "lotr:elf",
-    "skinId": "losttales:elf_high_male_6"
-  }
+  "race": "losttales:elf",
+  "body_type": "losttales:masculine",
+  "skin": "losttales:elf_high_masculine_6",
+  "faction": "lotr:high_elf"
 }

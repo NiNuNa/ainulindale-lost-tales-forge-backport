@@ -12,6 +12,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StringTranslate;
@@ -34,6 +35,7 @@ public final class LostTalesMapMarkerNamedAfterTest {
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final List<String> KEYS = Arrays.asList(
             LostTalesMapMarkerNamedAfter.WAYSTONE_NAME_KEY,
+            LostTalesMapMarkerNamedAfter.UNKNOWN_PLACER_KEY,
             LostTalesMapMarkerNames.WAYSTONE_DESCRIPTION_KEY,
             "gui.losttales.map_marker.category.waystone",
             "gui.losttales.map_marker.category.point_of_interest",
@@ -133,18 +135,92 @@ public final class LostTalesMapMarkerNamedAfterTest {
                         "The Old Gate", "player:Nils")));
     }
 
-    /** A player's waystone is made unnamed, with no words of its own. */
+    /**
+     * A player's waystone is made unnamed, with no words of its own, called
+     * after the character that placed it by its id; every map is sent it
+     * by that character's name as it stands (WAY-01).
+     */
     @Test
     public void aNewWaystoneKeepsNoWords() {
+        final UUID nils = UUID.fromString("0000000a-0000-0000-0000-00000000000a");
         LostTalesMapMarkerRecord record = LostTalesMapMarkerRecord
-                .createPlayerMarker("losttales:player/abc", "Nils",
-                        java.util.UUID.randomUUID(), 0, 1, 64, 1,
-                        java.util.UUID.randomUUID());
+                .createPlayerMarker("losttales:player/abc",
+                        nils, 0, 1, 64, 1, UUID.randomUUID());
         assertEquals("", record.getName());
-        assertEquals("player:Nils", record.getNamedAfter());
+        assertEquals("character:0000000a-0000-0000-0000-00000000000a",
+                record.getNamedAfter());
+        assertTrue(record.isCalledAfter(nils));
+        assertEquals(nils, record.getOwnerCharacterId());
         assertEquals("", record.getCategoryName());
         assertEquals("", record.getDescription());
-        assertEquals("player:Nils", record.toDefinition().getNamedAfter());
+        assertEquals("the server's own reading keeps the id",
+                record.getNamedAfter(), record.toDefinition().getNamedAfter());
+        assertEquals("player:Nils", record.toDefinition(names(nils, "Nils"))
+                .getNamedAfter());
+        assertEquals("a rename reaches it", "player:Nils the Bold",
+                record.toDefinition(names(nils, "Nils the Bold"))
+                        .getNamedAfter());
+    }
+
+    /** A record keeps nothing but the placing character's id: a name only travels. */
+    @Test(expected = IllegalArgumentException.class)
+    public void aRecordKeepsNoName() {
+        LostTalesMapMarkerRecord.builder("losttales:player/abc",
+                LostTalesMapMarkerSource.PLAYER_CREATED)
+                .namedAfter("player:Nils")
+                .ownerCharacterId(UUID.randomUUID())
+                .build();
+    }
+
+    @Test
+    public void aCharacterIsKeptByItsIdAndSentByItsName() {
+        UUID id = UUID.fromString("1234abcd-0000-4000-8000-00000000beef");
+        String kept = LostTalesMapMarkerNamedAfter.character(id);
+        assertEquals("character:1234abcd-0000-4000-8000-00000000beef", kept);
+        assertTrue(LostTalesMapMarkerNamedAfter.isValid(kept));
+        assertTrue(LostTalesMapMarkerNamedAfter.isKept(kept));
+        assertTrue(LostTalesMapMarkerNamedAfter.isKept(""));
+        assertFalse(LostTalesMapMarkerNamedAfter.isKept("player:Nils"));
+        assertEquals(id, LostTalesMapMarkerNamedAfter.characterId(kept));
+        assertEquals("", LostTalesMapMarkerNamedAfter.character(null));
+        assertFalse("only the id's own form",
+                LostTalesMapMarkerNamedAfter.isValid("character:Nils"));
+        assertFalse(LostTalesMapMarkerNamedAfter.isValid(
+                "character:1234ABCD-0000-4000-8000-00000000BEEF"));
+        assertEquals("player:Nils",
+                LostTalesMapMarkerNamedAfter.shown(kept, names(id, "Nils")));
+        assertEquals("every other reference is sent as it is",
+                "entity:losttales.Nia", LostTalesMapMarkerNamedAfter.shown(
+                        "entity:losttales.Nia", names(id, "Nils")));
+        assertEquals("a character nobody can name stays as it is kept", kept,
+                LostTalesMapMarkerNamedAfter.shown(kept, names(id, null)));
+        assertEquals(kept, LostTalesMapMarkerNamedAfter.shown(kept, null));
+        assertEquals("a name past a reference's bounds is never sent", kept,
+                LostTalesMapMarkerNamedAfter.shown(kept, names(id, "a§cb")));
+    }
+
+    /** A waystone whose placing character is purged reads Waystone in every game. */
+    @Test
+    public void aWaystoneOfAPurgedCharacterReadsWaystone() {
+        String kept = LostTalesMapMarkerNamedAfter.character(UUID.randomUUID());
+        assertEquals("Waystone", LostTalesMapMarkerNamedAfter.shownName(kept));
+        assertEquals("Waystone", clientMarker("", "", "", kept).getName());
+        IChatComponent name = LostTalesMapMarkerNames.component(
+                "losttales:player/abc", "", kept);
+        assertTrue(name instanceof ChatComponentTranslation);
+        assertEquals("Waystone", EnglishWords.INSTANCE.read(name));
+        inject(LostTalesMapMarkerNamedAfter.UNKNOWN_PLACER_KEY + "=Wegstein\n");
+        assertEquals("Wegstein", LostTalesMapMarkerNamedAfter.shownName(kept));
+    }
+
+    private static LostTalesMapMarkerNamedAfter.Names names(
+            final UUID id, final String name) {
+        return new LostTalesMapMarkerNamedAfter.Names() {
+            @Override
+            public String nameOf(UUID characterId) {
+                return id.equals(characterId) ? name : null;
+            }
+        };
     }
 
     @Test

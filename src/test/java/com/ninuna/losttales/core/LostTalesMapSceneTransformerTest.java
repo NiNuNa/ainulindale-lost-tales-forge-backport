@@ -243,7 +243,7 @@ public final class LostTalesMapSceneTransformerTest {
     private static ClassNode read(byte[] bytes) {
         ClassNode result = new ClassNode();
         new ClassReader(bytes).accept(result, 0);
-        return result;
+        return GuardedCalls.unguard(result);
     }
 
     private static byte[] readResource(String name) throws IOException {
